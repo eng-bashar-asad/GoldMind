@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GoldMind - Create Invoice</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#bec6e0",
+                    "tertiary-fixed": "#d3e4fe",
+                    "secondary": "#745a25",
+                    "on-error": "#ffffff",
+                    "primary-container": "#131b2e",
+                    "on-secondary-container": "#795f29",
+                    "on-tertiary-fixed-variant": "#38485d",
+                    "outline": "#76777d",
+                    "tertiary-fixed-dim": "#b7c8e1",
+                    "inverse-on-surface": "#eff1f3",
+                    "surface-container": "#eceef0",
+                    "on-secondary-fixed-variant": "#5a430f",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#261900",
+                    "tertiary": "#000000",
+                    "surface-bright": "#f7f9fb",
+                    "secondary-container": "#ffdb99",
+                    "surface-container-high": "#e6e8ea",
+                    "primary-fixed-dim": "#bec6e0",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "on-surface-variant": "#45464d",
+                    "primary-fixed": "#dae2fd",
+                    "surface-container-low": "#f2f4f6",
+                    "tertiary-container": "#0b1c30",
+                    "secondary-fixed-dim": "#e4c283",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#191c1e",
+                    "surface-variant": "#e0e3e5",
+                    "surface-container-highest": "#e0e3e5",
+                    "inverse-surface": "#2d3133",
+                    "background": "#f7f9fb",
+                    "on-primary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "on-background": "#191c1e",
+                    "on-primary-fixed": "#131b2e",
+                    "surface-dim": "#d8dadc",
+                    "on-tertiary-container": "#75859d",
+                    "surface-tint": "#565e74",
+                    "surface": "#f7f9fb",
+                    "secondary-fixed": "#ffdea4",
+                    "outline-variant": "#c6c6cd",
+                    "primary": "#000000",
+                    "on-tertiary-fixed": "#0b1c30",
+                    "error": "#ba1a1a",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-fixed-variant": "#3f465c"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "gutter": "24px",
+                    "margin-desktop": "40px",
+                    "margin-mobile": "16px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "headline-xl-mobile": ["Inter"],
+                    "data-mono": ["IBM Plex Sans"],
+                    "headline-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-xl": ["Inter"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-xl-mobile": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
+                    "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            display: inline-block;
+            line-height: 1;
+            text-transform: none;
+            letter-spacing: normal;
+            word-wrap: normal;
+            white-space: nowrap;
+            direction: ltr;
+        }
+        .step-active { color: #745a25; }
+        .numpad-key:active { transform: scale(0.95); background-color: #e0e3e5; }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col items-center">
+<!-- Top Navigation Header -->
+<header class="bg-surface border-b border-outline-variant w-full h-16 flex flex-row-reverse justify-between items-center px-margin-mobile md:px-margin-desktop sticky top-0 z-40">
+<div class="flex items-center gap-4">
+<span class="font-headline-lg text-headline-lg font-bold text-secondary-fixed">GoldMind</span>
+</div>
+<div class="flex items-center gap-3">
+<div class="cursor-pointer active:opacity-80 p-2 rounded-full hover:bg-surface-container-high transition-colors">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="A professional headshot of a luxury boutique manager, mid-40s, wearing a tailored navy suit. The image is captured in a high-end jewelry showroom with soft, warm golden spotlights highlighting displays of fine jewelry in the background. The aesthetic is clean, corporate, and sophisticated, mirroring a high-trust financial environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiOtagmD0CN1hIaIGsho9H7PvVS5eWkyoMGVHfaeHM49aPeEEfBJ8Ib9k9D1Xl_QQoEoddLDdhi4HWkG-yjGpkO6NsIxf5haOa4h_ZVPjinCuZgR1RrxMeV3-7AcXBuSFnaAoEuFhjFPxOUrt-Y1pdMm-ak5IOt0W_n-_mfzEgjY4aA1wt5Img9s3L_fE2WiaQYrzP9FZPUfnnHcx6T18KU54S5MqwQz7vEJsIE3dCT25-Onx6ZNa2aA"/>
+</div>
+</div>
+</header>
+<main class="w-full max-w-container-max flex flex-col px-margin-mobile md:px-margin-desktop py-8 mb-24">
+<!-- Simulation Progress Tracker -->
+<div class="w-full mb-8 flex items-center justify-center">
+<div class="flex items-center gap-4 text-label-md font-label-md">
+<div class="flex items-center gap-2 text-on-surface-variant opacity-60">
+<span class="w-6 h-6 flex items-center justify-center rounded-full border border-outline">1</span>
+<span>اختيار العناصر</span>
+</div>
+<div class="w-12 h-px bg-outline-variant"></div>
+<div class="flex items-center gap-2 text-secondary font-bold">
+<span class="w-6 h-6 flex items-center justify-center rounded-full bg-secondary text-white">2</span>
+<span>معلومات العميل</span>
+</div>
+<div class="w-12 h-px bg-outline-variant"></div>
+<div class="flex items-center gap-2 text-on-surface-variant opacity-60">
+<span class="w-6 h-6 flex items-center justify-center rounded-full border border-outline">3</span>
+<span>تأكيد الفاتورة</span>
+</div>
+</div>
+</div>
+<section class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
+<!-- Main Entry Area -->
+<div class="lg:col-span-7 flex flex-col gap-6">
+<div class="bg-surface-container-lowest border border-outline-variant p-6 rounded-lg">
+<h2 class="font-headline-md text-headline-md mb-6">إنشاء فاتورة جديدة</h2>
+<div class="space-y-4">
+<label class="block font-label-md text-label-md text-on-surface-variant mb-2">رقم الجوال للبحث عن العميل</label>
+<div class="relative">
+<input class="w-full h-14 bg-surface-container-low border-2 border-secondary rounded-lg px-4 font-data-mono text-body-lg text-on-surface focus:outline-none flex items-center" dir="ltr" readonly="" type="text" value="0501234567"/>
+<div class="absolute inset-y-0 right-4 flex items-center pointer-events-none">
+<span class="material-symbols-outlined text-secondary">phone_iphone</span>
+</div>
+</div>
+<!-- Dropdown Suggestions -->
+<div class="mt-2 bg-surface-container-lowest border border-outline shadow-xl rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
+<div class="p-3 bg-surface-container-high flex items-center justify-between">
+<span class="text-label-md font-label-md text-on-surface-variant">تم العثور على عميل مطابق</span>
+<span class="material-symbols-outlined text-secondary text-sm">person_search</span>
+</div>
+<div class="p-4 hover:bg-surface-container-low cursor-pointer transition-colors border-b border-outline-variant flex items-center justify-between group">
+<div class="flex items-center gap-4">
+<div class="w-12 h-12 bg-secondary-container text-on-secondary-container flex items-center justify-center rounded-full font-bold">
+                                        أق
+                                    </div>
+<div>
+<div class="font-bold text-body-md">أحمد القحطاني</div>
+<div class="text-label-md text-on-surface-variant">0501234567</div>
+</div>
+</div>
+<div class="bg-secondary text-white px-4 py-2 rounded-full font-label-md group-hover:bg-primary transition-colors">
+                                    اختيار العميل
+                                </div>
+</div>
+<div class="p-4 text-center">
+<button class="text-secondary font-label-md flex items-center justify-center gap-2 mx-auto hover:underline">
+<span class="material-symbols-outlined">person_add</span>
+                                    إضافة عميل جديد بهذا الرقم
+                                </button>
+</div>
+</div>
+</div>
+</div>
+<!-- Selected Items Summary (Context for Sales Step) -->
+<div class="bg-surface-container-lowest border border-outline-variant p-6 rounded-lg">
+<h3 class="font-label-md text-label-md font-bold mb-4">ملخص المنتجات المختارة</h3>
+<div class="flex items-center gap-4 p-3 bg-surface-container-low rounded-lg border border-outline-variant">
+<div class="w-16 h-16 bg-white rounded border border-outline-variant overflow-hidden">
+<img class="w-full h-full object-cover" data-alt="Close up high-resolution product shot of a 24k solid gold bar, 50 grams, featuring intricate stamps of purity and brand authenticity. The lighting is dramatic and luxurious, reflecting off the polished surface against a dark, velvet-textured background. Corporate luxury jewelry aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDZFlUpMBsyMBt0_by70f0-lVhOWJDnTQ1FI0NqJ_1CyLoxPC4CFIWzDnnAU0AT5Clv1IcGN0k3glwcI17l5F0RQLFs3JuM-jnqhmZPz6ni1kGGljfxt2-U1fiSvbHed0lMlNRU0YamJOCISfpN6iScwa1VnKHQtd8A1w085aBh50Eu-s_vrHAwn5V4g2QMuY8Pvi2WDC8n2xC_dsRWr6VRL7RciNltVmXbOsPu8XodgqXHneE_6NpNg"/>
+</div>
+<div class="flex-1">
+<div class="font-bold text-body-md">سبيكة ذهب عيار 24 - 50 جرام</div>
+<div class="text-label-md text-on-surface-variant">الكمية: 1</div>
+</div>
+<div class="text-left">
+<div class="font-data-mono font-bold text-secondary">12,450.00 ر.س</div>
+</div>
+</div>
+</div>
+</div>
+<!-- Right Sidebar / Payment Preview -->
+<div class="lg:col-span-5 flex flex-col gap-6">
+<div class="bg-primary text-white p-8 rounded-lg shadow-2xl relative overflow-hidden">
+<div class="absolute -right-10 -top-10 w-40 h-40 bg-secondary opacity-20 rounded-full blur-3xl"></div>
+<div class="relative z-10">
+<div class="text-label-md font-label-md opacity-80 mb-2">إجمالي الفاتورة المتوقع</div>
+<div class="font-headline-xl text-headline-xl mb-6">12,450.00 <span class="text-body-md">ر.س</span></div>
+<div class="space-y-3 pt-6 border-t border-white/20">
+<div class="flex justify-between text-label-md">
+<span>سعر الذهب العالمي (جرام)</span>
+<span class="font-data-mono">249.00 ر.س</span>
+</div>
+<div class="flex justify-between text-label-md">
+<span>ضريبة القيمة المضافة (15%)</span>
+<span class="font-data-mono">1,867.50 ر.س</span>
+</div>
+</div>
+</div>
+</div>
+<div class="bg-surface-container-high border border-outline-variant p-6 rounded-lg">
+<p class="text-label-md text-on-surface-variant mb-4">بمجرد اختيار العميل، ستتمكن من الانتقال لمرحلة الدفع النهائية.</p>
+<button class="w-full h-14 bg-surface-variant text-on-surface-variant cursor-not-allowed rounded-lg font-bold transition-all flex items-center justify-center gap-2" disabled="">
+                        الاستمرار للدفع
+                        <span class="material-symbols-outlined">arrow_back</span>
+</button>
+</div>
+</div>
+</section>
+</main>
+<!-- Floating Numeric Keypad Overlay (Simulating focused input) -->
+<div class="fixed bottom-0 inset-x-0 bg-surface-container-lowest border-t border-outline-variant shadow-2xl z-50 p-6 md:hidden lg:flex lg:w-[400px] lg:right-margin-desktop lg:left-auto lg:bottom-10 lg:rounded-2xl lg:border animate-in slide-in-from-bottom duration-500">
+<div class="w-full">
+<div class="flex items-center justify-between mb-4 border-b border-outline-variant pb-2">
+<span class="font-label-md font-bold text-on-surface">لوحة المفاتيح الرقمية</span>
+<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">keyboard_hide</span>
+</div>
+<div class="grid grid-cols-3 gap-2">
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">1</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">2</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">3</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">4</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">5</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">6</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">7</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">8</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">9</button>
+<button class="numpad-key h-14 bg-surface-container-high border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">.</button>
+<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">0</button>
+<button class="numpad-key h-14 bg-error-container text-on-error-container border border-error-container rounded-xl flex items-center justify-center">
+<span class="material-symbols-outlined">backspace</span>
+</button>
+</div>
+<button class="w-full h-12 mt-4 bg-secondary text-white rounded-xl font-bold active:scale-95 transition-all">
+                تأكيد الرقم
+            </button>
+</div>
+</div>
+<!-- Bottom Navigation Bar (Mobile only) -->
+<nav class="md:hidden fixed bottom-0 w-full h-20 bg-surface border-t border-outline-variant flex flex-row-reverse justify-around items-center z-50 pb-safe">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="dashboard-advanced-ar.html">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-xs">الرئيسية</span>
+</a>
+<div class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span class="font-label-md text-xs">المخزون</span>
+</div>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="audit-log-ar.html">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-xs">النشاط</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="index-ar.html">
+<span class="material-symbols-outlined">menu</span>
+<span class="font-label-md text-xs">المزيد</span>
+</a>
+</nav>
+</body></html>

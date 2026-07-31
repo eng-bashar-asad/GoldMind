@@ -1,0 +1,349 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GoldMind - Payment Stage</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+        .glow-gold {
+            box-shadow: 0 0 15px rgba(180, 149, 90, 0.3);
+        }
+        .glass-card {
+            background: rgba(255, 255, 255, 0.8);
+            backdrop-filter: blur(8px);
+        }
+    </style>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "inverse-primary": "#bec6e0",
+                    "tertiary-fixed": "#d3e4fe",
+                    "secondary": "#745a25",
+                    "on-error": "#ffffff",
+                    "primary-container": "#131b2e",
+                    "on-secondary-container": "#795f29",
+                    "on-tertiary-fixed-variant": "#38485d",
+                    "outline": "#76777d",
+                    "tertiary-fixed-dim": "#b7c8e1",
+                    "inverse-on-surface": "#eff1f3",
+                    "surface-container": "#eceef0",
+                    "on-secondary-fixed-variant": "#5a430f",
+                    "error-container": "#ffdad6",
+                    "on-secondary-fixed": "#261900",
+                    "tertiary": "#000000",
+                    "surface-bright": "#f7f9fb",
+                    "secondary-container": "#ffdb99",
+                    "surface-container-high": "#e6e8ea",
+                    "primary-fixed-dim": "#bec6e0",
+                    "on-secondary": "#ffffff",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "on-surface-variant": "#45464d",
+                    "primary-fixed": "#dae2fd",
+                    "surface-container-low": "#f2f4f6",
+                    "tertiary-container": "#0b1c30",
+                    "secondary-fixed-dim": "#e4c283",
+                    "surface-container-lowest": "#ffffff",
+                    "on-surface": "#191c1e",
+                    "surface-variant": "#e0e3e5",
+                    "surface-container-highest": "#e0e3e5",
+                    "inverse-surface": "#2d3133",
+                    "background": "#f7f9fb",
+                    "on-primary": "#ffffff",
+                    "on-error-container": "#93000a",
+                    "on-background": "#191c1e",
+                    "on-primary-fixed": "#131b2e",
+                    "surface-dim": "#d8dadc",
+                    "on-tertiary-container": "#75859d",
+                    "surface-tint": "#565e74",
+                    "surface": "#f7f9fb",
+                    "secondary-fixed": "#ffdea4",
+                    "outline-variant": "#c6c6cd",
+                    "primary": "#000000",
+                    "on-tertiary-fixed": "#0b1c30",
+                    "error": "#ba1a1a",
+                    "on-tertiary": "#ffffff",
+                    "on-primary-container": "#7c839b"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "unit": "4px",
+                    "gutter": "24px",
+                    "margin-desktop": "40px",
+                    "margin-mobile": "16px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "headline-xl-mobile": ["Inter"],
+                    "data-mono": ["IBM Plex Sans"],
+                    "headline-md": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-xl": ["Inter"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "headline-xl-mobile": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
+                    "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col">
+<!-- Top Navigation Bar -->
+<header class="bg-surface border-b border-outline-variant flex flex-row-reverse justify-between items-center px-margin-mobile md:px-margin-desktop h-16 w-full sticky top-0 z-50">
+<div class="flex items-center gap-4">
+<h1 class="font-headline-lg text-headline-lg font-bold text-secondary-fixed">GoldMind</h1>
+</div>
+<div class="flex items-center gap-4">
+<div class="flex flex-col items-end">
+<span class="font-label-md text-label-md text-on-surface">أمين الصندوق</span>
+<span class="text-xs text-on-surface-variant">الفرع الرئيسي - دبي</span>
+</div>
+<div class="w-10 h-10 rounded-full bg-surface-container-high border border-outline-variant flex items-center justify-center overflow-hidden">
+<span class="material-symbols-outlined text-secondary">person</span>
+</div>
+</div>
+</header>
+<main class="flex-grow flex flex-col max-w-container-max mx-auto w-full px-margin-mobile md:px-margin-desktop py-8">
+<!-- Step Progress Indicator -->
+<nav class="flex items-center justify-center mb-10 w-full">
+<div class="flex items-center gap-4 md:gap-12">
+<div class="flex flex-col items-center opacity-40">
+<div class="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-sm">check</span>
+</div>
+<span class="text-xs font-label-md">العميل</span>
+</div>
+<div class="h-[1px] w-8 md:w-16 bg-outline-variant"></div>
+<div class="flex flex-col items-center opacity-40">
+<div class="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-sm">check</span>
+</div>
+<span class="text-xs font-label-md">الأصناف</span>
+</div>
+<div class="h-[1px] w-8 md:w-16 bg-outline-variant"></div>
+<div class="flex flex-col items-center opacity-40">
+<div class="w-8 h-8 rounded-full border-2 border-primary flex items-center justify-center mb-2">
+<span class="material-symbols-outlined text-sm">check</span>
+</div>
+<span class="text-xs font-label-md">الوزن</span>
+</div>
+<div class="h-[1px] w-8 md:w-16 bg-outline-variant"></div>
+<div class="flex flex-col items-center">
+<div class="w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center mb-2 ring-4 ring-secondary-container">
+<span class="font-bold">4</span>
+</div>
+<span class="text-xs font-bold font-label-md text-primary">الدفع</span>
+</div>
+</div>
+</nav>
+<!-- Main Content: Bento Layout -->
+<div class="grid grid-cols-1 md:grid-cols-12 gap-gutter">
+<!-- Summary Column -->
+<div class="md:col-span-4 flex flex-col gap-gutter">
+<!-- Total Amount Card -->
+<section class="bg-surface-container-lowest border border-outline-variant p-8 flex flex-col items-center justify-center text-center">
+<span class="text-on-surface-variant font-label-md mb-2">إجمالي الفاتورة الضريبي</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-xl text-headline-xl text-primary">14,700.00</span>
+<span class="font-label-md text-secondary-fixed-dim">درهم</span>
+</div>
+<div class="mt-6 pt-6 border-t border-outline-variant w-full">
+<div class="flex justify-between mb-2">
+<span class="text-on-surface-variant">الصافي</span>
+<span class="font-data-mono">14,000.00</span>
+</div>
+<div class="flex justify-between text-error">
+<span class="text-on-surface-variant">ضريبة القيمة المضافة (5%)</span>
+<span class="font-data-mono">700.00</span>
+</div>
+</div>
+</section>
+<!-- Transaction Details -->
+<section class="bg-surface-container-lowest border border-outline-variant p-6">
+<h3 class="font-label-md text-primary uppercase tracking-wider mb-4 border-b border-outline-variant pb-2">تفاصيل العملية</h3>
+<ul class="space-y-4">
+<li class="flex justify-between items-center">
+<span class="text-on-surface-variant">رقم المسودة</span>
+<span class="font-data-mono text-primary">#DFT-8829-24</span>
+</li>
+<li class="flex justify-between items-center">
+<span class="text-on-surface-variant">العميل</span>
+<span class="font-label-md text-primary">شركة المظفر للمجوهرات</span>
+</li>
+<li class="flex justify-between items-center">
+<span class="text-on-surface-variant">سعر الذهب (24 قيراط)</span>
+<span class="font-data-mono text-secondary">284.50 AED/g</span>
+</li>
+</ul>
+</section>
+</div>
+<!-- Payment Methods Column -->
+<div class="md:col-span-8 flex flex-col gap-gutter">
+<section class="bg-surface-container-lowest border border-outline-variant p-8 flex-grow">
+<h2 class="font-headline-md text-headline-md text-primary mb-8">اختر وسيلة الدفع</h2>
+<div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+<!-- Cash Option (Active) -->
+<div class="relative cursor-pointer group transition-all duration-300 border-2 border-secondary-container bg-secondary-container bg-opacity-10 p-6 flex items-start gap-4 ring-1 ring-secondary">
+<div class="w-12 h-12 rounded-full bg-secondary text-on-secondary flex items-center justify-center">
+<span class="material-symbols-outlined">payments</span>
+</div>
+<div class="flex-grow">
+<div class="flex justify-between items-center">
+<span class="font-bold text-lg text-primary">نقدي (Cash)</span>
+<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">check_circle</span>
+</div>
+<p class="text-sm text-on-surface-variant mt-1">الدفع المباشر بالعملة المحلية في المتجر</p>
+</div>
+</div>
+<!-- Card Option -->
+<div class="cursor-pointer group transition-all duration-300 border border-outline-variant hover:border-secondary p-6 flex items-start gap-4 bg-surface hover:bg-surface-container-low">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined">credit_card</span>
+</div>
+<div class="flex-grow">
+<span class="font-bold text-lg text-on-surface group-hover:text-primary transition-colors">بطاقة مصرفية</span>
+<p class="text-sm text-on-surface-variant mt-1">فيزا، ماستركارد، أمريكان إكسبريس</p>
+</div>
+</div>
+<!-- Bank Transfer -->
+<div class="cursor-pointer group transition-all duration-300 border border-outline-variant hover:border-secondary p-6 flex items-start gap-4 bg-surface hover:bg-surface-container-low">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined">account_balance</span>
+</div>
+<div class="flex-grow">
+<span class="font-bold text-lg text-on-surface group-hover:text-primary transition-colors">تحويل بنكي</span>
+<p class="text-sm text-on-surface-variant mt-1">يتطلب تأكيد رقم المرجع من البنك</p>
+</div>
+</div>
+<!-- Mixed Payment -->
+<div class="cursor-pointer group transition-all duration-300 border border-outline-variant hover:border-secondary p-6 flex items-start gap-4 bg-surface hover:bg-surface-container-low">
+<div class="w-12 h-12 rounded-full bg-surface-container-highest text-on-surface-variant group-hover:bg-primary group-hover:text-on-primary flex items-center justify-center transition-colors">
+<span class="material-symbols-outlined">splitscreen</span>
+</div>
+<div class="flex-grow">
+<span class="font-bold text-lg text-on-surface group-hover:text-primary transition-colors">دفع مركب</span>
+<p class="text-sm text-on-surface-variant mt-1">تقسيم المبلغ على أكثر من وسيلة دفع</p>
+</div>
+</div>
+</div>
+<!-- Payment Input for Cash -->
+<div class="mt-10 p-6 bg-surface-container-low border-r-4 border-secondary">
+<label class="block font-label-md text-on-surface-variant mb-3">المبلغ المستلم نقداً</label>
+<div class="relative">
+<input class="w-full bg-surface-container-lowest border border-outline text-right font-data-mono text-headline-md px-4 py-3 focus:border-primary focus:ring-1 focus:ring-primary outline-none transition-all" type="text" value="14,700.00"/>
+<div class="absolute left-4 top-1/2 -translate-y-1/2 font-label-md text-on-surface-variant">درهم إماراتي</div>
+</div>
+<div class="mt-4 flex justify-between items-center">
+<span class="text-sm text-on-surface-variant">المبلغ المتبقي للعميل:</span>
+<span class="font-data-mono font-bold text-secondary">0.00 AED</span>
+</div>
+</div>
+</section>
+<!-- Final Action Section -->
+<div class="flex flex-col sm:flex-row gap-4 items-center justify-between mt-auto">
+<button class="flex items-center gap-2 text-on-surface-variant hover:text-primary transition-colors px-6 py-3">
+<span class="material-symbols-outlined">arrow_forward</span>
+<span>رجوع لتعديل الأوزان</span>
+</button>
+<button class="bg-primary hover:bg-tertiary-container text-on-primary font-bold px-12 py-5 flex items-center gap-4 transition-all duration-500 glow-gold active:scale-95 group" id="finalAction">
+<span class="material-symbols-outlined group-hover:animate-bounce">print</span>
+<span class="text-lg">حفظ وطباعة الفاتورة</span>
+<span class="material-symbols-outlined">verified</span>
+</button>
+</div>
+</div>
+</div>
+</main>
+<!-- Success Feedback (Hidden by default) -->
+<div class="fixed bottom-8 right-8 bg-on-surface text-surface p-6 flex items-center gap-4 translate-y-24 opacity-0 transition-all duration-500 z-[100]" id="successToast">
+<div class="w-8 h-8 rounded-full bg-secondary-container text-on-secondary-container flex items-center justify-center">
+<span class="material-symbols-outlined">done_all</span>
+</div>
+<div>
+<div class="font-bold">تم حفظ الفاتورة بنجاح</div>
+<div class="text-xs opacity-80">جاري إرسال نسخة لبريد العميل الإلكتروني...</div>
+</div>
+</div>
+<!-- Navigation Shell Placeholder -->
+<footer class="md:hidden fixed bottom-0 w-full z-50 bg-surface border-t border-outline-variant flex flex-row-reverse justify-around items-center h-20 pb-safe">
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="dashboard-advanced-ar.html">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-[10px]">الرئيسية</span>
+</a>
+<div class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-md text-[10px]">المخزون</span>
+</div>
+<a class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1" href="audit-log-ar.html">
+<span class="material-symbols-outlined">history</span>
+<span class="font-label-md text-[10px]">النشاط</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="index-ar.html">
+<span class="material-symbols-outlined">menu</span>
+<span class="font-label-md text-[10px]">المزيد</span>
+</a>
+</footer>
+<script>
+        // Micro-interaction for the final button
+        const btn = document.getElementById('finalAction');
+        const toast = document.getElementById('successToast');
+
+        btn.addEventListener('click', () => {
+            btn.innerHTML = `
+                <span class="material-symbols-outlined animate-spin">sync</span>
+                <span class="text-lg">جاري المعالجة...</span>
+            `;
+            btn.style.opacity = '0.7';
+            btn.style.pointerEvents = 'none';
+
+            setTimeout(() => {
+                btn.innerHTML = `
+                    <span class="material-symbols-outlined">done_all</span>
+                    <span class="text-lg">تمت العملية</span>
+                `;
+                btn.classList.remove('bg-primary');
+                btn.classList.add('bg-secondary');
+                
+                // Show success toast
+                toast.classList.remove('translate-y-24', 'opacity-0');
+                toast.classList.add('translate-y-0', 'opacity-100');
+            }, 1500);
+        });
+
+        // Subtle animation for the cash card to emphasize selection
+        setInterval(() => {
+            const card = document.querySelector('.border-secondary-container');
+            card.style.boxShadow = card.style.boxShadow === 'none' ? '0 0 10px rgba(180, 149, 90, 0.2)' : 'none';
+        }, 2000);
+    </script>
+</body></html>

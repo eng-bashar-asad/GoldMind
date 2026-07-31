@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        @media print {
+            body { background-color: white !important; }
+            .no-print { display: none !important; }
+            .print-container { width: 100% !important; margin: 0 !important; box-shadow: none !important; }
+            @page { size: A4; margin: 20mm; }
+        }
+        
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+        }
+
+        .gold-border-gradient {
+            border: 1px solid #745a25;
+            background: linear-gradient(135deg, #ffffff 0%, #fffbf2 100%);
+        }
+
+        .table-row-hover:hover {
+            background-color: #f2f4f6;
+        }
+
+        .pdf-canvas {
+            min-height: 297mm; /* A4 aspect ratio */
+        }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    "colors": {
+                        "on-surface": "#191c1e",
+                        "secondary-fixed": "#ffdea4",
+                        "surface-container-high": "#e6e8ea",
+                        "on-tertiary-fixed-variant": "#38485d",
+                        "tertiary-fixed-dim": "#b7c8e1",
+                        "on-secondary-fixed-variant": "#5a430f",
+                        "tertiary": "#000000",
+                        "surface": "#f7f9fb",
+                        "surface-container-low": "#f2f4f6",
+                        "error-container": "#ffdad6",
+                        "on-secondary": "#ffffff",
+                        "on-primary-container": "#7c839b",
+                        "primary": "#000000",
+                        "on-primary-fixed": "#131b2e",
+                        "surface-variant": "#e0e3e5",
+                        "secondary": "#745a25",
+                        "tertiary-fixed": "#d3e4fe",
+                        "on-tertiary": "#ffffff",
+                        "on-background": "#191c1e",
+                        "secondary-container": "#ffdb99",
+                        "secondary-fixed-dim": "#e4c283",
+                        "outline-variant": "#c6c6cd",
+                        "on-surface-variant": "#45464d",
+                        "on-error": "#ffffff",
+                        "on-secondary-fixed": "#261900",
+                        "surface-container": "#eceef0",
+                        "on-primary-fixed-variant": "#3f465c",
+                        "inverse-primary": "#bec6e0",
+                        "surface-container-lowest": "#ffffff",
+                        "on-primary": "#ffffff",
+                        "inverse-surface": "#2d3133",
+                        "outline": "#76777d",
+                        "on-tertiary-fixed": "#0b1c30",
+                        "surface-tint": "#565e74",
+                        "surface-dim": "#d8dadc",
+                        "surface-container-highest": "#e0e3e5",
+                        "on-tertiary-container": "#75859d",
+                        "primary-fixed": "#dae2fd",
+                        "surface-bright": "#f7f9fb",
+                        "on-secondary-container": "#795f29",
+                        "primary-fixed-dim": "#bec6e0",
+                        "on-error-container": "#93000a",
+                        "inverse-on-surface": "#eff1f3",
+                        "primary-container": "#131b2e",
+                        "error": "#ba1a1a",
+                        "tertiary-container": "#0b1c30",
+                        "background": "#f7f9fb"
+                    },
+                    "borderRadius": {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    "spacing": {
+                        "unit": "4px",
+                        "margin-mobile": "16px",
+                        "margin-desktop": "40px",
+                        "container-max": "1440px",
+                        "gutter": "24px"
+                    },
+                    "fontFamily": {
+                        "headline-md": ["Inter"],
+                        "body-lg": ["Inter"],
+                        "headline-xl": ["Inter"],
+                        "headline-lg": ["Inter"],
+                        "label-md": ["Inter"],
+                        "data-mono": ["IBM Plex Sans"],
+                        "body-md": ["Inter"]
+                    },
+                    "fontSize": {
+                        "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                        "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                        "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
+                        "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                        "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                        "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
+                        "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}]
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-surface-container-low font-body-md text-on-surface selection:bg-secondary-container">
+<!-- Top Bar Navigation (Hidden in Print) -->
+<header class="no-print w-full top-0 sticky bg-surface flex flex-row-reverse justify-between items-center px-margin-mobile md:px-margin-desktop h-16 border-b border-outline-variant z-50">
+<div class="flex items-center gap-4">
+<h1 class="font-headline-md text-headline-md text-primary">سجل مديونيات العملاء</h1>
+<span class="material-symbols-outlined text-primary">account_balance_wallet</span>
+</div>
+<div class="flex items-center gap-4">
+<button class="flex items-center gap-2 px-4 py-2 bg-primary text-on-primary rounded transition-colors hover:bg-primary-container hover:text-on-primary-container" onclick="window.print()">
+<span class="material-symbols-outlined text-[20px]">print</span>
+<span class="font-label-md">تصدير PDF</span>
+</button>
+<button class="material-symbols-outlined text-on-surface-variant p-2 hover:bg-surface-container-high rounded-full">search</button>
+</div>
+</header>
+<!-- Main Layout Container -->
+<main class="flex flex-row-reverse min-h-screen">
+<!-- Navigation Drawer (Desktop Only, Hidden in Print) -->
+<aside class="no-print hidden md:flex flex-col h-screen sticky top-0 w-[280px] bg-surface border-l border-outline-variant">
+<div class="p-6 flex flex-col items-end gap-2 border-b border-outline-variant">
+<img alt="GoldMind Logo" class="h-12 w-12 object-contain" src="https://lh3.googleusercontent.com/aida/AP1WRLsGXY6jzEYINzr0W0NQxZ-pPzs0Maqg4zYkaiLVix_u6HDWZp7yq2KnooUc8N0mNiuBfmDLIeEDbJFItaBUeqjjjryEd-kRGAPAlGXEs6fOvmdjvdohbfGwpn2NVcc9FnbO6d-91cYW4rQJXy6vNP1wK-XQFJ-XvBp0ZcOHW0JXTqjp2E2D0Ts4w0BKsxZGMf6VvRjos6Sl_2sh9HowrKluT9zR7OKfzqwnGcpwbwhPQiHQNqHX-kHIUkSB"/>
+<div class="text-right">
+<h2 class="font-headline-lg text-headline-lg font-bold text-secondary">متجر الذهب الملكي</h2>
+<p class="text-on-surface-variant text-sm">مدير النظام</p>
+</div>
+</div>
+<nav class="flex-1 p-4 flex flex-col gap-1">
+<a class="flex flex-row-reverse items-center gap-4 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-all" href="index-ar.html">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-body-md">لوحة التحكم</span>
+</a>
+<a class="flex flex-row-reverse items-center gap-4 px-4 py-3 bg-secondary-container text-on-secondary-container rounded-full active:scale-95 duration-150" href="customer-debts-ar.html">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-body-md font-semibold">سجل المديونيات</span>
+</a>
+<div class="flex flex-row-reverse items-center gap-4 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-all">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-body-md">المخزون</span>
+</div>
+<a class="flex flex-row-reverse items-center gap-4 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-all" href="reports-ar.html">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-body-md">التقارير</span>
+</a>
+<a class="flex flex-row-reverse items-center gap-4 px-4 py-3 text-on-surface-variant hover:bg-surface-container-low transition-all" href="settings-ar.html">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-body-md">الإعدادات</span>
+</a>
+</nav>
+</aside>
+<!-- Print Canvas Section -->
+<section class="flex-1 flex flex-col items-center py-10 px-4 md:px-margin-desktop bg-surface-container-low print:bg-white print:p-0 print:py-0">
+<div class="print-container w-full max-w-[210mm] bg-white shadow-xl p-12 pdf-canvas flex flex-col border border-outline-variant print:border-0 print:shadow-none">
+<!-- PDF Header -->
+<div class="flex flex-row justify-between items-start border-b-2 border-primary pb-8 mb-8">
+<div class="flex flex-col gap-2">
+<img alt="Logo" class="h-16 w-16 mb-2" src="https://lh3.googleusercontent.com/aida/AP1WRLsGXY6jzEYINzr0W0NQxZ-pPzs0Maqg4zYkaiLVix_u6HDWZp7yq2KnooUc8N0mNiuBfmDLIeEDbJFItaBUeqjjjryEd-kRGAPAlGXEs6fOvmdjvdohbfGwpn2NVcc9FnbO6d-91cYW4rQJXy6vNP1wK-XQFJ-XvBp0ZcOHW0JXTqjp2E2D0Ts4w0BKsxZGMf6VvRjos6Sl_2sh9HowrKluT9zR7OKfzqwnGcpwbwhPQiHQNqHX-kHIUkSB"/>
+<h2 class="font-headline-md text-primary">متجر الذهب الملكي</h2>
+<div class="flex flex-col text-on-surface-variant text-sm">
+<span>تاريخ التصدير: ٢٤ مايو ٢٠٢٤</span>
+<span>الرقم المرجعي: GM-2024-0524</span>
+</div>
+</div>
+<div class="text-right">
+<h1 class="font-headline-xl text-primary mb-2">تقرير مديونيات العملاء</h1>
+<p class="text-secondary font-semibold">إدارة الديون والالتزامات</p>
+<div class="mt-4 inline-flex items-center gap-2 px-3 py-1 bg-secondary-container text-on-secondary-container rounded text-sm">
+<span class="material-symbols-outlined text-[16px]">info</span>
+<span>العملة: د.إ | الوزن: غرام</span>
+</div>
+</div>
+</div>
+<!-- Summary Cards Section -->
+<div class="grid grid-cols-2 gap-6 mb-10">
+<div class="gold-border-gradient p-6 rounded-lg flex flex-col items-center justify-center text-center">
+<span class="text-on-surface-variant font-label-md mb-2">صافي المبالغ النقدية المستحقة</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-lg text-primary">١٤٥,٨٥٠.٠٠</span>
+<span class="font-label-md text-secondary">د.إ</span>
+</div>
+</div>
+<div class="gold-border-gradient p-6 rounded-lg flex flex-col items-center justify-center text-center">
+<span class="text-on-surface-variant font-label-md mb-2">إجمالي وزن الذهب المستحق</span>
+<div class="flex items-baseline gap-2">
+<span class="font-headline-lg text-primary">١,٢٤٠.٧٥</span>
+<span class="font-label-md text-secondary">غ</span>
+</div>
+</div>
+</div>
+<!-- Detailed Table -->
+<div class="flex-1">
+<table class="w-full text-right border-collapse">
+<thead>
+<tr class="bg-primary-container text-on-primary">
+<th class="py-4 px-4 font-headline-md text-[16px] border-b border-outline">العميل</th>
+<th class="py-4 px-4 font-headline-md text-[16px] border-b border-outline">رقم الهاتف</th>
+<th class="py-4 px-4 font-headline-md text-[16px] border-b border-outline">الدين النقدي (د.إ)</th>
+<th class="py-4 px-4 font-headline-md text-[16px] border-b border-outline">وزن الذهب (غ)</th>
+<th class="py-4 px-4 font-headline-md text-[16px] border-b border-outline">الحالة</th>
+</tr>
+</thead>
+<tbody class="divide-y divide-outline-variant">
+<tr class="table-row-hover transition-colors">
+<td class="py-4 px-4 font-body-md font-semibold">أحمد عبد الرحمن</td>
+<td class="py-4 px-4 font-data-mono">971 50 123 4567</td>
+<td class="py-4 px-4 font-data-mono text-left">٢٥,٤٠٠.٠٠</td>
+<td class="py-4 px-4 font-data-mono text-left">١٤٥.٥٠</td>
+<td class="py-4 px-4"><span class="px-2 py-1 bg-surface-container-highest text-on-surface-variant text-xs rounded uppercase">نشط</span></td>
+</tr>
+<tr class="table-row-hover transition-colors">
+<td class="py-4 px-4 font-body-md font-semibold">فاطمة الزهراء</td>
+<td class="py-4 px-4 font-data-mono">971 56 987 6543</td>
+<td class="py-4 px-4 font-data-mono text-left">٤٢,١٠٠.٠٠</td>
+<td class="py-4 px-4 font-data-mono text-left">٣٢٠.٠٠</td>
+<td class="py-4 px-4"><span class="px-2 py-1 bg-error-container text-on-error-container text-xs rounded uppercase">متأخر</span></td>
+</tr>
+<tr class="table-row-hover transition-colors">
+<td class="py-4 px-4 font-body-md font-semibold">شركة الهدى للمجوهرات</td>
+<td class="py-4 px-4 font-data-mono">971 4 555 0000</td>
+<td class="py-4 px-4 font-data-mono text-left">٦٠,٠٠٠.٠٠</td>
+<td class="py-4 px-4 font-data-mono text-left">٦٨٠.٢٥</td>
+<td class="py-4 px-4"><span class="px-2 py-1 bg-surface-container-highest text-on-surface-variant text-xs rounded uppercase">نشط</span></td>
+</tr>
+<tr class="table-row-hover transition-colors">
+<td class="py-4 px-4 font-body-md font-semibold">منصور بن زايد</td>
+<td class="py-4 px-4 font-data-mono">971 52 444 8888</td>
+<td class="py-4 px-4 font-data-mono text-left">١٨,٣٥٠.٠٠</td>
+<td class="py-4 px-4 font-data-mono text-left">٩٥.٠٠</td>
+<td class="py-4 px-4"><span class="px-2 py-1 bg-surface-container-highest text-on-surface-variant text-xs rounded uppercase">نشط</span></td>
+</tr>
+</tbody>
+</table>
+</div>
+<!-- Signature Section -->
+<div class="mt-12 grid grid-cols-2 gap-20">
+<div class="border-t border-dotted border-outline pt-4 text-center">
+<p class="font-label-md text-on-surface-variant">ختم المتجر</p>
+</div>
+<div class="border-t border-dotted border-outline pt-4 text-center">
+<p class="font-label-md text-on-surface-variant">توقيع المسؤول</p>
+</div>
+</div>
+<!-- PDF Footer -->
+<footer class="mt-auto pt-8 border-t border-outline-variant flex flex-row justify-between items-end text-on-surface-variant text-xs">
+<div class="flex flex-col gap-1">
+<p>تم استخراج هذا التقرير آلياً عبر نظام GoldMind</p>
+<p>تواصل: +971 4 000 0000 | info@royal-gold.ae</p>
+</div>
+<div class="flex flex-col items-end gap-1">
+<p>صفحة 1 من 1</p>
+<div class="flex gap-1">
+<div class="w-2 h-2 rounded-full bg-secondary"></div>
+<div class="w-2 h-2 rounded-full bg-primary"></div>
+</div>
+</div>
+</footer>
+</div>
+</section>
+</main>
+<!-- Bottom Nav (Mobile Only, Hidden in Print) -->
+<nav class="no-print fixed bottom-0 w-full z-50 flex flex-row-reverse justify-around items-center h-16 bg-surface border-t border-outline-variant md:hidden">
+<button class="flex flex-col items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">home</span>
+<span class="font-label-md">الرئيسية</span>
+</button>
+<button class="flex flex-col items-center justify-center text-secondary font-bold scale-110 transition-transform">
+<span class="material-symbols-outlined">payments</span>
+<span class="font-label-md">المديونيات</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">group</span>
+<span class="font-label-md">العملاء</span>
+</button>
+<button class="flex flex-col items-center justify-center text-on-surface-variant">
+<span class="material-symbols-outlined">more_horiz</span>
+<span class="font-label-md">المزيد</span>
+</button>
+</nav>
+<script>
+        // Simple micro-interaction for the print button
+        const printBtn = document.querySelector('button[onclick="window.print()"]');
+        printBtn.addEventListener('mouseenter', () => {
+            printBtn.style.transform = 'translateY(-2px)';
+        });
+        printBtn.addEventListener('mouseleave', () => {
+            printBtn.style.transform = 'translateY(0)';
+        });
+    </script>
+</body></html>
