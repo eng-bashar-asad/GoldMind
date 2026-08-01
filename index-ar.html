@@ -123,27 +123,29 @@
       min-height: max(884px, 100dvh);
     }
   </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
 <!-- TopAppBar -->
 <header class="fixed top-0 right-0 w-full h-16 bg-surface-container-lowest border-b border-outline-variant z-50 flex justify-between items-center px-margin-mobile">
 <div class="flex items-center gap-3">
-<button class="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high transition-colors rounded-full cursor-pointer active:opacity-80">
+<button class="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high transition-colors rounded-full cursor-pointer active:opacity-80" onclick="openNavDrawer()">
 <span class="material-symbols-outlined text-primary">menu</span>
 </button>
 <h1 class="font-headline-md text-headline-md font-bold text-primary">GoldMind</h1>
 </div>
 <div class="flex items-center gap-2">
-<button class="font-label-md text-label-md text-primary cursor-pointer active:opacity-80 px-2 py-1 hover:bg-surface-container-high rounded transition-colors">
+<a class="font-label-md text-label-md text-primary cursor-pointer active:opacity-80 px-2 py-1 hover:bg-surface-container-high rounded transition-colors" href="index.html">
                 AR - د.إ
-            </button>
+            </a>
 </div>
 </header>
 <main class="pt-20 pb-24 px-margin-mobile max-w-md mx-auto">
 <!-- Profile/Welcome -->
 <section class="mb-6">
-<h2 class="font-headline-md text-headline-md text-on-surface">محل الفارس للذهب</h2>
-<p class="font-body-md text-body-md text-on-surface-variant">بوابة المسؤول • حساب بريميوم</p>
+<h2 class="font-headline-md text-headline-md text-on-surface" id="storeNameEl">محل الفارس للذهب</h2>
+<p class="font-body-md text-body-md text-on-surface-variant" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
 </section>
 <!-- Summary Cards (Bento Style for Mobile) -->
 <section class="mb-8"><h3 class="font-label-md text-label-md text-on-surface-variant mb-4 uppercase tracking-wider">الاختصارات السريعة</h3><div class="grid grid-cols-2 gap-4"><a class="flex flex-col items-center justify-center p-4 bg-primary text-on-primary rounded-xl active:scale-95 transition-transform duration-200" href="new-sale-ar.html"><span class="material-symbols-outlined mb-2">add_shopping_cart</span><span class="text-[12px] font-medium leading-tight text-center">فاتورة جديدة</span></a><a class="flex flex-col items-center justify-center p-4 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" href="inventory-add.html"><span class="material-symbols-outlined mb-2">inventory_2</span><span class="text-[12px] font-medium leading-tight text-center">إضافة قطعة</span></a><a class="flex flex-col items-center justify-center p-4 gold-accent text-white rounded-xl active:scale-95 transition-transform duration-200" href="ledger.html"><span class="material-symbols-outlined mb-2">account_balance_wallet</span><span class="text-[12px] font-medium leading-tight text-center">الصندوق اليومي</span></a><button class="flex flex-col items-center justify-center p-4 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200"><span class="material-symbols-outlined mb-2">person_add</span><span class="text-[12px] font-medium leading-tight text-center">إضافة عميل</span></button><a class="flex flex-col items-center justify-center p-4 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" href="customer-debts-ar.html"><span class="material-symbols-outlined mb-2">account_balance_wallet</span><span class="text-[12px] font-medium leading-tight text-center">كشف حساب</span></a><a class="flex flex-col items-center justify-center p-4 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" href="inventory-add.html"><span class="material-symbols-outlined mb-2">inventory_2</span><span class="text-[12px] font-medium leading-tight text-center">المخزن</span></a><a class="flex flex-col items-center justify-center p-4 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" href="reports-ar.html"><span class="material-symbols-outlined mb-2">analytics</span><span class="text-[12px] font-medium leading-tight text-center">التقارير</span></a><button class="flex flex-col items-center justify-center p-4 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200"><span class="material-symbols-outlined mb-2">notifications_active</span><span class="text-[12px] font-medium leading-tight text-center">التنبيهات</span></button></div></section><section class="mb-8"><h3 class="font-label-md text-label-md text-on-surface-variant mb-4 uppercase tracking-wider">روابط خارجية سريعة</h3><div class="grid grid-cols-2 gap-3"><button class="flex flex-col items-center justify-center p-3 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200"><span class="material-symbols-outlined mb-1 text-[20px]">chat</span><span class="text-[10px] font-medium leading-tight text-center">واتساب ويب</span></button><button class="flex flex-col items-center justify-center p-3 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200"><span class="material-symbols-outlined mb-1 text-[20px]">currency_exchange</span><span class="text-[10px] font-medium leading-tight text-center">أسعار الصرف</span></button><button class="flex flex-col items-center justify-center p-3 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200"><span class="material-symbols-outlined mb-1 text-[20px]">newspaper</span><span class="text-[10px] font-medium leading-tight text-center">أخبار الذهب</span></button><button class="flex flex-col items-center justify-center p-3 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200"><span class="material-symbols-outlined mb-1 text-[20px]">mail</span><span class="text-[10px] font-medium leading-tight text-center">بريد جيميل</span></button></div></section><section class="grid grid-cols-1 gap-4 mb-8">
@@ -154,25 +156,25 @@
 <span class="material-symbols-outlined text-secondary">account_balance_wallet</span>
 </div>
 <div class="flex items-baseline gap-2">
-<span class="font-headline-xl-mobile text-headline-xl-mobile font-bold text-primary">125,430.50</span>
+<span class="font-headline-xl-mobile text-headline-xl-mobile font-bold text-primary" id="cashBalanceEl">0.00</span>
 <span class="font-label-md text-label-md text-on-surface-variant">د.إ</span>
 </div>
 <div class="mt-4 flex items-center gap-1 text-green-600">
 <span class="material-symbols-outlined text-[18px]">trending_up</span>
-<span class="text-xs font-medium">+2.4% منذ أمس</span>
+<span class="text-xs font-medium" id="balanceTrendEl">لا توجد بيانات كافية بعد</span>
 </div>
 </div>
 <div class="grid grid-cols-2 gap-4">
 <!-- Traders' Cash Box -->
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow">
 <span class="font-label-md text-label-md text-on-surface-variant block mb-2">صندوق التجار</span>
-<div class="font-headline-md text-headline-md font-semibold text-primary truncate">42,100.00</div>
+<div class="font-headline-md text-headline-md font-semibold text-primary truncate" id="tradersBoxEl">0.00</div>
 <span class="text-xs font-medium text-on-surface-variant">د.إ</span>
 </div>
 <!-- Today's Sales -->
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow">
 <span class="font-label-md text-label-md text-on-surface-variant block mb-2">مبيعات اليوم</span>
-<div class="font-headline-md text-headline-md font-semibold text-secondary truncate">18,250.00</div>
+<div class="font-headline-md text-headline-md font-semibold text-secondary truncate" id="todaySalesEl">0.00</div>
 <span class="text-xs font-medium text-on-surface-variant">د.إ</span>
 </div>
 </div>
@@ -182,57 +184,10 @@
 <section class="mb-4">
 <div class="flex justify-between items-center mb-4">
 <h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">أحدث الحركات</h3>
-<button class="text-secondary text-xs font-semibold">عرض الكل</button>
+<a class="text-secondary text-xs font-semibold" href="ledger.html">عرض الكل</a>
 </div>
-<div class="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant overflow-hidden">
-<!-- Entry 1 -->
-<div class="p-4 flex justify-between items-center hover:bg-surface-container-low transition-colors">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
-<span class="material-symbols-outlined text-green-600 text-[20px]">arrow_downward</span>
-</div>
-<div>
-<p class="font-label-md text-label-md font-semibold text-primary">بيع سبائك #821</p>
-<p class="text-[11px] text-on-surface-variant">10:45 ص • قيد نقدي</p>
-</div>
-</div>
-<div class="text-left">
-<p class="font-data-mono text-data-mono font-bold text-green-600">+4,200.00</p>
-<p class="text-[10px] text-on-surface-variant">د.إ</p>
-</div>
-</div>
-<!-- Entry 2 -->
-<div class="p-4 flex justify-between items-center hover:bg-surface-container-low transition-colors">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center">
-<span class="material-symbols-outlined text-red-600 text-[20px]">arrow_upward</span>
-</div>
-<div>
-<p class="font-label-md text-label-md font-semibold text-primary">دفع للوسيط</p>
-<p class="text-[11px] text-on-surface-variant">09:12 ص • مصروفات</p>
-</div>
-</div>
-<div class="text-left">
-<p class="font-data-mono text-data-mono font-bold text-red-600">-1,150.00</p>
-<p class="text-[10px] text-on-surface-variant">د.إ</p>
-</div>
-</div>
-<!-- Entry 3 -->
-<div class="p-4 flex justify-between items-center hover:bg-surface-container-low transition-colors">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 rounded-full bg-green-50 flex items-center justify-center">
-<span class="material-symbols-outlined text-green-600 text-[20px]">arrow_downward</span>
-</div>
-<div>
-<p class="font-label-md text-label-md font-semibold text-primary">إيداع الخزنة اليومي</p>
-<p class="text-[11px] text-on-surface-variant">أمس • قيد نقدي</p>
-</div>
-</div>
-<div class="text-left">
-<p class="font-data-mono text-data-mono font-bold text-green-600">+12,500.00</p>
-<p class="text-[10px] text-on-surface-variant">د.إ</p>
-</div>
-</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant overflow-hidden" id="recentMovementsEl">
+<div class="p-6 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 </div>
 </section>
 <!-- Decorative Spacer for FAB/BottomNav -->
@@ -276,19 +231,124 @@
             }, 150);
         });
 
-        // Toggle language as a dummy interaction
-        const langBtn = document.querySelector('header button.font-label-md');
-        langBtn.addEventListener('click', () => {
-            const current = langBtn.innerText.trim();
-            if (current === 'AR - د.إ') {
-                langBtn.innerText = 'EN - $';
-                document.documentElement.setAttribute('dir', 'ltr');
-                document.documentElement.setAttribute('lang', 'en');
-            } else {
-                langBtn.innerText = 'AR - د.إ';
-                document.documentElement.setAttribute('dir', 'rtl');
-                document.documentElement.setAttribute('lang', 'ar');
+        // --- Real data from Supabase ---
+        function fmt(n) {
+            return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        (async function loadDashboard() {
+            const session = await requireGoldMindSession('login-entry-ar.html');
+            if (!session) return;
+
+            // Store name
+            const { data: store } = await goldmindClient
+                .from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+            if (store) document.getElementById('storeNameEl').textContent = store.name;
+
+            // Staff name / role for the welcome line
+            const { data: staffRow } = await goldmindClient
+                .from('staff').select('full_name, role').eq('id', session.user.id).maybeSingle();
+            if (staffRow) {
+                const roleLabel = staffRow.role === 'owner' ? 'مالك الحساب' : 'موظف';
+                document.getElementById('welcomeEl').textContent = staffRow.full_name + ' • ' + roleLabel;
             }
-        });
+
+            // Cash balance (main box) = sum(in) - sum(out)
+            const { data: mainMovs } = await goldmindClient
+                .from('cash_movements').select('direction, amount')
+                .eq('store_id', GOLDMIND_STORE_ID).eq('box', 'main');
+            let cashBalance = 0;
+            (mainMovs || []).forEach(m => cashBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount));
+            document.getElementById('cashBalanceEl').textContent = fmt(cashBalance);
+            document.getElementById('balanceTrendEl').textContent = (mainMovs && mainMovs.length)
+                ? mainMovs.length + ' حركة مسجّلة' : 'لا توجد حركات مسجّلة بعد';
+
+            // Traders' box
+            const { data: traderMovs } = await goldmindClient
+                .from('cash_movements').select('direction, amount')
+                .eq('store_id', GOLDMIND_STORE_ID).eq('box', 'traders');
+            let tradersBalance = 0;
+            (traderMovs || []).forEach(m => tradersBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount));
+            document.getElementById('tradersBoxEl').textContent = fmt(tradersBalance);
+
+            // Today's sales
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const { data: todayInvoices } = await goldmindClient
+                .from('invoices').select('total_amount')
+                .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sell')
+                .gte('created_at', todayStart.toISOString());
+            const todaySales = (todayInvoices || []).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
+            document.getElementById('todaySalesEl').textContent = fmt(todaySales);
+
+            // Recent movements (latest 5)
+            const { data: recent } = await goldmindClient
+                .from('cash_movements')
+                .select('direction, amount, description, created_at')
+                .eq('store_id', GOLDMIND_STORE_ID)
+                .order('created_at', { ascending: false })
+                .limit(5);
+
+            const container = document.getElementById('recentMovementsEl');
+            if (!recent || recent.length === 0) {
+                container.innerHTML = '<div class="p-6 text-center text-on-surface-variant text-sm">لا توجد حركات مسجّلة بعد. أول عملية بيع أو إيداع رح تظهر هون.</div>';
+            } else {
+                container.innerHTML = recent.map(m => {
+                    const isIn = m.direction === 'in';
+                    const dateStr = new Date(m.created_at).toLocaleString('ar', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+                    return `
+                        <div class="p-4 flex justify-between items-center hover:bg-surface-container-low transition-colors">
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full ${isIn ? 'bg-green-50' : 'bg-red-50'} flex items-center justify-center">
+                                    <span class="material-symbols-outlined ${isIn ? 'text-green-600' : 'text-red-600'} text-[20px]">${isIn ? 'arrow_downward' : 'arrow_upward'}</span>
+                                </div>
+                                <div>
+                                    <p class="font-label-md text-label-md font-semibold text-primary">${m.description || (isIn ? 'إيداع' : 'مصروف')}</p>
+                                    <p class="text-[11px] text-on-surface-variant">${dateStr}</p>
+                                </div>
+                            </div>
+                            <div class="text-left">
+                                <p class="font-data-mono text-data-mono font-bold ${isIn ? 'text-green-600' : 'text-red-600'}">${isIn ? '+' : '-'}${fmt(m.amount)}</p>
+                                <p class="text-[10px] text-on-surface-variant">د.إ</p>
+                            </div>
+                        </div>`;
+                }).join('');
+            }
+        })();
     </script>
+
+<!-- Site Navigation Drawer -->
+<div class="fixed inset-0 bg-black/40 z-[200] hidden" id="navDrawerOverlay" onclick="closeNavDrawer()"></div>
+<div class="fixed top-0 right-0 h-full w-72 max-w-[80vw] bg-surface-container-lowest z-[201] shadow-2xl -translate-x-full rtl:translate-x-full transition-transform duration-300 flex flex-col" dir="rtl" id="navDrawer">
+<div class="flex items-center justify-between px-5 h-16 border-b border-outline-variant">
+<span class="font-headline-md text-headline-md font-bold text-primary">GoldMind</span>
+<button class="material-symbols-outlined text-on-surface-variant" onclick="closeNavDrawer()">close</button>
+</div>
+<nav class="flex-1 overflow-y-auto py-2">
+<a href="index-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">dashboard</span><span class="font-label-md text-label-md">لوحة التحكم</span></a>
+<a href="inventory-add.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory_2</span><span class="font-label-md text-label-md">إضافة قطعة للمخزون</span></a>
+<a href="new-sale-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt_long</span><span class="font-label-md text-label-md">بيع جديد / فاتورة</span></a>
+<a href="ledger.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">account_balance_wallet</span><span class="font-label-md text-label-md">سجل حركات التاجر</span></a>
+<a href="customer-debts-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">payments</span><span class="font-label-md text-label-md">سجل مديونيات العملاء</span></a>
+<a href="reports-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">bar_chart</span><span class="font-label-md text-label-md">التقارير والتحليلات</span></a>
+<a href="audit-log-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">history</span><span class="font-label-md text-label-md">سجل النشاط</span></a>
+<a href="staff-permissions-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">badge</span><span class="font-label-md text-label-md">الموظفون والصلاحيات</span></a>
+<a href="settings-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">settings</span><span class="font-label-md text-label-md">الإعدادات</span></a>
+<a href="dashboard-advanced-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">grid_view</span><span class="font-label-md text-label-md">اللوحة المتقدمة (تصميم بديل)</span></a>
+</nav>
+</div>
+<script>
+    function openNavDrawer() {
+        document.getElementById('navDrawerOverlay').classList.remove('hidden');
+        const d = document.getElementById('navDrawer');
+        d.classList.remove('-translate-x-full', 'translate-x-full');
+    }
+    function closeNavDrawer() {
+        document.getElementById('navDrawerOverlay').classList.add('hidden');
+        const d = document.getElementById('navDrawer');
+        const isRTL = document.documentElement.getAttribute('dir') === 'rtl';
+        d.classList.add(isRTL ? 'translate-x-full' : '-translate-x-full');
+    }
+</script>
+
 </body></html>
