@@ -5,6 +5,8 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>Inventory Entry | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
@@ -170,10 +172,10 @@
 <div class="relative">
 <label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="karat">Karat</label>
 <select class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none font-label-md" id="karat">
-<option value="18k">18K</option>
-<option selected="" value="21k">21K</option>
-<option value="22k">22K</option>
-<option value="24k">24K</option>
+<option value="18">18K</option>
+<option selected="" value="21">21K</option>
+<option value="22">22K</option>
+<option value="24">24K</option>
 </select>
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
 </div>
@@ -181,16 +183,16 @@
 <!-- Color Selector -->
 <div class="space-y-3">
 <span class="text-[11px] font-semibold text-outline tracking-wider uppercase px-1">Material Color</span>
-<div class="flex flex-wrap gap-3">
-<button class="flex items-center gap-2 px-4 py-3 border-2 border-primary rounded-xl bg-surface-container-lowest active:scale-95 transition-all">
+<div class="flex flex-wrap gap-3" id="color-group">
+<button type="button" data-color="Gold" class="color-btn flex items-center gap-2 px-4 py-3 border-2 border-primary rounded-xl bg-surface-container-lowest active:scale-95 transition-all">
 <div class="w-4 h-4 rounded-full bg-[#E3C58E] shadow-inner"></div>
 <span class="font-label-md text-label-md font-bold text-primary">Gold</span>
 </button>
-<button class="flex items-center gap-2 px-4 py-3 border border-outline-variant rounded-xl bg-surface-container-lowest hover:border-primary transition-all active:scale-95">
+<button type="button" data-color="White" class="color-btn flex items-center gap-2 px-4 py-3 border border-outline-variant rounded-xl bg-surface-container-lowest hover:border-primary transition-all active:scale-95">
 <div class="w-4 h-4 rounded-full bg-[#E5E7EB] shadow-inner"></div>
 <span class="font-label-md text-label-md text-on-surface-variant">White</span>
 </button>
-<button class="flex items-center gap-2 px-4 py-3 border border-outline-variant rounded-xl bg-surface-container-lowest hover:border-primary transition-all active:scale-95">
+<button type="button" data-color="Rose" class="color-btn flex items-center gap-2 px-4 py-3 border border-outline-variant rounded-xl bg-surface-container-lowest hover:border-primary transition-all active:scale-95">
 <div class="w-4 h-4 rounded-full bg-[#D4AF37] opacity-60 shadow-inner"></div>
 <span class="font-label-md text-label-md text-on-surface-variant">Rose</span>
 </button>
@@ -200,9 +202,11 @@
 </button>
 </div>
 </div>
+<!-- Status Message -->
+<div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 <!-- Save Button -->
 <div class="pt-4">
-<button onclick="window.location.href='index.html'" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold text-body-md shadow-md active:scale-[0.98] transition-all hover:brightness-110">
+<button id="save-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold text-body-md shadow-md active:scale-[0.98] transition-all hover:brightness-110">
                     Save Piece to Inventory
                 </button>
 </div>
@@ -237,6 +241,9 @@
 </a>
 </nav>
 <script>
+        // Require an active session before allowing use of this page
+        requireGoldMindSession();
+
         // Micro-interactions for form elements
         document.querySelectorAll('button, select, input').forEach(el => {
             el.addEventListener('touchstart', () => {
@@ -252,6 +259,74 @@
             } else {
                 weightInput.classList.remove('text-error');
             }
+        });
+
+        // Color selection state
+        let selectedColor = 'Gold';
+        const colorButtons = document.querySelectorAll('.color-btn');
+        colorButtons.forEach(btn => {
+            btn.addEventListener('click', () => {
+                selectedColor = btn.dataset.color;
+                colorButtons.forEach(b => {
+                    b.classList.remove('border-2', 'border-primary');
+                    b.classList.add('border', 'border-outline-variant');
+                    b.querySelector('span').classList.remove('font-bold', 'text-primary');
+                    b.querySelector('span').classList.add('text-on-surface-variant');
+                });
+                btn.classList.remove('border', 'border-outline-variant');
+                btn.classList.add('border-2', 'border-primary');
+                btn.querySelector('span').classList.remove('text-on-surface-variant');
+                btn.querySelector('span').classList.add('font-bold', 'text-primary');
+            });
+        });
+
+        // Save piece to Supabase
+        const saveBtn = document.getElementById('save-btn');
+        const messageBox = document.getElementById('save-message');
+
+        function showMessage(text, isError) {
+            messageBox.textContent = text;
+            messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+            messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
+        }
+
+        saveBtn.addEventListener('click', async () => {
+            const barcode = document.getElementById('barcode-id').value.trim();
+            const weight = parseFloat(document.getElementById('weight').value);
+            const karat = parseInt(document.getElementById('karat').value, 10);
+
+            if (!weight || weight <= 0) {
+                showMessage('Please enter a valid weight.', true);
+                return;
+            }
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            const { data: { session } } = await goldmindClient.auth.getSession();
+
+            const { error } = await goldmindClient.from('pieces').insert({
+                store_id: GOLDMIND_STORE_ID,
+                barcode: barcode || null,
+                weight_grams: weight,
+                karat: karat,
+                color: selectedColor,
+                status: 'available',
+                created_by: session ? session.user.id : null
+            });
+
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'Save Piece to Inventory';
+
+            if (error) {
+                showMessage('Error: ' + error.message, true);
+                return;
+            }
+
+            showMessage('Piece saved successfully!', false);
+            setTimeout(() => {
+                window.location.href = 'index.html';
+            }, 1000);
         });
     </script>
 </body></html>
