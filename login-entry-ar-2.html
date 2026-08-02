@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+
+<html class="dark" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GoldMind | تسجيل الدخول</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style>
+        :root {
+            --royal-gold: #FFD700;
+            --deep-navy: #0f172a;
+        }
+        body {
+            font-family: 'IBM+Plex+Sans+Arabic', 'Inter', sans-serif;
+            background-color: var(--deep-navy);
+        }
+        .gold-glow {
+            text-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+        }
+        .gold-border-focus:focus-within {
+            border-color: var(--royal-gold);
+            box-shadow: 0 0 0 1px var(--royal-gold);
+        }
+        .gold-gradient {
+            background: linear-gradient(135deg, #FFD700 0%, #B4955A 100%);
+        }
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 215, 0, 0.1);
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+            vertical-align: middle;
+        }
+        .error-text { display: none; }
+    </style>
+<script id="tailwind-config">
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#FFD700",
+                        "on-primary": "#0f172a",
+                        "secondary": "#745a25",
+                        "surface": "#0f172a",
+                        "surface-container": "#1e293b",
+                        "outline": "#76777d",
+                        "background": "#0f172a"
+                    },
+                    borderRadius: {
+                        "DEFAULT": "0.125rem",
+                        "lg": "0.25rem",
+                        "xl": "0.5rem",
+                        "full": "0.75rem"
+                    },
+                    fontFamily: {
+                        "headline-xl": ["Inter", "IBM+Plex+Sans+Arabic"],
+                        "body-md": ["Inter", "IBM+Plex+Sans+Arabic"]
+                    }
+                }
+            }
+        }
+    </script>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+</head>
+<body class="text-white min-h-screen flex flex-col items-center justify-center p-4">
+<main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
+<!-- Brand Identity -->
+<div class="mb-10 text-center">
+<div class="inline-flex items-center justify-center w-20 h-20 rounded-full border-2 border-primary/30 mb-6 bg-surface-container relative">
+<span class="material-symbols-outlined text-primary text-5xl gold-glow" style="font-variation-settings: 'FILL' 1;">temp_preferences_custom</span>
+<div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl"></div>
+</div>
+<h1 class="text-4xl font-headline-xl font-bold tracking-tight text-primary mb-2">جولد مايند</h1>
+<p class="text-xl text-primary/80 opacity-90">مرحباً بك في جولد مايند</p>
+</div>
+<!-- Login Form Card -->
+<div class="glass-panel w-full p-8 rounded-xl shadow-2xl space-y-8">
+<div class="text-center mb-8">
+<h2 class="text-2xl font-bold text-white">تسجيل الدخول</h2>
+<div class="h-1 w-12 bg-primary mx-auto mt-2 rounded-full"></div>
+<p class="text-sm text-primary/70 mt-4">أدخل بريدك الإلكتروني وسنرسل لك رمز تحقق مكوّن من ٨ أرقام لتأكيد دخولك</p>
+</div>
+<form class="space-y-6" id="loginForm">
+<div>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="email">البريد الإلكتروني</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden transition-all">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="email" placeholder="name@example.com" required="" type="email"/>
+</div>
+<p class="error-text text-error text-sm mt-2" id="emailError">فضلاً أدخل بريد إلكتروني صحيح</p>
+</div>
+<!-- Send Code Button -->
+<button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" id="submitBtn" type="submit">
+            إرسال رمز التحقق
+        </button>
+<p class="text-error text-sm text-center hidden" id="formError"></p>
+</form>
+</div>
+<!-- Footer / Language Switcher -->
+<footer class="mt-12 flex flex-col items-center gap-6 text-primary/40">
+<div class="flex items-center gap-4 text-sm">
+<span class="text-white/70 cursor-pointer hover:text-white transition-colors">English</span>
+<span class="opacity-30">|</span>
+<span class="text-primary font-semibold">العربية</span>
+</div>
+<p class="text-xs">© ٢٠٢٦ جولد مايند لإدارة محلات الذهب. جميع الحقوق محفوظة.</p>
+</footer>
+</main>
+<script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const email = document.getElementById('email').value.trim();
+            const emailError = document.getElementById('emailError');
+            const formError = document.getElementById('formError');
+            const submitBtn = document.getElementById('submitBtn');
+            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+            formError.classList.add('hidden');
+            if (!emailPattern.test(email)) {
+                emailError.style.display = 'block';
+                document.getElementById('email').focus();
+                return;
+            }
+            emailError.style.display = 'none';
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'جارِ الإرسال...';
+
+            const { error } = await goldmindClient.auth.signInWithOtp({
+                email: email,
+                options: {
+                    shouldCreateUser: true,
+                    emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html'
+                }
+            });
+
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'إرسال رمز التحقق';
+
+            if (error) {
+                formError.textContent = 'تعذّر إرسال الرمز: ' + error.message;
+                formError.classList.remove('hidden');
+                return;
+            }
+
+            sessionStorage.setItem('goldmind_email', email);
+            window.location.href = 'login-ar.html';
+        });
+    </script>
+</body></html>
