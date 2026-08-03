@@ -5,6 +5,8 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>GoldMind Dashboard - Al-Fares Gold Shop</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -302,22 +304,42 @@
             }, 150);
         });
 
-        // Real currency toggle (shared with Arabic dashboard via localStorage)
-        const currencySymbols = { 'AED': 'د.إ', 'USD': '$', 'EUR': '€' };
-        const currencyOrder = ['AED', 'USD', 'EUR'];
+        // Real currency toggle (shared with Arabic dashboard, synced to store currency)
+        const currencySymbols = {
+            'AED': 'د.إ', 'SAR': 'ر.س', 'KWD': 'د.ك', 'QAR': 'ر.ق', 'BHD': 'د.ب',
+            'OMR': 'ر.ع', 'EGP': 'ج.م', 'JOD': 'د.أ', 'LBP': 'ل.ل', 'IQD': 'د.ع',
+            'SYP': 'ل.س', 'USD': '$', 'EUR': '€'
+        };
+        function currencySymbolFor(code) {
+            return currencySymbols[code] || code;
+        }
         function toggleCurrency() {
             const btn = document.getElementById('currency-toggle-btn');
-            let current = localStorage.getItem('goldmind_currency_code') || 'AED';
-            let idx = currencyOrder.indexOf(current);
-            idx = (idx + 1) % currencyOrder.length;
-            const next = currencyOrder[idx];
+            const order = window.__goldmindCurrencyOrder || ['AED', 'USD', 'EUR'];
+            let current = localStorage.getItem('goldmind_currency_code') || order[0];
+            let idx = order.indexOf(current);
+            idx = (idx + 1) % order.length;
+            const next = order[idx];
             localStorage.setItem('goldmind_currency_code', next);
-            btn.textContent = currencySymbols[next];
+            btn.textContent = currencySymbolFor(next);
         }
-        (function initCurrencyButton() {
-            const saved = localStorage.getItem('goldmind_currency_code') || 'AED';
+        async function initCurrencyButton() {
             const btn = document.getElementById('currency-toggle-btn');
-            if (btn) btn.textContent = currencySymbols[saved];
-        })();
+            const { data: store } = await goldmindClient
+                .from('stores')
+                .select('currency')
+                .eq('id', GOLDMIND_STORE_ID)
+                .single();
+
+            const storeCurrency = (store && store.currency) ? store.currency.toUpperCase() : 'AED';
+            const order = [storeCurrency];
+            ['USD', 'EUR'].forEach(c => { if (!order.includes(c)) order.push(c); });
+            window.__goldmindCurrencyOrder = order;
+
+            const saved = localStorage.getItem('goldmind_currency_code');
+            const active = (saved && order.includes(saved)) ? saved : storeCurrency;
+            if (btn) btn.textContent = currencySymbolFor(active);
+        }
+        initCurrencyButton();
     </script>
 </body></html>
