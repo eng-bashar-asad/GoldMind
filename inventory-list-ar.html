@@ -156,6 +156,14 @@
 
 </main>
 
+<!-- Photo Lightbox -->
+<div id="photo-lightbox" onclick="closePhotoLightbox()" class="hidden fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-6">
+<img id="lightbox-img" class="max-w-full max-h-full rounded-lg object-contain"/>
+<button onclick="closePhotoLightbox()" class="absolute top-6 left-6 text-white">
+<span class="material-symbols-outlined text-3xl">close</span>
+</button>
+</div>
+
 <!-- Bottom Navigation Bar -->
 <nav class="fixed bottom-0 w-full flex justify-around items-center px-margin-mobile py-2 bg-surface-container-lowest text-primary docked full-width z-50 border-t border-outline-variant shadow-sm h-16">
 <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="index-ar.html">
@@ -183,6 +191,14 @@
 <script>
     requireGoldMindSession('login-entry-ar.html');
 
+    function openPhotoLightbox(url) {
+        document.getElementById('lightbox-img').src = url;
+        document.getElementById('photo-lightbox').classList.remove('hidden');
+    }
+    function closePhotoLightbox() {
+        document.getElementById('photo-lightbox').classList.add('hidden');
+    }
+
     const colorNames = { Gold: 'ذهبي', White: 'أبيض', Rose: 'وردي' };
     const colorSwatch = { Gold: '#E3C58E', White: '#E5E7EB', Rose: '#D4AF37' };
     const statusNames = { available: 'متوفرة', sold: 'مباعة', reserved: 'محجوزة' };
@@ -198,7 +214,7 @@
         const badgeClass = statusStyle[piece.status] || 'bg-gray-100 text-gray-600';
         const statusLabel = statusNames[piece.status] || piece.status;
         const photo = piece.photo_url
-            ? `<img src="${piece.photo_url}" class="w-16 h-16 rounded-lg object-cover border border-outline-variant" alt="صورة القطعة"/>`
+            ? `<img src="${piece.photo_url}" onclick="openPhotoLightbox('${piece.photo_url}')" class="w-16 h-16 rounded-lg object-cover border border-outline-variant cursor-pointer active:scale-95 transition-transform" alt="صورة القطعة"/>`
             : `<div class="w-16 h-16 rounded-lg border border-dashed border-outline-variant bg-surface-container-low flex items-center justify-center">
                  <span class="material-symbols-outlined text-outline">photo_camera</span>
                </div>`;
