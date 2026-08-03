@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الاشتراك والخطة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: { extend: {
+          "colors": {
+            "on-surface-variant": "#45464d", "secondary": "#745a25", "on-secondary": "#ffffff",
+            "on-secondary-container": "#795f29", "secondary-container": "#ffdb99",
+            "error": "#ba1a1a", "error-container": "#ffdad6", "on-error": "#ffffff", "on-error-container": "#93000a",
+            "on-surface": "#191c1e", "surface-container-low": "#f2f4f6", "surface-container": "#eceef0",
+            "surface-container-high": "#e6e8ea",
+            "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+            "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000", "outline": "#76777d",
+            "success": "#1e7d32", "success-container": "#d7f3dc"
+          },
+          "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+          "fontSize": {
+            "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+            "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+            "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+          }
+        } }
+      }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; min-height: max(884px, 100dvh); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px; }
+    .luxury-shadow { box-shadow: 0px 4px 20px rgba(15, 23, 42, 0.05); }
+    .gold-accent { background-color: #B4955A; }
+    ::-webkit-scrollbar { display: none; }
+    .plan-card.active { border-color: #B4955A; box-shadow: 0 0 0 1.5px #B4955A; }
+</style>
+</head>
+<body class="bg-background text-on-background selection:bg-secondary-container pb-24">
+<header class="fixed top-0 right-0 w-full h-16 bg-surface-container-lowest border-b border-outline-variant z-50 flex justify-between items-center px-4">
+<div class="flex items-center gap-3">
+<a href="settings-ar.html" class="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high transition-colors rounded-full cursor-pointer active:opacity-80">
+<span class="material-symbols-outlined text-primary">arrow_forward</span>
+</a>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">الاشتراك والخطة</h1>
+</div>
+</header>
+<main class="pt-20 px-4 max-w-md mx-auto">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<div id="page-content" class="hidden">
+
+<!-- Current status -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-5 mb-6">
+<div class="flex items-center justify-between mb-3">
+<span class="font-label-md text-label-md text-on-surface-variant">الحالة الحالية</span>
+<span id="status-badge" class="text-[11px] font-semibold px-3 py-1 rounded-full"></span>
+</div>
+<div class="flex items-center gap-3 mb-1">
+<span class="material-symbols-outlined text-secondary" style="font-size:28px;">workspace_premium</span>
+<div>
+<p id="current-plan-name" class="font-headline-md text-headline-md font-bold text-primary">—</p>
+<p id="current-plan-sub" class="text-[12px] text-on-surface-variant"></p>
+</div>
+</div>
+</section>
+
+<!-- Plans comparison -->
+<section class="mb-6">
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">الخطط المتاحة</h3>
+<div id="plans-list" class="flex flex-col gap-3"></div>
+</section>
+
+<div id="admin-panel" class="hidden bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-6">
+<p class="text-[12.5px] font-semibold text-on-surface mb-3">تحكم إداري بالاشتراك</p>
+<div class="flex flex-col gap-3">
+<div>
+<label class="block text-[11px] text-on-surface-variant mb-1">الخطة</label>
+<select id="admin-plan-select" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest"></select>
+</div>
+<div>
+<label class="block text-[11px] text-on-surface-variant mb-1">حالة الاشتراك</label>
+<select id="admin-status-select" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest">
+<option value="trialing">تجريبي</option>
+<option value="active">فعّال</option>
+<option value="past_due">متأخر بالدفع</option>
+<option value="canceled">ملغى</option>
+</select>
+</div>
+<button id="admin-save-btn" class="h-12 gold-accent text-white rounded-lg font-semibold text-[13px] active:scale-[0.98] transition-all">حفظ التغييرات</button>
+</div>
+</div>
+
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-8 text-[12px] text-on-surface-variant leading-5">
+<span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">info</span>
+الدفع الإلكتروني للاشتراك سيُفعّل قريباً عبر شركة الدفع/النتورك. حالياً تُدار حالة الاشتراك يدوياً من الإدارة.
+</div>
+
+</div>
+</main>
+
+<div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-[13px] px-4 py-2 rounded-full opacity-0 pointer-events-none transition-opacity z-[60]"></div>
+
+<script>
+const STATUS_LABELS = {
+  trialing: { text: 'تجريبي', class: 'bg-secondary-container text-on-secondary-container' },
+  active: { text: 'فعّال', class: 'bg-success-container text-success' },
+  past_due: { text: 'متأخر بالدفع', class: 'bg-error-container text-on-error-container' },
+  canceled: { text: 'ملغى', class: 'bg-surface-container-high text-on-surface-variant' }
+};
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'fixed bottom-6 left-1/2 -translate-x-1/2 text-[13px] px-4 py-2 rounded-full z-[60] transition-opacity ' +
+    (isError ? 'bg-error text-on-error' : 'bg-primary text-on-primary');
+  t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; }, 2200);
+}
+
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+function featureRow(label, on) {
+  return `<div class="flex items-center gap-2 text-[12px] ${on ? 'text-on-surface' : 'text-outline line-through'}">
+    <span class="material-symbols-outlined" style="font-size:15px;">${on ? 'check_circle' : 'cancel'}</span>
+    ${label}
+  </div>`;
+}
+
+function renderPlans(plans, currentPlanId) {
+  const featureLabels = {
+    ai_photo_entry: 'إدخال بيانات بالصورة (AI)',
+    voice_input: 'الإدخال الصوتي',
+    profit_report: 'تقرير الربح الداخلي',
+    custom_tables: 'جداول مخصصة قابلة للتعديل'
+  };
+
+  document.getElementById('plans-list').innerHTML = plans.map(plan => {
+    const isActive = plan.id === currentPlanId;
+    const features = Object.entries(plan.features || {})
+      .map(([k, v]) => featureRow(featureLabels[k] || k, v === true)).join('');
+    return `<div class="plan-card bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4 ${isActive ? 'active' : ''}">
+      <div class="flex items-center justify-between mb-2">
+        <p class="font-headline-md text-[17px] font-bold text-primary">${plan.name_ar}</p>
+        ${isActive ? '<span class="text-[10px] font-bold text-secondary bg-secondary-container px-2 py-0.5 rounded-full">خطتك الحالية</span>' : ''}
+      </div>
+      <p class="text-[13px] text-on-surface-variant mb-3">${plan.price_monthly} / شهرياً &nbsp;·&nbsp; ${plan.price_yearly} / سنوياً</p>
+      <div class="flex flex-col gap-1.5 pt-3 border-t border-outline-variant">${features}</div>
+      ${plan.max_staff ? `<p class="text-[11px] text-on-surface-variant mt-3">حتى ${plan.max_staff} موظفين</p>` : `<p class="text-[11px] text-on-surface-variant mt-3">عدد موظفين غير محدود</p>`}
+    </div>`;
+  }).join('');
+}
+
+async function load() {
+  const session = await requireGoldMindSession();
+  if (!session) return;
+
+  const { data: me } = await goldmindClient
+    .from('staff').select('role, permissions').eq('id', session.user.id).single();
+
+  const canManageSub = me && (me.role === 'owner' || (me.permissions && me.permissions.manage_subscription === true));
+
+  const { data: plans, error: plansErr } = await goldmindClient
+    .from('plans').select('*').eq('is_active', true).order('sort_order');
+
+  const { data: sub, error: subErr } = await goldmindClient
+    .from('subscriptions').select('*, plans(*)').eq('store_id', GOLDMIND_STORE_ID).single();
+
+  document.getElementById('loading-state').classList.add('hidden');
+
+  if (plansErr || subErr || !sub) {
+    showToast('تعذر تحميل بيانات الاشتراك', true);
+    return;
+  }
+
+  const statusInfo = STATUS_LABELS[sub.status] || { text: sub.status, class: 'bg-surface-container-high' };
+  const badge = document.getElementById('status-badge');
+  badge.textContent = statusInfo.text;
+  badge.className = 'text-[11px] font-semibold px-3 py-1 rounded-full ' + statusInfo.class;
+
+  document.getElementById('current-plan-name').textContent = sub.plans ? sub.plans.name_ar : '—';
+  let subText = '';
+  if (sub.status === 'trialing' && sub.trial_end) subText = 'ينتهي التجريبي في ' + fmtDate(sub.trial_end);
+  else if (sub.current_period_end) subText = 'التجديد القادم في ' + fmtDate(sub.current_period_end);
+  document.getElementById('current-plan-sub').textContent = subText;
+
+  renderPlans(plans, sub.plan_id);
+
+  if (canManageSub) {
+    const panel = document.getElementById('admin-panel');
+    panel.classList.remove('hidden');
+    const planSelect = document.getElementById('admin-plan-select');
+    planSelect.innerHTML = plans.map(p => `<option value="${p.id}" ${p.id === sub.plan_id ? 'selected' : ''}>${p.name_ar}</option>`).join('');
+    document.getElementById('admin-status-select').value = sub.status;
+
+    document.getElementById('admin-save-btn').addEventListener('click', async () => {
+      const btn = document.getElementById('admin-save-btn');
+      btn.disabled = true;
+      btn.textContent = 'جارِ الحفظ...';
+      const { error } = await goldmindClient
+        .from('subscriptions')
+        .update({
+          plan_id: planSelect.value,
+          status: document.getElementById('admin-status-select').value,
+          updated_at: new Date().toISOString()
+        })
+        .eq('store_id', GOLDMIND_STORE_ID);
+      btn.disabled = false;
+      btn.textContent = 'حفظ التغييرات';
+      if (error) { showToast('خطأ: ' + error.message, true); return; }
+      showToast('تم تحديث الاشتراك');
+      load();
+    });
+  }
+
+  document.getElementById('page-content').classList.remove('hidden');
+}
+
+load();
+</script>
+</body></html>
