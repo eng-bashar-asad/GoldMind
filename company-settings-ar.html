@@ -237,6 +237,9 @@
     logoInput.addEventListener('input', updateLogoPreview);
 
     async function loadStore() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
         const { data, error } = await goldmindClient
             .from('stores')
             .select('*')
@@ -274,6 +277,9 @@
     }
 
     saveBtn.addEventListener('click', async () => {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
         const name = document.getElementById('store-name').value.trim();
         const country = document.getElementById('store-country').value;
         const currency = document.getElementById('store-currency').value.trim().toUpperCase();
