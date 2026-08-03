@@ -4,11 +4,12 @@
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>GoldMind - بيع جديد</title>
-<!-- Fonts and Icons -->
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script id="tailwind-config">
         tailwind.config = {
           darkMode: "class",
@@ -16,85 +17,43 @@
             extend: {
               "colors": {
                       "on-surface-variant": "#45464d",
-                      "on-secondary-container": "#795f29",
                       "secondary": "#745a25",
-                      "surface-dim": "#d8dadc",
                       "on-tertiary": "#ffffff",
-                      "surface-bright": "#f7f9fb",
                       "error": "#ba1a1a",
                       "on-secondary": "#ffffff",
-                      "primary-fixed-dim": "#bec6e0",
-                      "on-primary-fixed-variant": "#3f465c",
-                      "on-tertiary-container": "#75859d",
-                      "tertiary": "#000000",
-                      "primary-fixed": "#dae2fd",
                       "primary-container": "#131b2e",
-                      "surface-tint": "#565e74",
                       "on-surface": "#191c1e",
                       "surface-container": "#eceef0",
-                      "on-primary-container": "#7c839b",
                       "surface-container-highest": "#e0e3e5",
-                      "on-error-container": "#93000a",
-                      "inverse-on-surface": "#eff1f3",
                       "surface-container-low": "#f2f4f6",
-                      "on-secondary-fixed-variant": "#5a430f",
                       "on-primary": "#ffffff",
                       "background": "#f7f9fb",
-                      "secondary-fixed-dim": "#e4c283",
                       "outline-variant": "#c6c6cd",
                       "surface-container-lowest": "#ffffff",
                       "surface": "#f7f9fb",
                       "error-container": "#ffdad6",
-                      "tertiary-fixed": "#d3e4fe",
-                      "on-primary-fixed": "#131b2e",
-                      "secondary-fixed": "#ffdea4",
-                      "on-secondary-fixed": "#261900",
-                      "tertiary-fixed-dim": "#b7c8e1",
                       "primary": "#000000",
                       "on-background": "#191c1e",
                       "on-error": "#ffffff",
                       "surface-variant": "#e0e3e5",
-                      "tertiary-container": "#0b1c30",
-                      "inverse-primary": "#bec6e0",
                       "outline": "#76777d",
-                      "on-tertiary-fixed-variant": "#38485d",
                       "surface-container-high": "#e6e8ea",
-                      "inverse-surface": "#2d3133",
                       "secondary-container": "#ffdb99",
-                      "on-tertiary-fixed": "#0b1c30"
-              },
-              "borderRadius": {
-                      "DEFAULT": "0.125rem",
-                      "lg": "0.25rem",
-                      "xl": "0.5rem",
-                      "full": "0.75rem"
-              },
-              "spacing": {
-                      "margin-desktop": "40px",
-                      "gutter": "24px",
-                      "unit": "4px",
-                      "margin-mobile": "16px",
-                      "container-max": "1440px"
+                      "on-secondary-container": "#795f29"
               },
               "fontFamily": {
                       "body-md": ["Inter"],
                       "data-mono": ["IBM Plex Sans"],
                       "headline-md": ["Inter"],
-                      "headline-xl-mobile": ["Inter"],
                       "label-md": ["Inter"],
-                      "headline-lg": ["Inter"],
-                      "body-lg": ["Inter"],
-                      "headline-xl": ["Inter"]
+                      "body-lg": ["Inter"]
               },
               "fontSize": {
                       "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
                       "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
                       "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
-                      "headline-xl-mobile": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
                       "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
-                      "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
-                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
-                      "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+                      "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
               }
             },
           },
@@ -103,130 +62,91 @@
 <style>
         .material-symbols-outlined {
             font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-            display: inline-block;
-            line-height: 1;
-            text-transform: none;
-            letter-spacing: normal;
-            word-wrap: normal;
-            white-space: nowrap;
-            direction: ltr;
-        }
-        .voice-pulse {
-            animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-        }
-        @keyframes pulse {
-            0%, 100% { opacity: 1; transform: scale(1); }
-            50% { opacity: .7; transform: scale(1.05); }
+            display: inline-block; line-height: 1; text-transform: none;
+            letter-spacing: normal; word-wrap: normal; white-space: nowrap; direction: ltr;
         }
         .scroll-hide::-webkit-scrollbar { display: none; }
         .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
+<style> body { min-height: max(884px, 100dvh); } </style>
 </head>
 <body class="bg-background font-body-md text-on-surface antialiased pb-24">
-<!-- Top App Bar (Mobile Viewport) -->
-<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-margin-mobile w-full h-16 sticky top-0 z-50 border-b border-outline-variant">
+<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-4 w-full h-16 sticky top-0 z-50 border-b border-outline-variant">
 <div class="flex items-center gap-3">
-<span class="material-symbols-outlined cursor-pointer active:opacity-80">menu</span>
+<button onclick="window.location.href='index-ar.html'" class="material-symbols-outlined cursor-pointer active:opacity-80">arrow_forward</button>
 <h1 class="font-headline-md text-headline-md font-bold text-primary">بيع جديد</h1>
 </div>
-<div class="flex items-center gap-4">
-<span class="font-label-md text-label-md text-primary font-semibold">AR - د.إ</span>
-<span class="material-symbols-outlined text-primary">account_circle</span>
-</div>
 </header>
-<main class="max-w-md mx-auto px-margin-mobile pt-6 space-y-6">
+<main class="max-w-md mx-auto px-4 pt-6 space-y-6">
+
 <!-- Client Info Section -->
 <section class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-4">معلومات العميل</h2>
-<div class="space-y-4">
+
+<div id="customer-selected" class="hidden items-center justify-between bg-surface-container-low rounded-lg p-3">
+<div>
+<div class="font-bold" id="customer-selected-name"></div>
+<div class="text-on-surface-variant text-sm font-data-mono" id="customer-selected-phone" dir="ltr"></div>
+</div>
+<button onclick="clearCustomer()" class="text-error text-sm font-semibold">تغيير</button>
+</div>
+
+<div id="customer-search-block" class="space-y-3">
 <div class="relative">
-<input class="w-full h-12 px-10 py-2 border border-outline-variant rounded bg-white focus:border-primary focus:ring-0 transition-all text-body-md font-body-md" placeholder="أدخل رقم الهاتف..." type="tel"/>
+<input class="w-full h-12 px-10 py-2 border border-outline-variant rounded bg-white focus:border-primary focus:ring-0 transition-all text-body-md font-body-md" id="customer-search" placeholder="ابحث برقم الهاتف أو الاسم..." type="text"/>
 <span class="absolute right-3 top-3 material-symbols-outlined text-outline">search</span>
 </div>
-<button class="w-full h-12 flex items-center justify-center gap-2 border border-primary text-primary font-semibold rounded-lg active:scale-95 transition-all">
+<div id="customer-results" class="space-y-2"></div>
+<button onclick="window.location.href='customer-add-ar.html'" class="w-full h-12 flex items-center justify-center gap-2 border border-primary text-primary font-semibold rounded-lg active:scale-95 transition-all">
 <span class="material-symbols-outlined">person_add</span>
                     إضافة عميل جديد
                 </button>
 </div>
 </section>
-<!-- Voice Input Widget -->
-<section class="bg-surface-container-lowest border border-outline-variant p-6 rounded-xl shadow-sm text-center">
-<div class="mb-4">
-<p class="font-label-md text-label-md text-on-surface-variant mb-1">إملاء الباركود أو رسوم المصنعية</p>
-<p class="text-[12px] text-outline italic" dir="ltr">"Barcode 9021, Fee 500"</p>
-</div>
-<div class="relative inline-flex items-center justify-center p-8 bg-secondary-container rounded-full cursor-pointer active:scale-90 transition-transform duration-200" id="voiceButton">
-<div class="absolute inset-0 bg-secondary-container rounded-full opacity-30 animate-ping hidden" id="voicePing"></div>
-<span class="material-symbols-outlined text-[48px] text-on-secondary-container" id="micIcon">mic</span>
-</div>
-<p class="mt-4 font-label-md text-label-md text-secondary font-bold" id="voiceStatus">بدء الإملاء الصوتي</p>
-</section>
-<!-- Invoice Items Table -->
+
+<!-- Available Pieces Picker -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-<div class="px-4 py-3 bg-primary-container">
-<h2 class="font-label-md text-label-md text-white font-bold">جدول المواد</h2>
+<div class="px-4 py-3 bg-primary-container flex items-center justify-between">
+<h2 class="font-label-md text-label-md text-white font-bold">اختر القطع المتوفرة</h2>
+<button onclick="loadAvailablePieces()" class="text-white text-[11px] underline">تحديث</button>
+</div>
+<div id="pieces-picker" class="divide-y divide-outline-variant max-h-72 overflow-y-auto scroll-hide">
+<div class="p-4 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+</div>
+</section>
+
+<!-- Cart / Invoice Items Table -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+<div class="px-4 py-3 bg-secondary">
+<h2 class="font-label-md text-label-md text-white font-bold">جدول المواد بالفاتورة</h2>
 </div>
 <div class="overflow-x-auto scroll-hide">
 <table class="w-full text-right">
 <thead class="bg-surface-container-high text-on-surface-variant text-[11px] uppercase tracking-tighter">
 <tr>
-<th class="px-4 py-2">الباركود</th>
+<th class="px-3 py-2">الباركود</th>
 <th class="px-2 py-2 text-center">العيار</th>
-<th class="px-2 py-2 text-left">الوزن (جرام)</th>
-<th class="px-2 py-2 text-left">المصنعية</th>
-<th class="px-4 py-2 text-left">الإجمالي</th>
+<th class="px-2 py-2 text-left">الوزن</th>
+<th class="px-2 py-2 text-left">السعر</th>
+<th class="px-2 py-2"></th>
 </tr>
 </thead>
-<tbody class="divide-y divide-outline-variant font-data-mono text-data-mono">
-<tr class="hover:bg-surface-container transition-colors">
-<td class="px-4 py-3">#7734</td>
-<td class="px-2 py-3 text-center">21K</td>
-<td class="px-2 py-3 text-left">12.50</td>
-<td class="px-2 py-3 text-left">150</td>
-<td class="px-4 py-3 text-left font-semibold">1,025 د.إ</td>
-</tr>
-<tr class="hover:bg-surface-container transition-colors">
-<td class="px-4 py-3">#8821</td>
-<td class="px-2 py-3 text-center">18K</td>
-<td class="px-2 py-3 text-left">8.20</td>
-<td class="px-2 py-3 text-left">45</td>
-<td class="px-4 py-3 text-left font-semibold">580 د.إ</td>
-</tr>
+<tbody id="cart-body" class="divide-y divide-outline-variant font-data-mono text-data-mono">
+<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>
 </tbody>
 </table>
 </div>
-<div class="p-4 bg-surface-container-low border-t border-outline-variant text-center">
-<button class="text-primary font-label-md text-label-md flex items-center justify-center gap-1 mx-auto">
-<span class="material-symbols-outlined text-[20px]">add_circle</span>
-                    إدخال يدوي
-                </button>
-</div>
 </section>
+
 <!-- Totals & Payment -->
 <section class="space-y-4 pb-8">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm space-y-2">
-<div class="flex justify-between items-center">
-<span class="text-on-surface-variant font-label-md text-label-md">قيمة الذهب (السعر الحالي)</span>
-<span class="font-data-mono text-data-mono">1,410.00 د.إ</span>
-</div>
-<div class="flex justify-between items-center">
-<span class="text-on-surface-variant font-label-md text-label-md">إجمالي رسوم المصنعية</span>
-<span class="font-data-mono text-data-mono">195.00 د.إ</span>
-</div>
-<div class="pt-2 mt-2 border-t border-outline-variant flex justify-between items-end">
+<div class="pt-2 flex justify-between items-end">
 <span class="text-primary font-bold font-headline-md text-headline-md">الإجمالي</span>
-<div class="text-left">
-<span class="block text-[10px] text-secondary font-bold uppercase tracking-widest leading-none">مقرب</span>
-<span class="text-primary font-bold text-headline-md font-headline-md">1,605.00 د.إ</span>
+<span class="text-primary font-bold text-headline-md font-headline-md" id="grand-total">0.00 د.إ</span>
 </div>
 </div>
-</div>
-<!-- Payment Mode -->
+
 <div class="grid grid-cols-2 gap-3">
 <button class="flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95" id="pay-cash" onclick="selectPayment('cash')">
 <span class="material-symbols-outlined mb-1">payments</span>
@@ -237,24 +157,25 @@
 <span class="font-label-md text-label-md">فيزا / بنك</span>
 </button>
 </div>
-<!-- Action Button -->
-<button onclick="window.location.href='index-ar.html'" class="w-full py-4 bg-[#B4955A] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
-<span class="material-symbols-outlined">print</span>
-                حفظ وطباعة الفاتورة
+
+<div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
+
+<button id="save-invoice-btn" class="w-full py-4 bg-[#B4955A] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
+<span class="material-symbols-outlined">save</span>
+                حفظ الفاتورة
             </button>
 </section>
 </main>
-<!-- Bottom Navigation Bar -->
-<nav class="fixed bottom-0 w-full flex justify-around items-center px-margin-mobile py-2 bg-surface-container-lowest border-t border-outline-variant shadow-sm z-50">
+
+<nav class="fixed bottom-0 w-full flex justify-around items-center px-4 py-2 bg-surface-container-lowest border-t border-outline-variant shadow-sm z-50">
 <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="index-ar.html">
 <span class="material-symbols-outlined">dashboard</span>
 <span class="font-label-md text-label-md">لوحة التحكم</span>
 </a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="inventory-add.html">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="inventory-list-ar.html">
 <span class="material-symbols-outlined">inventory_2</span>
 <span class="font-label-md text-label-md">المخزن</span>
 </a>
-<!-- Active Tab: Invoices (as we are creating a sale) -->
 <a class="flex flex-col items-center justify-center text-primary font-bold cursor-pointer active:scale-90 duration-150" href="new-sale-ar.html">
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
 <span class="font-label-md text-label-md">الفواتير</span>
@@ -268,60 +189,262 @@
 <span class="font-label-md text-label-md">الإعدادات</span>
 </a>
 </nav>
+
 <script>
-        // Micro-interactions for Voice Widget
-        const voiceBtn = document.getElementById('voiceButton');
-        const voicePing = document.getElementById('voicePing');
-        const voiceStatus = document.getElementById('voiceStatus');
-        const micIcon = document.getElementById('micIcon');
-        let isListening = false;
+    requireGoldMindSession('login-entry-ar.html');
 
-        voiceBtn.addEventListener('click', () => {
-            isListening = !isListening;
-            if (isListening) {
-                voicePing.classList.remove('hidden');
-                micIcon.innerText = 'graphic_eq';
-                voiceStatus.innerText = 'جاري الاستماع...';
-                voiceStatus.classList.add('text-error');
-                // Simulate processing
-                setTimeout(() => {
-                    if(isListening) {
-                        isListening = false;
-                        voicePing.classList.add('hidden');
-                        micIcon.innerText = 'mic';
-                        voiceStatus.innerText = 'تم إضافة العنصر بنجاح';
-                        voiceStatus.classList.replace('text-error', 'text-on-secondary-container');
-                        setTimeout(() => {
-                            voiceStatus.innerText = 'بدء الإملاء الصوتي';
-                            voiceStatus.classList.remove('text-on-secondary-container');
-                        }, 2000);
-                    }
-                }, 4000);
-            } else {
-                voicePing.classList.add('hidden');
-                micIcon.innerText = 'mic';
-                voiceStatus.innerText = 'بدء الإملاء الصوتي';
-                voiceStatus.classList.remove('text-error');
-            }
-        });
+    let selectedCustomer = null;
+    let selectedPaymentMethod = 'cash';
+    let availablePieces = [];
+    const cart = []; // { piece, price }
 
-        // Payment Toggle
-        function selectPayment(mode) {
-            const cashBtn = document.getElementById('pay-cash');
-            const bankBtn = document.getElementById('pay-bank');
-            
-            if (mode === 'cash') {
-                cashBtn.className = 'flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95';
-                bankBtn.className = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
-            } else {
-                bankBtn.className = 'flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95';
-                cashBtn.className = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
-            }
+    // ---------- Payment toggle ----------
+    function selectPayment(mode) {
+        selectedPaymentMethod = mode;
+        const cashBtn = document.getElementById('pay-cash');
+        const bankBtn = document.getElementById('pay-bank');
+        const active = 'flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95';
+        const inactive = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
+        cashBtn.className = mode === 'cash' ? active : inactive;
+        bankBtn.className = mode === 'bank' ? active : inactive;
+    }
+
+    // ---------- Customer search ----------
+    const customerSearchInput = document.getElementById('customer-search');
+    const customerResults = document.getElementById('customer-results');
+
+    let searchTimeout;
+    customerSearchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        const q = customerSearchInput.value.trim();
+        if (!q) { customerResults.innerHTML = ''; return; }
+        searchTimeout = setTimeout(() => searchCustomers(q), 350);
+    });
+
+    async function searchCustomers(q) {
+        const { data, error } = await goldmindClient
+            .from('customers')
+            .select('*')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .or(`name.ilike.%${q}%,phone.ilike.%${q}%`)
+            .limit(8);
+
+        if (error) {
+            customerResults.innerHTML = `<div class="text-error text-sm">خطأ بالبحث: ${error.message}</div>`;
+            return;
         }
 
-        // Fabrication fee rounding logic (nearest 0 or 5)
-        function roundFabrication(fee) {
-            return Math.round(fee / 5) * 5;
+        if (!data || data.length === 0) {
+            customerResults.innerHTML = `<div class="text-on-surface-variant text-sm p-2">لا يوجد عميل مطابق. جرب "إضافة عميل جديد".</div>`;
+            return;
         }
-    </script>
+
+        customerResults.innerHTML = data.map(c => `
+            <div class="flex items-center justify-between bg-surface-container-low rounded-lg p-3 cursor-pointer active:scale-[0.98] transition-all" onclick='pickCustomer(${JSON.stringify(c).replace(/'/g, "&apos;")})'>
+                <div>
+                    <div class="font-bold">${c.name}</div>
+                    <div class="text-on-surface-variant text-sm font-data-mono" dir="ltr">${c.phone || ''}</div>
+                </div>
+                <span class="material-symbols-outlined text-primary">chevron_left</span>
+            </div>
+        `).join('');
+    }
+
+    function pickCustomer(c) {
+        selectedCustomer = c;
+        document.getElementById('customer-selected-name').textContent = c.name;
+        document.getElementById('customer-selected-phone').textContent = c.phone || '';
+        document.getElementById('customer-selected').classList.remove('hidden');
+        document.getElementById('customer-selected').classList.add('flex');
+        document.getElementById('customer-search-block').classList.add('hidden');
+    }
+
+    function clearCustomer() {
+        selectedCustomer = null;
+        document.getElementById('customer-selected').classList.add('hidden');
+        document.getElementById('customer-selected').classList.remove('flex');
+        document.getElementById('customer-search-block').classList.remove('hidden');
+        customerSearchInput.value = '';
+        customerResults.innerHTML = '';
+    }
+
+    // ---------- Available pieces picker ----------
+    async function loadAvailablePieces() {
+        const picker = document.getElementById('pieces-picker');
+        picker.innerHTML = '<div class="p-4 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>';
+
+        const { data, error } = await goldmindClient
+            .from('pieces')
+            .select('*')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .eq('status', 'available')
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            picker.innerHTML = `<div class="p-4 text-error text-sm">خطأ: ${error.message}</div>`;
+            return;
+        }
+
+        availablePieces = data || [];
+        renderPiecesPicker();
+    }
+
+    function renderPiecesPicker() {
+        const picker = document.getElementById('pieces-picker');
+        const cartIds = new Set(cart.map(item => item.piece.id));
+        const remaining = availablePieces.filter(p => !cartIds.has(p.id));
+
+        if (remaining.length === 0) {
+            picker.innerHTML = '<div class="p-4 text-center text-on-surface-variant text-sm">لا توجد قطع متوفرة حالياً</div>';
+            return;
+        }
+
+        picker.innerHTML = remaining.map(p => `
+            <div class="p-3 flex items-center justify-between gap-2">
+                <div class="min-w-0">
+                    <div class="font-data-mono font-bold text-sm">${p.weight_grams} غ &middot; عيار ${p.karat}</div>
+                    <div class="text-outline text-[11px] font-data-mono truncate">${p.barcode || 'بدون باركود'}</div>
+                </div>
+                <div class="flex items-center gap-2 shrink-0">
+                    <input type="number" placeholder="السعر" class="w-24 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="price-input-${p.id}"/>
+                    <button onclick="addToCart('${p.id}')" class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all">
+                        <span class="material-symbols-outlined">add</span>
+                    </button>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    function addToCart(pieceId) {
+        const piece = availablePieces.find(p => p.id === pieceId);
+        const priceInput = document.getElementById(`price-input-${pieceId}`);
+        const price = parseFloat(priceInput.value);
+
+        if (!price || price <= 0) {
+            priceInput.classList.add('border-error');
+            priceInput.focus();
+            return;
+        }
+
+        cart.push({ piece, price });
+        renderCart();
+        renderPiecesPicker();
+    }
+
+    function removeFromCart(pieceId) {
+        const idx = cart.findIndex(item => item.piece.id === pieceId);
+        if (idx !== -1) cart.splice(idx, 1);
+        renderCart();
+        renderPiecesPicker();
+    }
+
+    function renderCart() {
+        const body = document.getElementById('cart-body');
+        if (cart.length === 0) {
+            body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
+            document.getElementById('grand-total').textContent = '0.00 د.إ';
+            return;
+        }
+
+        body.innerHTML = cart.map(item => `
+            <tr>
+                <td class="px-3 py-3">${item.piece.barcode || '—'}</td>
+                <td class="px-2 py-3 text-center">${item.piece.karat}K</td>
+                <td class="px-2 py-3 text-left">${item.piece.weight_grams}</td>
+                <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}</td>
+                <td class="px-2 py-3 text-left">
+                    <button onclick="removeFromCart('${item.piece.id}')" class="text-error">
+                        <span class="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+
+        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        document.getElementById('grand-total').textContent = total.toFixed(2) + ' د.إ';
+    }
+
+    // ---------- Save invoice ----------
+    const saveBtn = document.getElementById('save-invoice-btn');
+    const messageBox = document.getElementById('save-message');
+
+    function showMessage(text, isError) {
+        messageBox.textContent = text;
+        messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+        messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
+    }
+
+    saveBtn.addEventListener('click', async () => {
+        if (!selectedCustomer) {
+            showMessage('الرجاء اختيار عميل أولاً.', true);
+            return;
+        }
+        if (cart.length === 0) {
+            showMessage('الرجاء إضافة قطعة واحدة على الأقل.', true);
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'جارِ الحفظ...';
+
+        const { data: { session } } = await goldmindClient.auth.getSession();
+        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        const invoiceNumber = 'INV-' + Date.now();
+
+        const { data: invoiceRow, error: invoiceError } = await goldmindClient
+            .from('invoices')
+            .insert({
+                store_id: GOLDMIND_STORE_ID,
+                invoice_number: invoiceNumber,
+                type: 'sale',
+                customer_id: selectedCustomer.id,
+                payment_method: selectedPaymentMethod,
+                fabrication_fees: 0,
+                vat_amount: 0,
+                total_amount: total,
+                amount_paid: total,
+                status: 'paid',
+                created_by: session ? session.user.id : null
+            })
+            .select()
+            .single();
+
+        if (invoiceError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ الفاتورة';
+            showMessage('خطأ بحفظ الفاتورة: ' + invoiceError.message, true);
+            return;
+        }
+
+        const itemsPayload = cart.map(item => ({
+            invoice_id: invoiceRow.id,
+            piece_id: item.piece.id,
+            barcode: item.piece.barcode,
+            karat: item.piece.karat,
+            weight_grams: item.piece.weight_grams,
+            fabrication_fee: 0,
+            line_total: item.price
+        }));
+
+        const { error: itemsError } = await goldmindClient.from('invoice_items').insert(itemsPayload);
+
+        if (itemsError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ الفاتورة';
+            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة القطع: ' + itemsError.message, true);
+            return;
+        }
+
+        const pieceIds = cart.map(item => item.piece.id);
+        await goldmindClient.from('pieces').update({ status: 'sold' }).in('id', pieceIds);
+
+        showMessage('تم حفظ الفاتورة بنجاح!', false);
+        setTimeout(() => {
+            window.location.href = 'index-ar.html';
+        }, 1200);
+    });
+
+    // Init
+    loadAvailablePieces();
+</script>
 </body></html>
