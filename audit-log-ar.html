@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -196,11 +198,7 @@
 <div class="md:col-span-2 p-6 bg-surface-container-lowest border border-outline-variant rounded-xl flex flex-col justify-between overflow-hidden relative group">
 <div class="z-10">
 <p class="font-label-md text-label-md text-on-surface-variant mb-1">نشاطات اليوم</p>
-<h2 class="font-headline-xl text-headline-xl text-primary">124 <span class="text-body-md font-normal text-on-surface-variant">عملية</span></h2>
-<div class="mt-4 flex items-center gap-2 text-secondary font-medium">
-<span class="material-symbols-outlined text-[18px]">trending_up</span>
-<span class="text-label-md">+12% عن يوم أمس</span>
-</div>
+<h2 class="font-headline-xl text-headline-xl text-primary"><span id="stat-today">0</span> <span class="text-body-md font-normal text-on-surface-variant">عملية</span></h2>
 </div>
 <div class="absolute -left-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500">
 <span class="material-symbols-outlined text-[120px]">history</span>
@@ -211,14 +209,14 @@
 <span class="material-symbols-outlined text-green-600">add_circle</span>
 </div>
 <p class="font-label-md text-label-md text-on-surface-variant">إضافات</p>
-<p class="font-headline-md text-headline-md text-primary">45</p>
+<p class="font-headline-md text-headline-md text-primary" id="stat-adds">0</p>
 </div>
 <div class="p-6 bg-surface-container-lowest border border-outline-variant rounded-xl flex flex-col justify-center items-center text-center">
 <div class="w-12 h-12 rounded-full bg-red-50 flex items-center justify-center mb-3">
 <span class="material-symbols-outlined text-red-600">delete</span>
 </div>
 <p class="font-label-md text-label-md text-on-surface-variant">حذف</p>
-<p class="font-headline-md text-headline-md text-primary">12</p>
+<p class="font-headline-md text-headline-md text-primary" id="stat-deletes">0</p>
 </div>
 </section>
 <!-- Filters Bar -->
@@ -265,140 +263,15 @@
 <th class="px-6 py-4 font-label-md text-label-md uppercase tracking-wider">الإجراء</th>
 </tr>
 </thead>
-<tbody class="divide-y divide-outline-variant">
-<!-- Activity Item 1 -->
-<tr class="hover:bg-surface-container transition-colors cursor-pointer">
-<td class="px-6 py-4 whitespace-nowrap">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 rounded-full border border-outline-variant overflow-hidden">
-<img class="w-full h-full object-cover" data-alt="A high-quality portrait of a professional female jewelry appraiser in an upscale, modern office environment. The lighting is crisp and highlights fine textures. The overall mood is sophisticated and reliable, using a color palette of muted navy and warm gold tones typical of a luxury enterprise SaaS." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCKQu6Oy2RBYMNsyoLyG7nQ2WPlXr4OFFL-OPpfrNihkakjTlez_j-Df6tvg04vH2tBS22DPMm1GR-kyxLYlC5CGFch3eFjX7AvrHcWDhFtrcgLllu3_59KsuSK9RvRHp1-amQevNljoqgJGaYDBqLOr5I9deAj7w704OCbRakboqmFOqokVpKMbc1WKWZWRZBHgXM356eLGmVAnWwQjldW2fu2eRbjNXAo3lxIcYY-fkw-rcTZ0D0m8g"/>
-</div>
-<div>
-<p class="font-label-md text-label-md text-on-surface">فاطمة الزهراء</p>
-<p class="text-[12px] text-on-surface-variant">مدير المخازن</p>
-</div>
-</div>
-</td>
-<td class="px-6 py-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-green-600 text-[20px]">add_task</span>
-<span class="font-label-md text-label-md">إضافة مخزون</span>
-</div>
-</td>
-<td class="px-6 py-4">
-<p class="text-body-md text-on-surface-variant">تمت إضافة 500 جرام من الذهب عيار 24</p>
-</td>
-<td class="px-6 py-4 whitespace-nowrap">
-<p class="font-data-mono text-data-mono text-on-surface">10:45 AM</p>
-</td>
-<td class="px-6 py-4">
-<button class="text-primary hover:underline font-label-md text-label-md">التفاصيل</button>
-</td>
-</tr>
-<!-- Activity Item 2 -->
-<tr class="hover:bg-surface-container transition-colors cursor-pointer">
-<td class="px-6 py-4 whitespace-nowrap">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 rounded-full border border-outline-variant overflow-hidden">
-<img class="w-full h-full object-cover" data-alt="Close up portrait of a male data analyst in a sharp navy suit, looking directly at the camera with a confident and helpful expression. High-end office interior with subtle light bokeh. Corporate professional aesthetic with a clean, light-mode background color scheme." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAYy3vwwrht4mAT8kIbFZlTShbVWOrsuiTxLrLN8eKkG73i8t1Z_C596jI1c4AGeEg8xropAwdpo1J71-AfElF5clrTdXYlDH-zCQyhr_jHwnNu7EGf776Tr224XVdOtBm-rMskmBx6gMvfQuS1MtHhtbAQq7QUCORBFjPisJ3rScgqfA1IwAIqIOVHoxnzMQ2K0LCp4j3VdFXnZ74Ilvw2IMe8J5lSv2lUIKm4qXenDdbbcXvFDRfBjA"/>
-</div>
-<div>
-<p class="font-label-md text-label-md text-on-surface">أحمد العتيبي</p>
-<p class="text-[12px] text-on-surface-variant">محاسب مالي</p>
-</div>
-</div>
-</td>
-<td class="px-6 py-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-secondary text-[20px]">edit_note</span>
-<span class="font-label-md text-label-md">تعديل فاتورة</span>
-</div>
-</td>
-<td class="px-6 py-4">
-<p class="text-body-md text-on-surface-variant">تعديل قيمة الفاتورة #INV-9821</p>
-</td>
-<td class="px-6 py-4 whitespace-nowrap">
-<p class="font-data-mono text-data-mono text-on-surface">09:12 AM</p>
-</td>
-<td class="px-6 py-4">
-<button class="text-primary hover:underline font-label-md text-label-md">التفاصيل</button>
-</td>
-</tr>
-<!-- Activity Item 3 -->
-<tr class="hover:bg-surface-container transition-colors cursor-pointer">
-<td class="px-6 py-4 whitespace-nowrap">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 rounded-full border border-outline-variant overflow-hidden">
-<img class="w-full h-full object-cover" data-alt="Portrait of a young professional Arab woman in a modern business setting, wearing stylish corporate attire. Soft lighting, high-end minimalist interior with glass and slate accents. The mood is precise and authoritative, fitting for a financial technology platform administrator." src="https://lh3.googleusercontent.com/aida-public/AB6AXuCwlzuQFMtcYUOTlAsOew42_Y7STcGKRnUELH22mXVCMRX8zhSSoFacbRkTYCwQwXPz-AyAZkMNX_hv4anJnHIGJqizZoXYUmr7sc3SP_IHIJ9PP70GE_fVUFL8-GBw9svoIK-f5XRZ1nkEB2hqIzECJYNcSeFEftuda1U_aZNcCD3kR6HCzqDRqy-n8c0R3Gxy9V80KAXGsHokfiGFcwZZlAeIWrlIR5qOQ-Ce0bwdoJQv-wCAeO4X6g"/>
-</div>
-<div>
-<p class="font-label-md text-label-md text-on-surface">سارة المنصوري</p>
-<p class="text-[12px] text-on-surface-variant">مسؤول نظام</p>
-</div>
-</div>
-</td>
-<td class="px-6 py-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-red-600 text-[20px]">person_remove</span>
-<span class="font-label-md text-label-md">حذف صلاحية</span>
-</div>
-</td>
-<td class="px-6 py-4">
-<p class="text-body-md text-on-surface-variant">إزالة صلاحيات الوصول للموظف كمال خالد</p>
-</td>
-<td class="px-6 py-4 whitespace-nowrap">
-<p class="font-data-mono text-data-mono text-on-surface">08:30 AM</p>
-</td>
-<td class="px-6 py-4">
-<button class="text-primary hover:underline font-label-md text-label-md">التفاصيل</button>
-</td>
-</tr>
-<!-- Activity Item 4 -->
-<tr class="hover:bg-surface-container transition-colors cursor-pointer">
-<td class="px-6 py-4 whitespace-nowrap">
-<div class="flex items-center gap-3">
-<div class="w-10 h-10 rounded-full border border-outline-variant overflow-hidden">
-<img class="w-full h-full object-cover" data-alt="Portrait of a mature, experienced professional in the gold trading industry. High-quality corporate studio lighting, sharp focus on eyes, warm skin tones, blurred background of a modern trading floor. Trustworthy and authoritative vibe." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAyxfteHcC_LR29Lk4gKMZH8W-IZL2NLmlcrFnHyMmLozUhthuWrHgOi_rZVoVDss6ql-U6PIP_JDtoSoBWJJMZKD21xzoNA4vxv5jlrXBcvtGsqXSsGhrzUCJ0S1UA4-tQwFEvoZdQwU1Pfqyib9vIvHQIYcMPmXVsl5cG6QONkaSTEiX36ghfH8sm0TcY8OlVxvSgmrGXyNvzgoQRna1Wy6InU2d7hiW0BM4ngaFySjJvFQCeYW-2qA"/>
-</div>
-<div>
-<p class="font-label-md text-label-md text-on-surface">خالد الصباح</p>
-<p class="text-[12px] text-on-surface-variant">مدير المبيعات</p>
-</div>
-</div>
-</td>
-<td class="px-6 py-4">
-<div class="flex items-center gap-2">
-<span class="material-symbols-outlined text-green-600 text-[20px]">verified</span>
-<span class="font-label-md text-label-md">تأكيد عملية</span>
-</div>
-</td>
-<td class="px-6 py-4">
-<p class="text-body-md text-on-surface-variant">الموافقة على شحنة رقم #SHIP-331</p>
-</td>
-<td class="px-6 py-4 whitespace-nowrap">
-<p class="font-data-mono text-data-mono text-on-surface">07:55 AM</p>
-</td>
-<td class="px-6 py-4">
-<button class="text-primary hover:underline font-label-md text-label-md">التفاصيل</button>
-</td>
-</tr>
+<tbody class="divide-y divide-outline-variant" id="activity-tbody">
+<tr><td colspan="5" class="text-center text-on-surface-variant text-sm py-10">جارِ التحميل...</td></tr>
 </tbody>
 </table>
 </div>
+<div id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-10">لا يوجد نشاط مسجّل بعد.</div>
 <!-- Pagination -->
 <div class="flex items-center justify-between px-6 py-4 bg-surface-container-low border-t border-outline-variant">
-<p class="font-label-md text-label-md text-on-surface-variant">عرض 1-10 من 124 نشاط</p>
-<div class="flex gap-2">
-<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant hover:bg-surface-container active:scale-95 transition-transform">
-<span class="material-symbols-outlined text-[18px]">chevron_right</span>
-</button>
-<button class="w-8 h-8 flex items-center justify-center rounded bg-primary text-white font-label-md text-label-md">1</button>
-<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant hover:bg-surface-container active:scale-95 transition-transform">2</button>
-<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant hover:bg-surface-container active:scale-95 transition-transform">3</button>
-<button class="w-8 h-8 flex items-center justify-center rounded border border-outline-variant hover:bg-surface-container active:scale-95 transition-transform">
-<span class="material-symbols-outlined text-[18px]">chevron_left</span>
-</button>
-</div>
+<p class="font-label-md text-label-md text-on-surface-variant" id="activity-count-label">عرض 0 نشاط</p>
 </div>
 </div>
 </div>
@@ -424,25 +297,103 @@
 </nav>
 <!-- Micro-interaction script -->
 <script>
-        document.querySelectorAll('tr').forEach(row => {
-            row.addEventListener('click', () => {
-                row.classList.add('scale-[0.99]');
-                setTimeout(() => row.classList.remove('scale-[0.99]'), 100);
-            });
-        });
+requireGoldMindSession('login-entry-ar.html');
 
-        // Simple filtering simulation for demo
-        const searchInput = document.querySelector('input[type="text"]');
-        if(searchInput) {
-            searchInput.addEventListener('input', (e) => {
-                const term = e.target.value.toLowerCase();
-                document.querySelectorAll('tbody tr').forEach(row => {
-                    const text = row.innerText.toLowerCase();
-                    row.style.display = text.includes(term) ? '' : 'none';
-                });
-            });
-        }
-    </script>
+const ACTION_ICONS = {
+  invoices_insert: { icon: 'receipt_long', color: 'text-green-600' },
+  invoices_update: { icon: 'edit_note', color: 'text-secondary' },
+  invoices_delete: { icon: 'delete', color: 'text-red-600' },
+  pieces_insert: { icon: 'add_task', color: 'text-green-600' },
+  pieces_update: { icon: 'inventory_2', color: 'text-secondary' },
+  pieces_delete: { icon: 'delete', color: 'text-red-600' },
+  customers_insert: { icon: 'person_add', color: 'text-green-600' },
+  customers_delete: { icon: 'person_remove', color: 'text-red-600' },
+  cash_movements_insert: { icon: 'payments', color: 'text-secondary' }
+};
+
+let allEntries = [];
+
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return d.toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+}
+
+function renderEntries(entries) {
+  const tbody = document.getElementById('activity-tbody');
+  const emptyState = document.getElementById('empty-state');
+  document.getElementById('activity-count-label').textContent = 'عرض ' + entries.length + ' نشاط';
+
+  if (entries.length === 0) {
+    tbody.innerHTML = '';
+    document.querySelector('table').parentElement.classList.add('hidden');
+    emptyState.classList.remove('hidden');
+    return;
+  }
+  document.querySelector('table').parentElement.classList.remove('hidden');
+  emptyState.classList.add('hidden');
+
+  tbody.innerHTML = entries.map(e => {
+    const meta = ACTION_ICONS[e.action_type] || { icon: 'info', color: 'text-on-surface-variant' };
+    const staffName = e.staff ? (e.staff.full_name || 'موظف') : 'النظام';
+    return `<tr class="hover:bg-surface-container transition-colors">
+      <td class="px-6 py-4 whitespace-nowrap">
+        <p class="font-label-md text-label-md text-on-surface">${staffName}</p>
+      </td>
+      <td class="px-6 py-4">
+        <div class="flex items-center gap-2">
+          <span class="material-symbols-outlined ${meta.color} text-[20px]">${meta.icon}</span>
+          <span class="font-label-md text-label-md">${e.action_type}</span>
+        </div>
+      </td>
+      <td class="px-6 py-4"><p class="text-body-md text-on-surface-variant">${e.description || ''}</p></td>
+      <td class="px-6 py-4 whitespace-nowrap"><p class="font-data-mono text-data-mono text-on-surface">${fmtTime(e.created_at)}</p></td>
+      <td class="px-6 py-4"></td>
+    </tr>`;
+  }).join('');
+}
+
+async function loadActivity() {
+  const { data, error } = await goldmindClient
+    .from('audit_log')
+    .select('*, staff:staff_id(full_name)')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: false })
+    .limit(150);
+
+  if (error) {
+    document.getElementById('activity-tbody').innerHTML =
+      `<tr><td colspan="5" class="text-center text-error text-sm py-10">تعذّر تحميل السجل: ${error.message}</td></tr>`;
+    return;
+  }
+
+  allEntries = data || [];
+
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayCount = allEntries.filter(e => new Date(e.created_at) >= today).length;
+  const addCount = allEntries.filter(e => e.action_type.endsWith('_insert')).length;
+  const deleteCount = allEntries.filter(e => e.action_type.endsWith('_delete')).length;
+
+  document.getElementById('stat-today').textContent = todayCount;
+  document.getElementById('stat-adds').textContent = addCount;
+  document.getElementById('stat-deletes').textContent = deleteCount;
+
+  renderEntries(allEntries);
+}
+
+const searchInput = document.querySelector('input[type="text"]');
+if (searchInput) {
+  searchInput.addEventListener('input', (e) => {
+    const term = e.target.value.trim().toLowerCase();
+    if (!term) { renderEntries(allEntries); return; }
+    renderEntries(allEntries.filter(entry =>
+      (entry.description || '').toLowerCase().includes(term) ||
+      (entry.staff && entry.staff.full_name || '').toLowerCase().includes(term)
+    ));
+  });
+}
+
+loadActivity();
+</script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
