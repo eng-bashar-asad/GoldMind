@@ -56,6 +56,32 @@
 </div>
 
 <div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-country">الدولة</label>
+<select class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-country" onchange="onCountryChange()">
+<option value="">اختر الدولة...</option>
+<option value="AE">الإمارات العربية المتحدة</option>
+<option value="SA">المملكة العربية السعودية</option>
+<option value="KW">الكويت</option>
+<option value="QA">قطر</option>
+<option value="BH">البحرين</option>
+<option value="OM">عُمان</option>
+<option value="EG">مصر</option>
+<option value="JO">الأردن</option>
+<option value="LB">لبنان</option>
+<option value="IQ">العراق</option>
+<option value="SY">سوريا</option>
+<option value="US">الولايات المتحدة</option>
+<option value="OTHER">دولة أخرى</option>
+</select>
+<p class="text-[11px] text-outline mt-1 px-1">اختيار الدولة بيضبط العملة تلقائياً — بتقدر تعدلها يدوياً بعدين.</p>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-currency">رمز العملة</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-currency" placeholder="AED" type="text"/>
+</div>
+
+<div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-address">العنوان</label>
 <textarea class="w-full h-24 border border-outline-variant rounded-lg px-4 py-3 focus:ring-1 focus:ring-primary outline-none text-right resize-none" id="store-address" placeholder="الشارع، المدينة، الدولة"></textarea>
 </div>
@@ -179,6 +205,20 @@
         manualBtn.className = mode === 'manual' ? active : inactive;
     }
 
+    const countryCurrencyMap = {
+        'AE': 'AED', 'SA': 'SAR', 'KW': 'KWD', 'QA': 'QAR', 'BH': 'BHD',
+        'OM': 'OMR', 'EG': 'EGP', 'JO': 'JOD', 'LB': 'LBP', 'IQ': 'IQD',
+        'SY': 'SYP', 'US': 'USD'
+    };
+
+    function onCountryChange() {
+        const country = document.getElementById('store-country').value;
+        const currencyInput = document.getElementById('store-currency');
+        if (countryCurrencyMap[country]) {
+            currencyInput.value = countryCurrencyMap[country];
+        }
+    }
+
     function showMessage(text, isError) {
         messageBox.textContent = text;
         messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
@@ -212,6 +252,8 @@
         }
 
         document.getElementById('store-name').value = data.name || '';
+        document.getElementById('store-country').value = data.country || '';
+        document.getElementById('store-currency').value = data.currency || 'AED';
         document.getElementById('store-address').value = data.address || '';
         document.getElementById('store-phone').value = data.phone || '';
         document.getElementById('store-vat').value = data.vat_rate != null ? data.vat_rate : 5;
@@ -233,6 +275,8 @@
 
     saveBtn.addEventListener('click', async () => {
         const name = document.getElementById('store-name').value.trim();
+        const country = document.getElementById('store-country').value;
+        const currency = document.getElementById('store-currency').value.trim().toUpperCase();
         const address = document.getElementById('store-address').value.trim();
         const phone = document.getElementById('store-phone').value.trim();
         const vat = parseFloat(document.getElementById('store-vat').value);
@@ -259,6 +303,8 @@
             .from('stores')
             .update({
                 name: name,
+                country: country || null,
+                currency: currency || 'AED',
                 address: address || null,
                 phone: phone || null,
                 vat_rate: isNaN(vat) ? 5 : vat,
