@@ -258,6 +258,9 @@
     });
 
     async function searchCustomers(q) {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
         const { data, error } = await goldmindClient
             .from('customers')
             .select('*')
@@ -311,6 +314,9 @@
     });
 
     async function searchByBarcode() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
         const input = document.getElementById('barcode-search-input');
         const code = input.value.trim();
         if (!code) return;
@@ -457,6 +463,9 @@
     }
 
     saveBtn.addEventListener('click', async () => {
+        const gmSession = await requireGoldMindSession('login-entry-ar.html');
+        if (!gmSession) return;
+
         if (!selectedCustomer) {
             showMessage('الرجاء اختيار عميل أولاً.', true);
             return;
