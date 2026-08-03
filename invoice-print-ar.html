@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>فاتورة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; }
+    body { font-family: 'Inter', sans-serif; }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; }
+        #invoice-sheet { box-shadow: none !important; border: none !important; margin: 0 !important; }
+    }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<!-- Top bar (screen only) -->
+<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 h-14">
+<button onclick="window.location.href='index-ar.html'" class="flex items-center gap-2 text-gray-700">
+<span class="material-symbols-outlined">arrow_forward</span>
+<span class="text-sm font-semibold">الرئيسية</span>
+</button>
+<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">print</span>
+                طباعة
+            </button>
+</div>
+
+<div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
+<div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
+
+<div class="max-w-md mx-auto p-4">
+<div id="invoice-sheet" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-6">
+
+<!-- Header: logo + store info -->
+<div class="text-center border-b border-dashed border-gray-300 pb-4 mb-4">
+<img class="hidden mx-auto mb-2 h-14 object-contain" id="store-logo"/>
+<div class="font-bold text-lg" id="store-name"></div>
+<div class="text-[11px] text-gray-500 mt-1" id="store-address"></div>
+<div class="text-[11px] text-gray-500" id="store-contact"></div>
+<div class="text-[10px] text-gray-400 mt-1" id="store-legal"></div>
+</div>
+
+<!-- Invoice meta -->
+<div class="flex justify-between text-[12px] text-gray-600 mb-4">
+<div>
+<div>رقم الفاتورة: <span class="font-bold text-gray-900" id="inv-number"></span></div>
+<div>التاريخ: <span id="inv-date"></span></div>
+</div>
+<div class="text-left">
+<div>طريقة الدفع: <span id="inv-payment"></span></div>
+</div>
+</div>
+
+<!-- Customer info -->
+<div class="bg-gray-50 rounded-lg p-3 mb-4 text-[12px]">
+<div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1">بيانات العميل</div>
+<div class="font-bold" id="cust-name"></div>
+<div class="text-gray-600 font-mono" dir="ltr" id="cust-phone"></div>
+</div>
+
+<!-- Items table -->
+<table class="w-full text-[11px] mb-4">
+<thead>
+<tr class="border-b-2 border-gray-800 text-gray-600">
+<th class="py-2 text-right">الوصف</th>
+<th class="py-2 text-center">العيار</th>
+<th class="py-2 text-center">الوزن</th>
+<th class="py-2 text-left">السعر</th>
+<th class="py-2 text-left">الضريبة</th>
+<th class="py-2 text-left">الإجمالي</th>
+</tr>
+</thead>
+<tbody id="items-body" class="divide-y divide-gray-100"></tbody>
+</table>
+
+<!-- Totals -->
+<div class="border-t-2 border-gray-800 pt-3 space-y-1 text-[12px]">
+<div class="flex justify-between text-gray-600">
+<span>الإجمالي قبل الضريبة</span>
+<span id="sum-before-tax"></span>
+</div>
+<div class="flex justify-between text-gray-600">
+<span>قيمة الضريبة (<span id="vat-rate-label"></span>%)</span>
+<span id="sum-tax"></span>
+</div>
+<div class="flex justify-between font-bold text-base pt-1 border-t border-gray-200 mt-1">
+<span>الإجمالي الكامل</span>
+<span id="sum-total"></span>
+</div>
+</div>
+
+<div class="text-center text-[10px] text-gray-400 mt-6">شكراً لتعاملكم معنا</div>
+
+</div>
+</div>
+
+<script>
+    requireGoldMindSession('login-entry-ar.html');
+
+    function fmt(n) {
+        return (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+    }
+
+    async function loadInvoice() {
+        const params = new URLSearchParams(window.location.search);
+        const invoiceId = params.get('id');
+        const loading = document.getElementById('loading-state');
+        const errorState = document.getElementById('error-state');
+        const sheet = document.getElementById('invoice-sheet');
+
+        if (!invoiceId) {
+            loading.classList.add('hidden');
+            errorState.textContent = 'لم يتم تحديد رقم فاتورة.';
+            errorState.classList.remove('hidden');
+            return;
+        }
+
+        const [{ data: store, error: storeError }, { data: invoice, error: invoiceError }] = await Promise.all([
+            goldmindClient.from('stores').select('*').eq('id', GOLDMIND_STORE_ID).single(),
+            goldmindClient.from('invoices').select('*').eq('id', invoiceId).single()
+        ]);
+
+        if (storeError || invoiceError) {
+            loading.classList.add('hidden');
+            errorState.textContent = 'خطأ بتحميل الفاتورة: ' + ((invoiceError || storeError).message);
+            errorState.classList.remove('hidden');
+            return;
+        }
+
+        const [{ data: items, error: itemsError }, { data: customer }] = await Promise.all([
+            goldmindClient.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('created_at', { ascending: true }),
+            invoice.customer_id
+                ? goldmindClient.from('customers').select('*').eq('id', invoice.customer_id).single()
+                : Promise.resolve({ data: null })
+        ]);
+
+        if (itemsError) {
+            loading.classList.add('hidden');
+            errorState.textContent = 'خطأ بتحميل عناصر الفاتورة: ' + itemsError.message;
+            errorState.classList.remove('hidden');
+            return;
+        }
+
+        // ---- Header ----
+        if (store.logo_url) {
+            const logo = document.getElementById('store-logo');
+            logo.src = store.logo_url;
+            logo.classList.remove('hidden');
+        }
+        document.getElementById('store-name').textContent = store.name || '';
+        document.getElementById('store-address').textContent = store.address || '';
+
+        const contactParts = [];
+        if (store.phone) contactParts.push('هاتف: ' + store.phone);
+        if (store.email) contactParts.push('بريد: ' + store.email);
+        document.getElementById('store-contact').textContent = contactParts.join(' | ');
+
+        const legalParts = [];
+        if (store.commercial_registration_number) legalParts.push('س.ت: ' + store.commercial_registration_number);
+        if (store.tax_number) legalParts.push('ر.ض: ' + store.tax_number);
+        if (store.license_number) legalParts.push('رخصة: ' + store.license_number);
+        document.getElementById('store-legal').textContent = legalParts.join(' | ');
+
+        // ---- Invoice meta ----
+        document.getElementById('inv-number').textContent = invoice.invoice_number || invoice.id;
+        document.getElementById('inv-date').textContent = new Date(invoice.created_at).toLocaleDateString('ar-AE');
+        const paymentLabels = { cash: 'نقدي', bank: 'فيزا / بنك' };
+        document.getElementById('inv-payment').textContent = paymentLabels[invoice.payment_method] || invoice.payment_method || '';
+
+        // ---- Customer ----
+        document.getElementById('cust-name').textContent = customer ? customer.name : '—';
+        document.getElementById('cust-phone').textContent = customer ? (customer.phone || '') : '';
+
+        // ---- Items + VAT breakdown ----
+        const vatRate = Number(store.vat_rate || 0);
+        const vatMultiplier = 1 + (vatRate / 100);
+
+        let sumBeforeTax = 0;
+        let sumTax = 0;
+        let sumTotal = 0;
+
+        const itemsBody = document.getElementById('items-body');
+        itemsBody.innerHTML = (items || []).map(item => {
+            const full = Number(item.line_total || 0);
+            const beforeTax = full / vatMultiplier;
+            const tax = full - beforeTax;
+
+            sumBeforeTax += beforeTax;
+            sumTax += tax;
+            sumTotal += full;
+
+            return `
+                <tr>
+                    <td class="py-2">${item.description || '—'}</td>
+                    <td class="py-2 text-center">${item.karat}K</td>
+                    <td class="py-2 text-center">${item.weight_grams}</td>
+                    <td class="py-2 text-left">${fmt(beforeTax)}</td>
+                    <td class="py-2 text-left">${fmt(tax)}</td>
+                    <td class="py-2 text-left font-semibold">${fmt(full)}</td>
+                </tr>
+            `;
+        }).join('');
+
+        document.getElementById('vat-rate-label').textContent = fmt(vatRate).replace(/\.00$/, '');
+        document.getElementById('sum-before-tax').textContent = fmt(sumBeforeTax) + ' ' + (store.currency || 'AED');
+        document.getElementById('sum-tax').textContent = fmt(sumTax) + ' ' + (store.currency || 'AED');
+        document.getElementById('sum-total').textContent = fmt(sumTotal) + ' ' + (store.currency || 'AED');
+
+        loading.classList.add('hidden');
+        sheet.classList.remove('hidden');
+    }
+
+    loadInvoice();
+</script>
+</body></html>
