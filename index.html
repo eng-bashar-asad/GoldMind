@@ -138,9 +138,14 @@
 <h1 class="font-headline-md text-headline-md font-bold text-primary">GoldMind</h1>
 </div>
 <div class="flex items-center gap-2">
-<button class="font-label-md text-label-md text-primary cursor-pointer active:opacity-80 px-2 py-1 hover:bg-surface-container-high rounded transition-colors">
-                EN - $
+<div class="flex items-center gap-2">
+<button id="lang-toggle-btn" onclick="window.location.href='index-ar.html'" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-[11px] font-bold text-primary active:scale-90 transition-all" title="Switch language">
+                EN
             </button>
+<button id="currency-toggle-btn" onclick="toggleCurrency()" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-[13px] font-bold text-primary active:scale-90 transition-all" title="Switch currency">
+                $
+            </button>
+</div>
 </div>
 </header>
 <main class="pt-20 pb-24 px-margin-mobile max-w-md mx-auto">
@@ -297,11 +302,22 @@
             }, 150);
         });
 
-        // Toggle language as a dummy interaction
-        const langBtn = document.querySelector('header button.font-label-md');
-        langBtn.addEventListener('click', () => {
-            const current = langBtn.innerText;
-            langBtn.innerText = current === 'EN - $' ? 'AR - ﷼' : 'EN - $';
-        });
+        // Real currency toggle (shared with Arabic dashboard via localStorage)
+        const currencySymbols = { 'AED': 'د.إ', 'USD': '$', 'EUR': '€' };
+        const currencyOrder = ['AED', 'USD', 'EUR'];
+        function toggleCurrency() {
+            const btn = document.getElementById('currency-toggle-btn');
+            let current = localStorage.getItem('goldmind_currency_code') || 'AED';
+            let idx = currencyOrder.indexOf(current);
+            idx = (idx + 1) % currencyOrder.length;
+            const next = currencyOrder[idx];
+            localStorage.setItem('goldmind_currency_code', next);
+            btn.textContent = currencySymbols[next];
+        }
+        (function initCurrencyButton() {
+            const saved = localStorage.getItem('goldmind_currency_code') || 'AED';
+            const btn = document.getElementById('currency-toggle-btn');
+            if (btn) btn.textContent = currencySymbols[saved];
+        })();
     </script>
 </body></html>
