@@ -310,36 +310,14 @@
             }
 
             const user = data.user;
-            const { data: existingStaff } = await goldmindClient
-                .from('staff')
-                .select('id')
-                .eq('id', user.id)
-                .maybeSingle();
+            const mode = sessionStorage.getItem('goldmind_mode');
 
-            if (!existingStaff) {
-                const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
-                if (isAdmin) {
-                    sessionStorage.removeItem('goldmind_email');
-                    sessionStorage.removeItem('goldmind_mode');
-                    sessionStorage.removeItem('goldmind_company_name');
-                    sessionStorage.removeItem('goldmind_store_id');
-                    sessionStorage.removeItem('goldmind_store_name');
-                    window.location.href = 'admin-panel-ar.html';
-                    return;
-                }
+            if (mode === 'join') {
+                const storeId = sessionStorage.getItem('goldmind_store_id');
+                const { data: alreadyMember } = await goldmindClient
+                    .from('staff').select('id').eq('user_id', user.id).eq('store_id', storeId).maybeSingle();
 
-                const mode = sessionStorage.getItem('goldmind_mode');
-
-                if (mode === 'new') {
-                    const companyName = sessionStorage.getItem('goldmind_company_name');
-                    const { error: rpcError } = await goldmindClient.rpc('register_new_company', { company_name: companyName });
-                    if (rpcError) {
-                        errEl.textContent = 'تعذّر إنشاء الشركة: ' + rpcError.message;
-                        errEl.classList.remove('hidden');
-                        return;
-                    }
-                } else if (mode === 'join') {
-                    const storeId = sessionStorage.getItem('goldmind_store_id');
+                if (!alreadyMember) {
                     const { error: rpcError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: storeId });
                     if (rpcError) {
                         if (rpcError.message && rpcError.message.includes('NOT_INVITED')) {
@@ -351,11 +329,38 @@
                         await goldmindClient.auth.signOut();
                         return;
                     }
-                } else {
-                    errEl.textContent = 'فضلاً ابدأ من صفحة تسجيل الدخول واختر شركة أو سجّل شركة جديدة.';
-                    errEl.classList.remove('hidden');
-                    await goldmindClient.auth.signOut();
-                    return;
+                }
+                localStorage.setItem('goldmind_active_store', storeId);
+            } else {
+                const { data: anyMembership } = await goldmindClient
+                    .from('staff').select('id').eq('user_id', user.id).limit(1).maybeSingle();
+
+                if (!anyMembership) {
+                    const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
+                    if (isAdmin) {
+                        sessionStorage.removeItem('goldmind_email');
+                        sessionStorage.removeItem('goldmind_mode');
+                        sessionStorage.removeItem('goldmind_company_name');
+                        sessionStorage.removeItem('goldmind_store_id');
+                        sessionStorage.removeItem('goldmind_store_name');
+                        window.location.href = 'admin-panel-ar.html';
+                        return;
+                    }
+
+                    if (mode === 'new') {
+                        const companyName = sessionStorage.getItem('goldmind_company_name');
+                        const { error: rpcError } = await goldmindClient.rpc('register_new_company', { company_name: companyName });
+                        if (rpcError) {
+                            errEl.textContent = 'تعذّر إنشاء الشركة: ' + rpcError.message;
+                            errEl.classList.remove('hidden');
+                            return;
+                        }
+                    } else {
+                        errEl.textContent = 'فضلاً ابدأ من صفحة تسجيل الدخول واختر شركة أو سجّل شركة جديدة.';
+                        errEl.classList.remove('hidden');
+                        await goldmindClient.auth.signOut();
+                        return;
+                    }
                 }
             }
 
