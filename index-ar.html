@@ -349,21 +349,21 @@
         window.location.href = 'index.html';
     }
     function toggleCurrency() {
-        const currencies = ['د.إ', '$', '€'];
+        const currencySymbols = { 'AED': 'د.إ', 'USD': '$', 'EUR': '€' };
+        const currencyOrder = ['AED', 'USD', 'EUR'];
         const btn = document.getElementById('currency-toggle-btn');
-        let current = localStorage.getItem('goldmind_currency') || 'د.إ';
-        let idx = currencies.indexOf(current);
-        idx = (idx + 1) % currencies.length;
-        const next = currencies[idx];
-        localStorage.setItem('goldmind_currency', next);
-        btn.textContent = next;
+        let current = localStorage.getItem('goldmind_currency_code') || 'AED';
+        let idx = currencyOrder.indexOf(current);
+        idx = (idx + 1) % currencyOrder.length;
+        const next = currencyOrder[idx];
+        localStorage.setItem('goldmind_currency_code', next);
+        btn.textContent = currencySymbols[next];
     }
     (function initCurrencyButton() {
-        const saved = localStorage.getItem('goldmind_currency');
-        if (saved) {
-            const btn = document.getElementById('currency-toggle-btn');
-            if (btn) btn.textContent = saved;
-        }
+        const currencySymbols = { 'AED': 'د.إ', 'USD': '$', 'EUR': '€' };
+        const saved = localStorage.getItem('goldmind_currency_code') || 'AED';
+        const btn = document.getElementById('currency-toggle-btn');
+        if (btn) btn.textContent = currencySymbols[saved];
     })();
 
     function openNavDrawer() {
