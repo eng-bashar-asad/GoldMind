@@ -150,7 +150,7 @@ document.getElementById('companySearch').addEventListener('input', function () {
     clearTimeout(searchDebounce);
     const q = this.value.trim();
     const resultsBox = document.getElementById('companyResults');
-    if (q.length < 2) { resultsBox.classList.add('hidden'); return; }
+    if (q.length < 1) { resultsBox.classList.add('hidden'); return; }
     searchDebounce = setTimeout(async () => {
         const { data, error } = await goldmindClient.rpc('search_companies', { q });
         if (error || !data || data.length === 0) {
@@ -162,7 +162,7 @@ document.getElementById('companySearch').addEventListener('input', function () {
             `<div class="company-result px-4 py-3 text-sm cursor-pointer text-white/90" onclick="selectCompany('${c.id}', '${c.name.replace(/'/g, "\\'")}')">${c.name}</div>`
         ).join('');
         resultsBox.classList.remove('hidden');
-    }, 300);
+    }, 150);
 });
 
 document.getElementById('joinForm').addEventListener('submit', async function (e) {
