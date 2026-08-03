@@ -260,7 +260,7 @@
 
             // Staff name / role for the welcome line
             const { data: staffRow } = await goldmindClient
-                .from('staff').select('full_name, role').eq('id', session.user.id).maybeSingle();
+                .from('staff').select('full_name, role').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle();
             if (staffRow) {
                 const roleLabel = staffRow.role === 'owner' ? 'مالك الحساب' : 'موظف';
                 document.getElementById('welcomeEl').textContent = staffRow.full_name + ' • ' + roleLabel;
