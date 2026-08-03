@@ -349,22 +349,43 @@
         window.location.href = 'index.html';
     }
     function toggleCurrency() {
-        const currencySymbols = { 'AED': 'د.إ', 'USD': '$', 'EUR': '€' };
-        const currencyOrder = ['AED', 'USD', 'EUR'];
         const btn = document.getElementById('currency-toggle-btn');
-        let current = localStorage.getItem('goldmind_currency_code') || 'AED';
-        let idx = currencyOrder.indexOf(current);
-        idx = (idx + 1) % currencyOrder.length;
-        const next = currencyOrder[idx];
+        const order = window.__goldmindCurrencyOrder || ['AED', 'USD', 'EUR'];
+        let current = localStorage.getItem('goldmind_currency_code') || order[0];
+        let idx = order.indexOf(current);
+        idx = (idx + 1) % order.length;
+        const next = order[idx];
         localStorage.setItem('goldmind_currency_code', next);
-        btn.textContent = currencySymbols[next];
+        btn.textContent = currencySymbolFor(next);
     }
-    (function initCurrencyButton() {
-        const currencySymbols = { 'AED': 'د.إ', 'USD': '$', 'EUR': '€' };
-        const saved = localStorage.getItem('goldmind_currency_code') || 'AED';
+
+    const currencySymbols = {
+        'AED': 'د.إ', 'SAR': 'ر.س', 'KWD': 'د.ك', 'QAR': 'ر.ق', 'BHD': 'د.ب',
+        'OMR': 'ر.ع', 'EGP': 'ج.م', 'JOD': 'د.أ', 'LBP': 'ل.ل', 'IQD': 'د.ع',
+        'SYP': 'ل.س', 'USD': '$', 'EUR': '€'
+    };
+    function currencySymbolFor(code) {
+        return currencySymbols[code] || code;
+    }
+
+    async function initCurrencyButton() {
         const btn = document.getElementById('currency-toggle-btn');
-        if (btn) btn.textContent = currencySymbols[saved];
-    })();
+        const { data: store } = await goldmindClient
+            .from('stores')
+            .select('currency')
+            .eq('id', GOLDMIND_STORE_ID)
+            .single();
+
+        const storeCurrency = (store && store.currency) ? store.currency.toUpperCase() : 'AED';
+        const order = [storeCurrency];
+        ['USD', 'EUR'].forEach(c => { if (!order.includes(c)) order.push(c); });
+        window.__goldmindCurrencyOrder = order;
+
+        const saved = localStorage.getItem('goldmind_currency_code');
+        const active = (saved && order.includes(saved)) ? saved : storeCurrency;
+        if (btn) btn.textContent = currencySymbolFor(active);
+    }
+    initCurrencyButton();
 
     function openNavDrawer() {
         document.getElementById('navDrawerOverlay').classList.remove('hidden');
