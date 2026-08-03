@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>اختر الفرع | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25",
+          "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000", "outline": "#76777d"
+        },
+        "fontFamily": { "body-md": ["Inter"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; } body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md flex flex-col items-center justify-center p-6">
+<div class="w-full max-w-sm">
+<div class="text-center mb-8">
+<span class="material-symbols-outlined text-secondary" style="font-size:40px;">storefront</span>
+<h1 class="font-headline-md text-headline-md font-bold mt-2">اختر الفرع</h1>
+<p class="text-sm text-on-surface-variant mt-1">هذا الحساب مسجّل بأكتر من فرع</p>
+</div>
+
+<div id="loading-state" class="text-center text-on-surface-variant text-sm py-8">جارِ التحميل...</div>
+<div id="stores-list" class="flex flex-col gap-3"></div>
+
+<button onclick="goldMindSignOut()" class="w-full mt-8 text-error text-sm font-semibold">تسجيل الخروج</button>
+</div>
+
+<script>
+async function load() {
+  const { data: { session } } = await goldmindClient.auth.getSession();
+  if (!session) { window.location.href = 'login-entry-ar.html'; return; }
+
+  const { data, error } = await goldmindClient.rpc('my_stores');
+  document.getElementById('loading-state').classList.add('hidden');
+
+  if (error || !data || data.length === 0) {
+    document.getElementById('stores-list').innerHTML = '<p class="text-center text-error text-sm">تعذّر تحميل الفروع.</p>';
+    return;
+  }
+
+  const roleLabel = { owner: 'مالك', staff: 'موظف' };
+
+  document.getElementById('stores-list').innerHTML = data.map(s => `
+    <button onclick="goldMindSetActiveStore('${s.store_id}')" class="w-full text-right bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex items-center justify-between active:scale-[0.98] transition-all hover:border-primary">
+      <div>
+        <p class="font-semibold text-[15px]">${s.store_name}</p>
+        <p class="text-[12px] text-on-surface-variant">${roleLabel[s.role] || s.role}</p>
+      </div>
+      <span class="material-symbols-outlined text-outline">chevron_left</span>
+    </button>`).join('');
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
