@@ -137,9 +137,14 @@
 <h1 class="font-headline-md text-headline-md font-bold text-primary">GoldMind</h1>
 </div>
 <div class="flex items-center gap-2">
-<a class="font-label-md text-label-md text-primary cursor-pointer active:opacity-80 px-2 py-1 hover:bg-surface-container-high rounded transition-colors" href="index.html">
-                AR - د.إ
-            </a>
+<div class="flex items-center gap-2">
+<button id="lang-toggle-btn" onclick="toggleLanguage()" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-[11px] font-bold text-primary active:scale-90 transition-all" title="تبديل اللغة">
+                AR
+            </button>
+<button id="currency-toggle-btn" onclick="toggleCurrency()" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-[13px] font-bold text-primary active:scale-90 transition-all" title="تبديل العملة">
+                د.إ
+            </button>
+</div>
 </div>
 </header>
 <main class="pt-20 pb-24 px-margin-mobile max-w-md mx-auto">
@@ -319,7 +324,7 @@
 
 <!-- Site Navigation Drawer -->
 <div class="fixed inset-0 bg-black/40 z-[200] hidden" id="navDrawerOverlay" onclick="closeNavDrawer()"></div>
-<div class="fixed top-0 right-0 h-full w-72 max-w-[80vw] bg-surface-container-lowest z-[201] shadow-2xl -translate-x-full rtl:translate-x-full transition-transform duration-300 flex flex-col" dir="rtl" id="navDrawer">
+<div class="fixed top-0 right-0 h-full w-72 max-w-[80vw] bg-surface-container-lowest z-[201] shadow-2xl translate-x-full transition-transform duration-300 flex flex-col" dir="rtl" id="navDrawer">
 <div class="flex items-center justify-between px-5 h-16 border-b border-outline-variant">
 <span class="font-headline-md text-headline-md font-bold text-primary">GoldMind</span>
 <button class="material-symbols-outlined text-on-surface-variant" onclick="closeNavDrawer()">close</button>
@@ -338,16 +343,36 @@
 </nav>
 </div>
 <script>
+    function toggleLanguage() {
+        window.location.href = 'index.html';
+    }
+    function toggleCurrency() {
+        const currencies = ['د.إ', '$', '€'];
+        const btn = document.getElementById('currency-toggle-btn');
+        let current = localStorage.getItem('goldmind_currency') || 'د.إ';
+        let idx = currencies.indexOf(current);
+        idx = (idx + 1) % currencies.length;
+        const next = currencies[idx];
+        localStorage.setItem('goldmind_currency', next);
+        btn.textContent = next;
+    }
+    (function initCurrencyButton() {
+        const saved = localStorage.getItem('goldmind_currency');
+        if (saved) {
+            const btn = document.getElementById('currency-toggle-btn');
+            if (btn) btn.textContent = saved;
+        }
+    })();
+
     function openNavDrawer() {
         document.getElementById('navDrawerOverlay').classList.remove('hidden');
         const d = document.getElementById('navDrawer');
-        d.classList.remove('-translate-x-full', 'translate-x-full');
+        d.classList.remove('translate-x-full');
     }
     function closeNavDrawer() {
         document.getElementById('navDrawerOverlay').classList.add('hidden');
         const d = document.getElementById('navDrawer');
-        const isRTL = document.documentElement.getAttribute('dir') === 'rtl';
-        d.classList.add(isRTL ? 'translate-x-full' : '-translate-x-full');
+        d.classList.add('translate-x-full');
     }
 </script>
 
