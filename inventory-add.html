@@ -140,20 +140,25 @@
 <main class="pb-32 max-w-md mx-auto">
 <!-- Camera Section -->
 <section class="p-margin-mobile">
-<div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200">
-<div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden">
-<div class="absolute inset-0 opacity-10 bg-cover bg-center transition-opacity group-hover:opacity-20" data-alt="A luxurious close-up of a high-end jewelry photography station with soft, diffused white lighting and professional macro lenses. The background is a clean, minimalist studio setting with neutral gray tones, emphasizing a professional corporate atmosphere for asset management. The lighting is crisp and clear, reflecting off metallic surfaces with precision." style="background-image: url('https://lh3.googleusercontent.com/aida-public/AB6AXuA9NYvNW996_cU2OxJwAPZ93VcLRSxg-WyzJX-iZbPVbt41NnsNTzUMd976vhDYIenM-DPOC1QW69Jw46ETEyLF_UA_Oy4GvIugixDIIaFuyqx93RZwnKyQ68hcA5x8cg-wgIVlEsUWqdWrRK8zsbnEgTRTwHSmuYPp8E3onY156lcZIyf4pKIoZ84zv2SefGqfmCk6VYJzHC4UjS-QMVMslyq_dSE5y-LhrSsNNNKpenow32k_zXMfOg')"></div>
+<input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
+<div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200" id="photo-trigger" onclick="document.getElementById('photo-input').click()">
+<div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
 <span class="material-symbols-outlined text-outline text-5xl mb-4">photo_camera</span>
 <p class="font-label-md text-label-md text-on-surface-variant font-semibold">Capture Piece Photo</p>
-<p class="font-label-md text-label-md text-outline mt-1">High-resolution required</p>
+<p class="font-label-md text-label-md text-outline mt-1">Tap to take or choose a photo</p>
 </div>
+<img alt="" class="hidden aspect-square w-full rounded-xl object-cover border border-outline-variant" id="photo-preview"/>
+<button class="hidden absolute top-2 left-2 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" onclick="event.stopPropagation(); removePhoto();" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
 </div>
+</section>
 </section>
 <!-- Barcode Section -->
 <section class="px-margin-mobile py-2 flex flex-col gap-4">
-<button class="w-full h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center gap-3 active:scale-95 duration-200 transition-all font-semibold shadow-sm">
+<button type="button" onclick="document.getElementById('barcode-id').focus()" class="w-full h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center gap-3 active:scale-95 duration-200 transition-all font-semibold shadow-sm">
 <span class="material-symbols-outlined">barcode_scanner</span>
-<span class="font-label-md text-label-md">Scan Barcode</span>
+<span class="font-label-md text-label-md">Enter Barcode / Leave Blank to Auto-Generate</span>
 </button>
 <div class="relative">
 <label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="barcode-id">Barcode ID</label>
@@ -247,6 +252,39 @@
         // Require an active session before allowing use of this page
         requireGoldMindSession();
 
+        // ---------- Photo capture ----------
+        let selectedPhotoFile = null;
+        const photoInput = document.getElementById('photo-input');
+        const photoPlaceholder = document.getElementById('photo-placeholder');
+        const photoPreview = document.getElementById('photo-preview');
+        const photoRemoveBtn = document.getElementById('photo-remove-btn');
+
+        photoInput.addEventListener('change', () => {
+            const file = photoInput.files && photoInput.files[0];
+            if (!file) return;
+            selectedPhotoFile = file;
+            const url = URL.createObjectURL(file);
+            photoPreview.src = url;
+            photoPreview.classList.remove('hidden');
+            photoPlaceholder.classList.add('hidden');
+            photoRemoveBtn.classList.remove('hidden');
+            photoRemoveBtn.classList.add('flex');
+        });
+
+        function removePhoto() {
+            selectedPhotoFile = null;
+            photoInput.value = '';
+            photoPreview.classList.add('hidden');
+            photoPlaceholder.classList.remove('hidden');
+            photoRemoveBtn.classList.add('hidden');
+            photoRemoveBtn.classList.remove('flex');
+        }
+
+        function generateBarcode() {
+            const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+            return 'GM-' + Date.now().toString(36).toUpperCase() + '-' + rand;
+        }
+
         // Micro-interactions for form elements
         document.querySelectorAll('button, select, input').forEach(el => {
             el.addEventListener('touchstart', () => {
@@ -297,7 +335,7 @@
             const session = await requireGoldMindSession();
             if (!session) return;
 
-            const barcode = document.getElementById('barcode-id').value.trim();
+            let barcode = document.getElementById('barcode-id').value.trim();
             const weight = parseFloat(document.getElementById('weight').value);
             const karat = parseInt(document.getElementById('karat').value, 10);
 
@@ -306,12 +344,39 @@
                 return;
             }
 
+            if (!barcode) {
+                barcode = generateBarcode();
+            }
+
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
 
+            let photoUrl = null;
+            if (selectedPhotoFile) {
+                showMessage('Uploading photo...', false);
+                const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
+                const path = GOLDMIND_STORE_ID + '/' + barcode + '-' + Date.now() + '.' + ext;
+                const { error: uploadError } = await goldmindClient.storage
+                    .from('piece-photos')
+                    .upload(path, selectedPhotoFile, { upsert: false });
+
+                if (uploadError) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'Save Piece to Inventory';
+                    showMessage('Photo upload failed: ' + uploadError.message, true);
+                    return;
+                }
+
+                const { data: publicUrlData } = goldmindClient.storage
+                    .from('piece-photos')
+                    .getPublicUrl(path);
+                photoUrl = publicUrlData ? publicUrlData.publicUrl : null;
+            }
+
             const { error } = await goldmindClient.from('pieces').insert({
                 store_id: GOLDMIND_STORE_ID,
-                barcode: barcode || null,
+                barcode: barcode,
+                photo_url: photoUrl,
                 weight_grams: weight,
                 karat: karat,
                 color: selectedColor,
@@ -327,10 +392,11 @@
                 return;
             }
 
-            showMessage('Piece saved successfully! Ready for next piece.', false);
-                    document.getElementById('barcode-id').value = '';
-                    document.getElementById('weight').value = '';
-                    document.getElementById('weight').focus();
+            showMessage('Piece saved successfully! Barcode: ' + barcode, false);
+            document.getElementById('barcode-id').value = '';
+            document.getElementById('weight').value = '';
+            document.getElementById('weight').focus();
+            removePhoto();
         });
     </script>
 </body></html>
