@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>تواصل مع الدعم | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; } body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='settings-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">تواصل مع الدعم</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<div id="page-content" class="hidden py-6">
+
+<form id="requestForm" class="flex flex-col gap-5">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="subject">الموضوع</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="subject" required type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="message">تفاصيل الطلب</label>
+<textarea class="w-full h-36 border border-outline-variant rounded-lg p-4 focus:ring-1 focus:ring-primary outline-none text-right" id="message" required></textarea>
+</div>
+<div id="form-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
+<button class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all" id="submitBtn" type="submit">إرسال الطلب</button>
+</form>
+
+<section class="mt-10">
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">طلباتك السابقة</h3>
+<div id="my-requests" class="flex flex-col gap-3"></div>
+</section>
+
+</div>
+</main>
+
+<script>
+const STATUS_LABELS = { open: 'مفتوح', in_progress: 'قيد المعالجة', resolved: 'تم الحل' };
+
+function showMessage(text, isError) {
+  const box = document.getElementById('form-message');
+  box.textContent = text;
+  box.classList.remove('hidden', 'bg-error', 'text-white', 'bg-green-100', 'text-green-700');
+  box.classList.add(isError ? 'bg-error' : 'bg-green-100', isError ? 'text-white' : 'text-green-700');
+}
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+async function loadMyRequests() {
+  const { data, error } = await goldmindClient
+    .from('support_requests').select('*')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: false });
+
+  if (error || !data || data.length === 0) {
+    document.getElementById('my-requests').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-4">لا توجد طلبات سابقة.</p>';
+    return;
+  }
+
+  document.getElementById('my-requests').innerHTML = data.map(r => `
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+      <div class="flex items-center justify-between mb-1">
+        <p class="font-bold text-[14px]">${r.subject}</p>
+        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${r.status === 'resolved' ? 'bg-success-container text-success' : 'bg-surface-container-low text-on-surface-variant'}">${STATUS_LABELS[r.status] || r.status}</span>
+      </div>
+      <p class="text-[11px] text-on-surface-variant mb-2">${fmtDate(r.created_at)}</p>
+      <p class="text-[13px] text-on-surface-variant">${r.message}</p>
+      ${r.admin_reply ? `<div class="bg-surface-container-low rounded-lg p-2 text-[12px] mt-2"><strong>الرد:</strong> ${r.admin_reply}</div>` : ''}
+    </div>`).join('');
+}
+
+async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('page-content').classList.remove('hidden');
+  loadMyRequests();
+}
+
+document.getElementById('requestForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const subject = document.getElementById('subject').value.trim();
+  const message = document.getElementById('message').value.trim();
+  if (!subject || !message) return;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الإرسال...';
+
+  const { error } = await goldmindClient.from('support_requests').insert({
+    store_id: GOLDMIND_STORE_ID,
+    created_by: session.user.id,
+    subject: subject,
+    message: message
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'إرسال الطلب';
+
+  if (error) { showMessage('خطأ: ' + error.message, true); return; }
+
+  showMessage('تم إرسال طلبك، سيتم الرد عليك قريباً.', false);
+  document.getElementById('requestForm').reset();
+  loadMyRequests();
+});
+
+init();
+</script>
+</body></html>
