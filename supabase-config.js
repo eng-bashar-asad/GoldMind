@@ -28,3 +28,12 @@ async function requireGoldMindSession(redirectTo) {
     }
     return session;
 }
+
+// Sign the user out and send them back to the login screen.
+// Confirms first since it's a destructive/navigational action.
+async function goldMindSignOut() {
+    if (!confirm('هل تريد تسجيل الخروج؟')) return;
+    GOLDMIND_STORE_ID = null;
+    await goldmindClient.auth.signOut();
+    window.location.href = 'login-entry-ar.html';
+}
