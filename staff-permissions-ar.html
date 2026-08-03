@@ -80,9 +80,34 @@
 <div id="staff-list" class="flex flex-col gap-3"></div>
 </section>
 
+<section class="mb-6">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">دعوة موظف جديد</h3>
+</div>
+<button id="invite-toggle-btn" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 mb-3 active:scale-[0.98] transition-all" onclick="toggleInviteForm()">
+<span class="material-symbols-outlined">person_add</span>
+<span class="font-label-md text-label-md">دعوة موظف بالبريد الإلكتروني</span>
+</button>
+
+<div id="invite-form" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
+<div class="mb-3">
+<label class="block text-[11px] text-on-surface-variant mb-1">البريد الإلكتروني للموظف</label>
+<input id="invite-email" type="email" dir="ltr" placeholder="employee@example.com" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none"/>
+</div>
+<p class="text-[11px] text-on-surface-variant mb-2">حدد الصلاحيات التي سيحصل عليها فور دخوله لأول مرة:</p>
+<div id="invite-permissions"></div>
+<button id="invite-send-btn" class="w-full h-12 gold-accent text-white rounded-lg font-semibold text-[13px] mt-3 active:scale-[0.98] transition-all" onclick="sendInvite()">إرسال الدعوة</button>
+</div>
+</section>
+
+<section id="invites-section" class="hidden mb-6">
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">دعوات معلّقة</h3>
+<div id="invites-list" class="flex flex-col gap-2"></div>
+</section>
+
 <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-8 text-[12px] text-on-surface-variant leading-5">
 <span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">info</span>
-لإضافة موظف جديد: اطلب منه فتح رابط المتجر وتسجيل الدخول بإيميله عبر رمز OTP — يُنشأ له حساب وصف موظف تلقائياً بصلاحيات محدودة (عرض فقط)، ثم يظهر اسمه هنا خلال لحظات لتفعّل له الصلاحيات المطلوبة.
+بعد إرسال الدعوة، اطلب من الموظف فتح رابط المتجر وتسجيل الدخول بنفس البريد المدعو عبر رمز OTP، ويختار اسم شركتك من البحث — بيدخل مباشرة بالصلاحيات يلي حددتها.
 <br/><br/>
 <span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">lock</span>
 بطاقة المالك دائماً مقفلة على "الكل مفعّل" — المالك يملك كل الصلاحيات تلقائياً ولا حاجة لتعديلها.
@@ -215,6 +240,105 @@ async function onToggle(input) {
   showToast('تم تحديث الصلاحية');
 }
 
+function renderInvitePermissionChecklist() {
+  const html = PERMISSION_GROUPS.map((group) => {
+    const rows = group.keys.map(([key, label]) => `
+      <div class="flex items-center justify-between py-1.5">
+        <span class="text-[12px] text-on-surface-variant">${label}</span>
+        <label class="switch">
+          <input type="checkbox" data-invite-key="${key}"/>
+          <span class="slider"></span>
+        </label>
+      </div>`).join('');
+    return `<div class="border-t border-outline-variant first:border-t-0">
+      <button type="button" class="w-full flex items-center justify-between py-2.5" onclick="toggleGroup(this)">
+        <span class="flex items-center gap-2 text-[12.5px] font-semibold text-on-surface">
+          <span class="material-symbols-outlined text-secondary" style="font-size:16px;">${group.icon}</span>
+          ${group.label}
+        </span>
+        <span class="material-symbols-outlined chev text-outline" style="font-size:18px;">expand_more</span>
+      </button>
+      <div class="cat-body px-1 pb-1">${rows}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('invite-permissions').innerHTML = html;
+}
+
+function toggleInviteForm() {
+  const form = document.getElementById('invite-form');
+  form.classList.toggle('hidden');
+  if (!form.classList.contains('hidden') && !document.getElementById('invite-permissions').dataset.rendered) {
+    renderInvitePermissionChecklist();
+    document.getElementById('invite-permissions').dataset.rendered = '1';
+  }
+}
+
+async function sendInvite() {
+  const email = document.getElementById('invite-email').value.trim();
+  const btn = document.getElementById('invite-send-btn');
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    showToast('فضلاً أدخل بريد إلكتروني صحيح', true);
+    return;
+  }
+
+  const permissions = {};
+  document.querySelectorAll('#invite-permissions input[data-invite-key]').forEach(input => {
+    permissions[input.dataset.inviteKey] = input.checked;
+  });
+
+  btn.disabled = true;
+  btn.textContent = 'جارِ الإرسال...';
+
+  const { error } = await goldmindClient.from('store_invites').insert({
+    store_id: GOLDMIND_STORE_ID,
+    email: email,
+    permissions: permissions,
+    role: 'staff'
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'إرسال الدعوة';
+
+  if (error) {
+    showToast('تعذّر إرسال الدعوة: ' + error.message, true);
+    return;
+  }
+
+  showToast('تم إرسال الدعوة');
+  document.getElementById('invite-email').value = '';
+  document.getElementById('invite-form').classList.add('hidden');
+  loadInvites();
+}
+
+async function revokeInvite(id) {
+  const { error } = await goldmindClient.from('store_invites').update({ status: 'revoked' }).eq('id', id);
+  if (error) { showToast('تعذّر إلغاء الدعوة: ' + error.message, true); return; }
+  showToast('تم إلغاء الدعوة');
+  loadInvites();
+}
+
+async function loadInvites() {
+  const { data: invites, error } = await goldmindClient
+    .from('store_invites').select('id, email, created_at')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error || !invites || invites.length === 0) {
+    document.getElementById('invites-section').classList.add('hidden');
+    return;
+  }
+
+  document.getElementById('invites-section').classList.remove('hidden');
+  document.getElementById('invites-list').innerHTML = invites.map(inv => `
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex items-center justify-between">
+      <div class="min-w-0">
+        <p class="text-[13px] font-semibold text-on-surface truncate" dir="ltr">${inv.email}</p>
+        <p class="text-[11px] text-on-surface-variant">بانتظار أول تسجيل دخول</p>
+      </div>
+      <button class="text-error text-[12px] font-semibold shrink-0" onclick="revokeInvite('${inv.id}')">إلغاء</button>
+    </div>`).join('');
+}
+
 async function loadStaff() {
   const session = await requireGoldMindSession();
   if (!session) return;
@@ -253,6 +377,7 @@ async function loadStaff() {
   document.getElementById('stat-owners').textContent = staffRows.filter(s => s.role === 'owner').length;
   document.getElementById('staff-list').innerHTML = staffRows.map(renderStaffCard).join('');
   document.getElementById('page-content').classList.remove('hidden');
+  loadInvites();
 }
 
 loadStaff();
