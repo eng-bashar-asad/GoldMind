@@ -207,24 +207,42 @@
                 .maybeSingle();
 
             if (!existingStaff) {
-                const { count } = await goldmindClient
-                    .from('staff')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('store_id', GOLDMIND_STORE_ID);
-                const role = (count === 0) ? 'owner' : 'staff';
-                await goldmindClient.from('staff').insert({
-                    id: user.id,
-                    store_id: GOLDMIND_STORE_ID,
-                    full_name: email.split('@')[0],
-                    role: role,
-                    can_sell: true,
-                    can_manage_inventory: role === 'owner',
-                    can_view_reports: role === 'owner',
-                    can_delete: role === 'owner'
-                });
+                const mode = sessionStorage.getItem('goldmind_mode');
+
+                if (mode === 'new') {
+                    const companyName = sessionStorage.getItem('goldmind_company_name');
+                    const { error: rpcError } = await goldmindClient.rpc('register_new_company', { company_name: companyName });
+                    if (rpcError) {
+                        errEl.textContent = 'تعذّر إنشاء الشركة: ' + rpcError.message;
+                        errEl.classList.remove('hidden');
+                        return;
+                    }
+                } else if (mode === 'join') {
+                    const storeId = sessionStorage.getItem('goldmind_store_id');
+                    const { error: rpcError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: storeId });
+                    if (rpcError) {
+                        if (rpcError.message && rpcError.message.includes('NOT_INVITED')) {
+                            errEl.textContent = 'هذا البريد الإلكتروني غير مدعو من "' + (sessionStorage.getItem('goldmind_store_name') || 'هذه الشركة') + '". تواصل مع مدير الشركة ليضيفك، أو سجّل شركة جديدة.';
+                        } else {
+                            errEl.textContent = 'تعذّر الانضمام للشركة: ' + rpcError.message;
+                        }
+                        errEl.classList.remove('hidden');
+                        await goldmindClient.auth.signOut();
+                        return;
+                    }
+                } else {
+                    errEl.textContent = 'فضلاً ابدأ من صفحة تسجيل الدخول واختر شركة أو سجّل شركة جديدة.';
+                    errEl.classList.remove('hidden');
+                    await goldmindClient.auth.signOut();
+                    return;
+                }
             }
 
             sessionStorage.removeItem('goldmind_email');
+            sessionStorage.removeItem('goldmind_mode');
+            sessionStorage.removeItem('goldmind_company_name');
+            sessionStorage.removeItem('goldmind_store_id');
+            sessionStorage.removeItem('goldmind_store_name');
             window.location.href = 'index-ar.html';
         });
 
