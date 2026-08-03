@@ -294,6 +294,9 @@
         }
 
         saveBtn.addEventListener('click', async () => {
+            const session = await requireGoldMindSession();
+            if (!session) return;
+
             const barcode = document.getElementById('barcode-id').value.trim();
             const weight = parseFloat(document.getElementById('weight').value);
             const karat = parseInt(document.getElementById('karat').value, 10);
@@ -305,8 +308,6 @@
 
             saveBtn.disabled = true;
             saveBtn.textContent = 'Saving...';
-
-            const { data: { session } } = await goldmindClient.auth.getSession();
 
             const { error } = await goldmindClient.from('pieces').insert({
                 store_id: GOLDMIND_STORE_ID,
