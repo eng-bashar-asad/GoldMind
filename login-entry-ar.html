@@ -12,11 +12,19 @@
         body { font-family: 'IBM+Plex+Sans+Arabic', 'Inter', sans-serif; background-color: var(--deep-navy); }
         .gold-glow { text-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
         .gem-comet {
-            animation: gemComet 1.4s linear infinite;
             filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 7px rgba(255, 255, 255, 0.6));
         }
-        @keyframes gemComet {
+        .gem-comet-a {
+            animation: gemCometForward 1.4s linear infinite;
+        }
+        .gem-comet-b {
+            animation: gemCometReverse 2.3s linear infinite;
+        }
+        @keyframes gemCometForward {
             to { stroke-dashoffset: -140; }
+        }
+        @keyframes gemCometReverse {
+            to { stroke-dashoffset: 140; }
         }
         .gem-node {
             transform-box: fill-box;
@@ -55,21 +63,27 @@
 <body class="text-white min-h-screen flex flex-col items-center justify-center p-4">
 <main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
 <div class="mb-8 text-center">
-<div class="inline-flex items-center justify-center w-28 h-28 rounded-full border-2 border-primary/30 mb-6 bg-surface-container relative">
-<svg width="66" height="66" viewBox="0 0 56 56" fill="none" class="relative z-10">
+<div class="inline-flex items-center justify-center w-32 h-32 rounded-full border-2 border-primary/30 mb-6 bg-surface-container relative">
+<svg width="78" height="78" viewBox="0 0 56 56" fill="none" class="relative z-10">
 <defs>
 <linearGradient id="gemGrad" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
 <stop stop-color="#FFD700"/>
 <stop offset="1" stop-color="#B4955A"/>
 </linearGradient>
-<linearGradient id="cometGrad" x1="0" y1="0" x2="1" y2="1">
+<linearGradient id="cometGradA" x1="0" y1="0" x2="1" y2="1">
 <stop offset="0" stop-color="#FFD700" stop-opacity="0"/>
 <stop offset="0.55" stop-color="#FFD700" stop-opacity="0.85"/>
 <stop offset="1" stop-color="#FFFFFF" stop-opacity="1"/>
 </linearGradient>
+<linearGradient id="cometGradB" x1="1" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+<stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.75"/>
+<stop offset="1" stop-color="#FFD700" stop-opacity="1"/>
+</linearGradient>
 </defs>
 <path class="gem-track" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" stroke="url(#gemGrad)" stroke-width="1.5" fill="rgba(255,215,0,0.07)" stroke-linejoin="round" opacity="0.4"/>
-<path class="gem-comet" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" pathLength="140" stroke="url(#cometGrad)" stroke-width="3.2" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="24 116"/>
+<path class="gem-comet gem-comet-a" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" pathLength="140" stroke="url(#cometGradA)" stroke-width="3.2" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="22 118"/>
+<path class="gem-comet gem-comet-b" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" pathLength="140" stroke="url(#cometGradB)" stroke-width="2.2" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="14 126"/>
 <path d="M8 20 L48 20" stroke="url(#gemGrad)" stroke-width="1.2" opacity="0.5"/>
 <path d="M18 20 L16 50" stroke="url(#gemGrad)" stroke-width="1" opacity="0.4"/>
 <path d="M38 20 L40 50" stroke="url(#gemGrad)" stroke-width="1" opacity="0.4"/>
