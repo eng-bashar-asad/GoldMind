@@ -1,0 +1,181 @@
+<!DOCTYPE html>
+
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>بيانات الشركة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
+          "outline": "#76777d"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; }</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='settings-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">بيانات الشركة</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<form id="store-form" class="hidden py-6 flex flex-col gap-5">
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-name">اسم المتجر</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-name" type="text"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-address">العنوان</label>
+<textarea class="w-full h-24 border border-outline-variant rounded-lg px-4 py-3 focus:ring-1 focus:ring-primary outline-none text-right resize-none" id="store-address" placeholder="الشارع، المدينة، الدولة"></textarea>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-phone">رقم التواصل</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-phone" placeholder="+971 xx xxx xxxx" type="tel"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-vat">نسبة الضريبة (%)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-vat" step="0.01" type="number"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-logo">رابط اللوغو (اختياري)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-logo" placeholder="https://..." type="text"/>
+<p class="text-[11px] text-outline mt-1 px-1">إذا تركته فارغاً، لن يظهر أي لوغو بالفاتورة المطبوعة.</p>
+</div>
+
+<div id="logo-preview-wrap" class="hidden">
+<span class="text-[11px] font-semibold text-outline block mb-2">معاينة اللوغو</span>
+<img id="logo-preview" class="h-16 object-contain border border-outline-variant rounded-lg p-2 bg-white"/>
+</div>
+
+<div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
+
+<button id="save-btn" type="button" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md active:scale-[0.98] transition-all mt-2">
+    حفظ البيانات
+</button>
+
+</form>
+</main>
+
+<script>
+    requireGoldMindSession('login-entry-ar.html');
+
+    const loadingState = document.getElementById('loading-state');
+    const form = document.getElementById('store-form');
+    const saveBtn = document.getElementById('save-btn');
+    const messageBox = document.getElementById('save-message');
+    const logoInput = document.getElementById('store-logo');
+    const logoPreviewWrap = document.getElementById('logo-preview-wrap');
+    const logoPreview = document.getElementById('logo-preview');
+
+    function showMessage(text, isError) {
+        messageBox.textContent = text;
+        messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+        messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
+    }
+
+    function updateLogoPreview() {
+        const url = logoInput.value.trim();
+        if (url) {
+            logoPreview.src = url;
+            logoPreviewWrap.classList.remove('hidden');
+        } else {
+            logoPreviewWrap.classList.add('hidden');
+        }
+    }
+    logoInput.addEventListener('input', updateLogoPreview);
+
+    async function loadStore() {
+        const { data, error } = await goldmindClient
+            .from('stores')
+            .select('*')
+            .eq('id', GOLDMIND_STORE_ID)
+            .single();
+
+        loadingState.classList.add('hidden');
+
+        if (error) {
+            showMessage('خطأ بتحميل بيانات المتجر: ' + error.message, true);
+            form.classList.remove('hidden');
+            return;
+        }
+
+        document.getElementById('store-name').value = data.name || '';
+        document.getElementById('store-address').value = data.address || '';
+        document.getElementById('store-phone').value = data.phone || '';
+        document.getElementById('store-vat').value = data.vat_rate != null ? data.vat_rate : 5;
+        logoInput.value = data.logo_url || '';
+        updateLogoPreview();
+
+        form.classList.remove('hidden');
+    }
+
+    saveBtn.addEventListener('click', async () => {
+        const name = document.getElementById('store-name').value.trim();
+        const address = document.getElementById('store-address').value.trim();
+        const phone = document.getElementById('store-phone').value.trim();
+        const vat = parseFloat(document.getElementById('store-vat').value);
+        const logo = logoInput.value.trim();
+
+        if (!name) {
+            showMessage('الرجاء إدخال اسم المتجر.', true);
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'جارِ الحفظ...';
+
+        const { error } = await goldmindClient
+            .from('stores')
+            .update({
+                name: name,
+                address: address || null,
+                phone: phone || null,
+                vat_rate: isNaN(vat) ? 5 : vat,
+                logo_url: logo || null
+            })
+            .eq('id', GOLDMIND_STORE_ID);
+
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'حفظ البيانات';
+
+        if (error) {
+            showMessage('خطأ: ' + error.message, true);
+            return;
+        }
+
+        showMessage('تم حفظ بيانات الشركة بنجاح!', false);
+    });
+
+    loadStore();
+</script>
+</body></html>
