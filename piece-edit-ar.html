@@ -193,7 +193,7 @@ async function load() {
   }
 
   const { data: me } = await goldmindClient
-    .from('staff').select('role, permissions').eq('id', session.user.id).single();
+    .from('staff').select('role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).single();
   canEdit = me && (me.role === 'owner' || (me.permissions && me.permissions.edit_piece === true));
   canDelete = me && (me.role === 'owner' || (me.permissions && me.permissions.delete_piece === true));
 
