@@ -1,85 +1,42 @@
 <!DOCTYPE html>
-
 <html class="dark" dir="rtl" lang="ar"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>GoldMind | تسجيل الدخول</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
         html { font-size: 87.5%; }
-
-        :root {
-            --royal-gold: #FFD700;
-            --deep-navy: #0f172a;
-        }
-        body {
-            font-family: 'IBM+Plex+Sans+Arabic', 'Inter', sans-serif;
-            background-color: var(--deep-navy);
-        }
-        .gold-glow {
-            text-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
-        }
-        .gold-border-focus:focus-within {
-            border-color: var(--royal-gold);
-            box-shadow: 0 0 0 1px var(--royal-gold);
-        }
-        .gold-gradient {
-            background: linear-gradient(135deg, #FFD700 0%, #B4955A 100%);
-        }
-        .glass-panel {
-            background: rgba(30, 41, 59, 0.7);
-            backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 215, 0, 0.1);
-        }
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
-            vertical-align: middle;
-            font-size: 18px;
-        }
+        :root { --royal-gold: #FFD700; --deep-navy: #0f172a; }
+        body { font-family: 'IBM+Plex+Sans+Arabic', 'Inter', sans-serif; background-color: var(--deep-navy); }
+        .gold-glow { text-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
+        .gold-border-focus:focus-within { border-color: var(--royal-gold); box-shadow: 0 0 0 1px var(--royal-gold); }
+        .gold-gradient { background: linear-gradient(135deg, #FFD700 0%, #B4955A 100%); }
+        .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 215, 0, 0.1); }
+        .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; vertical-align: middle; font-size: 18px; }
         .error-text { display: none; }
+        .tab-btn { transition: all .15s ease; }
+        .tab-btn.active { background: rgba(255,215,0,0.12); color: var(--royal-gold); }
+        .tab-btn:not(.active) { color: rgba(255,255,255,0.55); }
+        .company-result:hover { background: rgba(255,215,0,0.08); }
+        .company-chip { background: rgba(255,215,0,0.12); border: 1px solid rgba(255,215,0,0.35); }
     </style>
 <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "primary": "#FFD700",
-                        "on-primary": "#0f172a",
-                        "secondary": "#745a25",
-                        "surface": "#0f172a",
-                        "surface-container": "#1e293b",
-                        "outline": "#76777d",
-                        "background": "#0f172a"
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.125rem",
-                        "lg": "0.25rem",
-                        "xl": "0.5rem",
-                        "full": "0.75rem"
-                    },
-                    fontFamily: {
-                        "headline-xl": ["Inter", "IBM+Plex+Sans+Arabic"],
-                        "body-md": ["Inter", "IBM+Plex+Sans+Arabic"]
-                    }
-                }
-            }
-        }
+        tailwind.config = { darkMode: "class", theme: { extend: {
+            colors: { "primary": "#FFD700", "on-primary": "#0f172a", "secondary": "#745a25",
+                "surface": "#0f172a", "surface-container": "#1e293b", "outline": "#76777d", "background": "#0f172a" },
+            borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+            fontFamily: { "headline-xl": ["Inter", "IBM+Plex+Sans+Arabic"], "body-md": ["Inter", "IBM+Plex+Sans+Arabic"] }
+        } } }
     </script>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
+<style> body { min-height: max(884px, 100dvh); } </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 </head>
 <body class="text-white min-h-screen flex flex-col items-center justify-center p-4">
 <main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
-<!-- Brand Identity -->
-<div class="mb-10 text-center">
+<div class="mb-8 text-center">
 <div class="inline-flex items-center justify-center w-20 h-20 rounded-full border-2 border-primary/30 mb-6 bg-surface-container relative">
 <span class="material-symbols-outlined text-primary text-5xl gold-glow" style="font-variation-settings: 'FILL' 1;">temp_preferences_custom</span>
 <div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl"></div>
@@ -87,29 +44,70 @@
 <h1 class="text-4xl font-headline-xl font-bold tracking-tight text-primary mb-2">جولد مايند</h1>
 <p class="text-xl text-primary/80 opacity-90">مرحباً بك في جولد مايند</p>
 </div>
-<!-- Login Form Card -->
-<div class="glass-panel w-full p-8 rounded-xl shadow-2xl space-y-8">
-<div class="text-center mb-8">
-<h2 class="text-2xl font-bold text-white">تسجيل الدخول</h2>
-<div class="h-1 w-12 bg-primary mx-auto mt-2 rounded-full"></div>
-<p class="text-sm text-primary/70 mt-4">أدخل بريدك الإلكتروني وسنرسل لك رمز تحقق مكوّن من ٨ أرقام لتأكيد دخولك</p>
+
+<div class="glass-panel w-full p-6 rounded-xl shadow-2xl space-y-6">
+
+<!-- Mode tabs -->
+<div class="flex bg-black/20 rounded-lg p-1 gap-1">
+<button class="tab-btn active flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabJoin" type="button" onclick="setMode('join')">الدخول لشركتي</button>
+<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabNew" type="button" onclick="setMode('new')">تسجيل شركة جديدة</button>
 </div>
-<form class="space-y-6" id="loginForm">
+
+<!-- JOIN mode -->
+<div id="joinPanel">
+<div class="text-center mb-4">
+<h2 class="text-lg font-bold text-white">ابحث عن شركتك</h2>
+<p class="text-xs text-primary/70 mt-2">اكتب اسم الشركة يلي عندك حساب فيها</p>
+</div>
+<div class="relative mb-3">
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<span class="material-symbols-outlined text-primary/50 px-3">search</span>
+<input class="flex-1 bg-transparent py-3.5 pl-4 text-white placeholder:text-white/30 focus:outline-none" id="companySearch" placeholder="اسم الشركة..." type="text"/>
+</div>
+<div class="absolute top-full right-0 left-0 mt-1 bg-surface-container border border-primary/20 rounded-lg overflow-hidden hidden z-20 max-h-48 overflow-y-auto" id="companyResults"></div>
+</div>
+<div class="hidden items-center justify-between company-chip rounded-lg px-4 py-3 mb-4" id="selectedCompanyChip">
+<span class="text-sm font-semibold" id="selectedCompanyName"></span>
+<button class="text-white/50 hover:text-white" onclick="clearSelectedCompany()" type="button"><span class="material-symbols-outlined text-base">close</span></button>
+</div>
+<form class="space-y-5" id="joinForm">
 <div>
-<label class="block text-sm font-semibold text-primary/80 mb-2" for="email">البريد الإلكتروني</label>
-<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden transition-all">
-<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="email" placeholder="name@example.com" required="" type="email"/>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="joinEmail">بريدك الإلكتروني</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="joinEmail" placeholder="name@example.com" required="" type="email"/>
 </div>
-<p class="error-text text-error text-sm mt-2" id="emailError">فضلاً أدخل بريد إلكتروني صحيح</p>
 </div>
-<!-- Send Code Button -->
-<button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" id="submitBtn" type="submit">
-            إرسال رمز التحقق
-        </button>
-<p class="text-error text-sm text-center hidden" id="formError"></p>
+<button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" id="joinSubmitBtn" type="submit">إرسال رمز التحقق</button>
+<p class="text-error text-sm text-center hidden" id="joinFormError"></p>
 </form>
 </div>
-<!-- Footer / Language Switcher -->
+
+<!-- NEW COMPANY mode -->
+<div class="hidden" id="newPanel">
+<div class="text-center mb-4">
+<h2 class="text-lg font-bold text-white">سجّل شركتك</h2>
+<p class="text-xs text-primary/70 mt-2">أنشئ حساباً جديداً وستصبح مالك الشركة تلقائياً</p>
+</div>
+<form class="space-y-5" id="newForm">
+<div>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="newCompanyName">اسم الشركة</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" id="newCompanyName" placeholder="مثال: شركة الذهب العصري" required="" type="text"/>
+</div>
+</div>
+<div>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="newEmail">بريدك الإلكتروني</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="newEmail" placeholder="name@example.com" required="" type="email"/>
+</div>
+</div>
+<button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" id="newSubmitBtn" type="submit">إنشاء الشركة وإرسال الرمز</button>
+<p class="text-error text-sm text-center hidden" id="newFormError"></p>
+</form>
+</div>
+
+</div>
+
 <footer class="mt-12 flex flex-col items-center gap-6 text-primary/40">
 <div class="flex items-center gap-4 text-sm">
 <span class="text-white/70 cursor-pointer hover:text-white transition-colors">English</span>
@@ -120,44 +118,135 @@
 </footer>
 </main>
 <script>
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            const email = document.getElementById('email').value.trim();
-            const emailError = document.getElementById('emailError');
-            const formError = document.getElementById('formError');
-            const submitBtn = document.getElementById('submitBtn');
-            const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+let selectedCompany = null; // { id, name }
 
-            formError.classList.add('hidden');
-            if (!emailPattern.test(email)) {
-                emailError.style.display = 'block';
-                document.getElementById('email').focus();
-                return;
-            }
-            emailError.style.display = 'none';
+function setMode(mode) {
+    document.getElementById('tabJoin').classList.toggle('active', mode === 'join');
+    document.getElementById('tabNew').classList.toggle('active', mode === 'new');
+    document.getElementById('joinPanel').classList.toggle('hidden', mode !== 'join');
+    document.getElementById('newPanel').classList.toggle('hidden', mode !== 'new');
+}
 
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'جارِ الإرسال...';
+function clearSelectedCompany() {
+    selectedCompany = null;
+    document.getElementById('selectedCompanyChip').classList.add('hidden');
+    document.getElementById('selectedCompanyChip').classList.remove('flex');
+    document.getElementById('companySearch').value = '';
+    document.getElementById('companySearch').classList.remove('hidden');
+}
 
-            const { error } = await goldmindClient.auth.signInWithOtp({
-                email: email,
-                options: {
-                    shouldCreateUser: true,
-                    emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html'
-                }
-            });
+function selectCompany(id, name) {
+    selectedCompany = { id, name };
+    document.getElementById('selectedCompanyName').textContent = name;
+    document.getElementById('selectedCompanyChip').classList.remove('hidden');
+    document.getElementById('selectedCompanyChip').classList.add('flex');
+    document.getElementById('companyResults').classList.add('hidden');
+    document.getElementById('companySearch').classList.add('hidden');
+}
 
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'إرسال رمز التحقق';
+let searchDebounce;
+document.getElementById('companySearch').addEventListener('input', function () {
+    clearTimeout(searchDebounce);
+    const q = this.value.trim();
+    const resultsBox = document.getElementById('companyResults');
+    if (q.length < 2) { resultsBox.classList.add('hidden'); return; }
+    searchDebounce = setTimeout(async () => {
+        const { data, error } = await goldmindClient.rpc('search_companies', { q });
+        if (error || !data || data.length === 0) {
+            resultsBox.innerHTML = '<div class="px-4 py-3 text-sm text-white/40">لا توجد نتائج</div>';
+            resultsBox.classList.remove('hidden');
+            return;
+        }
+        resultsBox.innerHTML = data.map(c =>
+            `<div class="company-result px-4 py-3 text-sm cursor-pointer text-white/90" onclick="selectCompany('${c.id}', '${c.name.replace(/'/g, "\\'")}')">${c.name}</div>`
+        ).join('');
+        resultsBox.classList.remove('hidden');
+    }, 300);
+});
 
-            if (error) {
-                formError.textContent = 'تعذّر إرسال الرمز: ' + error.message;
-                formError.classList.remove('hidden');
-                return;
-            }
+document.getElementById('joinForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const email = document.getElementById('joinEmail').value.trim();
+    const errEl = document.getElementById('joinFormError');
+    errEl.classList.add('hidden');
 
-            sessionStorage.setItem('goldmind_email', email);
-            window.location.href = 'login-ar-4.html';
-        });
-    </script>
+    if (!selectedCompany) {
+        errEl.textContent = 'فضلاً اختر اسم الشركة أولاً من نتائج البحث';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (!emailPattern.test(email)) {
+        errEl.textContent = 'فضلاً أدخل بريد إلكتروني صحيح';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('joinSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'جارِ الإرسال...';
+
+    const { error } = await goldmindClient.auth.signInWithOtp({
+        email: email,
+        options: { shouldCreateUser: true, emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html' }
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'إرسال رمز التحقق';
+
+    if (error) {
+        errEl.textContent = 'تعذّر إرسال الرمز: ' + error.message;
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    sessionStorage.setItem('goldmind_email', email);
+    sessionStorage.setItem('goldmind_mode', 'join');
+    sessionStorage.setItem('goldmind_store_id', selectedCompany.id);
+    sessionStorage.setItem('goldmind_store_name', selectedCompany.name);
+    window.location.href = 'login-ar-4.html';
+});
+
+document.getElementById('newForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const companyName = document.getElementById('newCompanyName').value.trim();
+    const email = document.getElementById('newEmail').value.trim();
+    const errEl = document.getElementById('newFormError');
+    errEl.classList.add('hidden');
+
+    if (!companyName) {
+        errEl.textContent = 'فضلاً أدخل اسم الشركة';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    if (!emailPattern.test(email)) {
+        errEl.textContent = 'فضلاً أدخل بريد إلكتروني صحيح';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('newSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'جارِ الإرسال...';
+
+    const { error } = await goldmindClient.auth.signInWithOtp({
+        email: email,
+        options: { shouldCreateUser: true, emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html' }
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'إنشاء الشركة وإرسال الرمز';
+
+    if (error) {
+        errEl.textContent = 'تعذّر إرسال الرمز: ' + error.message;
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    sessionStorage.setItem('goldmind_email', email);
+    sessionStorage.setItem('goldmind_mode', 'new');
+    sessionStorage.setItem('goldmind_company_name', companyName);
+    window.location.href = 'login-ar-4.html';
+});
+</script>
 </body></html>
