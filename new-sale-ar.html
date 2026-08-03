@@ -120,6 +120,10 @@
 <!-- Manual Entry (no barcode) -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة يدوية (بدون باركود)</h2>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-desc">وصف القطعة</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-desc" placeholder="خاتم، حلق، سلسال..." type="text"/>
+</div>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-weight">الوزن (غ)</label>
@@ -154,7 +158,7 @@
 <table class="w-full text-right">
 <thead class="bg-surface-container-high text-on-surface-variant text-[11px] uppercase tracking-tighter">
 <tr>
-<th class="px-3 py-2">الباركود</th>
+<th class="px-3 py-2">الوصف</th>
 <th class="px-2 py-2 text-center">العيار</th>
 <th class="px-2 py-2 text-left">الوزن</th>
 <th class="px-2 py-2 text-left">السعر</th>
@@ -331,14 +335,17 @@
 
         const pieceId = data.id;
         barcodeResult.innerHTML = `
-            <div class="p-3 bg-surface-container-low rounded-lg flex items-center justify-between gap-2">
-                <div class="min-w-0">
-                    <div class="font-data-mono font-bold text-sm">${data.weight_grams} غ &middot; عيار ${data.karat}</div>
-                    <div class="text-outline text-[11px] font-data-mono truncate">${data.barcode}</div>
+            <div class="p-3 bg-surface-container-low rounded-lg flex flex-col gap-2">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-data-mono font-bold text-sm">${data.weight_grams} غ &middot; عيار ${data.karat}</div>
+                        <div class="text-outline text-[11px] font-data-mono truncate">${data.barcode}</div>
+                    </div>
                 </div>
-                <div class="flex items-center gap-2 shrink-0">
-                    <input type="number" placeholder="السعر" class="w-24 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input"/>
-                    <button onclick='confirmAddBarcodePiece(${JSON.stringify(data).replace(/'/g, "&apos;")})' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all">
+                <input type="text" placeholder="وصف القطعة (خاتم، حلق...)" class="w-full h-10 border border-outline-variant rounded px-3 text-right" id="barcode-desc-input"/>
+                <div class="flex items-center gap-2">
+                    <input type="number" placeholder="السعر" class="flex-1 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input"/>
+                    <button onclick='confirmAddBarcodePiece(${JSON.stringify(data).replace(/'/g, "&apos;")})' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all shrink-0">
                         <span class="material-symbols-outlined">add</span>
                     </button>
                 </div>
@@ -348,6 +355,7 @@
 
     function confirmAddBarcodePiece(piece) {
         const priceInput = document.getElementById('barcode-price-input');
+        const descInput = document.getElementById('barcode-desc-input');
         const price = parseFloat(priceInput.value);
         if (!price || price <= 0) {
             priceInput.classList.add('border-error');
@@ -360,7 +368,8 @@
             barcode: piece.barcode,
             karat: piece.karat,
             weight: piece.weight_grams,
-            price: price
+            price: price,
+            description: descInput.value.trim() || null
         });
         document.getElementById('barcode-search-input').value = '';
         barcodeResult.innerHTML = '';
@@ -389,9 +398,11 @@
             barcode: null,
             karat: karat,
             weight: weight,
-            price: price
+            price: price,
+            description: document.getElementById('manual-desc').value.trim() || null
         });
 
+        document.getElementById('manual-desc').value = '';
         document.getElementById('manual-weight').value = '';
         document.getElementById('manual-price').value = '';
         renderCart();
@@ -414,7 +425,10 @@
 
         body.innerHTML = cart.map(item => `
             <tr>
-                <td class="px-3 py-3">${item.barcode || '—'}</td>
+                <td class="px-3 py-3">
+                    <div class="font-body-md">${item.description || '—'}</div>
+                    <div class="text-outline text-[10px] font-data-mono">${item.barcode || ''}</div>
+                </td>
                 <td class="px-2 py-3 text-center">${item.karat}K</td>
                 <td class="px-2 py-3 text-left">${item.weight}</td>
                 <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}</td>
@@ -489,7 +503,8 @@
             karat: item.karat,
             weight_grams: item.weight,
             fabrication_fee: 0,
-            line_total: item.price
+            line_total: item.price,
+            description: item.description
         }));
 
         const { error: itemsError } = await goldmindClient.from('invoice_items').insert(itemsPayload);
@@ -508,8 +523,8 @@
 
         showMessage('تم حفظ الفاتورة بنجاح!', false);
         setTimeout(() => {
-            window.location.href = 'index-ar.html';
-        }, 1200);
+            window.location.href = 'invoice-print-ar.html?id=' + invoiceRow.id;
+        }, 800);
     });
 </script>
 </body></html>
