@@ -83,36 +83,41 @@
             // First-time login: create the company/staff membership based on
             // whichever mode was chosen on the login-entry screen.
             const user = session.user;
-            const { data: existingStaff } = await goldmindClient
-                .from('staff').select('id').eq('id', user.id).maybeSingle();
+            const mode = sessionStorage.getItem('goldmind_mode');
+            let rpcError = null;
 
-            if (!existingStaff) {
-                const mode = sessionStorage.getItem('goldmind_mode');
-                let rpcError = null;
-
-                if (mode === 'new') {
-                    const companyName = sessionStorage.getItem('goldmind_company_name');
-                    ({ error: rpcError } = await goldmindClient.rpc('register_new_company', { company_name: companyName }));
-                } else if (mode === 'join') {
-                    const storeId = sessionStorage.getItem('goldmind_store_id');
+            if (mode === 'join') {
+                const storeId = sessionStorage.getItem('goldmind_store_id');
+                const { data: alreadyMember } = await goldmindClient
+                    .from('staff').select('id').eq('user_id', user.id).eq('store_id', storeId).maybeSingle();
+                if (!alreadyMember) {
                     ({ error: rpcError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: storeId }));
-                } else {
-                    rpcError = { message: 'NO_MODE' };
                 }
+            } else {
+                const { data: anyMembership } = await goldmindClient
+                    .from('staff').select('id').eq('user_id', user.id).limit(1).maybeSingle();
+                if (!anyMembership) {
+                    if (mode === 'new') {
+                        const companyName = sessionStorage.getItem('goldmind_company_name');
+                        ({ error: rpcError } = await goldmindClient.rpc('register_new_company', { company_name: companyName }));
+                    } else {
+                        rpcError = { message: 'NO_MODE' };
+                    }
+                }
+            }
 
-                if (rpcError) {
-                    spinnerWrap.classList.add('hidden');
-                    statusIcon.textContent = 'error';
-                    statusIcon.style.color = '#ff6b6b';
-                    statusIcon.classList.remove('hidden');
-                    statusTitle.textContent = 'تعذّر إكمال التسجيل';
-                    statusMsg.textContent = rpcError.message && rpcError.message.includes('NOT_INVITED')
-                        ? 'هذا البريد غير مدعو من هذه الشركة.'
-                        : 'فضلاً حاول تسجيل الدخول من جديد.';
-                    retryBtn.classList.remove('hidden');
-                    await goldmindClient.auth.signOut();
-                    return;
-                }
+            if (rpcError) {
+                spinnerWrap.classList.add('hidden');
+                statusIcon.textContent = 'error';
+                statusIcon.style.color = '#ff6b6b';
+                statusIcon.classList.remove('hidden');
+                statusTitle.textContent = 'تعذّر إكمال التسجيل';
+                statusMsg.textContent = rpcError.message && rpcError.message.includes('NOT_INVITED')
+                    ? 'هذا البريد غير مدعو من هذه الشركة.'
+                    : 'فضلاً حاول تسجيل الدخول من جديد.';
+                retryBtn.classList.remove('hidden');
+                await goldmindClient.auth.signOut();
+                return;
             }
 
             sessionStorage.removeItem('goldmind_email');
