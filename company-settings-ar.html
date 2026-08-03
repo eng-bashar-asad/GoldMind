@@ -63,6 +63,16 @@
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-phone" placeholder="+971 xx xxx xxxx" type="tel"/>
 </div>
 
+<div class="border-t border-outline-variant pt-5 mt-1">
+<h3 class="font-label-md text-label-md text-secondary font-bold mb-4">ترقيم الفواتير</h3>
+</div>
+
+<div class="flex gap-3">
+<button type="button" id="numbering-auto-btn" onclick="setNumberingMode('auto')" class="flex-1 h-14 rounded-lg border font-semibold transition-all">تلقائي</button>
+<button type="button" id="numbering-manual-btn" onclick="setNumberingMode('manual')" class="flex-1 h-14 rounded-lg border font-semibold transition-all">يدوي</button>
+</div>
+<p class="text-[11px] text-outline px-1 -mt-2">التلقائي: البرنامج يرقم الفواتير بالتسلسل. اليدوي: تكتب رقم الفاتورة بنفسك بكل مرة.</p>
+
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-vat">نسبة الضريبة (%)</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-vat" step="0.01" type="number"/>
@@ -156,6 +166,17 @@
     const logoPreviewWrap = document.getElementById('logo-preview-wrap');
     const logoPreview = document.getElementById('logo-preview');
 
+    let numberingMode = 'auto';
+    function setNumberingMode(mode) {
+        numberingMode = mode;
+        const autoBtn = document.getElementById('numbering-auto-btn');
+        const manualBtn = document.getElementById('numbering-manual-btn');
+        const active = 'flex-1 h-14 rounded-lg border-2 border-primary bg-primary text-white font-semibold transition-all';
+        const inactive = 'flex-1 h-14 rounded-lg border border-outline-variant bg-white text-on-surface-variant font-semibold transition-all';
+        autoBtn.className = mode === 'auto' ? active : inactive;
+        manualBtn.className = mode === 'manual' ? active : inactive;
+    }
+
     function showMessage(text, isError) {
         messageBox.textContent = text;
         messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
@@ -201,6 +222,7 @@
         document.getElementById('store-cr').value = data.commercial_registration_number || '';
         document.getElementById('store-tax').value = data.tax_number || '';
         document.getElementById('store-license').value = data.license_number || '';
+        setNumberingMode(data.invoice_numbering_mode || 'auto');
         logoInput.value = data.logo_url || '';
         updateLogoPreview();
 
@@ -247,7 +269,8 @@
                 contact_person_name: contactPerson || null,
                 commercial_registration_number: cr || null,
                 tax_number: tax || null,
-                license_number: license || null
+                license_number: license || null,
+                invoice_numbering_mode: numberingMode
             })
             .eq('id', GOLDMIND_STORE_ID);
 
