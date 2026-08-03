@@ -248,6 +248,20 @@
 </div>
 <span class="material-symbols-outlined text-outline">chevron_left</span>
 </a>
+<a href="support-contact-ar.html" class="w-full p-4 flex justify-between items-center text-right active:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">support_agent</span>
+<span class="font-label-md text-label-md text-on-surface">تواصل مع الدعم</span>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_left</span>
+</a>
+<a href="admin-panel-ar.html" class="hidden w-full p-4 flex justify-between items-center text-right active:bg-surface-container-low transition-colors" id="adminPanelLink">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">admin_panel_settings</span>
+<span class="font-label-md text-label-md text-on-surface">لوحة تحكم المنصة</span>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_left</span>
+</a>
 <button class="w-full p-4 flex justify-between items-center text-right active:bg-surface-container-low transition-colors" id="signOutBtn">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-error">logout</span>
@@ -286,5 +300,12 @@ document.getElementById('signOutBtn').addEventListener('click', async () => {
     await goldmindClient.auth.signOut();
     window.location.href = 'login-entry-ar.html';
 });
+
+(async function checkAdmin() {
+    const { data: { session } } = await goldmindClient.auth.getSession();
+    if (!session) return;
+    const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
+    if (isAdmin) document.getElementById('adminPanelLink').classList.remove('hidden');
+})();
 </script>
 </body></html>
