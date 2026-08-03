@@ -60,11 +60,11 @@
 <p class="text-xs text-primary/70 mt-2">اكتب اسم الشركة يلي عندك حساب فيها</p>
 </div>
 <div class="relative mb-3">
-<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden transition-all" id="companyInputWrap">
 <span class="material-symbols-outlined text-primary/50 px-3">search</span>
 <input class="flex-1 bg-transparent py-3.5 pl-4 text-white placeholder:text-white/30 focus:outline-none" id="companySearch" placeholder="اسم الشركة..." type="text"/>
 </div>
-<div class="absolute top-full right-0 left-0 mt-1 bg-surface-container border border-primary/20 rounded-lg overflow-hidden hidden z-20 max-h-48 overflow-y-auto" id="companyResults"></div>
+<div class="absolute top-full right-0 left-0 bg-surface-container border border-t-0 border-primary/30 rounded-b-lg overflow-hidden hidden z-20 max-h-48 overflow-y-auto shadow-lg" id="companyResults"></div>
 </div>
 <div class="hidden items-center justify-between company-chip rounded-lg px-4 py-3 mb-4" id="selectedCompanyChip">
 <span class="text-sm font-semibold" id="selectedCompanyName"></span>
@@ -128,12 +128,23 @@ function setMode(mode) {
     document.getElementById('newPanel').classList.toggle('hidden', mode !== 'new');
 }
 
+function closeCompanyResults() {
+    document.getElementById('companyResults').classList.add('hidden');
+    document.getElementById('companyInputWrap').classList.remove('rounded-b-none');
+}
+
+function openCompanyResults() {
+    document.getElementById('companyResults').classList.remove('hidden');
+    document.getElementById('companyInputWrap').classList.add('rounded-b-none');
+}
+
 function clearSelectedCompany() {
     selectedCompany = null;
     document.getElementById('selectedCompanyChip').classList.add('hidden');
     document.getElementById('selectedCompanyChip').classList.remove('flex');
     document.getElementById('companySearch').value = '';
     document.getElementById('companySearch').classList.remove('hidden');
+    closeCompanyResults();
 }
 
 function selectCompany(id, name) {
@@ -141,7 +152,7 @@ function selectCompany(id, name) {
     document.getElementById('selectedCompanyName').textContent = name;
     document.getElementById('selectedCompanyChip').classList.remove('hidden');
     document.getElementById('selectedCompanyChip').classList.add('flex');
-    document.getElementById('companyResults').classList.add('hidden');
+    closeCompanyResults();
     document.getElementById('companySearch').classList.add('hidden');
 }
 
@@ -150,19 +161,27 @@ document.getElementById('companySearch').addEventListener('input', function () {
     clearTimeout(searchDebounce);
     const q = this.value.trim();
     const resultsBox = document.getElementById('companyResults');
-    if (q.length < 1) { resultsBox.classList.add('hidden'); return; }
+    if (q.length < 1) { closeCompanyResults(); return; }
     searchDebounce = setTimeout(async () => {
         const { data, error } = await goldmindClient.rpc('search_companies', { q });
         if (error || !data || data.length === 0) {
             resultsBox.innerHTML = '<div class="px-4 py-3 text-sm text-white/40">لا توجد نتائج</div>';
-            resultsBox.classList.remove('hidden');
+            openCompanyResults();
             return;
         }
         resultsBox.innerHTML = data.map(c =>
             `<div class="company-result px-4 py-3 text-sm cursor-pointer text-white/90" onclick="selectCompany('${c.id}', '${c.name.replace(/'/g, "\\'")}')">${c.name}</div>`
         ).join('');
-        resultsBox.classList.remove('hidden');
+        openCompanyResults();
     }, 150);
+});
+
+document.addEventListener('click', function (e) {
+    const wrap = document.getElementById('companyInputWrap');
+    const resultsBox = document.getElementById('companyResults');
+    if (!wrap.contains(e.target) && !resultsBox.contains(e.target)) {
+        closeCompanyResults();
+    }
 });
 
 document.getElementById('joinForm').addEventListener('submit', async function (e) {
