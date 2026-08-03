@@ -311,6 +311,17 @@
                 .maybeSingle();
 
             if (!existingStaff) {
+                const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
+                if (isAdmin) {
+                    sessionStorage.removeItem('goldmind_email');
+                    sessionStorage.removeItem('goldmind_mode');
+                    sessionStorage.removeItem('goldmind_company_name');
+                    sessionStorage.removeItem('goldmind_store_id');
+                    sessionStorage.removeItem('goldmind_store_name');
+                    window.location.href = 'admin-panel-ar.html';
+                    return;
+                }
+
                 const mode = sessionStorage.getItem('goldmind_mode');
 
                 if (mode === 'new') {
