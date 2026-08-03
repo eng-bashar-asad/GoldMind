@@ -1,224 +1,257 @@
-<!DOCTYPE HTML>
+<!DOCTYPE html>
 <html class="light" dir="rtl" lang="ar"><head>
 <meta charset="utf-8"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>الموظفون والصلاحيات | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
-        theme: {
-          extend: {
-            "colors": {
-                    "on-surface-variant": "#45464d",
-                    "on-secondary-container": "#795f29",
-                    "secondary": "#745a25",
-                    "surface-dim": "#d8dadc",
-                    "on-tertiary": "#ffffff",
-                    "surface-bright": "#f7f9fb",
-                    "error": "#ba1a1a",
-                    "on-secondary": "#ffffff",
-                    "primary-fixed-dim": "#bec6e0",
-                    "on-primary-fixed-variant": "#3f465c",
-                    "on-tertiary-container": "#75859d",
-                    "tertiary": "#000000",
-                    "primary-fixed": "#dae2fd",
-                    "primary-container": "#131b2e",
-                    "surface-tint": "#565e74",
-                    "on-surface": "#191c1e",
-                    "surface-container": "#eceef0",
-                    "on-primary-container": "#7c839b",
-                    "surface-container-highest": "#e0e3e5",
-                    "on-error-container": "#93000a",
-                    "inverse-on-surface": "#eff1f3",
-                    "surface-container-low": "#f2f4f6",
-                    "on-secondary-fixed-variant": "#5a430f",
-                    "on-primary": "#ffffff",
-                    "background": "#f7f9fb",
-                    "secondary-fixed-dim": "#e4c283",
-                    "outline-variant": "#c6c6cd",
-                    "surface-container-lowest": "#ffffff",
-                    "surface": "#f7f9fb",
-                    "error-container": "#ffdad6",
-                    "tertiary-fixed": "#d3e4fe",
-                    "on-primary-fixed": "#131b2e",
-                    "secondary-fixed": "#ffdea4",
-                    "on-secondary-fixed": "#261900",
-                    "tertiary-fixed-dim": "#b7c8e1",
-                    "primary": "#000000",
-                    "on-background": "#191c1e",
-                    "on-error": "#ffffff",
-                    "surface-variant": "#e0e3e5",
-                    "tertiary-container": "#0b1c30",
-                    "inverse-primary": "#bec6e0",
-                    "outline": "#76777d",
-                    "on-tertiary-fixed-variant": "#38485d",
-                    "surface-container-high": "#e6e8ea",
-                    "inverse-surface": "#2d3133",
-                    "secondary-container": "#ffdb99",
-                    "on-tertiary-fixed": "#0b1c30"
-            },
-            "borderRadius": {
-                    "DEFAULT": "0.125rem",
-                    "lg": "0.25rem",
-                    "xl": "0.5rem",
-                    "full": "0.75rem"
-            },
-            "spacing": {
-                    "margin-desktop": "40px",
-                    "gutter": "24px",
-                    "unit": "4px",
-                    "margin-mobile": "16px",
-                    "container-max": "1440px"
-            },
-            "fontFamily": {
-                    "body-md": ["Inter"],
-                    "data-mono": ["IBM Plex Sans"],
-                    "headline-md": ["Inter"],
-                    "headline-xl-mobile": ["Inter"],
-                    "label-md": ["Inter"],
-                    "headline-lg": ["Inter"],
-                    "body-lg": ["Inter"],
-                    "headline-xl": ["Inter"]
-            },
-            "fontSize": {
-                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
-                    "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
-                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
-                    "headline-xl-mobile": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
-                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
-                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
-                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
-                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
-            }
+        theme: { extend: {
+          "colors": {
+            "on-surface-variant": "#45464d", "secondary": "#745a25", "on-secondary": "#ffffff",
+            "on-secondary-container": "#795f29", "secondary-container": "#ffdb99",
+            "error": "#ba1a1a", "error-container": "#ffdad6", "on-error": "#ffffff", "on-error-container": "#93000a",
+            "on-surface": "#191c1e", "surface-container-low": "#f2f4f6", "surface-container": "#eceef0",
+            "surface-container-high": "#e6e8ea", "surface-container-highest": "#e0e3e5",
+            "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+            "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000", "outline": "#76777d"
           },
-        },
+          "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+          "fontSize": {
+            "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+            "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+            "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+          }
+        } }
       }
     </script>
 <style>
-        html { font-size: 87.5%; }
-
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb;
-            -webkit-tap-highlight-color: transparent;
-        }
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-            font-size: 18px;
-        }
-        .luxury-shadow {
-            box-shadow: 0px 4px 20px rgba(15, 23, 42, 0.05);
-        }
-        .gold-accent {
-            background-color: #B4955A;
-        }
-        ::-webkit-scrollbar { display: none; }
-        .switch { position: relative; display: inline-block; width: 40px; height: 24px; flex-shrink: 0; }
-        .switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; inset: 0; background-color: #c6c6cd; transition: .2s; border-radius: 999px; }
-        .slider:before { position: absolute; content: ""; height: 18px; width: 18px; right: 3px; bottom: 3px; background-color: white; transition: .2s; border-radius: 50%; }
-        input:checked + .slider { background-color: #B4955A; }
-        input:checked + .slider:before { transform: translateX(-16px); }
-    </style>
-<style>
-    body { min-height: max(884px, 100dvh); }
-  </style>
-  </head>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; -webkit-tap-highlight-color: transparent; min-height: max(884px, 100dvh); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; font-size: 18px; }
+    .luxury-shadow { box-shadow: 0px 4px 20px rgba(15, 23, 42, 0.05); }
+    .gold-accent { background-color: #B4955A; }
+    ::-webkit-scrollbar { display: none; }
+    .switch { position: relative; display: inline-block; width: 38px; height: 22px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .slider { position: absolute; cursor: pointer; inset: 0; background-color: #c6c6cd; transition: .2s; border-radius: 999px; }
+    .slider:before { position: absolute; content: ""; height: 16px; width: 16px; right: 3px; bottom: 3px; background-color: white; transition: .2s; border-radius: 50%; }
+    input:checked + .slider { background-color: #B4955A; }
+    input:checked + .slider:before { transform: translateX(-16px); }
+    .cat-body { max-height: 0; overflow: hidden; transition: max-height .25s ease; }
+    .cat-body.open { max-height: 400px; }
+    .chev { transition: transform .2s ease; }
+    .chev.open { transform: rotate(180deg); }
+</style>
+</head>
 <body class="bg-background text-on-background selection:bg-secondary-container pb-24">
-<!-- TopAppBar -->
-<header class="fixed top-0 right-0 w-full h-16 bg-surface-container-lowest border-b border-outline-variant z-50 flex justify-between items-center px-margin-mobile">
+<header class="fixed top-0 right-0 w-full h-16 bg-surface-container-lowest border-b border-outline-variant z-50 flex justify-between items-center px-4">
 <div class="flex items-center gap-3">
 <a href="settings-ar.html" class="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high transition-colors rounded-full cursor-pointer active:opacity-80">
 <span class="material-symbols-outlined text-primary">arrow_forward</span>
 </a>
 <h1 class="font-headline-md text-headline-md font-bold text-primary">الموظفون والصلاحيات</h1>
 </div>
-<button class="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high transition-colors rounded-full cursor-pointer active:opacity-80">
-<span class="material-symbols-outlined text-secondary">person_add</span>
-</button>
 </header>
-<main class="pt-20 px-margin-mobile max-w-md mx-auto">
-<!-- Summary -->
+<main class="pt-20 px-4 max-w-md mx-auto">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">لا تملك صلاحية إدارة الموظفين.</div>
+
+<div id="page-content" class="hidden">
 <section class="grid grid-cols-2 gap-3 mb-6">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow">
 <span class="font-label-md text-label-md text-on-surface-variant block mb-1">إجمالي الموظفين</span>
-<div class="font-headline-md text-headline-md font-bold text-primary">5</div>
+<div id="stat-total" class="font-headline-md text-headline-md font-bold text-primary">0</div>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow">
-<span class="font-label-md text-label-md text-on-surface-variant block mb-1">صلاحيات كاملة</span>
-<div class="font-headline-md text-headline-md font-bold text-secondary">2</div>
+<span class="font-label-md text-label-md text-on-surface-variant block mb-1">صلاحيات كاملة (مالك)</span>
+<div id="stat-owners" class="font-headline-md text-headline-md font-bold text-secondary">0</div>
 </div>
 </section>
-<!-- Staff List -->
+
 <section class="mb-6">
 <h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">قائمة الموظفين</h3>
-<div class="flex flex-col gap-3">
-<!-- Staff 1 -->
-<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
-<div class="flex items-center gap-3 mb-3">
-<div class="w-11 h-11 rounded-full gold-accent flex items-center justify-center text-white font-bold shrink-0">خ</div>
-<div class="min-w-0">
-<p class="font-label-md text-label-md font-semibold text-on-surface truncate">خالد الصباح</p>
-<p class="text-[11px] text-on-surface-variant">مدير المبيعات</p>
-</div>
-<span class="material-symbols-outlined text-secondary mr-auto shrink-0" style="font-variation-settings: 'FILL' 1;">badge</span>
-</div>
-<div class="grid grid-cols-2 gap-x-4 gap-y-2 pt-3 border-t border-outline-variant">
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">البيع</span><label class="switch"><input checked="" type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">المخزون</span><label class="switch"><input checked="" type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">التقارير</span><label class="switch"><input checked="" type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">الحذف</span><label class="switch"><input type="checkbox"/><span class="slider"></span></label></div>
-</div>
-</div>
-<!-- Staff 2 -->
-<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
-<div class="flex items-center gap-3 mb-3">
-<div class="w-11 h-11 rounded-full bg-primary flex items-center justify-center text-white font-bold shrink-0">أ</div>
-<div class="min-w-0">
-<p class="font-label-md text-label-md font-semibold text-on-surface truncate">أحمد العتيبي</p>
-<p class="text-[11px] text-on-surface-variant">محاسب مالي</p>
-</div>
-<span class="material-symbols-outlined text-outline mr-auto shrink-0">badge</span>
-</div>
-<div class="grid grid-cols-2 gap-x-4 gap-y-2 pt-3 border-t border-outline-variant">
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">البيع</span><label class="switch"><input checked="" type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">المخزون</span><label class="switch"><input type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">التقارير</span><label class="switch"><input checked="" type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">الحذف</span><label class="switch"><input type="checkbox"/><span class="slider"></span></label></div>
-</div>
-</div>
-<!-- Staff 3 -->
-<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
-<div class="flex items-center gap-3 mb-3">
-<div class="w-11 h-11 rounded-full bg-secondary flex items-center justify-center text-white font-bold shrink-0">س</div>
-<div class="min-w-0">
-<p class="font-label-md text-label-md font-semibold text-on-surface truncate">سارة المنصوري</p>
-<p class="text-[11px] text-on-surface-variant">مسؤول نظام</p>
-</div>
-<span class="material-symbols-outlined text-outline mr-auto shrink-0">badge</span>
-</div>
-<div class="grid grid-cols-2 gap-x-4 gap-y-2 pt-3 border-t border-outline-variant">
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">البيع</span><label class="switch"><input type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">المخزون</span><label class="switch"><input checked="" type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">التقارير</span><label class="switch"><input type="checkbox"/><span class="slider"></span></label></div>
-<div class="flex items-center justify-between"><span class="text-[12px] text-on-surface-variant">الحذف</span><label class="switch"><input type="checkbox"/><span class="slider"></span></label></div>
-</div>
-</div>
-</div>
+<div id="staff-list" class="flex flex-col gap-3"></div>
 </section>
-<button class="w-full h-14 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 mb-8 active:scale-[0.98] transition-all">
-<span class="material-symbols-outlined">person_add</span>
-<span class="font-label-md text-label-md">إضافة موظف جديد</span>
-</button>
+
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-8 text-[12px] text-on-surface-variant leading-5">
+<span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">info</span>
+لإضافة موظف جديد: اطلب منه تسجيل الدخول أولاً عبر رابط المتجر (سيُنشأ له حساب تلقائياً بصلاحيات محدودة)، وبعدها يظهر هنا لتفعيل صلاحياته.
+</div>
+</div>
+
 </main>
-<!-- Bottom action bar -->
-<nav class="fixed bottom-0 right-0 w-full bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-center items-center px-margin-mobile py-3 shadow-sm">
+<nav class="fixed bottom-0 right-0 w-full bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-center items-center px-4 py-3 shadow-sm">
 <a href="audit-log-ar.html" class="flex items-center gap-2 text-secondary font-label-md text-label-md">
 <span class="material-symbols-outlined text-[20px]">history</span>
 عرض سجل النشاط الكامل
 </a>
 </nav>
+
+<div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-[13px] px-4 py-2 rounded-full opacity-0 pointer-events-none transition-opacity z-[60]"></div>
+
+<script>
+const PERMISSION_GROUPS = [
+  { label: 'المخزون', icon: 'inventory_2', keys: [
+    ['view_inventory', 'عرض المخزون'], ['add_piece', 'إضافة قطعة'],
+    ['edit_piece', 'تعديل قطعة'], ['delete_piece', 'حذف قطعة']
+  ]},
+  { label: 'العملاء والتجار', icon: 'groups', keys: [
+    ['view_customers', 'عرض العملاء'], ['add_customers', 'إضافة عميل'], ['edit_customers', 'تعديل عميل'],
+    ['view_traders', 'عرض التجار'], ['add_traders', 'إضافة تاجر'], ['edit_traders', 'تعديل تاجر']
+  ]},
+  { label: 'الفواتير', icon: 'receipt_long', keys: [
+    ['view_invoices', 'عرض الفواتير'], ['create_invoice', 'إنشاء فاتورة'], ['delete_invoice', 'حذف فاتورة']
+  ]},
+  { label: 'التقارير', icon: 'monitoring', keys: [
+    ['view_reports', 'عرض التقارير'], ['view_profit_report', 'تقرير الربح (سري)']
+  ]},
+  { label: 'الإدارة', icon: 'admin_panel_settings', keys: [
+    ['edit_settings', 'تعديل الإعدادات'], ['manage_staff', 'إدارة الموظفين'],
+    ['manage_gold_price', 'تعديل سعر الذهب'], ['manage_subscription', 'إدارة الاشتراك']
+  ]}
+];
+
+let currentStaffId = null;
+let canManage = false;
+
+function showToast(msg, isError) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'fixed bottom-20 left-1/2 -translate-x-1/2 text-[13px] px-4 py-2 rounded-full z-[60] transition-opacity ' +
+    (isError ? 'bg-error text-on-error' : 'bg-primary text-on-primary');
+  t.style.opacity = '1';
+  setTimeout(() => { t.style.opacity = '0'; }, 2200);
+}
+
+function initials(name) {
+  return (name || '?').trim().charAt(0) || '?';
+}
+
+function renderStaffCard(staff) {
+  const isOwner = staff.role === 'owner';
+  const perms = staff.permissions || {};
+  const avatarClass = isOwner ? 'gold-accent' : 'bg-primary';
+
+  const groupsHtml = PERMISSION_GROUPS.map((group) => {
+    const rows = group.keys.map(([key, label]) => {
+      const checked = isOwner || perms[key] === true;
+      return `<div class="flex items-center justify-between py-1.5">
+        <span class="text-[12px] text-on-surface-variant">${label}</span>
+        <label class="switch">
+          <input type="checkbox" ${checked ? 'checked' : ''} ${isOwner ? 'disabled' : ''}
+            data-staff="${staff.id}" data-key="${key}" onchange="onToggle(this)"/>
+          <span class="slider"></span>
+        </label>
+      </div>`;
+    }).join('');
+    return `<div class="border-t border-outline-variant first:border-t-0">
+      <button type="button" class="w-full flex items-center justify-between py-2.5" onclick="toggleGroup(this)">
+        <span class="flex items-center gap-2 text-[12.5px] font-semibold text-on-surface">
+          <span class="material-symbols-outlined text-secondary" style="font-size:16px;">${group.icon}</span>
+          ${group.label}
+        </span>
+        <span class="material-symbols-outlined chev text-outline" style="font-size:18px;">expand_more</span>
+      </button>
+      <div class="cat-body px-1 pb-1">${rows}</div>
+    </div>`;
+  }).join('');
+
+  return `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
+    <div class="flex items-center gap-3 mb-1">
+      <div class="w-11 h-11 rounded-full ${avatarClass} flex items-center justify-center text-white font-bold shrink-0">${initials(staff.full_name)}</div>
+      <div class="min-w-0">
+        <p class="font-label-md text-label-md font-semibold text-on-surface truncate">${staff.full_name || 'بدون اسم'}</p>
+        <p class="text-[11px] text-on-surface-variant">${isOwner ? 'مالك المتجر — كل الصلاحيات' : 'موظف'}</p>
+      </div>
+      <span class="material-symbols-outlined ${isOwner ? 'text-secondary' : 'text-outline'} mr-auto shrink-0" style="font-variation-settings: 'FILL' ${isOwner ? 1 : 0};">badge</span>
+    </div>
+    <div class="pt-1">${groupsHtml}</div>
+  </div>`;
+}
+
+function toggleGroup(btn) {
+  const body = btn.nextElementSibling;
+  const chev = btn.querySelector('.chev');
+  body.classList.toggle('open');
+  chev.classList.toggle('open');
+}
+
+async function onToggle(input) {
+  const staffId = input.dataset.staff;
+  const key = input.dataset.key;
+  const value = input.checked;
+
+  input.disabled = true;
+  const { data: row, error: fetchErr } = await goldmindClient
+    .from('staff').select('permissions').eq('id', staffId).single();
+
+  if (fetchErr) {
+    showToast('خطأ: ' + fetchErr.message, true);
+    input.checked = !value;
+    input.disabled = false;
+    return;
+  }
+
+  const updated = { ...(row.permissions || {}), [key]: value };
+  const { error } = await goldmindClient
+    .from('staff').update({ permissions: updated }).eq('id', staffId);
+
+  input.disabled = false;
+  if (error) {
+    showToast('خطأ بالحفظ: ' + error.message, true);
+    input.checked = !value;
+    return;
+  }
+  showToast('تم تحديث الصلاحية');
+}
+
+async function loadStaff() {
+  const session = await requireGoldMindSession();
+  if (!session) return;
+
+  currentStaffId = session.user.id;
+
+  const { data: me, error: meErr } = await goldmindClient
+    .from('staff').select('role, permissions').eq('id', currentStaffId).single();
+
+  if (meErr || !me) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
+  canManage = me.role === 'owner' || (me.permissions && me.permissions.manage_staff === true);
+  if (!canManage) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
+  const { data: staffRows, error } = await goldmindClient
+    .from('staff').select('id, full_name, role, permissions')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('role', { ascending: false });
+
+  document.getElementById('loading-state').classList.add('hidden');
+
+  if (error) {
+    showToast('تعذر تحميل الموظفين: ' + error.message, true);
+    return;
+  }
+
+  document.getElementById('stat-total').textContent = staffRows.length;
+  document.getElementById('stat-owners').textContent = staffRows.filter(s => s.role === 'owner').length;
+  document.getElementById('staff-list').innerHTML = staffRows.map(renderStaffCard).join('');
+  document.getElementById('page-content').classList.remove('hidden');
+}
+
+loadStaff();
+</script>
 </body></html>
