@@ -349,10 +349,10 @@ async function loadStaff() {
   const session = await requireGoldMindSession();
   if (!session) return;
 
-  currentStaffId = session.user.id;
+  currentStaffId = GOLDMIND_STAFF_ID;
 
   const { data: me, error: meErr } = await goldmindClient
-    .from('staff').select('role, permissions').eq('id', currentStaffId).single();
+    .from('staff').select('role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).single();
 
   if (meErr || !me) {
     document.getElementById('loading-state').classList.add('hidden');
