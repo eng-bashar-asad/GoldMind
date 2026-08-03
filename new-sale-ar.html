@@ -105,15 +105,44 @@
 </div>
 </section>
 
-<!-- Available Pieces Picker -->
-<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-<div class="px-4 py-3 bg-primary-container flex items-center justify-between">
-<h2 class="font-label-md text-label-md text-white font-bold">اختر القطع المتوفرة</h2>
-<button onclick="loadAvailablePieces()" class="text-white text-[11px] underline">تحديث</button>
+<!-- Barcode Search -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
+<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة قطعة بالباركود</h2>
+<div class="flex gap-2">
+<input class="flex-1 h-12 px-4 border border-outline-variant rounded-lg font-data-mono text-right" dir="ltr" id="barcode-search-input" placeholder="امسح أو اكتب الباركود" type="text"/>
+<button onclick="searchByBarcode()" class="w-12 h-12 bg-primary text-white rounded-lg flex items-center justify-center active:scale-90 transition-all">
+<span class="material-symbols-outlined">search</span>
+</button>
 </div>
-<div id="pieces-picker" class="divide-y divide-outline-variant max-h-72 overflow-y-auto scroll-hide">
-<div class="p-4 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="barcode-result"></div>
+</section>
+
+<!-- Manual Entry (no barcode) -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
+<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة يدوية (بدون باركود)</h2>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-weight">الوزن (غ)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-weight" step="0.01" type="number"/>
 </div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-karat">العيار</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-karat">
+<option value="18">18</option>
+<option selected="" value="21">21</option>
+<option value="22">22</option>
+<option value="24">24</option>
+</select>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-price">السعر</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-price" placeholder="السعر" step="0.01" type="number"/>
+</div>
+<button onclick="addManualToCart()" class="w-full h-12 bg-surface-container-high border border-outline-variant text-primary font-semibold rounded-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span>
+                إضافة للفاتورة
+            </button>
 </section>
 
 <!-- Cart / Invoice Items Table -->
@@ -196,8 +225,8 @@
 
     let selectedCustomer = null;
     let selectedPaymentMethod = 'cash';
-    let availablePieces = [];
-    const cart = []; // { piece, price }
+    const cart = []; // { cartId, piece (or null), barcode, karat, weight, price }
+    let cartCounter = 0;
 
     // ---------- Payment toggle ----------
     function selectPayment(mode) {
@@ -269,74 +298,110 @@
         customerResults.innerHTML = '';
     }
 
-    // ---------- Available pieces picker ----------
-    async function loadAvailablePieces() {
-        const picker = document.getElementById('pieces-picker');
-        picker.innerHTML = '<div class="p-4 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>';
+    // ---------- Barcode search ----------
+    const barcodeResult = document.getElementById('barcode-result');
+    document.getElementById('barcode-search-input').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') searchByBarcode();
+    });
+
+    async function searchByBarcode() {
+        const input = document.getElementById('barcode-search-input');
+        const code = input.value.trim();
+        if (!code) return;
+
+        barcodeResult.innerHTML = '<div class="text-on-surface-variant text-sm p-2">جارِ البحث...</div>';
 
         const { data, error } = await goldmindClient
             .from('pieces')
             .select('*')
             .eq('store_id', GOLDMIND_STORE_ID)
+            .eq('barcode', code)
             .eq('status', 'available')
-            .order('created_at', { ascending: false });
+            .maybeSingle();
 
         if (error) {
-            picker.innerHTML = `<div class="p-4 text-error text-sm">خطأ: ${error.message}</div>`;
+            barcodeResult.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${error.message}</div>`;
             return;
         }
 
-        availablePieces = data || [];
-        renderPiecesPicker();
-    }
-
-    function renderPiecesPicker() {
-        const picker = document.getElementById('pieces-picker');
-        const cartIds = new Set(cart.map(item => item.piece.id));
-        const remaining = availablePieces.filter(p => !cartIds.has(p.id));
-
-        if (remaining.length === 0) {
-            picker.innerHTML = '<div class="p-4 text-center text-on-surface-variant text-sm">لا توجد قطع متوفرة حالياً</div>';
+        if (!data) {
+            barcodeResult.innerHTML = '<div class="text-error text-sm p-2">لا توجد قطعة متوفرة بهذا الباركود.</div>';
             return;
         }
 
-        picker.innerHTML = remaining.map(p => `
-            <div class="p-3 flex items-center justify-between gap-2">
+        const pieceId = data.id;
+        barcodeResult.innerHTML = `
+            <div class="p-3 bg-surface-container-low rounded-lg flex items-center justify-between gap-2">
                 <div class="min-w-0">
-                    <div class="font-data-mono font-bold text-sm">${p.weight_grams} غ &middot; عيار ${p.karat}</div>
-                    <div class="text-outline text-[11px] font-data-mono truncate">${p.barcode || 'بدون باركود'}</div>
+                    <div class="font-data-mono font-bold text-sm">${data.weight_grams} غ &middot; عيار ${data.karat}</div>
+                    <div class="text-outline text-[11px] font-data-mono truncate">${data.barcode}</div>
                 </div>
                 <div class="flex items-center gap-2 shrink-0">
-                    <input type="number" placeholder="السعر" class="w-24 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="price-input-${p.id}"/>
-                    <button onclick="addToCart('${p.id}')" class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all">
+                    <input type="number" placeholder="السعر" class="w-24 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input"/>
+                    <button onclick='confirmAddBarcodePiece(${JSON.stringify(data).replace(/'/g, "&apos;")})' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all">
                         <span class="material-symbols-outlined">add</span>
                     </button>
                 </div>
             </div>
-        `).join('');
+        `;
     }
 
-    function addToCart(pieceId) {
-        const piece = availablePieces.find(p => p.id === pieceId);
-        const priceInput = document.getElementById(`price-input-${pieceId}`);
+    function confirmAddBarcodePiece(piece) {
+        const priceInput = document.getElementById('barcode-price-input');
         const price = parseFloat(priceInput.value);
-
         if (!price || price <= 0) {
             priceInput.classList.add('border-error');
             priceInput.focus();
             return;
         }
-
-        cart.push({ piece, price });
+        cart.push({
+            cartId: ++cartCounter,
+            piece: piece,
+            barcode: piece.barcode,
+            karat: piece.karat,
+            weight: piece.weight_grams,
+            price: price
+        });
+        document.getElementById('barcode-search-input').value = '';
+        barcodeResult.innerHTML = '';
         renderCart();
-        renderPiecesPicker();
     }
 
-    function removeFromCart(pieceId) {
-        const idx = cart.findIndex(item => item.piece.id === pieceId);
+    // ---------- Manual entry (no barcode) ----------
+    function addManualToCart() {
+        const weight = parseFloat(document.getElementById('manual-weight').value);
+        const karat = parseInt(document.getElementById('manual-karat').value, 10);
+        const price = parseFloat(document.getElementById('manual-price').value);
+
+        const weightInput = document.getElementById('manual-weight');
+        const priceInput = document.getElementById('manual-price');
+        weightInput.classList.remove('border-error');
+        priceInput.classList.remove('border-error');
+
+        let valid = true;
+        if (!weight || weight <= 0) { weightInput.classList.add('border-error'); valid = false; }
+        if (!price || price <= 0) { priceInput.classList.add('border-error'); valid = false; }
+        if (!valid) return;
+
+        cart.push({
+            cartId: ++cartCounter,
+            piece: null,
+            barcode: null,
+            karat: karat,
+            weight: weight,
+            price: price
+        });
+
+        document.getElementById('manual-weight').value = '';
+        document.getElementById('manual-price').value = '';
+        renderCart();
+    }
+
+    // ---------- Cart ----------
+    function removeFromCart(cartId) {
+        const idx = cart.findIndex(item => item.cartId === cartId);
         if (idx !== -1) cart.splice(idx, 1);
         renderCart();
-        renderPiecesPicker();
     }
 
     function renderCart() {
@@ -349,12 +414,12 @@
 
         body.innerHTML = cart.map(item => `
             <tr>
-                <td class="px-3 py-3">${item.piece.barcode || '—'}</td>
-                <td class="px-2 py-3 text-center">${item.piece.karat}K</td>
-                <td class="px-2 py-3 text-left">${item.piece.weight_grams}</td>
+                <td class="px-3 py-3">${item.barcode || '—'}</td>
+                <td class="px-2 py-3 text-center">${item.karat}K</td>
+                <td class="px-2 py-3 text-left">${item.weight}</td>
                 <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}</td>
                 <td class="px-2 py-3 text-left">
-                    <button onclick="removeFromCart('${item.piece.id}')" class="text-error">
+                    <button onclick="removeFromCart(${item.cartId})" class="text-error">
                         <span class="material-symbols-outlined text-[18px]">close</span>
                     </button>
                 </td>
@@ -419,10 +484,10 @@
 
         const itemsPayload = cart.map(item => ({
             invoice_id: invoiceRow.id,
-            piece_id: item.piece.id,
-            barcode: item.piece.barcode,
-            karat: item.piece.karat,
-            weight_grams: item.piece.weight_grams,
+            piece_id: item.piece ? item.piece.id : null,
+            barcode: item.barcode,
+            karat: item.karat,
+            weight_grams: item.weight,
             fabrication_fee: 0,
             line_total: item.price
         }));
@@ -436,16 +501,15 @@
             return;
         }
 
-        const pieceIds = cart.map(item => item.piece.id);
-        await goldmindClient.from('pieces').update({ status: 'sold' }).in('id', pieceIds);
+        const pieceIds = cart.filter(item => item.piece).map(item => item.piece.id);
+        if (pieceIds.length > 0) {
+            await goldmindClient.from('pieces').update({ status: 'sold' }).in('id', pieceIds);
+        }
 
         showMessage('تم حفظ الفاتورة بنجاح!', false);
         setTimeout(() => {
             window.location.href = 'index-ar.html';
         }, 1200);
     });
-
-    // Init
-    loadAvailablePieces();
 </script>
 </body></html>
