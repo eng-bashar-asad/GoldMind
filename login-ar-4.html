@@ -40,6 +40,18 @@
             vertical-align: middle;
             font-size: 18px;
         }
+        .otp-box {
+            opacity: 0;
+            transform: translateY(8px);
+            animation: otpIn 0.35s ease forwards;
+        }
+        @keyframes otpIn {
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .otp-box.filled {
+            border-color: var(--royal-gold);
+            box-shadow: 0 0 10px rgba(255, 215, 0, 0.45);
+        }
     </style>
 <script id="tailwind-config">
         tailwind.config = {
@@ -105,21 +117,21 @@
 <p class="text-sm text-primary font-semibold mt-1" dir="ltr" id="phoneDisplay"></p>
 </div>
 <form class="space-y-8" id="otpForm">
-<div class="flex justify-center gap-2 dir-ltr" dir="ltr">
-<input class="w-10 h-14 text-center text-2xl font-bold bg-black/20 border border-primary/30 rounded-lg text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" type="text"/>
-<input class="w-10 h-14 text-center text-2xl font-bold bg-black/20 border border-primary/30 rounded-lg text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" type="text"/>
-<input class="w-10 h-14 text-center text-2xl font-bold bg-black/20 border border-primary/30 rounded-lg text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" type="text"/>
-<input class="w-10 h-14 text-center text-2xl font-bold bg-black/20 border border-primary/30 rounded-lg text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" type="text"/>
-<input class="w-10 h-14 text-center text-2xl font-bold bg-black/20 border border-primary/30 rounded-lg text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" type="text"/>
-<input class="w-10 h-14 text-center text-2xl font-bold bg-black/20 border border-primary/30 rounded-lg text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" type="text"/>
-<input class="w-10 h-14 text-center text-2xl font-bold bg-black/20 border border-primary/30 rounded-lg text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" type="text"/>
-<input class="w-10 h-14 text-center text-2xl font-bold bg-black/20 border border-primary/30 rounded-lg text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" type="text"/>
+<div class="flex justify-center gap-1.5 dir-ltr" dir="ltr" id="otpBoxes">
+<input class="otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-xl text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" style="animation-delay:0.03s" type="text"/>
+<input class="otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-xl text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" style="animation-delay:0.08s" type="text"/>
+<input class="otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-xl text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" style="animation-delay:0.13s" type="text"/>
+<input class="otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-xl text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" style="animation-delay:0.18s" type="text"/>
+<input class="otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-xl text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" style="animation-delay:0.23s" type="text"/>
+<input class="otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-xl text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" style="animation-delay:0.28s" type="text"/>
+<input class="otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-xl text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" style="animation-delay:0.33s" type="text"/>
+<input class="otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-xl text-primary focus:border-primary focus:ring-1 focus:ring-primary transition-all" maxlength="1" style="animation-delay:0.38s" type="text"/>
 </div>
 <button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" type="submit">
             تحقق
         </button>
 <div class="text-center">
-<button class="text-sm font-semibold text-primary hover:text-white transition-colors duration-200" id="resendBtn" type="button">
+<button class="text-sm font-semibold text-primary hover:text-white transition-colors duration-200 disabled:opacity-40 disabled:cursor-not-allowed" id="resendBtn" type="button">
                 إعادة إرسال الرمز
             </button>
 <p class="text-error text-sm mt-3 hidden text-center" id="otpFormError"></p>
@@ -157,11 +169,24 @@
             if (session) window.location.href = 'index-ar.html';
         })();
 
-        // Auto-advance between the 6 OTP boxes as the user types
-        const otpInputs = document.querySelectorAll('input[maxlength="1"]');
+        // Auto-advance between the 8 OTP boxes as the user types
+        const otpInputs = document.querySelectorAll('.otp-box');
+        otpInputs[0].focus();
+
+        function distributeCode(code) {
+            const digits = code.replace(/[^0-9]/g, '').slice(0, otpInputs.length).split('');
+            digits.forEach((d, i) => {
+                otpInputs[i].value = d;
+                otpInputs[i].classList.add('filled');
+            });
+            const nextEmpty = digits.length < otpInputs.length ? digits.length : otpInputs.length - 1;
+            otpInputs[nextEmpty].focus();
+        }
+
         otpInputs.forEach((input, idx) => {
             input.addEventListener('input', () => {
                 input.value = input.value.replace(/[^0-9]/g, '');
+                input.classList.toggle('filled', !!input.value);
                 if (input.value && idx < otpInputs.length - 1) {
                     otpInputs[idx + 1].focus();
                 }
@@ -171,6 +196,22 @@
                     otpInputs[idx - 1].focus();
                 }
             });
+            input.addEventListener('paste', (e) => {
+                const pasted = (e.clipboardData || window.clipboardData).getData('text');
+                if (pasted && pasted.replace(/[^0-9]/g, '').length >= 4) {
+                    e.preventDefault();
+                    distributeCode(pasted);
+                }
+            });
+        });
+
+        // Also catch a paste anywhere on the form (in case focus isn't on a box)
+        document.getElementById('otpForm').addEventListener('paste', (e) => {
+            const pasted = (e.clipboardData || window.clipboardData).getData('text');
+            if (pasted && pasted.replace(/[^0-9]/g, '').length >= 4) {
+                e.preventDefault();
+                distributeCode(pasted);
+            }
         });
 
         // Real verification against Supabase, then create the owner profile on first login
@@ -246,12 +287,35 @@
             window.location.href = 'index-ar.html';
         });
 
-        // Resend the sign-in link
-        document.getElementById('resendBtn').addEventListener('click', async function() {
+        // Resend the sign-in code, with a 60s cooldown timer
+        const resendBtn = document.getElementById('resendBtn');
+        const RESEND_COOLDOWN = 60;
+        let resendTimer = null;
+
+        function startResendCooldown() {
+            let remaining = RESEND_COOLDOWN;
+            resendBtn.disabled = true;
+            resendBtn.textContent = 'إعادة الإرسال بعد ' + remaining + ' ثانية';
+            clearInterval(resendTimer);
+            resendTimer = setInterval(() => {
+                remaining -= 1;
+                if (remaining <= 0) {
+                    clearInterval(resendTimer);
+                    resendBtn.disabled = false;
+                    resendBtn.textContent = 'إعادة إرسال الرمز';
+                } else {
+                    resendBtn.textContent = 'إعادة الإرسال بعد ' + remaining + ' ثانية';
+                }
+            }, 1000);
+        }
+
+        startResendCooldown();
+
+        resendBtn.addEventListener('click', async function() {
             const email = sessionStorage.getItem('goldmind_email');
             const errEl = document.getElementById('otpFormError');
             this.disabled = true;
-            const original = this.textContent;
+            const original = 'إعادة إرسال الرمز';
             this.textContent = 'جارِ الإرسال...';
             const { error } = await goldmindClient.auth.signInWithOtp({
                 email,
@@ -260,14 +324,15 @@
                     emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html'
                 }
             });
-            this.disabled = false;
-            this.textContent = original;
             if (error) {
+                this.disabled = false;
+                this.textContent = original;
                 errEl.textContent = 'تعذّر إعادة الإرسال: ' + error.message;
                 errEl.classList.remove('hidden');
             } else {
                 errEl.classList.add('hidden');
-                alert('تم إرسال رابط جديد إلى بريدك الإلكتروني');
+                alert('تم إرسال رمز جديد إلى بريدك الإلكتروني');
+                startResendCooldown();
             }
         });
 
