@@ -61,10 +61,12 @@ function goldMindSetActiveStore(storeId) {
 
 // Sign the user out and send them back to the login screen.
 // Confirms first since it's a destructive/navigational action.
-async function goldMindSignOut() {
+// Pass a redirectTo (e.g. 'admin-login-ar.html') for pages that live outside
+// the normal company/staff flow, so sign-out lands back on the right entry point.
+async function goldMindSignOut(redirectTo) {
     if (!confirm('هل تريد تسجيل الخروج؟')) return;
     GOLDMIND_STORE_ID = null;
     GOLDMIND_STAFF_ID = null;
     await goldmindClient.auth.signOut();
-    window.location.href = 'login-entry-ar.html';
+    window.location.href = redirectTo || 'login-entry-ar.html';
 }
