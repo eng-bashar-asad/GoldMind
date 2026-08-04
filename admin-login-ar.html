@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html class="dark" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GoldMind | دخول مالك المنصة</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    :root { --royal-gold: #FFD700; --deep-navy: #0f172a; }
+    body { font-family: 'IBM+Plex+Sans+Arabic', 'Inter', sans-serif; background-color: var(--deep-navy); overflow: hidden; min-height: max(884px, 100dvh); }
+    .gold-glow { text-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
+    .gem-comet { filter: drop-shadow(0 0 3px rgba(255, 215, 0, 0.9)) drop-shadow(0 0 7px rgba(255, 255, 255, 0.6)); }
+    .gem-comet-a { animation: gemCometForward 1.4s linear infinite; }
+    .gem-comet-b { animation: gemCometReverse 2.3s linear infinite; }
+    @keyframes gemCometForward { to { stroke-dashoffset: -140; } }
+    @keyframes gemCometReverse { to { stroke-dashoffset: 140; } }
+    .gem-node { transform-box: fill-box; transform-origin: center; animation: gemPulse 1.8s ease-in-out infinite; }
+    .gem-node-2 { animation-delay: 0.3s; }
+    .gem-node-3 { animation-delay: 0.6s; }
+    @keyframes gemPulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.8); opacity: 0.45; } }
+    .gold-border-focus:focus-within { border-color: var(--royal-gold); box-shadow: 0 0 0 1px var(--royal-gold); }
+    .gold-gradient { background: linear-gradient(135deg, #FFD700 0%, #B4955A 100%); }
+    .glass-panel { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 215, 0, 0.1); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; vertical-align: middle; font-size: 18px; }
+    .otp-box { opacity: 0; transform: translateY(16px) scale(0.9); animation: otpIn 0.5s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes otpIn { to { opacity: 1; transform: translateY(0) scale(1); } }
+    .otp-box.filled { border-color: var(--royal-gold); box-shadow: 0 0 10px rgba(255, 215, 0, 0.45); }
+    .admin-badge { background: rgba(255,215,0,0.12); border: 1px solid rgba(255,215,0,0.35); }
+</style>
+<script id="tailwind-config">
+    tailwind.config = { darkMode: "class", theme: { extend: {
+        colors: { "primary": "#FFD700", "on-primary": "#0f172a", "secondary": "#745a25",
+            "surface": "#0f172a", "surface-container": "#1e293b", "outline": "#76777d", "background": "#0f172a" },
+        borderRadius: { "DEFAULT": "0.125rem", "lg": "0.25rem", "xl": "0.5rem", "full": "0.75rem" },
+        fontFamily: { "headline-xl": ["Inter", "IBM+Plex+Sans+Arabic"], "body-md": ["Inter", "IBM+Plex+Sans+Arabic"] }
+    } } }
+</script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+</head>
+<body class="text-white min-h-screen flex flex-col items-center justify-center p-4">
+<main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
+
+<div class="mb-8 text-center">
+<div class="inline-flex items-center justify-center w-32 h-32 rounded-full border-2 border-primary/30 mb-6 bg-surface-container relative">
+<svg width="78" height="78" viewBox="0 0 56 56" fill="none" class="relative z-10">
+<defs>
+<linearGradient id="gemGrad" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
+<stop stop-color="#FFD700"/>
+<stop offset="1" stop-color="#B4955A"/>
+</linearGradient>
+<linearGradient id="cometGradA" x1="0" y1="0" x2="1" y2="1">
+<stop offset="0" stop-color="#FFD700" stop-opacity="0"/>
+<stop offset="0.55" stop-color="#FFD700" stop-opacity="0.85"/>
+<stop offset="1" stop-color="#FFFFFF" stop-opacity="1"/>
+</linearGradient>
+<linearGradient id="cometGradB" x1="1" y1="0" x2="0" y2="1">
+<stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
+<stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.75"/>
+<stop offset="1" stop-color="#FFD700" stop-opacity="1"/>
+</linearGradient>
+</defs>
+<path class="gem-track" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" stroke="url(#gemGrad)" stroke-width="1.5" fill="rgba(255,215,0,0.07)" stroke-linejoin="round" opacity="0.4"/>
+<path class="gem-comet gem-comet-a" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" pathLength="140" stroke="url(#cometGradA)" stroke-width="3.2" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="22 118"/>
+<path class="gem-comet gem-comet-b" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" pathLength="140" stroke="url(#cometGradB)" stroke-width="2.2" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="14 126"/>
+<path d="M8 20 L48 20" stroke="url(#gemGrad)" stroke-width="1.2" opacity="0.5"/>
+<path d="M18 20 L16 50" stroke="url(#gemGrad)" stroke-width="1" opacity="0.4"/>
+<path d="M38 20 L40 50" stroke="url(#gemGrad)" stroke-width="1" opacity="0.4"/>
+<path d="M28 4 L18 20" stroke="url(#gemGrad)" stroke-width="1" opacity="0.35"/>
+<path d="M28 4 L38 20" stroke="url(#gemGrad)" stroke-width="1" opacity="0.35"/>
+<circle class="gem-node" cx="28" cy="20" r="2.2" fill="#FFD700"/>
+<circle class="gem-node gem-node-2" cx="18" cy="20" r="1.5" fill="#FFD700" opacity="0.8"/>
+<circle class="gem-node gem-node-3" cx="38" cy="20" r="1.5" fill="#FFD700" opacity="0.8"/>
+</svg>
+<div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl"></div>
+</div>
+<h1 class="text-4xl font-headline-xl font-bold tracking-tight text-primary mb-2">جولد مايند</h1>
+<div class="inline-flex items-center gap-1.5 admin-badge rounded-full px-4 py-1.5 mt-1">
+<span class="material-symbols-outlined text-primary text-sm">shield_person</span>
+<span class="text-sm font-semibold text-primary">دخول مالك المنصة</span>
+</div>
+</div>
+
+<div class="glass-panel w-full p-8 rounded-xl shadow-2xl space-y-6">
+
+<!-- STEP 1: email -->
+<div id="emailStep">
+<div class="text-center mb-6">
+<h2 class="text-lg font-bold text-white">دخول مباشر بدون اختيار شركة</h2>
+<p class="text-xs text-primary/70 mt-2">هذه الصفحة مخصصة لحساب مالك منصة GoldMind فقط</p>
+</div>
+<form class="space-y-5" id="emailForm">
+<div>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="adminEmail">البريد الإلكتروني</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="adminEmail" placeholder="name@example.com" required type="email"/>
+</div>
+</div>
+<button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" id="emailSubmitBtn" type="submit">إرسال رمز التحقق</button>
+<p class="text-error text-sm text-center hidden text-red-400" id="emailFormError"></p>
+</form>
+<a class="block text-center text-sm text-primary/50 hover:text-primary transition-colors mt-6" href="login-entry-ar.html">تسجيل الدخول كموظف/صاحب شركة</a>
+</div>
+
+<!-- STEP 2: OTP -->
+<div class="hidden" id="otpStep">
+<button class="inline-flex items-center gap-1 text-sm text-primary/60 hover:text-primary transition-colors mb-4" id="backToEmailBtn" type="button">
+<span class="material-symbols-outlined text-base">arrow_forward</span>
+تغيير البريد الإلكتروني
+</button>
+<div class="text-center mb-8">
+<h2 class="text-2xl font-bold text-white">التحقق بخطوتين</h2>
+<div class="h-1 w-12 bg-primary mx-auto mt-2 rounded-full"></div>
+<p class="text-sm text-primary/70 mt-4">أدخل الرمز المكوّن من ٨ أرقام المرسل إلى بريدك الإلكتروني</p>
+</div>
+<form class="space-y-6" id="otpForm">
+<div class="flex justify-center gap-2" dir="ltr" id="otpBoxes">
+<!-- filled by JS -->
+</div>
+<button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" type="submit">تأكيد الدخول</button>
+<p class="text-error text-sm text-center hidden text-red-400" id="otpFormError"></p>
+<button class="w-full text-center text-sm text-primary/60 hover:text-primary transition-colors" id="resendBtn" type="button">إعادة إرسال الرمز</button>
+</form>
+</div>
+
+</div>
+</main>
+
+<script>
+const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+document.getElementById('emailForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const email = document.getElementById('adminEmail').value.trim();
+    const errEl = document.getElementById('emailFormError');
+    errEl.classList.add('hidden');
+
+    if (!emailPattern.test(email)) {
+        errEl.textContent = 'فضلاً أدخل بريد إلكتروني صحيح';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('emailSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'جارِ الإرسال...';
+
+    const { error } = await goldmindClient.auth.signInWithOtp({
+        email: email,
+        options: { shouldCreateUser: false, emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html' }
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'إرسال رمز التحقق';
+
+    if (error) {
+        errEl.textContent = 'تعذّر إرسال الرمز: ' + error.message;
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    sessionStorage.setItem('goldmind_admin_email', email);
+    document.getElementById('emailStep').classList.add('hidden');
+    document.getElementById('otpStep').classList.remove('hidden');
+    buildOtpBoxes();
+    startResendCooldown();
+});
+
+document.getElementById('backToEmailBtn').addEventListener('click', function () {
+    document.getElementById('otpStep').classList.add('hidden');
+    document.getElementById('emailStep').classList.remove('hidden');
+    clearInterval(resendTimer);
+});
+
+let otpInputs = [];
+function buildOtpBoxes() {
+    const box = document.getElementById('otpBoxes');
+    box.innerHTML = '';
+    otpInputs = [];
+    for (let i = 0; i < 8; i++) {
+        const inp = document.createElement('input');
+        inp.type = 'tel';
+        inp.inputMode = 'numeric';
+        inp.maxLength = 8; // intentionally not 1, so paste isn't truncated before JS sees it
+        inp.className = 'otp-box w-9 h-12 text-center text-xl font-bold bg-black/20 border border-primary/30 rounded-lg text-white focus:outline-none gold-border-focus';
+        inp.style.animationDelay = (i * 0.06) + 's';
+        inp.dataset.index = i;
+        box.appendChild(inp);
+        otpInputs.push(inp);
+    }
+
+    otpInputs.forEach((input, idx) => {
+        input.addEventListener('input', function () {
+            const digits = this.value.replace(/[^0-9]/g, '');
+            if (digits.length > 1) {
+                distributeCode(digits);
+                return;
+            }
+            this.value = digits;
+            this.classList.toggle('filled', digits.length === 1);
+            if (digits.length === 1 && idx < otpInputs.length - 1) {
+                otpInputs[idx + 1].focus();
+            }
+        });
+        input.addEventListener('keydown', function (e) {
+            if (e.key === 'Backspace' && !this.value && idx > 0) {
+                otpInputs[idx - 1].focus();
+            }
+        });
+        input.addEventListener('paste', function (e) {
+            const pasted = (e.clipboardData || window.clipboardData).getData('text');
+            if (pasted && pasted.replace(/[^0-9]/g, '').length >= 2) {
+                e.preventDefault();
+                distributeCode(pasted);
+            }
+        });
+    });
+    otpInputs[0].focus();
+}
+
+function distributeCode(text) {
+    const digits = text.replace(/[^0-9]/g, '').slice(0, 8).split('');
+    otpInputs.forEach((input, i) => {
+        input.value = digits[i] || '';
+        input.classList.toggle('filled', !!digits[i]);
+    });
+    const next = otpInputs[Math.min(digits.length, otpInputs.length - 1)];
+    if (next) next.focus();
+}
+
+document.getElementById('otpForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const email = sessionStorage.getItem('goldmind_admin_email');
+    const code = otpInputs.map(i => i.value).join('');
+    const errEl = document.getElementById('otpFormError');
+    errEl.classList.add('hidden');
+
+    if (code.length !== 8) {
+        errEl.textContent = 'فضلاً أدخل الرمز المكوّن من ٨ أرقام كاملاً';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const { error } = await goldmindClient.auth.verifyOtp({ email: email, token: code, type: 'email' });
+
+    if (error) {
+        errEl.textContent = 'الرمز غير صحيح أو منتهي الصلاحية: ' + error.message;
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
+
+    if (!isAdmin) {
+        errEl.textContent = 'هذا البريد الإلكتروني ليس حساب مالك المنصة. سيتم تسجيل خروجك.';
+        errEl.classList.remove('hidden');
+        await goldmindClient.auth.signOut();
+        return;
+    }
+
+    sessionStorage.removeItem('goldmind_admin_email');
+    window.location.href = 'admin-panel-ar.html';
+});
+
+const resendBtn = document.getElementById('resendBtn');
+const RESEND_COOLDOWN = 60;
+let resendTimer = null;
+
+function startResendCooldown() {
+    let remaining = RESEND_COOLDOWN;
+    resendBtn.disabled = true;
+    resendBtn.textContent = 'إعادة الإرسال بعد ' + remaining + ' ثانية';
+    clearInterval(resendTimer);
+    resendTimer = setInterval(() => {
+        remaining -= 1;
+        if (remaining <= 0) {
+            clearInterval(resendTimer);
+            resendBtn.disabled = false;
+            resendBtn.textContent = 'إعادة إرسال الرمز';
+        } else {
+            resendBtn.textContent = 'إعادة الإرسال بعد ' + remaining + ' ثانية';
+        }
+    }, 1000);
+}
+
+resendBtn.addEventListener('click', async function () {
+    const email = sessionStorage.getItem('goldmind_admin_email');
+    const errEl = document.getElementById('otpFormError');
+    this.disabled = true;
+    const original = 'إعادة إرسال الرمز';
+    this.textContent = 'جارِ الإرسال...';
+    const { error } = await goldmindClient.auth.signInWithOtp({
+        email,
+        options: { shouldCreateUser: false, emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html' }
+    });
+    if (error) {
+        this.disabled = false;
+        this.textContent = original;
+        errEl.textContent = 'تعذّر إعادة الإرسال: ' + error.message;
+        errEl.classList.remove('hidden');
+    } else {
+        errEl.classList.add('hidden');
+        alert('تم إرسال رمز جديد إلى بريدك الإلكتروني');
+        startResendCooldown();
+    }
+});
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
