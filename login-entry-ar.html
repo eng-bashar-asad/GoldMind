@@ -111,6 +111,32 @@
 <div class="flex bg-black/20 rounded-lg p-1 gap-1">
 <button class="tab-btn active flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabJoin" type="button" onclick="setMode('join')">الدخول لشركتي</button>
 <button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabNew" type="button" onclick="setMode('new')">تسجيل شركة جديدة</button>
+<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabQuick" type="button" onclick="setMode('quick')">دخول سريع</button>
+</div>
+
+<!-- QUICK LOGIN mode (username/email + password, no OTP) -->
+<div class="hidden" id="quickPanel">
+<div class="text-center mb-4">
+<h2 class="text-lg font-bold text-white">دخول سريع بكلمة السر</h2>
+<p class="text-xs text-primary/70 mt-2">ادخل باسم المستخدم أو بريدك الإلكتروني وكلمة السر — بدون رمز تحقق</p>
+</div>
+<form class="space-y-5" id="quickForm">
+<div>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="quickIdentifier">اسم المستخدم أو البريد الإلكتروني</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="quickIdentifier" placeholder="username or name@example.com" required type="text"/>
+</div>
+</div>
+<div>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="quickPassword">كلمة السر</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="quickPassword" placeholder="••••••••" required type="password"/>
+</div>
+</div>
+<button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" id="quickSubmitBtn" type="submit">دخول</button>
+<p class="text-error text-sm text-center hidden" id="quickFormError"></p>
+<p class="text-[11px] text-primary/50 text-center">ما عندك كلمة سر بعد؟ سجّل دخول بالرمز العادي أول مرة وفعّلها من صفحة "الأمان" داخل التطبيق.</p>
+</form>
 </div>
 
 <!-- JOIN mode -->
@@ -184,8 +210,10 @@ let selectedCompany = null; // { id, name }
 function setMode(mode) {
     document.getElementById('tabJoin').classList.toggle('active', mode === 'join');
     document.getElementById('tabNew').classList.toggle('active', mode === 'new');
+    document.getElementById('tabQuick').classList.toggle('active', mode === 'quick');
     document.getElementById('joinPanel').classList.toggle('hidden', mode !== 'join');
     document.getElementById('newPanel').classList.toggle('hidden', mode !== 'new');
+    document.getElementById('quickPanel').classList.toggle('hidden', mode !== 'quick');
 }
 
 function closeCompanyResults() {
@@ -326,6 +354,66 @@ document.getElementById('newForm').addEventListener('submit', async function (e)
     sessionStorage.setItem('goldmind_mode', 'new');
     sessionStorage.setItem('goldmind_company_name', companyName);
     window.location.href = 'login-ar-4.html';
+});
+
+document.getElementById('quickForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const identifier = document.getElementById('quickIdentifier').value.trim();
+    const password = document.getElementById('quickPassword').value;
+    const errEl = document.getElementById('quickFormError');
+    errEl.classList.add('hidden');
+
+    if (!identifier || !password) {
+        errEl.textContent = 'فضلاً أدخل اسم المستخدم/البريد وكلمة السر';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('quickSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'جارِ الدخول...';
+
+    let email = identifier;
+    if (!identifier.includes('@')) {
+        const { data: resolvedEmail, error: lookupError } = await goldmindClient.rpc('lookup_email_by_username', { p_username: identifier });
+        if (lookupError || !resolvedEmail) {
+            btn.disabled = false;
+            btn.textContent = 'دخول';
+            errEl.textContent = 'لا يوجد حساب بهذا اسم المستخدم';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        email = resolvedEmail;
+    }
+
+    const { data: signInData, error: signInError } = await goldmindClient.auth.signInWithPassword({ email, password });
+
+    if (signInError) {
+        btn.disabled = false;
+        btn.textContent = 'دخول';
+        errEl.textContent = 'بيانات الدخول غير صحيحة';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const { data: memberships } = await goldmindClient
+        .from('staff').select('id').eq('user_id', signInData.user.id);
+
+    if (!memberships || memberships.length === 0) {
+        const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
+        btn.disabled = false;
+        btn.textContent = 'دخول';
+        if (isAdmin) {
+            window.location.href = 'admin-panel-ar.html';
+            return;
+        }
+        errEl.textContent = 'لا يوجد حساب شركة مرتبط بهذا المستخدم. تواصل مع مدير الشركة.';
+        errEl.classList.remove('hidden');
+        await goldmindClient.auth.signOut();
+        return;
+    }
+
+    window.location.href = 'index-ar.html';
 });
 </script>
 <script>
