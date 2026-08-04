@@ -157,7 +157,8 @@ async function load() {
     // back to today's live price for older sales made before snapshotting existed.
     const goldPrice = it.gold_price_per_gram != null ? Number(it.gold_price_per_gram) : (livePriceMap[it.karat] || 0);
     const isEstimated = it.gold_price_per_gram == null;
-    const weight = Number(it.weight_grams) || 0;
+    const weight = Number(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams) || 0;
+    const displayWeight = Number(it.weight_grams) || 0;
     const revenue = Number(it.line_total) || 0;
     const goldValue = weight * goldPrice;
     const beforeTax = revenue / vatMultiplier;
@@ -171,7 +172,7 @@ async function load() {
     totalProfit += profit;
 
     const inv = invoiceMap[it.invoice_id];
-    return { it, inv, weight, revenue, goldValue, vat, fabCost, profit, goldPrice, isEstimated };
+    return { it, inv, weight, displayWeight, revenue, goldValue, vat, fabCost, profit, goldPrice, isEstimated };
   });
 
   document.getElementById('stat-revenue').textContent = totalRevenue.toFixed(2);
@@ -186,7 +187,7 @@ async function load() {
     <tr class="border-t border-outline-variant">
       <td class="px-3 py-2">${(r.inv && r.inv.invoice_number) || '—'}</td>
       <td class="px-3 py-2">${r.it.barcode || r.it.description || '—'}</td>
-      <td class="px-3 py-2 font-data-mono">${r.weight}غ / ع${r.it.karat}</td>
+      <td class="px-3 py-2 font-data-mono">${r.displayWeight}غ / ع${r.it.karat}${r.displayWeight !== r.weight ? ` <span class="text-outline">(محاسبة: ${r.weight}غ)</span>` : ''}</td>
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono">${r.goldValue.toFixed(2)}${r.isEstimated ? ' <span class=\"text-outline\">(تقديري)</span>' : ''}</td>
       <td class="px-3 py-2 font-data-mono">${r.vat.toFixed(2)}</td>
