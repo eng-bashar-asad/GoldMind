@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-
-<html dir="rtl" lang="ar"><head>
+<html class="light" dir="rtl" lang="ar"><head>
 <meta charset="utf-8"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
@@ -9,295 +8,534 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>GoldMind - Create Invoice</title>
+<title>GoldMind - فاتورة شراء</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 <script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            "colors": {
-                    "inverse-primary": "#bec6e0",
-                    "tertiary-fixed": "#d3e4fe",
-                    "secondary": "#745a25",
-                    "on-error": "#ffffff",
-                    "primary-container": "#131b2e",
-                    "on-secondary-container": "#795f29",
-                    "on-tertiary-fixed-variant": "#38485d",
-                    "outline": "#76777d",
-                    "tertiary-fixed-dim": "#b7c8e1",
-                    "inverse-on-surface": "#eff1f3",
-                    "surface-container": "#eceef0",
-                    "on-secondary-fixed-variant": "#5a430f",
-                    "error-container": "#ffdad6",
-                    "on-secondary-fixed": "#261900",
-                    "tertiary": "#000000",
-                    "surface-bright": "#f7f9fb",
-                    "secondary-container": "#ffdb99",
-                    "surface-container-high": "#e6e8ea",
-                    "primary-fixed-dim": "#bec6e0",
-                    "on-secondary": "#ffffff",
-                    "on-primary-fixed-variant": "#3f465c",
-                    "on-surface-variant": "#45464d",
-                    "primary-fixed": "#dae2fd",
-                    "surface-container-low": "#f2f4f6",
-                    "tertiary-container": "#0b1c30",
-                    "secondary-fixed-dim": "#e4c283",
-                    "surface-container-lowest": "#ffffff",
-                    "on-surface": "#191c1e",
-                    "surface-variant": "#e0e3e5",
-                    "surface-container-highest": "#e0e3e5",
-                    "inverse-surface": "#2d3133",
-                    "background": "#f7f9fb",
-                    "on-primary": "#ffffff",
-                    "on-error-container": "#93000a",
-                    "on-background": "#191c1e",
-                    "on-primary-fixed": "#131b2e",
-                    "surface-dim": "#d8dadc",
-                    "on-tertiary-container": "#75859d",
-                    "surface-tint": "#565e74",
-                    "surface": "#f7f9fb",
-                    "secondary-fixed": "#ffdea4",
-                    "outline-variant": "#c6c6cd",
-                    "primary": "#000000",
-                    "on-tertiary-fixed": "#0b1c30",
-                    "error": "#ba1a1a",
-                    "on-tertiary": "#ffffff",
-                    "on-primary-fixed-variant": "#3f465c"
-            },
-            "borderRadius": {
-                    "DEFAULT": "0.125rem",
-                    "lg": "0.25rem",
-                    "xl": "0.5rem",
-                    "full": "0.75rem"
-            },
-            "spacing": {
-                    "unit": "4px",
-                    "gutter": "24px",
-                    "margin-desktop": "40px",
-                    "margin-mobile": "16px",
-                    "container-max": "1440px"
-            },
-            "fontFamily": {
-                    "body-md": ["Inter"],
-                    "headline-xl-mobile": ["Inter"],
-                    "data-mono": ["IBM Plex Sans"],
-                    "headline-md": ["Inter"],
-                    "body-lg": ["Inter"],
-                    "headline-lg": ["Inter"],
-                    "label-md": ["Inter"],
-                    "headline-xl": ["Inter"]
-            },
-            "fontSize": {
-                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
-                    "headline-xl-mobile": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
-                    "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
-                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
-                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
-                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
-                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
-                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
-            }
+        tailwind.config = { darkMode: "class", theme: { extend: {
+          "colors": {
+                  "on-surface-variant": "#45464d", "secondary": "#745a25", "on-tertiary": "#ffffff",
+                  "error": "#ba1a1a", "on-secondary": "#ffffff", "primary-container": "#131b2e",
+                  "on-surface": "#191c1e", "surface-container": "#eceef0", "surface-container-highest": "#e0e3e5",
+                  "surface-container-low": "#f2f4f6", "on-primary": "#ffffff", "background": "#f7f9fb",
+                  "outline-variant": "#c6c6cd", "surface-container-lowest": "#ffffff", "surface": "#f7f9fb",
+                  "error-container": "#ffdad6", "primary": "#000000", "on-background": "#191c1e",
+                  "on-error": "#ffffff", "surface-variant": "#e0e3e5", "outline": "#76777d",
+                  "surface-container-high": "#e6e8ea", "secondary-container": "#ffdb99", "on-secondary-container": "#795f29"
           },
-        },
-      }
+          "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"] },
+          "fontSize": {
+                  "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                  "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
+                  "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                  "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                  "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+          }
+        } } }
     </script>
 <style>
-        html { font-size: 87.5%; }
-
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-            display: inline-block;
-            line-height: 1;
-            text-transform: none;
-            letter-spacing: normal;
-            word-wrap: normal;
-            white-space: nowrap;
-            direction: ltr;
-            font-size: 18px;
-        }
-        .step-active { color: #745a25; }
-        .numpad-key:active { transform: scale(0.95); background-color: #e0e3e5; }
-    </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
-  </head>
-<body class="bg-background text-on-background font-body-md min-h-screen flex flex-col items-center">
-<!-- Top Navigation Header -->
-<header class="bg-surface border-b border-outline-variant w-full h-16 flex flex-row-reverse justify-between items-center px-margin-mobile md:px-margin-desktop sticky top-0 z-40">
-<div class="flex items-center gap-4">
-<span class="font-headline-lg text-headline-lg font-bold text-secondary-fixed">GoldMind</span>
-</div>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24; display: inline-block; line-height: 1; text-transform: none; letter-spacing: normal; word-wrap: normal; white-space: nowrap; direction: ltr; font-size: 18px; }
+    .scroll-hide::-webkit-scrollbar { display: none; }
+    .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .tab-btn.active { background: #000; color: #fff; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased pb-24">
+<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-4 w-full h-16 sticky top-0 z-50 border-b border-outline-variant">
 <div class="flex items-center gap-3">
-<div class="cursor-pointer active:opacity-80 p-2 rounded-full hover:bg-surface-container-high transition-colors">
-<span class="material-symbols-outlined text-on-surface-variant">search</span>
-</div>
-<div class="w-10 h-10 rounded-full bg-surface-container-highest border border-outline-variant overflow-hidden">
-<img class="w-full h-full object-cover" data-alt="A professional headshot of a luxury boutique manager, mid-40s, wearing a tailored navy suit. The image is captured in a high-end jewelry showroom with soft, warm golden spotlights highlighting displays of fine jewelry in the background. The aesthetic is clean, corporate, and sophisticated, mirroring a high-trust financial environment." src="https://lh3.googleusercontent.com/aida-public/AB6AXuAiOtagmD0CN1hIaIGsho9H7PvVS5eWkyoMGVHfaeHM49aPeEEfBJ8Ib9k9D1Xl_QQoEoddLDdhi4HWkG-yjGpkO6NsIxf5haOa4h_ZVPjinCuZgR1RrxMeV3-7AcXBuSFnaAoEuFhjFPxOUrt-Y1pdMm-ak5IOt0W_n-_mfzEgjY4aA1wt5Img9s3L_fE2WiaQYrzP9FZPUfnnHcx6T18KU54S5MqwQz7vEJsIE3dCT25-Onx6ZNa2aA"/>
-</div>
+<button onclick="window.location.href='index-ar.html'" class="material-symbols-outlined cursor-pointer active:opacity-80">arrow_forward</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">فاتورة شراء</h1>
 </div>
 </header>
-<main class="w-full max-w-container-max flex flex-col px-margin-mobile md:px-margin-desktop py-8 mb-24">
-<!-- Simulation Progress Tracker -->
-<div class="w-full mb-8 flex items-center justify-center">
-<div class="flex items-center gap-4 text-label-md font-label-md">
-<div class="flex items-center gap-2 text-on-surface-variant opacity-60">
-<span class="w-6 h-6 flex items-center justify-center rounded-full border border-outline">1</span>
-<span>اختيار العناصر</span>
+<main class="max-w-md mx-auto px-4 pt-6 space-y-6">
+
+<!-- Purchase type tabs -->
+<div class="flex bg-surface-container-low rounded-lg p-1 gap-1">
+<button class="tab-btn active flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabTrader" onclick="setPurchaseType('buyTrader')">شراء من تاجر</button>
+<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabRetail" onclick="setPurchaseType('buyRetail')">شراء من فرد</button>
 </div>
-<div class="w-12 h-px bg-outline-variant"></div>
-<div class="flex items-center gap-2 text-secondary font-bold">
-<span class="w-6 h-6 flex items-center justify-center rounded-full bg-secondary text-white">2</span>
-<span>معلومات العميل</span>
-</div>
-<div class="w-12 h-px bg-outline-variant"></div>
-<div class="flex items-center gap-2 text-on-surface-variant opacity-60">
-<span class="w-6 h-6 flex items-center justify-center rounded-full border border-outline">3</span>
-<span>تأكيد الفاتورة</span>
-</div>
-</div>
-</div>
-<section class="grid grid-cols-1 lg:grid-cols-12 gap-gutter">
-<!-- Main Entry Area -->
-<div class="lg:col-span-7 flex flex-col gap-6">
-<div class="bg-surface-container-lowest border border-outline-variant p-6 rounded-lg">
-<h2 class="font-headline-md text-headline-md mb-6">إنشاء فاتورة جديدة</h2>
-<div class="space-y-4">
-<label class="block font-label-md text-label-md text-on-surface-variant mb-2">رقم الجوال للبحث عن العميل</label>
-<div class="relative">
-<input class="w-full h-14 bg-surface-container-low border-2 border-secondary rounded-lg px-4 font-data-mono text-body-lg text-on-surface focus:outline-none flex items-center" dir="ltr" readonly="" type="text" value="0501234567"/>
-<div class="absolute inset-y-0 right-4 flex items-center pointer-events-none">
-<span class="material-symbols-outlined text-secondary">phone_iphone</span>
-</div>
-</div>
-<!-- Dropdown Suggestions -->
-<div class="mt-2 bg-surface-container-lowest border border-outline shadow-xl rounded-xl overflow-hidden animate-in fade-in slide-in-from-top-2 duration-300">
-<div class="p-3 bg-surface-container-high flex items-center justify-between">
-<span class="text-label-md font-label-md text-on-surface-variant">تم العثور على عميل مطابق</span>
-<span class="material-symbols-outlined text-secondary text-sm">person_search</span>
-</div>
-<div class="p-4 hover:bg-surface-container-low cursor-pointer transition-colors border-b border-outline-variant flex items-center justify-between group">
-<div class="flex items-center gap-4">
-<div class="w-12 h-12 bg-secondary-container text-on-secondary-container flex items-center justify-center rounded-full font-bold">
-                                        أق
-                                    </div>
+
+<!-- Trader / Seller Info -->
+<section class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm">
+<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-4" id="counterparty-label">معلومات التاجر</h2>
+
+<div id="trader-block">
+<div id="trader-selected" class="hidden items-center justify-between bg-surface-container-low rounded-lg p-3">
 <div>
-<div class="font-bold text-body-md">أحمد القحطاني</div>
-<div class="text-label-md text-on-surface-variant">0501234567</div>
+<div class="font-bold" id="trader-selected-name"></div>
+<div class="text-on-surface-variant text-sm font-data-mono" id="trader-selected-phone" dir="ltr"></div>
 </div>
+<button onclick="clearTrader()" class="text-error text-sm font-semibold">تغيير</button>
 </div>
-<div class="bg-secondary text-white px-4 py-2 rounded-full font-label-md group-hover:bg-primary transition-colors">
-                                    اختيار العميل
-                                </div>
+
+<div id="trader-search-block" class="space-y-3">
+<div class="relative">
+<input class="w-full h-12 px-10 py-2 border border-outline-variant rounded bg-white focus:border-primary focus:ring-0 transition-all text-body-md font-body-md" id="trader-search" placeholder="ابحث باسم التاجر أو الهاتف..." type="text"/>
+<span class="absolute right-3 top-3 material-symbols-outlined text-outline">search</span>
 </div>
-<div class="p-4 text-center">
-<button class="text-secondary font-label-md flex items-center justify-center gap-2 mx-auto hover:underline">
-<span class="material-symbols-outlined">person_add</span>
-                                    إضافة عميل جديد بهذا الرقم
-                                </button>
-</div>
-</div>
-</div>
-</div>
-<!-- Selected Items Summary (Context for Sales Step) -->
-<div class="bg-surface-container-lowest border border-outline-variant p-6 rounded-lg">
-<h3 class="font-label-md text-label-md font-bold mb-4">ملخص المنتجات المختارة</h3>
-<div class="flex items-center gap-4 p-3 bg-surface-container-low rounded-lg border border-outline-variant">
-<div class="w-16 h-16 bg-white rounded border border-outline-variant overflow-hidden">
-<img class="w-full h-full object-cover" data-alt="Close up high-resolution product shot of a 24k solid gold bar, 50 grams, featuring intricate stamps of purity and brand authenticity. The lighting is dramatic and luxurious, reflecting off the polished surface against a dark, velvet-textured background. Corporate luxury jewelry aesthetic." src="https://lh3.googleusercontent.com/aida-public/AB6AXuBDZFlUpMBsyMBt0_by70f0-lVhOWJDnTQ1FI0NqJ_1CyLoxPC4CFIWzDnnAU0AT5Clv1IcGN0k3glwcI17l5F0RQLFs3JuM-jnqhmZPz6ni1kGGljfxt2-U1fiSvbHed0lMlNRU0YamJOCISfpN6iScwa1VnKHQtd8A1w085aBh50Eu-s_vrHAwn5V4g2QMuY8Pvi2WDC8n2xC_dsRWr6VRL7RciNltVmXbOsPu8XodgqXHneE_6NpNg"/>
-</div>
-<div class="flex-1">
-<div class="font-bold text-body-md">سبيكة ذهب عيار 24 - 50 جرام</div>
-<div class="text-label-md text-on-surface-variant">الكمية: 1</div>
-</div>
-<div class="text-left">
-<div class="font-data-mono font-bold text-secondary">12,450.00 ر.س</div>
-</div>
-</div>
-</div>
-</div>
-<!-- Right Sidebar / Payment Preview -->
-<div class="lg:col-span-5 flex flex-col gap-6">
-<div class="bg-primary text-white p-8 rounded-lg shadow-2xl relative overflow-hidden">
-<div class="absolute -right-10 -top-10 w-40 h-40 bg-secondary opacity-20 rounded-full blur-3xl"></div>
-<div class="relative z-10">
-<div class="text-label-md font-label-md opacity-80 mb-2">إجمالي الفاتورة المتوقع</div>
-<div class="font-headline-xl text-headline-xl mb-6">12,450.00 <span class="text-body-md">ر.س</span></div>
-<div class="space-y-3 pt-6 border-t border-white/20">
-<div class="flex justify-between text-label-md">
-<span>سعر الذهب العالمي (جرام)</span>
-<span class="font-data-mono">249.00 ر.س</span>
-</div>
-<div class="flex justify-between text-label-md">
-<span>ضريبة القيمة المضافة (15%)</span>
-<span class="font-data-mono">1,867.50 ر.س</span>
-</div>
-</div>
-</div>
-</div>
-<div class="bg-surface-container-high border border-outline-variant p-6 rounded-lg">
-<p class="text-label-md text-on-surface-variant mb-4">بمجرد اختيار العميل، ستتمكن من الانتقال لمرحلة الدفع النهائية.</p>
-<button class="w-full h-14 bg-surface-variant text-on-surface-variant cursor-not-allowed rounded-lg font-bold transition-all flex items-center justify-center gap-2" disabled="">
-                        الاستمرار للدفع
-                        <span class="material-symbols-outlined">arrow_back</span>
+<div id="trader-results" class="space-y-2"></div>
+<button onclick="toggleNewTraderForm()" class="w-full h-12 flex items-center justify-center gap-2 border border-primary text-primary font-semibold rounded-lg active:scale-95 transition-all">
+<span class="material-symbols-outlined">person_add</span> إضافة تاجر جديد
 </button>
+<div class="hidden space-y-2" id="new-trader-form">
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="new-trader-name" placeholder="اسم التاجر"/>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" dir="ltr" id="new-trader-phone" placeholder="رقم الهاتف (اختياري)"/>
+<button onclick="saveNewTrader()" class="w-full h-11 bg-primary text-white rounded-lg text-sm font-semibold">حفظ التاجر واختياره</button>
 </div>
+</div>
+</div>
+
+<div id="retail-block" class="hidden">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-2" for="retail-name">اسم البائع (اختياري)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="retail-name" placeholder="مثال: زبون، أو اسم البائع"/>
 </div>
 </section>
-</main>
-<!-- Floating Numeric Keypad Overlay (Simulating focused input) -->
-<div class="fixed bottom-0 inset-x-0 bg-surface-container-lowest border-t border-outline-variant shadow-2xl z-50 p-6 md:hidden lg:flex lg:w-[400px] lg:right-margin-desktop lg:left-auto lg:bottom-10 lg:rounded-2xl lg:border animate-in slide-in-from-bottom duration-500">
-<div class="w-full">
-<div class="flex items-center justify-between mb-4 border-b border-outline-variant pb-2">
-<span class="font-label-md font-bold text-on-surface">لوحة المفاتيح الرقمية</span>
-<span class="material-symbols-outlined text-on-surface-variant cursor-pointer">keyboard_hide</span>
+
+<!-- Manual item entry -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
+<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة قطعة مشتراة</h2>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-desc">وصف القطعة (عربي)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-desc" placeholder="خاتم، سبيكة، قطع كسر..." type="text"/>
 </div>
-<div class="grid grid-cols-3 gap-2">
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">1</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">2</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">3</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">4</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">5</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">6</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">7</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">8</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">9</button>
-<button class="numpad-key h-14 bg-surface-container-high border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">.</button>
-<button class="numpad-key h-14 bg-white border border-outline-variant rounded-xl flex items-center justify-center text-headline-md font-bold text-on-surface">0</button>
-<button class="numpad-key h-14 bg-error-container text-on-error-container border border-error-container rounded-xl flex items-center justify-center">
-<span class="material-symbols-outlined">backspace</span>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-weight">الوزن (غ)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-weight" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-karat">العيار</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-karat">
+<option value="18">18</option>
+<option selected="" value="21">21</option>
+<option value="22">22</option>
+<option value="24">24</option>
+</select>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-price">سعر الشراء</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-price" placeholder="السعر" step="0.01" type="number"/>
+</div>
+<button onclick="addManualToCart()" class="w-full h-12 bg-surface-container-high border border-outline-variant text-primary font-semibold rounded-lg active:scale-95 transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span> إضافة للفاتورة
+</button>
+</section>
+
+<!-- Cart -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+<div class="px-4 py-3 bg-secondary">
+<h2 class="font-label-md text-label-md text-white font-bold">جدول القطع المشتراة</h2>
+</div>
+<div class="overflow-x-auto scroll-hide">
+<table class="w-full text-right">
+<thead class="bg-surface-container-high text-on-surface-variant text-[11px] uppercase tracking-tighter">
+<tr>
+<th class="px-3 py-2">الوصف</th>
+<th class="px-2 py-2 text-center">العيار</th>
+<th class="px-2 py-2 text-left">الوزن</th>
+<th class="px-2 py-2 text-left">السعر</th>
+<th class="px-2 py-2"></th>
+</tr>
+</thead>
+<tbody id="cart-body" class="divide-y divide-outline-variant font-data-mono text-data-mono">
+<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>
+</tbody>
+</table>
+</div>
+</section>
+
+<!-- Attachment -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
+<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إرفاق مستند (اختياري)</h2>
+<p class="text-[11px] text-outline">صورة أو PDF لفاتورة المورّد أو إيصال الشراء — لتوثيق العملية قانونياً.</p>
+<input accept="image/*,application/pdf" class="hidden" id="attachment-input" type="file"/>
+<button onclick="document.getElementById('attachment-input').click()" class="w-full h-12 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-on-surface-variant" id="attachment-trigger" type="button">
+<span class="material-symbols-outlined">attach_file</span> <span id="attachment-label">اختر ملف</span>
+</button>
+</section>
+
+<!-- Totals & Payment -->
+<section class="space-y-4 pb-8">
+<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm space-y-2">
+<div class="pt-2 flex justify-between items-end">
+<span class="text-primary font-bold font-headline-md text-headline-md">الإجمالي</span>
+<span class="text-primary font-bold text-headline-md font-headline-md" id="grand-total">0.00 د.إ</span>
+</div>
+</div>
+
+<div class="grid grid-cols-2 gap-3" id="payment-options">
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95" id="pay-cash" onclick="selectPayment('cash')">
+<span class="material-symbols-outlined mb-1">payments</span>
+<span class="font-label-md text-label-md">دفع نقدي فوري</span>
+</button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95" id="pay-credit" onclick="selectPayment('credit')">
+<span class="material-symbols-outlined mb-1">receipt_long</span>
+<span class="font-label-md text-label-md">دين على حساب التاجر</span>
 </button>
 </div>
-<button class="w-full h-12 mt-4 bg-secondary text-white rounded-xl font-bold active:scale-95 transition-all">
-                تأكيد الرقم
-            </button>
-</div>
-</div>
-<!-- Bottom Navigation Bar (Mobile only) -->
-<nav class="md:hidden fixed bottom-0 w-full h-20 bg-surface border-t border-outline-variant flex flex-row-reverse justify-around items-center z-50 pb-safe">
-<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="dashboard-advanced-ar.html">
+
+<div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
+
+<button id="save-invoice-btn" class="w-full py-4 bg-[#B4955A] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
+<span class="material-symbols-outlined">save</span> حفظ فاتورة الشراء
+</button>
+</section>
+</main>
+
+<nav class="fixed bottom-0 w-full flex justify-around items-center px-4 py-2 bg-surface-container-lowest border-t border-outline-variant shadow-sm z-50">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="index-ar.html">
 <span class="material-symbols-outlined">dashboard</span>
-<span class="font-label-md text-xs">الرئيسية</span>
+<span class="font-label-md text-label-md">لوحة التحكم</span>
 </a>
-<div class="flex flex-col items-center justify-center bg-secondary-container text-on-secondary-container rounded-full px-4 py-1">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
-<span class="font-label-md text-xs">المخزون</span>
-</div>
-<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="audit-log-ar.html">
-<span class="material-symbols-outlined">history</span>
-<span class="font-label-md text-xs">النشاط</span>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="inventory-list-ar.html">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-md text-label-md">المخزن</span>
 </a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant px-4 py-1" href="index-ar.html">
-<span class="material-symbols-outlined">menu</span>
-<span class="font-label-md text-xs">المزيد</span>
+<a class="flex flex-col items-center justify-center text-primary font-bold cursor-pointer active:scale-90 duration-150" href="new-sale-ar.html">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-label-md text-label-md">الفواتير</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="daily-cashbox-ar.html">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-label-md text-label-md">الصندوق</span>
+</a>
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="settings-ar.html">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">الإعدادات</span>
 </a>
 </nav>
+
+<script>
+    requireGoldMindSession('login-entry-ar.html');
+
+    let purchaseType = 'buyTrader';
+    let selectedTrader = null;
+    let selectedPaymentMethod = 'cash';
+    let attachmentFile = null;
+    const cart = []; // { cartId, karat, weight, price, description }
+    let cartCounter = 0;
+
+    // ---------- Purchase type toggle ----------
+    function setPurchaseType(type) {
+        purchaseType = type;
+        document.getElementById('tabTrader').classList.toggle('active', type === 'buyTrader');
+        document.getElementById('tabRetail').classList.toggle('active', type === 'buyRetail');
+        document.getElementById('trader-block').classList.toggle('hidden', type !== 'buyTrader');
+        document.getElementById('retail-block').classList.toggle('hidden', type !== 'buyRetail');
+        document.getElementById('counterparty-label').textContent = type === 'buyTrader' ? 'معلومات التاجر' : 'معلومات البائع';
+        document.getElementById('payment-options').classList.toggle('hidden', type !== 'buyTrader');
+        if (type !== 'buyTrader') selectPayment('cash');
+    }
+
+    // ---------- Payment toggle ----------
+    function selectPayment(mode) {
+        selectedPaymentMethod = mode;
+        const cashBtn = document.getElementById('pay-cash');
+        const creditBtn = document.getElementById('pay-credit');
+        const active = 'flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95';
+        const inactive = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
+        cashBtn.className = mode === 'cash' ? active : inactive;
+        creditBtn.className = mode === 'credit' ? active : inactive;
+    }
+
+    // ---------- Trader search ----------
+    const traderSearchInput = document.getElementById('trader-search');
+    const traderResults = document.getElementById('trader-results');
+
+    let searchTimeout;
+    traderSearchInput.addEventListener('input', () => {
+        clearTimeout(searchTimeout);
+        const q = traderSearchInput.value.trim();
+        if (!q) { traderResults.innerHTML = ''; return; }
+        searchTimeout = setTimeout(() => searchTraders(q), 350);
+    });
+
+    async function searchTraders(q) {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const { data, error } = await goldmindClient
+            .from('traders')
+            .select('*')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .or(`name.ilike.%${q}%,phone.ilike.%${q}%`)
+            .limit(8);
+
+        if (error) {
+            traderResults.innerHTML = `<div class="text-error text-sm">خطأ بالبحث: ${error.message}</div>`;
+            return;
+        }
+        if (!data || data.length === 0) {
+            traderResults.innerHTML = `<div class="text-on-surface-variant text-sm p-2">لا يوجد تاجر مطابق. جرب "إضافة تاجر جديد".</div>`;
+            return;
+        }
+        traderResults.innerHTML = data.map(t => `
+            <div class="flex items-center justify-between bg-surface-container-low rounded-lg p-3 cursor-pointer active:scale-[0.98] transition-all" onclick='pickTrader(${JSON.stringify(t).replace(/'/g, "&apos;")})'>
+                <div>
+                    <div class="font-bold">${t.name}</div>
+                    <div class="text-on-surface-variant text-sm font-data-mono" dir="ltr">${t.phone || ''}</div>
+                </div>
+                <span class="material-symbols-outlined text-primary">chevron_left</span>
+            </div>
+        `).join('');
+    }
+
+    function pickTrader(t) {
+        selectedTrader = t;
+        document.getElementById('trader-selected-name').textContent = t.name;
+        document.getElementById('trader-selected-phone').textContent = t.phone || '';
+        document.getElementById('trader-selected').classList.remove('hidden');
+        document.getElementById('trader-selected').classList.add('flex');
+        document.getElementById('trader-search-block').classList.add('hidden');
+    }
+
+    function clearTrader() {
+        selectedTrader = null;
+        document.getElementById('trader-selected').classList.add('hidden');
+        document.getElementById('trader-selected').classList.remove('flex');
+        document.getElementById('trader-search-block').classList.remove('hidden');
+        traderSearchInput.value = '';
+        traderResults.innerHTML = '';
+    }
+
+    function toggleNewTraderForm() {
+        document.getElementById('new-trader-form').classList.toggle('hidden');
+    }
+
+    async function saveNewTrader() {
+        const name = document.getElementById('new-trader-name').value.trim();
+        const phone = document.getElementById('new-trader-phone').value.trim();
+        if (!name) { alert('فضلاً أدخل اسم التاجر'); return; }
+
+        const { data, error } = await goldmindClient
+            .from('traders')
+            .insert({ store_id: GOLDMIND_STORE_ID, name, phone: phone || null })
+            .select().single();
+
+        if (error) { alert('تعذّر حفظ التاجر: ' + error.message); return; }
+
+        pickTrader(data);
+        document.getElementById('new-trader-form').classList.add('hidden');
+        document.getElementById('new-trader-name').value = '';
+        document.getElementById('new-trader-phone').value = '';
+    }
+
+    // ---------- Attachment ----------
+    document.getElementById('attachment-input').addEventListener('change', (e) => {
+        const file = e.target.files && e.target.files[0];
+        attachmentFile = file || null;
+        document.getElementById('attachment-label').textContent = file ? file.name : 'اختر ملف';
+    });
+
+    // ---------- Manual item entry ----------
+    function addManualToCart() {
+        const weight = parseFloat(document.getElementById('manual-weight').value);
+        const karat = parseInt(document.getElementById('manual-karat').value, 10);
+        const price = parseFloat(document.getElementById('manual-price').value);
+
+        const weightInput = document.getElementById('manual-weight');
+        const priceInput = document.getElementById('manual-price');
+        weightInput.classList.remove('border-error');
+        priceInput.classList.remove('border-error');
+
+        let valid = true;
+        if (!weight || weight <= 0) { weightInput.classList.add('border-error'); valid = false; }
+        if (!price || price <= 0) { priceInput.classList.add('border-error'); valid = false; }
+        if (!valid) return;
+
+        cart.push({
+            cartId: ++cartCounter,
+            karat: karat,
+            weight: weight,
+            price: price,
+            description: document.getElementById('manual-desc').value.trim() || null
+        });
+
+        document.getElementById('manual-desc').value = '';
+        document.getElementById('manual-weight').value = '';
+        document.getElementById('manual-price').value = '';
+        renderCart();
+    }
+
+    function removeFromCart(cartId) {
+        const idx = cart.findIndex(item => item.cartId === cartId);
+        if (idx !== -1) cart.splice(idx, 1);
+        renderCart();
+    }
+
+    function renderCart() {
+        const body = document.getElementById('cart-body');
+        if (cart.length === 0) {
+            body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
+            document.getElementById('grand-total').textContent = '0.00 د.إ';
+            return;
+        }
+        body.innerHTML = cart.map(item => `
+            <tr>
+                <td class="px-3 py-3"><div class="font-body-md">${item.description || '—'}</div></td>
+                <td class="px-2 py-3 text-center">${item.karat}K</td>
+                <td class="px-2 py-3 text-left">${item.weight}</td>
+                <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}</td>
+                <td class="px-2 py-3 text-left">
+                    <button onclick="removeFromCart(${item.cartId})" class="text-error">
+                        <span class="material-symbols-outlined text-[18px]">close</span>
+                    </button>
+                </td>
+            </tr>
+        `).join('');
+        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        document.getElementById('grand-total').textContent = total.toFixed(2) + ' د.إ';
+    }
+
+    // ---------- Save purchase invoice ----------
+    const saveBtn = document.getElementById('save-invoice-btn');
+    const messageBox = document.getElementById('save-message');
+
+    function showMessage(text, isError) {
+        messageBox.classList.remove('hidden');
+        messageBox.textContent = text;
+        messageBox.classList.remove('bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+        messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
+    }
+
+    saveBtn.addEventListener('click', async () => {
+        const gmSession = await requireGoldMindSession('login-entry-ar.html');
+        if (!gmSession) return;
+
+        if (purchaseType === 'buyTrader' && !selectedTrader) {
+            showMessage('الرجاء اختيار تاجر أولاً.', true);
+            return;
+        }
+        if (cart.length === 0) {
+            showMessage('الرجاء إضافة قطعة واحدة على الأقل.', true);
+            return;
+        }
+
+        saveBtn.disabled = true;
+        saveBtn.textContent = 'جارِ الحفظ...';
+
+        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        const invoiceNumber = 'PINV-' + Date.now();
+
+        // Upload attachment first (if any) so we can attach its URL to the invoice
+        let attachmentUrl = null;
+        if (attachmentFile) {
+            const ext = (attachmentFile.name.split('.').pop() || 'bin').toLowerCase();
+            const path = GOLDMIND_STORE_ID + '/' + invoiceNumber + '.' + ext;
+            const { error: uploadError } = await goldmindClient.storage
+                .from('invoice-attachments').upload(path, attachmentFile, { upsert: false });
+            if (uploadError) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'حفظ فاتورة الشراء';
+                showMessage('تعذّر رفع المرفق: ' + uploadError.message, true);
+                return;
+            }
+            const { data: publicUrlData } = goldmindClient.storage.from('invoice-attachments').getPublicUrl(path);
+            attachmentUrl = publicUrlData ? publicUrlData.publicUrl : null;
+        }
+
+        const { data: invoiceRow, error: invoiceError } = await goldmindClient
+            .from('invoices')
+            .insert({
+                store_id: GOLDMIND_STORE_ID,
+                invoice_number: invoiceNumber,
+                type: purchaseType,
+                trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
+                counterparty_name: purchaseType === 'buyRetail' ? (document.getElementById('retail-name').value.trim() || null) : null,
+                payment_method: selectedPaymentMethod === 'cash' ? 'cash' : 'credit',
+                fabrication_fees: 0,
+                vat_amount: 0,
+                total_amount: total,
+                amount_paid: selectedPaymentMethod === 'cash' ? total : 0,
+                status: selectedPaymentMethod === 'cash' ? 'paid' : 'unpaid',
+                attachment_url: attachmentUrl,
+                created_by: GOLDMIND_STAFF_ID
+            })
+            .select()
+            .single();
+
+        if (invoiceError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ فاتورة الشراء';
+            showMessage('خطأ بحفظ الفاتورة: ' + invoiceError.message, true);
+            return;
+        }
+
+        // Each purchased item becomes a new inventory piece
+        const piecesPayload = cart.map(item => ({
+            store_id: GOLDMIND_STORE_ID,
+            barcode: 'GM-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
+            weight_grams: item.weight,
+            karat: item.karat,
+            description_ar: item.description,
+            status: 'available',
+            created_by: GOLDMIND_STAFF_ID
+        }));
+
+        const { data: newPieces, error: piecesError } = await goldmindClient.from('pieces').insert(piecesPayload).select();
+
+        if (piecesError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ فاتورة الشراء';
+            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة القطع للمخزون: ' + piecesError.message, true);
+            return;
+        }
+
+        const itemsPayload = cart.map((item, idx) => ({
+            invoice_id: invoiceRow.id,
+            piece_id: newPieces[idx] ? newPieces[idx].id : null,
+            barcode: newPieces[idx] ? newPieces[idx].barcode : null,
+            karat: item.karat,
+            weight_grams: item.weight,
+            accounting_weight_grams: item.weight,
+            fabrication_fee: 0,
+            line_total: item.price,
+            description: item.description
+        }));
+
+        const { error: itemsError } = await goldmindClient.from('invoice_items').insert(itemsPayload);
+        if (itemsError) {
+            showMessage('تم حفظ الفاتورة والمخزون لكن حدث خطأ بربط عناصر الفاتورة: ' + itemsError.message, true);
+        }
+
+        // Cash paid immediately -> record as a cash-out movement in the daily cash box
+        if (selectedPaymentMethod === 'cash') {
+            await goldmindClient.from('cash_movements').insert({
+                store_id: GOLDMIND_STORE_ID,
+                box: 'main',
+                direction: 'out',
+                amount: total,
+                description: 'دفع فاتورة شراء ' + invoiceNumber,
+                created_by: GOLDMIND_STAFF_ID,
+                invoice_id: invoiceRow.id
+            });
+        }
+
+        // Credit purchase from a trader -> increases what we owe that trader
+        if (selectedPaymentMethod === 'credit' && purchaseType === 'buyTrader') {
+            const movementsPayload = cart.map(item => ({
+                store_id: GOLDMIND_STORE_ID,
+                trader_id: selectedTrader.id,
+                invoice_id: invoiceRow.id,
+                movement_type: 'debt_increase',
+                weight_grams: item.weight,
+                karat: item.karat,
+                gold_24k_equivalent: +(item.weight * (item.karat / 24)).toFixed(3),
+                fab_fee_amount: 0,
+                notes: item.description || ('فاتورة شراء ' + invoiceNumber)
+            }));
+            await goldmindClient.from('trader_movements').insert(movementsPayload);
+        }
+
+        showMessage('تم حفظ فاتورة الشراء وتحديث المخزون بنجاح!', false);
+        setTimeout(() => { window.location.href = 'inventory-list-ar.html'; }, 900);
+    });
+</script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
