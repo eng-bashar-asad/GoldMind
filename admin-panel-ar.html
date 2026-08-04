@@ -266,13 +266,27 @@ async function submitAddStore() {
   const btn = document.getElementById('addStoreSubmitBtn');
   btn.disabled = true;
   btn.textContent = 'جارِ الإنشاء...';
-  const { error } = await goldmindClient.rpc('admin_create_store', { company_name: name, owner_email: email });
+  const { data: newStoreId, error } = await goldmindClient.rpc('admin_create_store', { company_name: name, owner_email: email });
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = 'إنشاء';
+    errEl.textContent = 'تعذّر الإنشاء: ' + error.message; errEl.classList.remove('hidden'); return;
+  }
+
+  btn.textContent = 'جارِ إرسال إيميل الدعوة...';
+  const { error: emailError } = await goldmindClient.functions.invoke('send-invite-email', {
+    body: { store_id: newStoreId, invite_email: email }
+  });
+
   btn.disabled = false;
   btn.textContent = 'إنشاء';
 
-  if (error) { errEl.textContent = 'تعذّر الإنشاء: ' + error.message; errEl.classList.remove('hidden'); return; }
-
-  showToast('تم إنشاء الشركة وإرسال دعوة المالك');
+  if (emailError) {
+    showToast('تم إنشاء الشركة، لكن تعذّر إرسال إيميل الدعوة: ' + emailError.message, true);
+  } else {
+    showToast('تم إنشاء الشركة وإرسال دعوة المالك بالإيميل');
+  }
   closeAddStoreModal();
   loadStores();
 }
@@ -388,10 +402,10 @@ async function sendMemberInvite() {
   btn.disabled = true;
   btn.textContent = 'جارِ الإرسال...';
   const { error } = await goldmindClient.rpc('admin_invite_staff', { target_store_id: currentDetailStoreId, invite_email: email, invite_role: role });
-  btn.disabled = false;
-  btn.textContent = 'إرسال الدعوة';
 
   if (error) {
+    btn.disabled = false;
+    btn.textContent = 'إرسال الدعوة';
     if (error.message && error.message.includes('ALREADY_INVITED')) errEl.textContent = 'يوجد دعوة معلّقة بالفعل لهذا البريد';
     else if (error.message && error.message.includes('ALREADY_MEMBER')) errEl.textContent = 'هذا البريد عضو بالشركة أصلاً';
     else errEl.textContent = 'تعذّر إرسال الدعوة: ' + error.message;
@@ -399,7 +413,20 @@ async function sendMemberInvite() {
     return;
   }
 
-  showToast('تم إرسال الدعوة');
+  btn.textContent = 'جارِ إرسال الإيميل...';
+  const { error: emailError } = await goldmindClient.functions.invoke('send-invite-email', {
+    body: { store_id: currentDetailStoreId, invite_email: email }
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'إرسال الدعوة';
+
+  if (emailError) {
+    showToast('تم تسجيل الدعوة، لكن تعذّر إرسال إيميل التنبيه: ' + emailError.message, true);
+  } else {
+    showToast('تم إرسال الدعوة والإيميل بنجاح');
+  }
+
   document.getElementById('inviteMemberEmail').value = '';
   openStoreDetailModal(currentDetailStoreId);
   loadStores();
