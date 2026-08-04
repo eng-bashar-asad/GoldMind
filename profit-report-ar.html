@@ -56,7 +56,7 @@
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
 
-<p class="text-[11px] text-outline">الربح = سعر البيع − قيمة الذهب (بسعر السوق وقت البيع نفسه، وليس سعر اليوم) − الضريبة. هذا هو "ربح المصنعية" الفعلي — سعر الذهب نفسه لا يُحتسب ربحاً لأنك تشتري بديله بسعر السوق.</p>
+<p class="text-[11px] text-outline">الربح = سعر البيع − قيمة الذهب (بسعر السوق وقت البيع نفسه) − الضريبة − كلفة المصنعية المسجّلة على القطعة (وزن القطعة × كلفة المصنعية للغرام). هذا هو صافي ربح المصنعية الفعلي — سعر الذهب نفسه لا يُحتسب ربحاً لأنك تشتري بديله بسعر السوق.</p>
 
 <div class="grid grid-cols-2 gap-3">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl text-center">
@@ -79,6 +79,7 @@
 <th class="px-3 py-2">سعر البيع</th>
 <th class="px-3 py-2">قيمة الذهب</th>
 <th class="px-3 py-2">الضريبة</th>
+<th class="px-3 py-2">كلفة المصنعية</th>
 <th class="px-3 py-2">ربح المصنعية</th>
 </tr>
 </thead>
@@ -161,7 +162,8 @@ async function load() {
     const goldValue = weight * goldPrice;
     const beforeTax = revenue / vatMultiplier;
     const vat = revenue - beforeTax;
-    const profit = revenue - goldValue - vat;
+    const fabCost = weight * ((it.piece && it.piece.cost_fabrication_per_gram) || 0);
+    const profit = revenue - goldValue - vat - fabCost;
 
     totalRevenue += revenue;
     totalVat += vat;
@@ -169,7 +171,7 @@ async function load() {
     totalProfit += profit;
 
     const inv = invoiceMap[it.invoice_id];
-    return { it, inv, weight, revenue, goldValue, vat, profit, goldPrice, isEstimated };
+    return { it, inv, weight, revenue, goldValue, vat, fabCost, profit, goldPrice, isEstimated };
   });
 
   document.getElementById('stat-revenue').textContent = totalRevenue.toFixed(2);
@@ -188,6 +190,7 @@ async function load() {
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono">${r.goldValue.toFixed(2)}${r.isEstimated ? ' <span class=\"text-outline\">(تقديري)</span>' : ''}</td>
       <td class="px-3 py-2 font-data-mono">${r.vat.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono">${r.fabCost.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono font-bold ${r.profit >= 0 ? 'text-success' : 'text-error'}">${r.profit.toFixed(2)}</td>
     </tr>`).join('');
 }
