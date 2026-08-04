@@ -14,10 +14,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
         html { font-size: 87.5%; }
-    .logo-svg-wrap { width: 100%; max-width: 300px; margin: 0 auto 1rem; perspective: 800px; }
-    .logo-svg-inner { transform-style: preserve-3d; transition: transform 0.15s ease-out; filter: drop-shadow(0 10px 25px rgba(0,0,0,0.5)); }
-    .logo-svg-inner svg { display: block; width: 100%; height: auto; }
-    .parallax-layer { transition: transform 0.12s ease-out; }
+    .logo-tilt-wrap { width: 148px; height: 148px; margin: 0 auto 1rem; perspective: 700px; position: relative; }
+    .logo-tilt-inner { width: 100%; height: 100%; border-radius: 9999px; overflow: hidden; border: 2px solid rgba(255,215,0,0.3); transform-style: preserve-3d; transition: transform 0.15s ease-out; position: relative; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+    .logo-tilt-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .logo-tilt-glare { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s ease-out; pointer-events: none; }
         :root { --royal-gold: #FFD700; --deep-navy: #0f172a; }
         body { font-family: 'IBM+Plex+Sans+Arabic', 'Inter', sans-serif; background-color: var(--deep-navy); }
         .gold-glow { text-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
@@ -73,175 +73,12 @@
 <body class="text-white min-h-screen flex flex-col items-center justify-center p-4">
 <main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
 <div class="mb-8 text-center">
-<div class="logo-svg-wrap" id="logoSvgWrap">
-<div class="logo-svg-inner" id="logoSvgInner">
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="100%" height="100%">
-  <defs>
-    <radialGradient id="bg-grad" cx="50%" cy="50%" r="70%">
-      <stop offset="0%" stop-color="#121824"/>
-      <stop offset="60%" stop-color="#0a0d14"/>
-      <stop offset="100%" stop-color="#040508"/>
-    </radialGradient>
-
-    <linearGradient id="gold-bright" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#FFF5B8"/>
-      <stop offset="30%" stop-color="#FFD700"/>
-      <stop offset="70%" stop-color="#DAA520"/>
-      <stop offset="100%" stop-color="#996515"/>
-    </linearGradient>
-
-    <linearGradient id="gold-dark" x1="0%" y1="100%" x2="100%" y2="0%">
-      <stop offset="0%" stop-color="#7A5210"/>
-      <stop offset="50%" stop-color="#C59B27"/>
-      <stop offset="100%" stop-color="#FDF0A6"/>
-    </linearGradient>
-
-    <linearGradient id="cyan-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#00F0FF"/>
-      <stop offset="100%" stop-color="#0072FF"/>
-    </linearGradient>
-
-    <filter id="gold-filter" x="-20%" y="-20%" width="140%" height="140%">
-      <feGaussianBlur stdDeviation="3" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="cyan-filter" x="-30%" y="-30%" width="160%" height="160%">
-      <feGaussianBlur stdDeviation="4" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-    <filter id="sparkle-filter">
-      <feGaussianBlur stdDeviation="1.5" result="blur"/>
-      <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
-  </defs>
-
-  <style>
-    .bg { fill: url(#bg-grad); }
-    .shield-outer { fill: none; stroke: url(#gold-bright); stroke-width: 6; filter: url(#gold-filter); transform-origin: 400px 230px; animation: shieldPulse 6s ease-in-out infinite alternate; }
-    .shield-inner { fill: none; stroke: url(#gold-dark); stroke-width: 3; stroke-dasharray: 12 6; animation: dashRotate 20s linear infinite; transform-origin: 400px 230px; }
-    .circuit-line { stroke: #00F0FF; stroke-width: 1.5; stroke-dasharray: 8 12; opacity: 0.4; animation: circuitFlow 4s linear infinite; }
-    .node-pulse { animation: nodeGlow 2s ease-in-out infinite alternate; }
-    .node-pulse-delay-1 { animation-delay: 0.5s; }
-    .node-pulse-delay-2 { animation-delay: 1.0s; }
-    .node-pulse-delay-3 { animation-delay: 1.5s; }
-    .scale-balance { transform-origin: 400px 185px; animation: scaleTilt 5s ease-in-out infinite alternate; }
-    .pan-left { transform-origin: 350px 225px; animation: panFloatLeft 5s ease-in-out infinite alternate; }
-    .pan-right { transform-origin: 450px 225px; animation: panFloatRight 5s ease-in-out infinite alternate; }
-    .sparkle { fill: #FFFFFF; filter: url(#sparkle-filter); animation: sparkleFlash 3s ease-in-out infinite alternate; }
-    .text-gold { font-family: 'Montserrat', 'Arial Black', sans-serif; font-weight: 900; fill: url(#gold-bright); letter-spacing: 6px; filter: url(#gold-filter); }
-    .text-cyan { font-family: 'Montserrat', 'Arial Black', sans-serif; font-weight: 900; fill: url(#cyan-grad); letter-spacing: 6px; filter: url(#cyan-filter); animation: textPulse 3s ease-in-out infinite alternate; }
-    .text-sub { font-family: 'Segoe UI', Roboto, sans-serif; font-size: 14px; fill: #A0B2CE; letter-spacing: 5px; font-weight: 600; }
-
-    .parallax-layer { transition: transform 0.12s ease-out; }
-
-    @keyframes shieldPulse { 0% { transform: scale(1); } 100% { transform: scale(1.02); } }
-    @keyframes dashRotate { 0% { stroke-dashoffset: 0; } 100% { stroke-dashoffset: 360; } }
-    @keyframes circuitFlow { 0% { stroke-dashoffset: 100; opacity: 0.2; } 50% { opacity: 0.7; } 100% { stroke-dashoffset: 0; opacity: 0.2; } }
-    @keyframes nodeGlow { 0% { r: 4px; fill: #FFD700; } 100% { r: 7px; fill: #00F0FF; } }
-    @keyframes scaleTilt { 0% { transform: rotate(-3deg); } 100% { transform: rotate(3deg); } }
-    @keyframes panFloatLeft { 0% { transform: translateY(0px); } 100% { transform: translateY(6px); } }
-    @keyframes panFloatRight { 0% { transform: translateY(0px); } 100% { transform: translateY(-6px); } }
-    @keyframes sparkleFlash { 0%, 100% { opacity: 0.2; transform: scale(0.6); } 50% { opacity: 1; transform: scale(1.3); } }
-    @keyframes textPulse { 0% { opacity: 0.85; } 100% { opacity: 1; } }
-  </style>
-
-  <rect width="100%" height="100%" class="bg" />
-
-  <!-- LAYER 1 (furthest back): circuit lines + outer/inner shield -->
-  <g id="layer-back" class="parallax-layer">
-    <g opacity="0.3">
-      <path class="circuit-line" d="M 50 100 L 200 100 L 250 150 L 250 300" />
-      <path class="circuit-line" d="M 750 100 L 600 100 L 550 150 L 550 300" />
-      <path class="circuit-line" d="M 100 500 L 300 500 L 350 450" />
-      <path class="circuit-line" d="M 700 500 L 500 500 L 450 450" />
-      <circle cx="200" cy="100" r="3" fill="#00F0FF" />
-      <circle cx="600" cy="100" r="3" fill="#00F0FF" />
-      <circle cx="300" cy="500" r="3" fill="#00F0FF" />
-      <circle cx="500" cy="500" r="3" fill="#00F0FF" />
-    </g>
-    <path class="shield-outer" d="M 400 70 C 480 70, 530 90, 540 140 C 540 250, 480 340, 400 380 C 320 340, 260 250, 260 140 C 270 90, 320 70, 400 70 Z" />
-    <path class="shield-inner" d="M 400 88 C 465 88, 510 105, 518 148 C 518 238, 465 315, 400 350 C 335 315, 282 238, 282 148 C 290 105, 335 88, 400 88 Z" />
-  </g>
-
-  <!-- LAYER 2 (middle): brain neural network + scale -->
-  <g id="layer-mid" class="parallax-layer">
-    <g id="brain-network" opacity="0.9">
-      <path d="M 475.8 203.2 L 458.0 227.4 M 458.0 227.4 L 431.4 240.4 M 400.0 239.0 L 368.6 228.2 M 368.6 228.2 L 342.0 214.3 M 324.2 198.2 L 318.0 177.0 M 318.0 177.0 L 324.2 150.8 M 342.0 126.6 L 368.6 113.6 M 368.6 113.6 L 400.0 115.0 M 431.4 125.8 L 458.0 139.7 M 458.0 139.7 L 475.8 155.8 M 447.8 191.2 L 430.0 210.4 M 430.0 210.4 L 400.7 218.0 M 371.2 211.1 L 352.7 192.3 M 352.7 192.3 L 352.2 168.8 M 370.0 149.6 L 399.3 142.0 M 399.3 142.0 L 428.8 148.9 M 447.3 167.7 L 447.8 191.2 M 482.0 177.0 L 447.3 167.7 M 458.0 227.4 L 430.0 210.4 M 431.4 240.4 L 430.0 210.4 M 368.6 228.2 L 371.2 211.1 M 342.0 214.3 L 352.7 192.3 M 318.0 177.0 L 352.2 168.8 M 324.2 150.8 L 352.2 168.8 M 368.6 113.6 L 370.0 149.6 M 400.0 115.0 L 399.3 142.0 M 458.0 139.7 L 447.3 167.7 M 475.8 155.8 L 447.3 167.7 M 430.0 210.4 L 415.0 185.0 M 400.7 218.0 L 400.0 205.0 M 352.7 192.3 L 385.0 185.0 M 352.2 168.8 L 385.0 185.0 M 399.3 142.0 L 400.0 155.0 M 428.8 148.9 L 400.0 155.0 M 482.0 177.0 L 318.0 177.0 M 431.4 240.4 L 368.6 113.6 M 324.2 150.8 L 475.8 203.2 M 400.0 115.0 L 400.0 239.0" fill="none" stroke="url(#gold-bright)" stroke-width="1" opacity="0.65" />
-<path d="M 482.0 177.0 L 475.8 203.2 M 431.4 240.4 L 400.0 239.0 M 342.0 214.3 L 324.2 198.2 M 324.2 150.8 L 342.0 126.6 M 400.0 115.0 L 431.4 125.8 M 475.8 155.8 L 482.0 177.0 M 400.7 218.0 L 371.2 211.1 M 352.2 168.8 L 370.0 149.6 M 428.8 148.9 L 447.3 167.7 M 475.8 203.2 L 447.8 191.2 M 400.0 239.0 L 400.7 218.0 M 324.2 198.2 L 352.7 192.3 M 342.0 126.6 L 370.0 149.6 M 431.4 125.8 L 428.8 148.9 M 447.8 191.2 L 415.0 185.0 M 371.2 211.1 L 400.0 205.0 M 370.0 149.6 L 400.0 155.0 M 447.3 167.7 L 415.0 185.0 M 342.0 214.3 L 458.0 139.7 M 475.8 155.8 L 324.2 198.2" fill="none" stroke="url(#cyan-grad)" stroke-width="1.2" opacity="0.75" filter="url(#cyan-filter)" />
-<circle class="node-pulse" cx="482.0" cy="177.0" r="2.2" />
-<circle class="node-pulse-delay-2" cx="475.8" cy="203.2" r="2.2" />
-<circle class="node-pulse-delay-3" cx="458.0" cy="227.4" r="2.2" />
-<circle class="node-pulse-delay-1" cx="431.4" cy="240.4" r="2.2" />
-<circle class="node-pulse" cx="400.0" cy="239.0" r="2.2" />
-<circle class="node-pulse-delay-3" cx="368.6" cy="228.2" r="2.2" />
-<circle class="node-pulse-delay-1" cx="342.0" cy="214.3" r="2.2" />
-<circle class="node-pulse-delay-2" cx="324.2" cy="198.2" r="2.2" />
-<circle class="node-pulse" cx="318.0" cy="177.0" r="2.2" />
-<circle class="node-pulse-delay-1" cx="324.2" cy="150.8" r="2.2" />
-<circle class="node-pulse-delay-2" cx="342.0" cy="126.6" r="2.2" />
-<circle class="node-pulse-delay-3" cx="368.6" cy="113.6" r="2.2" />
-<circle class="node-pulse" cx="400.0" cy="115.0" r="2.2" />
-<circle class="node-pulse-delay-2" cx="431.4" cy="125.8" r="2.2" />
-<circle class="node-pulse-delay-3" cx="458.0" cy="139.7" r="2.2" />
-<circle class="node-pulse-delay-1" cx="475.8" cy="155.8" r="2.2" />
-<circle class="node-pulse" cx="447.8" cy="191.2" r="2.6" />
-<circle class="node-pulse-delay-3" cx="430.0" cy="210.4" r="2.6" />
-<circle class="node-pulse-delay-1" cx="400.7" cy="218.0" r="2.6" />
-<circle class="node-pulse-delay-2" cx="371.2" cy="211.1" r="2.6" />
-<circle class="node-pulse" cx="352.7" cy="192.3" r="2.6" />
-<circle class="node-pulse-delay-1" cx="352.2" cy="168.8" r="2.6" />
-<circle class="node-pulse-delay-2" cx="370.0" cy="149.6" r="2.6" />
-<circle class="node-pulse-delay-3" cx="399.3" cy="142.0" r="2.6" />
-<circle class="node-pulse" cx="428.8" cy="148.9" r="2.6" />
-<circle class="node-pulse-delay-2" cx="447.3" cy="167.7" r="2.6" />
-<circle class="node-pulse-delay-3" cx="400.0" cy="155.0" r="3.2" />
-<circle class="node-pulse-delay-1" cx="385.0" cy="185.0" r="3.2" />
-<circle class="node-pulse" cx="415.0" cy="185.0" r="3.2" />
-<circle class="node-pulse-delay-3" cx="400.0" cy="205.0" r="3.2" />
-    </g>
-
-    <g id="gold-scale">
-      <path d="M 390 270 L 410 270 L 405 185 L 395 185 Z" fill="url(#gold-dark)" />
-      <circle cx="400" cy="185" r="7" fill="url(#gold-bright)" filter="url(#gold-filter)" />
-      <g class="scale-balance">
-        <path d="M 330 185 L 470 185" stroke="url(#gold-bright)" stroke-width="5" stroke-linecap="round" filter="url(#gold-filter)" />
-        <g class="pan-left">
-          <line x1="340" y1="185" x2="320" y2="230" stroke="url(#gold-bright)" stroke-width="1.5" />
-          <line x1="360" y1="185" x2="380" y2="230" stroke="url(#gold-bright)" stroke-width="1.5" />
-          <path d="M 310 230 Q 350 245 390 230 Z" fill="url(#gold-bright)" filter="url(#gold-filter)" />
-          <rect x="330" y="220" width="18" height="9" rx="1" fill="#FFF5B8" stroke="#996515" stroke-width="1" />
-          <rect x="352" y="220" width="18" height="9" rx="1" fill="#FFF5B8" stroke="#996515" stroke-width="1" />
-          <rect x="341" y="212" width="18" height="9" rx="1" fill="#FFD700" stroke="#996515" stroke-width="1" />
-        </g>
-        <g class="pan-right">
-          <line x1="440" y1="185" x2="420" y2="230" stroke="url(#gold-bright)" stroke-width="1.5" />
-          <line x1="460" y1="185" x2="480" y2="230" stroke="url(#gold-bright)" stroke-width="1.5" />
-          <path d="M 410 230 Q 450 245 490 230 Z" fill="url(#gold-bright)" filter="url(#gold-filter)" />
-          <circle cx="440" cy="220" r="7" fill="url(#gold-bright)" filter="url(#gold-filter)" />
-          <text x="440" y="224" font-family="sans-serif" font-size="10" font-weight="bold" fill="#5a3d0a" text-anchor="middle">$</text>
-          <circle cx="460" cy="218" r="7" fill="url(#gold-bright)" filter="url(#gold-filter)" />
-          <text x="460" y="222" font-family="sans-serif" font-size="9" font-weight="bold" fill="#5a3d0a" text-anchor="middle">g</text>
-        </g>
-      </g>
-    </g>
-  </g>
-
-  <!-- LAYER 3 (closest/front): sparkles + text -->
-  <g id="layer-front" class="parallax-layer">
-    <path class="sparkle" d="M 400 60 L 403 67 L 410 70 L 403 73 L 400 80 L 397 73 L 390 70 L 397 67 Z" />
-    <path class="sparkle" style="animation-delay: 1s;" d="M 535 130 L 537 134 L 542 136 L 537 138 L 535 142 L 533 138 L 528 136 L 533 134 Z" />
-    <path class="sparkle" style="animation-delay: 2s;" d="M 270 130 L 272 134 L 277 136 L 272 138 L 270 142 L 268 138 L 263 136 L 268 134 Z" />
-
-    <g text-anchor="middle">
-      <text x="325" y="475" class="text-gold" font-size="52">GOLD</text>
-      <text x="495" y="475" class="text-cyan" font-size="52">MIND</text>
-      <text x="400" y="520" class="text-sub">ENTERPRISE GOLD ACCOUNTING</text>
-      <line x1="250" y1="540" x2="550" y2="540" stroke="url(#gold-bright)" stroke-width="2" opacity="0.6" />
-      <circle cx="400" cy="540" r="4" fill="#00F0FF" filter="url(#cyan-filter)" />
-    </g>
-  </g>
-</svg>
+<div class="logo-tilt-wrap" id="logoTiltWrap">
+<div class="logo-tilt-inner" id="logoTiltInner">
+<img src="logo-shield.png" alt="GoldMind" class="logo-tilt-img"/>
+<div class="logo-tilt-glare"></div>
 </div>
+<div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl -z-10"></div>
 </div>
 <p class="text-xl text-primary/80 opacity-90 mt-2">مرحباً بك في جولد مايند</p>
 </div>
@@ -576,30 +413,29 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <script>
-(function initLogoParallax() {
+(function initLogoTilt() {
   if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
-  const inner = document.getElementById('logoSvgInner');
-  const back = document.getElementById('layer-back');
-  const mid = document.getElementById('layer-mid');
-  const front = document.getElementById('layer-front');
-  if (!inner || !back || !mid || !front) return;
-  const maxTilt = 10;
+  const wrap = document.getElementById('logoTiltWrap');
+  const inner = document.getElementById('logoTiltInner');
+  if (!wrap || !inner) return;
+  const glare = inner.querySelector('.logo-tilt-glare');
+  const maxTilt = 16;
 
   window.addEventListener('mousemove', function (e) {
     const dx = Math.max(-1, Math.min(1, (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2)));
     const dy = Math.max(-1, Math.min(1, (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2)));
-
-    inner.style.transform = 'rotateX(' + (-dy * maxTilt) + 'deg) rotateY(' + (dx * maxTilt) + 'deg)';
-    back.style.transform = 'translate(' + (dx * 4) + 'px, ' + (dy * 4) + 'px)';
-    mid.style.transform = 'translate(' + (dx * 12) + 'px, ' + (dy * 12) + 'px)';
-    front.style.transform = 'translate(' + (dx * 22) + 'px, ' + (dy * 22) + 'px)';
+    const rotateY = dx * maxTilt;
+    const rotateX = -dy * maxTilt;
+    inner.style.transform = 'rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) scale(1.06)';
+    if (glare) {
+      glare.style.opacity = '0.45';
+      glare.style.background = 'radial-gradient(circle at ' + (50 + dx * 30) + '% ' + (50 + dy * 30) + '%, rgba(255,255,255,0.4), transparent 60%)';
+    }
   });
 
-  document.getElementById('logoSvgWrap').addEventListener('mouseleave', function () {
-    inner.style.transform = 'rotateX(0deg) rotateY(0deg)';
-    back.style.transform = 'translate(0px, 0px)';
-    mid.style.transform = 'translate(0px, 0px)';
-    front.style.transform = 'translate(0px, 0px)';
+  wrap.addEventListener('mouseleave', function () {
+    inner.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+    if (glare) glare.style.opacity = '0';
   });
 })();
 </script>
