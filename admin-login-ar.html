@@ -14,9 +14,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
     html { font-size: 87.5%; }
-    .logo-parallax-wrap { width: 100%; max-width: 260px; aspect-ratio: 512 / 384; margin: 0 auto 0.5rem; position: relative; perspective: 700px; }
-    .logo-parallax-inner { width: 100%; height: 100%; position: relative; transform-style: preserve-3d; transition: transform 0.15s ease-out; }
-    .parallax-img-layer { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: transform 0.12s ease-out; pointer-events: none; }
+    .logo-tilt-wrap { width: 160px; height: 160px; margin: 0 auto 1rem; perspective: 700px; position: relative; }
+    .logo-tilt-inner { width: 100%; height: 100%; border-radius: 9999px; overflow: hidden; border: 2px solid rgba(255,215,0,0.3); transform-style: preserve-3d; transition: transform 0.15s ease-out; position: relative; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+    .logo-tilt-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .logo-tilt-glare { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s ease-out; pointer-events: none; }
+    @media (max-width: 380px) { .logo-tilt-wrap { width: 130px; height: 130px; } }
     :root { --royal-gold: #FFD700; --deep-navy: #0f172a; }
     body { font-family: 'IBM+Plex+Sans+Arabic', 'Inter', sans-serif; background-color: var(--deep-navy); overflow: hidden; min-height: max(884px, 100dvh); }
     .gold-glow { text-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
@@ -56,13 +58,12 @@
 <main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
 
 <div class="mb-8 text-center">
-<div class="logo-parallax-wrap" id="logoParallaxWrap">
-<div class="logo-parallax-inner" id="logoParallaxInner">
-<img src="layer-shield.png" class="parallax-img-layer" id="layerShield" alt=""/>
-<img src="layer-brain.png" class="parallax-img-layer" id="layerBrain" alt=""/>
-<img src="layer-sparkle.png" class="parallax-img-layer" id="layerSparkle" alt=""/>
-<img src="layer-text.png" class="parallax-img-layer" id="layerText" alt="GoldMind"/>
+<div class="logo-tilt-wrap" id="logoTiltWrap">
+<div class="logo-tilt-inner" id="logoTiltInner">
+<img src="logo-shield.png" alt="GoldMind" class="logo-tilt-img"/>
+<div class="logo-tilt-glare"></div>
 </div>
+<div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl -z-10"></div>
 </div>
 <div class="inline-flex items-center gap-1.5 admin-badge rounded-full px-4 py-1.5 mt-1">
 <span class="material-symbols-outlined text-primary text-sm">shield_person</span>
@@ -398,31 +399,29 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <script>
-(function initLogoParallax() {
+(function initLogoTilt() {
   if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
-  const wrap = document.getElementById('logoParallaxWrap');
-  const inner = document.getElementById('logoParallaxInner');
-  const shield = document.getElementById('layerShield');
-  const brain = document.getElementById('layerBrain');
-  const sparkle = document.getElementById('layerSparkle');
-  const text = document.getElementById('layerText');
-  if (!wrap || !inner || !shield || !brain || !sparkle || !text) return;
-  const maxTilt = 12;
+  const wrap = document.getElementById('logoTiltWrap');
+  const inner = document.getElementById('logoTiltInner');
+  if (!wrap || !inner) return;
+  const glare = inner.querySelector('.logo-tilt-glare');
+  const maxTilt = 16;
 
   window.addEventListener('mousemove', function (e) {
     const dx = Math.max(-1, Math.min(1, (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2)));
     const dy = Math.max(-1, Math.min(1, (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2)));
-
-    inner.style.transform = 'rotateX(' + (-dy * maxTilt) + 'deg) rotateY(' + (dx * maxTilt) + 'deg)';
-    shield.style.transform = 'translate(' + (dx * 3) + 'px, ' + (dy * 3) + 'px)';
-    brain.style.transform = 'translate(' + (dx * 9) + 'px, ' + (dy * 9) + 'px)';
-    sparkle.style.transform = 'translate(' + (dx * 18) + 'px, ' + (dy * 18) + 'px) scale(1.05)';
-    text.style.transform = 'translate(' + (dx * 2) + 'px, ' + (dy * 2) + 'px)';
+    const rotateY = dx * maxTilt;
+    const rotateX = -dy * maxTilt;
+    inner.style.transform = 'rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) scale(1.06)';
+    if (glare) {
+      glare.style.opacity = '0.45';
+      glare.style.background = 'radial-gradient(circle at ' + (50 + dx * 30) + '% ' + (50 + dy * 30) + '%, rgba(255,255,255,0.4), transparent 60%)';
+    }
   });
 
   wrap.addEventListener('mouseleave', function () {
-    inner.style.transform = 'rotateX(0deg) rotateY(0deg)';
-    [shield, brain, sparkle, text].forEach(function (el) { el.style.transform = 'translate(0px, 0px)'; });
+    inner.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+    if (glare) glare.style.opacity = '0';
   });
 })();
 </script>
