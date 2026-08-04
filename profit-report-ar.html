@@ -56,7 +56,7 @@
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
 
-<p class="text-[11px] text-outline">الأرباح محسوبة على أساس سعر الذهب الحالي المُدخل في صفحة "سعر الذهب"، وليس بالضرورة سعر الشراء التاريخي للقطعة.</p>
+<p class="text-[11px] text-outline">الربح = سعر البيع − قيمة الذهب (بسعر السوق وقت البيع نفسه، وليس سعر اليوم) − الضريبة. هذا هو "ربح المصنعية" الفعلي — سعر الذهب نفسه لا يُحتسب ربحاً لأنك تشتري بديله بسعر السوق.</p>
 
 <div class="grid grid-cols-2 gap-3">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl text-center">
@@ -76,9 +76,10 @@
 <th class="px-3 py-2">الفاتورة</th>
 <th class="px-3 py-2">القطعة</th>
 <th class="px-3 py-2">الوزن/العيار</th>
-<th class="px-3 py-2">البيع</th>
-<th class="px-3 py-2">التكلفة</th>
-<th class="px-3 py-2">الربح</th>
+<th class="px-3 py-2">سعر البيع</th>
+<th class="px-3 py-2">قيمة الذهب</th>
+<th class="px-3 py-2">الضريبة</th>
+<th class="px-3 py-2">ربح المصنعية</th>
 </tr>
 </thead>
 <tbody id="items-tbody"></tbody>
@@ -104,17 +105,19 @@ async function load() {
     return;
   }
 
+  // Live prices are only a fallback for old sales made before we started
+  // snapshotting the price per item at the moment of sale.
   const { data: prices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
-  if (!prices || prices.length === 0) {
-    document.getElementById('no-prices').classList.remove('hidden');
-    return;
-  }
-  const priceMap = {};
-  prices.forEach(p => priceMap[p.karat] = Number(p.price_per_gram));
+  const livePriceMap = {};
+  (prices || []).forEach(p => livePriceMap[p.karat] = Number(p.price_per_gram));
+
+  const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  const vatRate = Number((storeRow && storeRow.vat_rate) || 0);
+  const vatMultiplier = 1 + (vatRate / 100);
 
   const { data: invoices } = await goldmindClient
     .from('invoices').select('id, invoice_number, created_at')
-    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sell')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale')
     .order('created_at', { ascending: false }).limit(100);
 
   const invoiceMap = {};
@@ -134,22 +137,39 @@ async function load() {
     .in('invoice_id', invoiceIds);
 
   if (error) {
-    document.getElementById('items-tbody').innerHTML = `<tr><td colspan="6" class="text-center text-error text-sm py-8">تعذّر التحميل: ${error.message}</td></tr>`;
+    document.getElementById('items-tbody').innerHTML = `<tr><td colspan="7" class="text-center text-error text-sm py-8">تعذّر التحميل: ${error.message}</td></tr>`;
     return;
   }
 
-  let totalRevenue = 0, totalProfit = 0;
+  if (!prices || prices.length === 0) {
+    const hasAnySnapshot = (items || []).some(it => it.gold_price_per_gram != null);
+    if (!hasAnySnapshot) {
+      document.getElementById('no-prices').classList.remove('hidden');
+      document.getElementById('page-content').classList.add('hidden');
+      return;
+    }
+  }
+
+  let totalRevenue = 0, totalVat = 0, totalGold = 0, totalProfit = 0;
   const rows = (items || []).map(it => {
-    const goldPrice = priceMap[it.karat] || 0;
-    const fabCost = (it.piece && it.piece.cost_fabrication_per_gram) || 0;
+    // Prefer the price snapshotted at the moment of THIS sale; only fall
+    // back to today's live price for older sales made before snapshotting existed.
+    const goldPrice = it.gold_price_per_gram != null ? Number(it.gold_price_per_gram) : (livePriceMap[it.karat] || 0);
+    const isEstimated = it.gold_price_per_gram == null;
     const weight = Number(it.weight_grams) || 0;
     const revenue = Number(it.line_total) || 0;
-    const cost = weight * goldPrice + weight * fabCost;
-    const profit = revenue - cost;
+    const goldValue = weight * goldPrice;
+    const beforeTax = revenue / vatMultiplier;
+    const vat = revenue - beforeTax;
+    const profit = revenue - goldValue - vat;
+
     totalRevenue += revenue;
+    totalVat += vat;
+    totalGold += goldValue;
     totalProfit += profit;
+
     const inv = invoiceMap[it.invoice_id];
-    return { it, inv, weight, revenue, cost, profit, goldPrice };
+    return { it, inv, weight, revenue, goldValue, vat, profit, goldPrice, isEstimated };
   });
 
   document.getElementById('stat-revenue').textContent = totalRevenue.toFixed(2);
@@ -166,7 +186,8 @@ async function load() {
       <td class="px-3 py-2">${r.it.barcode || r.it.description || '—'}</td>
       <td class="px-3 py-2 font-data-mono">${r.weight}غ / ع${r.it.karat}</td>
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>
-      <td class="px-3 py-2 font-data-mono">${r.cost.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono">${r.goldValue.toFixed(2)}${r.isEstimated ? ' <span class=\"text-outline\">(تقديري)</span>' : ''}</td>
+      <td class="px-3 py-2 font-data-mono">${r.vat.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono font-bold ${r.profit >= 0 ? 'text-success' : 'text-error'}">${r.profit.toFixed(2)}</td>
     </tr>`).join('');
 }
