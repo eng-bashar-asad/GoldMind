@@ -187,6 +187,10 @@
 <input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="newEmail" placeholder="name@example.com" required="" type="email"/>
 </div>
 </div>
+<div class="flex items-start gap-2 py-1">
+<input class="mt-1 w-4 h-4 accent-primary" id="termsCheckbox" type="checkbox"/>
+<label class="text-[13px] text-primary/80 leading-relaxed" for="termsCheckbox">أوافق على <a class="text-primary underline" href="terms-ar.html" target="_blank">الشروط والأحكام</a> الخاصة باستخدام GoldMind</label>
+</div>
 <button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" id="newSubmitBtn" type="submit">إنشاء الشركة وإرسال الرمز</button>
 <p class="text-error text-sm text-center hidden" id="newFormError"></p>
 </form>
@@ -331,6 +335,11 @@ document.getElementById('newForm').addEventListener('submit', async function (e)
         errEl.classList.remove('hidden');
         return;
     }
+    if (!document.getElementById('termsCheckbox').checked) {
+        errEl.textContent = 'فضلاً وافق على الشروط والأحكام للمتابعة';
+        errEl.classList.remove('hidden');
+        return;
+    }
 
     const btn = document.getElementById('newSubmitBtn');
     btn.disabled = true;
@@ -353,6 +362,7 @@ document.getElementById('newForm').addEventListener('submit', async function (e)
     sessionStorage.setItem('goldmind_email', email);
     sessionStorage.setItem('goldmind_mode', 'new');
     sessionStorage.setItem('goldmind_company_name', companyName);
+    sessionStorage.setItem('goldmind_terms_accepted', 'true');
     window.location.href = 'login-ar-4.html';
 });
 
