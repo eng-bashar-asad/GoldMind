@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>سعر الذهب | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">سعر الذهب</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية تعديل سعر الذهب.</div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-6">
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<h2 class="font-bold text-[14px] mb-3">سعر الأونصة العالمية</h2>
+<div class="relative mb-3">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="ouncePrice">سعر الأونصة (٣١.١٠٣٥ غرام) — بالدولار</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="ouncePrice" placeholder="2400.00" type="number" step="0.01"/>
+</div>
+<div class="relative mb-1">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="exchangeRate">سعر صرف الدولار مقابل عملة المحل (اتركه ١ إذا نفس العملة)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="exchangeRate" placeholder="1" type="number" step="0.0001" value="1"/>
+</div>
+<p class="text-[11px] text-outline mt-2">بيتم حساب سعر الغرام لعيار ٢٤ من الأونصة، وباقي العيارات (٢٢ / ٢١ / ١٨) تلقائياً حسب نسبة النقاء.</p>
+</div>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<h2 class="font-bold text-[14px] mb-3">أسعار الغرام المحسوبة (بعملة المحل)</h2>
+<div class="grid grid-cols-2 gap-3" id="calculatedPrices">
+<div class="text-center p-3 bg-surface-container-low rounded-lg"><p class="text-[11px] text-on-surface-variant">عيار ٢٤</p><p class="font-bold text-[16px]" id="price24">—</p></div>
+<div class="text-center p-3 bg-surface-container-low rounded-lg"><p class="text-[11px] text-on-surface-variant">عيار ٢٢</p><p class="font-bold text-[16px]" id="price22">—</p></div>
+<div class="text-center p-3 bg-surface-container-low rounded-lg"><p class="text-[11px] text-on-surface-variant">عيار ٢١</p><p class="font-bold text-[16px]" id="price21">—</p></div>
+<div class="text-center p-3 bg-surface-container-low rounded-lg"><p class="text-[11px] text-on-surface-variant">عيار ١٨</p><p class="font-bold text-[16px]" id="price18">—</p></div>
+</div>
+</div>
+
+<button onclick="saveGoldPrices()" id="saveBtn" class="w-full h-12 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الأسعار</button>
+<p class="text-error text-[12px] hidden" id="saveError"></p>
+<p class="text-success text-[12px] hidden" id="saveSuccess"></p>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<h2 class="font-bold text-[14px] mb-1">آخر تحديث</h2>
+<p class="text-[12px] text-on-surface-variant" id="lastUpdated">لم يتم تحديد سعر بعد</p>
+</div>
+
+<a href="profit-report-ar.html" class="text-center text-[13px] font-semibold text-secondary">عرض تقرير الأرباح على القطع المباعة ←</a>
+
+</div>
+</main>
+
+<script>
+const OUNCE_GRAMS = 31.1034768;
+const KARAT_PURITY = { 24: 1, 22: 22/24, 21: 21/24, 18: 18/24 };
+
+function recalcPreview() {
+  const ounce = parseFloat(document.getElementById('ouncePrice').value) || 0;
+  const rate = parseFloat(document.getElementById('exchangeRate').value) || 1;
+  const pricePerGram24 = (ounce / OUNCE_GRAMS) * rate;
+  for (const k of [24, 22, 21, 18]) {
+    const p = pricePerGram24 * KARAT_PURITY[k];
+    document.getElementById('price' + k).textContent = p ? p.toFixed(2) : '—';
+  }
+}
+
+document.getElementById('ouncePrice').addEventListener('input', recalcPreview);
+document.getElementById('exchangeRate').addEventListener('input', recalcPreview);
+
+async function saveGoldPrices() {
+  const ounce = parseFloat(document.getElementById('ouncePrice').value);
+  const rate = parseFloat(document.getElementById('exchangeRate').value) || 1;
+  const errEl = document.getElementById('saveError');
+  const okEl = document.getElementById('saveSuccess');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  if (!ounce || ounce <= 0) {
+    errEl.textContent = 'فضلاً أدخل سعر أونصة صحيح';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const pricePerGram24 = (ounce / OUNCE_GRAMS) * rate;
+  const rows = [24, 22, 21, 18].map(k => ({
+    store_id: GOLDMIND_STORE_ID,
+    karat: k,
+    price_per_gram: +(pricePerGram24 * KARAT_PURITY[k]).toFixed(2),
+    mode: 'manual_ounce'
+  }));
+
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('gold_prices').upsert(rows, { onConflict: 'store_id,karat' });
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ الأسعار';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  localStorage.setItem('goldmind_last_ounce_' + GOLDMIND_STORE_ID, JSON.stringify({ ounce, rate, at: new Date().toISOString() }));
+  okEl.textContent = 'تم حفظ الأسعار بنجاح';
+  okEl.classList.remove('hidden');
+  loadLastUpdated();
+}
+
+async function loadLastUpdated() {
+  const { data } = await goldmindClient
+    .from('gold_prices').select('karat, price_per_gram, updated_at')
+    .eq('store_id', GOLDMIND_STORE_ID).order('updated_at', { ascending: false }).limit(1).maybeSingle();
+
+  if (data) {
+    document.getElementById('lastUpdated').textContent =
+      'آخر تحديث: ' + new Date(data.updated_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' });
+
+    const { data: allPrices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
+    (allPrices || []).forEach(p => {
+      const el = document.getElementById('price' + p.karat);
+      if (el) el.textContent = Number(p.price_per_gram).toFixed(2);
+    });
+  }
+
+  const saved = localStorage.getItem('goldmind_last_ounce_' + GOLDMIND_STORE_ID);
+  if (saved) {
+    const parsed = JSON.parse(saved);
+    document.getElementById('ouncePrice').value = parsed.ounce;
+    document.getElementById('exchangeRate').value = parsed.rate;
+  }
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canManage = staffRow && staffRow.permissions && staffRow.permissions.manage_gold_price;
+
+  document.getElementById('loading-state').classList.add('hidden');
+
+  if (!canManage) {
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('page-content').classList.remove('hidden');
+  await loadLastUpdated();
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
