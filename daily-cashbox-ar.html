@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الصندوق اليومي | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .tab-btn.active { background: #000; color: #fff; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">الصندوق اليومي</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-2xl mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-4">
+
+<div class="flex bg-surface-container-low rounded-lg p-1 gap-1">
+<button class="tab-btn active flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabMain" onclick="setBox('main')">الصندوق الرئيسي</button>
+<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabTraders" onclick="setBox('traders')">صندوق التجار</button>
+</div>
+
+<div class="grid grid-cols-3 gap-3">
+<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded-xl text-center">
+<span class="text-[11px] text-on-surface-variant block mb-1">دخل اليوم</span>
+<div id="stat-in" class="font-bold text-[16px] text-success">0</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded-xl text-center">
+<span class="text-[11px] text-on-surface-variant block mb-1">خرج اليوم</span>
+<div id="stat-out" class="font-bold text-[16px] text-error">0</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded-xl text-center">
+<span class="text-[11px] text-on-surface-variant block mb-1">صافي اليوم</span>
+<div id="stat-net" class="font-bold text-[16px]">0</div>
+</div>
+</div>
+
+<button onclick="toggleAddForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span> إضافة حركة كاش يدوية
+</button>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="addForm">
+<div class="flex gap-2 mb-3">
+<button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirInBtn" onclick="setDirection('in')">دخول كاش</button>
+<button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirOutBtn" onclick="setDirection('out')">خروج كاش</button>
+</div>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-sm mb-3 font-data-mono" id="amountInput" placeholder="المبلغ" type="number" step="0.01" dir="ltr"/>
+<textarea class="w-full h-20 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="noteInput" placeholder="السبب / الملاحظة (مثلاً: سحب مصروف كهرباء، إيداع من صاحب المحل...)"></textarea>
+<button onclick="submitMovement()" id="submitMovBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الحركة</button>
+<p class="text-error text-[12px] hidden mt-2" id="addFormError"></p>
+</div>
+
+<h2 class="font-bold text-[14px] mt-2">حركات اليوم</h2>
+<div id="movements-list" class="flex flex-col gap-2"></div>
+<p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات كاش اليوم بعد.</p>
+
+</div>
+</main>
+
+<script>
+let currentBox = 'main';
+let currentDirection = 'in';
+
+function setDirection(dir) {
+  currentDirection = dir;
+  document.getElementById('dirInBtn').className = 'flex-1 h-11 rounded-lg text-sm font-semibold border ' + (dir === 'in' ? 'bg-success text-white border-success' : 'border-outline-variant');
+  document.getElementById('dirOutBtn').className = 'flex-1 h-11 rounded-lg text-sm font-semibold border ' + (dir === 'out' ? 'bg-error text-white border-error' : 'border-outline-variant');
+}
+
+function toggleAddForm() {
+  document.getElementById('addForm').classList.toggle('hidden');
+}
+
+function setBox(box) {
+  currentBox = box;
+  document.getElementById('tabMain').classList.toggle('active', box === 'main');
+  document.getElementById('tabTraders').classList.toggle('active', box === 'traders');
+  loadToday();
+}
+
+function fmt(n) {
+  return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+async function submitMovement() {
+  const amount = parseFloat(document.getElementById('amountInput').value);
+  const note = document.getElementById('noteInput').value.trim();
+  const errEl = document.getElementById('addFormError');
+  errEl.classList.add('hidden');
+
+  if (!amount || amount <= 0) {
+    errEl.textContent = 'فضلاً أدخل مبلغ صحيح';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (!note) {
+    errEl.textContent = 'فضلاً اكتب سبب/ملاحظة للحركة';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('submitMovBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('cash_movements').insert({
+    store_id: GOLDMIND_STORE_ID,
+    box: currentBox,
+    direction: currentDirection,
+    amount: amount,
+    description: note,
+    created_by: GOLDMIND_STAFF_ID
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ الحركة';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('amountInput').value = '';
+  document.getElementById('noteInput').value = '';
+  document.getElementById('addForm').classList.add('hidden');
+  loadToday();
+}
+
+async function loadToday() {
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+
+  const { data, error } = await goldmindClient
+    .from('cash_movements')
+    .select('id, direction, amount, description, created_at, invoice_id, staff:created_by(full_name)')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .eq('box', currentBox)
+    .gte('created_at', todayStart.toISOString())
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    document.getElementById('movements-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
+    return;
+  }
+
+  const entries = data || [];
+  let totalIn = 0, totalOut = 0;
+  entries.forEach(m => { if (m.direction === 'in') totalIn += Number(m.amount); else totalOut += Number(m.amount); });
+
+  document.getElementById('stat-in').textContent = fmt(totalIn);
+  document.getElementById('stat-out').textContent = fmt(totalOut);
+  const net = totalIn - totalOut;
+  const netEl = document.getElementById('stat-net');
+  netEl.textContent = fmt(net);
+  netEl.className = 'font-bold text-[16px] ' + (net >= 0 ? 'text-success' : 'text-error');
+
+  const listEl = document.getElementById('movements-list');
+  const emptyEl = document.getElementById('empty-state');
+
+  if (entries.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+
+  listEl.innerHTML = entries.map(m => {
+    const isIn = m.direction === 'in';
+    const time = new Date(m.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+    const staffName = (m.staff && m.staff.full_name) || 'غير معروف';
+    return `
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+        <div class="flex items-center justify-between mb-1">
+          <div class="flex items-center gap-2">
+            <span class="material-symbols-outlined ${isIn ? 'text-success' : 'text-error'} text-[20px]">${isIn ? 'arrow_downward' : 'arrow_upward'}</span>
+            <span class="font-bold text-[15px] ${isIn ? 'text-success' : 'text-error'}">${isIn ? '+' : '-'}${fmt(m.amount)}</span>
+          </div>
+          <span class="text-[11px] text-on-surface-variant">${time}</span>
+        </div>
+        <p class="text-[13px] text-on-surface mb-1">${m.description || '—'}</p>
+        <p class="text-[11px] text-on-surface-variant">بواسطة: ${staffName}${m.invoice_id ? ' · مرتبطة بفاتورة' : ' · إدخال يدوي'}</p>
+      </div>`;
+  }).join('');
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('page-content').classList.remove('hidden');
+  setDirection('in');
+  await loadToday();
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
