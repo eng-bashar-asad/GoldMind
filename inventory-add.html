@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 
-<html lang="en"><head>
+<html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>Inventory Entry | GoldMind</title>
+<title>إضافة قطعة | جولد مايند</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
@@ -133,13 +133,13 @@
 <header class="bg-surface-container-lowest text-primary docked full-width top-0 border-b border-outline-variant z-50 sticky">
 <div class="flex justify-between items-center px-margin-mobile w-full h-16">
 <div class="flex items-center gap-4">
-<button onclick="window.location.href='index.html'" class="cursor-pointer active:opacity-80 p-2 hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center">
-<span class="material-symbols-outlined">arrow_back</span>
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer active:opacity-80 p-2 hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
 </button>
-<h1 class="font-headline-md text-headline-md font-bold text-primary">GoldMind</h1>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">جولد مايند</h1>
 </div>
 <div class="flex items-center">
-<span class="font-label-md text-label-md text-on-surface-variant">EN - $</span>
+<span class="font-label-md text-label-md text-on-surface-variant">AR - د.إ</span>
 </div>
 </div>
 </header>
@@ -150,11 +150,11 @@
 <div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200" id="photo-trigger" onclick="document.getElementById('photo-input').click()">
 <div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
 <span class="material-symbols-outlined text-outline text-5xl mb-4">photo_camera</span>
-<p class="font-label-md text-label-md text-on-surface-variant font-semibold">Capture Piece Photo</p>
-<p class="font-label-md text-label-md text-outline mt-1">Tap to take or choose a photo</p>
+<p class="font-label-md text-label-md text-on-surface-variant font-semibold">التقط صورة للقطعة</p>
+<p class="font-label-md text-label-md text-outline mt-1">اضغط لالتقاط أو اختيار صورة</p>
 </div>
 <img alt="" class="hidden aspect-square w-full rounded-xl object-cover border border-outline-variant" id="photo-preview"/>
-<button class="hidden absolute top-2 left-2 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" onclick="event.stopPropagation(); removePhoto();" type="button">
+<button class="hidden absolute top-2 right-2 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" onclick="event.stopPropagation(); removePhoto();" type="button">
 <span class="material-symbols-outlined text-[18px]">close</span>
 </button>
 </div>
@@ -164,11 +164,11 @@
 <section class="px-margin-mobile py-2 flex flex-col gap-4">
 <button type="button" onclick="document.getElementById('barcode-id').focus()" class="w-full h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center gap-3 active:scale-95 duration-200 transition-all font-semibold shadow-sm">
 <span class="material-symbols-outlined">barcode_scanner</span>
-<span class="font-label-md text-label-md">Enter Barcode / Leave Blank to Auto-Generate</span>
+<span class="font-label-md text-label-md">أدخل الباركود أو اتركه فارغاً للتوليد التلقائي</span>
 </button>
 <div class="relative">
-<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="barcode-id">Barcode ID</label>
-<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono" id="barcode-id" placeholder="Enter ID manually" type="text"/>
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="barcode-id">رقم الباركود</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right" dir="ltr" id="barcode-id" placeholder="أدخله يدوياً" type="text"/>
 </div>
 </section>
 <!-- Form Fields -->
@@ -176,69 +176,69 @@
 <div class="grid grid-cols-2 gap-4">
 <!-- Weight Input -->
 <div class="relative">
-<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="weight">Weight (grams)</label>
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="weight">الوزن الفعلي (غرام)</label>
 <div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
 <input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold" id="weight" placeholder="0.00" step="0.01" type="number"/>
-<div class="bg-surface-container-high px-4 h-full flex items-center border-l border-outline-variant text-on-surface-variant font-label-md">g</div>
+<div class="bg-surface-container-high px-4 h-full flex items-center border-r border-outline-variant text-on-surface-variant font-label-md">غ</div>
 </div>
 </div>
 <!-- Karat Dropdown -->
 <div class="relative">
-<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="karat">Karat</label>
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="karat">العيار</label>
 <select class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none font-label-md" id="karat">
-<option value="18">18K</option>
-<option selected="" value="21">21K</option>
-<option value="22">22K</option>
-<option value="24">24K</option>
+<option value="18">عيار ١٨</option>
+<option selected="" value="21">عيار ٢١</option>
+<option value="22">عيار ٢٢</option>
+<option value="24">عيار ٢٤</option>
 </select>
-<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
 </div>
 </div>
 <!-- Color Selector -->
 <div class="space-y-3">
-<span class="text-[11px] font-semibold text-outline tracking-wider uppercase px-1">Material Color</span>
+<span class="text-[11px] font-semibold text-outline tracking-wider uppercase px-1">لون المعدن</span>
 <div class="flex flex-wrap gap-3" id="color-group">
 <button type="button" data-color="Gold" class="color-btn flex items-center gap-2 px-4 py-3 border-2 border-primary rounded-xl bg-surface-container-lowest active:scale-95 transition-all">
 <div class="w-4 h-4 rounded-full bg-[#E3C58E] shadow-inner"></div>
-<span class="font-label-md text-label-md font-bold text-primary">Gold</span>
+<span class="font-label-md text-label-md font-bold text-primary">أصفر</span>
 </button>
 <button type="button" data-color="White" class="color-btn flex items-center gap-2 px-4 py-3 border border-outline-variant rounded-xl bg-surface-container-lowest hover:border-primary transition-all active:scale-95">
 <div class="w-4 h-4 rounded-full bg-[#E5E7EB] shadow-inner"></div>
-<span class="font-label-md text-label-md text-on-surface-variant">White</span>
+<span class="font-label-md text-label-md text-on-surface-variant">أبيض</span>
 </button>
 <button type="button" data-color="Rose" class="color-btn flex items-center gap-2 px-4 py-3 border border-outline-variant rounded-xl bg-surface-container-lowest hover:border-primary transition-all active:scale-95">
 <div class="w-4 h-4 rounded-full bg-[#D4AF37] opacity-60 shadow-inner"></div>
-<span class="font-label-md text-label-md text-on-surface-variant">Rose</span>
+<span class="font-label-md text-label-md text-on-surface-variant">وردي</span>
 </button>
 <button class="flex items-center gap-2 px-4 py-3 border border-dashed border-outline-variant rounded-xl bg-transparent hover:bg-surface-container-low transition-all active:scale-95">
 <span class="material-symbols-outlined text-sm">add</span>
-<span class="font-label-md text-label-md text-on-surface-variant">Custom</span>
+<span class="font-label-md text-label-md text-on-surface-variant">مخصص</span>
 </button>
 </div>
 </div>
 <!-- Bilingual Description -->
 <div class="grid grid-cols-1 gap-4">
 <div class="relative">
-<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-ar">الوصف (عربي) / Description (Arabic)</label>
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-ar">الوصف (عربي)</label>
 <input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right" dir="rtl" id="desc-ar" placeholder="مثال: خاتم ذهب مرصّع"/>
 </div>
 <div class="relative">
-<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-en">Description (English)</label>
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-en">الوصف (إنجليزي)</label>
 <input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all" dir="ltr" id="desc-en" placeholder="e.g. Gold ring with stone"/>
 </div>
 </div>
 <!-- Weights -->
 <div class="grid grid-cols-2 gap-4">
 <div class="relative">
-<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="accounting-weight">Accounting Weight (optional)</label>
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="accounting-weight">وزن المحاسبة (اختياري)</label>
 <div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
-<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold" id="accounting-weight" placeholder="= actual if empty" step="0.01" type="number"/>
-<div class="bg-surface-container-high px-4 h-full flex items-center border-l border-outline-variant text-on-surface-variant font-label-md">g</div>
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold" id="accounting-weight" placeholder="= الوزن الفعلي إذا فارغ" step="0.01" type="number"/>
+<div class="bg-surface-container-high px-4 h-full flex items-center border-r border-outline-variant text-on-surface-variant font-label-md">غ</div>
 </div>
-<p class="text-[10px] text-outline mt-1 px-1">Use if stones reduce the billable gold weight. Profit is calculated on this weight.</p>
+<p class="text-[10px] text-outline mt-1 px-1">استخدمه إذا كانت القطعة فيها أحجار تُخصم من وزن الذهب. الربح يُحسب على هذا الوزن.</p>
 </div>
 <div class="relative">
-<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="fab-cost">Fabrication Cost / gram</label>
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="fab-cost">كلفة المصنعية / غرام</label>
 <div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
 <input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold" id="fab-cost" placeholder="0.00" step="0.01" type="number"/>
 </div>
@@ -249,7 +249,7 @@
 <!-- Save Button -->
 <div class="pt-4">
 <button id="save-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold text-body-md shadow-md active:scale-[0.98] transition-all hover:brightness-110">
-                    Save Piece to Inventory
+                    حفظ القطعة بالمخزون
                 </button>
 </div>
 </section>
@@ -257,29 +257,29 @@
 <!-- Bottom Navigation Bar -->
 <nav class="fixed bottom-0 w-full flex justify-around items-center px-margin-mobile py-2 bg-surface-container-lowest text-primary docked full-width z-50 border-t border-outline-variant shadow-sm h-16">
 <!-- Dashboard -->
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="index.html">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="index-ar.html">
 <span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
-<span class="font-label-md text-label-md">Dashboard</span>
+<span class="font-label-md text-label-md">الرئيسية</span>
 </a>
 <!-- Inventory (Active) -->
 <a class="flex flex-col items-center justify-center text-primary font-bold active:scale-90 duration-150" href="inventory-list-ar.html">
 <span class="material-symbols-outlined" data-icon="inventory_2" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
-<span class="font-label-md text-label-md">Inventory</span>
+<span class="font-label-md text-label-md">المخزون</span>
 </a>
 <!-- Invoices -->
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="new-sale.html">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="new-sale-ar.html">
 <span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
-<span class="font-label-md text-label-md">Invoices</span>
+<span class="font-label-md text-label-md">الفواتير</span>
 </a>
 <!-- Ledgers -->
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="ledger.html">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="daily-cashbox-ar.html">
 <span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
-<span class="font-label-md text-label-md">Ledgers</span>
+<span class="font-label-md text-label-md">الصندوق</span>
 </a>
 <!-- Settings -->
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="settings.html">
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="settings-ar.html">
 <span class="material-symbols-outlined" data-icon="settings">settings</span>
-<span class="font-label-md text-label-md">Settings</span>
+<span class="font-label-md text-label-md">الإعدادات</span>
 </a>
 </nav>
 <script>
@@ -374,7 +374,7 @@
             const karat = parseInt(document.getElementById('karat').value, 10);
 
             if (!weight || weight <= 0) {
-                showMessage('Please enter a valid weight.', true);
+                showMessage('فضلاً أدخل وزناً صحيحاً.', true);
                 return;
             }
 
@@ -383,11 +383,11 @@
             }
 
             saveBtn.disabled = true;
-            saveBtn.textContent = 'Saving...';
+            saveBtn.textContent = 'جارِ الحفظ...';
 
             let photoUrl = null;
             if (selectedPhotoFile) {
-                showMessage('Uploading photo...', false);
+                showMessage('جارِ رفع الصورة...', false);
                 const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
                 const path = GOLDMIND_STORE_ID + '/' + barcode + '-' + Date.now() + '.' + ext;
                 const { error: uploadError } = await goldmindClient.storage
@@ -396,8 +396,8 @@
 
                 if (uploadError) {
                     saveBtn.disabled = false;
-                    saveBtn.textContent = 'Save Piece to Inventory';
-                    showMessage('Photo upload failed: ' + uploadError.message, true);
+                    saveBtn.textContent = 'حفظ القطعة بالمخزون';
+                    showMessage('فشل رفع الصورة: ' + uploadError.message, true);
                     return;
                 }
 
@@ -423,14 +423,14 @@
             });
 
             saveBtn.disabled = false;
-            saveBtn.textContent = 'Save Piece to Inventory';
+            saveBtn.textContent = 'حفظ القطعة بالمخزون';
 
             if (error) {
-                showMessage('Error: ' + error.message, true);
+                showMessage('خطأ: ' + error.message, true);
                 return;
             }
 
-            showMessage('Piece saved successfully! Barcode: ' + barcode, false);
+            showMessage('تم حفظ القطعة بنجاح! الباركود: ' + barcode, false);
             document.getElementById('barcode-id').value = '';
             document.getElementById('weight').value = '';
             document.getElementById('accounting-weight').value = '';
