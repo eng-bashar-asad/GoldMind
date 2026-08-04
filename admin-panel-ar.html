@@ -58,6 +58,10 @@
 <a href="account-security-ar.html" class="inline-flex items-center gap-1.5 text-[12px] font-semibold text-secondary">
 <span class="material-symbols-outlined text-[16px]">lock</span> تعيين اسم مستخدم وكلمة سر للدخول السريع
 </a>
+<button onclick="toggleAdminUsernames()" class="flex items-center gap-1.5 text-[12px] font-semibold text-on-surface-variant mt-2">
+<span class="material-symbols-outlined text-[16px]">badge</span> أسماء مستخدمين حسابات مالكي المنصة
+</button>
+<div id="adminUsernamesList" class="hidden mt-2 bg-surface-container-lowest border border-outline-variant rounded-lg p-3 text-[12px] flex flex-col gap-1"></div>
 </div>
 <main class="pb-32 max-w-2xl mx-auto px-4">
 
@@ -481,6 +485,20 @@ async function submitReply() {
   showToast('تم الحفظ');
   closeReplyModal();
   loadSupportRequests();
+}
+
+let adminUsernamesLoaded = false;
+async function toggleAdminUsernames() {
+  const box = document.getElementById('adminUsernamesList');
+  box.classList.toggle('hidden');
+  if (box.classList.contains('hidden') || adminUsernamesLoaded) return;
+
+  const { data, error } = await goldmindClient.rpc('admin_list_platform_admin_accounts');
+  if (error) { box.innerHTML = '<span class="text-error">تعذّر التحميل: ' + error.message + '</span>'; return; }
+  adminUsernamesLoaded = true;
+  box.innerHTML = (data || []).map(a =>
+    `<div class="flex items-center justify-between"><span dir="ltr">${a.email}</span><span class="font-semibold">${a.username || '— لم يُفعَّل بعد —'}</span></div>`
+  ).join('') || '<span class="text-on-surface-variant">لا يوجد حسابات</span>';
 }
 
 async function load() {
