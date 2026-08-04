@@ -356,7 +356,7 @@
                         <div class="text-outline text-[11px] font-data-mono truncate">${data.barcode}</div>
                     </div>
                 </div>
-                <input type="text" placeholder="وصف القطعة (خاتم، حلق...)" class="w-full h-10 border border-outline-variant rounded px-3 text-right" id="barcode-desc-input"/>
+                <input type="text" placeholder="وصف القطعة (خاتم، حلق...)" class="w-full h-10 border border-outline-variant rounded px-3 text-right" id="barcode-desc-input" value="${(data.description_ar || '').replace(/"/g, '&quot;')}"/>
                 <div class="flex items-center gap-2">
                     <input type="number" placeholder="السعر" class="flex-1 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input"/>
                     <button onclick='confirmAddBarcodePiece(${JSON.stringify(data).replace(/'/g, "&apos;")})' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all shrink-0">
@@ -527,9 +527,11 @@
             barcode: item.barcode,
             karat: item.karat,
             weight_grams: item.weight,
+            accounting_weight_grams: item.piece ? (item.piece.accounting_weight_grams || item.piece.weight_grams) : item.weight,
             fabrication_fee: 0,
             line_total: item.price,
-            description: item.description,
+            description: (item.piece && item.piece.description_ar) || item.description,
+            description_en: item.piece ? item.piece.description_en : null,
             gold_price_per_gram: goldPriceMap[item.karat] || null
         }));
 
