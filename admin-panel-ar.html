@@ -78,6 +78,13 @@
 <div id="stat-active-subs" class="font-headline-md text-headline-md font-bold text-secondary">0</div>
 </div>
 </div>
+<button onclick="openAddStoreModal()" class="w-full h-12 mb-4 bg-primary text-on-primary rounded-lg text-sm font-semibold flex items-center justify-center gap-2">
+<span class="material-symbols-outlined text-[18px]">add_business</span> إضافة شركة جديدة
+</button>
+<div class="relative mb-4">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input id="storeFilterInput" oninput="renderStores()" placeholder="ابحث باسم الشركة..." class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-surface-container-lowest"/>
+</div>
 <div id="stores-list" class="flex flex-col gap-3"></div>
 </section>
 
@@ -109,6 +116,48 @@
 </div>
 </div>
 
+<!-- Add company modal -->
+<div class="fixed inset-0 bg-black/40 z-[100] hidden items-center justify-center p-4" id="addStoreModal">
+<div class="bg-surface-container-lowest rounded-xl p-5 w-full max-w-md">
+<h3 class="font-bold text-lg mb-1">إضافة شركة جديدة</h3>
+<p class="text-[12px] text-on-surface-variant mb-4">تُنشأ الشركة فوراً، ويُرسل دعوة مالك لهذا البريد — يصبح مالكاً تلقائياً عند أول تسجيل دخول له.</p>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم الشركة</label>
+<input id="newStoreName" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" placeholder="مثال: مجوهرات النور"/>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">بريد المالك الإلكتروني</label>
+<input id="newStoreOwnerEmail" dir="ltr" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-1" placeholder="owner@example.com"/>
+<p class="text-error text-[12px] hidden mb-2" id="addStoreError"></p>
+<div class="flex gap-2 mt-4">
+<button onclick="closeAddStoreModal()" class="flex-1 h-11 border border-outline-variant rounded-lg text-sm font-semibold">إلغاء</button>
+<button onclick="submitAddStore()" id="addStoreSubmitBtn" class="flex-1 h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">إنشاء</button>
+</div>
+</div>
+</div>
+
+<!-- Company details modal -->
+<div class="fixed inset-0 bg-black/40 z-[100] hidden items-center justify-center p-4" id="storeDetailModal">
+<div class="bg-surface-container-lowest rounded-xl p-5 w-full max-w-md max-h-[85vh] overflow-y-auto">
+<div class="flex items-center justify-between mb-1">
+<div class="flex items-center gap-2 flex-1" id="storeDetailNameRow">
+<h3 class="font-bold text-lg" id="storeDetailName"></h3>
+<button onclick="startRenameStore()" class="text-on-surface-variant"><span class="material-symbols-outlined text-[16px]">edit</span></button>
+</div>
+<button onclick="closeStoreDetailModal()" class="text-on-surface-variant"><span class="material-symbols-outlined text-[20px]">close</span></button>
+</div>
+<div class="hidden items-center gap-2 mb-3" id="storeRenameRow">
+<input id="storeRenameInput" class="flex-1 h-10 border border-outline-variant rounded-lg px-3 text-sm"/>
+<button onclick="saveRenameStore()" class="h-10 px-3 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ</button>
+<button onclick="cancelRenameStore()" class="h-10 px-3 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+</div>
+<p class="text-[12px] text-on-surface-variant mb-4" id="storeDetailMeta"></p>
+
+<h4 class="font-semibold text-[13px] mb-2">الموظفون المسجّلون (<span id="storeStaffCount">0</span>)</h4>
+<div id="storeStaffList" class="flex flex-col gap-2 mb-5"></div>
+
+<h4 class="font-semibold text-[13px] mb-2">دعوات معلّقة (<span id="storeInviteCount">0</span>)</h4>
+<div id="storeInviteList" class="flex flex-col gap-2"></div>
+</div>
+</div>
+
 <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-[13px] px-4 py-2 rounded-full opacity-0 pointer-events-none transition-opacity z-[110]"></div>
 
 <script>
@@ -136,18 +185,26 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+let allStores = [];
+
 async function loadStores() {
   const { data, error } = await goldmindClient.rpc('admin_list_stores');
   if (error) { showToast('تعذّر تحميل الشركات: ' + error.message, true); return; }
-
+  allStores = data;
   document.getElementById('stat-total-stores').textContent = data.length;
   document.getElementById('stat-active-subs').textContent = data.filter(s => s.subscription_status === 'active' || s.subscription_status === 'trialing').length;
+  renderStores();
+}
+
+function renderStores() {
+  const q = (document.getElementById('storeFilterInput').value || '').trim().toLowerCase();
+  const data = q ? allStores.filter(s => s.name.toLowerCase().includes(q)) : allStores;
 
   document.getElementById('stores-list').innerHTML = data.map(s => `
-    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4 cursor-pointer" onclick="openStoreDetailModal('${s.id}')">
       <div class="flex items-center justify-between mb-2">
         <p class="font-bold text-[15px]">${s.name}</p>
-        <button onclick="deleteStore('${s.id}', '${s.name.replace(/'/g, "\\'")}')" class="text-error">
+        <button onclick="event.stopPropagation(); deleteStore('${s.id}', '${s.name.replace(/'/g, "\\'")}')" class="text-error">
           <span class="material-symbols-outlined text-[18px]">delete</span>
         </button>
       </div>
@@ -157,7 +214,7 @@ async function loadStores() {
         <span>الحالة: ${STATUS_LABELS[s.subscription_status] || s.subscription_status || '—'}</span>
         <span>تاريخ التسجيل: ${fmtDate(s.created_at)}</span>
       </div>
-    </div>`).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد شركات مسجّلة بعد.</p>';
+    </div>`).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد شركات مطابقة.</p>';
 }
 
 async function deleteStore(id, name) {
@@ -166,6 +223,142 @@ async function deleteStore(id, name) {
   if (error) { showToast('تعذّر الحذف: ' + error.message, true); return; }
   showToast('تم حذف الشركة');
   loadStores();
+}
+
+function openAddStoreModal() {
+  document.getElementById('newStoreName').value = '';
+  document.getElementById('newStoreOwnerEmail').value = '';
+  document.getElementById('addStoreError').classList.add('hidden');
+  const modal = document.getElementById('addStoreModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+
+function closeAddStoreModal() {
+  const modal = document.getElementById('addStoreModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+}
+
+async function submitAddStore() {
+  const name = document.getElementById('newStoreName').value.trim();
+  const email = document.getElementById('newStoreOwnerEmail').value.trim();
+  const errEl = document.getElementById('addStoreError');
+  errEl.classList.add('hidden');
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!name) { errEl.textContent = 'فضلاً أدخل اسم الشركة'; errEl.classList.remove('hidden'); return; }
+  if (!emailPattern.test(email)) { errEl.textContent = 'فضلاً أدخل بريد إلكتروني صحيح للمالك'; errEl.classList.remove('hidden'); return; }
+
+  const btn = document.getElementById('addStoreSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الإنشاء...';
+  const { error } = await goldmindClient.rpc('admin_create_store', { company_name: name, owner_email: email });
+  btn.disabled = false;
+  btn.textContent = 'إنشاء';
+
+  if (error) { errEl.textContent = 'تعذّر الإنشاء: ' + error.message; errEl.classList.remove('hidden'); return; }
+
+  showToast('تم إنشاء الشركة وإرسال دعوة المالك');
+  closeAddStoreModal();
+  loadStores();
+}
+
+let currentDetailStoreId = null;
+
+async function openStoreDetailModal(storeId) {
+  currentDetailStoreId = storeId;
+  const store = allStores.find(s => s.id === storeId);
+  if (!store) return;
+
+  document.getElementById('storeDetailName').textContent = store.name;
+  document.getElementById('storeDetailNameRow').classList.remove('hidden');
+  document.getElementById('storeRenameRow').classList.add('hidden');
+  document.getElementById('storeDetailMeta').textContent =
+    `الخطة: ${store.plan_name || '—'} · الحالة: ${STATUS_LABELS[store.subscription_status] || store.subscription_status || '—'} · تسجّلت: ${fmtDate(store.created_at)}`;
+  document.getElementById('storeStaffList').innerHTML = '<p class="text-[12px] text-on-surface-variant">جارِ التحميل...</p>';
+  document.getElementById('storeInviteList').innerHTML = '';
+
+  const modal = document.getElementById('storeDetailModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+
+  const [{ data: staff, error: staffErr }, { data: invites, error: invErr }] = await Promise.all([
+    goldmindClient.rpc('admin_list_store_staff', { target_store_id: storeId }),
+    goldmindClient.rpc('admin_list_store_invites', { target_store_id: storeId })
+  ]);
+
+  if (staffErr) { showToast('تعذّر تحميل الموظفين: ' + staffErr.message, true); }
+  document.getElementById('storeStaffCount').textContent = staff ? staff.length : 0;
+  document.getElementById('storeStaffList').innerHTML = (staff || []).map(m => `
+    <div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2">
+      <div>
+        <p class="text-[13px] font-semibold" dir="ltr">${m.email}</p>
+        <p class="text-[11px] text-on-surface-variant">${m.role === 'owner' ? 'مالك' : 'موظف'} · انضم ${fmtDate(m.joined_at)}</p>
+      </div>
+      <button onclick="removeStaffMember('${m.staff_id}')" class="text-error"><span class="material-symbols-outlined text-[16px]">person_remove</span></button>
+    </div>`).join('') || '<p class="text-[12px] text-on-surface-variant">لا يوجد موظفون بعد.</p>';
+
+  if (invErr) { showToast('تعذّر تحميل الدعوات: ' + invErr.message, true); }
+  const pending = (invites || []).filter(i => i.status === 'pending');
+  document.getElementById('storeInviteCount').textContent = pending.length;
+  document.getElementById('storeInviteList').innerHTML = pending.map(i => `
+    <div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2">
+      <div>
+        <p class="text-[13px] font-semibold" dir="ltr">${i.email}</p>
+        <p class="text-[11px] text-on-surface-variant">${i.role === 'owner' ? 'مالك' : 'موظف'} · دُعي ${fmtDate(i.created_at)}</p>
+      </div>
+      <button onclick="revokeInvite('${i.invite_id}')" class="text-error"><span class="material-symbols-outlined text-[16px]">cancel</span></button>
+    </div>`).join('') || '<p class="text-[12px] text-on-surface-variant">لا توجد دعوات معلّقة.</p>';
+}
+
+function closeStoreDetailModal() {
+  const modal = document.getElementById('storeDetailModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  currentDetailStoreId = null;
+}
+
+function startRenameStore() {
+  const store = allStores.find(s => s.id === currentDetailStoreId);
+  if (!store) return;
+  document.getElementById('storeRenameInput').value = store.name;
+  document.getElementById('storeDetailNameRow').classList.add('hidden');
+  document.getElementById('storeRenameRow').classList.remove('hidden');
+  document.getElementById('storeRenameRow').classList.add('flex');
+}
+
+function cancelRenameStore() {
+  document.getElementById('storeDetailNameRow').classList.remove('hidden');
+  document.getElementById('storeRenameRow').classList.add('hidden');
+}
+
+async function saveRenameStore() {
+  const newName = document.getElementById('storeRenameInput').value.trim();
+  if (!newName || !currentDetailStoreId) return;
+  const { error } = await goldmindClient.rpc('admin_update_store', { target_store_id: currentDetailStoreId, new_name: newName });
+  if (error) { showToast('تعذّر إعادة التسمية: ' + error.message, true); return; }
+  showToast('تم تحديث اسم الشركة');
+  document.getElementById('storeDetailName').textContent = newName;
+  cancelRenameStore();
+  loadStores();
+}
+
+async function removeStaffMember(staffId) {
+  if (!confirm('هل تريد إزالة هذا الموظف من الشركة؟')) return;
+  const { error } = await goldmindClient.rpc('admin_remove_staff', { target_staff_id: staffId });
+  if (error) { showToast('تعذّر الإزالة: ' + error.message, true); return; }
+  showToast('تمت الإزالة');
+  openStoreDetailModal(currentDetailStoreId);
+  loadStores();
+}
+
+async function revokeInvite(inviteId) {
+  if (!confirm('هل تريد إلغاء هذه الدعوة؟')) return;
+  const { error } = await goldmindClient.rpc('admin_revoke_invite', { target_invite_id: inviteId });
+  if (error) { showToast('تعذّر الإلغاء: ' + error.message, true); return; }
+  showToast('تم إلغاء الدعوة');
+  openStoreDetailModal(currentDetailStoreId);
 }
 
 async function loadSupportRequests() {
