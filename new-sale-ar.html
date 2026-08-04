@@ -488,6 +488,14 @@
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         const invoiceNumber = 'INV-' + Date.now();
 
+        // Snapshot today's gold price per karat so profit reports stay
+        // accurate to the market price at the moment of THIS sale, not
+        // whatever the price happens to be when the report is viewed later.
+        const { data: goldPrices } = await goldmindClient
+            .from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
+        const goldPriceMap = {};
+        (goldPrices || []).forEach(p => { goldPriceMap[p.karat] = Number(p.price_per_gram); });
+
         const { data: invoiceRow, error: invoiceError } = await goldmindClient
             .from('invoices')
             .insert({
@@ -521,7 +529,8 @@
             weight_grams: item.weight,
             fabrication_fee: 0,
             line_total: item.price,
-            description: item.description
+            description: item.description,
+            gold_price_per_gram: goldPriceMap[item.karat] || null
         }));
 
         const { error: itemsError } = await goldmindClient.from('invoice_items').insert(itemsPayload);
