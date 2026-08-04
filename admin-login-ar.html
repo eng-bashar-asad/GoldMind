@@ -34,6 +34,9 @@
     @keyframes otpIn { to { opacity: 1; transform: translateY(0) scale(1); } }
     .otp-box.filled { border-color: var(--royal-gold); box-shadow: 0 0 10px rgba(255, 215, 0, 0.45); }
     .admin-badge { background: rgba(255,215,0,0.12); border: 1px solid rgba(255,215,0,0.35); }
+    .tab-btn { transition: all .15s ease; }
+    .tab-btn.active { background: rgba(255,215,0,0.12); color: var(--royal-gold); }
+    .tab-btn:not(.active) { color: rgba(255,255,255,0.55); }
 </style>
 <script id="tailwind-config">
     tailwind.config = { darkMode: "class", theme: { extend: {
@@ -91,6 +94,12 @@
 
 <div class="glass-panel w-full p-8 rounded-xl shadow-2xl space-y-6">
 
+<div class="flex bg-black/20 rounded-lg p-1 gap-1 mb-2">
+<button class="tab-btn active flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabOtpMode" type="button" onclick="setEntryMode('otp')">دخول بالرمز</button>
+<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabPasswordMode" type="button" onclick="setEntryMode('password')">دخول بكلمة السر</button>
+</div>
+
+<div id="otpModePanel">
 <!-- STEP 1: email -->
 <div id="emailStep">
 <div class="text-center mb-6">
@@ -132,10 +141,99 @@
 </div>
 
 </div>
+
+<!-- PASSWORD MODE: username/email + password, admin-only -->
+<div class="hidden" id="passwordModePanel">
+<div class="text-center mb-6">
+<h2 class="text-lg font-bold text-white">دخول مباشر بكلمة السر</h2>
+<p class="text-xs text-primary/70 mt-2">لحسابات مالكي المنصة فقط — بدون رمز تحقق</p>
+</div>
+<form class="space-y-5" id="adminPasswordForm">
+<div>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="adminIdentifier">اسم المستخدم أو البريد الإلكتروني</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="adminIdentifier" placeholder="username or name@example.com" required type="text"/>
+</div>
+</div>
+<div>
+<label class="block text-sm font-semibold text-primary/80 mb-2" for="adminPassword">كلمة السر</label>
+<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden">
+<input class="flex-1 bg-transparent px-4 py-4 text-white placeholder:text-white/30 focus:outline-none text-lg" dir="ltr" id="adminPassword" placeholder="••••••••" required type="password"/>
+</div>
+</div>
+<button class="w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" id="adminPasswordSubmitBtn" type="submit">دخول</button>
+<p class="text-error text-sm text-center hidden text-red-400" id="adminPasswordFormError"></p>
+<p class="text-[11px] text-primary/50 text-center">فعّل كلمة السر مرة وحدة من داخل حسابك (صفحة "الأمان وكلمة المرور") بعد الدخول بالرمز.</p>
+</form>
+</div>
+
+</div>
 </main>
 
 <script>
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+function setEntryMode(mode) {
+    document.getElementById('tabOtpMode').classList.toggle('active', mode === 'otp');
+    document.getElementById('tabPasswordMode').classList.toggle('active', mode === 'password');
+    document.getElementById('otpModePanel').classList.toggle('hidden', mode !== 'otp');
+    document.getElementById('passwordModePanel').classList.toggle('hidden', mode !== 'password');
+}
+
+document.getElementById('adminPasswordForm').addEventListener('submit', async function (e) {
+    e.preventDefault();
+    const identifier = document.getElementById('adminIdentifier').value.trim();
+    const password = document.getElementById('adminPassword').value;
+    const errEl = document.getElementById('adminPasswordFormError');
+    errEl.classList.add('hidden');
+
+    if (!identifier || !password) {
+        errEl.textContent = 'فضلاً أدخل اسم المستخدم/البريد وكلمة السر';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('adminPasswordSubmitBtn');
+    btn.disabled = true;
+    btn.textContent = 'جارِ الدخول...';
+
+    let email = identifier;
+    if (!identifier.includes('@')) {
+        const { data: resolvedEmail, error: lookupError } = await goldmindClient.rpc('lookup_email_by_username', { p_username: identifier });
+        if (lookupError || !resolvedEmail) {
+            btn.disabled = false;
+            btn.textContent = 'دخول';
+            errEl.textContent = 'لا يوجد حساب بهذا اسم المستخدم';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        email = resolvedEmail;
+    }
+
+    const { error: signInError } = await goldmindClient.auth.signInWithPassword({ email, password });
+
+    if (signInError) {
+        btn.disabled = false;
+        btn.textContent = 'دخول';
+        errEl.textContent = 'بيانات الدخول غير صحيحة';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
+
+    btn.disabled = false;
+    btn.textContent = 'دخول';
+
+    if (!isAdmin) {
+        errEl.textContent = 'هذا الحساب ليس حساب مالك المنصة. سيتم تسجيل خروجك.';
+        errEl.classList.remove('hidden');
+        await goldmindClient.auth.signOut();
+        return;
+    }
+
+    window.location.href = 'admin-panel-ar.html';
+});
 
 document.getElementById('emailForm').addEventListener('submit', async function (e) {
     e.preventDefault();
