@@ -226,27 +226,29 @@
 <span class="absolute inset-y-0 right-4 flex items-center pointer-events-none">
 <span class="material-symbols-outlined text-on-surface-variant">search</span>
 </span>
-<input class="w-full bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-0 rounded-lg pr-12 pl-4 py-3 text-body-md text-right" placeholder="ابحث عن موظف أو عملية..." type="text"/>
+<input class="w-full bg-surface-container-lowest border border-outline-variant focus:border-primary focus:ring-0 rounded-lg pr-12 pl-4 py-3 text-body-md text-right" id="activitySearchInput" placeholder="ابحث عن موظف أو عملية..." type="text"/>
 </div>
 </div>
 <div class="flex items-center gap-2 overflow-x-auto pb-2 md:pb-0 custom-scrollbar">
-<select class="bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-label-md min-w-[140px] appearance-none cursor-pointer focus:ring-0">
-<option>كل التواريخ</option>
-<option>اليوم</option>
-<option>آخر 7 أيام</option>
-<option>هذا الشهر</option>
+<select class="bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-label-md min-w-[140px] appearance-none cursor-pointer focus:ring-0" id="dateFilterSelect">
+<option value="all">كل التواريخ</option>
+<option value="today">اليوم</option>
+<option value="7days">آخر 7 أيام</option>
+<option value="month">هذا الشهر</option>
 </select>
-<select class="bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-label-md min-w-[140px] appearance-none cursor-pointer focus:ring-0">
-<option>كل الموظفين</option>
-<option>أحمد العتيبي</option>
-<option>فاطمة الزهراء</option>
-<option>يوسف كمال</option>
+<select class="bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-label-md min-w-[140px] appearance-none cursor-pointer focus:ring-0" id="staffFilterSelect">
+<option value="all">كل الموظفين</option>
 </select>
-<select class="bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-label-md min-w-[140px] appearance-none cursor-pointer focus:ring-0">
-<option>نوع العملية</option>
+<select class="bg-surface-container-lowest border border-outline-variant rounded-lg px-4 py-3 text-label-md min-w-[140px] appearance-none cursor-pointer focus:ring-0" id="actionFilterSelect">
+<option value="all">نوع العملية</option>
 <option>إنشاء فاتورة</option>
 <option>تحديث مخزون</option>
-<option>حذف عميل</option>
+<option value="all">نوع العملية</option>
+<option value="invoices_insert">إنشاء فاتورة</option>
+<option value="pieces_insert">إضافة قطعة مخزون</option>
+<option value="pieces_delete">حذف قطعة مخزون</option>
+<option value="customers_insert">إضافة عميل</option>
+<option value="cash_movements_insert">حركة صندوق</option>
 </select>
 </div>
 </div>
@@ -297,7 +299,6 @@
 </nav>
 <!-- Micro-interaction script -->
 <script>
-requireGoldMindSession('login-entry-ar.html');
 
 const ACTION_ICONS = {
   invoices_insert: { icon: 'receipt_long', color: 'text-green-600' },
@@ -309,6 +310,13 @@ const ACTION_ICONS = {
   customers_insert: { icon: 'person_add', color: 'text-green-600' },
   customers_delete: { icon: 'person_remove', color: 'text-red-600' },
   cash_movements_insert: { icon: 'payments', color: 'text-secondary' }
+};
+
+const ACTION_LABELS = {
+  invoices_insert: 'إنشاء فاتورة', invoices_update: 'تعديل فاتورة', invoices_delete: 'حذف فاتورة',
+  pieces_insert: 'إضافة قطعة مخزون', pieces_update: 'تعديل قطعة مخزون', pieces_delete: 'حذف قطعة مخزون',
+  customers_insert: 'إضافة عميل', customers_update: 'تعديل عميل', customers_delete: 'حذف عميل',
+  cash_movements_insert: 'حركة صندوق', cash_movements_update: 'تعديل حركة صندوق'
 };
 
 let allEntries = [];
@@ -342,7 +350,7 @@ function renderEntries(entries) {
       <td class="px-6 py-4">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined ${meta.color} text-[20px]">${meta.icon}</span>
-          <span class="font-label-md text-label-md">${e.action_type}</span>
+          <span class="font-label-md text-label-md">${ACTION_LABELS[e.action_type] || e.action_type}</span>
         </div>
       </td>
       <td class="px-6 py-4"><p class="text-body-md text-on-surface-variant">${e.description || ''}</p></td>
@@ -377,22 +385,57 @@ async function loadActivity() {
   document.getElementById('stat-adds').textContent = addCount;
   document.getElementById('stat-deletes').textContent = deleteCount;
 
+  const staffSelect = document.getElementById('staffFilterSelect');
+  const staffNames = [...new Set(allEntries.map(e => e.staff && e.staff.full_name).filter(Boolean))].sort();
+  staffSelect.innerHTML = '<option value="all">كل الموظفين</option>' +
+    staffNames.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+
   renderEntries(allEntries);
 }
 
-const searchInput = document.querySelector('input[type="text"]');
-if (searchInput) {
-  searchInput.addEventListener('input', (e) => {
-    const term = e.target.value.trim().toLowerCase();
-    if (!term) { renderEntries(allEntries); return; }
-    renderEntries(allEntries.filter(entry =>
-      (entry.description || '').toLowerCase().includes(term) ||
-      (entry.staff && entry.staff.full_name || '').toLowerCase().includes(term)
-    ));
+function applyFilters() {
+  const term = document.getElementById('activitySearchInput').value.trim().toLowerCase();
+  const dateFilter = document.getElementById('dateFilterSelect').value;
+  const staffFilter = document.getElementById('staffFilterSelect').value;
+  const actionFilter = document.getElementById('actionFilterSelect').value;
+
+  const now = new Date();
+  const todayStart = new Date(now); todayStart.setHours(0,0,0,0);
+  const weekStart = new Date(now); weekStart.setDate(now.getDate() - 7);
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+  const filtered = allEntries.filter(e => {
+    const staffName = (e.staff && e.staff.full_name) || '';
+    if (term && !((e.description || '').toLowerCase().includes(term) || staffName.toLowerCase().includes(term))) return false;
+    if (staffFilter !== 'all' && staffName !== staffFilter) return false;
+    if (actionFilter !== 'all' && e.action_type !== actionFilter) return false;
+    if (dateFilter !== 'all') {
+      const d = new Date(e.created_at);
+      if (dateFilter === 'today' && d < todayStart) return false;
+      if (dateFilter === '7days' && d < weekStart) return false;
+      if (dateFilter === 'month' && d < monthStart) return false;
+    }
+    return true;
   });
+
+  renderEntries(filtered);
 }
 
-loadActivity();
+['activitySearchInput'].forEach(id => document.getElementById(id).addEventListener('input', applyFilters));
+['dateFilterSelect', 'staffFilterSelect', 'actionFilterSelect'].forEach(id => document.getElementById(id).addEventListener('change', applyFilters));
+
+(async function () {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canView = staffRow && staffRow.permissions && staffRow.permissions.view_reports;
+  if (!canView) {
+    document.querySelector('main').innerHTML = '<div class="p-10 text-center text-error text-sm">ليس لديك صلاحية لعرض سجل النشاط. تواصل مع مدير الشركة.</div>';
+    return;
+  }
+  loadActivity();
+})();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
