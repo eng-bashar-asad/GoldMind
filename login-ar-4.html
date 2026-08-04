@@ -349,7 +349,8 @@
 
                     if (mode === 'new') {
                         const companyName = sessionStorage.getItem('goldmind_company_name');
-                        const { error: rpcError } = await goldmindClient.rpc('register_new_company', { company_name: companyName });
+                        const termsAccepted = sessionStorage.getItem('goldmind_terms_accepted') === 'true';
+                        const { error: rpcError } = await goldmindClient.rpc('register_new_company', { company_name: companyName, terms_accepted: termsAccepted, terms_version: '1.0' });
                         if (rpcError) {
                             errEl.textContent = 'تعذّر إنشاء الشركة: ' + rpcError.message;
                             errEl.classList.remove('hidden');
