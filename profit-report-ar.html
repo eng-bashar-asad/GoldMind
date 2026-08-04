@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>تقرير الأرباح | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='gold-price-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">تقرير الأرباح</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-2xl mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية عرض تقرير الأرباح.</div>
+<div id="no-prices" class="hidden py-16 text-center text-on-surface-variant text-sm">لم يتم تحديد سعر الذهب بعد — <a class="text-secondary font-semibold" href="gold-price-ar.html">حدّده من هنا</a> أولاً.</div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-4">
+
+<p class="text-[11px] text-outline">الأرباح محسوبة على أساس سعر الذهب الحالي المُدخل في صفحة "سعر الذهب"، وليس بالضرورة سعر الشراء التاريخي للقطعة.</p>
+
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl text-center">
+<span class="text-[11px] text-on-surface-variant block mb-1">إجمالي المبيعات</span>
+<div id="stat-revenue" class="font-bold text-[18px]">0</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl text-center">
+<span class="text-[11px] text-on-surface-variant block mb-1">إجمالي الربح</span>
+<div id="stat-profit" class="font-bold text-[18px] text-success">0</div>
+</div>
+</div>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<table class="w-full text-right text-[12px]">
+<thead>
+<tr class="bg-surface-container-low">
+<th class="px-3 py-2">الفاتورة</th>
+<th class="px-3 py-2">القطعة</th>
+<th class="px-3 py-2">الوزن/العيار</th>
+<th class="px-3 py-2">البيع</th>
+<th class="px-3 py-2">التكلفة</th>
+<th class="px-3 py-2">الربح</th>
+</tr>
+</thead>
+<tbody id="items-tbody"></tbody>
+</table>
+<p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد مبيعات بعد.</p>
+</div>
+
+</div>
+</main>
+
+<script>
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canView = staffRow && staffRow.permissions && staffRow.permissions.view_profit_report;
+
+  document.getElementById('loading-state').classList.add('hidden');
+
+  if (!canView) {
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
+  const { data: prices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
+  if (!prices || prices.length === 0) {
+    document.getElementById('no-prices').classList.remove('hidden');
+    return;
+  }
+  const priceMap = {};
+  prices.forEach(p => priceMap[p.karat] = Number(p.price_per_gram));
+
+  const { data: invoices } = await goldmindClient
+    .from('invoices').select('id, invoice_number, created_at')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sell')
+    .order('created_at', { ascending: false }).limit(100);
+
+  const invoiceMap = {};
+  (invoices || []).forEach(i => invoiceMap[i.id] = i);
+  const invoiceIds = (invoices || []).map(i => i.id);
+
+  document.getElementById('page-content').classList.remove('hidden');
+
+  if (invoiceIds.length === 0) {
+    document.getElementById('empty-state').classList.remove('hidden');
+    return;
+  }
+
+  const { data: items, error } = await goldmindClient
+    .from('invoice_items')
+    .select('*, piece:piece_id(cost_fabrication_per_gram)')
+    .in('invoice_id', invoiceIds);
+
+  if (error) {
+    document.getElementById('items-tbody').innerHTML = `<tr><td colspan="6" class="text-center text-error text-sm py-8">تعذّر التحميل: ${error.message}</td></tr>`;
+    return;
+  }
+
+  let totalRevenue = 0, totalProfit = 0;
+  const rows = (items || []).map(it => {
+    const goldPrice = priceMap[it.karat] || 0;
+    const fabCost = (it.piece && it.piece.cost_fabrication_per_gram) || 0;
+    const weight = Number(it.weight_grams) || 0;
+    const revenue = Number(it.line_total) || 0;
+    const cost = weight * goldPrice + weight * fabCost;
+    const profit = revenue - cost;
+    totalRevenue += revenue;
+    totalProfit += profit;
+    const inv = invoiceMap[it.invoice_id];
+    return { it, inv, weight, revenue, cost, profit, goldPrice };
+  });
+
+  document.getElementById('stat-revenue').textContent = totalRevenue.toFixed(2);
+  document.getElementById('stat-profit').textContent = totalProfit.toFixed(2);
+
+  if (rows.length === 0) {
+    document.getElementById('empty-state').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('items-tbody').innerHTML = rows.map(r => `
+    <tr class="border-t border-outline-variant">
+      <td class="px-3 py-2">${(r.inv && r.inv.invoice_number) || '—'}</td>
+      <td class="px-3 py-2">${r.it.barcode || r.it.description || '—'}</td>
+      <td class="px-3 py-2 font-data-mono">${r.weight}غ / ع${r.it.karat}</td>
+      <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono">${r.cost.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono font-bold ${r.profit >= 0 ? 'text-success' : 'text-error'}">${r.profit.toFixed(2)}</td>
+    </tr>`).join('');
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
