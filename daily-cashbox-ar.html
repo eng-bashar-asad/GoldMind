@@ -60,20 +60,10 @@
 <button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabTraders" onclick="setBox('traders')">صندوق التجار</button>
 </div>
 
-<div class="grid grid-cols-3 gap-3">
-<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded-xl text-center">
-<span class="text-[11px] text-on-surface-variant block mb-1">دخل اليوم</span>
-<div id="stat-in" class="font-bold text-[16px] text-success">0</div>
+<div class="grid grid-cols-3 gap-3 text-[11px] font-semibold text-on-surface-variant px-1" id="stats-header">
+<span>دخل اليوم</span><span>خرج اليوم</span><span>صافي اليوم</span>
 </div>
-<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded-xl text-center">
-<span class="text-[11px] text-on-surface-variant block mb-1">خرج اليوم</span>
-<div id="stat-out" class="font-bold text-[16px] text-error">0</div>
-</div>
-<div class="bg-surface-container-lowest border border-outline-variant p-3 rounded-xl text-center">
-<span class="text-[11px] text-on-surface-variant block mb-1">صافي اليوم</span>
-<div id="stat-net" class="font-bold text-[16px]">0</div>
-</div>
-</div>
+<div id="stats-by-currency" class="flex flex-col gap-2"></div>
 
 <button onclick="toggleAddForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">add</span> إضافة حركة كاش يدوية
@@ -85,6 +75,14 @@
 <button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirOutBtn" onclick="setDirection('out')">خروج كاش</button>
 </div>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-sm mb-3 font-data-mono" id="amountInput" placeholder="المبلغ" type="number" step="0.01" dir="ltr"/>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" id="currencySelect">
+<option value="AED">درهم إماراتي (AED)</option>
+<option value="USD">دولار أمريكي (USD)</option>
+<option value="SAR">ريال سعودي (SAR)</option>
+<option value="EGP">جنيه مصري (EGP)</option>
+<option value="EUR">يورو (EUR)</option>
+<option value="GBP">جنيه إسترليني (GBP)</option>
+</select>
 <textarea class="w-full h-20 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="noteInput" placeholder="السبب / الملاحظة (مثلاً: سحب مصروف كهرباء، إيداع من صاحب المحل...)"></textarea>
 <button onclick="submitMovement()" id="submitMovBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الحركة</button>
 <p class="text-error text-[12px] hidden mt-2" id="addFormError"></p>
@@ -148,6 +146,7 @@ async function submitMovement() {
     box: currentBox,
     direction: currentDirection,
     amount: amount,
+    currency: document.getElementById('currencySelect').value,
     description: note,
     created_by: GOLDMIND_STAFF_ID
   });
@@ -172,7 +171,7 @@ async function loadToday() {
 
   const { data, error } = await goldmindClient
     .from('cash_movements')
-    .select('id, direction, amount, description, created_at, invoice_id, staff:created_by(full_name)')
+    .select('id, direction, amount, currency, description, created_at, invoice_id, staff:created_by(full_name)')
     .eq('store_id', GOLDMIND_STORE_ID)
     .eq('box', currentBox)
     .gte('created_at', todayStart.toISOString())
@@ -184,15 +183,40 @@ async function loadToday() {
   }
 
   const entries = data || [];
-  let totalIn = 0, totalOut = 0;
-  entries.forEach(m => { if (m.direction === 'in') totalIn += Number(m.amount); else totalOut += Number(m.amount); });
 
-  document.getElementById('stat-in').textContent = fmt(totalIn);
-  document.getElementById('stat-out').textContent = fmt(totalOut);
-  const net = totalIn - totalOut;
-  const netEl = document.getElementById('stat-net');
-  netEl.textContent = fmt(net);
-  netEl.className = 'font-bold text-[16px] ' + (net >= 0 ? 'text-success' : 'text-error');
+  // Totals grouped per currency — each currency's balance is fully independent.
+  const totalsByCurrency = {};
+  entries.forEach(m => {
+    const cur = m.currency || 'AED';
+    if (!totalsByCurrency[cur]) totalsByCurrency[cur] = { in: 0, out: 0 };
+    if (m.direction === 'in') totalsByCurrency[cur].in += Number(m.amount);
+    else totalsByCurrency[cur].out += Number(m.amount);
+  });
+
+  const statsEl = document.getElementById('stats-by-currency');
+  const currencies = Object.keys(totalsByCurrency);
+  if (currencies.length === 0) {
+    statsEl.innerHTML = `
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 grid grid-cols-3 gap-3 text-center">
+        <div class="font-bold text-[16px] text-success">0.00</div>
+        <div class="font-bold text-[16px] text-error">0.00</div>
+        <div class="font-bold text-[16px]">0.00</div>
+      </div>`;
+  } else {
+    statsEl.innerHTML = currencies.map(cur => {
+      const t = totalsByCurrency[cur];
+      const net = t.in - t.out;
+      return `
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
+          <div class="text-[11px] font-bold text-secondary mb-1">${cur}</div>
+          <div class="grid grid-cols-3 gap-3 text-center">
+            <div class="font-bold text-[16px] text-success">${fmt(t.in)}</div>
+            <div class="font-bold text-[16px] text-error">${fmt(t.out)}</div>
+            <div class="font-bold text-[16px] ${net >= 0 ? 'text-success' : 'text-error'}">${fmt(net)}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
 
   const listEl = document.getElementById('movements-list');
   const emptyEl = document.getElementById('empty-state');
@@ -213,7 +237,7 @@ async function loadToday() {
         <div class="flex items-center justify-between mb-1">
           <div class="flex items-center gap-2">
             <span class="material-symbols-outlined ${isIn ? 'text-success' : 'text-error'} text-[20px]">${isIn ? 'arrow_downward' : 'arrow_upward'}</span>
-            <span class="font-bold text-[15px] ${isIn ? 'text-success' : 'text-error'}">${isIn ? '+' : '-'}${fmt(m.amount)}</span>
+            <span class="font-bold text-[15px] ${isIn ? 'text-success' : 'text-error'}">${isIn ? '+' : '-'}${fmt(m.amount)} <span class="text-[11px] text-on-surface-variant font-normal">${m.currency || 'AED'}</span></span>
           </div>
           <span class="text-[11px] text-on-surface-variant">${time}</span>
         </div>
@@ -226,6 +250,12 @@ async function loadToday() {
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+
+  const { data: storeRow } = await goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  if (storeRow && storeRow.currency) {
+    const sel = document.getElementById('currencySelect');
+    if ([...sel.options].some(o => o.value === storeRow.currency)) sel.value = storeRow.currency;
+  }
 
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
