@@ -1,6 +1,5 @@
 <!DOCTYPE html>
-
-<html dir="rtl" lang="ar"><head>
+<html class="light" dir="rtl" lang="ar"><head>
 <meta charset="utf-8"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
@@ -9,399 +8,275 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>GoldMind - سجل مديونيات العملاء</title>
+<title>ديون العملاء | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<!-- Use Tailwind Config from Design System -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
-      tailwind.config = {
-        darkMode: "class",
-        theme: {
-          extend: {
-            "colors": {
-                    "on-secondary": "#ffffff",
-                    "inverse-on-surface": "#eff1f3",
-                    "on-surface": "#191c1e",
-                    "on-primary": "#ffffff",
-                    "surface-bright": "#f7f9fb",
-                    "secondary": "#745a25",
-                    "on-primary-fixed": "#131b2e",
-                    "tertiary-fixed-dim": "#b7c8e1",
-                    "tertiary": "#000000",
-                    "on-primary-fixed-variant": "#3f465c",
-                    "surface-dim": "#d8dadc",
-                    "surface-container-high": "#e6e8ea",
-                    "primary-container": "#131b2e",
-                    "on-background": "#191c1e",
-                    "on-surface-variant": "#45464d",
-                    "on-error": "#ffffff",
-                    "secondary-fixed-dim": "#e4c283",
-                    "error-container": "#ffdad6",
-                    "surface-container-lowest": "#ffffff",
-                    "surface-container-highest": "#e0e3e5",
-                    "on-error-container": "#93000a",
-                    "inverse-primary": "#bec6e0",
-                    "primary-fixed": "#dae2fd",
-                    "surface-container-low": "#f2f4f6",
-                    "secondary-container": "#ffdb99",
-                    "outline-variant": "#c6c6cd",
-                    "outline": "#76777d",
-                    "on-secondary-container": "#795f29",
-                    "on-tertiary-fixed-variant": "#38485d",
-                    "primary-fixed-dim": "#bec6e0",
-                    "surface-tint": "#565e74",
-                    "on-tertiary-fixed": "#0b1c30",
-                    "surface-variant": "#e0e3e5",
-                    "surface-container": "#eceef0",
-                    "on-tertiary-container": "#75859d",
-                    "on-primary-container": "#7c839b",
-                    "background": "#f7f9fb",
-                    "tertiary-container": "#0b1c30",
-                    "secondary-fixed": "#ffdea4",
-                    "on-secondary-fixed": "#261900",
-                    "inverse-surface": "#2d3133",
-                    "error": "#ba1a1a",
-                    "primary": "#000000",
-                    "on-tertiary": "#ffffff",
-                    "on-secondary-fixed-variant": "#5a430f",
-                    "surface": "#f7f9fb",
-                    "tertiary-fixed": "#d3e4fe"
-            },
-            "borderRadius": {
-                    "DEFAULT": "0.125rem",
-                    "lg": "0.25rem",
-                    "xl": "0.5rem",
-                    "full": "0.75rem"
-            },
-            "spacing": {
-                    "unit": "4px",
-                    "margin-mobile": "16px",
-                    "gutter": "24px",
-                    "container-max": "1440px",
-                    "margin-desktop": "40px"
-            },
-            "fontFamily": {
-                    "headline-md": ["IBM Plex Sans Arabic"],
-                    "headline-lg": ["IBM Plex Sans Arabic"],
-                    "body-md": ["IBM Plex Sans Arabic"],
-                    "label-md": ["IBM Plex Sans Arabic"],
-                    "headline-xl": ["IBM Plex Sans Arabic"],
-                    "headline-xl-mobile": ["IBM Plex Sans Arabic"],
-                    "data-mono": ["IBM Plex Sans"],
-                    "body-lg": ["IBM Plex Sans Arabic"]
-            },
-            "fontSize": {
-                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
-                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
-                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
-                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
-                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}],
-                    "headline-xl-mobile": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
-                    "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
-                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
-            }
-          },
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
         },
-      }
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
     </script>
 <style>
-        html { font-size: 87.5%; }
-
-        body {
-            font-family: 'IBM Plex Sans Arabic', sans-serif;
-            background-color: #f7f9fb;
-        }
-        .material-symbols-outlined {
-            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
-            font-size: 18px;
-        }
-        /* Custom scrollbar for data tables */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: #cbd5e1;
-            border-radius: 10px;
-        }
-        /* Fixed sidebar for desktop */
-        @media (min-width: 768px) {
-            .main-content {
-                margin-right: 280px;
-            }
-        }
-    </style>
-<style>
-    body {
-      min-height: max(884px, 100dvh);
-    }
-  </style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
 </head>
-<body class="bg-background text-on-background">
-<!-- NavigationDrawer (Desktop Only) -->
-<aside class="hidden md:flex fixed right-0 top-0 h-full w-[280px] bg-surface flex flex-col border-l border-outline-variant z-40">
-<div class="p-8 flex flex-col items-end gap-2">
-<div class="font-headline-lg text-headline-lg font-bold text-secondary">GoldMind</div>
-<div class="flex items-center gap-3 mt-6">
-<div class="text-right">
-<p class="font-body-md text-body-md font-bold text-on-surface">متجر الذهب الملكي</p>
-<p class="text-on-surface-variant text-sm">مدير النظام</p>
-</div>
-<div class="w-12 h-12 rounded-full bg-secondary-container flex items-center justify-center">
-<span class="material-symbols-outlined text-on-secondary-container">person</span>
-</div>
-</div>
-</div>
-<nav class="flex-1 px-4 mt-4 space-y-2">
-<a class="flex items-center justify-end gap-4 p-4 text-on-surface-variant hover:bg-surface-container-low transition-all active:scale-95 duration-150" href="#">
-<span class="font-body-md text-body-md">لوحة التحكم</span>
-<span class="material-symbols-outlined">dashboard</span>
-</a>
-<a class="flex items-center justify-end gap-4 p-4 bg-secondary-container text-on-secondary-container rounded-full active:scale-95 duration-150" href="#">
-<span class="font-body-md text-body-md">سجل المديونيات</span>
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">account_balance_wallet</span>
-</a>
-<a class="flex items-center justify-end gap-4 p-4 text-on-surface-variant hover:bg-surface-container-low transition-all active:scale-95 duration-150" href="#">
-<span class="font-body-md text-body-md">المخزون</span>
-<span class="material-symbols-outlined">inventory_2</span>
-</a>
-<a class="flex items-center justify-end gap-4 p-4 text-on-surface-variant hover:bg-surface-container-low transition-all active:scale-95 duration-150" href="#">
-<span class="font-body-md text-body-md">التقارير</span>
-<span class="material-symbols-outlined">analytics</span>
-</a>
-<a class="flex items-center justify-end gap-4 p-4 text-on-surface-variant hover:bg-surface-container-low transition-all active:scale-95 duration-150" href="#">
-<span class="font-body-md text-body-md">الإعدادات</span>
-<span class="material-symbols-outlined">settings</span>
-</a>
-</nav>
-</aside>
-<div class="main-content min-h-screen flex flex-col pb-20 md:pb-0">
-<!-- TopAppBar -->
-<header class="w-full top-0 sticky bg-surface flex flex-row-reverse justify-between items-center px-margin-mobile md:px-margin-desktop h-16 border-b border-outline-variant z-30">
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
 <div class="flex items-center gap-4">
-<span class="material-symbols-outlined text-primary cursor-pointer hover:bg-surface-container-low p-2 rounded-full transition-colors">search</span>
-<h1 class="font-headline-md text-headline-md text-primary">سجل مديونيات العملاء</h1>
-</div>
-<div class="flex items-center">
-<span class="material-symbols-outlined text-primary cursor-pointer md:hidden">menu</span>
-<div class="hidden md:flex gap-2 text-sm items-center text-on-surface-variant">
-<span class="material-symbols-outlined text-sm">schedule</span>
-<span>آخر تحديث: منذ دقيقتين</span>
+<button onclick="goBack()" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold" id="page-title">ديون العملاء</h1>
 </div>
 </div>
 </header>
-<!-- Canvas / Content -->
-<main class="p-margin-mobile md:p-margin-desktop flex flex-col gap-8 flex-1">
-<!-- Summary Header (Bento Cards) -->
-<section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-gutter">
-<div class="bg-surface-container-lowest border border-outline-variant p-6 rounded-lg flex flex-col gap-2">
-<div class="flex justify-between items-center">
-<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">payments</span>
-<span class="text-label-md font-label-md text-on-surface-variant">صافي المبالغ النقدية</span>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<!-- Customers list -->
+<div id="customers-list-view" class="hidden py-6">
+<div class="relative mb-4">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input id="customerFilterInput" oninput="renderCustomers()" placeholder="ابحث باسم العميل..." class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-surface-container-lowest"/>
 </div>
-<div class="font-headline-lg text-headline-lg text-primary text-right mt-2">14,250.00 د.إ</div>
-<div class="flex items-center gap-1 text-error text-sm self-end">
-<span class="material-symbols-outlined text-sm">arrow_upward</span>
-<span>12% زيادة</span>
+<div id="customers-list" class="flex flex-col gap-3"></div>
 </div>
+
+<!-- Customer detail -->
+<div id="customer-detail-view" class="hidden py-6 flex flex-col gap-4">
+<button onclick="showCustomersList()" class="text-[12px] text-secondary font-semibold self-start">→ كل العملاء</button>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<h2 class="font-bold text-[16px]" id="detail-customer-name"></h2>
+<p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="detail-customer-phone"></p>
+<div class="mt-3 pt-3 border-t border-outline-variant flex justify-between items-center">
+<span class="text-[13px] text-on-surface-variant">رصيد الدين (نقدي)</span>
+<span class="font-bold text-[18px] font-data-mono" id="detail-balance">0.00</span>
 </div>
-<div class="bg-surface-container-lowest border border-outline-variant p-6 rounded-lg flex flex-col gap-2">
-<div class="flex justify-between items-center">
-<span class="material-symbols-outlined text-secondary" style="font-variation-settings: 'FILL' 1;">diamond</span>
-<span class="text-label-md font-label-md text-on-surface-variant">إجمالي الذهب المستحق</span>
+<p class="text-[10px] text-outline mt-1">قيمة موجبة = دين على العميل لصالح المحل لم يُسدَّد بعد</p>
 </div>
-<div class="font-headline-lg text-headline-lg text-primary text-right mt-2">1,452.20 غ</div>
-<div class="text-on-surface-variant text-sm self-end">عيار 24 صافي</div>
-</div>
-<div class="hidden lg:flex bg-primary-container p-6 rounded-lg flex-col justify-center relative overflow-hidden group">
-<div class="absolute -right-4 -bottom-4 opacity-10 transition-transform group-hover:scale-110">
-<span class="material-symbols-outlined text-[120px] text-white">account_balance</span>
-</div>
-<p class="text-on-primary-container font-body-md mb-2">إجمالي الذمم المدينة</p>
-<p class="text-white font-headline-md">تحصيل متوقع هذا الشهر</p>
-<button class="mt-4 bg-secondary text-on-secondary px-4 py-2 rounded font-label-md w-fit hover:opacity-90 transition-opacity">تصدير التقرير</button>
-</div>
-</section>
-<!-- Search and Filter Bar -->
-<section class="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-lg border border-outline-variant">
-<div class="relative w-full md:flex-1">
-<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-outline">search</span>
-<input class="w-full pr-10 py-3 bg-surface-container-low border-none rounded focus:ring-2 focus:ring-primary transition-all text-right" placeholder="ابحث عن عميل بالاسم أو رقم الهاتف..." type="text"/>
-</div>
-<div class="flex gap-2 w-full md:w-auto">
-<button class="flex-1 md:flex-none flex items-center justify-center gap-2 border border-outline px-4 py-2 rounded hover:bg-surface-container-low transition-colors">
-<span>الفلترة</span>
-<span class="material-symbols-outlined">filter_list</span>
+
+<button onclick="toggleSettleForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">payments</span> تسجيل دفعة من العميل
 </button>
-<button class="flex-1 md:flex-none flex items-center justify-center gap-2 border border-outline px-4 py-2 rounded hover:bg-surface-container-low transition-colors">
-<span>الفترة الزمنية</span>
-<span class="material-symbols-outlined">calendar_today</span>
-</button>
-<button class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-secondary text-on-secondary px-4 py-2 rounded hover:opacity-90 transition-opacity border border-secondary-fixed">
-<span class="font-label-md">تصدير PDF</span>
-<span class="material-symbols-outlined">picture_as_pdf</span>
-</button>
-<button class="flex-1 md:flex-none flex items-center justify-center gap-2 bg-secondary text-on-secondary px-4 py-2 rounded hover:opacity-90 transition-opacity border border-secondary-fixed">
-<span class="font-label-md">تصدير Excel</span>
-<span class="material-symbols-outlined">table_view</span>
-</button></div>
-</section>
-<!-- Client Debt List -->
-<section class="bg-white border border-outline-variant rounded-lg overflow-hidden shadow-sm">
-<div class="overflow-x-auto">
-<table class="w-full text-right border-collapse">
-<thead>
-<tr class="bg-primary-container text-white">
-<th class="p-4 font-label-md text-label-md uppercase tracking-wider">العميل</th>
-<th class="p-4 font-label-md text-label-md uppercase tracking-wider">رقم الهاتف</th>
-<th class="p-4 font-label-md text-label-md uppercase tracking-wider">رصيد الذهب</th>
-<th class="p-4 font-label-md text-label-md uppercase tracking-wider">الرصيد النقدي</th>
-<th class="p-4 font-label-md text-label-md uppercase tracking-wider">الحالة</th>
-<th class="p-4 font-label-md text-label-md uppercase tracking-wider"></th>
-</tr>
-</thead>
-<tbody class="divide-y divide-outline-variant">
-<!-- Row 1 -->
-<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
-<td class="p-4">
-<div class="flex items-center justify-end gap-3"><button class="w-8 h-8 flex items-center justify-center rounded-full border border-secondary text-secondary hover:bg-secondary-container transition-colors active:scale-95" title="إرسال تذكير واتساب"><span class="material-symbols-outlined text-sm">chat</span></button>
-<span class="font-body-md font-bold text-on-surface">أحمد محمد العامري</span>
-<div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs text-primary font-bold">أ م</div>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ المدفوع</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="settle-amount" step="0.01" type="number"/>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="settle-notes" placeholder="ملاحظة (اختياري)"></textarea>
+<button onclick="submitSettlement()" id="settle-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الدفعة</button>
+<p class="text-error text-[12px] hidden mt-2" id="settle-error"></p>
 </div>
-</td>
-<td class="p-4 font-data-mono text-data-mono text-on-surface-variant">0501234567</td>
-<td class="p-4 font-data-mono text-data-mono text-error font-bold">+15.50 غ <span class="text-xs text-on-surface-variant">24K</span></td>
-<td class="p-4 font-data-mono text-data-mono text-error font-bold">-1,200 د.إ</td>
-<td class="p-4">
-<span class="bg-red-50 text-error px-3 py-1 rounded-full text-xs font-bold border border-red-100">مدين</span>
-</td>
-<td class="p-4 text-left">
-<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
-</td>
-</tr>
-<!-- Row 2 -->
-<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
-<td class="p-4">
-<div class="flex items-center justify-end gap-3"><button class="w-8 h-8 flex items-center justify-center rounded-full border border-secondary text-secondary hover:bg-secondary-container transition-colors active:scale-95" title="إرسال تذكير واتساب"><span class="material-symbols-outlined text-sm">chat</span></button>
-<span class="font-body-md font-bold text-on-surface">سارة بنت خالد</span>
-<div class="w-8 h-8 rounded-full bg-secondary-container flex items-center justify-center text-xs text-on-secondary-container font-bold">س خ</div>
+
+<h3 class="font-semibold text-[13px] mt-2">سجل الحركات</h3>
+<div id="movements-list" class="flex flex-col gap-2"></div>
+<p id="empty-movements" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات مسجّلة بعد.</p>
+
 </div>
-</td>
-<td class="p-4 font-data-mono text-data-mono text-on-surface-variant">0559876543</td>
-<td class="p-4 font-data-mono text-data-mono text-secondary font-bold">0.00 غ</td>
-<td class="p-4 font-data-mono text-data-mono text-secondary font-bold">+2,450 د.إ</td>
-<td class="p-4">
-<span class="bg-secondary-container text-on-secondary-container px-3 py-1 rounded-full text-xs font-bold border border-orange-100">دائن</span>
-</td>
-<td class="p-4 text-left">
-<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
-</td>
-</tr>
-<!-- Row 3 -->
-<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
-<td class="p-4">
-<div class="flex items-center justify-end gap-3"><button class="w-8 h-8 flex items-center justify-center rounded-full border border-secondary text-secondary hover:bg-secondary-container transition-colors active:scale-95" title="إرسال تذكير واتساب"><span class="material-symbols-outlined text-sm">chat</span></button>
-<span class="font-body-md font-bold text-on-surface">مجوهرات المها</span>
-<div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs text-primary font-bold">م م</div>
-</div>
-</td>
-<td class="p-4 font-data-mono text-data-mono text-on-surface-variant">0520001122</td>
-<td class="p-4 font-data-mono text-data-mono text-error font-bold">+102.75 غ <span class="text-xs text-on-surface-variant">24K</span></td>
-<td class="p-4 font-data-mono text-data-mono text-error font-bold">-45,000 د.إ</td>
-<td class="p-4">
-<span class="bg-red-50 text-error px-3 py-1 rounded-full text-xs font-bold border border-red-100">مدين</span>
-</td>
-<td class="p-4 text-left">
-<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
-</td>
-</tr>
-<!-- Row 4 -->
-<tr class="hover:bg-surface-container-low transition-colors cursor-pointer group">
-<td class="p-4">
-<div class="flex items-center justify-end gap-3"><button class="w-8 h-8 flex items-center justify-center rounded-full border border-secondary text-secondary hover:bg-secondary-container transition-colors active:scale-95" title="إرسال تذكير واتساب"><span class="material-symbols-outlined text-sm">chat</span></button>
-<span class="font-body-md font-bold text-on-surface">إبراهيم عبدالله</span>
-<div class="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-xs text-primary font-bold">إ ع</div>
-</div>
-</td>
-<td class="p-4 font-data-mono text-data-mono text-on-surface-variant">0564433221</td>
-<td class="p-4 font-data-mono text-data-mono text-error font-bold">+5.20 غ <span class="text-xs text-on-surface-variant">21K</span></td>
-<td class="p-4 font-data-mono text-data-mono text-secondary font-bold">0.00 د.إ</td>
-<td class="p-4">
-<span class="bg-red-50 text-error px-3 py-1 rounded-full text-xs font-bold border border-red-100">مدين</span>
-</td>
-<td class="p-4 text-left">
-<span class="material-symbols-outlined text-outline group-hover:text-primary transition-colors">chevron_left</span>
-</td>
-</tr>
-</tbody>
-</table>
-</div>
-<div class="p-4 flex justify-between items-center border-t border-outline-variant bg-surface-container-lowest">
-<div class="flex gap-2">
-<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container-low">
-<span class="material-symbols-outlined">chevron_right</span>
-</button>
-<button class="w-10 h-10 bg-primary-container text-white rounded flex items-center justify-center">1</button>
-<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container-low">2</button>
-<button class="w-10 h-10 border border-outline-variant rounded flex items-center justify-center hover:bg-surface-container-low">
-<span class="material-symbols-outlined">chevron_left</span>
-</button>
-</div>
-<span class="text-sm text-on-surface-variant font-label-md">عرض 1-10 من 45 عميل</span>
-</div>
-</section>
 </main>
-<!-- Floating Action Button -->
-<button class="fixed bottom-20 md:bottom-8 left-8 w-14 h-14 bg-secondary text-on-secondary rounded-full flex items-center justify-center shadow-lg hover:scale-110 active:scale-95 transition-transform z-50">
-<span class="material-symbols-outlined text-3xl">add</span>
-</button>
-<!-- BottomNavBar (Mobile Only) -->
-<nav class="fixed bottom-0 w-full z-50 flex flex-row-reverse justify-around items-center h-16 bg-surface px-margin-mobile border-t border-outline-variant md:hidden">
-<a class="flex flex-col items-center justify-center text-on-surface-variant scale-110 transition-transform" href="dashboard-advanced-ar.html">
-<span class="material-symbols-outlined">home</span>
-<span class="font-label-md text-label-md">الرئيسية</span>
-</a>
-<a class="flex flex-col items-center justify-center text-secondary font-bold" href="customer-debts-ar.html">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">payments</span>
-<span class="font-label-md text-label-md">المديونيات</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant" href="customer-debts-ar.html">
-<span class="material-symbols-outlined">group</span>
-<span class="font-label-md text-label-md">العملاء</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant" href="index-ar.html">
-<span class="material-symbols-outlined">more_horiz</span>
-<span class="font-label-md text-label-md">المزيد</span>
-</a>
-</nav>
-</div>
-<!-- Micro-interaction Script -->
+
 <script>
-        document.querySelectorAll('tr').forEach(row => {
-            row.addEventListener('click', () => {
-                // In a real app, this would navigate to the client's detailed history
-                const clientName = row.querySelector('.font-bold.text-on-surface').innerText;
-                console.log('Navigating to history for: ' + clientName);
-                
-                // Visual feedback
-                row.classList.add('bg-surface-container-high');
-                setTimeout(() => {
-                    row.classList.remove('bg-surface-container-high');
-                }, 200);
-            });
-        });
-        
-        // FAB Hover effect
-        const fab = document.querySelector('button.fixed.bottom-20');
-        fab.addEventListener('mouseenter', () => {
-            fab.style.boxShadow = '0 8px 30px rgba(116, 90, 37, 0.4)';
-        });
-        fab.addEventListener('mouseleave', () => {
-            fab.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
-        });
-    </script>
+let customers = [];
+let movementsByCustomer = {};
+let currentCustomerId = null;
+
+function fmt(n) {
+  return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+const MOVEMENT_LABELS = { debt_increase: 'فاتورة بيع بالدين', debt_decrease: 'دفعة من العميل' };
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const [{ data: customerRows, error: cErr }, { data: moveRows, error: mErr }] = await Promise.all([
+    goldmindClient.from('customers').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
+    goldmindClient.from('customer_debts').select('*, invoice:invoice_id(invoice_number)').eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false })
+  ]);
+
+  document.getElementById('loading-state').classList.add('hidden');
+
+  if (cErr) {
+    document.getElementById('customers-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${cErr.message}</p>`;
+    document.getElementById('customers-list-view').classList.remove('hidden');
+    return;
+  }
+
+  customers = customerRows || [];
+  movementsByCustomer = {};
+  (moveRows || []).forEach(m => {
+    if (!movementsByCustomer[m.customer_id]) movementsByCustomer[m.customer_id] = [];
+    movementsByCustomer[m.customer_id].push(m);
+  });
+
+  showCustomersList();
+}
+
+function customerBalance(customerId) {
+  const moves = movementsByCustomer[customerId] || [];
+  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? Number(m.cash_amount || 0) : -Number(m.cash_amount || 0)), 0);
+}
+
+function showCustomersList() {
+  currentCustomerId = null;
+  document.getElementById('page-title').textContent = 'ديون العملاء';
+  document.getElementById('customer-detail-view').classList.add('hidden');
+  document.getElementById('customers-list-view').classList.remove('hidden');
+  renderCustomers();
+}
+
+function renderCustomers() {
+  const q = (document.getElementById('customerFilterInput').value || '').trim().toLowerCase();
+  const list = (q ? customers.filter(c => c.name.toLowerCase().includes(q)) : customers)
+    .slice()
+    .sort((a, b) => customerBalance(b.id) - customerBalance(a.id));
+
+  document.getElementById('customers-list').innerHTML = list.map(c => {
+    const bal = customerBalance(c.id);
+    return `
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 cursor-pointer" onclick="showCustomerDetail('${c.id}')">
+        <div class="flex items-center justify-between">
+          <div>
+            <p class="font-bold text-[14px]">${c.name}</p>
+            <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr">${c.phone || ''}</p>
+          </div>
+          <span class="font-bold text-[14px] font-data-mono ${bal > 0 ? 'text-error' : 'text-success'}">${fmt(Math.abs(bal))}</span>
+        </div>
+      </div>`;
+  }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>';
+}
+
+function showCustomerDetail(customerId) {
+  currentCustomerId = customerId;
+  const customer = customers.find(c => c.id === customerId);
+  if (!customer) return;
+
+  document.getElementById('page-title').textContent = customer.name;
+  document.getElementById('customers-list-view').classList.add('hidden');
+  document.getElementById('customer-detail-view').classList.remove('hidden');
+  document.getElementById('settle-form').classList.add('hidden');
+
+  document.getElementById('detail-customer-name').textContent = customer.name;
+  document.getElementById('detail-customer-phone').textContent = customer.phone || '';
+
+  const bal = customerBalance(customerId);
+  const balEl = document.getElementById('detail-balance');
+  balEl.textContent = fmt(Math.abs(bal));
+  balEl.className = 'font-bold text-[18px] font-data-mono ' + (bal > 0 ? 'text-error' : 'text-success');
+
+  const moves = movementsByCustomer[customerId] || [];
+  const listEl = document.getElementById('movements-list');
+  const emptyEl = document.getElementById('empty-movements');
+
+  if (moves.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+
+  listEl.innerHTML = moves.map(m => {
+    const isIncrease = m.movement_type === 'debt_increase';
+    const date = new Date(m.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${MOVEMENT_LABELS[m.movement_type] || m.movement_type}</span>
+          <span class="text-[11px] text-on-surface-variant">${date}</span>
+        </div>
+        <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-error' : 'text-success'}">${isIncrease ? '+' : '-'}${fmt(m.cash_amount)}</p>
+        ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${m.notes}</p>` : ''}
+        ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${m.invoice.invoice_number}</p>` : ''}
+      </div>`;
+  }).join('');
+}
+
+function toggleSettleForm() {
+  document.getElementById('settle-form').classList.toggle('hidden');
+}
+
+async function submitSettlement() {
+  const amount = parseFloat(document.getElementById('settle-amount').value);
+  const notes = document.getElementById('settle-notes').value.trim();
+  const errEl = document.getElementById('settle-error');
+  errEl.classList.add('hidden');
+
+  if (!amount || amount <= 0) {
+    errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('settle-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('customer_debts').insert({
+    store_id: GOLDMIND_STORE_ID,
+    customer_id: currentCustomerId,
+    movement_type: 'debt_decrease',
+    cash_amount: amount,
+    gold_grams_24k: 0,
+    notes: notes || 'دفعة يدوية',
+    created_by: GOLDMIND_STAFF_ID
+  });
+
+  if (!error) {
+    // Payment collected -> also reflect in the daily cash box
+    await goldmindClient.from('cash_movements').insert({
+      store_id: GOLDMIND_STORE_ID,
+      box: 'main',
+      direction: 'in',
+      amount: amount,
+      description: 'تحصيل دين عميل',
+      created_by: GOLDMIND_STAFF_ID
+    });
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ الدفعة';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('settle-amount').value = '';
+  document.getElementById('settle-notes').value = '';
+  document.getElementById('settle-form').classList.add('hidden');
+  const customerIdToReopen = currentCustomerId;
+  await load();
+  showCustomerDetail(customerIdToReopen);
+}
+
+function goBack() {
+  if (currentCustomerId) { showCustomersList(); return; }
+  window.location.href = 'index-ar.html';
+}
+
+load();
+</script>
 <script>
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
