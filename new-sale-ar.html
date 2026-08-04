@@ -189,7 +189,7 @@
 </div>
 </div>
 
-<div class="grid grid-cols-2 gap-3">
+<div class="grid grid-cols-3 gap-3">
 <button class="flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95" id="pay-cash" onclick="selectPayment('cash')">
 <span class="material-symbols-outlined mb-1">payments</span>
 <span class="font-label-md text-label-md">نقدي</span>
@@ -197,6 +197,10 @@
 <button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95" id="pay-bank" onclick="selectPayment('bank')">
 <span class="material-symbols-outlined mb-1">credit_card</span>
 <span class="font-label-md text-label-md">فيزا / بنك</span>
+</button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95" id="pay-credit" onclick="selectPayment('credit')">
+<span class="material-symbols-outlined mb-1">receipt_long</span>
+<span class="font-label-md text-label-md">دين</span>
 </button>
 </div>
 
@@ -245,10 +249,12 @@
         selectedPaymentMethod = mode;
         const cashBtn = document.getElementById('pay-cash');
         const bankBtn = document.getElementById('pay-bank');
+        const creditBtn = document.getElementById('pay-credit');
         const active = 'flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95';
         const inactive = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
         cashBtn.className = mode === 'cash' ? active : inactive;
         bankBtn.className = mode === 'bank' ? active : inactive;
+        creditBtn.className = mode === 'credit' ? active : inactive;
     }
 
     // ---------- Customer search ----------
@@ -507,8 +513,8 @@
                 fabrication_fees: 0,
                 vat_amount: 0,
                 total_amount: total,
-                amount_paid: total,
-                status: 'paid',
+                amount_paid: selectedPaymentMethod === 'credit' ? 0 : total,
+                status: selectedPaymentMethod === 'credit' ? 'unpaid' : 'paid',
                 created_by: GOLDMIND_STAFF_ID
             })
             .select()
@@ -547,6 +553,33 @@
         const pieceIds = cart.filter(item => item.piece).map(item => item.piece.id);
         if (pieceIds.length > 0) {
             await goldmindClient.from('pieces').update({ status: 'sold' }).in('id', pieceIds);
+        }
+
+        // Cash/bank sale -> record as a cash-in movement so the daily cash box reflects it
+        if (selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'bank') {
+            await goldmindClient.from('cash_movements').insert({
+                store_id: GOLDMIND_STORE_ID,
+                box: 'main',
+                direction: 'in',
+                amount: total,
+                description: 'تحصيل فاتورة بيع ' + invoiceNumber,
+                created_by: GOLDMIND_STAFF_ID,
+                invoice_id: invoiceRow.id
+            });
+        }
+
+        // Credit sale -> registers as a customer debt (accounts receivable)
+        if (selectedPaymentMethod === 'credit') {
+            await goldmindClient.from('customer_debts').insert({
+                store_id: GOLDMIND_STORE_ID,
+                customer_id: selectedCustomer.id,
+                invoice_id: invoiceRow.id,
+                movement_type: 'debt_increase',
+                cash_amount: total,
+                gold_grams_24k: 0,
+                notes: 'فاتورة بيع ' + invoiceNumber,
+                created_by: GOLDMIND_STAFF_ID
+            });
         }
 
         showMessage('تم حفظ الفاتورة بنجاح!', false);
