@@ -14,6 +14,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
     html { font-size: 87.5%; }
+    .logo-tilt-wrap { width: 128px; height: 128px; margin: 0 auto 1.5rem; perspective: 700px; position: relative; }
+    .logo-tilt-inner { width: 100%; height: 100%; border-radius: 9999px; overflow: hidden; border: 2px solid rgba(255,215,0,0.3); transform-style: preserve-3d; transition: transform 0.15s ease-out; position: relative; box-shadow: 0 8px 24px rgba(0,0,0,0.45); }
+    .logo-tilt-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+    .logo-tilt-glare { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s ease-out; pointer-events: none; }
     :root { --royal-gold: #FFD700; --deep-navy: #0f172a; }
     body { font-family: 'IBM+Plex+Sans+Arabic', 'Inter', sans-serif; background-color: var(--deep-navy); overflow: hidden; min-height: max(884px, 100dvh); }
     .gold-glow { text-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
@@ -53,37 +57,12 @@
 <main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
 
 <div class="mb-8 text-center">
-<div class="inline-flex items-center justify-center w-32 h-32 rounded-full border-2 border-primary/30 mb-6 bg-surface-container relative">
-<svg width="78" height="78" viewBox="0 0 56 56" fill="none" class="relative z-10">
-<defs>
-<linearGradient id="gemGrad" x1="0" y1="0" x2="56" y2="56" gradientUnits="userSpaceOnUse">
-<stop stop-color="#FFD700"/>
-<stop offset="1" stop-color="#B4955A"/>
-</linearGradient>
-<linearGradient id="cometGradA" x1="0" y1="0" x2="1" y2="1">
-<stop offset="0" stop-color="#FFD700" stop-opacity="0"/>
-<stop offset="0.55" stop-color="#FFD700" stop-opacity="0.85"/>
-<stop offset="1" stop-color="#FFFFFF" stop-opacity="1"/>
-</linearGradient>
-<linearGradient id="cometGradB" x1="1" y1="0" x2="0" y2="1">
-<stop offset="0" stop-color="#FFFFFF" stop-opacity="0"/>
-<stop offset="0.55" stop-color="#FFFFFF" stop-opacity="0.75"/>
-<stop offset="1" stop-color="#FFD700" stop-opacity="1"/>
-</linearGradient>
-</defs>
-<path class="gem-track" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" stroke="url(#gemGrad)" stroke-width="1.5" fill="rgba(255,215,0,0.07)" stroke-linejoin="round" opacity="0.4"/>
-<path class="gem-comet gem-comet-a" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" pathLength="140" stroke="url(#cometGradA)" stroke-width="3.2" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="22 118"/>
-<path class="gem-comet gem-comet-b" d="M28 4 L48 20 L40 50 L16 50 L8 20 Z" pathLength="140" stroke="url(#cometGradB)" stroke-width="2.2" fill="none" stroke-linejoin="round" stroke-linecap="round" stroke-dasharray="14 126"/>
-<path d="M8 20 L48 20" stroke="url(#gemGrad)" stroke-width="1.2" opacity="0.5"/>
-<path d="M18 20 L16 50" stroke="url(#gemGrad)" stroke-width="1" opacity="0.4"/>
-<path d="M38 20 L40 50" stroke="url(#gemGrad)" stroke-width="1" opacity="0.4"/>
-<path d="M28 4 L18 20" stroke="url(#gemGrad)" stroke-width="1" opacity="0.35"/>
-<path d="M28 4 L38 20" stroke="url(#gemGrad)" stroke-width="1" opacity="0.35"/>
-<circle class="gem-node" cx="28" cy="20" r="2.2" fill="#FFD700"/>
-<circle class="gem-node gem-node-2" cx="18" cy="20" r="1.5" fill="#FFD700" opacity="0.8"/>
-<circle class="gem-node gem-node-3" cx="38" cy="20" r="1.5" fill="#FFD700" opacity="0.8"/>
-</svg>
-<div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl"></div>
+<div class="logo-tilt-wrap" id="logoTiltWrap">
+<div class="logo-tilt-inner" id="logoTiltInner">
+<img src="logo-shield.png" alt="GoldMind" class="logo-tilt-img"/>
+<div class="logo-tilt-glare"></div>
+</div>
+<div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl -z-10"></div>
 </div>
 <h1 class="text-4xl font-headline-xl font-bold tracking-tight text-primary mb-2">جولد مايند</h1>
 <div class="inline-flex items-center gap-1.5 admin-badge rounded-full px-4 py-1.5 mt-1">
@@ -417,5 +396,35 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
   });
 }
+</script>
+
+<script>
+(function initLogoTilt() {
+  if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
+  const wrap = document.getElementById('logoTiltWrap');
+  const inner = document.getElementById('logoTiltInner');
+  if (!wrap || !inner) return;
+  const glare = inner.querySelector('.logo-tilt-glare');
+  const maxTilt = 16;
+
+  window.addEventListener('mousemove', function (e) {
+    const dx = (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2);
+    const dy = (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2);
+    const clampedX = Math.max(-1, Math.min(1, dx));
+    const clampedY = Math.max(-1, Math.min(1, dy));
+    const rotateY = clampedX * maxTilt;
+    const rotateX = -clampedY * maxTilt;
+    inner.style.transform = 'rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) scale(1.06)';
+    if (glare) {
+      glare.style.opacity = '0.45';
+      glare.style.background = 'radial-gradient(circle at ' + (50 + clampedX * 30) + '% ' + (50 + clampedY * 30) + '%, rgba(255,255,255,0.4), transparent 60%)';
+    }
+  });
+
+  wrap.addEventListener('mouseleave', function () {
+    inner.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+    if (glare) glare.style.opacity = '0';
+  });
+})();
 </script>
 </body></html>
