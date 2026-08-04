@@ -121,6 +121,10 @@
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-price">سعر الشراء</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-price" placeholder="السعر" step="0.01" type="number"/>
 </div>
+<div class="relative" id="fab-fee-field">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-fabfee">أجرة المصنعية (دين منفصل على التاجر، اختياري)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-fabfee" placeholder="0.00" step="0.01" type="number"/>
+</div>
 <button onclick="addManualToCart()" class="w-full h-12 bg-surface-container-high border border-outline-variant text-primary font-semibold rounded-lg active:scale-95 transition-all flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">add</span> إضافة للفاتورة
 </button>
@@ -229,6 +233,7 @@
         document.getElementById('retail-block').classList.toggle('hidden', type !== 'buyRetail');
         document.getElementById('counterparty-label').textContent = type === 'buyTrader' ? 'معلومات التاجر' : 'معلومات البائع';
         document.getElementById('payment-options').classList.toggle('hidden', type !== 'buyTrader');
+        document.getElementById('fab-fee-field').classList.toggle('hidden', type !== 'buyTrader');
         if (type !== 'buyTrader') selectPayment('cash');
     }
 
@@ -353,12 +358,14 @@
             karat: karat,
             weight: weight,
             price: price,
+            fabFee: parseFloat(document.getElementById('manual-fabfee').value) || 0,
             description: document.getElementById('manual-desc').value.trim() || null
         });
 
         document.getElementById('manual-desc').value = '';
         document.getElementById('manual-weight').value = '';
         document.getElementById('manual-price').value = '';
+        document.getElementById('manual-fabfee').value = '';
         renderCart();
     }
 
@@ -380,7 +387,7 @@
                 <td class="px-3 py-3"><div class="font-body-md">${item.description || '—'}</div></td>
                 <td class="px-2 py-3 text-center">${item.karat}K</td>
                 <td class="px-2 py-3 text-left">${item.weight}</td>
-                <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}</td>
+                <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}${item.fabFee ? `<br><span class="text-[10px] text-outline">+مصنعية ${item.fabFee.toFixed(2)}</span>` : ''}</td>
                 <td class="px-2 py-3 text-left">
                     <button onclick="removeFromCart(${item.cartId})" class="text-error">
                         <span class="material-symbols-outlined text-[18px]">close</span>
@@ -516,7 +523,9 @@
             });
         }
 
-        // Credit purchase from a trader -> increases what we owe that trader
+        // Credit purchase from a trader -> increases what we owe that trader.
+        // Gold weight and fabrication fee are tracked as two separate debts
+        // (24K gold equivalent vs. a plain cash fee amount) in the same row.
         if (selectedPaymentMethod === 'credit' && purchaseType === 'buyTrader') {
             const movementsPayload = cart.map(item => ({
                 store_id: GOLDMIND_STORE_ID,
@@ -526,7 +535,7 @@
                 weight_grams: item.weight,
                 karat: item.karat,
                 gold_24k_equivalent: +(item.weight * (item.karat / 24)).toFixed(3),
-                fab_fee_amount: 0,
+                fab_fee_amount: item.fabFee || 0,
                 notes: item.description || ('فاتورة شراء ' + invoiceNumber)
             }));
             await goldmindClient.from('trader_movements').insert(movementsPayload);
