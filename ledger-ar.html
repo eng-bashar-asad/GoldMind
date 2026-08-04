@@ -34,6 +34,8 @@
 <style>
     html { font-size: 87.5%; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .settle-tab-btn.active { background: #000; color: #fff; }
+    .settle-tab-btn:not(.active) { color: #45464d; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
@@ -68,11 +70,17 @@
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <h2 class="font-bold text-[16px]" id="detail-trader-name"></h2>
 <p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="detail-trader-phone"></p>
-<div class="mt-3 pt-3 border-t border-outline-variant flex justify-between items-center">
-<span class="text-[13px] text-on-surface-variant">الرصيد (بمكافئ عيار ٢٤)</span>
-<span class="font-bold text-[18px] font-data-mono" id="detail-balance">0.00 غ</span>
+<div class="mt-3 pt-3 border-t border-outline-variant flex flex-col gap-2">
+<div class="flex justify-between items-center">
+<span class="text-[13px] text-on-surface-variant">دين الذهب (بمكافئ عيار ٢٤)</span>
+<span class="font-bold text-[16px] font-data-mono" id="detail-gold-balance">0.00 غ</span>
 </div>
-<p class="text-[10px] text-outline mt-1">رصيد موجب = دين علينا للتاجر (استلمنا ذهب منه ولم نسوّه بعد)</p>
+<div class="flex justify-between items-center">
+<span class="text-[13px] text-on-surface-variant">دين المصنعية (نقدي)</span>
+<span class="font-bold text-[16px] font-data-mono" id="detail-fee-balance">0.00 د.إ</span>
+</div>
+</div>
+<p class="text-[10px] text-outline mt-1">قيمة موجبة = دين علينا للتاجر لم يُسوَّ بعد. الذهب والمصنعية دينان منفصلان تماماً.</p>
 </div>
 
 <button onclick="toggleSettleForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
@@ -80,7 +88,11 @@
 </button>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form">
-<div class="grid grid-cols-2 gap-3 mb-3">
+<div class="flex bg-surface-container-low rounded-lg p-1 gap-1 mb-3">
+<button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabGold" onclick="setSettleMode('gold')">تسوية ذهب</button>
+<button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabCash" onclick="setSettleMode('cash')">تسوية نقدية (مصنعية)</button>
+</div>
+<div id="settle-gold-fields" class="grid grid-cols-2 gap-3 mb-3">
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن المُسوّى (غ)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-weight" step="0.01" type="number"/>
@@ -94,6 +106,10 @@
 <option value="24">24</option>
 </select>
 </div>
+</div>
+<div class="hidden mb-3" id="settle-cash-fields">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ المدفوع (د.إ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-cash-amount" step="0.01" type="number"/>
 </div>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="settle-notes" placeholder="ملاحظة (اختياري)"></textarea>
 <button onclick="submitSettlement()" id="settle-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ التسوية</button>
@@ -145,9 +161,14 @@ async function load() {
   showTradersList();
 }
 
-function traderBalance(traderId) {
+function traderGoldBalance(traderId) {
   const moves = movementsByTrader[traderId] || [];
-  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? Number(m.gold_24k_equivalent) : -Number(m.gold_24k_equivalent)), 0);
+  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? Number(m.gold_24k_equivalent || 0) : -Number(m.gold_24k_equivalent || 0)), 0);
+}
+
+function traderFeeBalance(traderId) {
+  const moves = movementsByTrader[traderId] || [];
+  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? Number(m.fab_fee_amount || 0) : -Number(m.fab_fee_amount || 0)), 0);
 }
 
 function showTradersList() {
@@ -163,15 +184,19 @@ function renderTraders() {
   const list = q ? traders.filter(t => t.name.toLowerCase().includes(q)) : traders;
 
   document.getElementById('traders-list').innerHTML = list.map(t => {
-    const bal = traderBalance(t.id);
+    const goldBal = traderGoldBalance(t.id);
+    const feeBal = traderFeeBalance(t.id);
     return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 cursor-pointer" onclick="showTraderDetail('${t.id}')">
-        <div class="flex items-center justify-between">
+        <div class="flex items-center justify-between mb-1">
           <div>
             <p class="font-bold text-[14px]">${t.name}</p>
             <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr">${t.phone || ''}</p>
           </div>
-          <span class="font-bold text-[14px] font-data-mono ${bal > 0 ? 'text-error' : 'text-success'}">${fmt(Math.abs(bal))} غ</span>
+        </div>
+        <div class="flex gap-4 text-[12px] font-data-mono mt-1">
+          <span class="${goldBal > 0 ? 'text-error' : 'text-success'}">ذهب: ${fmt(Math.abs(goldBal))} غ</span>
+          <span class="${feeBal > 0 ? 'text-error' : 'text-success'}">مصنعية: ${fmt(Math.abs(feeBal))} د.إ</span>
         </div>
       </div>`;
   }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد تجار مطابقون. يُضافون تلقائياً عند إنشاء أول فاتورة شراء منهم.</p>';
@@ -190,10 +215,14 @@ function showTraderDetail(traderId) {
   document.getElementById('detail-trader-name').textContent = trader.name;
   document.getElementById('detail-trader-phone').textContent = trader.phone || '';
 
-  const bal = traderBalance(traderId);
-  const balEl = document.getElementById('detail-balance');
-  balEl.textContent = fmt(Math.abs(bal)) + ' غ';
-  balEl.className = 'font-bold text-[18px] font-data-mono ' + (bal > 0 ? 'text-error' : 'text-success');
+  const goldBal = traderGoldBalance(traderId);
+  const feeBal = traderFeeBalance(traderId);
+  const goldEl = document.getElementById('detail-gold-balance');
+  goldEl.textContent = fmt(Math.abs(goldBal)) + ' غ';
+  goldEl.className = 'font-bold text-[16px] font-data-mono ' + (goldBal > 0 ? 'text-error' : 'text-success');
+  const feeEl = document.getElementById('detail-fee-balance');
+  feeEl.textContent = fmt(Math.abs(feeBal)) + ' د.إ';
+  feeEl.className = 'font-bold text-[16px] font-data-mono ' + (feeBal > 0 ? 'text-error' : 'text-success');
 
   const moves = movementsByTrader[traderId] || [];
   const listEl = document.getElementById('movements-list');
@@ -215,7 +244,7 @@ function showTraderDetail(traderId) {
           <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${MOVEMENT_LABELS[m.movement_type] || m.movement_type}</span>
           <span class="text-[11px] text-on-surface-variant">${date}</span>
         </div>
-        <p class="text-[12px] font-data-mono">${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)</p>
+        <p class="text-[12px] font-data-mono">${m.weight_grams ? `${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : ''}${(m.fab_fee_amount && Number(m.fab_fee_amount) > 0) ? ` ${m.weight_grams ? '+' : ''}مصنعية ${fmt(m.fab_fee_amount)} د.إ` : ''}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${m.notes}</p>` : ''}
         ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${m.invoice.invoice_number}</p>` : ''}
       </div>`;
@@ -224,35 +253,66 @@ function showTraderDetail(traderId) {
 
 function toggleSettleForm() {
   document.getElementById('settle-form').classList.toggle('hidden');
+  setSettleMode('gold');
+}
+
+let settleMode = 'gold';
+function setSettleMode(mode) {
+  settleMode = mode;
+  document.getElementById('settleTabGold').classList.toggle('active', mode === 'gold');
+  document.getElementById('settleTabCash').classList.toggle('active', mode === 'cash');
+  document.getElementById('settle-gold-fields').classList.toggle('hidden', mode !== 'gold');
+  document.getElementById('settle-cash-fields').classList.toggle('hidden', mode !== 'cash');
 }
 
 async function submitSettlement() {
-  const weight = parseFloat(document.getElementById('settle-weight').value);
-  const karat = parseInt(document.getElementById('settle-karat').value, 10);
   const notes = document.getElementById('settle-notes').value.trim();
   const errEl = document.getElementById('settle-error');
   errEl.classList.add('hidden');
 
-  if (!weight || weight <= 0) {
-    errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
-    errEl.classList.remove('hidden');
-    return;
+  let movement;
+  if (settleMode === 'gold') {
+    const weight = parseFloat(document.getElementById('settle-weight').value);
+    const karat = parseInt(document.getElementById('settle-karat').value, 10);
+    if (!weight || weight <= 0) {
+      errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    movement = {
+      store_id: GOLDMIND_STORE_ID,
+      trader_id: currentTraderId,
+      movement_type: 'debt_decrease',
+      weight_grams: weight,
+      karat: karat,
+      gold_24k_equivalent: +(weight * (karat / 24)).toFixed(3),
+      fab_fee_amount: 0,
+      notes: notes || 'تسوية ذهب يدوية'
+    };
+  } else {
+    const amount = parseFloat(document.getElementById('settle-cash-amount').value);
+    if (!amount || amount <= 0) {
+      errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    movement = {
+      store_id: GOLDMIND_STORE_ID,
+      trader_id: currentTraderId,
+      movement_type: 'debt_decrease',
+      weight_grams: 0,
+      karat: null,
+      gold_24k_equivalent: 0,
+      fab_fee_amount: amount,
+      notes: notes || 'تسوية مصنعية نقدية'
+    };
   }
 
   const btn = document.getElementById('settle-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.from('trader_movements').insert({
-    store_id: GOLDMIND_STORE_ID,
-    trader_id: currentTraderId,
-    movement_type: 'debt_decrease',
-    weight_grams: weight,
-    karat: karat,
-    gold_24k_equivalent: +(weight * (karat / 24)).toFixed(3),
-    fab_fee_amount: 0,
-    notes: notes || 'تسوية يدوية'
-  });
+  const { error } = await goldmindClient.from('trader_movements').insert(movement);
 
   btn.disabled = false;
   btn.textContent = 'حفظ التسوية';
@@ -264,6 +324,7 @@ async function submitSettlement() {
   }
 
   document.getElementById('settle-weight').value = '';
+  document.getElementById('settle-cash-amount').value = '';
   document.getElementById('settle-notes').value = '';
   document.getElementById('settle-form').classList.add('hidden');
   const traderIdToReopen = currentTraderId;
