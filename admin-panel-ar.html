@@ -154,7 +154,20 @@
 <div id="storeStaffList" class="flex flex-col gap-2 mb-5"></div>
 
 <h4 class="font-semibold text-[13px] mb-2">دعوات معلّقة (<span id="storeInviteCount">0</span>)</h4>
-<div id="storeInviteList" class="flex flex-col gap-2"></div>
+<div id="storeInviteList" class="flex flex-col gap-2 mb-5"></div>
+
+<h4 class="font-semibold text-[13px] mb-2">دعوة عضو جديد</h4>
+<div class="flex flex-col gap-2">
+<input id="inviteMemberEmail" dir="ltr" type="email" placeholder="newuser@example.com" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm"/>
+<div class="flex gap-2">
+<select id="inviteMemberRole" class="flex-1 h-11 border border-outline-variant rounded-lg px-2 text-[13px]">
+<option value="staff">موظف (صلاحيات أساسية — تُضبط لاحقاً من صفحة الصلاحيات)</option>
+<option value="owner">مالك (كل الصلاحيات)</option>
+</select>
+</div>
+<button onclick="sendMemberInvite()" id="inviteMemberBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">إرسال الدعوة</button>
+<p class="text-error text-[12px] hidden" id="inviteMemberError"></p>
+</div>
 </div>
 </div>
 
@@ -359,6 +372,37 @@ async function revokeInvite(inviteId) {
   if (error) { showToast('تعذّر الإلغاء: ' + error.message, true); return; }
   showToast('تم إلغاء الدعوة');
   openStoreDetailModal(currentDetailStoreId);
+}
+
+async function sendMemberInvite() {
+  const email = document.getElementById('inviteMemberEmail').value.trim();
+  const role = document.getElementById('inviteMemberRole').value;
+  const errEl = document.getElementById('inviteMemberError');
+  errEl.classList.add('hidden');
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+  if (!emailPattern.test(email)) { errEl.textContent = 'فضلاً أدخل بريد إلكتروني صحيح'; errEl.classList.remove('hidden'); return; }
+  if (!currentDetailStoreId) return;
+
+  const btn = document.getElementById('inviteMemberBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الإرسال...';
+  const { error } = await goldmindClient.rpc('admin_invite_staff', { target_store_id: currentDetailStoreId, invite_email: email, invite_role: role });
+  btn.disabled = false;
+  btn.textContent = 'إرسال الدعوة';
+
+  if (error) {
+    if (error.message && error.message.includes('ALREADY_INVITED')) errEl.textContent = 'يوجد دعوة معلّقة بالفعل لهذا البريد';
+    else if (error.message && error.message.includes('ALREADY_MEMBER')) errEl.textContent = 'هذا البريد عضو بالشركة أصلاً';
+    else errEl.textContent = 'تعذّر إرسال الدعوة: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  showToast('تم إرسال الدعوة');
+  document.getElementById('inviteMemberEmail').value = '';
+  openStoreDetailModal(currentDetailStoreId);
+  loadStores();
 }
 
 async function loadSupportRequests() {
