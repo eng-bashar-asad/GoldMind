@@ -216,6 +216,34 @@
 </button>
 </div>
 </div>
+<!-- Bilingual Description -->
+<div class="grid grid-cols-1 gap-4">
+<div class="relative">
+<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-ar">الوصف (عربي) / Description (Arabic)</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right" dir="rtl" id="desc-ar" placeholder="مثال: خاتم ذهب مرصّع"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-en">Description (English)</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all" dir="ltr" id="desc-en" placeholder="e.g. Gold ring with stone"/>
+</div>
+</div>
+<!-- Weights -->
+<div class="grid grid-cols-2 gap-4">
+<div class="relative">
+<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="accounting-weight">Accounting Weight (optional)</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold" id="accounting-weight" placeholder="= actual if empty" step="0.01" type="number"/>
+<div class="bg-surface-container-high px-4 h-full flex items-center border-l border-outline-variant text-on-surface-variant font-label-md">g</div>
+</div>
+<p class="text-[10px] text-outline mt-1 px-1">Use if stones reduce the billable gold weight. Profit is calculated on this weight.</p>
+</div>
+<div class="relative">
+<label class="absolute -top-2 left-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="fab-cost">Fabrication Cost / gram</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold" id="fab-cost" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+</div>
 <!-- Status Message -->
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 <!-- Save Button -->
@@ -384,6 +412,10 @@
                 barcode: barcode,
                 photo_url: photoUrl,
                 weight_grams: weight,
+                accounting_weight_grams: parseFloat(document.getElementById('accounting-weight').value) || null,
+                cost_fabrication_per_gram: parseFloat(document.getElementById('fab-cost').value) || null,
+                description_ar: document.getElementById('desc-ar').value.trim() || null,
+                description_en: document.getElementById('desc-en').value.trim() || null,
                 karat: karat,
                 color: selectedColor,
                 status: 'available',
@@ -401,6 +433,10 @@
             showMessage('Piece saved successfully! Barcode: ' + barcode, false);
             document.getElementById('barcode-id').value = '';
             document.getElementById('weight').value = '';
+            document.getElementById('accounting-weight').value = '';
+            document.getElementById('fab-cost').value = '';
+            document.getElementById('desc-ar').value = '';
+            document.getElementById('desc-en').value = '';
             document.getElementById('weight').focus();
             removePhoto();
         });
