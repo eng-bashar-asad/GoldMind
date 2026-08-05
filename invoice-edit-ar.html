@@ -230,6 +230,37 @@ function updateTotal() {
   document.getElementById('newTotal').textContent = fmt(total);
 }
 
+async function postLedgerEntry(invoiceType, paymentMethod, amount, mode, description) {
+  const isTraderInvoice = invoiceType === 'buyTrader' || invoiceType === 'buyRetail';
+  const isAdding = mode === 'add';
+
+  if (paymentMethod === 'cash' || paymentMethod === 'bank') {
+    // Sale: adding money in means direction 'in'; purchase: adding means 'out'.
+    let direction;
+    if (invoiceType === 'sale') direction = isAdding ? 'in' : 'out';
+    else direction = isAdding ? 'out' : 'in';
+
+    await goldmindClient.from('cash_movements').insert({
+      store_id: GOLDMIND_STORE_ID, box: 'main', direction, amount,
+      description, created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id
+    });
+  } else if (paymentMethod === 'credit' && invoiceType === 'sale') {
+    await goldmindClient.from('customer_debts').insert({
+      store_id: GOLDMIND_STORE_ID, customer_id: invoice.customer_id, invoice_id: invoice.id,
+      movement_type: isAdding ? 'debt_increase' : 'debt_decrease',
+      cash_amount: amount, gold_grams_24k: 0,
+      notes: description, created_by: GOLDMIND_STAFF_ID
+    });
+  } else if (paymentMethod === 'credit' && isTraderInvoice) {
+    await goldmindClient.from('trader_movements').insert({
+      store_id: GOLDMIND_STORE_ID, trader_id: invoice.trader_id, invoice_id: invoice.id,
+      movement_type: isAdding ? 'debt_increase' : 'debt_decrease',
+      weight_grams: 0, karat: null, gold_24k_equivalent: 0, fab_fee_amount: amount,
+      notes: description
+    });
+  }
+}
+
 async function saveEdit() {
   const errEl = document.getElementById('save-error');
   const okEl = document.getElementById('save-success');
@@ -317,32 +348,16 @@ async function saveEdit() {
     }
   }
 
-  // Post an adjustment for the money/debt difference, dated today — never
-  // silently rewrite the original movement.
-  if (delta !== 0 && !paymentMethodChanged) {
-    if (invoice.payment_method === 'cash' || invoice.payment_method === 'bank') {
-      await goldmindClient.from('cash_movements').insert({
-        store_id: GOLDMIND_STORE_ID, box: 'main',
-        direction: delta > 0 ? (invoice.type === 'sale' ? 'in' : 'out') : (invoice.type === 'sale' ? 'out' : 'in'),
-        amount: Math.abs(delta),
-        description: 'تسوية تعديل فاتورة ' + invoice.invoice_number,
-        created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id
-      });
-    } else if (invoice.payment_method === 'credit' && invoice.type === 'sale') {
-      await goldmindClient.from('customer_debts').insert({
-        store_id: GOLDMIND_STORE_ID, customer_id: invoice.customer_id, invoice_id: invoice.id,
-        movement_type: delta > 0 ? 'debt_increase' : 'debt_decrease',
-        cash_amount: Math.abs(delta), gold_grams_24k: 0,
-        notes: 'تسوية تعديل فاتورة ' + invoice.invoice_number, created_by: GOLDMIND_STAFF_ID
-      });
-    } else if (invoice.payment_method === 'credit' && isTrader) {
-      await goldmindClient.from('trader_movements').insert({
-        store_id: GOLDMIND_STORE_ID, trader_id: invoice.trader_id, invoice_id: invoice.id,
-        movement_type: delta > 0 ? 'debt_increase' : 'debt_decrease',
-        weight_grams: 0, karat: null, gold_24k_equivalent: 0, fab_fee_amount: Math.abs(delta),
-        notes: 'تسوية تعديل فاتورة ' + invoice.invoice_number
-      });
-    }
+  // Post the money/debt effect as TWO explicit dated entries — a full
+  // removal of the old invoice value, then a full addition of the new
+  // value — instead of one net delta. Never touches the original entry.
+  if (oldTotal > 0) {
+    await postLedgerEntry(invoice.type, invoice.payment_method, oldTotal, 'remove',
+      'حذف قيمة فاتورة ' + invoice.invoice_number + ' (قبل التعديل)');
+  }
+  if (newTotal > 0) {
+    await postLedgerEntry(invoice.type, newPaymentMethod, newTotal, 'add',
+      'إضافة قيمة فاتورة ' + invoice.invoice_number + ' (بعد التعديل)');
   }
 
   okEl.textContent = 'تم حفظ التعديلات بنجاح';
