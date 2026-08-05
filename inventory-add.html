@@ -285,7 +285,12 @@
 </nav>
 <script>
         // Require an active session before allowing use of this page
-        requireGoldMindSession();
+        (async function __enforcePermission() {
+            await requireGoldMindSession();
+            const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+            const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['add_piece'] === true));
+            if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+        })();
 
         // ---------- Photo capture ----------
         let selectedPhotoFile = null;
