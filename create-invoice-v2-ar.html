@@ -427,7 +427,18 @@
         saveBtn.textContent = 'جارِ الحفظ...';
 
         const total = cart.reduce((sum, item) => sum + item.price, 0);
-        const invoiceNumber = 'PINV-' + Date.now();
+
+        const { data: invoiceNumber, error: numError } = await goldmindClient.rpc('next_invoice_number', { target_store_id: GOLDMIND_STORE_ID, prefix: 'PINV' });
+        if (numError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ فاتورة الشراء';
+            showMessage('تعذّر توليد رقم الفاتورة: ' + numError.message, true);
+            return;
+        }
+
+        const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+        const vatRate = Number((storeRow && storeRow.vat_rate) || 0);
+        const vatAmount = total - (total / (1 + vatRate / 100));
 
         // Upload attachment first (if any) so we can attach its URL to the invoice
         let attachmentUrl = null;
@@ -456,7 +467,7 @@
                 counterparty_name: purchaseType === 'buyRetail' ? (document.getElementById('retail-name').value.trim() || null) : null,
                 payment_method: selectedPaymentMethod === 'cash' ? 'cash' : 'credit',
                 fabrication_fees: 0,
-                vat_amount: 0,
+                vat_amount: vatAmount,
                 total_amount: total,
                 amount_paid: selectedPaymentMethod === 'cash' ? total : 0,
                 status: selectedPaymentMethod === 'cash' ? 'paid' : 'unpaid',
