@@ -78,6 +78,15 @@
 <p class="text-success text-[12px] hidden mt-2" id="passwordSuccess"></p>
 </div>
 
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<h2 class="font-bold text-[14px] mb-3">رقم الواتساب لاستلام التقارير</h2>
+<p class="text-[11px] text-outline mb-3">إذا فعّلت هذا الرقم (وكان عندك صلاحية "عرض التقارير")، بيقدر يبعتلك زميلك بالمحل تقرير الحركة اليومية آخر كل يوم بضغطة زر.</p>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none mb-3" dir="ltr" id="whatsappInput" placeholder="971501234567 (بدون + أو أصفار البداية)" type="tel"/>
+<button onclick="saveWhatsapp()" id="whatsappSaveBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ رقم الواتساب</button>
+<p class="text-error text-[12px] hidden mt-2" id="whatsappError"></p>
+<p class="text-success text-[12px] hidden mt-2" id="whatsappSuccess"></p>
+</div>
+
 </div>
 </main>
 
@@ -97,8 +106,47 @@ async function load() {
     document.getElementById('usernameInput').value = profile.username;
   }
 
+  if (typeof GOLDMIND_STAFF_ID !== 'undefined' && GOLDMIND_STAFF_ID) {
+    const { data: staffRow } = await goldmindClient.from('staff').select('whatsapp_phone').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    if (staffRow && staffRow.whatsapp_phone) {
+      document.getElementById('whatsappInput').value = staffRow.whatsapp_phone;
+    }
+  }
+
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
+}
+
+async function saveWhatsapp() {
+  const phone = document.getElementById('whatsappInput').value.trim().replace(/[^0-9]/g, '');
+  const errEl = document.getElementById('whatsappError');
+  const okEl = document.getElementById('whatsappSuccess');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  if (phone && phone.length < 8) {
+    errEl.textContent = 'رقم غير صالح — اكتب الرقم مع رمز الدولة بدون + (مثال: 971501234567)';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('whatsappSaveBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('staff').update({ whatsapp_phone: phone || null }).eq('id', GOLDMIND_STAFF_ID);
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ رقم الواتساب';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  okEl.textContent = 'تم الحفظ بنجاح';
+  okEl.classList.remove('hidden');
 }
 
 function goBack() {
