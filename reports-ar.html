@@ -94,8 +94,9 @@
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
 <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
 <div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined text-on-secondary-container">payments</span></div>
-<p class="text-[12px] text-on-surface-variant mb-1">إجمالي المبيعات</p>
+<p class="text-[12px] text-on-surface-variant mb-1">إجمالي المبيعات (صافي)</p>
 <h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-total-sales">0</h2>
+<p class="text-[10px] text-outline mt-1" id="returns-note"></p>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
 <div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined text-on-secondary-container">trending_up</span></div>
@@ -244,6 +245,13 @@ async function loadReport() {
   const salesInvoices = invoices || [];
   const totalSales = salesInvoices.reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
 
+  const { data: returnInvoices } = await goldmindClient
+    .from('invoices').select('total_amount')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'return')
+    .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString());
+  const totalReturns = (returnInvoices || []).reduce((sum, r) => sum + Number(r.total_amount || 0), 0);
+  const netSales = totalSales - totalReturns;
+
   // Weight sold + rough profit estimate, same methodology as profit-report-ar.html
   let totalWeight = 0, totalProfit = 0;
   if (salesInvoices.length > 0) {
@@ -266,7 +274,11 @@ async function loadReport() {
     });
   }
 
-  document.getElementById('stat-total-sales').textContent = fmt(totalSales);
+  document.getElementById('stat-total-sales').textContent = fmt(netSales);
+  const returnsNoteEl = document.getElementById('returns-note');
+  if (returnsNoteEl) {
+    returnsNoteEl.textContent = totalReturns > 0 ? ('بعد خصم مرتجعات بقيمة ' + fmt(totalReturns)) : '';
+  }
   document.getElementById('stat-net-profit').textContent = fmt(totalProfit);
   document.getElementById('stat-gold-weight').textContent = fmt(totalWeight) + ' جم';
   document.getElementById('invoices-count').textContent = salesInvoices.length;
