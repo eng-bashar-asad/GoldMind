@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>مرتجع مبيعات | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
+          "outline": "#76777d", "success": "#1e7d32"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">مرتجع مبيعات</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية تسجيل مرتجعات.</div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-5">
+
+<p class="text-[11px] text-outline">هذه الشاشة تسجّل إرجاع قطعة بتاريخ اليوم الفعلي وتربطه بالفاتورة الأصلية — الفاتورة الأصلية وتاريخها لا يتغيّران أبداً، كما يقتضي القانون.</p>
+
+<!-- Search original invoice -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-2">رقم الفاتورة الأصلية</label>
+<div class="flex gap-2">
+<input id="searchInput" class="flex-1 h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" placeholder="INV-2026-000123"/>
+<button onclick="searchInvoice()" class="h-11 px-4 bg-primary text-on-primary rounded-lg text-sm font-semibold">بحث</button>
+</div>
+<p class="text-error text-[12px] hidden mt-2" id="search-error"></p>
+</div>
+
+<!-- Original invoice + items -->
+<div class="hidden flex flex-col gap-4" id="invoice-block">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<div class="flex justify-between items-center mb-1">
+<p class="font-bold text-[14px]" id="orig-number"></p>
+<p class="text-[12px] text-on-surface-variant" id="orig-date"></p>
+</div>
+<p class="text-[12px] text-on-surface-variant" id="orig-customer"></p>
+<p class="text-[12px] text-on-surface-variant">طريقة الدفع الأصلية: <span id="orig-payment"></span></p>
+</div>
+
+<h3 class="font-semibold text-[13px]">اختر القطع المرتجعة</h3>
+<div id="items-list" class="flex flex-col gap-2"></div>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-2">طريقة رد المبلغ</label>
+<select id="refundMethod" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3"></select>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-2">سبب الإرجاع</label>
+<textarea id="returnReason" class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm" placeholder="مثال: القطعة لا تناسب المقاس"></textarea>
+</div>
+
+<div class="flex justify-between items-center px-1">
+<span class="text-[13px] font-semibold">إجمالي المرتجع</span>
+<span class="font-bold text-[18px] font-data-mono" id="return-total">0.00</span>
+</div>
+
+<button onclick="submitReturn()" id="submit-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md">تسجيل المرتجع</button>
+<p class="text-error text-[12px] hidden text-center" id="submit-error"></p>
+<p class="text-success text-[12px] hidden text-center" id="submit-success"></p>
+</div>
+
+</div>
+</main>
+
+<script>
+let originalInvoice = null;
+let originalItems = [];
+let selectedItemIds = new Set();
+
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+async function searchInvoice() {
+  const num = document.getElementById('searchInput').value.trim();
+  const errEl = document.getElementById('search-error');
+  errEl.classList.add('hidden');
+  document.getElementById('invoice-block').classList.add('hidden');
+
+  if (!num) { errEl.textContent = 'فضلاً أدخل رقم الفاتورة'; errEl.classList.remove('hidden'); return; }
+
+  const { data: invoice, error } = await goldmindClient
+    .from('invoices').select('*, customer:customer_id(name, phone)')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('invoice_number', num).eq('type', 'sale')
+    .maybeSingle();
+
+  if (error || !invoice) {
+    errEl.textContent = 'لم يتم العثور على فاتورة بيع بهذا الرقم';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (invoice.status === 'cancelled') {
+    errEl.textContent = 'هذه الفاتورة ملغاة أصلاً، لا يمكن تسجيل مرتجع عليها';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  originalInvoice = invoice;
+
+  const { data: items } = await goldmindClient
+    .from('invoice_items').select('*').eq('invoice_id', invoice.id);
+
+  // Exclude items already returned in a previous return invoice
+  const { data: priorReturns } = await goldmindClient
+    .from('invoices').select('id').eq('related_invoice_id', invoice.id).eq('type', 'return');
+  let alreadyReturnedPieceIds = new Set();
+  if (priorReturns && priorReturns.length > 0) {
+    const { data: returnedItems } = await goldmindClient
+      .from('invoice_items').select('piece_id').in('invoice_id', priorReturns.map(r => r.id));
+    alreadyReturnedPieceIds = new Set((returnedItems || []).map(r => r.piece_id));
+  }
+
+  originalItems = (items || []).filter(it => !it.piece_id || !alreadyReturnedPieceIds.has(it.piece_id));
+  selectedItemIds = new Set();
+
+  document.getElementById('orig-number').textContent = invoice.invoice_number;
+  document.getElementById('orig-date').textContent = new Date(invoice.created_at).toLocaleDateString('ar-EG');
+  document.getElementById('orig-customer').textContent = 'العميل: ' + (invoice.customer ? invoice.customer.name : '—');
+  const PAYMENT_LABELS = { cash: 'نقدي', bank: 'فيزا/بنك', credit: 'دين' };
+  document.getElementById('orig-payment').textContent = PAYMENT_LABELS[invoice.payment_method] || invoice.payment_method;
+
+  const refundSelect = document.getElementById('refundMethod');
+  if (invoice.payment_method === 'credit') {
+    refundSelect.innerHTML = '<option value="debt_reduce">تخفيض دين العميل</option><option value="cash">رد نقدي</option>';
+  } else {
+    refundSelect.innerHTML = '<option value="cash">رد نقدي</option><option value="bank">رد لحساب البنك/الفيزا</option>';
+  }
+
+  renderItems();
+  document.getElementById('invoice-block').classList.remove('hidden');
+}
+
+function renderItems() {
+  const listEl = document.getElementById('items-list');
+  if (originalItems.length === 0) {
+    listEl.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-6">كل قطع هذه الفاتورة أُرجعت مسبقاً.</p>';
+    updateTotal();
+    return;
+  }
+  listEl.innerHTML = originalItems.map(it => `
+    <label class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-xl p-3 cursor-pointer">
+      <input type="checkbox" class="w-5 h-5" onchange="toggleItem('${it.id}', this.checked)"/>
+      <div class="flex-1">
+        <p class="text-[13px] font-semibold">${it.description || it.barcode || '—'}</p>
+        <p class="text-[11px] text-on-surface-variant font-data-mono">${it.weight_grams}غ / عيار ${it.karat}</p>
+      </div>
+      <span class="font-data-mono font-bold text-[13px]">${fmt(it.line_total)}</span>
+    </label>`).join('');
+}
+
+function toggleItem(itemId, checked) {
+  if (checked) selectedItemIds.add(itemId); else selectedItemIds.delete(itemId);
+  updateTotal();
+}
+
+function updateTotal() {
+  const total = originalItems.filter(it => selectedItemIds.has(it.id)).reduce((s, it) => s + Number(it.line_total), 0);
+  document.getElementById('return-total').textContent = fmt(total);
+}
+
+async function submitReturn() {
+  const errEl = document.getElementById('submit-error');
+  const okEl = document.getElementById('submit-success');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  if (selectedItemIds.size === 0) {
+    errEl.textContent = 'فضلاً اختر قطعة واحدة على الأقل للإرجاع';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const itemsToReturn = originalItems.filter(it => selectedItemIds.has(it.id));
+  const total = itemsToReturn.reduce((s, it) => s + Number(it.line_total), 0);
+  const refundMethod = document.getElementById('refundMethod').value;
+  const reason = document.getElementById('returnReason').value.trim();
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { data: returnNumber, error: numError } = await goldmindClient.rpc('next_invoice_number', { target_store_id: GOLDMIND_STORE_ID, prefix: 'RET' });
+  if (numError) {
+    btn.disabled = false; btn.textContent = 'تسجيل المرتجع';
+    errEl.textContent = 'تعذّر توليد رقم المرتجع: ' + numError.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const { data: returnInvoice, error: invError } = await goldmindClient
+    .from('invoices').insert({
+      store_id: GOLDMIND_STORE_ID,
+      invoice_number: returnNumber,
+      type: 'return',
+      related_invoice_id: originalInvoice.id,
+      customer_id: originalInvoice.customer_id,
+      payment_method: refundMethod === 'debt_reduce' ? 'credit' : refundMethod,
+      total_amount: total,
+      amount_paid: total,
+      status: 'paid',
+      created_by: GOLDMIND_STAFF_ID
+    }).select().single();
+
+  if (invError) {
+    btn.disabled = false; btn.textContent = 'تسجيل المرتجع';
+    errEl.textContent = 'تعذّر حفظ المرتجع: ' + invError.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const itemsPayload = itemsToReturn.map(it => ({
+    invoice_id: returnInvoice.id,
+    piece_id: it.piece_id,
+    barcode: it.barcode,
+    karat: it.karat,
+    weight_grams: it.weight_grams,
+    accounting_weight_grams: it.accounting_weight_grams,
+    fabrication_fee: 0,
+    line_total: it.line_total,
+    description: it.description,
+    description_en: it.description_en,
+    gold_price_per_gram: it.gold_price_per_gram
+  }));
+  await goldmindClient.from('invoice_items').insert(itemsPayload);
+
+  // Returned pieces go back into available inventory
+  const pieceIds = itemsToReturn.filter(it => it.piece_id).map(it => it.piece_id);
+  if (pieceIds.length > 0) {
+    await goldmindClient.from('pieces').update({ status: 'available' }).in('id', pieceIds);
+  }
+
+  // Money/debt side of the return, dated today (the real event date)
+  if (refundMethod === 'debt_reduce') {
+    await goldmindClient.from('customer_debts').insert({
+      store_id: GOLDMIND_STORE_ID,
+      customer_id: originalInvoice.customer_id,
+      invoice_id: returnInvoice.id,
+      movement_type: 'debt_decrease',
+      cash_amount: total,
+      gold_grams_24k: 0,
+      notes: 'مرتجع ' + returnNumber + ' لفاتورة ' + originalInvoice.invoice_number + (reason ? ' — ' + reason : ''),
+      created_by: GOLDMIND_STAFF_ID
+    });
+  } else {
+    await goldmindClient.from('cash_movements').insert({
+      store_id: GOLDMIND_STORE_ID,
+      box: 'main',
+      direction: 'out',
+      amount: total,
+      description: 'رد مبلغ مرتجع ' + returnNumber + ' لفاتورة ' + originalInvoice.invoice_number + (reason ? ' — ' + reason : ''),
+      created_by: GOLDMIND_STAFF_ID,
+      invoice_id: returnInvoice.id
+    });
+  }
+
+  okEl.textContent = 'تم تسجيل المرتجع بنجاح برقم ' + returnNumber;
+  okEl.classList.remove('hidden');
+  btn.disabled = false;
+  btn.textContent = 'تسجيل المرتجع';
+
+  setTimeout(() => { window.location.href = 'invoice-print-ar.html?id=' + returnInvoice.id; }, 1200);
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canReturn = staffRow && staffRow.permissions && (staffRow.permissions.create_invoice || staffRow.permissions.delete_invoice);
+
+  document.getElementById('loading-state').classList.add('hidden');
+  if (!canReturn) {
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+  document.getElementById('page-content').classList.remove('hidden');
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
