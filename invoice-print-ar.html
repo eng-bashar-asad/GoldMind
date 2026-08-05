@@ -39,10 +39,17 @@
 <span class="material-symbols-outlined">print</span>
                 طباعة
             </button>
+<button class="hidden items-center gap-2 bg-red-50 text-red-700 border border-red-200 px-3 py-2 rounded-lg text-sm font-semibold" id="cancel-invoice-btn" onclick="cancelInvoiceFlow()">
+<span class="material-symbols-outlined">cancel</span>
+                إلغاء الفاتورة
+            </button>
 </div>
 
 <div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
 <div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
+<div class="no-print hidden max-w-md mx-auto mt-3 px-4" id="cancelled-banner">
+<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm text-center font-semibold">هذه الفاتورة ملغاة ولا تُحتسب في أي تقرير</div>
+</div>
 
 <div class="max-w-md mx-auto p-4">
 <div id="invoice-sheet" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-6">
@@ -183,8 +190,20 @@
         // ---- Invoice meta ----
         document.getElementById('inv-number').textContent = invoice.invoice_number || invoice.id;
         document.getElementById('inv-date').textContent = new Date(invoice.created_at).toLocaleDateString('ar-AE');
-        const paymentLabels = { cash: 'نقدي', bank: 'فيزا / بنك' };
+        const paymentLabels = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين' };
         document.getElementById('inv-payment').textContent = paymentLabels[invoice.payment_method] || invoice.payment_method || '';
+
+        if (invoice.status === 'cancelled') {
+            document.getElementById('cancelled-banner').classList.remove('hidden');
+        } else {
+            const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+            if (staffRow && staffRow.permissions && staffRow.permissions.delete_invoice) {
+                const btn = document.getElementById('cancel-invoice-btn');
+                btn.classList.remove('hidden');
+                btn.classList.add('flex');
+                window.__currentInvoiceId = invoiceId;
+            }
+        }
 
         // ---- Customer ----
         document.getElementById('cust-name').textContent = customer ? customer.name : '—';
@@ -230,6 +249,24 @@
     }
 
     loadInvoice();
+
+    async function cancelInvoiceFlow() {
+        if (!confirm('هل أنت متأكد من إلغاء هذه الفاتورة؟ رقمها يضل محفوظ بالسجل بشكل دائم ومعلَّم كملغاة (ما بينحذف نهائياً).')) return;
+        const reason = prompt('سبب الإلغاء (اختياري):') || null;
+
+        const btn = document.getElementById('cancel-invoice-btn');
+        btn.disabled = true;
+
+        const { error } = await goldmindClient.rpc('cancel_invoice', { target_invoice_id: window.__currentInvoiceId, reason });
+
+        btn.disabled = false;
+
+        if (error) {
+            alert('تعذّر إلغاء الفاتورة: ' + error.message);
+            return;
+        }
+        window.location.reload();
+    }
 </script>
 <script>
 if ('serviceWorker' in navigator) {
