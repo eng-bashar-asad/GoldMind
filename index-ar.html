@@ -156,6 +156,12 @@
 </div>
 </header>
 <main class="pt-20 pb-24 px-margin-mobile max-w-md mx-auto">
+<!-- Fiscal year closing reminder (owner only, shown when a past year isn't closed) -->
+<a id="fiscalYearBanner" href="fiscal-year-close-ar.html" class="hidden mb-4 flex items-center gap-3 bg-red-50 border border-error/40 text-error rounded-xl p-3">
+<span class="material-symbols-outlined">event_busy</span>
+<span class="flex-1 text-[13px] font-semibold" id="fiscalYearBannerText"></span>
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</a>
 <!-- Profile/Welcome -->
 <section class="mb-6">
 <h2 class="font-headline-md text-headline-md text-on-surface" id="storeNameEl">محل الفارس للذهب</h2>
@@ -266,6 +272,28 @@
                 document.getElementById('welcomeEl').textContent = staffRow.full_name + ' • ' + roleLabel;
             }
 
+            // Fiscal year closing reminder — owner only, checks for an unclosed past year
+            if (staffRow && staffRow.role === 'owner') {
+                const { data: storeCreated } = await goldmindClient.from('stores').select('created_at').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+                const startYear = storeCreated ? new Date(storeCreated.created_at).getFullYear() : new Date().getFullYear();
+                const currentYear = new Date().getFullYear();
+                if (currentYear > startYear) {
+                    const { data: closures } = await goldmindClient.from('fiscal_year_closures').select('fiscal_year').eq('store_id', GOLDMIND_STORE_ID);
+                    const closedYears = new Set((closures || []).map(c => c.fiscal_year));
+                    const unclosedYears = [];
+                    for (let y = startYear; y < currentYear; y++) if (!closedYears.has(y)) unclosedYears.push(y);
+                    if (unclosedYears.length > 0) {
+                        document.getElementById('fiscalYearBannerText').textContent =
+                            unclosedYears.length === 1
+                                ? 'سنة ' + unclosedYears[0] + ' المالية لسا مو مقفولة — اضغط لإغلاقها'
+                                : unclosedYears.length + ' سنوات مالية لسا مو مقفولة — اضغط للمراجعة';
+                        const banner = document.getElementById('fiscalYearBanner');
+                        banner.classList.remove('hidden');
+                        banner.classList.add('flex');
+                    }
+                }
+            }
+
             // Cash balance (main box) = sum(in) - sum(out)
             const { data: mainMovs } = await goldmindClient
                 .from('cash_movements').select('direction, amount')
@@ -352,6 +380,7 @@
 <a href="gold-price-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">payments</span><span class="font-label-md text-label-md">سعر الذهب</span></a>
 <a href="profit-report-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">trending_up</span><span class="font-label-md text-label-md">تقرير الأرباح</span></a>
 <a href="settings-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">settings</span><span class="font-label-md text-label-md">الإعدادات</span></a>
+<a href="fiscal-year-close-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">event_repeat</span><span class="font-label-md text-label-md">إغلاق السنة المالية</span></a>
 <a href="account-security-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">lock</span><span class="font-label-md text-label-md">الأمان وكلمة المرور</span></a>
 <a href="dashboard-advanced-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">grid_view</span><span class="font-label-md text-label-md">اللوحة المتقدمة (تصميم بديل)</span></a>
 </nav>
