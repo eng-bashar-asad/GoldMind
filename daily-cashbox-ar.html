@@ -69,6 +69,15 @@
 <span class="material-symbols-outlined">add</span> إضافة حركة كاش يدوية
 </button>
 
+<button onclick="toggleReportPanel()" class="w-full h-12 bg-secondary text-on-secondary rounded-xl flex items-center justify-center gap-2 font-semibold">
+<span class="material-symbols-outlined">share</span> إرسال تقرير اليوم عبر واتساب
+</button>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="reportPanel">
+<p class="text-[12px] text-on-surface-variant mb-3" id="reportPanelIntro">جارِ تجهيز التقرير...</p>
+<div id="reportRecipients" class="flex flex-col gap-2"></div>
+</div>
+
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="addForm">
 <div class="flex gap-2 mb-3">
 <button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirInBtn" onclick="setDirection('in')">دخول كاش</button>
@@ -107,6 +116,80 @@ function setDirection(dir) {
 
 function toggleAddForm() {
   document.getElementById('addForm').classList.toggle('hidden');
+}
+
+let reportPanelLoaded = false;
+function toggleReportPanel() {
+  const panel = document.getElementById('reportPanel');
+  panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden') && !reportPanelLoaded) {
+    reportPanelLoaded = true;
+    buildDailyReport();
+  }
+}
+
+async function buildDailyReport() {
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
+  const dateLabel = todayStart.toLocaleDateString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const [{ data: store }, { data: sales }, { data: purchases }, { data: expenses }, { data: cashMoves }] = await Promise.all([
+    goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('invoices').select('total_amount').eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString()),
+    goldmindClient.from('invoices').select('total_amount').eq('store_id', GOLDMIND_STORE_ID).in('type', ['buyTrader', 'buyRetail']).neq('status', 'cancelled').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString()),
+    goldmindClient.from('expense_entries').select('amount').eq('store_id', GOLDMIND_STORE_ID).gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString()),
+    goldmindClient.from('cash_movements').select('direction, amount, currency').eq('store_id', GOLDMIND_STORE_ID).eq('box', 'main').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString())
+  ]);
+
+  const salesCount = (sales || []).length;
+  const salesTotal = (sales || []).reduce((s, i) => s + Number(i.total_amount), 0);
+  const purchasesCount = (purchases || []).length;
+  const purchasesTotal = (purchases || []).reduce((s, i) => s + Number(i.total_amount), 0);
+  const expensesTotal = (expenses || []).reduce((s, e) => s + Number(e.amount), 0);
+
+  const byCurrency = {};
+  (cashMoves || []).forEach(m => {
+    const cur = m.currency || 'AED';
+    if (!byCurrency[cur]) byCurrency[cur] = { in: 0, out: 0 };
+    if (m.direction === 'in') byCurrency[cur].in += Number(m.amount); else byCurrency[cur].out += Number(m.amount);
+  });
+
+  let cashLines = Object.keys(byCurrency).map(cur => {
+    const t = byCurrency[cur];
+    return `${cur}: دخل ${fmt(t.in)} / خرج ${fmt(t.out)} / صافي ${fmt(t.in - t.out)}`;
+  }).join('\n');
+  if (!cashLines) cashLines = 'لا توجد حركات صندوق اليوم';
+
+  const reportText =
+    `*تقرير الحركة اليومية*\n` +
+    `Day ${dateLabel}\n` +
+    `${store ? store.name : ''}\n` +
+    `——————————\n` +
+    `📄 فواتير بيع: ${salesCount} بقيمة ${fmt(salesTotal)}\n` +
+    `📦 فواتير شراء: ${purchasesCount} بقيمة ${fmt(purchasesTotal)}\n` +
+    `🧾 مصاريف اليوم: ${fmt(expensesTotal)}\n` +
+    `——————————\n` +
+    `💰 حركة الصندوق:\n${cashLines}`;
+
+  window.__dailyReportText = reportText;
+  document.getElementById('reportPanelIntro').textContent = 'التقرير جاهز — اختر مين تبعتله:';
+
+  const { data: managers } = await goldmindClient
+    .from('staff').select('id, full_name, whatsapp_phone')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('permissions->>view_reports', 'true')
+    .not('whatsapp_phone', 'is', null);
+
+  const listEl = document.getElementById('reportRecipients');
+  if (!managers || managers.length === 0) {
+    listEl.innerHTML = '<p class="text-[12px] text-on-surface-variant">ما في مدراء فعّلوا رقم واتساب لاستلام التقارير بعد (من صفحة "الأمان وكلمة المرور").</p>';
+    return;
+  }
+
+  listEl.innerHTML = managers.map(m => `
+    <a class="h-11 flex items-center justify-center gap-2 bg-success text-white rounded-lg text-sm font-semibold"
+       href="https://wa.me/${m.whatsapp_phone}?text=${encodeURIComponent(reportText)}" target="_blank" rel="noopener">
+      <span class="material-symbols-outlined text-[18px]">send</span> إرسال لـ ${m.full_name}
+    </a>`).join('');
 }
 
 function setBox(box) {
