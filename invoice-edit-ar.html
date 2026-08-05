@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>تعديل الفاتورة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "#45464d", "secondary": "#745a25", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
+          "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
+          "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
+          "outline": "#76777d", "success": "#1e7d32"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="history.back()" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">تعديل الفاتورة</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm"></div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-5">
+
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 flex items-center justify-between">
+<div>
+<p class="text-[11px] text-on-surface-variant">رقم الفاتورة (ثابت)</p>
+<p class="font-bold font-data-mono" id="lockedNumber"></p>
+</div>
+<div class="text-left">
+<p class="text-[11px] text-on-surface-variant">التاريخ (ثابت)</p>
+<p class="font-bold font-data-mono" id="lockedDate"></p>
+</div>
+<span class="material-symbols-outlined text-outline">lock</span>
+</div>
+
+<p class="text-[11px] text-outline">أي تعديل هون بينسجّل تلقائياً بسجل النشاط، وبيتحدّث الفرق بالمبلغ بالصندوق أو دين العميل/التاجر بتاريخ اليوم — مش بتاريخ الفاتورة الأصلي.</p>
+
+<!-- Counterparty -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="counterpartyBlock">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-2" id="counterpartyLabel"></label>
+<input id="counterpartyInput" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm"/>
+</div>
+
+<!-- Payment method -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-2">طريقة الدفع</label>
+<select id="paymentMethodSelect" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm"></select>
+</div>
+
+<!-- Items -->
+<h3 class="font-semibold text-[13px]">القطع بالفاتورة</h3>
+<div id="items-editor" class="flex flex-col gap-3"></div>
+
+<div class="flex justify-between items-center px-1">
+<span class="text-[13px] font-semibold">الإجمالي الجديد</span>
+<span class="font-bold text-[18px] font-data-mono" id="newTotal">0.00</span>
+</div>
+
+<button onclick="saveEdit()" id="save-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md">حفظ التعديلات</button>
+<p class="text-error text-[12px] hidden text-center" id="save-error"></p>
+<p class="text-success text-[12px] hidden text-center" id="save-success"></p>
+
+</div>
+</main>
+
+<script>
+let invoice = null;
+let items = [];
+
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function renderItems() {
+  document.getElementById('items-editor').innerHTML = items.map((it, idx) => `
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
+      <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2" placeholder="الوصف" value="${(it.description || '').replace(/"/g,'&quot;')}" oninput="items[${idx}].description = this.value"/>
+      <div class="grid grid-cols-3 gap-2">
+        <div>
+          <label class="text-[10px] text-outline">الوزن (غ)</label>
+          <input type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${it.weight_grams}" oninput="items[${idx}].weight_grams = parseFloat(this.value)||0; updateTotal();"/>
+        </div>
+        <div>
+          <label class="text-[10px] text-outline">العيار</label>
+          <select class="w-full h-10 border border-outline-variant rounded-lg px-1 text-[13px]" onchange="items[${idx}].karat = parseInt(this.value)">
+            ${[18,21,22,24].map(k => `<option value="${k}" ${it.karat==k?'selected':''}>${k}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="text-[10px] text-outline">السعر</label>
+          <input type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${it.line_total}" oninput="items[${idx}].line_total = parseFloat(this.value)||0; updateTotal();"/>
+        </div>
+      </div>
+    </div>`).join('');
+  updateTotal();
+}
+
+function updateTotal() {
+  const total = items.reduce((s, it) => s + Number(it.line_total || 0), 0);
+  document.getElementById('newTotal').textContent = fmt(total);
+}
+
+async function saveEdit() {
+  const errEl = document.getElementById('save-error');
+  const okEl = document.getElementById('save-success');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  const newTotal = items.reduce((s, it) => s + Number(it.line_total || 0), 0);
+  const oldTotal = Number(invoice.total_amount);
+  const delta = newTotal - oldTotal;
+  const newPaymentMethod = document.getElementById('paymentMethodSelect').value;
+  const paymentMethodChanged = newPaymentMethod !== invoice.payment_method;
+
+  if (!confirm('هل أنت متأكد من حفظ التعديلات؟ الفرق بالمبلغ (' + fmt(delta) + ') بينسجّل كحركة بتاريخ اليوم.')) return;
+
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const isTrader = invoice.type === 'buyTrader' || invoice.type === 'buyRetail';
+  const counterpartyVal = document.getElementById('counterpartyInput').value.trim();
+
+  const updatePayload = {
+    payment_method: newPaymentMethod,
+    total_amount: newTotal,
+    amount_paid: (newPaymentMethod === 'credit') ? 0 : newTotal
+  };
+  if (invoice.type === 'sale' || invoice.type === 'return') {
+    // customer editing left as-is (rare case) — only re-linkable via cancel+reissue
+  } else if (invoice.type === 'buyRetail') {
+    updatePayload.counterparty_name = counterpartyVal || null;
+  }
+
+  const { error: invUpdateError } = await goldmindClient.from('invoices').update(updatePayload).eq('id', invoice.id);
+  if (invUpdateError) {
+    btn.disabled = false; btn.textContent = 'حفظ التعديلات';
+    errEl.textContent = 'تعذّر حفظ الفاتورة: ' + invUpdateError.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  for (const it of items) {
+    await goldmindClient.from('invoice_items').update({
+      description: it.description,
+      weight_grams: it.weight_grams,
+      karat: it.karat,
+      line_total: it.line_total
+    }).eq('id', it.id);
+  }
+
+  // Post an adjustment for the money/debt difference, dated today — never
+  // silently rewrite the original movement.
+  if (delta !== 0 && !paymentMethodChanged) {
+    if (invoice.payment_method === 'cash' || invoice.payment_method === 'bank') {
+      await goldmindClient.from('cash_movements').insert({
+        store_id: GOLDMIND_STORE_ID, box: 'main',
+        direction: delta > 0 ? (invoice.type === 'sale' ? 'in' : 'out') : (invoice.type === 'sale' ? 'out' : 'in'),
+        amount: Math.abs(delta),
+        description: 'تسوية تعديل فاتورة ' + invoice.invoice_number,
+        created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id
+      });
+    } else if (invoice.payment_method === 'credit' && invoice.type === 'sale') {
+      await goldmindClient.from('customer_debts').insert({
+        store_id: GOLDMIND_STORE_ID, customer_id: invoice.customer_id, invoice_id: invoice.id,
+        movement_type: delta > 0 ? 'debt_increase' : 'debt_decrease',
+        cash_amount: Math.abs(delta), gold_grams_24k: 0,
+        notes: 'تسوية تعديل فاتورة ' + invoice.invoice_number, created_by: GOLDMIND_STAFF_ID
+      });
+    } else if (invoice.payment_method === 'credit' && isTrader) {
+      await goldmindClient.from('trader_movements').insert({
+        store_id: GOLDMIND_STORE_ID, trader_id: invoice.trader_id, invoice_id: invoice.id,
+        movement_type: delta > 0 ? 'debt_increase' : 'debt_decrease',
+        weight_grams: 0, karat: null, gold_24k_equivalent: 0, fab_fee_amount: Math.abs(delta),
+        notes: 'تسوية تعديل فاتورة ' + invoice.invoice_number
+      });
+    }
+  }
+
+  okEl.textContent = 'تم حفظ التعديلات بنجاح';
+  okEl.classList.remove('hidden');
+  btn.disabled = false;
+  btn.textContent = 'حفظ التعديلات';
+  setTimeout(() => { window.location.href = 'invoice-print-ar.html?id=' + invoice.id; }, 1000);
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const params = new URLSearchParams(window.location.search);
+  const invoiceId = params.get('id');
+  const loading = document.getElementById('loading-state');
+  const noAccess = document.getElementById('no-access');
+
+  if (!invoiceId) {
+    loading.classList.add('hidden');
+    noAccess.textContent = 'لم يتم تحديد فاتورة.';
+    noAccess.classList.remove('hidden');
+    return;
+  }
+
+  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canEdit = staffRow && staffRow.permissions && staffRow.permissions.edit_invoice;
+
+  const { data: inv, error: invError } = await goldmindClient.from('invoices').select('*').eq('id', invoiceId).single();
+
+  loading.classList.add('hidden');
+
+  if (!canEdit) {
+    noAccess.textContent = 'ليس لديك صلاحية تعديل الفواتير.';
+    noAccess.classList.remove('hidden');
+    return;
+  }
+  if (invError || !inv) {
+    noAccess.textContent = 'تعذّر تحميل الفاتورة.';
+    noAccess.classList.remove('hidden');
+    return;
+  }
+  if (inv.status === 'cancelled') {
+    noAccess.textContent = 'هذه الفاتورة ملغاة، لا يمكن تعديلها.';
+    noAccess.classList.remove('hidden');
+    return;
+  }
+  if (inv.type === 'return' || inv.type === 'traderPay') {
+    noAccess.textContent = 'هذا النوع من الفواتير غير قابل للتعديل من هنا.';
+    noAccess.classList.remove('hidden');
+    return;
+  }
+
+  invoice = inv;
+
+  const { data: itemRows } = await goldmindClient.from('invoice_items').select('*').eq('invoice_id', invoiceId);
+  items = itemRows || [];
+
+  document.getElementById('lockedNumber').textContent = invoice.invoice_number;
+  document.getElementById('lockedDate').textContent = new Date(invoice.created_at).toLocaleDateString('ar-EG');
+
+  const paySelect = document.getElementById('paymentMethodSelect');
+  if (invoice.type === 'sale') {
+    paySelect.innerHTML = '<option value="cash">نقدي</option><option value="bank">فيزا/بنك</option><option value="credit">دين</option>';
+  } else {
+    paySelect.innerHTML = '<option value="cash">نقدي</option><option value="credit">دين</option>';
+  }
+  paySelect.value = invoice.payment_method;
+
+  const counterpartyBlock = document.getElementById('counterpartyBlock');
+  if (invoice.type === 'buyRetail') {
+    document.getElementById('counterpartyLabel').textContent = 'اسم البائع';
+    document.getElementById('counterpartyInput').value = invoice.counterparty_name || '';
+  } else {
+    counterpartyBlock.classList.add('hidden');
+  }
+
+  renderItems();
+  document.getElementById('page-content').classList.remove('hidden');
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
