@@ -374,6 +374,11 @@ async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
 
+  // Enforce permission (real page-level gate, not just the dashboard icon)
+  const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_reports'] === true));
+  if (!__allowed) { window.__permCheckInserted = true; alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; return; }
+
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
   setPeriod('today');
