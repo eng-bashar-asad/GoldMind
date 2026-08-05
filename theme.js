@@ -79,6 +79,114 @@ const GOLDMIND_THEMES = {
       '--gm-on-surface-variant': '#5a544a',
       '--gm-outline-variant': '#e3dbc9'
     }
+  },
+  'rose-gold': {
+    label: 'الوردي الذهبي',
+    swatch: ['#E8B4B8', '#2b1620', '#3d1f2c'],
+    vars: {
+      '--gm-bg': '#2b1620',
+      '--gm-bg-elevated': '#fdf5f6',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#f7eaeb',
+      '--gm-primary': '#2b1620',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#B76E79',
+      '--gm-on-accent': '#ffffff',
+      '--gm-secondary': '#9c5a63',
+      '--gm-on-surface': '#2b1620',
+      '--gm-on-surface-variant': '#5e4249',
+      '--gm-outline-variant': '#e3cdd1'
+    }
+  },
+  'platinum-silver': {
+    label: 'الفضي البلاتيني',
+    swatch: ['#B9C2CB', '#14181c', '#1e242a'],
+    vars: {
+      '--gm-bg': '#14181c',
+      '--gm-bg-elevated': '#f6f7f8',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#eef0f2',
+      '--gm-primary': '#14181c',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#9FA8B0',
+      '--gm-on-accent': '#14181c',
+      '--gm-secondary': '#5b6670',
+      '--gm-on-surface': '#14181c',
+      '--gm-on-surface-variant': '#454e56',
+      '--gm-outline-variant': '#ccd1d6'
+    }
+  },
+  'emerald': {
+    label: 'الزمردي',
+    swatch: ['#0F9D58', '#0a1f14', '#123321'],
+    vars: {
+      '--gm-bg': '#0a1f14',
+      '--gm-bg-elevated': '#f2f9f4',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#e8f5eb',
+      '--gm-primary': '#0a1f14',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#0F9D58',
+      '--gm-on-accent': '#ffffff',
+      '--gm-secondary': '#1c6b3e',
+      '--gm-on-surface': '#0a1f14',
+      '--gm-on-surface-variant': '#3c5445',
+      '--gm-outline-variant': '#c8dccf'
+    }
+  },
+  'royal-purple': {
+    label: 'الأرجواني الملكي',
+    swatch: ['#8B5CF6', '#1a1024', '#241533'],
+    vars: {
+      '--gm-bg': '#1a1024',
+      '--gm-bg-elevated': '#f7f5fb',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#efeaf8',
+      '--gm-primary': '#1a1024',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#8B5CF6',
+      '--gm-on-accent': '#ffffff',
+      '--gm-secondary': '#6B46C1',
+      '--gm-on-surface': '#1a1024',
+      '--gm-on-surface-variant': '#4d4358',
+      '--gm-outline-variant': '#d9d0e8'
+    }
+  },
+  'sapphire-blue': {
+    label: 'الياقوتي الأزرق',
+    swatch: ['#3B82F6', '#0a1628', '#0f2138'],
+    vars: {
+      '--gm-bg': '#0a1628',
+      '--gm-bg-elevated': '#f3f7fc',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#e9f0fa',
+      '--gm-primary': '#0a1628',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#3B82F6',
+      '--gm-on-accent': '#ffffff',
+      '--gm-secondary': '#B4955A',
+      '--gm-on-surface': '#0a1628',
+      '--gm-on-surface-variant': '#3d4c5e',
+      '--gm-outline-variant': '#c9d6e6'
+    }
+  },
+  'ruby-red': {
+    label: 'الياقوتي الأحمر',
+    swatch: ['#C0392B', '#210a0a', '#2e1010'],
+    vars: {
+      '--gm-bg': '#210a0a',
+      '--gm-bg-elevated': '#fbf3f2',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#f7e6e4',
+      '--gm-primary': '#210a0a',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#C0392B',
+      '--gm-on-accent': '#ffffff',
+      '--gm-secondary': '#B4955A',
+      '--gm-on-surface': '#210a0a',
+      '--gm-on-surface-variant': '#5a3d3a',
+      '--gm-outline-variant': '#e6d0cd'
+    }
   }
 };
 
