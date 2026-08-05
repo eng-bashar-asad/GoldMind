@@ -266,6 +266,20 @@
             return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        function showQuickActionToast(message) {
+            let toast = document.getElementById('quickActionToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'quickActionToast';
+                toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[13px] px-4 py-2 rounded-full shadow-lg z-[100] transition-opacity duration-300';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.style.opacity = '1';
+            clearTimeout(window.__quickActionToastTimer);
+            window.__quickActionToastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2200);
+        }
+
         (async function loadDashboard() {
             const session = await requireGoldMindSession('login-entry-ar.html');
             if (!session) return;
@@ -283,14 +297,21 @@
                 document.getElementById('welcomeEl').textContent = staffRow.full_name + ' • ' + roleLabel;
             }
 
-            // Dim quick-action icons the current staff member doesn't have permission for
+            // Dim quick-action icons the current staff member doesn't have permission
+            // for, and block them from opening entirely (not just visual dimming)
             // (owners always see everything at full color; the daily cash box is
             // intentionally always full-color since it's open to every staff member)
             document.querySelectorAll('.quick-action-icon[data-permission]').forEach(function (el) {
                 const perm = el.dataset.permission;
                 const allowed = staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions[perm] === true));
                 if (!allowed) {
-                    el.classList.add('opacity-40', 'grayscale');
+                    el.classList.add('opacity-40', 'grayscale', 'cursor-not-allowed');
+                    el.removeAttribute('href');
+                    el.addEventListener('click', function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        showQuickActionToast('ليس لديك صلاحية الدخول لهذه الشاشة — راجع مدير الشركة.');
+                    });
                 }
             });
 
