@@ -237,7 +237,7 @@ async function loadReport() {
 
   const { data: invoices } = await goldmindClient
     .from('invoices').select('id, invoice_number, type, payment_method, total_amount, created_at')
-    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
     .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString())
     .order('created_at', { ascending: false });
 
@@ -331,6 +331,7 @@ async function loadReport() {
     .from('invoices').select('vat_amount, type')
     .eq('store_id', GOLDMIND_STORE_ID)
     .in('type', ['buyTrader', 'buyRetail'])
+    .neq('status', 'cancelled')
     .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString());
 
   const totalInputTax = (purchaseInvoices || []).reduce((sum, p) => sum + Number(p.vat_amount || 0), 0);
