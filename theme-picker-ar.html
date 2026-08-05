@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>مظهر التطبيق | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .theme-card { border: 2px solid #e5e7eb; border-radius: 1rem; padding: 1rem; cursor: pointer; transition: all .15s; }
+    .theme-card.active { border-color: var(--gm-accent, #FFD700); box-shadow: 0 0 0 3px rgba(212,175,55,0.15); }
+</style>
+</head>
+<body>
+<header class="border-b border-gray-200 sticky top-0 z-50" style="background: var(--gm-surface-lowest);">
+<div class="flex justify-between items-center px-4 w-full h-16 max-w-md mx-auto">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="text-xl font-bold">مظهر التطبيق</h1>
+</div>
+</div>
+</header>
+<main class="max-w-md mx-auto px-4 py-6">
+
+<p class="text-[12px] mb-5" style="color: var(--gm-on-surface-variant);">اختر الثيم اللي بيعجبك — الألوان كلها مستوحاة من شعار GoldMind نفسه. التغيير بيطبّق فوراً على هاد الجهاز.</p>
+
+<div id="themes-grid" class="flex flex-col gap-3"></div>
+
+<p class="text-[11px] mt-6" style="color: var(--gm-on-surface-variant);">ملاحظة: الثيم حالياً مطبّق بشكل كامل على الصفحة الرئيسية، وبيتوسّع تدريجياً لباقي شاشات التطبيق.</p>
+
+</main>
+<script>
+function renderThemes() {
+  const current = localStorage.getItem('goldmind_theme') || 'royal-gold';
+  const grid = document.getElementById('themes-grid');
+  grid.innerHTML = Object.keys(GOLDMIND_THEMES).map(key => {
+    const t = GOLDMIND_THEMES[key];
+    const isActive = key === current;
+    return `
+      <div class="theme-card ${isActive ? 'active' : ''}" onclick="selectTheme('${key}')" style="background: var(--gm-surface-lowest);">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-3">
+            <div class="flex -space-x-2 rtl:space-x-reverse">
+              ${t.swatch.map(c => `<div class="w-8 h-8 rounded-full border-2 border-white" style="background:${c}"></div>`).join('')}
+            </div>
+            <span class="font-bold text-[15px]">${t.label}</span>
+          </div>
+          ${isActive ? '<span class="material-symbols-outlined" style="color: var(--gm-accent, #FFD700);">check_circle</span>' : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function selectTheme(key) {
+  goldmindApplyTheme(key);
+  renderThemes();
+}
+
+renderThemes();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
