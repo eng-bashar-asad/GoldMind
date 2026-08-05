@@ -85,6 +85,30 @@
 <h3 class="font-semibold text-[13px]">القطع بالفاتورة</h3>
 <div id="items-editor" class="flex flex-col gap-3"></div>
 
+<div class="bg-surface-container-lowest border-2 border-dashed border-outline-variant rounded-xl p-3" id="addItemBlock">
+<div class="flex items-center justify-between mb-2 cursor-pointer" onclick="toggleAddItemForm()">
+<span class="text-[13px] font-semibold text-secondary flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add</span> إضافة قطعة للفاتورة</span>
+</div>
+<div class="hidden flex-col gap-2" id="addItemForm">
+<div class="hidden" id="barcodeSearchRow">
+<div class="flex gap-2">
+<input id="newItemBarcode" class="flex-1 h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" dir="ltr" placeholder="امسح أو اكتب باركود قطعة من المخزون (اختياري)"/>
+<button onclick="lookupPieceByBarcode()" class="h-10 px-3 bg-surface-container-high rounded-lg text-[12px] font-semibold">بحث</button>
+</div>
+<p class="text-[11px] hidden mt-1" id="barcodeLookupMsg"></p>
+</div>
+<input id="newItemDesc" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" placeholder="الوصف"/>
+<div class="grid grid-cols-3 gap-2">
+<input id="newItemWeight" type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" placeholder="الوزن"/>
+<select id="newItemKarat" class="w-full h-10 border border-outline-variant rounded-lg px-1 text-[13px]">
+<option value="18">18</option><option value="21" selected>21</option><option value="22">22</option><option value="24">24</option>
+</select>
+<input id="newItemPrice" type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" placeholder="السعر"/>
+</div>
+<button onclick="addNewItem()" class="w-full h-10 bg-primary text-on-primary rounded-lg text-[13px] font-semibold">إضافة للفاتورة</button>
+</div>
+</div>
+
 <div class="flex justify-between items-center px-1">
 <span class="text-[13px] font-semibold">الإجمالي الجديد</span>
 <span class="font-bold text-[18px] font-data-mono" id="newTotal">0.00</span>
@@ -100,12 +124,19 @@
 <script>
 let invoice = null;
 let items = [];
+let removedItems = [];
+let newlyAddedCount = 0;
+let itemUid = 0;
 
 function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 function renderItems() {
   document.getElementById('items-editor').innerHTML = items.map((it, idx) => `
     <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
+      <div class="flex items-center justify-between mb-2">
+        ${it._new ? '<span class="text-[10px] font-semibold text-secondary bg-secondary/10 px-2 py-0.5 rounded-full">جديدة</span>' : '<span></span>'}
+        <button onclick="removeItem(${idx})" class="text-error"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+      </div>
       <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2" placeholder="الوصف" value="${(it.description || '').replace(/"/g,'&quot;')}" oninput="items[${idx}].description = this.value"/>
       <div class="grid grid-cols-3 gap-2">
         <div>
@@ -123,8 +154,75 @@ function renderItems() {
           <input type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${it.line_total}" oninput="items[${idx}].line_total = parseFloat(this.value)||0; updateTotal();"/>
         </div>
       </div>
-    </div>`).join('');
+    </div>`).join('') || '<p class="text-center text-on-surface-variant text-sm py-4">لا توجد قطع — أضف واحدة بالأسفل.</p>';
   updateTotal();
+}
+
+function removeItem(idx) {
+  const [removed] = items.splice(idx, 1);
+  if (!removed._new) removedItems.push(removed);
+  renderItems();
+}
+
+function toggleAddItemForm() {
+  const form = document.getElementById('addItemForm');
+  form.classList.toggle('hidden');
+  form.classList.toggle('flex');
+  const barcodeRow = document.getElementById('barcodeSearchRow');
+  if (invoice && invoice.type === 'sale') { barcodeRow.classList.remove('hidden'); }
+}
+
+async function lookupPieceByBarcode() {
+  const barcode = document.getElementById('newItemBarcode').value.trim();
+  const msgEl = document.getElementById('barcodeLookupMsg');
+  msgEl.classList.remove('hidden');
+  if (!barcode) { msgEl.textContent = ''; msgEl.classList.add('hidden'); return; }
+
+  const { data, error } = await goldmindClient
+    .from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).eq('barcode', barcode).eq('status', 'available').maybeSingle();
+
+  if (error || !data) {
+    msgEl.textContent = 'لم يتم العثور على قطعة متاحة بهذا الباركود';
+    msgEl.className = 'text-[11px] mt-1 text-error';
+    window.__lookedUpPiece = null;
+    return;
+  }
+  window.__lookedUpPiece = data;
+  document.getElementById('newItemDesc').value = data.description_ar || '';
+  document.getElementById('newItemWeight').value = data.weight_grams;
+  document.getElementById('newItemKarat').value = data.karat;
+  msgEl.textContent = 'تم العثور على القطعة وتعبئة بياناتها';
+  msgEl.className = 'text-[11px] mt-1 text-success';
+}
+
+function addNewItem() {
+  const weight = parseFloat(document.getElementById('newItemWeight').value);
+  const karat = parseInt(document.getElementById('newItemKarat').value, 10);
+  const price = parseFloat(document.getElementById('newItemPrice').value);
+  const desc = document.getElementById('newItemDesc').value.trim();
+
+  if (!weight || weight <= 0 || !price || price <= 0) { alert('فضلاً أدخل وزن وسعر صحيحين'); return; }
+
+  const piece = window.__lookedUpPiece || null;
+  items.push({
+    _uid: ++itemUid,
+    _new: true,
+    piece_id: piece ? piece.id : null,
+    barcode: piece ? piece.barcode : null,
+    karat, weight_grams: weight, accounting_weight_grams: piece ? (piece.accounting_weight_grams || weight) : weight,
+    description: desc || (piece ? piece.description_ar : null),
+    description_en: piece ? piece.description_en : null,
+    line_total: price,
+    gold_price_per_gram: null
+  });
+
+  document.getElementById('newItemBarcode').value = '';
+  document.getElementById('newItemDesc').value = '';
+  document.getElementById('newItemWeight').value = '';
+  document.getElementById('newItemPrice').value = '';
+  window.__lookedUpPiece = null;
+  document.getElementById('barcodeLookupMsg').classList.add('hidden');
+  renderItems();
 }
 
 function updateTotal() {
@@ -164,7 +262,7 @@ async function saveEdit() {
     updatePayload.counterparty_name = counterpartyVal || null;
   }
 
-  const { error: invUpdateError } = await goldmindClient.from('invoices').update(updatePayload).eq('id', invoice.id);
+  const { data: invUpdateData, error: invUpdateError } = await goldmindClient.from('invoices').update(updatePayload).eq('id', invoice.id);
   if (invUpdateError) {
     btn.disabled = false; btn.textContent = 'حفظ التعديلات';
     errEl.textContent = 'تعذّر حفظ الفاتورة: ' + invUpdateError.message;
@@ -172,13 +270,51 @@ async function saveEdit() {
     return;
   }
 
-  for (const it of items) {
+  // Update fields on items that already existed
+  for (const it of items.filter(i => !i._new)) {
     await goldmindClient.from('invoice_items').update({
       description: it.description,
       weight_grams: it.weight_grams,
       karat: it.karat,
       line_total: it.line_total
     }).eq('id', it.id);
+  }
+
+  // Insert brand-new items (create a piece first for purchase invoices so
+  // the added stock actually lands in inventory; sale items reuse a piece
+  // found via barcode lookup, or stay unlinked like a manual sale line)
+  const newItems = items.filter(i => i._new);
+  for (const it of newItems) {
+    let pieceId = it.piece_id;
+    if (!pieceId && isTrader) {
+      const { data: newPiece } = await goldmindClient.from('pieces').insert({
+        store_id: GOLDMIND_STORE_ID,
+        barcode: 'GM-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
+        weight_grams: it.weight_grams, karat: it.karat, description_ar: it.description,
+        status: 'available', created_by: GOLDMIND_STAFF_ID
+      }).select().single();
+      pieceId = newPiece ? newPiece.id : null;
+    } else if (pieceId && invoice.type === 'sale') {
+      await goldmindClient.from('pieces').update({ status: 'sold' }).eq('id', pieceId);
+    }
+
+    await goldmindClient.from('invoice_items').insert({
+      invoice_id: invoice.id, piece_id: pieceId, barcode: it.barcode,
+      karat: it.karat, weight_grams: it.weight_grams, accounting_weight_grams: it.accounting_weight_grams,
+      fabrication_fee: 0, line_total: it.line_total,
+      description: it.description, description_en: it.description_en,
+      gold_price_per_gram: it.gold_price_per_gram
+    });
+  }
+
+  // Release pieces from removed items back to a sane inventory state
+  for (const it of removedItems) {
+    await goldmindClient.from('invoice_items').delete().eq('id', it.id);
+    if (it.piece_id) {
+      await goldmindClient.from('pieces').update({
+        status: invoice.type === 'sale' ? 'available' : 'cancelled'
+      }).eq('id', it.piece_id);
+    }
   }
 
   // Post an adjustment for the money/debt difference, dated today — never
