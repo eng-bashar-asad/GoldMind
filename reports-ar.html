@@ -58,6 +58,13 @@
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-6">
 
+<!-- Invoice number search (searches all invoices, ignores period) -->
+<div class="relative">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input id="invoiceSearchInput" placeholder="ابحث برقم الفاتورة..." class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-surface-container-lowest" onkeydown="if(event.key==='Enter') searchByInvoiceNumber();"/>
+</div>
+<div id="invoiceSearchResult" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4"></div>
+
 <!-- Period tabs -->
 <div class="flex gap-1 p-1 bg-surface-container-low rounded-lg overflow-x-auto">
 <button class="period-tab active px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="today" onclick="setPeriod('today')">اليوم</button>
@@ -128,14 +135,14 @@
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
 <p class="text-[12px] text-on-surface-variant mb-1">ضريبة المدخلات (المشتريات)</p>
-<h2 class="font-headline-lg text-headline-lg font-data-mono text-outline" id="tax-input">غير متتبَّعة بعد</h2>
+<h2 class="font-headline-lg text-headline-lg font-data-mono" id="tax-input">0.00</h2>
 </div>
 <div class="bg-surface-container-lowest border border-secondary bg-secondary-container/20 p-5 rounded-xl">
 <p class="text-[12px] text-on-surface-variant mb-1">صافي الضريبة المستحقة (من المبيعات)</p>
 <h2 class="font-headline-lg text-headline-lg font-data-mono text-secondary" id="tax-net">0</h2>
 </div>
 </div>
-<p class="text-[11px] text-outline mb-4">ضريبة المدخلات (على المشتريات) غير مُتتبَّعة تلقائياً حالياً بالنظام — قيمة الضريبة أدناه محسوبة من مبيعاتك فقط.</p>
+<p class="text-[11px] text-outline mb-4">ضريبة المدخلات محسوبة من فواتير الشراء (من تجار أو أفراد) المسجّلة بهذه الفترة فقط — إذا ما كان عندك فواتير شراء بعد، بتظهر صفر.</p>
 
 <h3 class="font-bold text-[15px] mb-3">تفاصيل معاملات ضريبة القيمة المضافة</h3>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
@@ -153,6 +160,33 @@
 </main>
 
 <script>
+async function searchByInvoiceNumber() {
+  const q = document.getElementById('invoiceSearchInput').value.trim();
+  const resultEl = document.getElementById('invoiceSearchResult');
+  if (!q) { resultEl.classList.add('hidden'); return; }
+
+  const { data, error } = await goldmindClient
+    .from('invoices').select('id, invoice_number, type, payment_method, total_amount, vat_amount, created_at')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .ilike('invoice_number', '%' + q + '%')
+    .order('created_at', { ascending: false })
+    .limit(10);
+
+  resultEl.classList.remove('hidden');
+  if (error) { resultEl.innerHTML = `<p class="text-error text-sm">تعذّر البحث: ${error.message}</p>`; return; }
+  if (!data || data.length === 0) { resultEl.innerHTML = `<p class="text-on-surface-variant text-sm">لا توجد فاتورة برقم "${q}"</p>`; return; }
+
+  const TYPE_LABELS = { sale: 'بيع', buyTrader: 'شراء من تاجر', buyRetail: 'شراء من فرد', traderPay: 'سند دفع تاجر' };
+  resultEl.innerHTML = data.map(i => `
+    <div class="flex items-center justify-between py-2 border-b border-outline-variant last:border-0">
+      <div>
+        <p class="font-data-mono font-bold text-[13px]">${i.invoice_number}</p>
+        <p class="text-[11px] text-on-surface-variant">${TYPE_LABELS[i.type] || i.type} · ${new Date(i.created_at).toLocaleDateString('ar-EG')}</p>
+      </div>
+      <span class="font-data-mono font-bold text-[13px]">${fmt(i.total_amount)}</span>
+    </div>`).join('');
+}
+
 let currentPeriod = 'today';
 let rangeStart = null, rangeEnd = null;
 
@@ -283,7 +317,7 @@ async function loadReport() {
     }).join('');
   }
 
-  // Tax report data (output VAT from sales only — input VAT not tracked yet)
+  // Tax report data (output VAT from sales; input VAT from purchases)
   let totalTax = 0;
   const taxRows = salesInvoices.map(i => {
     const total = Number(i.total_amount || 0);
@@ -293,8 +327,18 @@ async function loadReport() {
     return { i, beforeTax, tax };
   });
 
+  const { data: purchaseInvoices } = await goldmindClient
+    .from('invoices').select('vat_amount, type')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .in('type', ['buyTrader', 'buyRetail'])
+    .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString());
+
+  const totalInputTax = (purchaseInvoices || []).reduce((sum, p) => sum + Number(p.vat_amount || 0), 0);
+
   document.getElementById('tax-output').textContent = fmt(totalTax);
-  document.getElementById('tax-net').textContent = fmt(totalTax);
+  document.getElementById('tax-input').textContent = fmt(totalInputTax);
+  document.getElementById('tax-input').classList.remove('text-outline');
+  document.getElementById('tax-net').textContent = fmt(totalTax - totalInputTax);
 
   const taxTbody = document.getElementById('tax-tbody');
   if (taxRows.length === 0) {
