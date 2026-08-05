@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>الصندوق اليومي | GoldMind</title>
+<title>الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
@@ -21,7 +21,7 @@
           "on-secondary": "#ffffff", "on-surface": "#191c1e", "surface-container-low": "#f2f4f6",
           "on-primary": "#ffffff", "background": "#f7f9fb", "outline-variant": "#c6c6cd",
           "surface-container-lowest": "#ffffff", "surface": "#f7f9fb", "primary": "#000000",
-          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+          "outline": "#76777d", "success": "#1e7d32"
         },
         "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
         "fontSize": {
@@ -34,7 +34,6 @@
 <style>
     html { font-size: 87.5%; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
-    .tab-btn.active { background: #000; color: #fff; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
@@ -45,44 +44,30 @@
 <button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
 <span class="material-symbols-outlined">arrow_forward</span>
 </button>
-<h1 class="font-headline-md text-headline-md font-bold">الصندوق اليومي</h1>
+<h1 class="font-headline-md text-headline-md font-bold">الحركة اليومية</h1>
 </div>
 </div>
 </header>
-<main class="pb-32 max-w-2xl mx-auto px-4">
+<main class="pb-32 max-w-md mx-auto px-4">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
 
-<div class="flex bg-surface-container-low rounded-lg p-1 gap-1">
-<button class="tab-btn active flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabMain" onclick="setBox('main')">الصندوق الرئيسي</button>
-<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabTraders" onclick="setBox('traders')">صندوق التجار</button>
-</div>
+<p class="text-[11px] text-outline">هاد دفتر يدوي بسيط لمتابعة كاش الدرج بس — مش جزء من الحسابات الرسمية (المبيعات/الديون/الضريبة موجودين بمكان تاني). الرصيد بيترحل تلقائياً كل يوم كقيد افتتاحي لليوم يلي بعده.</p>
 
-<div class="grid grid-cols-3 gap-3 text-[11px] font-semibold text-on-surface-variant px-1" id="stats-header">
-<span>دخل اليوم</span><span>خرج اليوم</span><span>صافي اليوم</span>
-</div>
-<div id="stats-by-currency" class="flex flex-col gap-2"></div>
+<div id="balances-by-currency" class="flex flex-col gap-2"></div>
 
 <button onclick="toggleAddForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
-<span class="material-symbols-outlined">add</span> إضافة حركة كاش يدوية
+<span class="material-symbols-outlined">add</span> إضافة عملية اليوم
 </button>
-
-<button onclick="toggleReportPanel()" class="w-full h-12 bg-secondary text-on-secondary rounded-xl flex items-center justify-center gap-2 font-semibold">
-<span class="material-symbols-outlined">share</span> إرسال تقرير اليوم عبر واتساب
-</button>
-
-<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="reportPanel">
-<p class="text-[12px] text-on-surface-variant mb-3" id="reportPanelIntro">جارِ تجهيز التقرير...</p>
-<div id="reportRecipients" class="flex flex-col gap-2"></div>
-</div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="addForm">
 <div class="flex gap-2 mb-3">
 <button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirInBtn" onclick="setDirection('in')">دخول كاش</button>
 <button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirOutBtn" onclick="setDirection('out')">خروج كاش</button>
 </div>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" id="opTypeInput" placeholder="نوع العملية (مثال: بيع، شراء، شراء أثاث مكتب، دين عميل...)"/>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-sm mb-3 font-data-mono" id="amountInput" placeholder="المبلغ" type="number" step="0.01" dir="ltr"/>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" id="currencySelect">
 <option value="AED">درهم إماراتي (AED)</option>
@@ -92,21 +77,32 @@
 <option value="EUR">يورو (EUR)</option>
 <option value="GBP">جنيه إسترليني (GBP)</option>
 </select>
-<textarea class="w-full h-20 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="noteInput" placeholder="السبب / الملاحظة (مثلاً: سحب مصروف كهرباء، إيداع من صاحب المحل...)"></textarea>
-<button onclick="submitMovement()" id="submitMovBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الحركة</button>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="notesInput" placeholder="ملاحظة / وصف إضافي (اختياري)"></textarea>
+<button onclick="submitEntry()" id="submitBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ العملية</button>
 <p class="text-error text-[12px] hidden mt-2" id="addFormError"></p>
 </div>
 
-<h2 class="font-bold text-[14px] mt-2">حركات اليوم</h2>
-<div id="movements-list" class="flex flex-col gap-2"></div>
-<p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات كاش اليوم بعد.</p>
+<button onclick="toggleReportPanel()" class="w-full h-12 bg-secondary text-on-secondary rounded-xl flex items-center justify-center gap-2 font-semibold">
+<span class="material-symbols-outlined">share</span> إرسال جدول اليوم عبر واتساب
+</button>
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="reportPanel">
+<p class="text-[12px] text-on-surface-variant mb-3" id="reportPanelIntro">جارِ تجهيز الجدول...</p>
+<div id="reportRecipients" class="flex flex-col gap-2"></div>
+</div>
+
+<h2 class="font-semibold text-[13px] mt-2">عمليات اليوم</h2>
+<div id="entries-list" class="flex flex-col gap-2"></div>
+<p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد عمليات مسجّلة اليوم بعد.</p>
 
 </div>
 </main>
 
 <script>
-let currentBox = 'main';
 let currentDirection = 'in';
+let allEntries = []; // every entry ever (for computing running balance)
+let todayEntries = [];
+
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 function setDirection(dir) {
   currentDirection = dir;
@@ -116,6 +112,116 @@ function setDirection(dir) {
 
 function toggleAddForm() {
   document.getElementById('addForm').classList.toggle('hidden');
+}
+
+async function submitEntry() {
+  const opType = document.getElementById('opTypeInput').value.trim();
+  const amount = parseFloat(document.getElementById('amountInput').value);
+  const currency = document.getElementById('currencySelect').value;
+  const notes = document.getElementById('notesInput').value.trim();
+  const errEl = document.getElementById('addFormError');
+  errEl.classList.add('hidden');
+
+  if (!opType) { errEl.textContent = 'فضلاً اكتب نوع العملية'; errEl.classList.remove('hidden'); return; }
+  if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('daily_cash_log').insert({
+    store_id: GOLDMIND_STORE_ID,
+    operation_type: opType,
+    direction: currentDirection,
+    amount: amount,
+    currency: currency,
+    notes: notes || null,
+    created_by: GOLDMIND_STAFF_ID
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ العملية';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('opTypeInput').value = '';
+  document.getElementById('amountInput').value = '';
+  document.getElementById('notesInput').value = '';
+  document.getElementById('addForm').classList.add('hidden');
+  reportPanelLoaded = false;
+  document.getElementById('reportPanel').classList.add('hidden');
+  await loadAll();
+}
+
+async function loadAll() {
+  const { data, error } = await goldmindClient
+    .from('daily_cash_log')
+    .select('*, staff:created_by(full_name)')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    document.getElementById('entries-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
+    return;
+  }
+
+  allEntries = data || [];
+
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  todayEntries = allEntries.filter(e => new Date(e.created_at) >= todayStart);
+  const priorEntries = allEntries.filter(e => new Date(e.created_at) < todayStart);
+
+  // Running balance per currency: opening (everything before today) + today = closing
+  const currencies = [...new Set(allEntries.map(e => e.currency))];
+  const balancesEl = document.getElementById('balances-by-currency');
+
+  if (currencies.length === 0) {
+    balancesEl.innerHTML = '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-center text-on-surface-variant text-sm">لا يوجد رصيد مسجّل بعد.</div>';
+  } else {
+    balancesEl.innerHTML = currencies.map(cur => {
+      const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+      const todayNet = todayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+      const closing = opening + todayNet;
+      return `
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+          <div class="text-[11px] font-bold text-secondary mb-2">${cur}</div>
+          <div class="grid grid-cols-3 gap-2 text-center">
+            <div><p class="text-[10px] text-on-surface-variant">افتتاحي اليوم</p><p class="font-bold text-[14px] font-data-mono">${fmt(opening)}</p></div>
+            <div><p class="text-[10px] text-on-surface-variant">صافي اليوم</p><p class="font-bold text-[14px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</p></div>
+            <div><p class="text-[10px] text-on-surface-variant">الرصيد الحالي</p><p class="font-bold text-[15px] font-data-mono">${fmt(closing)}</p></div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  const listEl = document.getElementById('entries-list');
+  const emptyEl = document.getElementById('empty-state');
+  if (todayEntries.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+  } else {
+    emptyEl.classList.add('hidden');
+    listEl.innerHTML = todayEntries.slice().reverse().map(e => {
+      const isIn = e.direction === 'in';
+      const time = new Date(e.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+      return `
+        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+          <div class="flex items-center justify-between mb-1">
+            <span class="font-bold text-[14px]">${e.operation_type}</span>
+            <span class="text-[11px] text-on-surface-variant">${time}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-[15px] font-data-mono ${isIn ? 'text-success' : 'text-error'}">${isIn ? '+' : '-'}${fmt(e.amount)} ${e.currency}</span>
+            <span class="text-[11px] text-on-surface-variant">${(e.staff && e.staff.full_name) || ''}</span>
+          </div>
+          ${e.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${e.notes}</p>` : ''}
+        </div>`;
+    }).join('');
+  }
 }
 
 let reportPanelLoaded = false;
@@ -130,49 +236,32 @@ function toggleReportPanel() {
 
 async function buildDailyReport() {
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const todayEnd = new Date(); todayEnd.setHours(23, 59, 59, 999);
   const dateLabel = todayStart.toLocaleDateString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-  const [{ data: store }, { data: sales }, { data: purchases }, { data: expenses }, { data: cashMoves }] = await Promise.all([
-    goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
-    goldmindClient.from('invoices').select('total_amount').eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString()),
-    goldmindClient.from('invoices').select('total_amount').eq('store_id', GOLDMIND_STORE_ID).in('type', ['buyTrader', 'buyRetail']).neq('status', 'cancelled').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString()),
-    goldmindClient.from('expense_entries').select('amount').eq('store_id', GOLDMIND_STORE_ID).gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString()),
-    goldmindClient.from('cash_movements').select('direction, amount, currency').eq('store_id', GOLDMIND_STORE_ID).eq('box', 'main').gte('created_at', todayStart.toISOString()).lte('created_at', todayEnd.toISOString())
-  ]);
+  const { data: store } = await goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
 
-  const salesCount = (sales || []).length;
-  const salesTotal = (sales || []).reduce((s, i) => s + Number(i.total_amount), 0);
-  const purchasesCount = (purchases || []).length;
-  const purchasesTotal = (purchases || []).reduce((s, i) => s + Number(i.total_amount), 0);
-  const expensesTotal = (expenses || []).reduce((s, e) => s + Number(e.amount), 0);
-
-  const byCurrency = {};
-  (cashMoves || []).forEach(m => {
-    const cur = m.currency || 'AED';
-    if (!byCurrency[cur]) byCurrency[cur] = { in: 0, out: 0 };
-    if (m.direction === 'in') byCurrency[cur].in += Number(m.amount); else byCurrency[cur].out += Number(m.amount);
-  });
-
-  let cashLines = Object.keys(byCurrency).map(cur => {
-    const t = byCurrency[cur];
-    return `${cur}: دخل ${fmt(t.in)} / خرج ${fmt(t.out)} / صافي ${fmt(t.in - t.out)}`;
+  let lines = todayEntries.map(e => {
+    const isIn = e.direction === 'in';
+    return `${isIn ? '➕' : '➖'} ${e.operation_type}: ${fmt(e.amount)} ${e.currency}${e.notes ? ' — ' + e.notes : ''}`;
   }).join('\n');
-  if (!cashLines) cashLines = 'لا توجد حركات صندوق اليوم';
+  if (!lines) lines = 'لا توجد عمليات اليوم';
+
+  const currencies = [...new Set(allEntries.map(e => e.currency))];
+  const balanceLines = currencies.map(cur => {
+    const total = allEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+    return `${cur}: ${fmt(total)}`;
+  }).join('\n') || 'لا يوجد رصيد';
 
   const reportText =
-    `*تقرير الحركة اليومية*\n` +
+    `*جدول الحركة اليومية*\n` +
     `Day ${dateLabel}\n` +
     `${store ? store.name : ''}\n` +
     `——————————\n` +
-    `📄 فواتير بيع: ${salesCount} بقيمة ${fmt(salesTotal)}\n` +
-    `📦 فواتير شراء: ${purchasesCount} بقيمة ${fmt(purchasesTotal)}\n` +
-    `🧾 مصاريف اليوم: ${fmt(expensesTotal)}\n` +
+    `${lines}\n` +
     `——————————\n` +
-    `💰 حركة الصندوق:\n${cashLines}`;
+    `💰 الرصيد الحالي بالدرج:\n${balanceLines}`;
 
-  window.__dailyReportText = reportText;
-  document.getElementById('reportPanelIntro').textContent = 'التقرير جاهز — اختر مين تبعتله:';
+  document.getElementById('reportPanelIntro').textContent = 'الجدول جاهز — اختر مين تبعتله:';
 
   const { data: managers } = await goldmindClient
     .from('staff').select('id, full_name, whatsapp_phone')
@@ -192,158 +281,14 @@ async function buildDailyReport() {
     </a>`).join('');
 }
 
-function setBox(box) {
-  currentBox = box;
-  document.getElementById('tabMain').classList.toggle('active', box === 'main');
-  document.getElementById('tabTraders').classList.toggle('active', box === 'traders');
-  loadToday();
-}
-
-function fmt(n) {
-  return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-}
-
-async function submitMovement() {
-  const amount = parseFloat(document.getElementById('amountInput').value);
-  const note = document.getElementById('noteInput').value.trim();
-  const errEl = document.getElementById('addFormError');
-  errEl.classList.add('hidden');
-
-  if (!amount || amount <= 0) {
-    errEl.textContent = 'فضلاً أدخل مبلغ صحيح';
-    errEl.classList.remove('hidden');
-    return;
-  }
-  if (!note) {
-    errEl.textContent = 'فضلاً اكتب سبب/ملاحظة للحركة';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  const btn = document.getElementById('submitMovBtn');
-  btn.disabled = true;
-  btn.textContent = 'جارِ الحفظ...';
-
-  const { error } = await goldmindClient.from('cash_movements').insert({
-    store_id: GOLDMIND_STORE_ID,
-    box: currentBox,
-    direction: currentDirection,
-    amount: amount,
-    currency: document.getElementById('currencySelect').value,
-    description: note,
-    created_by: GOLDMIND_STAFF_ID
-  });
-
-  btn.disabled = false;
-  btn.textContent = 'حفظ الحركة';
-
-  if (error) {
-    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  document.getElementById('amountInput').value = '';
-  document.getElementById('noteInput').value = '';
-  document.getElementById('addForm').classList.add('hidden');
-  loadToday();
-}
-
-async function loadToday() {
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-
-  const { data, error } = await goldmindClient
-    .from('cash_movements')
-    .select('id, direction, amount, currency, description, created_at, invoice_id, staff:created_by(full_name)')
-    .eq('store_id', GOLDMIND_STORE_ID)
-    .eq('box', currentBox)
-    .gte('created_at', todayStart.toISOString())
-    .order('created_at', { ascending: false });
-
-  if (error) {
-    document.getElementById('movements-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
-    return;
-  }
-
-  const entries = data || [];
-
-  // Totals grouped per currency — each currency's balance is fully independent.
-  const totalsByCurrency = {};
-  entries.forEach(m => {
-    const cur = m.currency || 'AED';
-    if (!totalsByCurrency[cur]) totalsByCurrency[cur] = { in: 0, out: 0 };
-    if (m.direction === 'in') totalsByCurrency[cur].in += Number(m.amount);
-    else totalsByCurrency[cur].out += Number(m.amount);
-  });
-
-  const statsEl = document.getElementById('stats-by-currency');
-  const currencies = Object.keys(totalsByCurrency);
-  if (currencies.length === 0) {
-    statsEl.innerHTML = `
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 grid grid-cols-3 gap-3 text-center">
-        <div class="font-bold text-[16px] text-success">0.00</div>
-        <div class="font-bold text-[16px] text-error">0.00</div>
-        <div class="font-bold text-[16px]">0.00</div>
-      </div>`;
-  } else {
-    statsEl.innerHTML = currencies.map(cur => {
-      const t = totalsByCurrency[cur];
-      const net = t.in - t.out;
-      return `
-        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
-          <div class="text-[11px] font-bold text-secondary mb-1">${cur}</div>
-          <div class="grid grid-cols-3 gap-3 text-center">
-            <div class="font-bold text-[16px] text-success">${fmt(t.in)}</div>
-            <div class="font-bold text-[16px] text-error">${fmt(t.out)}</div>
-            <div class="font-bold text-[16px] ${net >= 0 ? 'text-success' : 'text-error'}">${fmt(net)}</div>
-          </div>
-        </div>`;
-    }).join('');
-  }
-
-  const listEl = document.getElementById('movements-list');
-  const emptyEl = document.getElementById('empty-state');
-
-  if (entries.length === 0) {
-    listEl.innerHTML = '';
-    emptyEl.classList.remove('hidden');
-    return;
-  }
-  emptyEl.classList.add('hidden');
-
-  listEl.innerHTML = entries.map(m => {
-    const isIn = m.direction === 'in';
-    const time = new Date(m.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
-    const staffName = (m.staff && m.staff.full_name) || 'غير معروف';
-    return `
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-        <div class="flex items-center justify-between mb-1">
-          <div class="flex items-center gap-2">
-            <span class="material-symbols-outlined ${isIn ? 'text-success' : 'text-error'} text-[20px]">${isIn ? 'arrow_downward' : 'arrow_upward'}</span>
-            <span class="font-bold text-[15px] ${isIn ? 'text-success' : 'text-error'}">${isIn ? '+' : '-'}${fmt(m.amount)} <span class="text-[11px] text-on-surface-variant font-normal">${m.currency || 'AED'}</span></span>
-          </div>
-          <span class="text-[11px] text-on-surface-variant">${time}</span>
-        </div>
-        <p class="text-[13px] text-on-surface mb-1">${m.description || '—'}</p>
-        <p class="text-[11px] text-on-surface-variant">بواسطة: ${staffName}${m.invoice_id ? ' · مرتبطة بفاتورة' : ' · إدخال يدوي'}</p>
-      </div>`;
-  }).join('');
-}
-
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
 
-  const { data: storeRow } = await goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-  if (storeRow && storeRow.currency) {
-    const sel = document.getElementById('currencySelect');
-    if ([...sel.options].some(o => o.value === storeRow.currency)) sel.value = storeRow.currency;
-  }
-
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
   setDirection('in');
-  await loadToday();
+  await loadAll();
 }
 
 load();
