@@ -118,7 +118,7 @@ async function load() {
 
   const { data: invoices } = await goldmindClient
     .from('invoices').select('id, invoice_number, created_at')
-    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
     .order('created_at', { ascending: false }).limit(100);
 
   const invoiceMap = {};
