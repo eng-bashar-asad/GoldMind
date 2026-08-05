@@ -13,7 +13,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#FFD700', '#0f232a', '#1e333b'],
     vars: {
       '--gm-bg': '#0f172a',
-      '--gm-bg-elevated': '#f3f5f9',
+      '--gm-bg-elevated': '#0f172a',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#eaeef5',
       '--gm-primary': '#000000',
@@ -31,7 +31,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#C9A227', '#0d2b30', '#153a40'],
     vars: {
       '--gm-bg': '#0d2b30',
-      '--gm-bg-elevated': '#e9f4f3',
+      '--gm-bg-elevated': '#0d2b30',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#dcefed',
       '--gm-primary': '#0d2b30',
@@ -49,7 +49,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#00E0EF', '#0a1420', '#132030'],
     vars: {
       '--gm-bg': '#0a1420',
-      '--gm-bg-elevated': '#e7f3f5',
+      '--gm-bg-elevated': '#0a1420',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#daedf0',
       '--gm-primary': '#0a1420',
@@ -67,7 +67,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#C9A227', '#faf7f0', '#ffffff'],
     vars: {
       '--gm-bg': '#1c1710',
-      '--gm-bg-elevated': '#f6efdf',
+      '--gm-bg-elevated': '#1c1710',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#f0e5cb',
       '--gm-primary': '#191c1e',
@@ -85,7 +85,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#E8B4B8', '#2b1620', '#3d1f2c'],
     vars: {
       '--gm-bg': '#2b1620',
-      '--gm-bg-elevated': '#f9ebec',
+      '--gm-bg-elevated': '#2b1620',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#f4dfe1',
       '--gm-primary': '#2b1620',
@@ -103,7 +103,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#B9C2CB', '#14181c', '#1e242a'],
     vars: {
       '--gm-bg': '#14181c',
-      '--gm-bg-elevated': '#eaedf0',
+      '--gm-bg-elevated': '#14181c',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#dfe3e7',
       '--gm-primary': '#14181c',
@@ -121,7 +121,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#0F9D58', '#0a1f14', '#123321'],
     vars: {
       '--gm-bg': '#0a1f14',
-      '--gm-bg-elevated': '#e4f3e8',
+      '--gm-bg-elevated': '#0a1f14',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#d6ecdc',
       '--gm-primary': '#0a1f14',
@@ -139,7 +139,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#8B5CF6', '#1a1024', '#241533'],
     vars: {
       '--gm-bg': '#1a1024',
-      '--gm-bg-elevated': '#f0ebf9',
+      '--gm-bg-elevated': '#1a1024',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#e6ddf4',
       '--gm-primary': '#1a1024',
