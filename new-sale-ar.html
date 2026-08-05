@@ -492,7 +492,13 @@
 
         const { data: { session } } = await goldmindClient.auth.getSession();
         const total = cart.reduce((sum, item) => sum + item.price, 0);
-        const invoiceNumber = 'INV-' + Date.now();
+        const { data: invoiceNumber, error: numError } = await goldmindClient.rpc('next_invoice_number', { target_store_id: GOLDMIND_STORE_ID, prefix: 'INV' });
+        if (numError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ الفاتورة';
+            showMessage('تعذّر توليد رقم الفاتورة: ' + numError.message, true);
+            return;
+        }
 
         // Snapshot today's gold price per karat so profit reports stay
         // accurate to the market price at the moment of THIS sale, not
