@@ -152,42 +152,6 @@ const GOLDMIND_THEMES = {
       '--gm-outline-variant': '#d9d0e8'
     }
   },
-  'sapphire-blue': {
-    label: 'الياقوتي الأزرق',
-    swatch: ['#3B82F6', '#0a1628', '#0f2138'],
-    vars: {
-      '--gm-bg': '#0a1628',
-      '--gm-bg-elevated': '#f3f7fc',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#e9f0fa',
-      '--gm-primary': '#0a1628',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#3B82F6',
-      '--gm-on-accent': '#ffffff',
-      '--gm-secondary': '#B4955A',
-      '--gm-on-surface': '#0a1628',
-      '--gm-on-surface-variant': '#3d4c5e',
-      '--gm-outline-variant': '#c9d6e6'
-    }
-  },
-  'ruby-red': {
-    label: 'الياقوتي الأحمر',
-    swatch: ['#C0392B', '#210a0a', '#2e1010'],
-    vars: {
-      '--gm-bg': '#210a0a',
-      '--gm-bg-elevated': '#fbf3f2',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#f7e6e4',
-      '--gm-primary': '#210a0a',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#C0392B',
-      '--gm-on-accent': '#ffffff',
-      '--gm-secondary': '#B4955A',
-      '--gm-on-surface': '#210a0a',
-      '--gm-on-surface-variant': '#5a3d3a',
-      '--gm-outline-variant': '#e6d0cd'
-    }
-  }
 };
 
 function goldmindApplyTheme(name) {
