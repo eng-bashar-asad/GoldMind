@@ -2,6 +2,10 @@
 // Each theme sets CSS custom properties on :root. Pages whose Tailwind
 // config colors reference these variables (e.g. "primary": "var(--gm-primary)")
 // update live when the theme changes — no rebuild/reload needed.
+//
+// --gm-bg          = dark hero tone (used only by index-ar.html's body)
+// --gm-bg-elevated = light page background (used by all other pages' body)
+// --gm-surface-*   = white/near-white card surfaces, same across all pages
 
 const GOLDMIND_THEMES = {
   'royal-gold': {
@@ -9,7 +13,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#FFD700', '#0f232a', '#1e333b'],
     vars: {
       '--gm-bg': '#0f172a',
-      '--gm-bg-elevated': '#1e293b',
+      '--gm-bg-elevated': '#f7f9fb',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#f2f4f6',
       '--gm-primary': '#000000',
@@ -27,7 +31,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#C9A227', '#0d2b30', '#153a40'],
     vars: {
       '--gm-bg': '#0d2b30',
-      '--gm-bg-elevated': '#153a40',
+      '--gm-bg-elevated': '#f3f8f8',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#eef5f5',
       '--gm-primary': '#0d2b30',
@@ -45,7 +49,7 @@ const GOLDMIND_THEMES = {
     swatch: ['#00E0EF', '#0a1420', '#132030'],
     vars: {
       '--gm-bg': '#0a1420',
-      '--gm-bg-elevated': '#132030',
+      '--gm-bg-elevated': '#f2f8f9',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#eef6f8',
       '--gm-primary': '#0a1420',
@@ -62,8 +66,8 @@ const GOLDMIND_THEMES = {
     label: 'الفاتح الذهبي',
     swatch: ['#C9A227', '#faf7f0', '#ffffff'],
     vars: {
-      '--gm-bg': '#faf7f0',
-      '--gm-bg-elevated': '#ffffff',
+      '--gm-bg': '#1c1710',
+      '--gm-bg-elevated': '#faf7f0',
       '--gm-surface-lowest': '#ffffff',
       '--gm-surface-low': '#f2ede1',
       '--gm-primary': '#191c1e',
