@@ -61,6 +61,21 @@
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
 <input id="traderFilterInput" oninput="renderTraders()" placeholder="ابحث باسم التاجر..." class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-surface-container-lowest"/>
 </div>
+
+<button onclick="toggleAddTraderForm()" class="w-full h-11 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 mb-4">
+<span class="material-symbols-outlined">person_add</span> إضافة تاجر جديد
+</button>
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4" id="addTraderForm">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم التاجر</label>
+<input id="newTraderName" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3"/>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">رقم الهاتف (اختياري)</label>
+<input id="newTraderPhone" dir="ltr" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3"/>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">ملاحظات (اختياري)</label>
+<textarea id="newTraderNotes" class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3"></textarea>
+<button onclick="submitNewTrader()" id="newTraderBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ التاجر</button>
+<p class="text-error text-[12px] hidden mt-2" id="newTraderError"></p>
+</div>
+
 <div id="traders-list" class="flex flex-col gap-3"></div>
 </div>
 
@@ -178,6 +193,50 @@ function showTradersList() {
   document.getElementById('trader-detail-view').classList.add('hidden');
   document.getElementById('traders-list-view').classList.remove('hidden');
   renderTraders();
+}
+
+function toggleAddTraderForm() {
+  document.getElementById('addTraderForm').classList.toggle('hidden');
+}
+
+async function submitNewTrader() {
+  const name = document.getElementById('newTraderName').value.trim();
+  const phone = document.getElementById('newTraderPhone').value.trim();
+  const notes = document.getElementById('newTraderNotes').value.trim();
+  const errEl = document.getElementById('newTraderError');
+  errEl.classList.add('hidden');
+
+  if (!name) {
+    errEl.textContent = 'فضلاً أدخل اسم التاجر';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('newTraderBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('traders').insert({
+    store_id: GOLDMIND_STORE_ID,
+    name: name,
+    phone: phone || null,
+    notes: notes || null
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ التاجر';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('newTraderName').value = '';
+  document.getElementById('newTraderPhone').value = '';
+  document.getElementById('newTraderNotes').value = '';
+  document.getElementById('addTraderForm').classList.add('hidden');
+  await load();
 }
 
 function renderTraders() {
