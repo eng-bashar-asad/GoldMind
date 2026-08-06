@@ -146,6 +146,11 @@
 </div>
 <p class="text-[11px] text-outline mb-4">ضريبة المدخلات محسوبة من فواتير الشراء (من تجار أو أفراد) المسجّلة بهذه الفترة فقط — إذا ما كان عندك فواتير شراء بعد، بتظهر صفر.</p>
 
+<button class="w-full h-12 mb-4 rounded-lg border border-secondary text-secondary font-bold text-[13px] flex items-center justify-center gap-2" onclick="exportTaxCsv()">
+<span class="material-symbols-outlined text-[18px]">download</span>
+تصدير تقرير الضريبة (CSV / Excel)
+</button>
+
 <h3 class="font-bold text-[15px] mb-3">تفاصيل معاملات ضريبة القيمة المضافة</h3>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
 <table class="w-full text-right text-[12px]">
@@ -354,6 +359,9 @@ async function loadReport() {
   document.getElementById('tax-input').classList.remove('text-outline');
   document.getElementById('tax-net').textContent = fmt(totalTax - totalInputTax);
 
+  // Kept for the CSV export button
+  window.__lastTaxExport = { taxRows, totalInputTax, totalTax, period: window.__currentPeriod || 'today' };
+
   const taxTbody = document.getElementById('tax-tbody');
   if (taxRows.length === 0) {
     taxTbody.innerHTML = '';
@@ -368,6 +376,34 @@ async function loadReport() {
         <td class="px-3 py-2 font-data-mono text-secondary">${fmt(r.tax)}</td>
       </tr>`).join('');
   }
+}
+
+function exportTaxCsv() {
+  const data = window.__lastTaxExport;
+  if (!data) { alert('انتظر تحميل التقرير أولاً.'); return; }
+
+  const rows = [
+    ['رقم الفاتورة', 'التاريخ', 'المبلغ الخاضع', 'قيمة الضريبة']
+  ];
+  data.taxRows.forEach(r => {
+    rows.push([r.i.invoice_number, new Date(r.i.created_at).toLocaleDateString('ar-EG'), r.beforeTax.toFixed(2), r.tax.toFixed(2)]);
+  });
+  rows.push([]);
+  rows.push(['ضريبة المخرجات (المبيعات)', '', '', data.totalTax.toFixed(2)]);
+  rows.push(['ضريبة المدخلات (المشتريات)', '', '', data.totalInputTax.toFixed(2)]);
+  rows.push(['صافي الضريبة المستحقة', '', '', (data.totalTax - data.totalInputTax).toFixed(2)]);
+
+  const csv = rows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(',')).join('\r\n');
+  // UTF-8 BOM so Excel renders Arabic correctly instead of garbled text
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `tax-report-${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
 
 async function load() {
