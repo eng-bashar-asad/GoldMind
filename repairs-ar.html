@@ -82,7 +82,11 @@
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">رقم واتساب العميل</label>
-<input class="w-full h-14 border border-outline-variant rounded-lg px-4 outline-none text-right" id="customerPhone" placeholder="9715xxxxxxxx" required type="tel"/>
+<div class="w-full h-14 border border-outline-variant rounded-lg px-4 flex items-center gap-2">
+<span class="text-on-surface-variant font-bold select-none">+971</span>
+<span class="text-outline-variant">|</span>
+<input class="flex-1 h-full outline-none text-left" dir="ltr" id="customerPhone" maxlength="9" placeholder="5xxxxxxxx" required type="tel"/>
+</div>
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">وصف القطعة</label>
@@ -182,7 +186,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 
   const { data: numData } = await goldmindClient.rpc('next_repair_number', { p_store_id: GOLDMIND_STORE_ID });
 
-  const customerPhone = document.getElementById('customerPhone').value.trim().replace(/[^0-9]/g, '');
+  const customerPhone = '971' + document.getElementById('customerPhone').value.trim().replace(/[^0-9]/g, '').replace(/^0+/, '');
   const pieceDesc = document.getElementById('pieceDesc').value.trim();
   const problemDesc = document.getElementById('problemDesc').value.trim();
   const customerName = document.getElementById('customerName').value.trim();
@@ -219,7 +223,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   let msg = `مرحباً ${customerName}،\n${storeName} استلم قطعتك للصيانة.\nرقم التذكرة: ${inserted.ticket_number}\nوصف القطعة: ${pieceDesc}\nالمشكلة: ${problemDesc}`;
   if (intakePhotoUrl) msg += `\nصورة القطعة: ${intakePhotoUrl}`;
   msg += `\nبنعلمك فور ما تجهز.`;
-  if (customerPhone) {
+  if (customerPhone.length >= 12) {
     window.open(`https://wa.me/${customerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   }
 
