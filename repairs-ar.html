@@ -83,9 +83,9 @@
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">رقم واتساب العميل</label>
 <div class="w-full h-14 border border-outline-variant rounded-lg px-4 flex items-center gap-2">
-<span class="text-on-surface-variant font-bold select-none">+971</span>
+<span class="text-on-surface-variant font-bold select-none" id="phonePrefixLabel">+971</span>
 <span class="text-outline-variant">|</span>
-<input class="flex-1 h-full outline-none text-left" dir="ltr" id="customerPhone" maxlength="9" placeholder="5xxxxxxxx" required type="tel"/>
+<input class="flex-1 h-full outline-none text-left" dir="ltr" id="customerPhone" maxlength="12" placeholder="5xxxxxxxx" required type="tel"/>
 </div>
 </div>
 <div class="relative">
@@ -186,7 +186,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 
   const { data: numData } = await goldmindClient.rpc('next_repair_number', { p_store_id: GOLDMIND_STORE_ID });
 
-  const customerPhone = '971' + document.getElementById('customerPhone').value.trim().replace(/[^0-9]/g, '').replace(/^0+/, '');
+  const customerPhone = window.__gmPhoneCode + document.getElementById('customerPhone').value.trim().replace(/[^0-9]/g, '').replace(/^0+/, '');
   const pieceDesc = document.getElementById('pieceDesc').value.trim();
   const problemDesc = document.getElementById('problemDesc').value.trim();
   const customerName = document.getElementById('customerName').value.trim();
@@ -223,7 +223,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   let msg = `مرحباً ${customerName}،\n${storeName} استلم قطعتك للصيانة.\nرقم التذكرة: ${inserted.ticket_number}\nوصف القطعة: ${pieceDesc}\nالمشكلة: ${problemDesc}`;
   if (intakePhotoUrl) msg += `\nصورة القطعة: ${intakePhotoUrl}`;
   msg += `\nبنعلمك فور ما تجهز.`;
-  if (customerPhone.length >= 12) {
+  if (customerPhone.length > window.__gmPhoneCode.length + 5) {
     window.open(`https://wa.me/${customerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   }
 
@@ -238,6 +238,11 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 async function init() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+
+  const { data: storeInfo } = await goldmindClient.from('stores').select('country').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  window.__gmPhoneCode = (storeInfo && GOLDMIND_COUNTRY_PHONE_MAP[storeInfo.country]) || GOLDMIND_DEFAULT_PHONE_CODE;
+  const prefixLabel = document.getElementById('phonePrefixLabel');
+  if (prefixLabel) prefixLabel.textContent = '+' + window.__gmPhoneCode;
 
   const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
   const canView = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['view_repairs'] === true));
