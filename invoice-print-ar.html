@@ -282,18 +282,11 @@
         if (!d) return;
 
         const invNumber = d.invoice.invoice_number || d.invoice.id;
-        const invDate = new Date(d.invoice.created_at).toLocaleDateString('ar-AE');
         const customerName = d.customer ? d.customer.name : '';
+        const receiptUrl = `${window.location.origin}${window.location.pathname.replace('invoice-print-ar.html', '')}invoice-receipt-ar.html?id=${d.invoice.id}`;
 
-        let msg = customerName ? `مرحباً ${customerName}،\n` : '';
-        msg += `${d.store.name || 'المحل'}\nنسخة من فاتورتكم\n\nرقم الفاتورة: ${invNumber}\nالتاريخ: ${invDate}\n`;
-
-        d.items.forEach(item => {
-            const desc = item.description || '—';
-            msg += `\n- ${desc} | عيار ${item.karat}K | ${item.weight_grams} غ | ${fmt(Number(item.line_total || 0))} ${d.currency}`;
-        });
-
-        msg += `\n\nالإجمالي الكامل: ${fmt(d.sumTotal)} ${d.currency}\nشكراً لتعاملكم معنا.`;
+        let msg = customerName ? `مرحباً ${customerName}،\n` : 'مرحباً،\n';
+        msg += `${d.store.name || 'المحل'}\nنسخة من فاتورتكم رقم ${invNumber}\n\n${receiptUrl}\n\nشكراً لتعاملكم معنا.`;
 
         const rawPhone = d.customer ? (d.customer.phone || '') : '';
         if (rawPhone) {

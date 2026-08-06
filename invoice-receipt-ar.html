@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>فاتورة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style> body { font-family: 'IBM Plex Sans Arabic', sans-serif; } </style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<div id="loading" class="min-h-screen flex items-center justify-center text-gray-500 text-sm">جارِ تحميل الفاتورة...</div>
+<div id="not-found" class="hidden min-h-screen flex items-center justify-center text-center px-6 text-gray-500 text-sm">
+تعذّر العثور على هذه الفاتورة. تأكد من الرابط أو تواصل مع المحل مباشرة.
+</div>
+
+<div id="receipt" class="hidden max-w-md mx-auto min-h-screen bg-white">
+
+<!-- Letterhead -->
+<div class="p-6 text-center border-b-4 border-amber-600">
+<img id="storeLogo" class="hidden w-16 h-16 mx-auto mb-2 object-contain"/>
+<h1 id="storeName" class="text-xl font-bold"></h1>
+<p id="storeAddress" class="text-[12px] text-gray-500 mt-1"></p>
+<p id="storeContact" class="text-[12px] text-gray-500" dir="ltr"></p>
+</div>
+
+<div class="p-5">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-lg font-bold" id="typeLabel">فاتورة</h2>
+<span id="statusBadge" class="text-[11px] font-bold px-3 py-1 rounded-full"></span>
+</div>
+
+<table class="w-full text-[13px] mb-4">
+<tbody>
+<tr class="border-b"><td class="py-2 text-gray-500">رقم الفاتورة</td><td class="py-2 font-bold text-left" dir="ltr" id="invNumber"></td></tr>
+<tr class="border-b"><td class="py-2 text-gray-500">التاريخ</td><td class="py-2 font-semibold text-left" id="invDate"></td></tr>
+<tr class="border-b"><td class="py-2 text-gray-500">طريقة الدفع</td><td class="py-2 font-semibold text-left" id="invPayment"></td></tr>
+<tr id="custRow" class="hidden"><td class="py-2 text-gray-500">العميل</td><td class="py-2 font-semibold text-left" id="custName"></td></tr>
+</tbody>
+</table>
+
+<table class="w-full text-[11px] mb-4">
+<thead>
+<tr class="border-b-2 border-gray-800 text-gray-600">
+<th class="py-2 text-right">الوصف</th>
+<th class="py-2 text-center">العيار</th>
+<th class="py-2 text-center">الوزن</th>
+<th class="py-2 text-left">الإجمالي</th>
+</tr>
+</thead>
+<tbody id="itemsBody" class="divide-y divide-gray-100"></tbody>
+</table>
+
+<div class="border-t-2 border-gray-800 pt-3 space-y-1 text-[12px]">
+<div class="flex justify-between text-gray-600">
+<span>قيمة الضريبة</span>
+<span id="sumVat"></span>
+</div>
+<div class="flex justify-between font-bold text-base pt-1 border-t border-gray-200 mt-1">
+<span>الإجمالي الكامل</span>
+<span id="sumTotal"></span>
+</div>
+</div>
+
+<div class="text-center text-[10px] text-gray-400 mt-6">شكراً لتعاملكم معنا</div>
+
+<a id="policyLink" href="#" class="block text-center mt-4 text-[12px] text-amber-700 font-semibold underline">سياسة البيع والإرجاع والتبديل</a>
+</div>
+
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const invoiceId = params.get('id');
+
+const TYPE_LABELS = { sale: 'فاتورة بيع', buyTrader: 'فاتورة شراء', buyRetail: 'فاتورة شراء', traderPay: 'سند دفع', return: 'فاتورة مرتجع' };
+const STATUS_LABELS = { paid: 'مدفوعة', unpaid: 'غير مدفوعة' };
+const STATUS_COLORS = { paid: 'bg-green-100 text-green-700', unpaid: 'bg-amber-100 text-amber-800' };
+const PAYMENT_LABELS = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'مختلط' };
+
+function fmt(n) {
+  return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+async function load() {
+  if (!invoiceId) { showNotFound(); return; }
+
+  const { data, error } = await goldmindClient.rpc('get_invoice_receipt', { p_id: invoiceId });
+  const row = data && data[0];
+
+  if (error || !row) { showNotFound(); return; }
+
+  if (row.store_logo_url) {
+    const logo = document.getElementById('storeLogo');
+    logo.src = row.store_logo_url;
+    logo.classList.remove('hidden');
+  }
+  document.getElementById('storeName').textContent = row.store_name || 'المحل';
+  if (row.store_address) document.getElementById('storeAddress').textContent = row.store_address;
+  const contactParts = [];
+  if (row.store_phone) contactParts.push(row.store_phone);
+  if (row.store_email) contactParts.push(row.store_email);
+  document.getElementById('storeContact').textContent = contactParts.join(' | ');
+
+  document.getElementById('typeLabel').textContent = TYPE_LABELS[row.invoice_type] || 'فاتورة';
+  document.getElementById('invNumber').textContent = row.invoice_number || '—';
+  document.getElementById('invDate').textContent = fmtDate(row.created_at);
+  document.getElementById('invPayment').textContent = PAYMENT_LABELS[row.payment_method] || row.payment_method || '—';
+  document.getElementById('statusBadge').textContent = STATUS_LABELS[row.status] || row.status || '';
+  document.getElementById('statusBadge').className = 'text-[11px] font-bold px-3 py-1 rounded-full ' + (STATUS_COLORS[row.status] || 'bg-gray-100 text-gray-600');
+
+  if (row.customer_name) {
+    document.getElementById('custRow').classList.remove('hidden');
+    document.getElementById('custName').textContent = row.customer_name;
+  }
+
+  const items = row.items || [];
+  document.getElementById('itemsBody').innerHTML = items.map(item => `
+    <tr>
+      <td class="py-2">${item.description || '—'}</td>
+      <td class="py-2 text-center">${item.karat}K</td>
+      <td class="py-2 text-center">${item.weight_grams}</td>
+      <td class="py-2 text-left font-semibold">${fmt(item.line_total)}</td>
+    </tr>`).join('');
+
+  // vat_amount stored on the invoice row isn't reliable (recorded as 0 at
+  // sale time), so derive it from vat_rate the same way invoice-print-ar.html
+  // does: total_amount is tax-inclusive.
+  const vatRate = Number(row.vat_rate || 0);
+  const vatMultiplier = 1 + (vatRate / 100);
+  const total = Number(row.total_amount || 0);
+  const beforeTax = total / vatMultiplier;
+  const tax = total - beforeTax;
+
+  const currency = row.currency || 'AED';
+  document.getElementById('sumVat').textContent = fmt(tax) + ' ' + currency;
+  document.getElementById('sumTotal').textContent = fmt(total) + ' ' + currency;
+
+  document.getElementById('policyLink').href = 'invoice-receipt-policy-ar.html?store=' + encodeURIComponent(row.store_name || '');
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('receipt').classList.remove('hidden');
+}
+
+function showNotFound() {
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('not-found').classList.remove('hidden');
+}
+
+load();
+</script>
+</body></html>
