@@ -163,7 +163,7 @@
         }
 
         const [{ data: items, error: itemsError }, { data: customer }] = await Promise.all([
-            goldmindClient.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('created_at', { ascending: true }),
+            goldmindClient.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('id', { ascending: true }),
             invoice.customer_id
                 ? goldmindClient.from('customers').select('*').eq('id', invoice.customer_id).single()
                 : Promise.resolve({ data: null })
