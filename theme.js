@@ -171,3 +171,27 @@ function goldmindLoadSavedTheme() {
 
 // Apply immediately on script load (before first paint as much as possible)
 goldmindLoadSavedTheme();
+
+// Body text is intentionally light (on-primary) so it reads on the dark
+// page background used site-wide. But that means any plain text sitting
+// inside a light/white card (bg-surface-container*, bg-white) with no
+// text-color class of its own would inherit that light color and become
+// invisible against its own light card. Rather than hunting down every
+// such element across every page (and every one added in the future),
+// set the correct dark default directly on the light-surface classes
+// themselves via the CSS variable — this works even on pages whose own
+// Tailwind config doesn't map "on-surface", since it targets the plain
+// class name and the CSS variable, not a Tailwind-generated utility.
+// Any element with its own explicit text-* class is unaffected, since an
+// element's own declared color always wins over an inherited one.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    .bg-surface-container-lowest, .bg-surface-container-low,
+    .bg-surface-container, .bg-surface-container-high,
+    .bg-surface-container-highest, .bg-white {
+      color: var(--gm-on-surface, #191c1e);
+    }
+  `;
+  document.head.appendChild(style);
+})();
