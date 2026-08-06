@@ -27,6 +27,19 @@ async function requireGoldMindSession(redirectTo) {
         window.location.href = redirectTo || 'login-entry-ar.html';
         return null;
     }
+
+    // Mandatory privacy-policy acceptance gate — applies to every user (owner
+    // or staff), regardless of how they signed up. Skipped only on the gate
+    // page itself to avoid a redirect loop.
+    if (!window.location.pathname.endsWith('privacy-accept-ar.html')) {
+        const { data: profile } = await goldmindClient.from('user_profiles').select('privacy_accepted_at').eq('id', session.user.id).maybeSingle();
+        if (!profile || !profile.privacy_accepted_at) {
+            const here = window.location.pathname.split('/').pop() || 'index-ar.html';
+            window.location.href = 'privacy-accept-ar.html?return=' + encodeURIComponent(here);
+            return null;
+        }
+    }
+
     if (!GOLDMIND_STORE_ID) {
         const { data: memberships } = await goldmindClient
             .from('staff')

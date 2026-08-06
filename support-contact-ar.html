@@ -57,6 +57,13 @@
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="subject" required type="text"/>
 </div>
 <div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="preferredLang">اللغة المفضلة للرد</label>
+<select class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right bg-white" id="preferredLang">
+<option value="ar">العربية</option>
+<option value="en">English</option>
+</select>
+</div>
+<div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="message">تفاصيل الطلب</label>
 <textarea class="w-full h-36 border border-outline-variant rounded-lg p-4 focus:ring-1 focus:ring-primary outline-none text-right" id="message" required></textarea>
 </div>
@@ -112,6 +119,14 @@ async function loadMyRequests() {
 async function init() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+
+  const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['contact_support'] === true));
+  if (!allowed) {
+    document.getElementById('loading-state').innerHTML = '<div class="py-10 px-4"><p class="text-error font-semibold mb-1">ليست لديك صلاحية التواصل مع الدعم الفني.</p><p class="text-on-surface-variant">تواصل مع إدارة شركتك لمنحك هذه الصلاحية.</p></div>';
+    return;
+  }
+
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
   loadMyRequests();
@@ -121,6 +136,10 @@ document.getElementById('requestForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+
+  const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['contact_support'] === true));
+  if (!allowed) { showMessage('ليست لديك صلاحية التواصل مع الدعم الفني.', true); return; }
 
   const subject = document.getElementById('subject').value.trim();
   const message = document.getElementById('message').value.trim();
@@ -134,7 +153,8 @@ document.getElementById('requestForm').addEventListener('submit', async (e) => {
     store_id: GOLDMIND_STORE_ID,
     created_by: GOLDMIND_STAFF_ID,
     subject: subject,
-    message: message
+    message: message,
+    preferred_language: document.getElementById('preferredLang').value
   });
 
   btn.disabled = false;
