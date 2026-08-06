@@ -18,6 +18,7 @@
 <script id="tailwind-config">
       tailwind.config = { darkMode: "class", theme: { extend: {
         "colors": {
+          "on-background": "var(--gm-on-primary)",
           "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
           "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
           "on-primary": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
@@ -34,7 +35,7 @@
     </script>
 <style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; } body { min-height: max(884px, 100dvh); } </style>
 </head>
-<body class="bg-background text-on-surface font-body-md">
+<body class="bg-background text-on-background font-body-md">
 <header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
 <div class="flex justify-between items-center px-4 w-full h-16">
 <div class="flex items-center gap-4">
@@ -50,7 +51,7 @@
 </header>
 <main class="pb-32 max-w-md mx-auto px-4">
 
-<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="loading-state" class="py-16 text-center text-on-background/70 text-sm">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">ليست لديك صلاحية عرض قطع الصيانة.</div>
 
 <div id="page-content" class="hidden py-6">
@@ -143,19 +144,22 @@ async function loadTickets() {
 
   const list = document.getElementById('ticketsList');
   if (error || !data || data.length === 0) {
-    list.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-10">لا توجد قطع صيانة بعد.</p>';
+    list.innerHTML = '<p class="text-center text-on-background/70 text-sm py-10">لا توجد قطع صيانة بعد.</p>';
     return;
   }
 
   list.innerHTML = data.map(t => `
-    <a href="repair-detail-ar.html?id=${t.id}" class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 block active:scale-[0.98] transition-transform">
-      <div class="flex items-center justify-between mb-1">
-        <span class="font-bold text-[13px] text-primary">${t.ticket_number || '—'}</span>
-        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status] || ''}">${STATUS_LABELS[t.status] || t.status}</span>
+    <a href="repair-detail-ar.html?id=${t.id}" class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex gap-3 items-center active:scale-[0.98] transition-transform">
+      ${(t.ready_photo_url || t.intake_photo_url) ? `<img src="${t.ready_photo_url || t.intake_photo_url}" class="w-16 h-16 rounded-lg object-cover flex-shrink-0" />` : `<div class="w-16 h-16 rounded-lg bg-surface-container-low flex items-center justify-center flex-shrink-0"><span class="material-symbols-outlined text-outline">build</span></div>`}
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center justify-between mb-1">
+          <span class="font-bold text-[13px] text-primary">${t.ticket_number || '—'}</span>
+          <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status] || ''}">${STATUS_LABELS[t.status] || t.status}</span>
+        </div>
+        <p class="font-bold text-[14px] mb-0.5 truncate">${t.piece_description}</p>
+        <p class="text-[12px] text-on-surface-variant mb-1 truncate">${t.customer_name}</p>
+        <p class="text-[11px] text-on-surface-variant">استُلمت: ${fmtDate(t.received_at)}</p>
       </div>
-      <p class="font-bold text-[14px] mb-0.5">${t.piece_description}</p>
-      <p class="text-[12px] text-on-surface-variant mb-1">${t.customer_name}</p>
-      <p class="text-[11px] text-on-surface-variant">استُلمت: ${fmtDate(t.received_at)}</p>
     </a>`).join('');
 }
 
