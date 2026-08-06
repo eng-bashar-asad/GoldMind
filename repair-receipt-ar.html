@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إيصال صيانة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style> body { font-family: 'IBM Plex Sans Arabic', sans-serif; } </style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<div id="loading" class="min-h-screen flex items-center justify-center text-gray-500 text-sm">جارِ تحميل الإيصال...</div>
+<div id="not-found" class="hidden min-h-screen flex items-center justify-center text-center px-6 text-gray-500 text-sm">
+تعذّر العثور على هذا الإيصال. تأكد من الرابط أو تواصل مع المحل مباشرة.
+</div>
+
+<div id="receipt" class="hidden max-w-md mx-auto min-h-screen bg-white">
+
+<!-- Letterhead -->
+<div class="p-6 text-center border-b-4 border-amber-600">
+<img id="storeLogo" class="hidden w-16 h-16 mx-auto mb-2 object-contain" />
+<h1 id="storeName" class="text-xl font-bold"></h1>
+<p id="storeAddress" class="text-[12px] text-gray-500 mt-1"></p>
+<p id="storePhone" class="text-[12px] text-gray-500" dir="ltr"></p>
+</div>
+
+<div class="p-5">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-lg font-bold">إيصال استلام قطعة للصيانة</h2>
+<span id="statusBadge" class="text-[11px] font-bold px-3 py-1 rounded-full"></span>
+</div>
+
+<div id="ticketPhotoWrap" class="hidden mb-4">
+<img id="ticketPhoto" class="w-full h-56 object-cover rounded-lg border" />
+</div>
+
+<table class="w-full text-[13px] mb-4">
+<tbody>
+<tr class="border-b"><td class="py-2 text-gray-500">رقم الإيصال</td><td class="py-2 font-bold text-left" dir="ltr" id="ticketNumber"></td></tr>
+<tr class="border-b"><td class="py-2 text-gray-500">تاريخ الاستلام</td><td class="py-2 font-semibold text-left" id="receivedAt"></td></tr>
+<tr class="border-b"><td class="py-2 text-gray-500">القطعة</td><td class="py-2 font-semibold text-left" id="pieceDesc"></td></tr>
+<tr class="border-b"><td class="py-2 text-gray-500 align-top">المشكلة</td><td class="py-2 font-semibold text-left" id="problemDesc"></td></tr>
+<tr id="readyAtRow" class="hidden border-b"><td class="py-2 text-gray-500">جاهزة منذ</td><td class="py-2 font-semibold text-left" id="readyAt"></td></tr>
+<tr><td class="py-2 text-gray-500">استلمها الموظف</td><td class="py-2 font-semibold text-left" id="receivedBy"></td></tr>
+</tbody>
+</table>
+
+<div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+<p class="text-[10.5px] leading-5 text-amber-900">
+<strong>سياسة الصيانة:</strong> في حال التأخر عن استلام القطعة بعد إشعارها بالجاهزية بمدة تتجاوز أسبوعين، تكون الشركة غير مسؤولة عن ضياعها أو تلفها.
+</p>
+</div>
+</div>
+
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const ticketId = params.get('id');
+
+const STATUS_LABELS = { received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة للاستلام', delivered: 'تم التسليم', cancelled: 'ملغاة' };
+const STATUS_COLORS = { received: 'bg-gray-100 text-gray-600', in_progress: 'bg-amber-100 text-amber-800', ready: 'bg-green-100 text-green-700', delivered: 'bg-gray-200 text-gray-600', cancelled: 'bg-red-100 text-red-700' };
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('ar-EG', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+
+async function load() {
+  if (!ticketId) { showNotFound(); return; }
+
+  const { data, error } = await goldmindClient.rpc('get_repair_receipt', { p_id: ticketId });
+  const row = data && data[0];
+
+  if (error || !row) { showNotFound(); return; }
+
+  document.getElementById('storeName').textContent = row.store_name || 'المحل';
+  if (row.store_address) document.getElementById('storeAddress').textContent = row.store_address;
+  if (row.store_phone) document.getElementById('storePhone').textContent = row.store_phone;
+  if (row.store_logo_url) {
+    const logo = document.getElementById('storeLogo');
+    logo.src = row.store_logo_url;
+    logo.classList.remove('hidden');
+  }
+
+  document.getElementById('ticketNumber').textContent = row.ticket_number || '—';
+  document.getElementById('receivedAt').textContent = fmtDate(row.received_at);
+  document.getElementById('pieceDesc').textContent = row.piece_description || '—';
+  document.getElementById('problemDesc').textContent = row.problem_description || '—';
+  document.getElementById('receivedBy').textContent = row.received_by_name || '—';
+  document.getElementById('statusBadge').textContent = STATUS_LABELS[row.status] || row.status;
+  document.getElementById('statusBadge').className = 'text-[11px] font-bold px-3 py-1 rounded-full ' + (STATUS_COLORS[row.status] || '');
+
+  if (row.ready_at) {
+    document.getElementById('readyAtRow').classList.remove('hidden');
+    document.getElementById('readyAt').textContent = fmtDate(row.ready_at);
+  }
+
+  const photoUrl = row.ready_photo_url || row.intake_photo_url;
+  if (photoUrl) {
+    document.getElementById('ticketPhoto').src = photoUrl;
+    document.getElementById('ticketPhotoWrap').classList.remove('hidden');
+  }
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('receipt').classList.remove('hidden');
+}
+
+function showNotFound() {
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('not-found').classList.remove('hidden');
+}
+
+load();
+</script>
+</body></html>
