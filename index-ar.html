@@ -152,6 +152,9 @@
 </div>
 <div class="flex items-center gap-2">
 <div class="flex items-center gap-2">
+<button id="quick-search-btn" onclick="openQuickSearch()" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center active:scale-90 transition-all" title="بحث سريع">
+<span class="material-symbols-outlined text-primary text-[20px]">search</span>
+</button>
 <button id="currency-toggle-btn" onclick="toggleCurrency()" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-[13px] font-bold text-primary active:scale-90 transition-all" title="تبديل العملة">
                 د.إ
             </button>
@@ -445,6 +448,81 @@
 <button onclick="goldMindSignOut()" class="w-full flex items-center gap-3 px-5 py-4 text-error hover:bg-error-container/30 transition-colors"><span class="material-symbols-outlined">logout</span><span class="font-label-md text-label-md font-semibold">تسجيل الخروج</span></button>
 </div>
 </div>
+
+<!-- Quick Search (command palette) -->
+<div class="fixed inset-0 bg-black/40 z-[300] hidden" id="quickSearchOverlay" onclick="closeQuickSearch()"></div>
+<div class="fixed inset-x-0 top-0 z-[301] translate-y-[-100%] transition-transform duration-200 bg-surface-container-lowest rounded-b-2xl shadow-2xl" dir="rtl" id="quickSearchPanel">
+<div class="p-4 flex items-center gap-2 border-b border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+<input id="quickSearchInput" oninput="renderQuickSearchResults()" placeholder="اكتب اسم الشاشة يلي بدك ياها... (مثال: عميل، فاتورة، صندوق)" class="flex-1 h-10 bg-transparent border-none outline-none focus:ring-0 text-[14px] text-on-surface"/>
+<button onclick="closeQuickSearch()" class="material-symbols-outlined text-on-surface-variant">close</button>
+</div>
+<div id="quickSearchResults" class="max-h-[70vh] overflow-y-auto py-2"></div>
+</div>
+<script>
+    const GOLDMIND_SEARCH_INDEX = [
+        { label: 'لوحة التحكم', href: 'index-ar.html', icon: 'dashboard', keywords: 'الرئيسية home dashboard' },
+        { label: 'بيع جديد / فاتورة', href: 'new-sale-ar.html', icon: 'add_shopping_cart', keywords: 'بيع فاتورة جديدة sale invoice' },
+        { label: 'فاتورة شراء', href: 'create-invoice-v2-ar.html', icon: 'local_shipping', keywords: 'شراء تاجر فرد purchase buy' },
+        { label: 'كل الفواتير (بحث وفلترة)', href: 'invoices-list-ar.html', icon: 'manage_search', keywords: 'فواتير بحث فلتر invoices search' },
+        { label: 'مرتجع مبيعات', href: 'sales-return-ar.html', icon: 'keyboard_return', keywords: 'ارجاع مرتجع return' },
+        { label: 'إضافة قطعة للمخزون', href: 'inventory-add.html', icon: 'inventory_2', keywords: 'قطعة مخزون اضافة add piece inventory' },
+        { label: 'المخزن', href: 'inventory-list-ar.html', icon: 'inventory_2', keywords: 'مخزون قطع inventory stock' },
+        { label: 'مصروف جديد', href: 'expense-entry-ar.html', icon: 'receipt', keywords: 'مصروف expense' },
+        { label: 'إضافة عميل', href: 'customer-add-ar.html', icon: 'person_add', keywords: 'عميل زبون customer add' },
+        { label: 'ديون العملاء / كشف حساب', href: 'customer-debts-ar.html', icon: 'account_balance_wallet', keywords: 'عميل دين كشف حساب customer debt' },
+        { label: 'سجل حركات التاجر / إضافة تاجر', href: 'ledger-ar.html', icon: 'groups', keywords: 'تاجر دين ledger trader add' },
+        { label: 'الصندوق اليومي', href: 'daily-cashbox-ar.html', icon: 'point_of_sale', keywords: 'صندوق يومي كاش cashbox daily' },
+        { label: 'الصندوق الرئيسي', href: 'main-cashbox-ar.html', icon: 'account_balance', keywords: 'صندوق رئيسي كاش main cashbox' },
+        { label: 'الصيانة والتصليح', href: 'repairs-ar.html', icon: 'build', keywords: 'صيانة تصليح repair' },
+        { label: 'سعر الذهب', href: 'gold-price-ar.html', icon: 'payments', keywords: 'سعر ذهب عيار gold price' },
+        { label: 'التقارير والتحليلات', href: 'reports-ar.html', icon: 'bar_chart', keywords: 'تقرير ضريبة vat report tax' },
+        { label: 'تقرير الأرباح', href: 'profit-report-ar.html', icon: 'trending_up', keywords: 'ربح أرباح profit' },
+        { label: 'سجل النشاط', href: 'audit-log-ar.html', icon: 'history', keywords: 'سجل نشاط audit log' },
+        { label: 'الموظفون والصلاحيات', href: 'staff-permissions-ar.html', icon: 'badge', keywords: 'موظف صلاحية دعوة staff permission invite' },
+        { label: 'إغلاق السنة المالية', href: 'fiscal-year-close-ar.html', icon: 'event_repeat', keywords: 'سنة مالية اغلاق fiscal year close' },
+        { label: 'إعدادات المحل', href: 'settings-ar.html', icon: 'settings', keywords: 'اعدادات settings' },
+        { label: 'مظهر التطبيق', href: 'theme-picker-ar.html', icon: 'palette', keywords: 'ثيم لون مظهر theme color' },
+        { label: 'الأمان وكلمة المرور', href: 'account-security-ar.html', icon: 'lock', keywords: 'أمان كلمة مرور password security' },
+        { label: 'الاشتراك', href: 'subscription-ar.html', icon: 'workspace_premium', keywords: 'اشتراك خطة subscription plan' },
+        { label: 'تواصل مع الدعم', href: 'support-contact-ar.html', icon: 'support_agent', keywords: 'دعم مساعدة support help' }
+    ];
+
+    function openQuickSearch() {
+        document.getElementById('quickSearchOverlay').classList.remove('hidden');
+        const panel = document.getElementById('quickSearchPanel');
+        panel.classList.remove('translate-y-[-100%]');
+        const input = document.getElementById('quickSearchInput');
+        input.value = '';
+        renderQuickSearchResults();
+        setTimeout(function () { input.focus(); }, 50);
+    }
+
+    function closeQuickSearch() {
+        document.getElementById('quickSearchOverlay').classList.add('hidden');
+        document.getElementById('quickSearchPanel').classList.add('translate-y-[-100%]');
+    }
+
+    function renderQuickSearchResults() {
+        const q = (document.getElementById('quickSearchInput').value || '').trim().toLowerCase();
+        const results = q
+            ? GOLDMIND_SEARCH_INDEX.filter(function (item) {
+                return item.label.toLowerCase().includes(q) || item.keywords.toLowerCase().includes(q);
+            })
+            : GOLDMIND_SEARCH_INDEX;
+
+        const container = document.getElementById('quickSearchResults');
+        if (results.length === 0) {
+            container.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">ما في نتائج مطابقة.</p>';
+            return;
+        }
+        container.innerHTML = results.map(function (item) {
+            return '<a href="' + item.href + '" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors">' +
+                '<span class="material-symbols-outlined text-secondary">' + item.icon + '</span>' +
+                '<span class="font-label-md text-label-md">' + item.label + '</span></a>';
+        }).join('');
+    }
+</script>
 <script>
     function toggleCurrency() {
         const btn = document.getElementById('currency-toggle-btn');
