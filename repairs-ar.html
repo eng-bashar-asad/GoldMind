@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الصيانة والتصليح | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; } body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">الصيانة والتصليح</h1>
+</div>
+<button id="addBtn" class="hidden w-10 h-10 rounded-full bg-primary text-on-primary flex items-center justify-center active:scale-90 transition-all" onclick="openAddForm()">
+<span class="material-symbols-outlined">add</span>
+</button>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليست لديك صلاحية عرض قطع الصيانة.</div>
+
+<div id="page-content" class="hidden py-6">
+<div id="ticketsList" class="flex flex-col gap-3"></div>
+</div>
+
+</main>
+
+<!-- Add ticket sheet -->
+<div class="fixed inset-0 bg-black/40 z-[200] hidden" id="addOverlay" onclick="closeAddForm()"></div>
+<div class="fixed bottom-0 right-0 left-0 max-h-[92vh] overflow-y-auto bg-surface-container-lowest z-[201] rounded-t-2xl shadow-2xl translate-y-full transition-transform duration-300" id="addSheet">
+<div class="flex items-center justify-between px-5 h-16 border-b border-outline-variant sticky top-0 bg-surface-container-lowest">
+<span class="font-headline-md text-headline-md font-bold text-primary">استلام قطعة للصيانة</span>
+<button class="material-symbols-outlined text-on-surface-variant" onclick="closeAddForm()">close</button>
+</div>
+<form id="addForm" class="p-5 flex flex-col gap-4">
+
+<input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
+<div class="w-full h-40 rounded-xl border-2 border-dashed border-outline-variant flex flex-col items-center justify-center gap-2 cursor-pointer overflow-hidden relative" id="photo-placeholder" onclick="document.getElementById('photo-input').click()">
+<span class="material-symbols-outlined text-3xl text-on-surface-variant">add_a_photo</span>
+<span class="text-[12px] text-on-surface-variant">صورة القطعة عند الاستلام</span>
+</div>
+<img class="hidden w-full h-40 object-cover rounded-xl" id="photo-preview"/>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">اسم العميل</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 outline-none text-right" id="customerName" required type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">رقم واتساب العميل</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 outline-none text-right" id="customerPhone" placeholder="9715xxxxxxxx" required type="tel"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">وصف القطعة</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 outline-none text-right" id="pieceDesc" required type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">وصف المشكلة</label>
+<textarea class="w-full h-24 border border-outline-variant rounded-lg p-4 outline-none text-right" id="problemDesc" required></textarea>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">التكلفة التقديرية (اختياري)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 outline-none text-right" id="estCost" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">تاريخ الجاهزية المتوقع (اختياري)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 outline-none text-right" id="expectedDate" type="date"/>
+</div>
+
+<div id="form-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
+<button class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all" id="submitBtn" type="submit">استلام القطعة وإرسال إشعار واتساب</button>
+</form>
+</div>
+
+<script>
+let selectedPhotoFile = null;
+
+document.getElementById('photo-input').addEventListener('change', () => {
+  const file = document.getElementById('photo-input').files && document.getElementById('photo-input').files[0];
+  if (!file) return;
+  selectedPhotoFile = file;
+  const url = URL.createObjectURL(file);
+  const preview = document.getElementById('photo-preview');
+  preview.src = url;
+  preview.classList.remove('hidden');
+  document.getElementById('photo-placeholder').classList.add('hidden');
+});
+
+function openAddForm() {
+  document.getElementById('addOverlay').classList.remove('hidden');
+  document.getElementById('addSheet').classList.remove('translate-y-full');
+}
+function closeAddForm() {
+  document.getElementById('addOverlay').classList.add('hidden');
+  document.getElementById('addSheet').classList.add('translate-y-full');
+}
+
+const STATUS_LABELS = { received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة للاستلام', delivered: 'تم التسليم', cancelled: 'ملغاة' };
+const STATUS_COLORS = { received: 'bg-surface-container-low text-on-surface-variant', in_progress: 'bg-amber-100 text-amber-800', ready: 'bg-success-container text-success', delivered: 'bg-gray-200 text-gray-600', cancelled: 'bg-error-container text-on-error-container' };
+
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+async function loadTickets() {
+  const { data, error } = await goldmindClient
+    .from('repair_tickets').select('*')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: false });
+
+  const list = document.getElementById('ticketsList');
+  if (error || !data || data.length === 0) {
+    list.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-10">لا توجد قطع صيانة بعد.</p>';
+    return;
+  }
+
+  list.innerHTML = data.map(t => `
+    <a href="repair-detail-ar.html?id=${t.id}" class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 block active:scale-[0.98] transition-transform">
+      <div class="flex items-center justify-between mb-1">
+        <span class="font-bold text-[13px] text-primary">${t.ticket_number || '—'}</span>
+        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${STATUS_COLORS[t.status] || ''}">${STATUS_LABELS[t.status] || t.status}</span>
+      </div>
+      <p class="font-bold text-[14px] mb-0.5">${t.piece_description}</p>
+      <p class="text-[12px] text-on-surface-variant mb-1">${t.customer_name}</p>
+      <p class="text-[11px] text-on-surface-variant">استُلمت: ${fmtDate(t.received_at)}</p>
+    </a>`).join('');
+}
+
+document.getElementById('addForm').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  let intakePhotoUrl = null;
+  if (selectedPhotoFile) {
+    const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = `${GOLDMIND_STORE_ID}/repairs/${Date.now()}.${ext}`;
+    const { error: upErr } = await goldmindClient.storage.from('piece-photos').upload(path, selectedPhotoFile, { upsert: false });
+    if (!upErr) {
+      const { data: pub } = goldmindClient.storage.from('piece-photos').getPublicUrl(path);
+      intakePhotoUrl = pub.publicUrl;
+    }
+  }
+
+  const { data: numData } = await goldmindClient.rpc('next_repair_number', { p_store_id: GOLDMIND_STORE_ID });
+
+  const customerPhone = document.getElementById('customerPhone').value.trim().replace(/[^0-9]/g, '');
+  const pieceDesc = document.getElementById('pieceDesc').value.trim();
+  const problemDesc = document.getElementById('problemDesc').value.trim();
+  const customerName = document.getElementById('customerName').value.trim();
+
+  const { data: storeData } = await goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  const storeName = (storeData && storeData.name) || 'المحل';
+
+  const { data: inserted, error } = await goldmindClient.from('repair_tickets').insert({
+    store_id: GOLDMIND_STORE_ID,
+    ticket_number: numData || null,
+    customer_name: customerName,
+    customer_phone: customerPhone,
+    piece_description: pieceDesc,
+    problem_description: problemDesc,
+    intake_photo_url: intakePhotoUrl,
+    estimated_cost: document.getElementById('estCost').value || null,
+    expected_ready_at: document.getElementById('expectedDate').value || null,
+    status: 'received',
+    received_by: GOLDMIND_STAFF_ID
+  }).select().maybeSingle();
+
+  btn.disabled = false;
+  btn.textContent = 'استلام القطعة وإرسال إشعار واتساب';
+
+  if (error) {
+    const box = document.getElementById('form-message');
+    box.textContent = 'خطأ: ' + error.message;
+    box.classList.remove('hidden');
+    box.classList.add('bg-error', 'text-white');
+    return;
+  }
+
+  // Build the WhatsApp intake message and open it
+  let msg = `مرحباً ${customerName}،\n${storeName} استلم قطعتك للصيانة.\nرقم التذكرة: ${inserted.ticket_number}\nوصف القطعة: ${pieceDesc}\nالمشكلة: ${problemDesc}`;
+  if (intakePhotoUrl) msg += `\nصورة القطعة: ${intakePhotoUrl}`;
+  msg += `\nبنعلمك فور ما تجهز.`;
+  if (customerPhone) {
+    window.open(`https://wa.me/${customerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
+  }
+
+  closeAddForm();
+  e.target.reset();
+  selectedPhotoFile = null;
+  document.getElementById('photo-preview').classList.add('hidden');
+  document.getElementById('photo-placeholder').classList.remove('hidden');
+  loadTickets();
+});
+
+async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canView = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['view_repairs'] === true));
+  const canAdd = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['add_repair'] === true));
+
+  if (!canView) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
+  if (canAdd) document.getElementById('addBtn').classList.remove('hidden');
+
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('page-content').classList.remove('hidden');
+  loadTickets();
+}
+
+init();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>

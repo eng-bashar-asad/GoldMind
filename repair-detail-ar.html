@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>تفاصيل الصيانة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; } body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-surface font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='repairs-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold" id="pageTitle">تفاصيل القطعة</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليست لديك صلاحية عرض هذه القطعة.</div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-5">
+
+<img class="hidden w-full h-52 object-cover rounded-xl" id="ticketPhoto"/>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<div class="flex items-center justify-between mb-2">
+<span class="font-bold text-primary" id="ticketNumberEl">—</span>
+<span class="text-[11px] font-semibold px-2 py-0.5 rounded-full" id="statusBadge"></span>
+</div>
+<p class="font-bold text-[15px] mb-1" id="pieceDescEl"></p>
+<p class="text-[13px] text-on-surface-variant mb-3" id="problemDescEl"></p>
+<div class="grid grid-cols-2 gap-3 text-[12px] text-on-surface-variant">
+<div><span class="block text-outline">العميل</span><span id="customerNameEl" class="text-on-surface font-semibold"></span></div>
+<div><span class="block text-outline">واتساب</span><span id="customerPhoneEl" class="text-on-surface font-semibold"></span></div>
+<div><span class="block text-outline">تاريخ الاستلام</span><span id="receivedAtEl" class="text-on-surface font-semibold"></span></div>
+<div><span class="block text-outline">الجاهزية المتوقعة</span><span id="expectedAtEl" class="text-on-surface font-semibold"></span></div>
+<div><span class="block text-outline">التكلفة التقديرية</span><span id="estCostEl" class="text-on-surface font-semibold"></span></div>
+<div><span class="block text-outline">التكلفة الفعلية</span><span id="actualCostEl" class="text-on-surface font-semibold"></span></div>
+</div>
+</div>
+
+<div id="editSection" class="hidden flex flex-col gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline">التكلفة الفعلية</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 outline-none text-right" id="actualCostInput" step="0.01" type="number"/>
+</div>
+
+<div class="grid grid-cols-2 gap-3">
+<button class="h-12 rounded-lg border border-outline-variant text-on-surface font-semibold text-[13px]" data-status="in_progress" onclick="updateStatus('in_progress')">بدء التصليح</button>
+<button class="h-12 rounded-lg bg-success text-white font-semibold text-[13px]" data-status="ready" onclick="markReady()">جاهزة + إشعار واتساب</button>
+</div>
+<button class="h-12 rounded-lg bg-primary text-on-primary font-semibold text-[13px]" data-status="delivered" onclick="updateStatus('delivered')">تم تسليم القطعة للعميل</button>
+<button class="h-12 rounded-lg text-error text-[13px] font-semibold" data-status="cancelled" onclick="updateStatus('cancelled')">إلغاء التذكرة</button>
+</div>
+
+<div id="statusMsg" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
+
+</div>
+</main>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const ticketId = params.get('id');
+let currentTicket = null;
+let canEdit = false;
+
+const STATUS_LABELS = { received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة للاستلام', delivered: 'تم التسليم', cancelled: 'ملغاة' };
+const STATUS_COLORS = { received: 'bg-surface-container-low text-on-surface-variant', in_progress: 'bg-amber-100 text-amber-800', ready: 'bg-success-container text-success', delivered: 'bg-gray-200 text-gray-600', cancelled: 'bg-error-container text-on-error-container' };
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' });
+}
+
+function renderTicket() {
+  const t = currentTicket;
+  document.getElementById('ticketNumberEl').textContent = t.ticket_number || '—';
+  document.getElementById('statusBadge').textContent = STATUS_LABELS[t.status] || t.status;
+  document.getElementById('statusBadge').className = 'text-[11px] font-semibold px-2 py-0.5 rounded-full ' + (STATUS_COLORS[t.status] || '');
+  document.getElementById('pieceDescEl').textContent = t.piece_description;
+  document.getElementById('problemDescEl').textContent = t.problem_description;
+  document.getElementById('customerNameEl').textContent = t.customer_name || '—';
+  document.getElementById('customerPhoneEl').textContent = t.customer_phone || '—';
+  document.getElementById('receivedAtEl').textContent = fmtDate(t.received_at);
+  document.getElementById('expectedAtEl').textContent = fmtDate(t.expected_ready_at);
+  document.getElementById('estCostEl').textContent = t.estimated_cost != null ? t.estimated_cost : '—';
+  document.getElementById('actualCostEl').textContent = t.actual_cost != null ? t.actual_cost : '—';
+
+  const photo = document.getElementById('ticketPhoto');
+  if (t.ready_photo_url || t.intake_photo_url) {
+    photo.src = t.ready_photo_url || t.intake_photo_url;
+    photo.classList.remove('hidden');
+  }
+
+  if (t.status === 'delivered' || t.status === 'cancelled') {
+    document.getElementById('editSection').classList.add('hidden');
+  } else if (canEdit) {
+    document.getElementById('editSection').classList.remove('hidden');
+    document.getElementById('actualCostInput').value = t.actual_cost || '';
+  }
+}
+
+function showMsg(text, isError) {
+  const box = document.getElementById('statusMsg');
+  box.textContent = text;
+  box.classList.remove('hidden', 'bg-error', 'text-white', 'bg-green-100', 'text-green-700');
+  box.classList.add(isError ? 'bg-error' : 'bg-green-100', isError ? 'text-white' : 'text-green-700');
+}
+
+async function updateStatus(newStatus) {
+  const updates = { status: newStatus };
+  const costVal = document.getElementById('actualCostInput').value;
+  if (costVal) updates.actual_cost = costVal;
+  if (newStatus === 'delivered') {
+    updates.delivered_at = new Date().toISOString();
+    updates.delivered_by = GOLDMIND_STAFF_ID;
+  }
+
+  const { error } = await goldmindClient.from('repair_tickets').update(updates).eq('id', ticketId);
+  if (error) { showMsg('خطأ: ' + error.message, true); return; }
+  showMsg('تم التحديث بنجاح.', false);
+  loadTicket();
+}
+
+async function markReady() {
+  const costVal = document.getElementById('actualCostInput').value;
+  const updates = { status: 'ready', ready_at: new Date().toISOString() };
+  if (costVal) updates.actual_cost = costVal;
+
+  const { error } = await goldmindClient.from('repair_tickets').update(updates).eq('id', ticketId);
+  if (error) { showMsg('خطأ: ' + error.message, true); return; }
+
+  const { data: storeData } = await goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  const storeName = (storeData && storeData.name) || 'المحل';
+  const t = currentTicket;
+
+  let msg = `مرحباً ${t.customer_name}،\nقطعتك جاهزة للاستلام من ${storeName}.\nرقم التذكرة: ${t.ticket_number}\nوصف القطعة: ${t.piece_description}`;
+  if (costVal) msg += `\nالتكلفة: ${costVal}`;
+  msg += `\nبانتظارك 🙏`;
+
+  if (t.customer_phone) {
+    window.open(`https://wa.me/${t.customer_phone}?text=${encodeURIComponent(msg)}`, '_blank');
+  }
+
+  showMsg('تم تحديث الحالة لـ"جاهزة" وفُتح واتساب لإرسال الإشعار.', false);
+  loadTicket();
+}
+
+async function loadTicket() {
+  const { data, error } = await goldmindClient.from('repair_tickets').select('*').eq('id', ticketId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle();
+  if (error || !data) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+  currentTicket = data;
+  renderTicket();
+}
+
+async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canView = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['view_repairs'] === true));
+  canEdit = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['edit_repair'] === true));
+
+  if (!canView || !ticketId) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('page-content').classList.remove('hidden');
+  loadTicket();
+}
+
+init();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
