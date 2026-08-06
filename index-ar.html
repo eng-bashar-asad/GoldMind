@@ -240,7 +240,7 @@
 <span class="font-label-md text-[10px] mt-1">المخزن</span>
 </a>
 <!-- Invoices -->
-<a class="flex flex-col items-center justify-center text-on-surface-variant cursor-pointer transition-all hover:text-primary active:scale-90" href="new-sale-ar.html">
+<a class="flex flex-col items-center justify-center text-on-surface-variant cursor-pointer transition-all hover:text-primary active:scale-90" href="invoices-list-ar.html">
 <span class="material-symbols-outlined">receipt_long</span>
 <span class="font-label-md text-[10px] mt-1">الفواتير</span>
 </a>
@@ -372,7 +372,7 @@
             // Recent movements (latest 5)
             const { data: recent } = await goldmindClient
                 .from('cash_movements')
-                .select('direction, amount, description, created_at')
+                .select('direction, amount, description, created_at, invoice_id')
                 .eq('store_id', GOLDMIND_STORE_ID)
                 .order('created_at', { ascending: false })
                 .limit(5);
@@ -384,8 +384,9 @@
                 container.innerHTML = recent.map(m => {
                     const isIn = m.direction === 'in';
                     const dateStr = new Date(m.created_at).toLocaleString('ar', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+                    const clickable = !!m.invoice_id;
                     return `
-                        <div class="p-4 flex justify-between items-center hover:bg-surface-container-low transition-colors">
+                        <div class="p-4 flex justify-between items-center hover:bg-surface-container-low transition-colors ${clickable ? 'cursor-pointer active:opacity-70' : ''}" ${clickable ? `onclick="window.location.href='invoice-print-ar.html?id=${m.invoice_id}'"` : ''}>
                             <div class="flex items-center gap-3">
                                 <div class="w-10 h-10 rounded-full ${isIn ? 'bg-green-50' : 'bg-red-50'} flex items-center justify-center">
                                     <span class="material-symbols-outlined ${isIn ? 'text-green-600' : 'text-red-600'} text-[20px]">${isIn ? 'arrow_downward' : 'arrow_upward'}</span>
@@ -395,9 +396,12 @@
                                     <p class="text-[11px] text-on-surface-variant">${dateStr}</p>
                                 </div>
                             </div>
-                            <div class="text-left">
-                                <p class="font-data-mono text-data-mono font-bold ${isIn ? 'text-green-600' : 'text-red-600'}">${isIn ? '+' : '-'}${fmt(m.amount)}</p>
-                                <p class="text-[10px] text-on-surface-variant">د.إ</p>
+                            <div class="flex items-center gap-2">
+                                <div class="text-left">
+                                    <p class="font-data-mono text-data-mono font-bold ${isIn ? 'text-green-600' : 'text-red-600'}">${isIn ? '+' : '-'}${fmt(m.amount)}</p>
+                                    <p class="text-[10px] text-on-surface-variant">د.إ</p>
+                                </div>
+                                ${clickable ? '<span class="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_left</span>' : ''}
                             </div>
                         </div>`;
                 }).join('');
@@ -416,6 +420,7 @@
 <a href="index-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">dashboard</span><span class="font-label-md text-label-md">لوحة التحكم</span></a>
 <a href="inventory-add.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory_2</span><span class="font-label-md text-label-md">إضافة قطعة للمخزون</span></a>
 <a href="new-sale-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt_long</span><span class="font-label-md text-label-md">بيع جديد / فاتورة</span></a>
+<a href="invoices-list-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">list_alt</span><span class="font-label-md text-label-md">كل الفواتير</span></a>
 <a href="sales-return-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">keyboard_return</span><span class="font-label-md text-label-md">مرتجع مبيعات</span></a>
 <a href="daily-cashbox-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">point_of_sale</span><span class="font-label-md text-label-md">الصندوق اليومي</span></a>
 <a href="main-cashbox-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">account_balance</span><span class="font-label-md text-label-md">الصندوق الرئيسي</span></a>

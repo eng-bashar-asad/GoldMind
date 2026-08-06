@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الفواتير | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { min-height: max(884px, 100dvh); }
+    .type-badge { font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">الفواتير</h1>
+</div>
+</div>
+</header>
+
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<div id="page-content" class="hidden py-4 flex flex-col gap-4">
+
+<!-- Filters -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+
+<div class="relative">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
+<input id="searchInput" oninput="applyFilters()" placeholder="رقم الفاتورة، اسم العميل/التاجر، أو رقم الهاتف" class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-background"/>
+</div>
+
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">نوع الفاتورة</label>
+<select id="typeFilter" onchange="applyFilters()" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background">
+<option value="">الكل</option>
+<option value="sale">بيع</option>
+<option value="buyTrader">شراء من تاجر</option>
+<option value="buyRetail">شراء من فرد</option>
+<option value="traderPay">سند دفع تاجر</option>
+<option value="return">مرتجع</option>
+<option value="repair">صيانة</option>
+</select>
+</div>
+
+<div class="grid grid-cols-2 gap-3">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">من تاريخ</label>
+<input id="fromDate" type="date" onchange="loadData()" class="w-full h-11 border border-outline-variant rounded-lg px-2 text-[13px] bg-background"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">إلى تاريخ</label>
+<input id="toDate" type="date" onchange="loadData()" class="w-full h-11 border border-outline-variant rounded-lg px-2 text-[13px] bg-background"/>
+</div>
+</div>
+
+<button onclick="clearFilters()" class="text-[11px] text-secondary font-semibold self-start">مسح الفلاتر</button>
+</div>
+
+<p class="text-[11px] text-on-surface-variant" id="resultCount"></p>
+
+<div id="results-list" class="flex flex-col gap-2"></div>
+<div id="empty-state" class="hidden py-16 text-center text-on-surface-variant text-sm">لا توجد نتائج مطابقة</div>
+
+</div>
+</main>
+
+<script>
+const TYPE_LABELS = { sale: 'بيع', buyTrader: 'شراء من تاجر', buyRetail: 'شراء من فرد', traderPay: 'سند دفع تاجر', return: 'مرتجع', repair: 'صيانة' };
+const TYPE_COLORS = {
+  sale: 'bg-green-50 text-green-700',
+  buyTrader: 'bg-amber-50 text-amber-700',
+  buyRetail: 'bg-amber-50 text-amber-700',
+  traderPay: 'bg-blue-50 text-blue-700',
+  return: 'bg-red-50 text-red-700',
+  repair: 'bg-purple-50 text-purple-700'
+};
+const STATUS_LABELS = { paid: 'مدفوعة', unpaid: 'غير مدفوعة', cancelled: 'ملغاة', received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة', delivered: 'تم التسليم' };
+
+let allRows = [];
+
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+async function loadData() {
+  const fromVal = document.getElementById('fromDate').value;
+  const toVal = document.getElementById('toDate').value;
+  const fromISO = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
+  const toISO = toVal ? new Date(toVal + 'T23:59:59').toISOString() : null;
+
+  let invQuery = goldmindClient
+    .from('invoices')
+    .select('id, invoice_number, type, status, total_amount, created_at, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: false })
+    .limit(300);
+  if (fromISO) invQuery = invQuery.gte('created_at', fromISO);
+  if (toISO) invQuery = invQuery.lte('created_at', toISO);
+
+  let repQuery = goldmindClient
+    .from('repair_tickets')
+    .select('id, ticket_number, customer_name, customer_phone, estimated_cost, status, created_at')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: false })
+    .limit(300);
+  if (fromISO) repQuery = repQuery.gte('created_at', fromISO);
+  if (toISO) repQuery = repQuery.lte('created_at', toISO);
+
+  const [{ data: invoices, error: invErr }, { data: repairs, error: repErr }] = await Promise.all([invQuery, repQuery]);
+
+  const invRows = (invoices || []).map(i => ({
+    id: i.id,
+    kind: 'invoice',
+    number: i.invoice_number,
+    type: i.type,
+    status: i.status,
+    amount: i.total_amount,
+    created_at: i.created_at,
+    counterpartyName: (i.customer && i.customer.name) || (i.trader && i.trader.name) || i.counterparty_name || '',
+    counterpartyPhone: (i.customer && i.customer.phone) || (i.trader && i.trader.phone) || '',
+    href: 'invoice-print-ar.html?id=' + i.id
+  }));
+
+  const repRows = (repairs || []).map(r => ({
+    id: r.id,
+    kind: 'repair',
+    number: r.ticket_number || '—',
+    type: 'repair',
+    status: r.status,
+    amount: r.estimated_cost,
+    created_at: r.created_at,
+    counterpartyName: r.customer_name || '',
+    counterpartyPhone: r.customer_phone || '',
+    href: 'repair-detail-ar.html?id=' + r.id
+  }));
+
+  allRows = invRows.concat(repRows).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+
+  if (invErr || repErr) {
+    document.getElementById('results-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر تحميل البيانات: ${(invErr || repErr).message}</p>`;
+  } else {
+    applyFilters();
+  }
+}
+
+function applyFilters() {
+  const q = document.getElementById('searchInput').value.trim().toLowerCase();
+  const type = document.getElementById('typeFilter').value;
+
+  let rows = allRows;
+  if (type) rows = rows.filter(r => r.type === type);
+  if (q) {
+    rows = rows.filter(r =>
+      (r.number || '').toLowerCase().includes(q) ||
+      (r.counterpartyName || '').toLowerCase().includes(q) ||
+      (r.counterpartyPhone || '').toLowerCase().includes(q)
+    );
+  }
+
+  document.getElementById('resultCount').textContent = rows.length + ' نتيجة';
+  const list = document.getElementById('results-list');
+  const empty = document.getElementById('empty-state');
+
+  if (rows.length === 0) {
+    list.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+
+  list.innerHTML = rows.map(r => {
+    const dateStr = new Date(r.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+    const badgeColor = TYPE_COLORS[r.type] || 'bg-gray-100 text-gray-700';
+    const statusLabel = STATUS_LABELS[r.status] || r.status || '';
+    return `
+      <a href="${r.href}" class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex items-center justify-between hover:bg-surface-container-low transition-colors active:scale-[0.99]">
+        <div class="flex flex-col gap-1 min-w-0">
+          <div class="flex items-center gap-2">
+            <span class="font-data-mono font-bold text-[13px]">${r.number}</span>
+            <span class="type-badge ${badgeColor}">${TYPE_LABELS[r.type] || r.type}</span>
+          </div>
+          <p class="text-[12px] text-on-surface-variant truncate">${r.counterpartyName || 'بدون اسم'} ${r.counterpartyPhone ? '· ' + r.counterpartyPhone : ''}</p>
+          <p class="text-[10px] text-outline">${dateStr}${statusLabel ? ' · ' + statusLabel : ''}</p>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <span class="font-data-mono font-bold text-[14px]">${fmt(r.amount)}</span>
+          <span class="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_left</span>
+        </div>
+      </a>`;
+  }).join('');
+}
+
+function clearFilters() {
+  document.getElementById('searchInput').value = '';
+  document.getElementById('typeFilter').value = '';
+  document.getElementById('fromDate').value = '';
+  document.getElementById('toDate').value = '';
+  loadData();
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('page-content').classList.remove('hidden');
+  await loadData();
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
