@@ -56,6 +56,10 @@
 <span class="material-symbols-outlined">edit</span>
                 تعديل
             </button>
+<button class="hidden items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg text-sm font-semibold" id="restore-invoice-btn" onclick="restoreInvoiceFlow()">
+<span class="material-symbols-outlined">restore</span>
+                استعادة الفاتورة
+            </button>
 </div>
 
 <div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
@@ -208,6 +212,13 @@
 
         if (invoice.status === 'cancelled') {
             document.getElementById('cancelled-banner').classList.remove('hidden');
+            const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+            if (staffRow && staffRow.permissions && staffRow.permissions.delete_invoice) {
+                const restoreBtn = document.getElementById('restore-invoice-btn');
+                restoreBtn.classList.remove('hidden');
+                restoreBtn.classList.add('flex');
+                window.__currentInvoiceId = invoiceId;
+            }
         } else {
             const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
             if (staffRow && staffRow.permissions && staffRow.permissions.delete_invoice) {
@@ -315,6 +326,23 @@
 
         if (error) {
             alert('تعذّر إلغاء الفاتورة: ' + error.message);
+            return;
+        }
+        window.location.reload();
+    }
+
+    async function restoreInvoiceFlow() {
+        if (!confirm('هل أنت متأكد من استعادة هذه الفاتورة؟ رح ترجع فاتورة فعالة (نفس التأثير المحاسبي الأصلي)، وبعدها فيك تعدّل عليها عادي.')) return;
+
+        const btn = document.getElementById('restore-invoice-btn');
+        btn.disabled = true;
+
+        const { error } = await goldmindClient.rpc('restore_invoice', { target_invoice_id: window.__currentInvoiceId });
+
+        btn.disabled = false;
+
+        if (error) {
+            alert('تعذّر استعادة الفاتورة: ' + error.message);
             return;
         }
         window.location.reload();
