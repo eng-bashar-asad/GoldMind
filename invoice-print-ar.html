@@ -44,6 +44,10 @@
 <span class="material-symbols-outlined">print</span>
                 طباعة
             </button>
+<button class="hidden items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-lg text-sm font-semibold" id="whatsapp-invoice-btn" onclick="sendInvoiceWhatsApp()">
+<span class="material-symbols-outlined">share</span>
+                واتساب
+            </button>
 <button class="hidden items-center gap-2 bg-red-50 text-red-700 border border-red-200 px-3 py-2 rounded-lg text-sm font-semibold" id="cancel-invoice-btn" onclick="cancelInvoiceFlow()">
 <span class="material-symbols-outlined">cancel</span>
                 إلغاء الفاتورة
@@ -260,8 +264,47 @@
         document.getElementById('sum-tax').textContent = fmt(sumTax) + ' ' + (store.currency || 'AED');
         document.getElementById('sum-total').textContent = fmt(sumTotal) + ' ' + (store.currency || 'AED');
 
+        // ---- WhatsApp share (free wa.me text link, same convention used
+        // by repairs/daily-cashbox — no paid Business API) ----
+        if (invoice.status !== 'cancelled') {
+            window.__waInvoiceData = { store, invoice, customer, items: items || [], sumTotal, currency: store.currency || 'AED' };
+            const waBtn = document.getElementById('whatsapp-invoice-btn');
+            waBtn.classList.remove('hidden');
+            waBtn.classList.add('flex');
+        }
+
         loading.classList.add('hidden');
         sheet.classList.remove('hidden');
+    }
+
+    function sendInvoiceWhatsApp() {
+        const d = window.__waInvoiceData;
+        if (!d) return;
+
+        const invNumber = d.invoice.invoice_number || d.invoice.id;
+        const invDate = new Date(d.invoice.created_at).toLocaleDateString('ar-AE');
+        const customerName = d.customer ? d.customer.name : '';
+
+        let msg = customerName ? `مرحباً ${customerName}،\n` : '';
+        msg += `${d.store.name || 'المحل'}\nنسخة من فاتورتكم\n\nرقم الفاتورة: ${invNumber}\nالتاريخ: ${invDate}\n`;
+
+        d.items.forEach(item => {
+            const desc = item.description || '—';
+            msg += `\n- ${desc} | عيار ${item.karat}K | ${item.weight_grams} غ | ${fmt(Number(item.line_total || 0))} ${d.currency}`;
+        });
+
+        msg += `\n\nالإجمالي الكامل: ${fmt(d.sumTotal)} ${d.currency}\nشكراً لتعاملكم معنا.`;
+
+        const rawPhone = d.customer ? (d.customer.phone || '') : '';
+        if (rawPhone) {
+            const code = GOLDMIND_COUNTRY_PHONE_MAP[d.store.country] || GOLDMIND_DEFAULT_PHONE_CODE;
+            const digits = rawPhone.replace(/[^0-9]/g, '').replace(/^0+/, '');
+            window.open(`https://wa.me/${code}${digits}?text=${encodeURIComponent(msg)}`, '_blank');
+        } else {
+            // No saved phone for this customer — open WhatsApp with the
+            // message ready so the user can pick a contact themselves.
+            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+        }
     }
 
     loadInvoice();
