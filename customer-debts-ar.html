@@ -67,13 +67,54 @@
 <button onclick="showCustomersList()" class="text-[12px] text-secondary font-semibold self-start">→ كل العملاء</button>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<div class="flex items-start justify-between gap-2">
+<div>
 <h2 class="font-bold text-[16px]" id="detail-customer-name"></h2>
 <p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="detail-customer-phone"></p>
+</div>
+<button id="editCustomerBtn" onclick="toggleEditCustomerForm()" class="hidden h-9 w-9 items-center justify-center rounded-full hover:bg-surface-container-low shrink-0">
+<span class="material-symbols-outlined text-[18px]">edit</span>
+</button>
+</div>
 <div class="mt-3 pt-3 border-t border-outline-variant flex justify-between items-center">
 <span class="text-[13px] text-on-surface-variant">رصيد الدين (نقدي)</span>
 <span class="font-bold text-[18px] font-data-mono" id="detail-balance">0.00</span>
 </div>
 <p class="text-[10px] text-outline mt-1">قيمة موجبة = دين على العميل لصالح المحل لم يُسدَّد بعد</p>
+</div>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex-col gap-3" id="editCustomerForm">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">اسم العميل</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="editCustomerName"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">رقم الهاتف</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="editCustomerPhone"/>
+</div>
+<div id="editCustomerCompanyFields" class="hidden flex-col gap-3">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">اسم الشركة القانوني</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="editCustomerLegalName"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الرقم الضريبي</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="editCustomerTaxNumber"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العنوان</label>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm" id="editCustomerAddress"></textarea>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الإيميل</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="editCustomerEmail"/>
+</div>
+</div>
+<div class="flex gap-2">
+<button onclick="saveCustomerEdit()" id="saveCustomerEditBtn" class="flex-1 h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ التعديلات</button>
+<button onclick="toggleEditCustomerForm()" class="flex-1 h-11 border border-outline-variant rounded-lg text-sm font-semibold">إلغاء</button>
+</div>
+<p class="text-error text-[12px] hidden" id="editCustomerError"></p>
 </div>
 
 <button onclick="toggleSettleForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
@@ -102,6 +143,7 @@
 let customers = [];
 let movementsByCustomer = {};
 let currentCustomerId = null;
+let canEditCustomers = false;
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -138,7 +180,14 @@ async function load() {
     movementsByCustomer[m.customer_id].push(m);
   });
 
-  showCustomersList();
+  canEditCustomers = !!(__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['edit_customers'] === true));
+
+  const openId = new URLSearchParams(window.location.search).get('open');
+  if (openId && customers.some(c => c.id === openId)) {
+    showCustomerDetail(openId);
+  } else {
+    showCustomersList();
+  }
 }
 
 function customerBalance(customerId) {
@@ -188,6 +237,10 @@ function showCustomerDetail(customerId) {
 
   document.getElementById('detail-customer-name').textContent = customer.name;
   document.getElementById('detail-customer-phone').textContent = customer.phone || '';
+  document.getElementById('editCustomerBtn').classList.toggle('hidden', !canEditCustomers);
+  document.getElementById('editCustomerBtn').classList.toggle('flex', canEditCustomers);
+  document.getElementById('editCustomerForm').classList.add('hidden');
+  document.getElementById('editCustomerForm').classList.remove('flex');
 
   const bal = customerBalance(customerId);
   const balEl = document.getElementById('detail-balance');
@@ -275,6 +328,78 @@ async function submitSettlement() {
   document.getElementById('settle-amount').value = '';
   document.getElementById('settle-notes').value = '';
   document.getElementById('settle-form').classList.add('hidden');
+  const customerIdToReopen = currentCustomerId;
+  await load();
+  showCustomerDetail(customerIdToReopen);
+}
+
+function toggleEditCustomerForm() {
+  const form = document.getElementById('editCustomerForm');
+  const willShow = form.classList.contains('hidden');
+  form.classList.toggle('hidden');
+  form.classList.toggle('flex');
+  if (!willShow) return;
+
+  const customer = customers.find(c => c.id === currentCustomerId);
+  if (!customer) return;
+
+  document.getElementById('editCustomerName').value = customer.name || '';
+  document.getElementById('editCustomerPhone').value = customer.phone || '';
+  document.getElementById('editCustomerError').classList.add('hidden');
+
+  const companyFields = document.getElementById('editCustomerCompanyFields');
+  companyFields.classList.toggle('hidden', !customer.is_company);
+  companyFields.classList.toggle('flex', !!customer.is_company);
+  if (customer.is_company) {
+    document.getElementById('editCustomerLegalName').value = customer.legal_name || '';
+    document.getElementById('editCustomerTaxNumber').value = customer.tax_number || '';
+    document.getElementById('editCustomerAddress').value = customer.address || '';
+    document.getElementById('editCustomerEmail').value = customer.email || '';
+  }
+}
+
+async function saveCustomerEdit() {
+  const name = document.getElementById('editCustomerName').value.trim();
+  const phone = document.getElementById('editCustomerPhone').value.trim();
+  const errEl = document.getElementById('editCustomerError');
+  errEl.classList.add('hidden');
+
+  if (!name) {
+    errEl.textContent = 'فضلاً أدخل اسم العميل';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const customer = customers.find(c => c.id === currentCustomerId);
+  const updatePayload = { name, phone: phone || null };
+  if (customer && customer.is_company) {
+    const legalName = document.getElementById('editCustomerLegalName').value.trim();
+    if (!legalName) {
+      errEl.textContent = 'فضلاً أدخل اسم الشركة القانوني';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    updatePayload.legal_name = legalName;
+    updatePayload.tax_number = document.getElementById('editCustomerTaxNumber').value.trim() || null;
+    updatePayload.address = document.getElementById('editCustomerAddress').value.trim() || null;
+    updatePayload.email = document.getElementById('editCustomerEmail').value.trim() || null;
+  }
+
+  const btn = document.getElementById('saveCustomerEditBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('customers').update(updatePayload).eq('id', currentCustomerId);
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ التعديلات';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
   const customerIdToReopen = currentCustomerId;
   await load();
   showCustomerDetail(customerIdToReopen);

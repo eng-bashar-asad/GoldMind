@@ -92,7 +92,9 @@
 </div>
 
 <!-- Counterparty info (customer or trader) -->
-<div class="bg-gray-50 rounded-lg p-3 mb-4 text-[12px]">
+<div class="bg-gray-50 rounded-lg p-3 mb-4 text-[12px] no-print-hide-edit">
+<div class="flex items-start justify-between gap-2">
+<div class="flex-1">
 <div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1" id="cust-label">بيانات العميل</div>
 <div class="font-bold" id="cust-name"></div>
 <div class="text-gray-600" id="cust-legal-name"></div>
@@ -100,6 +102,11 @@
 <div class="text-gray-600 font-mono" dir="ltr" id="cust-phone"></div>
 <div class="text-gray-600" id="cust-email"></div>
 <div class="text-gray-500" id="cust-tax"></div>
+</div>
+<a id="editCounterpartyLink" href="#" class="no-print hidden shrink-0 h-8 w-8 items-center justify-center rounded-full hover:bg-gray-200">
+<span class="material-symbols-outlined text-[16px]">edit</span>
+</a>
+</div>
 </div>
 
 <!-- Items table -->
@@ -253,6 +260,13 @@
         document.getElementById('cust-phone').textContent = (counterparty && counterparty.phone)
             ? (counterparty.is_company && counterparty.phone_country_code ? '+' + counterparty.phone_country_code + ' ' + counterparty.phone : counterparty.phone)
             : '';
+
+        const editLink = document.getElementById('editCounterpartyLink');
+        if (customer) {
+            editLink.href = 'customer-debts-ar.html?open=' + customer.id;
+            editLink.classList.remove('hidden');
+            editLink.classList.add('flex');
+        }
 
         if (counterparty && counterparty.is_company) {
             document.getElementById('cust-legal-name').textContent = counterparty.legal_name || '';
