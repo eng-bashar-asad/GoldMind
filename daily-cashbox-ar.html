@@ -58,13 +58,23 @@
 
 <p class="text-[11px] text-outline">هاد دفتر يدوي بسيط لمتابعة كاش الدرج بس — مش جزء من الحسابات الرسمية (المبيعات/الديون/الضريبة موجودين بمكان تاني). الرصيد بيترحل تلقائياً كل يوم كقيد افتتاحي لليوم يلي بعده.</p>
 
+<div id="day-nav" class="hidden items-center justify-between bg-surface-container-lowest border border-outline-variant rounded-xl p-2">
+<button onclick="shiftDay(-1)" class="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-surface-container-low"><span class="material-symbols-outlined">chevron_right</span></button>
+<span class="text-[13px] font-semibold" id="day-nav-label"></span>
+<button onclick="shiftDay(1)" class="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-surface-container-low" id="day-nav-next"><span class="material-symbols-outlined">chevron_left</span></button>
+</div>
+
 <div id="balances-by-currency" class="flex flex-col gap-2"></div>
 
-<button onclick="toggleAddForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
-<span class="material-symbols-outlined">add</span> إضافة عملية اليوم
+<button onclick="toggleAddForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">add</span> إضافة عملية
 </button>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="addForm">
+<div id="addFormDateWrap" class="hidden mb-3">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">تاريخ العملية</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="addFormDate" type="date"/>
+</div>
 <div class="flex gap-2 mb-3">
 <button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirInBtn" onclick="setDirection('in')">دخول كاش</button>
 <button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirOutBtn" onclick="setDirection('out')">خروج كاش</button>
@@ -95,7 +105,7 @@
 <div id="reportRecipients" class="flex flex-col gap-2"></div>
 </div>
 
-<h2 class="font-semibold text-[13px] mt-2">عمليات اليوم</h2>
+<h2 class="font-semibold text-[13px] mt-2" id="entries-heading">عمليات اليوم</h2>
 <div id="entries-list" class="flex flex-col gap-2"></div>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد عمليات مسجّلة اليوم بعد.</p>
 
@@ -105,9 +115,36 @@
 <script>
 let currentDirection = 'in';
 let allEntries = []; // every entry ever (for computing running balance)
-let todayEntries = [];
+let todayEntries = []; // entries for the currently selected day
+let canManageDates = false; // owner/manager only: view/add/edit entries on days other than today
+let selectedDate = new Date(); selectedDate.setHours(0, 0, 0, 0);
 
 function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function isToday(d) {
+  const t = new Date(); t.setHours(0, 0, 0, 0);
+  return d.getTime() === t.getTime();
+}
+
+function updateDayNav() {
+  const label = document.getElementById('day-nav-label');
+  label.textContent = isToday(selectedDate) ? 'اليوم' : selectedDate.toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  document.getElementById('day-nav-next').classList.toggle('invisible', isToday(selectedDate));
+  document.getElementById('entries-heading').textContent = isToday(selectedDate) ? 'عمليات اليوم' : 'عمليات يوم ' + label.textContent;
+  document.getElementById('empty-state').textContent = isToday(selectedDate) ? 'لا توجد عمليات مسجّلة اليوم بعد.' : 'لا توجد عمليات مسجّلة بهذا اليوم.';
+}
+
+function shiftDay(delta) {
+  if (delta > 0 && isToday(selectedDate)) return; // can't go past today
+  const d = new Date(selectedDate);
+  d.setDate(d.getDate() + delta);
+  selectedDate = d;
+  updateDayNav();
+  document.getElementById('addFormDate').value = selectedDate.toISOString().slice(0, 10);
+  reportPanelLoaded = false;
+  document.getElementById('reportPanel').classList.add('hidden');
+  renderAll();
+}
 
 function setDirection(dir) {
   currentDirection = dir;
@@ -117,6 +154,11 @@ function setDirection(dir) {
 
 function toggleAddForm() {
   document.getElementById('addForm').classList.toggle('hidden');
+  if (canManageDates) {
+    document.getElementById('addFormDateWrap').classList.remove('hidden');
+    document.getElementById('addFormDate').value = selectedDate.toISOString().slice(0, 10);
+    document.getElementById('addFormDate').max = new Date().toISOString().slice(0, 10);
+  }
 }
 
 async function submitEntry() {
@@ -134,7 +176,7 @@ async function submitEntry() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.from('daily_cash_log').insert({
+  const insertPayload = {
     store_id: GOLDMIND_STORE_ID,
     operation_type: opType,
     direction: currentDirection,
@@ -142,7 +184,21 @@ async function submitEntry() {
     currency: currency,
     notes: notes || null,
     created_by: GOLDMIND_STAFF_ID
-  });
+  };
+
+  if (canManageDates) {
+    const chosenDateStr = document.getElementById('addFormDate').value;
+    if (chosenDateStr) {
+      const now = new Date();
+      const chosen = new Date(chosenDateStr + 'T00:00:00');
+      // Keep the current time-of-day so entries added "for" a past day still
+      // sort sensibly among that day's other entries.
+      chosen.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
+      insertPayload.created_at = chosen.toISOString();
+    }
+  }
+
+  const { error } = await goldmindClient.from('daily_cash_log').insert(insertPayload);
 
   btn.disabled = false;
   btn.textContent = 'حفظ العملية';
@@ -175,12 +231,17 @@ async function loadAll() {
   }
 
   allEntries = data || [];
+  renderAll();
+}
 
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  todayEntries = allEntries.filter(e => new Date(e.created_at) >= todayStart);
-  const priorEntries = allEntries.filter(e => new Date(e.created_at) < todayStart);
+function renderAll() {
+  updateDayNav();
 
-  // Running balance per currency: opening (everything before today) + today = closing
+  const dayEnd = new Date(selectedDate); dayEnd.setDate(dayEnd.getDate() + 1);
+  todayEntries = allEntries.filter(e => new Date(e.created_at) >= selectedDate && new Date(e.created_at) < dayEnd);
+  const priorEntries = allEntries.filter(e => new Date(e.created_at) < selectedDate);
+
+  // Running balance per currency: opening (everything before the selected day) + that day = closing
   const currencies = [...new Set(allEntries.map(e => e.currency))];
   const balancesEl = document.getElementById('balances-by-currency');
 
@@ -321,7 +382,7 @@ async function deleteEntry(id) {
 }
 
 function downloadExcel() {
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayStart = selectedDate;
   const dateLabel = todayStart.toLocaleDateString('en-CA'); // YYYY-MM-DD, safe for filenames
 
   const rows = todayEntries.slice().reverse().map(e => ({
@@ -361,7 +422,7 @@ function toggleReportPanel() {
 }
 
 async function buildDailyReport() {
-  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const todayStart = selectedDate;
   const dateLabel = todayStart.toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const { data: store } = await goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
@@ -427,6 +488,11 @@ async function buildDailyReport() {
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+
+  const { data: staffRow } = await goldmindClient.from('staff').select('permissions, role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  canManageDates = !!(staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.view_profit_report)));
+  document.getElementById('day-nav').classList.toggle('hidden', !canManageDates);
+  document.getElementById('day-nav').classList.toggle('flex', canManageDates);
 
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
