@@ -195,3 +195,25 @@ goldmindLoadSavedTheme();
   `;
   document.head.appendChild(style);
 })();
+
+// Same root cause, different shape: plain <input>/<select>/<textarea>
+// elements across several pages (company-settings, account-security,
+// ledger's trader form, invoice forms, etc.) were given a border but no
+// background or text-color class at all. They render on the browser's
+// native white input background while still inheriting the page's light
+// body text color -> invisible white-on-white text. Pages that
+// deliberately want a dark, see-through input (bg-transparent +
+// text-on-background, used e.g. on customer-add-ar.html) are explicitly
+// excluded so they keep their intended look.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    input:not(.bg-transparent):not(.text-on-background),
+    select:not(.bg-transparent):not(.text-on-background),
+    textarea:not(.bg-transparent):not(.text-on-background) {
+      color: var(--gm-on-surface, #191c1e);
+      background-color: var(--gm-surface-lowest, #ffffff);
+    }
+  `;
+  document.head.appendChild(style);
+})();
