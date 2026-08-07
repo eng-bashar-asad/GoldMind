@@ -91,11 +91,15 @@
 </div>
 </div>
 
-<!-- Customer info -->
+<!-- Counterparty info (customer or trader) -->
 <div class="bg-gray-50 rounded-lg p-3 mb-4 text-[12px]">
-<div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1">بيانات العميل</div>
+<div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1" id="cust-label">بيانات العميل</div>
 <div class="font-bold" id="cust-name"></div>
+<div class="text-gray-600" id="cust-legal-name"></div>
+<div class="text-gray-600" id="cust-address"></div>
 <div class="text-gray-600 font-mono" dir="ltr" id="cust-phone"></div>
+<div class="text-gray-600" id="cust-email"></div>
+<div class="text-gray-500" id="cust-tax"></div>
 </div>
 
 <!-- Items table -->
@@ -170,12 +174,19 @@
             return;
         }
 
-        const [{ data: items, error: itemsError }, { data: customer }] = await Promise.all([
+        const [{ data: items, error: itemsError }, { data: customer }, { data: trader }] = await Promise.all([
             goldmindClient.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('id', { ascending: true }),
             invoice.customer_id
                 ? goldmindClient.from('customers').select('*').eq('id', invoice.customer_id).single()
+                : Promise.resolve({ data: null }),
+            invoice.trader_id
+                ? goldmindClient.from('traders').select('*').eq('id', invoice.trader_id).single()
                 : Promise.resolve({ data: null })
         ]);
+
+        // The counterparty is whichever side the invoice actually links to.
+        const counterparty = customer || trader;
+        const counterpartyLabel = customer ? 'بيانات العميل' : (trader ? 'بيانات التاجر' : 'بيانات العميل');
 
         if (itemsError) {
             loading.classList.add('hidden');
@@ -236,9 +247,24 @@
             }
         }
 
-        // ---- Customer ----
-        document.getElementById('cust-name').textContent = customer ? customer.name : '—';
-        document.getElementById('cust-phone').textContent = customer ? (customer.phone || '') : '';
+        // ---- Counterparty (customer or trader) ----
+        document.getElementById('cust-label').textContent = counterpartyLabel;
+        document.getElementById('cust-name').textContent = counterparty ? counterparty.name : '—';
+        document.getElementById('cust-phone').textContent = (counterparty && counterparty.phone)
+            ? (counterparty.is_company && counterparty.phone_country_code ? '+' + counterparty.phone_country_code + ' ' + counterparty.phone : counterparty.phone)
+            : '';
+
+        if (counterparty && counterparty.is_company) {
+            document.getElementById('cust-legal-name').textContent = counterparty.legal_name || '';
+            document.getElementById('cust-address').textContent = counterparty.address || '';
+            document.getElementById('cust-email').textContent = counterparty.email || '';
+            document.getElementById('cust-tax').textContent = counterparty.tax_number ? ('ر.ض: ' + counterparty.tax_number) : '';
+        } else {
+            document.getElementById('cust-legal-name').textContent = '';
+            document.getElementById('cust-address').textContent = '';
+            document.getElementById('cust-email').textContent = '';
+            document.getElementById('cust-tax').textContent = '';
+        }
 
         // ---- Items + VAT breakdown ----
         const vatRate = Number(store.vat_rate || 0);
@@ -278,7 +304,7 @@
         // ---- WhatsApp share (free wa.me text link, same convention used
         // by repairs/daily-cashbox — no paid Business API) ----
         if (invoice.status !== 'cancelled') {
-            window.__waInvoiceData = { store, invoice, customer, items: items || [], sumTotal, currency: store.currency || 'AED' };
+            window.__waInvoiceData = { store, invoice, customer: counterparty, items: items || [], sumTotal, currency: store.currency || 'AED' };
             const waBtn = document.getElementById('whatsapp-invoice-btn');
             waBtn.classList.remove('hidden');
             waBtn.classList.add('flex');

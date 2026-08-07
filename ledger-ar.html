@@ -66,10 +66,50 @@
 <span class="material-symbols-outlined">person_add</span> إضافة تاجر جديد
 </button>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4" id="addTraderForm">
-<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم التاجر</label>
+
+<div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
+<button type="button" id="trader-type-individual-btn" onclick="setTraderType(false)" class="flex-1 h-10 font-semibold text-xs transition-all">فرد</button>
+<button type="button" id="trader-type-company-btn" onclick="setTraderType(true)" class="flex-1 h-10 font-semibold text-xs transition-all">شركة</button>
+</div>
+
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1" id="newTraderNameLabel">اسم التاجر</label>
 <input id="newTraderName" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3"/>
+
+<div id="trader-company-fields" class="hidden flex-col gap-3 mb-3">
+<div>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم الشركة القانوني</label>
+<input id="traderLegalName" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm"/>
+</div>
+<div>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">الرقم الضريبي (اختياري)</label>
+<input id="traderTaxNumber" dir="ltr" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm"/>
+</div>
+<div>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">عنوان الشركة</label>
+<textarea id="traderAddress" class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm resize-none"></textarea>
+</div>
+<div>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">إيميل الشركة</label>
+<input id="traderEmail" dir="ltr" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm"/>
+</div>
+<div>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">رقم التواصل</label>
+<div class="flex gap-2">
+<select id="traderPhoneCode" dir="ltr" class="h-11 border border-outline-variant rounded-lg px-2 text-xs"></select>
+<input id="traderCompanyPhone" dir="ltr" class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm" placeholder="رقم الموبايل أو الأرضي"/>
+</div>
+</div>
+<div>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">مستندات KYC (صور أو PDF)</label>
+<input id="traderKycFiles" multiple="" type="file" accept="image/*,.pdf" class="w-full text-xs border border-dashed border-outline-variant rounded-lg px-2 py-2"/>
+</div>
+</div>
+
+<div id="trader-individual-phone-wrap">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-1">رقم الهاتف (اختياري)</label>
 <input id="newTraderPhone" dir="ltr" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3"/>
+</div>
+
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-1">ملاحظات (اختياري)</label>
 <textarea id="newTraderNotes" class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3"></textarea>
 <button onclick="submitNewTrader()" id="newTraderBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ التاجر</button>
@@ -199,6 +239,59 @@ function toggleAddTraderForm() {
   document.getElementById('addTraderForm').classList.toggle('hidden');
 }
 
+let traderIsCompany = false;
+
+(function initTraderPhoneCodes() {
+  const sel = document.getElementById('traderPhoneCode');
+  Object.keys(GOLDMIND_COUNTRY_PHONE_MAP).forEach(function (cc) {
+    const opt = document.createElement('option');
+    opt.value = GOLDMIND_COUNTRY_PHONE_MAP[cc];
+    opt.textContent = '+' + GOLDMIND_COUNTRY_PHONE_MAP[cc] + ' (' + cc + ')';
+    sel.appendChild(opt);
+  });
+  sel.value = GOLDMIND_DEFAULT_PHONE_CODE;
+})();
+
+function setTraderType(company) {
+  traderIsCompany = company;
+  document.getElementById('trader-type-company-btn').classList.toggle('bg-primary', company);
+  document.getElementById('trader-type-company-btn').classList.toggle('text-on-primary', company);
+  document.getElementById('trader-type-individual-btn').classList.toggle('bg-primary', !company);
+  document.getElementById('trader-type-individual-btn').classList.toggle('text-on-primary', !company);
+  document.getElementById('trader-company-fields').classList.toggle('hidden', !company);
+  document.getElementById('trader-company-fields').classList.toggle('flex', company);
+  document.getElementById('trader-individual-phone-wrap').classList.toggle('hidden', company);
+  document.getElementById('newTraderNameLabel').textContent = company ? 'اسم التاجر (مختصر/شائع)' : 'اسم التاجر';
+}
+setTraderType(false);
+
+async function uploadTraderKycFiles(traderId) {
+  const filesInput = document.getElementById('traderKycFiles');
+  const files = filesInput.files;
+  if (!files || files.length === 0) return { ok: true };
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+    const path = GOLDMIND_STORE_ID + '/trader-' + traderId + '/' + Date.now() + '-' + i + '.' + ext;
+
+    const { error: uploadError } = await goldmindClient.storage
+      .from('company-kyc-documents').upload(path, file, { upsert: false });
+    if (uploadError) return { ok: false, message: uploadError.message };
+
+    const { error: rowError } = await goldmindClient.from('company_kyc_documents').insert({
+      store_id: GOLDMIND_STORE_ID,
+      owner_type: 'trader',
+      owner_id: traderId,
+      file_url: path,
+      file_name: file.name,
+      uploaded_by: GOLDMIND_STAFF_ID
+    });
+    if (rowError) return { ok: false, message: rowError.message };
+  }
+  return { ok: true };
+}
+
 async function submitNewTrader() {
   const name = document.getElementById('newTraderName').value.trim();
   const phone = document.getElementById('newTraderPhone').value.trim();
@@ -212,29 +305,66 @@ async function submitNewTrader() {
     return;
   }
 
+  const legalName = document.getElementById('traderLegalName').value.trim();
+  if (traderIsCompany && !legalName) {
+    errEl.textContent = 'فضلاً أدخل اسم الشركة القانوني';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
   const btn = document.getElementById('newTraderBtn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.from('traders').insert({
+  const insertPayload = {
     store_id: GOLDMIND_STORE_ID,
     name: name,
-    phone: phone || null,
-    notes: notes || null
-  });
+    notes: notes || null,
+    is_company: traderIsCompany
+  };
 
-  btn.disabled = false;
-  btn.textContent = 'حفظ التاجر';
+  if (traderIsCompany) {
+    const companyPhone = document.getElementById('traderCompanyPhone').value.trim();
+    insertPayload.phone = companyPhone || null;
+    insertPayload.phone_country_code = companyPhone ? document.getElementById('traderPhoneCode').value : null;
+    insertPayload.legal_name = legalName;
+    insertPayload.tax_number = document.getElementById('traderTaxNumber').value.trim() || null;
+    insertPayload.address = document.getElementById('traderAddress').value.trim() || null;
+    insertPayload.email = document.getElementById('traderEmail').value.trim() || null;
+  } else {
+    insertPayload.phone = phone || null;
+  }
+
+  const { data: inserted, error } = await goldmindClient.from('traders').insert(insertPayload).select('id').single();
 
   if (error) {
+    btn.disabled = false;
+    btn.textContent = 'حفظ التاجر';
     errEl.textContent = 'تعذّر الحفظ: ' + error.message;
     errEl.classList.remove('hidden');
     return;
   }
 
+  if (traderIsCompany) {
+    const kycResult = await uploadTraderKycFiles(inserted.id);
+    if (!kycResult.ok) {
+      errEl.textContent = 'تم حفظ التاجر لكن تعذّر رفع بعض مستندات KYC: ' + kycResult.message;
+      errEl.classList.remove('hidden');
+    }
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ التاجر';
+
   document.getElementById('newTraderName').value = '';
   document.getElementById('newTraderPhone').value = '';
   document.getElementById('newTraderNotes').value = '';
+  document.getElementById('traderLegalName').value = '';
+  document.getElementById('traderTaxNumber').value = '';
+  document.getElementById('traderAddress').value = '';
+  document.getElementById('traderEmail').value = '';
+  document.getElementById('traderCompanyPhone').value = '';
+  document.getElementById('traderKycFiles').value = '';
   document.getElementById('addTraderForm').classList.add('hidden');
   await load();
 }
