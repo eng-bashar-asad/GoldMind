@@ -413,14 +413,8 @@ function downloadExcel() {
   XLSX.writeFile(buildWorkbook(), `جدول-الحركة-اليومية-${dateLabel}.xlsx`);
 }
 
-// Uploads today's report as a real .xlsx to private storage, then returns a
-// short clean link to our own redirect page (daily-report-open-ar.html)
-// instead of the raw long signed-URL token. Embedding that raw token
-// directly inside RTL Arabic WhatsApp text caused it to get corrupted in
-// transit (WhatsApp's link auto-detection mangled it, producing an
-// "InvalidJWT / failed to base64url decode" error when tapped) — a short
-// UUID link is far safer, and the redirect page generates a fresh signed
-// URL at click time.
+// Same free/no-login/no-expiry pattern as the repair-receipt WhatsApp
+// links: a plain public URL, no signed-token machinery, no redirect page.
 async function uploadReportExcelAndGetLink() {
   const dateLabel = selectedDate.toLocaleDateString('en-CA');
   const wb = buildWorkbook();
@@ -431,13 +425,8 @@ async function uploadReportExcelAndGetLink() {
   const { error: uploadError } = await goldmindClient.storage.from('daily-reports').upload(path, blob, { upsert: false });
   if (uploadError) return null;
 
-  const { data: linkRow, error: linkError } = await goldmindClient
-    .from('daily_report_links')
-    .insert({ store_id: GOLDMIND_STORE_ID, storage_path: path })
-    .select('id').single();
-  if (linkError || !linkRow) return null;
-
-  return window.location.origin + window.location.pathname.replace('daily-cashbox-ar.html', 'daily-report-open-ar.html') + '?id=' + linkRow.id;
+  const { data: pub } = goldmindClient.storage.from('daily-reports').getPublicUrl(path);
+  return pub ? pub.publicUrl : null;
 }
 
 let reportPanelLoaded = false;
