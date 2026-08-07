@@ -381,10 +381,7 @@ async function deleteEntry(id) {
   await loadAll();
 }
 
-function downloadExcel() {
-  const todayStart = selectedDate;
-  const dateLabel = todayStart.toLocaleDateString('en-CA'); // YYYY-MM-DD, safe for filenames
-
+function buildWorkbook() {
   const rows = todayEntries.slice().reverse().map(e => ({
     'الوقت': new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' }),
     'نوع العملية': e.operation_type,
@@ -408,7 +405,30 @@ function downloadExcel() {
   const wsBalances = XLSX.utils.json_to_sheet(balanceRows.length ? balanceRows : [{ 'ملاحظة': 'لا يوجد رصيد' }]);
   XLSX.utils.book_append_sheet(wb, wsBalances, 'الأرصدة');
 
-  XLSX.writeFile(wb, `جدول-الحركة-اليومية-${dateLabel}.xlsx`);
+  return wb;
+}
+
+function downloadExcel() {
+  const dateLabel = selectedDate.toLocaleDateString('en-CA'); // YYYY-MM-DD, safe for filenames
+  XLSX.writeFile(buildWorkbook(), `جدول-الحركة-اليومية-${dateLabel}.xlsx`);
+}
+
+// Uploads today's report as a real .xlsx to private storage and returns a
+// signed link (valid a week) that can be dropped straight into the WhatsApp
+// message — the recipient taps it and downloads the actual spreadsheet
+// instead of reading a squeezed monospace table.
+async function uploadReportExcelAndGetLink() {
+  const dateLabel = selectedDate.toLocaleDateString('en-CA');
+  const wb = buildWorkbook();
+  const arrayBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
+  const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const path = `${GOLDMIND_STORE_ID}/daily-report-${dateLabel}-${Date.now()}.xlsx`;
+
+  const { error: uploadError } = await goldmindClient.storage.from('daily-reports').upload(path, blob, { upsert: false });
+  if (uploadError) return null;
+
+  const { data: signed } = await goldmindClient.storage.from('daily-reports').createSignedUrl(path, 60 * 60 * 24 * 7);
+  return signed ? signed.signedUrl : null;
 }
 
 let reportPanelLoaded = false;
@@ -456,6 +476,10 @@ async function buildDailyReport() {
     return `${cur}: ${fmt(total)}`;
   }).join('\n') || 'لا يوجد رصيد';
 
+  document.getElementById('reportPanelIntro').textContent = 'جارِ تجهيز ملف Excel...';
+  const excelLink = await uploadReportExcelAndGetLink();
+  const fileLine = excelLink ? `\n📎 الملف الكامل (Excel):\n${excelLink}\n(الرابط صالح 7 أيام)` : '';
+
   const reportText =
     `*جدول الحركة اليومية*\n` +
     `Day ${dateLabel}\n` +
@@ -463,7 +487,8 @@ async function buildDailyReport() {
     `——————————\n` +
     `${tableBlock}\n` +
     `——————————\n` +
-    `💰 الرصيد الحالي بالدرج:\n${balanceLines}`;
+    `💰 الرصيد الحالي بالدرج:\n${balanceLines}\n` +
+    fileLine;
 
   document.getElementById('reportPanelIntro').textContent = 'الجدول جاهز — اختر مين تبعتله:';
 
