@@ -384,8 +384,8 @@ async function load() {
     return;
   }
 
-  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-  const canEdit = staffRow && staffRow.permissions && staffRow.permissions.edit_invoice;
+  const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canEdit = staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.edit_invoice));
 
   const { data: inv, error: invError } = await goldmindClient.from('invoices').select('*').eq('id', invoiceId).single();
 

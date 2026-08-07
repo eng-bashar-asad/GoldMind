@@ -230,22 +230,22 @@
 
         if (invoice.status === 'cancelled') {
             document.getElementById('cancelled-banner').classList.remove('hidden');
-            const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-            if (staffRow && staffRow.permissions && staffRow.permissions.delete_invoice) {
+            const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+            if (staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.delete_invoice))) {
                 const restoreBtn = document.getElementById('restore-invoice-btn');
                 restoreBtn.classList.remove('hidden');
                 restoreBtn.classList.add('flex');
                 window.__currentInvoiceId = invoiceId;
             }
         } else {
-            const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-            if (staffRow && staffRow.permissions && staffRow.permissions.delete_invoice) {
+            const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+            if (staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.delete_invoice))) {
                 const btn = document.getElementById('cancel-invoice-btn');
                 btn.classList.remove('hidden');
                 btn.classList.add('flex');
                 window.__currentInvoiceId = invoiceId;
             }
-            if (staffRow && staffRow.permissions && staffRow.permissions.edit_invoice
+            if (staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.edit_invoice))
                 && (invoice.type === 'sale' || invoice.type === 'buyTrader' || invoice.type === 'buyRetail')) {
                 const editBtn = document.getElementById('edit-invoice-btn');
                 editBtn.classList.remove('hidden');
