@@ -413,10 +413,14 @@ function downloadExcel() {
   XLSX.writeFile(buildWorkbook(), `جدول-الحركة-اليومية-${dateLabel}.xlsx`);
 }
 
-// Uploads today's report as a real .xlsx to private storage and returns a
-// signed link (valid a week) that can be dropped straight into the WhatsApp
-// message — the recipient taps it and downloads the actual spreadsheet
-// instead of reading a squeezed monospace table.
+// Uploads today's report as a real .xlsx to private storage, then returns a
+// short clean link to our own redirect page (daily-report-open-ar.html)
+// instead of the raw long signed-URL token. Embedding that raw token
+// directly inside RTL Arabic WhatsApp text caused it to get corrupted in
+// transit (WhatsApp's link auto-detection mangled it, producing an
+// "InvalidJWT / failed to base64url decode" error when tapped) — a short
+// UUID link is far safer, and the redirect page generates a fresh signed
+// URL at click time.
 async function uploadReportExcelAndGetLink() {
   const dateLabel = selectedDate.toLocaleDateString('en-CA');
   const wb = buildWorkbook();
@@ -427,8 +431,13 @@ async function uploadReportExcelAndGetLink() {
   const { error: uploadError } = await goldmindClient.storage.from('daily-reports').upload(path, blob, { upsert: false });
   if (uploadError) return null;
 
-  const { data: signed } = await goldmindClient.storage.from('daily-reports').createSignedUrl(path, 60 * 60 * 24 * 7);
-  return signed ? signed.signedUrl : null;
+  const { data: linkRow, error: linkError } = await goldmindClient
+    .from('daily_report_links')
+    .insert({ store_id: GOLDMIND_STORE_ID, storage_path: path })
+    .select('id').single();
+  if (linkError || !linkRow) return null;
+
+  return window.location.origin + window.location.pathname.replace('daily-cashbox-ar.html', 'daily-report-open-ar.html') + '?id=' + linkRow.id;
 }
 
 let reportPanelLoaded = false;
@@ -478,7 +487,7 @@ async function buildDailyReport() {
 
   document.getElementById('reportPanelIntro').textContent = 'جارِ تجهيز ملف Excel...';
   const excelLink = await uploadReportExcelAndGetLink();
-  const fileLine = excelLink ? `\n📎 الملف الكامل (Excel):\n${excelLink}\n(الرابط صالح 7 أيام)` : '';
+  const fileLine = excelLink ? `\n📎 الملف الكامل (Excel):\n${excelLink}` : '';
 
   const reportText =
     `*جدول الحركة اليومية*\n` +
