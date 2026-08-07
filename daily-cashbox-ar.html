@@ -11,6 +11,7 @@
 <title>الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="supabase-config.js"></script>
 <script src="theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -85,6 +86,9 @@
 
 <button onclick="toggleReportPanel()" class="w-full h-12 bg-secondary text-on-secondary rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">share</span> إرسال جدول اليوم عبر واتساب
+</button>
+<button onclick="downloadExcel()" class="w-full h-12 border-2 border-outline-variant text-on-surface rounded-xl flex items-center justify-center gap-2 font-semibold">
+<span class="material-symbols-outlined">download</span> تنزيل جدول اليوم Excel
 </button>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="reportPanel">
 <p class="text-[12px] text-on-surface-variant mb-3" id="reportPanelIntro">جارِ تجهيز الجدول...</p>
@@ -314,6 +318,36 @@ async function deleteEntry(id) {
   reportPanelLoaded = false;
   document.getElementById('reportPanel').classList.add('hidden');
   await loadAll();
+}
+
+function downloadExcel() {
+  const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
+  const dateLabel = todayStart.toLocaleDateString('en-CA'); // YYYY-MM-DD, safe for filenames
+
+  const rows = todayEntries.slice().reverse().map(e => ({
+    'الوقت': new Date(e.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+    'نوع العملية': e.operation_type,
+    'الاتجاه': e.direction === 'in' ? 'دخول' : 'خروج',
+    'المبلغ': Number(e.amount),
+    'العملة': e.currency,
+    'ملاحظات': e.notes || '',
+    'الموظف': (e.staff && e.staff.full_name) || ''
+  }));
+
+  const currencies = [...new Set(allEntries.map(e => e.currency))];
+  const balanceRows = currencies.map(cur => {
+    const total = allEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+    return { 'العملة': cur, 'الرصيد الحالي': total };
+  });
+
+  const wb = XLSX.utils.book_new();
+  const wsEntries = XLSX.utils.json_to_sheet(rows.length ? rows : [{ 'ملاحظة': 'لا توجد عمليات اليوم' }]);
+  XLSX.utils.book_append_sheet(wb, wsEntries, 'عمليات اليوم');
+
+  const wsBalances = XLSX.utils.json_to_sheet(balanceRows.length ? balanceRows : [{ 'ملاحظة': 'لا يوجد رصيد' }]);
+  XLSX.utils.book_append_sheet(wb, wsBalances, 'الأرصدة');
+
+  XLSX.writeFile(wb, `جدول-الحركة-اليومية-${dateLabel}.xlsx`);
 }
 
 let reportPanelLoaded = false;
