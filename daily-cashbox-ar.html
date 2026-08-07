@@ -11,7 +11,6 @@
 <title>الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="supabase-config.js"></script>
 <script src="theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -96,9 +95,6 @@
 
 <button onclick="toggleReportPanel()" class="w-full h-12 bg-secondary text-on-secondary rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">share</span> إرسال جدول اليوم عبر واتساب
-</button>
-<button onclick="downloadExcel()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
-<span class="material-symbols-outlined">download</span> تنزيل جدول اليوم Excel
 </button>
 <button onclick="openPrintView()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">receipt_long</span> عرض كشف قابل للطباعة
@@ -384,54 +380,6 @@ async function deleteEntry(id) {
   await loadAll();
 }
 
-function buildWorkbook() {
-  const rows = todayEntries.slice().reverse().map(e => ({
-    'الوقت': new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' }),
-    'نوع العملية': e.operation_type,
-    'الاتجاه': e.direction === 'in' ? 'دخول' : 'خروج',
-    'المبلغ': Number(e.amount),
-    'العملة': e.currency,
-    'ملاحظات': e.notes || '',
-    'الموظف': (e.staff && e.staff.full_name) || ''
-  }));
-
-  const currencies = [...new Set(allEntries.map(e => e.currency))];
-  const balanceRows = currencies.map(cur => {
-    const total = allEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
-    return { 'العملة': cur, 'الرصيد الحالي': total };
-  });
-
-  const wb = XLSX.utils.book_new();
-  const wsEntries = XLSX.utils.json_to_sheet(rows.length ? rows : [{ 'ملاحظة': 'لا توجد عمليات اليوم' }]);
-  XLSX.utils.book_append_sheet(wb, wsEntries, 'عمليات اليوم');
-
-  const wsBalances = XLSX.utils.json_to_sheet(balanceRows.length ? balanceRows : [{ 'ملاحظة': 'لا يوجد رصيد' }]);
-  XLSX.utils.book_append_sheet(wb, wsBalances, 'الأرصدة');
-
-  return wb;
-}
-
-function downloadExcel() {
-  const dateLabel = selectedDate.toLocaleDateString('en-CA'); // YYYY-MM-DD, safe for filenames
-  XLSX.writeFile(buildWorkbook(), `جدول-الحركة-اليومية-${dateLabel}.xlsx`);
-}
-
-// Same free/no-login/no-expiry pattern as the repair-receipt WhatsApp
-// links: a plain public URL, no signed-token machinery, no redirect page.
-async function uploadReportExcelAndGetLink() {
-  const dateLabel = selectedDate.toLocaleDateString('en-CA');
-  const wb = buildWorkbook();
-  const arrayBuffer = XLSX.write(wb, { type: 'array', bookType: 'xlsx' });
-  const blob = new Blob([arrayBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const path = `${GOLDMIND_STORE_ID}/daily-report-${dateLabel}-${Date.now()}.xlsx`;
-
-  const { error: uploadError } = await goldmindClient.storage.from('daily-reports').upload(path, blob, { upsert: false });
-  if (uploadError) return null;
-
-  const { data: pub } = goldmindClient.storage.from('daily-reports').getPublicUrl(path);
-  return pub ? pub.publicUrl : null;
-}
-
 function openPrintView() {
   const dateStr = selectedDate.toISOString().slice(0, 10);
   window.open('daily-cashbox-print-ar.html?date=' + dateStr, '_blank');
@@ -482,9 +430,9 @@ async function buildDailyReport() {
     return `${cur}: ${fmt(total)}`;
   }).join('\n') || 'لا يوجد رصيد';
 
-  document.getElementById('reportPanelIntro').textContent = 'جارِ تجهيز ملف Excel...';
-  const excelLink = await uploadReportExcelAndGetLink();
-  const fileLine = excelLink ? `\n📎 الملف الكامل (Excel):\n${excelLink}` : '';
+  const dateStr = selectedDate.toISOString().slice(0, 10);
+  const printLink = window.location.origin + window.location.pathname.replace('daily-cashbox-ar.html', 'daily-cashbox-print-ar.html') + '?date=' + dateStr;
+  const fileLine = `\n📎 الكشف القابل للطباعة:\n${printLink}`;
 
   const reportText =
     `*جدول الحركة اليومية*\n` +
