@@ -56,7 +56,7 @@
 </div>
 
 <script>
-function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
@@ -89,7 +89,7 @@ async function load() {
   }
 
   document.getElementById('store-name').textContent = store ? store.name : 'GoldMind';
-  document.getElementById('print-date').textContent = 'تاريخ الإصدار: ' + new Date().toLocaleDateString('ar-EG');
+  document.getElementById('print-date').textContent = 'تاريخ الإصدار: ' + new Date().toLocaleDateString('ar-EG-u-nu-latn');
   document.getElementById('customer-name').textContent = customer.name;
   document.getElementById('customer-phone').textContent = customer.phone || '';
 
@@ -108,7 +108,7 @@ async function load() {
   } else {
     tbody.innerHTML = moves.map(m => {
       const isIncrease = m.movement_type === 'debt_increase';
-      const date = new Date(m.created_at).toLocaleDateString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const date = new Date(m.created_at).toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
       const label = (MOVEMENT_LABELS[m.movement_type] || m.movement_type) + (m.invoice && m.invoice.invoice_number ? ' (' + m.invoice.invoice_number + ')' : '');
       return `
         <tr class="border-b border-gray-100">

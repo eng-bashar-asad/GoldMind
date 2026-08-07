@@ -107,7 +107,7 @@ let currentDirection = 'in';
 let allEntries = []; // every entry ever (for computing running balance)
 let todayEntries = [];
 
-function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 function setDirection(dir) {
   currentDirection = dir;
@@ -212,7 +212,7 @@ async function loadAll() {
     emptyEl.classList.add('hidden');
     listEl.innerHTML = todayEntries.slice().reverse().map(e => {
       const isIn = e.direction === 'in';
-      const time = new Date(e.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' });
+      const time = new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' });
       return `
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="entry-${e.id}">
           <div class="flex items-center justify-between mb-1">
@@ -325,7 +325,7 @@ function downloadExcel() {
   const dateLabel = todayStart.toLocaleDateString('en-CA'); // YYYY-MM-DD, safe for filenames
 
   const rows = todayEntries.slice().reverse().map(e => ({
-    'الوقت': new Date(e.created_at).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }),
+    'الوقت': new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' }),
     'نوع العملية': e.operation_type,
     'الاتجاه': e.direction === 'in' ? 'دخول' : 'خروج',
     'المبلغ': Number(e.amount),
@@ -362,7 +362,7 @@ function toggleReportPanel() {
 
 async function buildDailyReport() {
   const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
-  const dateLabel = todayStart.toLocaleDateString('ar-EG', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const dateLabel = todayStart.toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const { data: store } = await goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
 

@@ -107,7 +107,7 @@ let originalInvoice = null;
 let originalItems = [];
 let selectedItemIds = new Set();
 
-function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 async function searchInvoice() {
   const num = document.getElementById('searchInput').value.trim();
@@ -152,7 +152,7 @@ async function searchInvoice() {
   selectedItemIds = new Set();
 
   document.getElementById('orig-number').textContent = invoice.invoice_number;
-  document.getElementById('orig-date').textContent = new Date(invoice.created_at).toLocaleDateString('ar-EG');
+  document.getElementById('orig-date').textContent = new Date(invoice.created_at).toLocaleDateString('ar-EG-u-nu-latn');
   document.getElementById('orig-customer').textContent = 'العميل: ' + (invoice.customer ? invoice.customer.name : '—');
   const PAYMENT_LABELS = { cash: 'نقدي', bank: 'فيزا/بنك', credit: 'دين' };
   document.getElementById('orig-payment').textContent = PAYMENT_LABELS[invoice.payment_method] || invoice.payment_method;

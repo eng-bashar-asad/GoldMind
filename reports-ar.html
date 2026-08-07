@@ -188,7 +188,7 @@ async function searchByInvoiceNumber() {
     <div class="flex items-center justify-between py-2 border-b border-outline-variant last:border-0">
       <div>
         <p class="font-data-mono font-bold text-[13px]">${i.invoice_number}</p>
-        <p class="text-[11px] text-on-surface-variant">${TYPE_LABELS[i.type] || i.type} · ${new Date(i.created_at).toLocaleDateString('ar-EG')}</p>
+        <p class="text-[11px] text-on-surface-variant">${TYPE_LABELS[i.type] || i.type} · ${new Date(i.created_at).toLocaleDateString('ar-EG-u-nu-latn')}</p>
       </div>
       <span class="font-data-mono font-bold text-[13px]">${fmt(i.total_amount)}</span>
     </div>`).join('');
@@ -197,7 +197,7 @@ async function searchByInvoiceNumber() {
 let currentPeriod = 'today';
 let rangeStart = null, rangeEnd = null;
 
-function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 function computeRange(period) {
   const now = new Date();
@@ -299,7 +299,7 @@ async function loadReport() {
     invTbody.innerHTML = salesInvoices.map(i => `
       <tr class="border-t border-outline-variant">
         <td class="px-3 py-2 font-data-mono">${i.invoice_number}</td>
-        <td class="px-3 py-2">${new Date(i.created_at).toLocaleDateString('ar-EG')}</td>
+        <td class="px-3 py-2">${new Date(i.created_at).toLocaleDateString('ar-EG-u-nu-latn')}</td>
         <td class="px-3 py-2">${PAYMENT_LABELS[i.payment_method] || i.payment_method}</td>
         <td class="px-3 py-2 font-data-mono font-bold">${fmt(i.total_amount)}</td>
       </tr>`).join('');
@@ -371,7 +371,7 @@ async function loadReport() {
     taxTbody.innerHTML = taxRows.map(r => `
       <tr class="border-t border-outline-variant">
         <td class="px-3 py-2 font-data-mono">${r.i.invoice_number}</td>
-        <td class="px-3 py-2">${new Date(r.i.created_at).toLocaleDateString('ar-EG')}</td>
+        <td class="px-3 py-2">${new Date(r.i.created_at).toLocaleDateString('ar-EG-u-nu-latn')}</td>
         <td class="px-3 py-2 font-data-mono">${fmt(r.beforeTax)}</td>
         <td class="px-3 py-2 font-data-mono text-secondary">${fmt(r.tax)}</td>
       </tr>`).join('');
@@ -386,7 +386,7 @@ function exportTaxCsv() {
     ['رقم الفاتورة', 'التاريخ', 'المبلغ الخاضع', 'قيمة الضريبة']
   ];
   data.taxRows.forEach(r => {
-    rows.push([r.i.invoice_number, new Date(r.i.created_at).toLocaleDateString('ar-EG'), r.beforeTax.toFixed(2), r.tax.toFixed(2)]);
+    rows.push([r.i.invoice_number, new Date(r.i.created_at).toLocaleDateString('ar-EG-u-nu-latn'), r.beforeTax.toFixed(2), r.tax.toFixed(2)]);
   });
   rows.push([]);
   rows.push(['ضريبة المخرجات (المبيعات)', '', '', data.totalTax.toFixed(2)]);

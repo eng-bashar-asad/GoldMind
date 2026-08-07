@@ -114,7 +114,7 @@ const STATUS_LABELS = { paid: 'مدفوعة', unpaid: 'غير مدفوعة', can
 
 let allRows = [];
 
-function fmt(n) { return Number(n || 0).toLocaleString('ar-EG', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 async function loadData() {
   const fromVal = document.getElementById('fromDate').value;
@@ -203,7 +203,7 @@ function applyFilters() {
   empty.classList.add('hidden');
 
   list.innerHTML = rows.map(r => {
-    const dateStr = new Date(r.created_at).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+    const dateStr = new Date(r.created_at).toLocaleString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
     const badgeColor = TYPE_COLORS[r.type] || 'bg-gray-100 text-gray-700';
     const statusLabel = STATUS_LABELS[r.status] || r.status || '';
     return `
