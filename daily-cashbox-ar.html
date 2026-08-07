@@ -100,6 +100,9 @@
 <button onclick="downloadExcel()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">download</span> تنزيل جدول اليوم Excel
 </button>
+<button onclick="openPrintView()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
+<span class="material-symbols-outlined">receipt_long</span> عرض كشف قابل للطباعة
+</button>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="reportPanel">
 <p class="text-[12px] text-on-surface-variant mb-3" id="reportPanelIntro">جارِ تجهيز الجدول...</p>
 <div id="reportRecipients" class="flex flex-col gap-2"></div>
@@ -427,6 +430,11 @@ async function uploadReportExcelAndGetLink() {
 
   const { data: pub } = goldmindClient.storage.from('daily-reports').getPublicUrl(path);
   return pub ? pub.publicUrl : null;
+}
+
+function openPrintView() {
+  const dateStr = selectedDate.toISOString().slice(0, 10);
+  window.open('daily-cashbox-print-ar.html?date=' + dateStr, '_blank');
 }
 
 let reportPanelLoaded = false;

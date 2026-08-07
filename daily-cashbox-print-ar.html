@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>كشف الحركة اليومية | GoldMind</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; }
+        #sheet { box-shadow: none !important; border: none !important; margin: 0 !important; max-width: none !important; }
+    }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 h-14">
+<button onclick="window.location.href='daily-cashbox-ar.html'" class="flex items-center gap-2 text-gray-700">
+<span class="material-symbols-outlined">arrow_forward</span>
+<span class="text-sm font-semibold">الحركة اليومية</span>
+</button>
+<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">print</span> طباعة
+</button>
+</div>
+
+<div id="loading" class="py-16 text-center text-gray-500 text-sm">جارِ التحميل...</div>
+
+<div id="sheet" class="hidden max-w-2xl mx-auto my-6 bg-white shadow rounded-lg overflow-hidden">
+
+<!-- Letterhead -->
+<div class="p-6 text-center border-b-4 border-amber-600">
+<img id="storeLogo" class="hidden w-16 h-16 mx-auto mb-2 object-contain"/>
+<h1 id="storeName" class="text-xl font-bold"></h1>
+<p id="storeAddress" class="text-[12px] text-gray-500 mt-1"></p>
+<p id="storePhone" class="text-[12px] text-gray-500" dir="ltr"></p>
+</div>
+
+<div class="p-5">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-lg font-bold">كشف الحركة اليومية</h2>
+<span id="dateLabel" class="text-[12px] text-gray-500"></span>
+</div>
+
+<!-- Two symmetric columns: outgoing (right) / incoming (left) -->
+<table class="w-full border border-gray-300 text-[13px]">
+<thead>
+<tr>
+<th colspan="2" class="bg-red-100 text-red-800 py-2 border border-gray-300">الصادر</th>
+<th colspan="2" class="bg-blue-100 text-blue-800 py-2 border border-gray-300">الداخل</th>
+</tr>
+</thead>
+<tbody id="rowsBody"></tbody>
+</table>
+
+<!-- Per-currency totals, mirroring the reference sheet's summary block -->
+<div class="mt-5">
+<h3 class="text-[13px] font-bold text-gray-700 mb-2">الرصيد الحالي بالدرج</h3>
+<table class="w-full border border-gray-300 text-[13px]" id="totalsTable"></table>
+</div>
+</div>
+
+</div>
+
+<script>
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+function getSelectedDate() {
+  const params = new URLSearchParams(window.location.search);
+  const dateStr = params.get('date');
+  const d = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: store } = await goldmindClient.from('stores').select('name, address, phone, logo_url').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  if (store) {
+    document.getElementById('storeName').textContent = store.name || '';
+    if (store.address) document.getElementById('storeAddress').textContent = store.address;
+    if (store.phone) document.getElementById('storePhone').textContent = store.phone;
+    if (store.logo_url) {
+      const logo = document.getElementById('storeLogo');
+      logo.src = store.logo_url;
+      logo.classList.remove('hidden');
+    }
+  }
+
+  const selectedDate = getSelectedDate();
+  const dayEnd = new Date(selectedDate); dayEnd.setDate(dayEnd.getDate() + 1);
+  document.getElementById('dateLabel').textContent = selectedDate.toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const { data: allEntries, error } = await goldmindClient
+    .from('daily_cash_log')
+    .select('*')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    document.getElementById('loading').textContent = 'تعذّر التحميل: ' + error.message;
+    return;
+  }
+
+  const dayEntries = (allEntries || []).filter(e => new Date(e.created_at) >= selectedDate && new Date(e.created_at) < dayEnd);
+  const priorEntries = (allEntries || []).filter(e => new Date(e.created_at) < selectedDate);
+
+  const outEntries = dayEntries.filter(e => e.direction === 'out');
+  const inEntries = dayEntries.filter(e => e.direction === 'in');
+  const rowCount = Math.max(outEntries.length, inEntries.length, 1);
+
+  const rowsBody = document.getElementById('rowsBody');
+  let rowsHtml = '';
+  for (let i = 0; i < rowCount; i++) {
+    const o = outEntries[i];
+    const inn = inEntries[i];
+    rowsHtml += `<tr>
+      <td class="py-2 px-2 border border-gray-300">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
+      <td class="py-2 px-2 border border-gray-300 font-bold text-left" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
+      <td class="py-2 px-2 border border-gray-300">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
+      <td class="py-2 px-2 border border-gray-300 font-bold text-left" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
+    </tr>`;
+  }
+  if (dayEntries.length === 0) {
+    rowsHtml = '<tr><td colspan="4" class="py-6 text-center text-gray-400 border border-gray-300">لا توجد عمليات بهذا اليوم</td></tr>';
+  }
+  rowsBody.innerHTML = rowsHtml;
+
+  const currencies = [...new Set((allEntries || []).map(e => e.currency))];
+  const totalsTable = document.getElementById('totalsTable');
+  if (currencies.length === 0) {
+    totalsTable.innerHTML = '<tr><td class="py-3 px-2 text-center text-gray-400 border border-gray-300">لا يوجد رصيد مسجّل بعد</td></tr>';
+  } else {
+    totalsTable.innerHTML = currencies.map(cur => {
+      const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+      const dayNet = dayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+      const closing = opening + dayNet;
+      return `<tr>
+        <td class="py-2 px-3 border border-gray-300 font-bold bg-gray-50">${cur}</td>
+        <td class="py-2 px-3 border border-gray-300 text-left" dir="ltr">${fmt(closing)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('sheet').classList.remove('hidden');
+}
+
+load();
+</script>
+</body></html>
