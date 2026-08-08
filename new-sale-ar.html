@@ -203,6 +203,18 @@
             </button>
 </section>
 
+<!-- Sell a diamond piece (only shown if diamonds_enabled) -->
+<section class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3" id="diamond-sale-section">
+<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">بيع قطعة ماس</h2>
+<div class="flex gap-2">
+<input class="flex-1 h-12 px-4 border border-outline-variant rounded-lg font-data-mono text-right" dir="ltr" id="diamond-search-input" placeholder="الباركود، الوصف، أو القيراط" type="text"/>
+<button onclick="searchDiamondPiece()" class="w-12 h-12 bg-primary text-white rounded-lg flex items-center justify-center active:scale-90 transition-all">
+<span class="material-symbols-outlined">search</span>
+</button>
+</div>
+<div id="diamond-search-results" class="space-y-2"></div>
+</section>
+
 <!-- Cart / Invoice Items Table -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
 <div class="px-4 py-3 bg-secondary">
@@ -288,6 +300,15 @@
         const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
         const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['create_invoice'] === true));
         if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+    })();
+
+    // Show the diamond-sale section only for stores that have diamonds_enabled
+    (async function __showDiamondSectionIfEnabled() {
+        await requireGoldMindSession('login-entry-ar.html');
+        const { data: __store } = await goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+        if (__store && __store.diamonds_enabled) {
+            document.getElementById('diamond-sale-section').classList.remove('hidden');
+        }
     })();
 
     let selectedCustomer = null;
@@ -392,6 +413,93 @@
     }
 
     loadStockLots();
+
+    // ---------- Sell a diamond piece (diamond_pieces) ----------
+    async function searchDiamondPiece() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const box = document.getElementById('diamond-search-results');
+        const q = document.getElementById('diamond-search-input').value.trim();
+        if (!q) { box.innerHTML = ''; return; }
+
+        box.innerHTML = '<div class="text-on-surface-variant text-sm p-2">جارِ البحث...</div>';
+
+        const { data, error } = await goldmindClient
+            .from('diamond_pieces')
+            .select('*')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .eq('status', 'available');
+
+        if (error) {
+            box.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${error.message}</div>`;
+            return;
+        }
+
+        const qLower = q.toLowerCase();
+        const matches = (data || []).filter(p =>
+            (p.barcode && p.barcode.toLowerCase().includes(qLower)) ||
+            (p.description_ar && p.description_ar.toLowerCase().includes(qLower)) ||
+            (p.description_en && p.description_en.toLowerCase().includes(qLower)) ||
+            (p.diamond_carat && String(p.diamond_carat).includes(qLower))
+        ).slice(0, 8);
+
+        if (matches.length === 0) {
+            box.innerHTML = '<div class="text-error text-sm p-2">لا توجد قطعة ماس متوفرة مطابقة.</div>';
+            return;
+        }
+
+        box.innerHTML = matches.map(piece => {
+            const specParts = [Number(piece.diamond_carat).toFixed(2) + ' ct'];
+            if (piece.has_gold) specParts.push('ذهب ' + (piece.gold_weight_grams || 0) + 'غ عيار ' + (piece.gold_karat || ''));
+            let suggested = piece.suggested_sale_price;
+            if (!suggested || suggested <= 0) {
+                suggested = Number(piece.diamond_carat || 0) * Number(piece.diamond_price_per_carat || 0);
+            }
+            return `
+            <div class="p-3 bg-surface-container-low rounded-lg flex flex-col gap-2">
+                <div class="flex items-center justify-between gap-2">
+                    <div class="min-w-0">
+                        <div class="font-data-mono font-bold text-sm">${specParts.join(' · ')}</div>
+                        <div class="text-outline text-[11px] font-data-mono truncate">${piece.barcode || 'بدون باركود'}</div>
+                    </div>
+                </div>
+                <input type="text" placeholder="وصف القطعة" class="w-full h-10 border border-outline-variant rounded px-3 text-right diamond-desc-input" value="${(piece.description_ar || '').replace(/"/g, '&quot;')}"/>
+                <div class="flex items-center gap-2">
+                    <input type="number" placeholder="السعر" class="flex-1 h-10 border border-outline-variant rounded px-2 text-left font-data-mono diamond-price-input" value="${suggested ? suggested.toFixed(2) : ''}"/>
+                    <button onclick='confirmAddDiamondPiece(${JSON.stringify(piece).replace(/'/g, "&apos;")}, this)' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all shrink-0">
+                        <span class="material-symbols-outlined">add</span>
+                    </button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    function confirmAddDiamondPiece(piece, btnEl) {
+        const card = btnEl.closest('div.p-3');
+        const priceInput = card.querySelector('.diamond-price-input');
+        const descInput = card.querySelector('.diamond-desc-input');
+        const price = parseFloat(priceInput.value);
+        if (!price || price <= 0) {
+            priceInput.classList.add('border-error');
+            priceInput.focus();
+            return;
+        }
+        cart.push({
+            cartId: ++cartCounter,
+            mode: 'diamond',
+            piece: piece,
+            diamondPieceId: piece.id,
+            barcode: piece.barcode,
+            karat: piece.has_gold ? piece.gold_karat : null,
+            weight: piece.diamond_carat,
+            price: price,
+            description: descInput.value.trim() || null
+        });
+        document.getElementById('diamond-search-input').value = '';
+        document.getElementById('diamond-search-results').innerHTML = '';
+        renderCart();
+    }
 
     // ---------- Payment toggle ----------
     function selectPayment(mode) {
@@ -602,11 +710,11 @@
         body.innerHTML = cart.map(item => `
             <tr>
                 <td class="px-3 py-3">
-                    <div class="font-body-md">${item.description || '—'}${item.mode === 'stock' ? ' <span class="text-[10px] text-secondary font-semibold">(من الرصيد)</span>' : ''}</div>
+                    <div class="font-body-md">${item.description || '—'}${item.mode === 'stock' ? ' <span class="text-[10px] text-secondary font-semibold">(من الرصيد)</span>' : ''}${item.mode === 'diamond' ? ' <span class="text-[10px] text-secondary font-semibold">(ماس)</span>' : ''}</div>
                     <div class="text-outline text-[10px] font-data-mono">${item.barcode || ''}</div>
                 </td>
-                <td class="px-2 py-3 text-center">${item.karat}K</td>
-                <td class="px-2 py-3 text-left">${item.weight}</td>
+                <td class="px-2 py-3 text-center">${item.mode === 'diamond' ? (item.karat ? item.karat + 'K' : 'ماس') : item.karat + 'K'}</td>
+                <td class="px-2 py-3 text-left">${item.mode === 'diamond' ? item.weight + ' ct' : item.weight}</td>
                 <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}</td>
                 <td class="px-2 py-3 text-left">
                     <button onclick="removeFromCart(${item.cartId})" class="text-error">
@@ -711,18 +819,19 @@
 
         const itemsPayload = cart.map(item => ({
             invoice_id: invoiceRow.id,
-            piece_id: item.piece ? item.piece.id : null,
+            piece_id: (item.piece && item.mode !== 'diamond') ? item.piece.id : null,
+            diamond_piece_id: item.mode === 'diamond' ? item.diamondPieceId : null,
             gold_stock_lot_id: item.mode === 'stock' ? item.lotId : null,
             barcode: item.barcode,
             karat: item.karat,
-            weight_grams: item.weight,
-            accounting_weight_grams: item.piece ? (item.piece.accounting_weight_grams || item.piece.weight_grams) : item.weight,
+            weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : item.weight,
+            accounting_weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : (item.piece ? (item.piece.accounting_weight_grams || item.piece.weight_grams) : item.weight),
             fabrication_fee: 0,
             line_total: item.price,
             description: (item.piece && item.piece.description_ar) || item.description,
             description_en: item.piece ? item.piece.description_en : null,
             item_photo_url: item.mode === 'stock' ? (stockPhotoUrls[item.cartId] || null) : null,
-            gold_price_per_gram: goldPriceMap[item.karat] || null
+            gold_price_per_gram: item.mode === 'diamond' ? (item.piece.has_gold ? (goldPriceMap[item.piece.gold_karat] || null) : null) : (goldPriceMap[item.karat] || null)
         }));
 
         const { error: itemsError } = await goldmindClient.from('invoice_items').insert(itemsPayload);
@@ -734,9 +843,14 @@
             return;
         }
 
-        const pieceIds = cart.filter(item => item.piece).map(item => item.piece.id);
+        const pieceIds = cart.filter(item => item.piece && item.mode !== 'diamond').map(item => item.piece.id);
         if (pieceIds.length > 0) {
             await goldmindClient.from('pieces').update({ status: 'sold' }).in('id', pieceIds);
+        }
+
+        const diamondPieceIds = cart.filter(item => item.mode === 'diamond').map(item => item.diamondPieceId);
+        if (diamondPieceIds.length > 0) {
+            await goldmindClient.from('diamond_pieces').update({ status: 'sold' }).in('id', diamondPieceIds);
         }
 
         // Deduct the sold weight from each bulk stock lot used in this sale.
