@@ -78,14 +78,16 @@
 <div class="max-w-md mx-auto p-4" id="print-wrap">
 <div id="invoice-sheet" class="hidden bg-white shadow-sm p-6">
 
-<!-- Header: logo + store info -->
-<div class="text-center border-b border-dashed border-gray-300 pb-4 mb-4">
+<!-- Header: logo + store info (right: Arabic / left: English) -->
+<div class="text-center pb-3 mb-3">
 <img class="hidden mx-auto mb-2 h-14 object-contain" id="store-logo"/>
 <div class="font-bold text-lg" id="store-name"></div>
-<div class="text-[11px] text-gray-500 mt-1" id="store-address"></div>
-<div class="text-[11px] text-gray-500" id="store-contact"></div>
-<div class="text-[10px] text-gray-400 mt-1" id="store-legal"></div>
 </div>
+<div class="border-b border-dashed border-gray-300 pb-3 mb-4 flex" dir="rtl">
+<div style="flex:1; text-align:right;" class="text-[10.5px] text-gray-600 leading-5" dir="rtl" id="store-info-ar"></div>
+<div style="flex:1; text-align:left; border-right: 1px solid #e5e7eb; padding-right: 10px; margin-right: 10px;" class="text-[10.5px] text-gray-600 leading-5" dir="ltr" id="store-info-en"></div>
+</div>
+<div class="text-center text-[10px] text-gray-400 mb-4" id="store-legal"></div>
 
 <!-- Invoice meta -->
 <div class="flex justify-between text-[12px] text-gray-600 mb-4">
@@ -274,17 +276,30 @@
             logo.classList.remove('hidden');
         }
         document.getElementById('store-name').textContent = store.name || '';
-        document.getElementById('store-address').textContent = store.address || '';
 
-        const contactParts = [];
-        if (store.phone) contactParts.push('هاتف: ' + store.phone);
-        if (store.email) contactParts.push('بريد: ' + store.email);
-        document.getElementById('store-contact').textContent = contactParts.join(' | ');
+        function buildStoreInfoRows(labels) {
+            const rows = [];
+            if (store.address) rows.push(`<div>${labels.address}: ${store.address}</div>`);
+            if (store.phone) rows.push(`<div>${labels.phone}: <span dir="ltr" style="unicode-bidi: embed;">${store.phone}</span></div>`);
+            if (store.website_url) rows.push(`<div>${labels.website}: <span dir="ltr" style="unicode-bidi: embed;">${store.website_url}</span></div>`);
+            if (store.social_instagram) rows.push(`<div>${labels.instagram}: <span dir="ltr" style="unicode-bidi: embed;">${store.social_instagram}</span></div>`);
+            if (store.social_tiktok) rows.push(`<div>${labels.tiktok}: <span dir="ltr" style="unicode-bidi: embed;">${store.social_tiktok}</span></div>`);
+            if (store.social_snapchat) rows.push(`<div>${labels.snapchat}: <span dir="ltr" style="unicode-bidi: embed;">${store.social_snapchat}</span></div>`);
+            return rows.join('');
+        }
+
+        document.getElementById('store-info-ar').innerHTML = buildStoreInfoRows({
+            address: 'العنوان', phone: 'الهاتف', website: 'الموقع الإلكتروني',
+            instagram: 'إنستغرام', tiktok: 'تيك توك', snapchat: 'سناب شات'
+        });
+        document.getElementById('store-info-en').innerHTML = buildStoreInfoRows({
+            address: 'Address', phone: 'Phone', website: 'Website',
+            instagram: 'Instagram', tiktok: 'TikTok', snapchat: 'Snapchat'
+        });
 
         const legalParts = [];
-        if (store.commercial_registration_number) legalParts.push('س.ت: ' + store.commercial_registration_number);
-        if (store.tax_number) legalParts.push('ر.ض: ' + store.tax_number);
-        if (store.license_number) legalParts.push('رخصة: ' + store.license_number);
+        if (store.commercial_registration_number) legalParts.push('CR: ' + store.commercial_registration_number);
+        if (store.tax_number) legalParts.push('TRN: ' + store.tax_number);
         document.getElementById('store-legal').textContent = legalParts.join(' | ');
 
         // ---- Invoice meta ----
@@ -338,7 +353,7 @@
             document.getElementById('cust-legal-name').textContent = counterparty.legal_name || '';
             document.getElementById('cust-address').textContent = counterparty.address || '';
             document.getElementById('cust-email').textContent = counterparty.email || '';
-            document.getElementById('cust-tax').textContent = counterparty.tax_number ? ('ر.ض: ' + counterparty.tax_number) : '';
+            document.getElementById('cust-tax').textContent = counterparty.tax_number ? ('TRN: ' + counterparty.tax_number) : '';
         } else {
             document.getElementById('cust-legal-name').textContent = '';
             document.getElementById('cust-address').textContent = '';
