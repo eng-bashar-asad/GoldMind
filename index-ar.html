@@ -226,12 +226,12 @@
 <!-- Recent Movements Log -->
 <section class="mb-4">
 <div class="flex justify-between items-center mb-4">
-<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">حركات اليوم</h3>
+<h3 class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wider">حركات اليوم</h3>
 <div class="flex items-center gap-2">
 <div class="hidden items-center gap-1" id="movementsDayNav">
-<button onclick="shiftMovementsDay(-1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px]">chevron_right</span></button>
-<span class="text-[11px] text-on-surface-variant font-data-mono" id="movementsDayLabel"></span>
-<button onclick="shiftMovementsDay(1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px]">chevron_left</span></button>
+<button onclick="shiftMovementsDay(-1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px] text-on-surface">chevron_right</span></button>
+<span class="text-[11px] text-on-surface font-semibold font-data-mono" id="movementsDayLabel"></span>
+<button onclick="shiftMovementsDay(1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px] text-on-surface">chevron_left</span></button>
 </div>
 <a class="text-secondary text-xs font-semibold" href="ledger-ar.html">عرض الكل</a>
 </div>
@@ -240,13 +240,9 @@
 <div class="p-6 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 </div>
 </section>
-<!-- Decorative Spacer for FAB/BottomNav -->
+<!-- Decorative Spacer for BottomNav -->
 <div class="h-8"></div>
 </main>
-<!-- Floating action button: new invoice -->
-<a id="newInvoiceFab" href="new-sale-ar.html" class="hidden fixed bottom-20 left-4 z-40 w-14 h-14 rounded-full bg-primary text-on-primary shadow-lg items-center justify-center active:scale-90 transition-transform">
-<span class="material-symbols-outlined text-2xl">add_shopping_cart</span>
-</a>
 <!-- BottomNavBar -->
 <nav class="fixed bottom-0 right-0 w-full h-16 bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-around items-center px-margin-mobile shadow-sm">
 <!-- Dashboard (Active) -->
@@ -335,13 +331,6 @@
             document.querySelectorAll('.quick-action-icon[data-permission]').forEach(function (el) {
                 if (!hasPerm(el.dataset.permission)) el.remove();
             });
-
-            // Floating "new invoice" button — only for staff who can actually create one
-            if (hasPerm('create_invoice')) {
-                const fab = document.getElementById('newInvoiceFab');
-                fab.classList.remove('hidden');
-                fab.classList.add('flex');
-            }
 
             canManageFinance = hasPerm('view_profit_report');
             if (canManageFinance) {
