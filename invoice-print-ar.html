@@ -95,6 +95,7 @@
 </div>
 <div class="text-left">
 <div>طريقة الدفع: <span id="inv-payment"></span></div>
+<div>الموظف: <span id="inv-creator"></span></div>
 </div>
 </div>
 
@@ -123,27 +124,33 @@
 <th class="py-2 text-right">الوصف</th>
 <th class="py-2 text-center">العيار</th>
 <th class="py-2 text-center">الوزن</th>
-<th class="py-2 text-left">السعر</th>
-<th class="py-2 text-left">الضريبة</th>
 <th class="py-2 text-left">الإجمالي</th>
 </tr>
 </thead>
 <tbody id="items-body" class="divide-y divide-gray-100"></tbody>
 </table>
 
-<!-- Totals -->
-<div class="border-t-2 border-gray-800 pt-3 space-y-1 text-[12px]">
+<!-- Totals: subtotal / VAT / grand total, stacked, aligned left -->
+<div class="border-t-2 border-gray-800 pt-3 text-[12px]" style="width: 62%; margin-inline-start: auto;">
 <div class="flex justify-between text-gray-600">
 <span>الإجمالي قبل الضريبة</span>
 <span id="sum-before-tax"></span>
 </div>
-<div class="flex justify-between text-gray-600">
+<div class="flex justify-between text-gray-600 mt-1">
 <span>قيمة الضريبة (<span id="vat-rate-label"></span>%)</span>
 <span id="sum-tax"></span>
 </div>
 <div class="flex justify-between font-bold text-base pt-1 border-t border-gray-200 mt-1">
 <span>الإجمالي الكامل</span>
 <span id="sum-total"></span>
+</div>
+</div>
+
+<!-- Customer signature -->
+<div class="mt-10 pt-3 flex justify-between items-end text-[11px] text-gray-500">
+<div class="flex-1">
+<div class="border-b border-gray-400 h-8"></div>
+<div class="mt-1">توقيع العميل</div>
 </div>
 </div>
 
@@ -235,13 +242,16 @@
             return;
         }
 
-        const [{ data: items, error: itemsError }, { data: customer }, { data: trader }] = await Promise.all([
+        const [{ data: items, error: itemsError }, { data: customer }, { data: trader }, { data: creator }] = await Promise.all([
             goldmindClient.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('id', { ascending: true }),
             invoice.customer_id
                 ? goldmindClient.from('customers').select('*').eq('id', invoice.customer_id).single()
                 : Promise.resolve({ data: null }),
             invoice.trader_id
                 ? goldmindClient.from('traders').select('*').eq('id', invoice.trader_id).single()
+                : Promise.resolve({ data: null }),
+            invoice.created_by
+                ? goldmindClient.from('staff').select('full_name').eq('id', invoice.created_by).maybeSingle()
                 : Promise.resolve({ data: null })
         ]);
 
@@ -282,6 +292,7 @@
         document.getElementById('inv-date').textContent = new Date(invoice.created_at).toLocaleDateString('ar-AE-u-nu-latn');
         const paymentLabels = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين' };
         document.getElementById('inv-payment').textContent = paymentLabels[invoice.payment_method] || invoice.payment_method || '';
+        document.getElementById('inv-creator').textContent = creator && creator.full_name ? creator.full_name : '—';
 
         if (invoice.status === 'cancelled') {
             document.getElementById('cancelled-banner').classList.remove('hidden');
@@ -358,8 +369,6 @@
                     <td class="py-2">${item.description || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${item.description_en}</span>` : ''}</td>
                     <td class="py-2 text-center">${item.karat}K</td>
                     <td class="py-2 text-center">${item.weight_grams}</td>
-                    <td class="py-2 text-left">${fmt(beforeTax)}</td>
-                    <td class="py-2 text-left">${fmt(tax)}</td>
                     <td class="py-2 text-left font-semibold">${fmt(full)}</td>
                 </tr>
             `;
