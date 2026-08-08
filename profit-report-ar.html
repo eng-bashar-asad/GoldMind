@@ -118,9 +118,9 @@ async function load() {
   const vatMultiplier = 1 + (vatRate / 100);
 
   const { data: invoices } = await goldmindClient
-    .from('invoices').select('id, invoice_number, created_at')
-    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
-    .order('created_at', { ascending: false }).limit(100);
+    .from('invoices').select('id, invoice_number, created_at, type')
+    .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return']).neq('status', 'cancelled')
+    .order('created_at', { ascending: false }).limit(200);
 
   const invoiceMap = {};
   (invoices || []).forEach(i => invoiceMap[i.id] = i);
@@ -160,11 +160,16 @@ async function load() {
     const isEstimated = it.gold_price_per_gram == null;
     const weight = Number(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams) || 0;
     const displayWeight = Number(it.weight_grams) || 0;
-    const revenue = Number(it.line_total) || 0;
-    const goldValue = weight * goldPrice;
+    const inv = invoiceMap[it.invoice_id];
+    // A returned item reverses its original sale: revenue, gold value, VAT,
+    // fabrication cost, and profit all flow the opposite direction.
+    const isReturn = inv && inv.type === 'return';
+    const sign = isReturn ? -1 : 1;
+    const revenue = sign * (Number(it.line_total) || 0);
+    const goldValue = sign * (weight * goldPrice);
     const beforeTax = revenue / vatMultiplier;
     const vat = revenue - beforeTax;
-    const fabCost = weight * ((it.piece && it.piece.cost_fabrication_per_gram) || 0);
+    const fabCost = sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || 0));
     const profit = revenue - goldValue - vat - fabCost;
 
     totalRevenue += revenue;
@@ -172,8 +177,7 @@ async function load() {
     totalGold += goldValue;
     totalProfit += profit;
 
-    const inv = invoiceMap[it.invoice_id];
-    return { it, inv, weight, displayWeight, revenue, goldValue, vat, fabCost, profit, goldPrice, isEstimated };
+    return { it, inv, isReturn, weight, displayWeight, revenue, goldValue, vat, fabCost, profit, goldPrice, isEstimated };
   });
 
   document.getElementById('stat-revenue').textContent = totalRevenue.toFixed(2);
@@ -185,8 +189,8 @@ async function load() {
   }
 
   document.getElementById('items-tbody').innerHTML = rows.map(r => `
-    <tr class="border-t border-outline-variant">
-      <td class="px-3 py-2">${(r.inv && r.inv.invoice_number) || '—'}</td>
+    <tr class="border-t border-outline-variant ${r.isReturn ? 'bg-error-container/20' : ''}">
+      <td class="px-3 py-2">${(r.inv && r.inv.invoice_number) || '—'}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">(مرتجع)</span>' : ''}</td>
       <td class="px-3 py-2">${r.it.barcode || r.it.description || '—'}</td>
       <td class="px-3 py-2 font-data-mono">${r.displayWeight}غ / ع${r.it.karat}${r.displayWeight !== r.weight ? ` <span class="text-outline">(محاسبة: ${r.weight}غ)</span>` : ''}</td>
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>
