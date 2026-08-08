@@ -181,6 +181,18 @@
 <img id="logo-preview" class="h-16 object-contain border border-outline-variant rounded-lg p-2 bg-white"/>
 </div>
 
+<!-- Print style (frame + shape) for sales/purchase/repair invoices -->
+<div class="pt-2 border-t border-outline-variant">
+<h3 class="font-bold text-[14px] mb-1 mt-3">شكل الفاتورة المطبوعة</h3>
+<p class="text-[11px] text-outline mb-3">يُطبَّق على فواتير المبيعات والمشتريات وإيصالات الصيانة.</p>
+
+<span class="text-[11px] font-semibold text-outline block mb-2">إطار الفاتورة</span>
+<div class="grid grid-cols-3 gap-2 mb-4" id="frame-style-options"></div>
+
+<span class="text-[11px] font-semibold text-outline block mb-2">شكل الزوايا</span>
+<div class="grid grid-cols-3 gap-2" id="shape-style-options"></div>
+</div>
+
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
 <button id="save-btn" type="button" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md active:scale-[0.98] transition-all mt-2">
@@ -211,6 +223,54 @@
         autoBtn.className = mode === 'auto' ? active : inactive;
         manualBtn.className = mode === 'manual' ? active : inactive;
     }
+
+    // Print style (frame + shape) for sales/purchase/repair invoices --------
+    const FRAME_STYLE_OPTIONS = [
+        { value: 'classic', label: 'كلاسيكي', swatchClass: 'border border-gray-400' },
+        { value: 'gold', label: 'ذهبي', swatchClass: 'border-2 border-amber-500' },
+        { value: 'double', label: 'مزدوج', swatchClass: 'border-4 border-double border-gray-500' },
+        { value: 'dashed', label: 'متقطّع', swatchClass: 'border-2 border-dashed border-gray-500' },
+        { value: 'none', label: 'بدون إطار', swatchClass: 'border border-transparent' }
+    ];
+    const SHAPE_STYLE_OPTIONS = [
+        { value: 'square', label: 'زوايا حادة', swatchClass: 'rounded-none' },
+        { value: 'soft', label: 'زوايا ناعمة', swatchClass: 'rounded-lg' },
+        { value: 'round', label: 'زوايا دائرية', swatchClass: 'rounded-2xl' }
+    ];
+
+    let selectedFrameStyle = 'classic';
+    let selectedShapeStyle = 'soft';
+
+    function renderStyleOptions(containerId, options, selectedValue, onSelect) {
+        const container = document.getElementById(containerId);
+        container.innerHTML = '';
+        options.forEach(opt => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            const isActive = opt.value === selectedValue;
+            btn.className = 'flex flex-col items-center gap-1.5 p-2 rounded-lg border-2 transition-all ' +
+                (isActive ? 'border-primary bg-secondary-container/30' : 'border-outline-variant');
+            btn.innerHTML = `
+                <span class="w-full h-9 bg-white ${opt.swatchClass}"></span>
+                <span class="text-[10px] font-semibold text-on-surface-variant">${opt.label}</span>
+            `;
+            btn.addEventListener('click', () => onSelect(opt.value));
+            container.appendChild(btn);
+        });
+    }
+
+    function setFrameStyle(value) {
+        selectedFrameStyle = value;
+        renderStyleOptions('frame-style-options', FRAME_STYLE_OPTIONS, selectedFrameStyle, setFrameStyle);
+    }
+
+    function setShapeStyle(value) {
+        selectedShapeStyle = value;
+        renderStyleOptions('shape-style-options', SHAPE_STYLE_OPTIONS, selectedShapeStyle, setShapeStyle);
+    }
+
+    setFrameStyle(selectedFrameStyle);
+    setShapeStyle(selectedShapeStyle);
 
     const countryCurrencyMap = {
         'AE': 'AED', 'SA': 'SAR', 'KW': 'KWD', 'QA': 'QAR', 'BH': 'BHD',
@@ -280,6 +340,9 @@
         logoInput.value = data.logo_url || '';
         updateLogoPreview();
 
+        setFrameStyle(data.invoice_print_frame || 'classic');
+        setShapeStyle(data.invoice_print_shape || 'soft');
+
         form.classList.remove('hidden');
     }
 
@@ -331,7 +394,9 @@
                 commercial_registration_number: cr || null,
                 tax_number: tax || null,
                 license_number: license || null,
-                invoice_numbering_mode: numberingMode
+                invoice_numbering_mode: numberingMode,
+                invoice_print_frame: selectedFrameStyle,
+                invoice_print_shape: selectedShapeStyle
             })
             .eq('id', GOLDMIND_STORE_ID);
 

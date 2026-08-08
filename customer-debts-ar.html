@@ -71,6 +71,7 @@
 <div>
 <h2 class="font-bold text-[16px]" id="detail-customer-name"></h2>
 <p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="detail-customer-phone"></p>
+<div class="flex flex-wrap gap-x-2 gap-y-0.5" id="detail-customer-extra-phones"></div>
 </div>
 <button id="editCustomerBtn" onclick="toggleEditCustomerForm()" class="hidden h-9 w-9 items-center justify-center rounded-full hover:bg-surface-container-low shrink-0">
 <span class="material-symbols-outlined text-[18px]">edit</span>
@@ -91,6 +92,11 @@
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">رقم الهاتف</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="editCustomerPhone"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">أرقام هاتف إضافية</label>
+<div class="flex flex-col gap-2" id="editExtraPhonesList"></div>
+<button type="button" id="editAddExtraPhoneBtn" class="mt-1 w-full h-9 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary">+ إضافة رقم آخر</button>
 </div>
 <div id="editCustomerCompanyFields" class="hidden flex-col gap-3">
 <div>
@@ -237,6 +243,7 @@ function showCustomerDetail(customerId) {
 
   document.getElementById('detail-customer-name').textContent = customer.name;
   document.getElementById('detail-customer-phone').textContent = customer.phone || '';
+  loadExtraPhonesForDetail(customerId);
   document.getElementById('editCustomerBtn').classList.toggle('hidden', !canEditCustomers);
   document.getElementById('editCustomerBtn').classList.toggle('flex', canEditCustomers);
   document.getElementById('editCustomerForm').classList.add('hidden');
@@ -333,6 +340,40 @@ async function submitSettlement() {
   showCustomerDetail(customerIdToReopen);
 }
 
+// A customer name must include at least a first name and a last name/kunya.
+function hasFullName(value) {
+  return value.split(/\s+/).filter(Boolean).length >= 2;
+}
+
+async function loadExtraPhonesForDetail(customerId) {
+  const wrap = document.getElementById('detail-customer-extra-phones');
+  wrap.innerHTML = '';
+  const { data } = await goldmindClient.from('customer_phones').select('phone').eq('customer_id', customerId);
+  (data || []).forEach(row => {
+    const chip = document.createElement('span');
+    chip.className = 'text-[11px] text-on-surface-variant font-data-mono';
+    chip.dir = 'ltr';
+    chip.textContent = row.phone;
+    wrap.appendChild(chip);
+  });
+}
+
+function addEditExtraPhoneRow(value) {
+  const list = document.getElementById('editExtraPhonesList');
+  const row = document.createElement('div');
+  row.className = 'flex gap-2 items-center';
+  row.innerHTML = `
+    <input class="flex-1 h-10 border border-outline-variant rounded-lg px-3 text-sm font-data-mono edit-extra-phone-input" dir="ltr" placeholder="رقم هاتف إضافي" value="${value ? value.replace(/"/g, '&quot;') : ''}"/>
+    <button type="button" class="h-10 w-10 flex items-center justify-center rounded-lg border border-outline-variant text-error remove-edit-extra-phone-btn">
+      <span class="material-symbols-outlined text-[16px]">delete</span>
+    </button>
+  `;
+  row.querySelector('.remove-edit-extra-phone-btn').addEventListener('click', () => row.remove());
+  list.appendChild(row);
+}
+
+document.getElementById('editAddExtraPhoneBtn').addEventListener('click', () => addEditExtraPhoneRow(''));
+
 function toggleEditCustomerForm() {
   const form = document.getElementById('editCustomerForm');
   const willShow = form.classList.contains('hidden');
@@ -346,6 +387,12 @@ function toggleEditCustomerForm() {
   document.getElementById('editCustomerName').value = customer.name || '';
   document.getElementById('editCustomerPhone').value = customer.phone || '';
   document.getElementById('editCustomerError').classList.add('hidden');
+
+  const editExtraPhonesList = document.getElementById('editExtraPhonesList');
+  editExtraPhonesList.innerHTML = '';
+  goldmindClient.from('customer_phones').select('phone').eq('customer_id', currentCustomerId).then(({ data }) => {
+    (data || []).forEach(row => addEditExtraPhoneRow(row.phone));
+  });
 
   const companyFields = document.getElementById('editCustomerCompanyFields');
   companyFields.classList.toggle('hidden', !customer.is_company);
@@ -371,6 +418,13 @@ async function saveCustomerEdit() {
   }
 
   const customer = customers.find(c => c.id === currentCustomerId);
+
+  if (!(customer && customer.is_company) && !hasFullName(name)) {
+    errEl.textContent = 'فضلاً أدخل الاسم الكامل (الاسم والكنية على الأقل)';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
   const updatePayload = { name, phone: phone || null };
   if (customer && customer.is_company) {
     const legalName = document.getElementById('editCustomerLegalName').value.trim();
@@ -398,6 +452,17 @@ async function saveCustomerEdit() {
     errEl.textContent = 'تعذّر الحفظ: ' + error.message;
     errEl.classList.remove('hidden');
     return;
+  }
+
+  // Sync extra phone numbers: replace the stored set with what's currently in the form.
+  const extraPhoneValues = Array.from(document.querySelectorAll('.edit-extra-phone-input'))
+    .map(i => i.value.trim())
+    .filter(v => v.length > 0);
+  await goldmindClient.from('customer_phones').delete().eq('customer_id', currentCustomerId);
+  if (extraPhoneValues.length > 0) {
+    await goldmindClient.from('customer_phones').insert(
+      extraPhoneValues.map(p => ({ store_id: GOLDMIND_STORE_ID, customer_id: currentCustomerId, phone: p }))
+    );
   }
 
   const customerIdToReopen = currentCustomerId;

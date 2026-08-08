@@ -7,7 +7,13 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
-<style> body { font-family: 'IBM Plex Sans Arabic', sans-serif; } </style>
+<style>
+    body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+    @media print {
+        body { background: #fff !important; }
+        #receipt { box-shadow: none !important; margin: 0 auto !important; }
+    }
+</style>
 </head>
 <body class="bg-gray-100 text-gray-900">
 
@@ -16,7 +22,7 @@
 تعذّر العثور على هذا الإيصال. تأكد من الرابط أو تواصل مع المحل مباشرة.
 </div>
 
-<div id="receipt" class="hidden max-w-md mx-auto min-h-screen bg-white">
+<div id="receipt" class="hidden max-w-md mx-auto my-4 bg-white">
 
 <!-- Letterhead -->
 <div class="p-6 text-center border-b-4 border-amber-600">
@@ -68,6 +74,25 @@ function fmtDate(iso) {
   return new Date(iso).toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+const PRINT_FRAME_CLASSES = {
+    classic: 'border border-gray-300',
+    gold: 'border-2 border-amber-500',
+    double: 'border-4 border-double border-gray-400',
+    dashed: 'border-2 border-dashed border-gray-400',
+    none: 'border-0'
+};
+const PRINT_SHAPE_CLASSES = {
+    square: 'rounded-none',
+    soft: 'rounded-xl',
+    round: 'rounded-3xl'
+};
+function applyReceiptPrintStyle(frame, shape) {
+    const sheet = document.getElementById('receipt');
+    const frameClass = PRINT_FRAME_CLASSES[frame] || PRINT_FRAME_CLASSES.classic;
+    const shapeClass = PRINT_SHAPE_CLASSES[shape] || PRINT_SHAPE_CLASSES.soft;
+    sheet.className = 'hidden max-w-md mx-auto my-4 bg-white ' + frameClass + ' ' + shapeClass;
+}
+
 async function load() {
   if (!ticketId) { showNotFound(); return; }
 
@@ -77,6 +102,7 @@ async function load() {
   if (error || !row) { showNotFound(); return; }
 
   document.getElementById('storeName').textContent = row.store_name || 'المحل';
+  applyReceiptPrintStyle(row.invoice_print_frame, row.invoice_print_shape);
   if (row.store_address) document.getElementById('storeAddress').textContent = row.store_address;
   if (row.store_phone) document.getElementById('storePhone').textContent = row.store_phone;
   if (row.store_logo_url) {

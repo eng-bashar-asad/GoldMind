@@ -161,6 +161,13 @@
 <input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="customer-phone" placeholder="09xxxxxxxx" type="tel"/>
 </div>
 
+<!-- Extra Phone Numbers -->
+<div>
+<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">أرقام هاتف إضافية (اختياري)</label>
+<div class="flex flex-col gap-2" id="extra-phones-list"></div>
+<button type="button" id="add-extra-phone-btn" class="mt-2 w-full h-11 border border-dashed border-outline-variant rounded-lg text-sm font-semibold text-primary active:scale-[0.98] transition-all">+ إضافة رقم هاتف آخر</button>
+</div>
+
 <!-- Status Message -->
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
@@ -195,6 +202,34 @@
         phoneCodeSelect.appendChild(opt);
     });
     phoneCodeSelect.value = GOLDMIND_DEFAULT_PHONE_CODE;
+
+    // Extra phone numbers (repeatable rows) -----------------------------
+    const extraPhonesList = document.getElementById('extra-phones-list');
+    document.getElementById('add-extra-phone-btn').addEventListener('click', addExtraPhoneRow);
+
+    function addExtraPhoneRow() {
+        const row = document.createElement('div');
+        row.className = 'flex gap-2 items-center';
+        row.innerHTML = `
+            <input class="flex-1 h-12 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background extra-phone-input" dir="ltr" placeholder="رقم هاتف إضافي" type="tel"/>
+            <button type="button" class="h-12 w-12 flex items-center justify-center rounded-lg border border-outline-variant text-error active:scale-[0.98] transition-all remove-extra-phone-btn">
+                <span class="material-symbols-outlined">delete</span>
+            </button>
+        `;
+        row.querySelector('.remove-extra-phone-btn').addEventListener('click', () => row.remove());
+        extraPhonesList.appendChild(row);
+    }
+
+    function getExtraPhoneValues() {
+        return Array.from(document.querySelectorAll('.extra-phone-input'))
+            .map(i => i.value.trim())
+            .filter(v => v.length > 0);
+    }
+
+    // A customer name must include at least a first name and a last name/kunya.
+    function hasFullName(value) {
+        return value.split(/\s+/).filter(Boolean).length >= 2;
+    }
 
     function setCustomerType(company) {
         isCompany = company;
@@ -259,6 +294,10 @@
             showMessage('الرجاء إدخال اسم العميل.', true);
             return;
         }
+        if (!isCompany && !hasFullName(name)) {
+            showMessage('الرجاء إدخال الاسم الكامل (الاسم والكنية على الأقل).', true);
+            return;
+        }
         if (isCompany && !legalName) {
             showMessage('الرجاء إدخال اسم الشركة القانوني.', true);
             return;
@@ -266,6 +305,28 @@
 
         saveBtn.disabled = true;
         saveBtn.textContent = 'جارِ الحفظ...';
+
+        const { data: existingCustomers, error: dupCheckError } = await goldmindClient
+            .from('customers')
+            .select('id, name, phone')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .ilike('name', name);
+
+        if (dupCheckError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ العميل';
+            showMessage('خطأ: ' + dupCheckError.message, true);
+            return;
+        }
+
+        if (existingCustomers && existingCustomers.length > 0) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ العميل';
+            const existing = existingCustomers[0];
+            const phoneNote = existing.phone ? ` (${existing.phone})` : '';
+            showMessage('يوجد عميل مسجل مسبقاً بنفس الاسم "' + existing.name + '"' + phoneNote + '. الرجاء اختيار العميل الموجود بدلاً من إضافة تكرار.', true);
+            return;
+        }
 
         const insertPayload = {
             store_id: GOLDMIND_STORE_ID,
@@ -300,10 +361,24 @@
             }
         }
 
+        const extraPhoneValues = getExtraPhoneValues();
+        if (extraPhoneValues.length > 0) {
+            const extraPhonesPayload = extraPhoneValues.map(p => ({
+                store_id: GOLDMIND_STORE_ID,
+                customer_id: inserted.id,
+                phone: p
+            }));
+            const { error: extraPhonesError } = await goldmindClient.from('customer_phones').insert(extraPhonesPayload);
+            if (extraPhonesError) {
+                kycMessage += ' (تنبيه: تعذّر حفظ بعض أرقام الهاتف الإضافية: ' + extraPhonesError.message + ')';
+            }
+        }
+
         saveBtn.disabled = false;
         saveBtn.textContent = 'حفظ العميل';
 
         showMessage('تم حفظ العميل بنجاح! جاهز لإضافة عميل آخر.' + kycMessage, kycMessage !== '');
+        extraPhonesList.innerHTML = '';
         document.getElementById('customer-name').value = '';
         document.getElementById('customer-phone').value = '';
         document.getElementById('company-legal-name').value = '';
