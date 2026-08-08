@@ -156,9 +156,12 @@
 </div>
 
 <!-- Phone Input (individual) -->
-<div class="relative" id="individual-phone-wrap">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider" for="customer-phone">رقم الهاتف</label>
-<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="customer-phone" placeholder="09xxxxxxxx" type="tel"/>
+<div id="individual-phone-wrap">
+<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">رقم الهاتف</label>
+<div class="flex gap-2">
+<select class="h-14 bg-transparent border border-outline-variant rounded-lg px-2 focus:ring-1 focus:ring-primary outline-none text-sm font-data-mono" dir="ltr" id="individual-phone-code"></select>
+<input class="flex-1 h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="customer-phone" placeholder="09xxxxxxxx" type="tel"/>
+</div>
 </div>
 
 <!-- Extra Phone Numbers -->
@@ -193,15 +196,20 @@
     const messageBox = document.getElementById('save-message');
     let isCompany = false;
 
-    // Populate the phone country-code select from the shared map.
+    // Populate the phone country-code selects from the shared map.
+    function populatePhoneCodeSelect(select) {
+        Object.keys(GOLDMIND_COUNTRY_PHONE_MAP).forEach(function (cc) {
+            const opt = document.createElement('option');
+            opt.value = GOLDMIND_COUNTRY_PHONE_MAP[cc];
+            opt.textContent = '+' + GOLDMIND_COUNTRY_PHONE_MAP[cc] + ' (' + cc + ')';
+            select.appendChild(opt);
+        });
+        select.value = GOLDMIND_DEFAULT_PHONE_CODE;
+    }
     const phoneCodeSelect = document.getElementById('company-phone-code');
-    Object.keys(GOLDMIND_COUNTRY_PHONE_MAP).forEach(function (cc) {
-        const opt = document.createElement('option');
-        opt.value = GOLDMIND_COUNTRY_PHONE_MAP[cc];
-        opt.textContent = '+' + GOLDMIND_COUNTRY_PHONE_MAP[cc] + ' (' + cc + ')';
-        phoneCodeSelect.appendChild(opt);
-    });
-    phoneCodeSelect.value = GOLDMIND_DEFAULT_PHONE_CODE;
+    populatePhoneCodeSelect(phoneCodeSelect);
+    const individualPhoneCodeSelect = document.getElementById('individual-phone-code');
+    populatePhoneCodeSelect(individualPhoneCodeSelect);
 
     // Extra phone numbers (repeatable rows) -----------------------------
     const extraPhonesList = document.getElementById('extra-phones-list');
@@ -342,6 +350,7 @@
             insertPayload.email = email || null;
         } else {
             insertPayload.phone = phone || null;
+            insertPayload.phone_country_code = phone ? individualPhoneCodeSelect.value : null;
         }
 
         const { data: inserted, error } = await goldmindClient.from('customers').insert(insertPayload).select('id').single();
@@ -381,6 +390,7 @@
         extraPhonesList.innerHTML = '';
         document.getElementById('customer-name').value = '';
         document.getElementById('customer-phone').value = '';
+        individualPhoneCodeSelect.value = GOLDMIND_DEFAULT_PHONE_CODE;
         document.getElementById('company-legal-name').value = '';
         document.getElementById('company-tax-number').value = '';
         document.getElementById('company-address').value = '';

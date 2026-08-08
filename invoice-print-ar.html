@@ -106,10 +106,12 @@
 <div class="flex items-start justify-between gap-2">
 <div class="flex-1">
 <div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1" id="cust-label">بيانات العميل</div>
-<div class="font-bold" id="cust-name"></div>
+<div class="font-bold flex items-baseline gap-2 flex-wrap" dir="auto" id="cust-name-phone-row">
+<span id="cust-name"></span>
+<span class="text-gray-600 font-normal" id="cust-phone"></span>
+</div>
 <div class="text-gray-600" id="cust-legal-name"></div>
 <div class="text-gray-600" id="cust-address"></div>
-<div class="text-gray-600 font-mono" dir="ltr" id="cust-phone"></div>
 <div class="text-gray-600" id="cust-email"></div>
 <div class="text-gray-500" id="cust-tax"></div>
 </div>
@@ -338,9 +340,18 @@
         // ---- Counterparty (customer or trader) ----
         document.getElementById('cust-label').textContent = counterpartyLabel;
         document.getElementById('cust-name').textContent = counterparty ? counterparty.name : '—';
-        document.getElementById('cust-phone').textContent = (counterparty && counterparty.phone)
-            ? (counterparty.is_company && counterparty.phone_country_code ? '+' + counterparty.phone_country_code + ' ' + counterparty.phone : counterparty.phone)
-            : '';
+
+        if (counterparty && counterparty.phone) {
+            // Always print the full number including a country code — fall
+            // back to the store's own country code when the counterparty
+            // record doesn't have one saved (e.g. older individual customers).
+            const dialCode = counterparty.phone_country_code
+                || GOLDMIND_COUNTRY_PHONE_MAP[store.country]
+                || GOLDMIND_DEFAULT_PHONE_CODE;
+            document.getElementById('cust-phone').textContent = '+' + dialCode + ' ' + counterparty.phone;
+        } else {
+            document.getElementById('cust-phone').textContent = '';
+        }
 
         const editLink = document.getElementById('editCounterpartyLink');
         if (customer) {

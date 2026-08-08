@@ -91,7 +91,10 @@
 </div>
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">رقم الهاتف</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="editCustomerPhone"/>
+<div class="flex gap-2">
+<select class="h-11 border border-outline-variant rounded-lg px-2 text-sm font-data-mono" dir="ltr" id="editCustomerPhoneCode"></select>
+<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="editCustomerPhone"/>
+</div>
 </div>
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">أرقام هاتف إضافية</label>
@@ -150,6 +153,14 @@ let customers = [];
 let movementsByCustomer = {};
 let currentCustomerId = null;
 let canEditCustomers = false;
+
+const editCustomerPhoneCodeSelect = document.getElementById('editCustomerPhoneCode');
+Object.keys(GOLDMIND_COUNTRY_PHONE_MAP).forEach(function (cc) {
+  const opt = document.createElement('option');
+  opt.value = GOLDMIND_COUNTRY_PHONE_MAP[cc];
+  opt.textContent = '+' + GOLDMIND_COUNTRY_PHONE_MAP[cc] + ' (' + cc + ')';
+  editCustomerPhoneCodeSelect.appendChild(opt);
+});
 
 function fmt(n) {
   return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -386,6 +397,7 @@ function toggleEditCustomerForm() {
 
   document.getElementById('editCustomerName').value = customer.name || '';
   document.getElementById('editCustomerPhone').value = customer.phone || '';
+  editCustomerPhoneCodeSelect.value = customer.phone_country_code || GOLDMIND_DEFAULT_PHONE_CODE;
   document.getElementById('editCustomerError').classList.add('hidden');
 
   const editExtraPhonesList = document.getElementById('editExtraPhonesList');
@@ -425,7 +437,7 @@ async function saveCustomerEdit() {
     return;
   }
 
-  const updatePayload = { name, phone: phone || null };
+  const updatePayload = { name, phone: phone || null, phone_country_code: phone ? editCustomerPhoneCodeSelect.value : null };
   if (customer && customer.is_company) {
     const legalName = document.getElementById('editCustomerLegalName').value.trim();
     if (!legalName) {
