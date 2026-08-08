@@ -27,8 +27,14 @@
     body { font-family: 'Inter', sans-serif; }
     @media print {
         .no-print { display: none !important; }
-        body { background: #fff !important; }
-        #invoice-sheet { box-shadow: none !important; margin: 0 !important; }
+        body { background: #fff !important; margin: 0 !important; }
+        html { font-size: 100% !important; }
+        /* Let the invoice fill whatever paper size the employee picks in
+           their printer dialog (A5, A4, thermal...) instead of staying
+           locked to the small mobile-card width used on screen. */
+        #print-wrap { max-width: 100% !important; padding: 0 !important; }
+        #invoice-sheet { box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; padding: 28px !important; }
+        @page { margin: 10mm; }
     }
 </style>
 </head>
@@ -68,7 +74,7 @@
 <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm text-center font-semibold">هذه الفاتورة ملغاة ولا تُحتسب في أي تقرير</div>
 </div>
 
-<div class="max-w-md mx-auto p-4">
+<div class="max-w-md mx-auto p-4" id="print-wrap">
 <div id="invoice-sheet" class="hidden bg-white shadow-sm p-6">
 
 <!-- Header: logo + store info -->
