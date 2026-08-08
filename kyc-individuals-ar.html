@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>مستندات الهوية — الأفراد | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = { darkMode: "class", theme: { extend: {
+          "colors": {
+                  "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "on-tertiary": "#ffffff",
+                  "error": "#ba1a1a", "on-secondary": "#ffffff", "primary-container": "#131b2e",
+                  "on-surface": "var(--gm-on-surface)", "surface-container": "#eceef0", "surface-container-highest": "#e0e3e5",
+                  "surface-container-low": "var(--gm-surface-low)", "on-primary": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)",
+                  "outline-variant": "var(--gm-outline-variant)", "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)",
+                  "error-container": "#ffdad6", "primary": "var(--gm-primary)", "on-background": "var(--gm-on-primary)",
+                  "on-error": "#ffffff", "surface-variant": "#e0e3e5", "outline": "#76777d",
+                  "surface-container-high": "#e6e8ea", "secondary-container": "#ffdb99", "on-secondary-container": "#795f29"
+          },
+          "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"] }
+        } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { min-height: max(884px, 100dvh); }
+</style>
+</head>
+<body class="bg-background font-body-md text-on-background antialiased pb-24">
+<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-4 w-full h-16 sticky top-0 z-50 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<button onclick="window.location.href='index-ar.html'" class="material-symbols-outlined cursor-pointer active:opacity-80">arrow_forward</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">مستندات الهوية — الأفراد</h1>
+</div>
+</header>
+<main class="max-w-md mx-auto px-4 pt-6 space-y-3">
+
+<div class="relative">
+<input class="w-full h-12 px-10 py-2 border border-outline-variant rounded-lg bg-white focus:border-primary focus:ring-0 transition-all text-body-md font-body-md text-right" id="search-input" oninput="renderList()" placeholder="ابحث باسم العميل..." type="text"/>
+<span class="absolute right-3 top-3 material-symbols-outlined text-outline">search</span>
+</div>
+
+<div id="loading-state" class="text-center text-on-surface-variant text-sm py-10">جارِ التحميل...</div>
+<div id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-10">لا يوجد عملاء أفراد لديهم مستندات هوية مرفوعة حتى الآن.</div>
+<div class="space-y-3" id="companies-list"></div>
+
+</main>
+
+<script>
+    (async function __enforcePermission() {
+        await requireGoldMindSession('login-entry-ar.html');
+        const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+        const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_customers'] === true));
+        if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+    })();
+
+    let companies = []; // [{ customer, docs: [...] }]
+
+    async function load() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const { data: customers, error: custError } = await goldmindClient
+            .from('customers').select('*')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .eq('is_company', false)
+            .order('name');
+
+        if (custError) {
+            document.getElementById('loading-state').textContent = 'تعذّر التحميل: ' + custError.message;
+            return;
+        }
+
+        const customerIds = (customers || []).map(c => c.id);
+        let docsByCustomer = {};
+        if (customerIds.length > 0) {
+            const { data: docs } = await goldmindClient
+                .from('company_kyc_documents')
+                .select('*')
+                .eq('owner_type', 'customer')
+                .eq('document_category', 'id_document')
+                .in('owner_id', customerIds)
+                .order('created_at', { ascending: false });
+            (docs || []).forEach(d => {
+                if (!docsByCustomer[d.owner_id]) docsByCustomer[d.owner_id] = [];
+                docsByCustomer[d.owner_id].push(d);
+            });
+        }
+
+        companies = (customers || [])
+            .filter(c => docsByCustomer[c.id] && docsByCustomer[c.id].length > 0)
+            .map(c => ({ customer: c, docs: docsByCustomer[c.id] }));
+
+        document.getElementById('loading-state').classList.add('hidden');
+        renderList();
+    }
+
+    async function renderList() {
+        const q = document.getElementById('search-input').value.trim().toLowerCase();
+        const filtered = companies.filter(row =>
+            !q || (row.customer.name || '').toLowerCase().includes(q) || (row.customer.phone || '').toLowerCase().includes(q)
+        );
+
+        if (filtered.length === 0) {
+            document.getElementById('empty-state').classList.remove('hidden');
+            document.getElementById('companies-list').innerHTML = '';
+            return;
+        }
+        document.getElementById('empty-state').classList.add('hidden');
+
+        const cards = await Promise.all(filtered.map(async row => {
+            const docsHtml = await Promise.all(row.docs.map(async doc => {
+                const { data: signed } = await goldmindClient.storage.from('company-kyc-documents').createSignedUrl(doc.file_url, 3600);
+                const url = signed ? signed.signedUrl : '#';
+                return `<a href="${url}" target="_blank" class="flex items-center gap-2 text-[12px] text-secondary underline">
+                    <span class="material-symbols-outlined text-[15px]">description</span> ${doc.file_name}
+                </a>`;
+            }));
+
+            return `
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4">
+                <div class="font-bold text-[14px]">${row.customer.name}</div>
+                <div class="text-[11px] text-on-surface-variant mb-2" dir="ltr">${row.customer.phone || ''}</div>
+                <div class="flex flex-col gap-1.5 pt-2 border-t border-outline-variant">${docsHtml.join('')}</div>
+            </div>`;
+        }));
+
+        document.getElementById('companies-list').innerHTML = cards.join('');
+    }
+
+    load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
