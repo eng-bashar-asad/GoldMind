@@ -207,6 +207,8 @@
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="inventory-add.html"><span class="material-symbols-outlined text-xl mb-1">inventory_2</span><span class="text-[10.5px] font-medium leading-tight text-center">إضافة قطعة</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="stock-production-ar.html"><span class="material-symbols-outlined text-xl mb-1">precision_manufacturing</span><span class="text-[10.5px] font-medium leading-tight text-center">إنتاج القطع</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="inventory-list-ar.html"><span class="material-symbols-outlined text-xl mb-1">inventory_2</span><span class="text-[10.5px] font-medium leading-tight text-center">المخزن</span></a>
+<a class="quick-action-icon diamond-feature flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="diamond-inventory-add.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[10.5px] font-medium leading-tight text-center">إضافة ألماسة</span></a>
+<a class="quick-action-icon diamond-feature flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="diamond-inventory-list-ar.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[10.5px] font-medium leading-tight text-center">مخزون الألماس</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_customers" href="customer-add-ar.html"><span class="material-symbols-outlined text-xl mb-1">person_add</span><span class="text-[10.5px] font-medium leading-tight text-center">إضافة عميل</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_customers" href="customer-debts-ar.html"><span class="material-symbols-outlined text-xl mb-1">account_balance_wallet</span><span class="text-[10.5px] font-medium leading-tight text-center">كشف حساب</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_reports" href="reports-ar.html"><span class="material-symbols-outlined text-xl mb-1">analytics</span><span class="text-[10.5px] font-medium leading-tight text-center">التقارير</span></a>
@@ -309,7 +311,7 @@
 
             // Store name
             const { data: store } = await goldmindClient
-                .from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+                .from('stores').select('name, diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
             if (store) document.getElementById('storeNameEl').textContent = store.name;
 
             // Staff name / role for the welcome line
@@ -331,6 +333,12 @@
             document.querySelectorAll('.quick-action-icon[data-permission]').forEach(function (el) {
                 if (!hasPerm(el.dataset.permission)) el.remove();
             });
+
+            // Diamond quick-actions only show for stores that turned the
+            // diamonds feature on in company settings (independent of permissions above)
+            if (!store || !store.diamonds_enabled) {
+                document.querySelectorAll('.diamond-feature').forEach(function (el) { el.remove(); });
+            }
 
             canManageFinance = hasPerm('view_profit_report');
             if (canManageFinance) {
@@ -553,6 +561,8 @@
         { label: 'إضافة قطعة للمخزون', href: 'inventory-add.html', icon: 'inventory_2', keywords: 'قطعة مخزون اضافة add piece inventory' },
         { label: 'إنتاج القطع من رصيد الجملة', href: 'stock-production-ar.html', icon: 'precision_manufacturing', keywords: 'انتاج رصيد جملة لوت production stock lot' },
         { label: 'المخزن', href: 'inventory-list-ar.html', icon: 'inventory_2', keywords: 'مخزون قطع inventory stock' },
+        { label: 'إضافة ألماسة', href: 'diamond-inventory-add.html', icon: 'diamond', keywords: 'ألماس الماسة اضافة diamond add' },
+        { label: 'مخزون الألماس', href: 'diamond-inventory-list-ar.html', icon: 'diamond', keywords: 'ألماس مخزون diamond inventory stock' },
         { label: 'مصروف جديد', href: 'expense-entry-ar.html', icon: 'receipt', keywords: 'مصروف expense' },
         { label: 'إضافة عميل', href: 'customer-add-ar.html', icon: 'person_add', keywords: 'عميل زبون customer add' },
         { label: 'ديون العملاء / كشف حساب', href: 'customer-debts-ar.html', icon: 'account_balance_wallet', keywords: 'عميل دين كشف حساب customer debt' },

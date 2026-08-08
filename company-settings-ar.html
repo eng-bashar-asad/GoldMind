@@ -218,6 +218,16 @@
 <div class="grid grid-cols-3 gap-2" id="shape-style-options"></div>
 </div>
 
+<!-- Diamonds feature toggle -->
+<div class="border-t border-outline-variant pt-5 mt-1">
+<h3 class="font-label-md text-label-md text-secondary font-bold mb-1">الألماس</h3>
+<p class="text-[11px] text-outline mb-3">عند التفعيل، تظهر خيارات مخزون الألماس والبيع منه بلوحة التحكم وشاشة البيع.</p>
+<div class="flex gap-3">
+<button type="button" id="diamonds-off-btn" onclick="setDiamondsEnabled(false)" class="flex-1 h-14 rounded-lg border font-semibold transition-all">غير مفعّل</button>
+<button type="button" id="diamonds-on-btn" onclick="setDiamondsEnabled(true)" class="flex-1 h-14 rounded-lg border font-semibold transition-all">مفعّل</button>
+</div>
+</div>
+
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
 <button id="save-btn" type="button" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md active:scale-[0.98] transition-all mt-2">
@@ -237,6 +247,17 @@
     const logoInput = document.getElementById('store-logo');
     const logoPreviewWrap = document.getElementById('logo-preview-wrap');
     const logoPreview = document.getElementById('logo-preview');
+
+    let diamondsEnabled = false;
+    function setDiamondsEnabled(value) {
+        diamondsEnabled = value;
+        const offBtn = document.getElementById('diamonds-off-btn');
+        const onBtn = document.getElementById('diamonds-on-btn');
+        const active = 'flex-1 h-14 rounded-lg border-2 border-primary bg-primary text-white font-semibold transition-all';
+        const inactive = 'flex-1 h-14 rounded-lg border border-outline-variant bg-white text-on-surface-variant font-semibold transition-all';
+        offBtn.className = value ? inactive : active;
+        onBtn.className = value ? active : inactive;
+    }
 
     let numberingMode = 'auto';
     function setNumberingMode(mode) {
@@ -296,6 +317,7 @@
 
     setFrameStyle(selectedFrameStyle);
     setShapeStyle(selectedShapeStyle);
+    setDiamondsEnabled(diamondsEnabled);
 
     const countryCurrencyMap = {
         'AE': 'AED', 'SA': 'SAR', 'KW': 'KWD', 'QA': 'QAR', 'BH': 'BHD',
@@ -404,6 +426,7 @@
 
         setFrameStyle(data.invoice_print_frame || 'classic');
         setShapeStyle(data.invoice_print_shape || 'soft');
+        setDiamondsEnabled(data.diamonds_enabled === true);
 
         renderNextInvoicePreview(data);
 
@@ -466,7 +489,8 @@
                 license_number: license || null,
                 invoice_numbering_mode: numberingMode,
                 invoice_print_frame: selectedFrameStyle,
-                invoice_print_shape: selectedShapeStyle
+                invoice_print_shape: selectedShapeStyle,
+                diamonds_enabled: diamondsEnabled
             })
             .eq('id', GOLDMIND_STORE_ID);
 
