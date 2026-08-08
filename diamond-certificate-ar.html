@@ -3,27 +3,66 @@
 <meta charset="utf-8"/>
 <link rel="manifest" href="manifest.json"/>
 <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
-<meta name="theme-color" content="#0f172a"/>
+<meta name="theme-color" content="#0b1730"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>شهادة ماس | GoldMind</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
     body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+    .font-cert-title { font-family: 'Amiri', 'IBM Plex Sans Arabic', serif; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
-    .pseudo-barcode {
-        height: 40px;
-        background-image: repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 4px, #000 4px 5px, transparent 5px 9px, #000 9px 12px, transparent 12px 14px);
+
+    .cert-outer {
+        background: radial-gradient(120% 100% at 50% 0%, #16264f 0%, #0b1730 55%, #08122a 100%);
+        color: #f2ecd9;
+        position: relative;
     }
+    .cert-frame {
+        border: 1px solid #c9a447;
+        position: relative;
+        padding: 1px;
+    }
+    .cert-frame-inner {
+        border: 3px double #d9b866;
+        position: relative;
+    }
+    .cert-gold-text { color: #e3c069; }
+    .cert-divider { border-color: #7a6a3d; }
+    .cert-corner {
+        position: absolute;
+        width: 34px;
+        height: 34px;
+        opacity: 0.85;
+    }
+    .cert-corner svg { width: 100%; height: 100%; }
+    .cert-corner.tl { top: -2px; right: -2px; transform: scaleX(-1); }
+    .cert-corner.tr { top: -2px; left: -2px; }
+    .cert-corner.bl { bottom: -2px; right: -2px; transform: scale(-1); }
+    .cert-corner.br { bottom: -2px; left: -2px; transform: scaleY(-1); }
+    .cert-seal {
+        width: 58px; height: 58px; border-radius: 999px;
+        border: 2px solid #d9b866;
+        display: flex; align-items: center; justify-content: center; flex-direction: column;
+        background: radial-gradient(circle, #1b2c58 0%, #0f1c3f 100%);
+        flex-shrink: 0;
+    }
+    .pseudo-barcode {
+        height: 34px;
+        background-image: repeating-linear-gradient(90deg, #d9b866 0 2px, transparent 2px 4px, #d9b866 4px 5px, transparent 5px 9px, #d9b866 9px 12px, transparent 12px 14px);
+        opacity: 0.9;
+    }
+
     @media print {
         .no-print { display: none !important; }
-        body { background: #fff !important; margin: 0 !important; }
+        html, body { background: #fff !important; margin: 0 !important; }
         #print-wrap { max-width: 100% !important; padding: 0 !important; }
         #cert-sheet { box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
-        @page { margin: 10mm; }
+        * { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+        @page { margin: 8mm; }
     }
 </style>
 </head>
@@ -44,75 +83,101 @@
 <div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
 
 <div class="max-w-md mx-auto p-4" id="print-wrap">
-<div id="cert-sheet" class="hidden bg-white shadow-sm p-6 border-4 border-double border-amber-600 rounded-xl">
+<div id="cert-sheet" class="hidden cert-outer rounded-xl shadow-xl p-3">
+<div class="cert-frame rounded-lg">
+<div class="cert-frame-inner rounded-md p-5">
 
-<!-- Header: logo + store name -->
-<div class="text-center pb-3 mb-4 border-b-2 border-amber-600">
-<img class="hidden mx-auto mb-2 h-14 object-contain" id="store-logo"/>
-<div class="font-bold text-lg" id="store-name"></div>
-<div class="text-[10.5px] text-gray-500 mt-0.5" id="store-info-line"></div>
-<div class="mt-3">
-<div class="font-bold text-[15px] tracking-wide" id="cert-title-ar">شهادة ملكية وجودة قطعة ألماس</div>
-<div class="text-[10.5px] text-gray-500 tracking-widest" dir="ltr" id="cert-title-en">DIAMOND OWNERSHIP &amp; QUALITY CERTIFICATE</div>
+<!-- Decorative corners -->
+<div class="cert-corner tl"><svg viewBox="0 0 34 34" fill="none"><path d="M2 32V10C2 5.6 5.6 2 10 2H32" stroke="#d9b866" stroke-width="1.4"/><path d="M2 24V16" stroke="#d9b866" stroke-width="1"/><path d="M10 2H18" stroke="#d9b866" stroke-width="1"/><circle cx="10" cy="10" r="2" fill="#d9b866"/></svg></div>
+<div class="cert-corner tr"><svg viewBox="0 0 34 34" fill="none"><path d="M2 32V10C2 5.6 5.6 2 10 2H32" stroke="#d9b866" stroke-width="1.4"/><path d="M2 24V16" stroke="#d9b866" stroke-width="1"/><path d="M10 2H18" stroke="#d9b866" stroke-width="1"/><circle cx="10" cy="10" r="2" fill="#d9b866"/></svg></div>
+<div class="cert-corner bl"><svg viewBox="0 0 34 34" fill="none"><path d="M2 32V10C2 5.6 5.6 2 10 2H32" stroke="#d9b866" stroke-width="1.4"/><path d="M2 24V16" stroke="#d9b866" stroke-width="1"/><path d="M10 2H18" stroke="#d9b866" stroke-width="1"/><circle cx="10" cy="10" r="2" fill="#d9b866"/></svg></div>
+<div class="cert-corner br"><svg viewBox="0 0 34 34" fill="none"><path d="M2 32V10C2 5.6 5.6 2 10 2H32" stroke="#d9b866" stroke-width="1.4"/><path d="M2 24V16" stroke="#d9b866" stroke-width="1"/><path d="M10 2H18" stroke="#d9b866" stroke-width="1"/><circle cx="10" cy="10" r="2" fill="#d9b866"/></svg></div>
+
+<!-- Header: logo / diamond glyph + store name -->
+<div class="text-center pb-4 mb-4 border-b cert-divider">
+<img class="hidden mx-auto mb-2 h-12 object-contain" id="store-logo"/>
+<div class="hidden justify-center mb-1" id="diamond-glyph-wrap">
+<span class="material-symbols-outlined cert-gold-text" style="font-size:26px;">diamond</span>
+</div>
+<div class="font-cert-title font-bold text-[22px] tracking-wide cert-gold-text" id="store-name"></div>
+<div class="text-[10px] text-gray-300 mt-0.5 tracking-widest" id="store-info-line"></div>
+
+<div class="mt-4">
+<div class="font-cert-title font-bold text-[17px] cert-gold-text tracking-wide" id="cert-title-ar">شهادة ملكية وجودة قطعة ألماس</div>
+<div class="text-[10px] text-gray-300 tracking-[0.2em] mt-1" dir="ltr" id="cert-title-en">CERTIFICATE OF AUTHENTICITY &amp; QUALITY</div>
 </div>
 </div>
 
 <!-- Certificate meta -->
-<div class="flex justify-between text-[11px] text-gray-600 mb-4">
-<div>
-<div>رقم الشهادة: <span class="font-bold text-gray-900 font-mono" dir="ltr" id="cert-number"></span></div>
-<div>تاريخ الإصدار: <span id="cert-date"></span></div>
+<div class="flex justify-between items-center text-[10.5px] text-gray-300 mb-4 pb-2 border-b cert-divider">
+<div>رقم الشهادة: <span class="font-bold cert-gold-text font-mono" dir="ltr" id="cert-number"></span></div>
+<div id="cert-date-wrap">التاريخ: <span id="cert-date"></span></div>
 </div>
-<div class="text-left">
-<div id="cert-invoice-line"></div>
-</div>
-</div>
+<div class="text-[10.5px] text-gray-300 mb-4 -mt-2" id="cert-invoice-line"></div>
 
-<!-- Photo (if available) -->
-<div class="hidden justify-center mb-4" id="photo-wrap">
-<img class="w-28 h-28 rounded-lg object-cover border border-gray-200" id="piece-photo" alt="صورة القطعة"/>
+<!-- Photo + specs -->
+<div class="flex gap-3 mb-4">
+<div class="w-24 shrink-0">
+<div class="text-[9.5px] cert-gold-text text-center mb-1 tracking-wide">صورة القطعة</div>
+<div class="hidden aspect-square rounded-md border border-[#7a6a3d] overflow-hidden" id="photo-wrap">
+<img class="w-full h-full object-cover" id="piece-photo" alt="صورة القطعة"/>
+</div>
+<div class="aspect-square rounded-md border border-dashed border-[#7a6a3d] flex items-center justify-center" id="photo-placeholder">
+<span class="material-symbols-outlined text-[#7a6a3d]" style="font-size:22px;">diamond</span>
+</div>
+</div>
+<div class="flex-1 min-w-0">
+<div class="text-[9.5px] cert-gold-text mb-1 tracking-wide">المواصفات</div>
+<table class="w-full text-[11.5px]" id="specs-table"></table>
+</div>
 </div>
 
 <!-- Owner (only if this piece has been sold) -->
-<div class="hidden bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-[12px]" id="owner-block">
-<div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1">صادرة باسم</div>
+<div class="hidden rounded-md p-3 mb-4 text-[12px]" style="background: rgba(217,184,102,0.08); border: 1px solid #7a6a3d;" id="owner-block">
+<div class="text-[9.5px] cert-gold-text tracking-wide mb-1">صادرة باسم</div>
 <div class="font-bold" id="owner-name"></div>
 </div>
 
-<!-- Diamond specs grid -->
-<div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
-<table class="w-full text-[12px]">
-<tbody id="specs-table"></tbody>
-</table>
-</div>
-
 <!-- Description -->
-<div class="text-[12px] text-gray-700 mb-4" id="desc-line"></div>
+<div class="text-[11.5px] text-gray-300 mb-4" id="desc-line"></div>
 
-<!-- External lab reference (only if the piece carries an outside certificate) -->
-<div class="hidden bg-gray-50 rounded-lg p-3 mb-4 text-[11.5px] text-gray-600" id="external-cert-block">
-<div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1">مرجع تقييم مختبر خارجي</div>
+<!-- External lab reference -->
+<div class="hidden rounded-md p-3 mb-4 text-[11px] text-gray-300" style="background: rgba(255,255,255,0.04); border: 1px solid #45465a;" id="external-cert-block">
+<div class="text-[9.5px] cert-gold-text tracking-wide mb-1">مرجع تقييم مختبر خارجي</div>
 <div id="external-cert-text" class="font-mono" dir="ltr"></div>
 </div>
 
-<!-- Disclaimer -->
-<p class="text-[10px] text-gray-400 leading-5 mb-6" id="disclaimer-text"></p>
+<!-- Authenticity seal + tagline -->
+<div class="flex items-center gap-3 mb-4">
+<div class="cert-seal">
+<span class="material-symbols-outlined cert-gold-text" style="font-size:18px;">verified</span>
+<span class="text-[7px] cert-gold-text tracking-wide mt-0.5">معتمد</span>
+</div>
+<div class="text-[10.5px] text-gray-300 leading-5" id="authenticity-line">ختم توثيق صادر عن المحل يشهد بمطابقة القطعة للمواصفات المذكورة أعلاه.</div>
+</div>
 
-<!-- Signature / stamp -->
-<div class="flex justify-between items-end text-[11px] text-gray-500 mb-4">
+<div class="text-center text-[10px] cert-gold-text tracking-[0.15em] mb-5" id="cert-tagline">التميز في كل التفاصيل</div>
+
+<!-- Disclaimer -->
+<p class="text-[9px] text-gray-400 leading-4 mb-6" id="disclaimer-text"></p>
+
+<!-- Signatures -->
+<div class="flex justify-between items-end text-[10px] text-gray-300 mb-4">
 <div class="flex-1 ml-4">
-<div class="border-b border-gray-400 h-10"></div>
+<div class="border-b cert-divider h-9"></div>
 <div class="mt-1">توقيع وختم المحل</div>
 </div>
 <div class="flex-1 mr-4">
-<div class="border-b border-gray-400 h-10"></div>
+<div class="border-b cert-divider h-9"></div>
 <div class="mt-1">المسؤول المُصدِر</div>
 </div>
 </div>
 
 <div class="pseudo-barcode w-full"></div>
-<div class="font-mono text-[10px] tracking-widest mt-1 text-center" dir="ltr" id="barcode-text"></div>
+<div class="font-mono text-[9.5px] tracking-widest mt-1 text-center text-gray-300" dir="ltr" id="barcode-text"></div>
 
+</div>
+</div>
 </div>
 </div>
 
@@ -126,9 +191,9 @@
 
     function specRow(label, value) {
         if (!value) return '';
-        return `<tr class="border-b border-gray-100 last:border-0">
-            <td class="px-3 py-2 text-gray-500 bg-gray-50 w-1/3">${label}</td>
-            <td class="px-3 py-2 font-semibold" dir="auto">${value}</td>
+        return `<tr>
+            <td class="py-1 pl-2 text-gray-400 w-1/2">${label}</td>
+            <td class="py-1 font-semibold text-left" style="color:#f2ecd9;" dir="auto">${value}</td>
         </tr>`;
     }
 
@@ -184,12 +249,15 @@
             const logo = document.getElementById('store-logo');
             logo.src = store.logo_url;
             logo.classList.remove('hidden');
+        } else {
+            document.getElementById('diamond-glyph-wrap').classList.remove('hidden');
+            document.getElementById('diamond-glyph-wrap').classList.add('flex');
         }
         document.getElementById('store-name').textContent = (store && store.name) || 'GoldMind';
         const infoParts = [];
         if (store && store.address) infoParts.push(store.address);
         if (store && store.phone) infoParts.push(store.phone);
-        document.getElementById('store-info-line').textContent = infoParts.join(' · ');
+        document.getElementById('store-info-line').textContent = infoParts.join('  ·  ');
 
         // ---- Meta ----
         document.getElementById('cert-number').textContent = piece.barcode || pieceId.slice(0, 12).toUpperCase();
@@ -203,7 +271,7 @@
         if (piece.photo_url) {
             document.getElementById('piece-photo').src = piece.photo_url;
             document.getElementById('photo-wrap').classList.remove('hidden');
-            document.getElementById('photo-wrap').classList.add('flex');
+            document.getElementById('photo-placeholder').classList.add('hidden');
         }
 
         // ---- Owner ----
@@ -214,14 +282,14 @@
 
         // ---- Specs table ----
         const rows = [
-            specRow('وزن الماس', Number(piece.diamond_carat || 0).toFixed(2) + ' قيراط (ct)'),
-            specRow('الشكل (Shape)', piece.shape ? (SHAPE_NAMES[piece.shape] || piece.shape) : ''),
-            specRow('النقاء (Clarity)', piece.clarity || ''),
-            specRow('القص (Cut)', piece.cut ? (CUT_NAMES[piece.cut] || piece.cut) : ''),
-            specRow('اللون (Color)', piece.color || '')
+            specRow('وزن الماس', Number(piece.diamond_carat || 0).toFixed(2) + ' ct'),
+            specRow('الشكل', piece.shape ? (SHAPE_NAMES[piece.shape] || piece.shape) : ''),
+            specRow('النقاء', piece.clarity || ''),
+            specRow('القص', piece.cut ? (CUT_NAMES[piece.cut] || piece.cut) : ''),
+            specRow('اللون', piece.color || '')
         ];
         if (piece.has_gold) {
-            rows.push(specRow('الجزء الذهبي', (piece.gold_weight_grams || 0) + ' غ — عيار ' + (piece.gold_karat || '')));
+            rows.push(specRow('الجزء الذهبي', (piece.gold_weight_grams || 0) + ' غ عيار ' + (piece.gold_karat || '')));
         }
         document.getElementById('specs-table').innerHTML = rows.join('');
 
