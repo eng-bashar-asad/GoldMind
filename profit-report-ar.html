@@ -81,6 +81,7 @@
 <th class="px-3 py-2">قيمة الذهب</th>
 <th class="px-3 py-2">الضريبة</th>
 <th class="px-3 py-2">كلفة المصنعية</th>
+<th class="px-3 py-2">كلفة الماس</th>
 <th class="px-3 py-2">ربح المصنعية</th>
 </tr>
 </thead>
@@ -135,11 +136,11 @@ async function load() {
 
   const { data: items, error } = await goldmindClient
     .from('invoice_items')
-    .select('*, piece:piece_id(cost_fabrication_per_gram), lot:gold_stock_lot_id(cost_fabrication_per_gram)')
+    .select('*, piece:piece_id(cost_fabrication_per_gram), lot:gold_stock_lot_id(cost_fabrication_per_gram), diamond:diamond_piece_id(diamond_carat, diamond_price_per_carat, has_gold, gold_cost_fabrication_per_gram)')
     .in('invoice_id', invoiceIds);
 
   if (error) {
-    document.getElementById('items-tbody').innerHTML = `<tr><td colspan="7" class="text-center text-error text-sm py-8">تعذّر التحميل: ${error.message}</td></tr>`;
+    document.getElementById('items-tbody').innerHTML = `<tr><td colspan="9" class="text-center text-error text-sm py-8">تعذّر التحميل: ${error.message}</td></tr>`;
     return;
   }
 
@@ -169,15 +170,18 @@ async function load() {
     const goldValue = sign * (weight * goldPrice);
     const beforeTax = revenue / vatMultiplier;
     const vat = revenue - beforeTax;
-    const fabCost = sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || 0));
-    const profit = revenue - goldValue - vat - fabCost;
+    const fabCost = sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || ((it.diamond && it.diamond.has_gold && it.diamond.gold_cost_fabrication_per_gram) || 0)));
+    // Diamond-sourced lines carry their own acquisition cost (carat × price/carat),
+    // separate from any gold portion already priced above.
+    const diamondCost = it.diamond ? sign * (Number(it.diamond.diamond_carat || 0) * Number(it.diamond.diamond_price_per_carat || 0)) : 0;
+    const profit = revenue - goldValue - vat - fabCost - diamondCost;
 
     totalRevenue += revenue;
     totalVat += vat;
     totalGold += goldValue;
     totalProfit += profit;
 
-    return { it, inv, isReturn, weight, displayWeight, revenue, goldValue, vat, fabCost, profit, goldPrice, isEstimated };
+    return { it, inv, isReturn, weight, displayWeight, revenue, goldValue, vat, fabCost, diamondCost, profit, goldPrice, isEstimated };
   });
 
   document.getElementById('stat-revenue').textContent = totalRevenue.toFixed(2);
@@ -192,11 +196,12 @@ async function load() {
     <tr class="border-t border-outline-variant ${r.isReturn ? 'bg-error-container/20' : ''}">
       <td class="px-3 py-2">${(r.inv && r.inv.invoice_number) || '—'}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">(مرتجع)</span>' : ''}</td>
       <td class="px-3 py-2">${r.it.barcode || r.it.description || '—'}</td>
-      <td class="px-3 py-2 font-data-mono">${r.displayWeight}غ / ع${r.it.karat}${r.displayWeight !== r.weight ? ` <span class="text-outline">(محاسبة: ${r.weight}غ)</span>` : ''}</td>
+      <td class="px-3 py-2 font-data-mono">${r.it.diamond ? (Number(r.it.diamond.diamond_carat).toFixed(2) + ' ct' + (r.it.diamond.has_gold ? ` + ${r.displayWeight}غ/ع${r.it.karat}` : '')) : `${r.displayWeight}غ / ع${r.it.karat}${r.displayWeight !== r.weight ? ` <span class="text-outline">(محاسبة: ${r.weight}غ)</span>` : ''}`}</td>
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono">${r.goldValue.toFixed(2)}${r.isEstimated ? ' <span class=\"text-outline\">(تقديري)</span>' : ''}</td>
       <td class="px-3 py-2 font-data-mono">${r.vat.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono">${r.fabCost.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono">${r.it.diamond ? r.diamondCost.toFixed(2) : '—'}</td>
       <td class="px-3 py-2 font-data-mono font-bold ${r.profit >= 0 ? 'text-success' : 'text-error'}">${r.profit.toFixed(2)}</td>
     </tr>`).join('');
 }
