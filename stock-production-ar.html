@@ -1,0 +1,228 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إنتاج القطع | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = { darkMode: "class", theme: { extend: {
+          "colors": {
+                  "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "on-tertiary": "#ffffff",
+                  "error": "#ba1a1a", "on-secondary": "#ffffff", "primary-container": "#131b2e",
+                  "on-surface": "var(--gm-on-surface)", "surface-container": "#eceef0", "surface-container-highest": "#e0e3e5",
+                  "surface-container-low": "var(--gm-surface-low)", "on-primary": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)",
+                  "outline-variant": "var(--gm-outline-variant)", "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)",
+                  "error-container": "#ffdad6", "primary": "var(--gm-primary)", "on-background": "var(--gm-on-primary)",
+                  "on-error": "#ffffff", "surface-variant": "#e0e3e5", "outline": "#76777d",
+                  "surface-container-high": "#e6e8ea", "secondary-container": "#ffdb99", "on-secondary-container": "#795f29"
+          },
+          "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"] }
+        } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { min-height: max(884px, 100dvh); }
+</style>
+</head>
+<body class="bg-background font-body-md text-on-background antialiased pb-24">
+<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-4 w-full h-16 sticky top-0 z-50 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<button onclick="window.location.href='index-ar.html'" class="material-symbols-outlined cursor-pointer active:opacity-80">arrow_forward</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">إنتاج القطع</h1>
+</div>
+</header>
+<main class="max-w-md mx-auto px-4 pt-6 space-y-4">
+
+<p class="text-[12px] text-on-surface-variant leading-5">حوّل رصيد الجملة (اللوتات) إلى قطع مستقلة برواكيد فردية بالمخزون — العيار والمصنعية بيتوارثوا تلقائياً من الدفعة.</p>
+
+<div id="loading-state" class="text-center text-on-surface-variant text-sm py-10">جارِ التحميل...</div>
+<div id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-10">لا يوجد رصيد جملة متوفر حالياً. أضِف رصيداً من فاتورة شراء (وضع "رصيد بالجملة").</div>
+<div class="space-y-3" id="lots-list"></div>
+
+</main>
+
+<script>
+    (async function __enforcePermission() {
+        await requireGoldMindSession('login-entry-ar.html');
+        const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+        const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['add_piece'] === true));
+        if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+    })();
+
+    let lots = [];
+    let openLotId = null;
+    const rowsByLot = {}; // lotId -> [{ rowId, description, weight }]
+    let rowCounter = 0;
+
+    function fmt(n) { return (Math.round((Number(n) + Number.EPSILON) * 100) / 100).toFixed(2); }
+
+    async function load() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const { data, error } = await goldmindClient
+            .from('gold_stock_lots')
+            .select('*, trader:trader_id(name), invoice:source_invoice_id(invoice_number)')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .gt('weight_grams_remaining', 0)
+            .order('created_at', { ascending: false });
+
+        document.getElementById('loading-state').classList.add('hidden');
+
+        if (error) {
+            document.getElementById('lots-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
+            return;
+        }
+
+        lots = data || [];
+        if (lots.length === 0) {
+            document.getElementById('empty-state').classList.remove('hidden');
+            return;
+        }
+        renderLots();
+    }
+
+    function renderLots() {
+        document.getElementById('lots-list').innerHTML = lots.map(lot => {
+            const isOpen = openLotId === lot.id;
+            const rows = rowsByLot[lot.id] || [];
+            const usedInForm = rows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+            const remainingAfterForm = Number(lot.weight_grams_remaining) - usedInForm;
+
+            const rowsHtml = rows.map(r => `
+                <div class="flex gap-2 items-center">
+                    <input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm" placeholder="وصف القطعة" value="${(r.description || '').replace(/"/g, '&quot;')}" oninput="updateRow('${lot.id}', ${r.rowId}, 'description', this.value)"/>
+                    <input class="w-24 h-11 border border-outline-variant rounded-lg px-2 text-sm font-data-mono" dir="ltr" placeholder="الوزن" step="0.01" type="number" value="${r.weight || ''}" oninput="updateRow('${lot.id}', ${r.rowId}, 'weight', this.value)"/>
+                    <button type="button" onclick="removeRow('${lot.id}', ${r.rowId})" class="h-11 w-11 flex items-center justify-center rounded-lg border border-outline-variant text-error">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                </div>`).join('');
+
+            return `
+            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+                <button type="button" onclick="toggleLot('${lot.id}')" class="w-full p-4 flex items-center justify-between text-right">
+                    <div>
+                        <div class="font-bold text-[14px]">عيار ${lot.karat}K — متبقي ${fmt(lot.weight_grams_remaining)}غ <span class="text-outline font-normal">(من أصل ${fmt(lot.weight_grams_total)}غ)</span></div>
+                        <div class="text-[11px] text-on-surface-variant mt-1">مصنعية الغرام: ${fmt(lot.cost_fabrication_per_gram)}${lot.trader ? ' • من: ' + lot.trader.name : ''}${lot.invoice ? ' • فاتورة ' + lot.invoice.invoice_number : ''}</div>
+                    </div>
+                    <span class="material-symbols-outlined text-outline">${isOpen ? 'expand_less' : 'expand_more'}</span>
+                </button>
+                ${isOpen ? `
+                <div class="p-4 pt-0 border-t border-outline-variant space-y-3">
+                    <div class="space-y-2" id="rows-${lot.id}">${rowsHtml}</div>
+                    <button type="button" onclick="addRow('${lot.id}')" class="w-full h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary">+ إضافة قطعة</button>
+                    <div class="text-[11.5px] ${remainingAfterForm < 0 ? 'text-error font-bold' : 'text-on-surface-variant'}" id="lot-remaining-${lot.id}">
+                        المتبقي بعد الإنتاج: ${fmt(remainingAfterForm)}غ
+                    </div>
+                    <div class="hidden text-error text-[11.5px]" id="lot-error-${lot.id}"></div>
+                    <button type="button" onclick="produceFromLot('${lot.id}')" class="w-full h-11 bg-[#B4955A] text-white font-bold rounded-lg text-[13px]">حفظ القطع المنتَجة</button>
+                </div>` : ''}
+            </div>`;
+        }).join('');
+    }
+
+    function toggleLot(lotId) {
+        openLotId = openLotId === lotId ? null : lotId;
+        if (openLotId && !rowsByLot[lotId]) rowsByLot[lotId] = [];
+        renderLots();
+    }
+
+    function addRow(lotId) {
+        if (!rowsByLot[lotId]) rowsByLot[lotId] = [];
+        rowsByLot[lotId].push({ rowId: ++rowCounter, description: '', weight: '' });
+        renderLots();
+    }
+
+    function updateRow(lotId, rowId, field, value) {
+        const row = (rowsByLot[lotId] || []).find(r => r.rowId === rowId);
+        if (row) row[field] = value;
+        // Update just the running-total line by id, not a full re-render,
+        // so the weight/description input the person is typing in doesn't
+        // lose focus or cursor position on every keystroke.
+        const rows = rowsByLot[lotId] || [];
+        const lot = lots.find(l => l.id === lotId);
+        if (lot) {
+            const usedInForm = rows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+            const remainingAfterForm = Number(lot.weight_grams_remaining) - usedInForm;
+            const el = document.getElementById('lot-remaining-' + lotId);
+            if (el) {
+                el.textContent = 'المتبقي بعد الإنتاج: ' + fmt(remainingAfterForm) + 'غ';
+                el.className = (remainingAfterForm < 0 ? 'text-error font-bold' : 'text-on-surface-variant') + ' text-[11.5px]';
+            }
+        }
+    }
+
+    function removeRow(lotId, rowId) {
+        rowsByLot[lotId] = (rowsByLot[lotId] || []).filter(r => r.rowId !== rowId);
+        renderLots();
+    }
+
+    async function produceFromLot(lotId) {
+        const lot = lots.find(l => l.id === lotId);
+        const rows = (rowsByLot[lotId] || []).filter(r => r.weight && Number(r.weight) > 0);
+        const errEl = document.getElementById('lot-error-' + lotId);
+        errEl.classList.add('hidden');
+
+        if (rows.length === 0) {
+            errEl.textContent = 'أضف قطعة واحدة على الأقل بوزن صحيح.';
+            errEl.classList.remove('hidden');
+            return;
+        }
+
+        const totalWeight = rows.reduce((s, r) => s + Number(r.weight), 0);
+        if (totalWeight > Number(lot.weight_grams_remaining)) {
+            errEl.textContent = `مجموع أوزان القطع (${fmt(totalWeight)}غ) أكبر من المتبقي بالدفعة (${fmt(lot.weight_grams_remaining)}غ).`;
+            errEl.classList.remove('hidden');
+            return;
+        }
+
+        const piecesPayload = rows.map(r => ({
+            store_id: GOLDMIND_STORE_ID,
+            barcode: 'GM-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
+            weight_grams: Number(r.weight),
+            karat: lot.karat,
+            cost_fabrication_per_gram: lot.cost_fabrication_per_gram,
+            description_ar: r.description || null,
+            status: 'available',
+            created_by: GOLDMIND_STAFF_ID
+        }));
+
+        const { error: piecesError } = await goldmindClient.from('pieces').insert(piecesPayload);
+        if (piecesError) {
+            errEl.textContent = 'تعذّر إنشاء القطع: ' + piecesError.message;
+            errEl.classList.remove('hidden');
+            return;
+        }
+
+        const { error: consumeError } = await goldmindClient.rpc('consume_gold_stock_lot', { target_lot_id: lotId, amount: totalWeight });
+        if (consumeError) {
+            errEl.textContent = 'تم إنشاء القطع لكن تعذّر خصم الوزن من الدفعة: ' + consumeError.message + ' — راجع الرصيد يدوياً.';
+            errEl.classList.remove('hidden');
+        }
+
+        delete rowsByLot[lotId];
+        openLotId = null;
+        await load();
+    }
+
+    load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>

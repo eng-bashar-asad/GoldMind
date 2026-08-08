@@ -135,7 +135,7 @@ async function load() {
 
   const { data: items, error } = await goldmindClient
     .from('invoice_items')
-    .select('*, piece:piece_id(cost_fabrication_per_gram)')
+    .select('*, piece:piece_id(cost_fabrication_per_gram), lot:gold_stock_lot_id(cost_fabrication_per_gram)')
     .in('invoice_id', invoiceIds);
 
   if (error) {
@@ -169,7 +169,7 @@ async function load() {
     const goldValue = sign * (weight * goldPrice);
     const beforeTax = revenue / vatMultiplier;
     const vat = revenue - beforeTax;
-    const fabCost = sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || 0));
+    const fabCost = sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || 0));
     const profit = revenue - goldValue - vat - fabCost;
 
     totalRevenue += revenue;

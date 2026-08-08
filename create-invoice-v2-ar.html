@@ -99,13 +99,20 @@
 <!-- Manual item entry -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة قطعة مشتراة</h2>
-<div class="relative">
+
+<div class="flex bg-surface-container-low rounded-lg p-1 gap-1">
+<button class="tab-btn active flex-1 py-2 rounded-md text-[12px] font-semibold" id="itemModePiece" type="button" onclick="setItemMode('piece')">قطعة فردية</button>
+<button class="tab-btn flex-1 py-2 rounded-md text-[12px] font-semibold" id="itemModeBulk" type="button" onclick="setItemMode('bulk')">رصيد بالجملة (لوت)</button>
+</div>
+<p class="text-[10.5px] text-outline" id="itemModeHint">قطعة واحدة محددة الوزن تُسجَّل بالمخزون فوراً.</p>
+
+<div class="relative" id="manual-desc-wrap">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-desc">وصف القطعة (عربي)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-desc" placeholder="خاتم، سبيكة، قطع كسر..." type="text"/>
 </div>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-weight">الوزن (غ)</label>
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-weight" id="manual-weight-label">الوزن (غ)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-weight" step="0.01" type="number"/>
 </div>
 <div class="relative">
@@ -117,6 +124,10 @@
 <option value="24">24</option>
 </select>
 </div>
+</div>
+<div class="relative" id="bulk-fab-per-gram-field" hidden="">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="bulk-fab-per-gram">مصنعية الغرام (لحساب الربح لاحقاً)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="bulk-fab-per-gram" placeholder="0.00" step="0.01" type="number"/>
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-price">سعر الشراء</label>
@@ -227,8 +238,21 @@
     let selectedTrader = null;
     let selectedPaymentMethod = 'cash';
     let attachmentFile = null;
-    const cart = []; // { cartId, karat, weight, price, description }
+    let itemMode = 'piece'; // 'piece' | 'bulk'
+    const cart = []; // { cartId, karat, weight, price, description, mode, fabPerGram }
     let cartCounter = 0;
+
+    // ---------- Item mode toggle (individual piece vs. bulk stock lot) ----------
+    function setItemMode(mode) {
+        itemMode = mode;
+        document.getElementById('itemModePiece').classList.toggle('active', mode === 'piece');
+        document.getElementById('itemModeBulk').classList.toggle('active', mode === 'bulk');
+        document.getElementById('bulk-fab-per-gram-field').hidden = mode !== 'bulk';
+        document.getElementById('manual-weight-label').textContent = mode === 'bulk' ? 'الوزن الكلي (غ)' : 'الوزن (غ)';
+        document.getElementById('itemModeHint').textContent = mode === 'bulk'
+            ? 'دفعة/لوت بوزن إجمالي واحد — تُباع لاحقاً بالوزن مباشرة من الرصيد، أو تُحوَّل لقطع مستقلة من صفحة "إنتاج القطع".'
+            : 'قطعة واحدة محددة الوزن تُسجَّل بالمخزون فوراً.';
+    }
 
     // ---------- Purchase type toggle ----------
     function setPurchaseType(type) {
@@ -361,17 +385,20 @@
 
         cart.push({
             cartId: ++cartCounter,
+            mode: itemMode,
             karat: karat,
             weight: weight,
             price: price,
             fabFee: parseFloat(document.getElementById('manual-fabfee').value) || 0,
-            description: document.getElementById('manual-desc').value.trim() || null
+            fabPerGram: itemMode === 'bulk' ? (parseFloat(document.getElementById('bulk-fab-per-gram').value) || 0) : null,
+            description: document.getElementById('manual-desc').value.trim() || (itemMode === 'bulk' ? 'رصيد بالجملة' : null)
         });
 
         document.getElementById('manual-desc').value = '';
         document.getElementById('manual-weight').value = '';
         document.getElementById('manual-price').value = '';
         document.getElementById('manual-fabfee').value = '';
+        document.getElementById('bulk-fab-per-gram').value = '';
         renderCart();
     }
 
@@ -390,7 +417,7 @@
         }
         body.innerHTML = cart.map(item => `
             <tr>
-                <td class="px-3 py-3"><div class="font-body-md">${item.description || '—'}</div></td>
+                <td class="px-3 py-3"><div class="font-body-md">${item.description || '—'}${item.mode === 'bulk' ? ' <span class="text-[10px] text-secondary font-semibold">(رصيد)</span>' : ''}</div></td>
                 <td class="px-2 py-3 text-center">${item.karat}K</td>
                 <td class="px-2 py-3 text-left">${item.weight}</td>
                 <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}${item.fabFee ? `<br><span class="text-[10px] text-outline">+مصنعية ${item.fabFee.toFixed(2)}</span>` : ''}</td>
@@ -495,8 +522,9 @@
             return;
         }
 
-        // Each purchased item becomes a new inventory piece
-        const piecesPayload = cart.map(item => ({
+        // Individual-piece cart items become new inventory pieces immediately.
+        const pieceCartItems = cart.filter(item => item.mode !== 'bulk');
+        const piecesPayload = pieceCartItems.map(item => ({
             store_id: GOLDMIND_STORE_ID,
             barcode: 'GM-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
             weight_grams: item.weight,
@@ -506,7 +534,9 @@
             created_by: GOLDMIND_STAFF_ID
         }));
 
-        const { data: newPieces, error: piecesError } = await goldmindClient.from('pieces').insert(piecesPayload).select();
+        const { data: newPieces, error: piecesError } = piecesPayload.length > 0
+            ? await goldmindClient.from('pieces').insert(piecesPayload).select()
+            : { data: [], error: null };
 
         if (piecesError) {
             saveBtn.disabled = false;
@@ -515,17 +545,63 @@
             return;
         }
 
-        const itemsPayload = cart.map((item, idx) => ({
-            invoice_id: invoiceRow.id,
-            piece_id: newPieces[idx] ? newPieces[idx].id : null,
-            barcode: newPieces[idx] ? newPieces[idx].barcode : null,
+        // Bulk-lot cart items become gold_stock_lots rows instead of pieces —
+        // a running weight balance that gets sold from directly or later
+        // "produced" into discrete pieces from stock-production-ar.html.
+        const bulkCartItems = cart.filter(item => item.mode === 'bulk');
+        const lotsPayload = bulkCartItems.map(item => ({
+            store_id: GOLDMIND_STORE_ID,
             karat: item.karat,
-            weight_grams: item.weight,
-            accounting_weight_grams: item.weight,
-            fabrication_fee: 0,
-            line_total: item.price,
-            description: item.description
+            weight_grams_total: item.weight,
+            weight_grams_remaining: item.weight,
+            cost_fabrication_per_gram: item.fabPerGram || 0,
+            trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
+            source_invoice_id: invoiceRow.id,
+            notes: item.description,
+            created_by: GOLDMIND_STAFF_ID
         }));
+
+        const { data: newLots, error: lotsError } = lotsPayload.length > 0
+            ? await goldmindClient.from('gold_stock_lots').insert(lotsPayload).select()
+            : { data: [], error: null };
+
+        if (lotsError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ فاتورة الشراء';
+            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة رصيد الجملة: ' + lotsError.message, true);
+            return;
+        }
+
+        let pieceIdx = 0, lotIdx = 0;
+        const itemsPayload = cart.map(item => {
+            if (item.mode === 'bulk') {
+                const lot = newLots[lotIdx++];
+                return {
+                    invoice_id: invoiceRow.id,
+                    piece_id: null,
+                    gold_stock_lot_id: lot ? lot.id : null,
+                    barcode: null,
+                    karat: item.karat,
+                    weight_grams: item.weight,
+                    accounting_weight_grams: item.weight,
+                    fabrication_fee: 0,
+                    line_total: item.price,
+                    description: item.description
+                };
+            }
+            const piece = newPieces[pieceIdx++];
+            return {
+                invoice_id: invoiceRow.id,
+                piece_id: piece ? piece.id : null,
+                barcode: piece ? piece.barcode : null,
+                karat: item.karat,
+                weight_grams: item.weight,
+                accounting_weight_grams: item.weight,
+                fabrication_fee: 0,
+                line_total: item.price,
+                description: item.description
+            };
+        });
 
         const { error: itemsError } = await goldmindClient.from('invoice_items').insert(itemsPayload);
         if (itemsError) {

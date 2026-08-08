@@ -152,6 +152,24 @@ const GOLDMIND_THEMES = {
       '--gm-outline-variant': '#d9d0e8'
     }
   },
+  'aurum-night': {
+    label: 'الذهبي الليلي (Aurum)',
+    swatch: ['#f2ca50', '#081425', '#111c2d'],
+    vars: {
+      '--gm-bg': '#081425',
+      '--gm-bg-elevated': '#081425',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#f7edd3',
+      '--gm-primary': '#081425',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#f2ca50',
+      '--gm-on-accent': '#081425',
+      '--gm-secondary': '#404756',
+      '--gm-on-surface': '#0f1b2e',
+      '--gm-on-surface-variant': '#4a5568',
+      '--gm-outline-variant': '#ddd6c4'
+    }
+  },
 };
 
 function goldmindApplyTheme(name) {
