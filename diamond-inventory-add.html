@@ -1,0 +1,466 @@
+<!DOCTYPE html>
+
+<html lang="ar" dir="rtl"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إضافة قطعة ماس | جولد مايند</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "var(--gm-on-surface-variant)",
+                    "on-secondary-container": "#795f29",
+                    "secondary": "var(--gm-secondary)",
+                    "surface-dim": "#d8dadc",
+                    "on-tertiary": "#ffffff",
+                    "surface-bright": "#f7f9fb",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "primary-fixed-dim": "#bec6e0",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "on-tertiary-container": "#75859d",
+                    "tertiary": "#000000",
+                    "primary-fixed": "#dae2fd",
+                    "primary-container": "#131b2e",
+                    "surface-tint": "#565e74",
+                    "on-surface": "var(--gm-on-surface)",
+                    "surface-container": "#eceef0",
+                    "on-primary-container": "#7c839b",
+                    "surface-container-highest": "#e0e3e5",
+                    "on-error-container": "#93000a",
+                    "inverse-on-surface": "#eff1f3",
+                    "surface-container-low": "var(--gm-surface-low)",
+                    "on-secondary-fixed-variant": "#5a430f",
+                    "on-primary": "var(--gm-on-primary)",
+                    "background": "var(--gm-bg-elevated)",
+                    "secondary-fixed-dim": "#e4c283",
+                    "outline-variant": "var(--gm-outline-variant)",
+                    "surface-container-lowest": "var(--gm-surface-lowest)",
+                    "surface": "var(--gm-bg-elevated)",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed": "#d3e4fe",
+                    "on-primary-fixed": "#131b2e",
+                    "secondary-fixed": "#ffdea4",
+                    "on-secondary-fixed": "#261900",
+                    "tertiary-fixed-dim": "#b7c8e1",
+                    "primary": "var(--gm-primary)",
+                    "on-background": "var(--gm-on-primary)",
+                    "on-error": "#ffffff",
+                    "surface-variant": "#e0e3e5",
+                    "tertiary-container": "#0b1c30",
+                    "inverse-primary": "#bec6e0",
+                    "outline": "#76777d",
+                    "on-tertiary-fixed-variant": "#38485d",
+                    "surface-container-high": "#e6e8ea",
+                    "inverse-surface": "#2d3133",
+                    "secondary-container": "#ffdb99",
+                    "on-tertiary-fixed": "#0b1c30"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-desktop": "40px",
+                    "gutter": "24px",
+                    "unit": "4px",
+                    "margin-mobile": "16px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "data-mono": ["IBM Plex Sans"],
+                    "headline-md": ["Inter"],
+                    "headline-xl-mobile": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-xl": ["Inter"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-xl-mobile": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        html { font-size: 87.5%; }
+
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 18px;
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        /* Premium subtle transition */
+        .input-focus-effect:focus-within {
+            box-shadow: 0 0 0 1px #000000;
+        }
+
+        /* Gold-sub-fields toggle switch */
+        .gm-switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+        .gm-switch input { opacity: 0; width: 0; height: 0; }
+        .gm-switch-track { position: absolute; cursor: pointer; inset: 0; background-color: var(--gm-outline-variant, #76777d); transition: .2s; border-radius: 999px; }
+        .gm-switch-track:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s; border-radius: 50%; }
+        .gm-switch input:checked + .gm-switch-track { background-color: var(--gm-primary, #131b2e); }
+        .gm-switch input:checked + .gm-switch-track:before { transform: translateX(-20px); }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+  </head>
+<body class="bg-background text-on-background font-body-md selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- Top Navigation Bar -->
+<header class="bg-surface-container-lowest text-primary docked full-width top-0 border-b border-outline-variant z-50 sticky">
+<div class="flex justify-between items-center px-margin-mobile w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer active:opacity-80 p-2 hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">إضافة قطعة ماس</h1>
+</div>
+<div class="flex items-center">
+<span class="font-label-md text-label-md text-on-surface-variant">AR - د.إ</span>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto">
+<!-- Camera Section -->
+<section class="p-margin-mobile">
+<input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
+<div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200" id="photo-trigger" onclick="document.getElementById('photo-input').click()">
+<div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
+<span class="material-symbols-outlined text-outline text-5xl mb-4">photo_camera</span>
+<p class="font-label-md text-label-md text-on-surface-variant font-semibold">التقط صورة للقطعة</p>
+<p class="font-label-md text-label-md text-outline mt-1">اضغط لالتقاط أو اختيار صورة</p>
+</div>
+<img alt="" class="hidden aspect-square w-full rounded-xl object-cover border border-outline-variant" id="photo-preview"/>
+<button class="hidden absolute top-2 right-2 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" onclick="event.stopPropagation(); removePhoto();" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
+</section>
+<!-- Barcode Section -->
+<section class="px-margin-mobile py-2 flex flex-col gap-4">
+<button type="button" onclick="document.getElementById('barcode-id').focus()" class="w-full h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center gap-3 active:scale-95 duration-200 transition-all font-semibold shadow-sm">
+<span class="material-symbols-outlined">barcode_scanner</span>
+<span class="font-label-md text-label-md">أدخل الباركود أو اتركه فارغاً للتوليد التلقائي</span>
+</button>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="barcode-id">رقم الباركود</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="barcode-id" placeholder="أدخله يدوياً" type="text"/>
+</div>
+</section>
+<!-- Form Fields -->
+<section class="px-margin-mobile py-6 flex flex-col gap-6">
+<!-- Diamond Weight/Carat + Price per Carat -->
+<div class="grid grid-cols-2 gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="diamond-carat">وزن الماس (قيراط)</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="diamond-carat" placeholder="0.00" step="0.01" type="number"/>
+<div class="bg-surface-container-high px-4 h-full flex items-center border-r border-outline-variant text-on-surface-variant font-label-md">ct</div>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="diamond-price-per-carat">سعر القيراط</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="diamond-price-per-carat" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+</div>
+<!-- Suggested Sale Price -->
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="suggested-price">سعر البيع المقترح (اختياري)</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="suggested-price" placeholder="0.00" step="0.01" type="number"/>
+<div class="bg-surface-container-high px-4 h-full flex items-center border-r border-outline-variant text-on-surface-variant font-label-md">د.إ</div>
+</div>
+<p class="text-[10px] text-outline mt-1 px-1">اتركه فارغاً لاستخدام (وزن الماس × سعر القيراط) تلقائياً + قيمة الذهب إن وجدت.</p>
+</div>
+<!-- Has Gold Toggle -->
+<div class="flex items-center justify-between border border-outline-variant rounded-lg px-4 h-14">
+<span class="font-label-md text-label-md font-semibold text-on-background">القطعة فيها ذهب؟</span>
+<label class="gm-switch">
+<input id="has-gold-toggle" type="checkbox"/>
+<span class="gm-switch-track"></span>
+</label>
+</div>
+<!-- Gold Sub-fields (hidden unless has-gold) -->
+<div class="hidden flex-col gap-4 border border-dashed border-outline-variant rounded-xl p-4" id="gold-subfields">
+<div class="grid grid-cols-2 gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="gold-weight">وزن الذهب (غرام)</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="gold-weight" placeholder="0.00" step="0.01" type="number"/>
+<div class="bg-surface-container-high px-4 h-full flex items-center border-r border-outline-variant text-on-surface-variant font-label-md">غ</div>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="gold-karat">العيار</label>
+<select class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none font-label-md text-on-background" id="gold-karat">
+<option value="18">عيار ١٨</option>
+<option selected="" value="21">عيار ٢١</option>
+<option value="22">عيار ٢٢</option>
+<option value="24">عيار ٢٤</option>
+</select>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="gold-fab-cost">كلفة المصنعية / غرام</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="gold-fab-cost" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+</div>
+<!-- Bilingual Description -->
+<div class="grid grid-cols-1 gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-ar">الوصف (عربي)</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" dir="rtl" id="desc-ar" placeholder="مثال: خاتم ماس سوليتير"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-en">الوصف (إنجليزي)</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-on-background" dir="ltr" id="desc-en" placeholder="e.g. Solitaire diamond ring"/>
+</div>
+</div>
+<!-- Status Message -->
+<div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
+<!-- Save Button -->
+<div class="pt-4">
+<button id="save-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold text-body-md shadow-md active:scale-[0.98] transition-all hover:brightness-110">
+                    حفظ قطعة الماس بالمخزون
+                </button>
+</div>
+</section>
+</main>
+<!-- Bottom Navigation Bar -->
+<nav class="fixed bottom-0 w-full flex justify-around items-center px-margin-mobile py-2 bg-surface-container-lowest text-primary docked full-width z-50 border-t border-outline-variant shadow-sm h-16">
+<!-- Dashboard -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="index-ar.html">
+<span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
+<span class="font-label-md text-label-md">الرئيسية</span>
+</a>
+<!-- Inventory (Active) -->
+<a class="flex flex-col items-center justify-center text-primary font-bold active:scale-90 duration-150" href="diamond-inventory-list-ar.html">
+<span class="material-symbols-outlined" data-icon="diamond" style="font-variation-settings: 'FILL' 1;">diamond</span>
+<span class="font-label-md text-label-md">مخزون الماس</span>
+</a>
+<!-- Invoices -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="new-sale-ar.html">
+<span class="material-symbols-outlined" data-icon="receipt_long">receipt_long</span>
+<span class="font-label-md text-label-md">الفواتير</span>
+</a>
+<!-- Ledgers -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="daily-cashbox-ar.html">
+<span class="material-symbols-outlined" data-icon="account_balance_wallet">account_balance_wallet</span>
+<span class="font-label-md text-label-md">الصندوق</span>
+</a>
+<!-- Settings -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="settings-ar.html">
+<span class="material-symbols-outlined" data-icon="settings">settings</span>
+<span class="font-label-md text-label-md">الإعدادات</span>
+</a>
+</nav>
+<script>
+        // Require an active session before allowing use of this page
+        (async function __enforcePermission() {
+            await requireGoldMindSession();
+            const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+            const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['add_piece'] === true));
+            if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'diamond-inventory-list-ar.html'; }
+        })();
+
+        // ---------- Photo capture ----------
+        let selectedPhotoFile = null;
+        const photoInput = document.getElementById('photo-input');
+        const photoPlaceholder = document.getElementById('photo-placeholder');
+        const photoPreview = document.getElementById('photo-preview');
+        const photoRemoveBtn = document.getElementById('photo-remove-btn');
+
+        photoInput.addEventListener('change', () => {
+            const file = photoInput.files && photoInput.files[0];
+            if (!file) return;
+            selectedPhotoFile = file;
+            const url = URL.createObjectURL(file);
+            photoPreview.src = url;
+            photoPreview.classList.remove('hidden');
+            photoPlaceholder.classList.add('hidden');
+            photoRemoveBtn.classList.remove('hidden');
+            photoRemoveBtn.classList.add('flex');
+        });
+
+        function removePhoto() {
+            selectedPhotoFile = null;
+            photoInput.value = '';
+            photoPreview.classList.add('hidden');
+            photoPlaceholder.classList.remove('hidden');
+            photoRemoveBtn.classList.add('hidden');
+            photoRemoveBtn.classList.remove('flex');
+        }
+
+        function generateBarcode() {
+            const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+            return 'GM-D-' + Date.now().toString(36).toUpperCase() + '-' + rand;
+        }
+
+        // Has-gold toggle shows/hides gold sub-fields
+        const hasGoldToggle = document.getElementById('has-gold-toggle');
+        const goldSubfields = document.getElementById('gold-subfields');
+        hasGoldToggle.addEventListener('change', () => {
+            if (hasGoldToggle.checked) {
+                goldSubfields.classList.remove('hidden');
+                goldSubfields.classList.add('flex');
+            } else {
+                goldSubfields.classList.add('hidden');
+                goldSubfields.classList.remove('flex');
+            }
+        });
+
+        // Save piece to Supabase
+        const saveBtn = document.getElementById('save-btn');
+        const messageBox = document.getElementById('save-message');
+
+        function showMessage(text, isError) {
+            messageBox.textContent = text;
+            messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+            messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
+        }
+
+        saveBtn.addEventListener('click', async () => {
+            const session = await requireGoldMindSession();
+            if (!session) return;
+
+            let barcode = document.getElementById('barcode-id').value.trim();
+            const diamondCarat = parseFloat(document.getElementById('diamond-carat').value);
+            const diamondPricePerCarat = parseFloat(document.getElementById('diamond-price-per-carat').value);
+
+            if (!diamondCarat || diamondCarat <= 0) {
+                showMessage('فضلاً أدخل وزن ماس صحيحاً (قيراط).', true);
+                return;
+            }
+            if (!diamondPricePerCarat || diamondPricePerCarat <= 0) {
+                showMessage('فضلاً أدخل سعر القيراط.', true);
+                return;
+            }
+
+            const hasGold = hasGoldToggle.checked;
+            const goldWeight = hasGold ? parseFloat(document.getElementById('gold-weight').value) : null;
+            const goldKarat = hasGold ? parseInt(document.getElementById('gold-karat').value, 10) : null;
+            const goldFabCost = hasGold ? (parseFloat(document.getElementById('gold-fab-cost').value) || null) : null;
+
+            if (hasGold && (!goldWeight || goldWeight <= 0)) {
+                showMessage('فضلاً أدخل وزن الذهب أو ألغِ تفعيل "القطعة فيها ذهب".', true);
+                return;
+            }
+
+            if (!barcode) {
+                barcode = generateBarcode();
+            }
+
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'جارِ الحفظ...';
+
+            let photoUrl = null;
+            if (selectedPhotoFile) {
+                showMessage('جارِ رفع الصورة...', false);
+                const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
+                const path = GOLDMIND_STORE_ID + '/' + barcode + '-' + Date.now() + '.' + ext;
+                const { error: uploadError } = await goldmindClient.storage
+                    .from('piece-photos')
+                    .upload(path, selectedPhotoFile, { upsert: false });
+
+                if (uploadError) {
+                    saveBtn.disabled = false;
+                    saveBtn.textContent = 'حفظ قطعة الماس بالمخزون';
+                    showMessage('فشل رفع الصورة: ' + uploadError.message, true);
+                    return;
+                }
+
+                const { data: publicUrlData } = goldmindClient.storage
+                    .from('piece-photos')
+                    .getPublicUrl(path);
+                photoUrl = publicUrlData ? publicUrlData.publicUrl : null;
+            }
+
+            const suggestedPriceInput = parseFloat(document.getElementById('suggested-price').value);
+            const suggestedPrice = suggestedPriceInput > 0 ? suggestedPriceInput : null;
+
+            const { error } = await goldmindClient.from('diamond_pieces').insert({
+                store_id: GOLDMIND_STORE_ID,
+                barcode: barcode,
+                photo_url: photoUrl,
+                has_gold: hasGold,
+                gold_weight_grams: goldWeight,
+                gold_karat: goldKarat,
+                gold_cost_fabrication_per_gram: goldFabCost,
+                diamond_carat: diamondCarat,
+                diamond_price_per_carat: diamondPricePerCarat,
+                suggested_sale_price: suggestedPrice,
+                description_ar: document.getElementById('desc-ar').value.trim() || null,
+                description_en: document.getElementById('desc-en').value.trim() || null,
+                status: 'available',
+                created_by: GOLDMIND_STAFF_ID
+            });
+
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ قطعة الماس بالمخزون';
+
+            if (error) {
+                showMessage('خطأ: ' + error.message, true);
+                return;
+            }
+
+            showMessage('تم حفظ القطعة بنجاح! الباركود: ' + barcode, false);
+            document.getElementById('barcode-id').value = '';
+            document.getElementById('diamond-carat').value = '';
+            document.getElementById('diamond-price-per-carat').value = '';
+            document.getElementById('suggested-price').value = '';
+            document.getElementById('gold-weight').value = '';
+            document.getElementById('gold-fab-cost').value = '';
+            document.getElementById('desc-ar').value = '';
+            document.getElementById('desc-en').value = '';
+            hasGoldToggle.checked = false;
+            goldSubfields.classList.add('hidden');
+            goldSubfields.classList.remove('flex');
+            document.getElementById('diamond-carat').focus();
+            removePhoto();
+        });
+    </script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
