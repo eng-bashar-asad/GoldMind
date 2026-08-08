@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ملصق قطعة ماس | GoldMind</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .pseudo-barcode {
+        height: 46px;
+        background-image: repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 4px, #000 4px 5px, transparent 5px 9px, #000 9px 12px, transparent 12px 14px);
+    }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; }
+        #label { box-shadow: none !important; border: 1px dashed #999 !important; margin: 0 auto !important; }
+    }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 h-14">
+<button onclick="window.location.href='diamond-inventory-list-ar.html'" class="flex items-center gap-2 text-gray-700">
+<span class="material-symbols-outlined">arrow_forward</span>
+<span class="text-sm font-semibold">مخزون الماس</span>
+</button>
+<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">print</span> طباعة
+</button>
+</div>
+
+<div id="loading" class="py-16 text-center text-gray-500 text-sm">جارِ التحميل...</div>
+<div id="error-box" class="hidden py-10 px-6 text-center text-red-700 bg-red-100 max-w-sm mx-auto mt-6 rounded-lg"></div>
+
+<div id="label" class="hidden max-w-xs mx-auto my-8 bg-white shadow rounded-lg border border-gray-200 p-4 text-center">
+<div id="storeName" class="text-sm font-bold mb-1"></div>
+<div id="description" class="text-xs text-gray-600 mb-2 truncate"></div>
+<div id="specs" class="text-[11px] text-gray-500 mb-3"></div>
+<div id="price" class="text-lg font-extrabold mb-3" dir="ltr"></div>
+<div class="pseudo-barcode w-full"></div>
+<div id="barcodeText" class="font-mono text-xs tracking-widest mt-1" dir="ltr"></div>
+</div>
+
+<script>
+    function getParam(name) {
+        return new URLSearchParams(window.location.search).get(name);
+    }
+
+    async function loadLabel() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const pieceId = getParam('id');
+        const loading = document.getElementById('loading');
+        const errorBox = document.getElementById('error-box');
+        const label = document.getElementById('label');
+
+        if (!pieceId) {
+            loading.classList.add('hidden');
+            errorBox.textContent = 'لم يتم تحديد القطعة.';
+            errorBox.classList.remove('hidden');
+            return;
+        }
+
+        const [{ data: piece, error: pieceError }, { data: store }] = await Promise.all([
+            goldmindClient.from('diamond_pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+        ]);
+
+        loading.classList.add('hidden');
+
+        if (pieceError || !piece) {
+            errorBox.textContent = 'تعذر إيجاد هذه القطعة.';
+            errorBox.classList.remove('hidden');
+            return;
+        }
+
+        document.getElementById('storeName').textContent = (store && store.name) ? store.name : 'GoldMind';
+        document.getElementById('description').textContent = piece.description_ar || piece.description_en || '';
+
+        const specParts = [(piece.diamond_carat || 0) + ' ct'];
+        if (piece.has_gold) {
+            specParts.push('ذهب ' + (piece.gold_weight_grams || 0) + ' غ عيار ' + (piece.gold_karat || ''));
+        }
+        document.getElementById('specs').textContent = specParts.join(' &middot; ').replace('&middot;', '·');
+
+        let price = piece.suggested_sale_price;
+        if (!price || price <= 0) {
+            price = Number(piece.diamond_carat || 0) * Number(piece.diamond_price_per_carat || 0);
+        }
+        document.getElementById('price').textContent = price ? price.toFixed(2) + ' د.إ' : '—';
+
+        document.getElementById('barcodeText').textContent = piece.barcode || pieceId.slice(0, 12).toUpperCase();
+
+        label.classList.remove('hidden');
+    }
+
+    loadLabel();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
