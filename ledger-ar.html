@@ -132,11 +132,11 @@
 <span class="font-bold text-[16px] font-data-mono" id="detail-gold-balance">0.00 غ</span>
 </div>
 <div class="flex justify-between items-center">
-<span class="text-[13px] text-on-surface-variant">دين المصنعية (نقدي)</span>
+<span class="text-[13px] text-on-surface-variant">دين نقدي (مصنعية/ألماس)</span>
 <span class="font-bold text-[16px] font-data-mono" id="detail-fee-balance">0.00 د.إ</span>
 </div>
 </div>
-<p class="text-[10px] text-outline mt-1">قيمة موجبة = دين علينا للتاجر لم يُسوَّ بعد. الذهب والمصنعية دينان منفصلان تماماً.</p>
+<p class="text-[10px] text-outline mt-1">قيمة موجبة = دين علينا للتاجر لم يُسوَّ بعد. دين الذهب والدين النقدي (مصنعية أو ألماس) منفصلان تماماً.</p>
 </div>
 
 <button onclick="toggleSettleForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
@@ -146,7 +146,7 @@
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form">
 <div class="flex bg-surface-container-low rounded-lg p-1 gap-1 mb-3">
 <button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabGold" onclick="setSettleMode('gold')">تسوية ذهب</button>
-<button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabCash" onclick="setSettleMode('cash')">تسوية نقدية (مصنعية)</button>
+<button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabCash" onclick="setSettleMode('cash')">تسوية نقدية (مصنعية/ألماس)</button>
 </div>
 <div id="settle-gold-fields" class="grid grid-cols-2 gap-3 mb-3">
 <div>
@@ -386,7 +386,7 @@ function renderTraders() {
         </div>
         <div class="flex gap-4 text-[12px] font-data-mono mt-1">
           <span class="${goldBal > 0 ? 'text-error' : 'text-success'}">ذهب: ${fmt(Math.abs(goldBal))} غ</span>
-          <span class="${feeBal > 0 ? 'text-error' : 'text-success'}">مصنعية: ${fmt(Math.abs(feeBal))} د.إ</span>
+          <span class="${feeBal > 0 ? 'text-error' : 'text-success'}">نقدي: ${fmt(Math.abs(feeBal))} د.إ</span>
         </div>
       </div>`;
   }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد تجار مطابقون. يُضافون تلقائياً عند إنشاء أول فاتورة شراء منهم.</p>';
@@ -434,7 +434,7 @@ function showTraderDetail(traderId) {
           <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${MOVEMENT_LABELS[m.movement_type] || m.movement_type}</span>
           <span class="text-[11px] text-on-surface-variant">${date}</span>
         </div>
-        <p class="text-[12px] font-data-mono">${m.weight_grams ? `${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : ''}${(m.fab_fee_amount && Number(m.fab_fee_amount) > 0) ? ` ${m.weight_grams ? '+' : ''}مصنعية ${fmt(m.fab_fee_amount)} د.إ` : ''}</p>
+        <p class="text-[12px] font-data-mono">${m.weight_grams ? `${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : ''}${(m.fab_fee_amount && Number(m.fab_fee_amount) > 0) ? ` ${m.weight_grams ? '+' : ''}نقدي (مصنعية/ألماس) ${fmt(m.fab_fee_amount)} د.إ` : ''}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${m.notes}</p>` : ''}
         ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${m.invoice.invoice_number}</p>` : ''}
       </div>`;
@@ -494,7 +494,7 @@ async function submitSettlement() {
       karat: null,
       gold_24k_equivalent: 0,
       fab_fee_amount: amount,
-      notes: notes || 'تسوية مصنعية نقدية'
+      notes: notes || 'تسوية نقدية (مصنعية/ألماس)'
     };
   }
 
