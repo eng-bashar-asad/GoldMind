@@ -169,12 +169,36 @@
 <span class="material-symbols-outlined text-[18px]">chevron_left</span>
 </a>
 <!-- Profile/Welcome -->
-<section class="mb-6">
+<section class="mb-4">
 <h2 class="font-headline-md text-headline-md text-on-primary" id="storeNameEl">محل الفارس للذهب</h2>
 <p class="font-body-md text-body-md text-on-primary opacity-70" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
 </section>
+<!-- Always-visible search bar (opens the same quick search panel) -->
+<button onclick="openQuickSearch()" class="w-full h-12 mb-5 px-4 flex items-center gap-2 bg-surface-container-lowest border border-outline-variant rounded-full text-on-surface-variant active:scale-[0.99] transition-transform">
+<span class="material-symbols-outlined text-[20px]">search</span>
+<span class="text-[13px]">بحث سريع عن فاتورة، عميل، أو أي شاشة...</span>
+</button>
+<!-- Today at a glance -->
+<section class="mb-5">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4 grid grid-cols-3 divide-x divide-x-reverse divide-outline-variant">
+<div class="text-center px-1">
+<div class="font-headline-md text-headline-md font-bold text-secondary truncate" id="todaySalesEl">0.00</div>
+<span class="text-[10px] text-on-surface-variant">مبيعات اليوم</span>
+</div>
+<div class="text-center px-1">
+<div class="font-headline-md text-headline-md font-bold text-primary truncate" id="todayInvoiceCountEl">0</div>
+<span class="text-[10px] text-on-surface-variant">فواتير اليوم</span>
+</div>
+<div class="text-center px-1">
+<div class="font-headline-md text-headline-md font-bold text-primary truncate" id="cashBalanceEl">0.00</div>
+<span class="text-[10px] text-on-surface-variant">الرصيد النقدي</span>
+</div>
+</div>
+</section>
+<!-- Real alerts (replaces the old non-functional notifications button) -->
+<div class="hidden flex-col gap-2 mb-5" id="alertsWrap"></div>
 <!-- Summary Cards (Bento Style for Mobile) -->
-<section class="mb-8"><h3 class="font-label-md text-label-md text-on-primary opacity-70 mb-4 uppercase tracking-wider">الاختصارات السريعة</h3><div class="grid grid-cols-4 gap-3">
+<section class="mb-6"><h3 class="font-label-md text-label-md text-on-primary opacity-70 mb-4 uppercase tracking-wider">الاختصارات السريعة</h3><div class="grid grid-cols-4 gap-3">
 <a class="quick-action-icon col-span-4 flex flex-row items-center justify-center gap-2 p-2.5 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" href="invoices-list-ar.html"><span class="material-symbols-outlined text-[20px]">manage_search</span><span class="text-[12px] font-semibold">بحث الفواتير</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-primary text-on-primary rounded-xl active:scale-95 transition-transform duration-200" data-permission="create_invoice" href="new-sale-ar.html"><span class="material-symbols-outlined text-xl mb-1">add_shopping_cart</span><span class="text-[10.5px] font-medium leading-tight text-center">فاتورة جديدة</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="create_invoice" href="create-invoice-v2-ar.html"><span class="material-symbols-outlined text-xl mb-1">local_shipping</span><span class="text-[10.5px] font-medium leading-tight text-center">فاتورة شراء</span></a>
@@ -187,42 +211,30 @@
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_customers" href="customer-debts-ar.html"><span class="material-symbols-outlined text-xl mb-1">account_balance_wallet</span><span class="text-[10.5px] font-medium leading-tight text-center">كشف حساب</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_reports" href="reports-ar.html"><span class="material-symbols-outlined text-xl mb-1">analytics</span><span class="text-[10.5px] font-medium leading-tight text-center">التقارير</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_repairs" href="repairs-ar.html"><span class="material-symbols-outlined text-xl mb-1">build</span><span class="text-[10.5px] font-medium leading-tight text-center">الصيانة</span></a>
-</div></section><section class="grid grid-cols-1 gap-4 mb-8"><!-- Overall Balance -->
-<div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl luxury-shadow">
-<div class="flex justify-between items-start mb-3">
-<span class="font-label-md text-label-md text-on-surface-variant">إجمالي الرصيد النقدي</span>
-<span class="material-symbols-outlined text-secondary">account_balance_wallet</span>
+</div></section>
+<!-- Traders' box (supplementary, smaller) -->
+<section class="mb-6">
+<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow flex items-center justify-between">
+<div>
+<span class="font-label-md text-label-md text-on-surface-variant block mb-1">صندوق التجار</span>
+<div class="font-headline-md text-headline-md font-semibold text-primary" id="tradersBoxEl">0.00</div>
 </div>
-<div class="flex items-baseline gap-2">
-<span class="font-headline-xl-mobile text-headline-xl-mobile font-bold text-primary" id="cashBalanceEl">0.00</span>
-<span class="font-label-md text-label-md text-on-surface-variant">د.إ</span>
-</div>
-<div class="mt-4 flex items-center gap-1 text-green-600">
-<span class="material-symbols-outlined text-[18px]">trending_up</span>
-<span class="text-xs font-medium" id="balanceTrendEl">لا توجد بيانات كافية بعد</span>
-</div>
-</div>
-<div class="grid grid-cols-2 gap-4">
-<!-- Traders' Cash Box -->
-<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow">
-<span class="font-label-md text-label-md text-on-surface-variant block mb-2">صندوق التجار</span>
-<div class="font-headline-md text-headline-md font-semibold text-primary truncate" id="tradersBoxEl">0.00</div>
-<span class="text-xs font-medium text-on-surface-variant">د.إ</span>
-</div>
-<!-- Today's Sales -->
-<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow">
-<span class="font-label-md text-label-md text-on-surface-variant block mb-2">مبيعات اليوم</span>
-<div class="font-headline-md text-headline-md font-semibold text-secondary truncate" id="todaySalesEl">0.00</div>
-<span class="text-xs font-medium text-on-surface-variant">د.إ</span>
-</div>
+<span class="material-symbols-outlined text-secondary text-2xl">account_balance</span>
 </div>
 </section>
 <!-- Quick Actions -->
 <!-- Recent Movements Log -->
 <section class="mb-4">
 <div class="flex justify-between items-center mb-4">
-<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">أحدث الحركات</h3>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">حركات اليوم</h3>
+<div class="flex items-center gap-2">
+<div class="hidden items-center gap-1" id="movementsDayNav">
+<button onclick="shiftMovementsDay(-1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px]">chevron_right</span></button>
+<span class="text-[11px] text-on-surface-variant font-data-mono" id="movementsDayLabel"></span>
+<button onclick="shiftMovementsDay(1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px]">chevron_left</span></button>
+</div>
 <a class="text-secondary text-xs font-semibold" href="ledger-ar.html">عرض الكل</a>
+</div>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant overflow-hidden" id="recentMovementsEl">
 <div class="p-6 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
@@ -231,6 +243,10 @@
 <!-- Decorative Spacer for FAB/BottomNav -->
 <div class="h-8"></div>
 </main>
+<!-- Floating action button: new invoice -->
+<a id="newInvoiceFab" href="new-sale-ar.html" class="hidden fixed bottom-20 left-4 z-40 w-14 h-14 rounded-full bg-primary text-on-primary shadow-lg items-center justify-center active:scale-90 transition-transform">
+<span class="material-symbols-outlined text-2xl">add_shopping_cart</span>
+</a>
 <!-- BottomNavBar -->
 <nav class="fixed bottom-0 right-0 w-full h-16 bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-around items-center px-margin-mobile shadow-sm">
 <!-- Dashboard (Active) -->
@@ -288,6 +304,9 @@
             window.__quickActionToastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2200);
         }
 
+        let canManageFinance = false; // owner or view_profit_report — gates movements day-navigation
+        let movementsViewDate = new Date(); // day currently shown in "حركات اليوم"
+
         (async function loadDashboard() {
             const session = await requireGoldMindSession('login-entry-ar.html');
             if (!session) return;
@@ -305,26 +324,34 @@
                 document.getElementById('welcomeEl').textContent = staffRow.full_name + ' • ' + roleLabel;
             }
 
-            // Dim quick-action icons the current staff member doesn't have permission
-            // for, and block them from opening entirely (not just visual dimming)
-            // (owners always see everything at full color; the daily cash box is
-            // intentionally always full-color since it's open to every staff member)
+            const isOwner = staffRow && staffRow.role === 'owner';
+            const hasPerm = (perm) => isOwner || (staffRow && staffRow.permissions && staffRow.permissions[perm] === true);
+
+            // Hide (not just dim) quick-action icons the current staff member
+            // doesn't have permission for, so the grid actually shrinks and
+            // reflows instead of leaving empty-feeling greyed-out slots.
+            // (owners always see everything; the daily cash box has no
+            // data-permission since it's intentionally open to all staff)
             document.querySelectorAll('.quick-action-icon[data-permission]').forEach(function (el) {
-                const perm = el.dataset.permission;
-                const allowed = staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions[perm] === true));
-                if (!allowed) {
-                    el.classList.add('opacity-40', 'grayscale', 'cursor-not-allowed');
-                    el.removeAttribute('href');
-                    el.addEventListener('click', function (e) {
-                        e.preventDefault();
-                        e.stopPropagation();
-                        showQuickActionToast('ليس لديك صلاحية الدخول لهذه الشاشة — راجع مدير الشركة.');
-                    });
-                }
+                if (!hasPerm(el.dataset.permission)) el.remove();
             });
 
+            // Floating "new invoice" button — only for staff who can actually create one
+            if (hasPerm('create_invoice')) {
+                const fab = document.getElementById('newInvoiceFab');
+                fab.classList.remove('hidden');
+                fab.classList.add('flex');
+            }
+
+            canManageFinance = hasPerm('view_profit_report');
+            if (canManageFinance) {
+                const nav = document.getElementById('movementsDayNav');
+                nav.classList.remove('hidden');
+                nav.classList.add('flex');
+            }
+
             // Fiscal year closing reminder — owner only, checks for an unclosed past year
-            if (staffRow && staffRow.role === 'owner') {
+            if (isOwner) {
                 const { data: storeCreated } = await goldmindClient.from('stores').select('created_at').eq('id', GOLDMIND_STORE_ID).maybeSingle();
                 const startYear = storeCreated ? new Date(storeCreated.created_at).getFullYear() : new Date().getFullYear();
                 const currentYear = new Date().getFullYear();
@@ -352,8 +379,6 @@
             let cashBalance = 0;
             (mainMovs || []).forEach(m => cashBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount));
             document.getElementById('cashBalanceEl').textContent = fmt(cashBalance);
-            document.getElementById('balanceTrendEl').textContent = (mainMovs && mainMovs.length)
-                ? mainMovs.length + ' حركة مسجّلة' : 'لا توجد حركات مسجّلة بعد';
 
             // Traders' box
             const { data: traderMovs } = await goldmindClient
@@ -363,27 +388,81 @@
             (traderMovs || []).forEach(m => tradersBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount));
             document.getElementById('tradersBoxEl').textContent = fmt(tradersBalance);
 
-            // Today's sales
+            // Today's sales + invoice count (real invoice type is 'sale', not
+            // 'sell' — fixing a real bug that made this card always read 0.00)
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
             const { data: todayInvoices } = await goldmindClient
                 .from('invoices').select('total_amount')
-                .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sell')
+                .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
                 .gte('created_at', todayStart.toISOString());
             const todaySales = (todayInvoices || []).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
             document.getElementById('todaySalesEl').textContent = fmt(todaySales);
+            document.getElementById('todayInvoiceCountEl').textContent = (todayInvoices || []).length;
 
-            // Recent movements (latest 5)
+            // Real alerts — replaces the old dead "التنبيهات" button
+            const alerts = [];
+            const { count: unpaidCount } = await goldmindClient
+                .from('invoices').select('id', { count: 'exact', head: true })
+                .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'unpaid');
+            if (unpaidCount > 0) {
+                alerts.push({ href: 'invoices-list-ar.html', icon: 'receipt_long', text: unpaidCount + ' فاتورة غير مدفوعة' });
+            }
+            const { data: lowLots } = await goldmindClient
+                .from('gold_stock_lots').select('id')
+                .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).lt('weight_grams_remaining', 5);
+            if (lowLots && lowLots.length > 0) {
+                alerts.push({ href: 'stock-production-ar.html', icon: 'inventory_2', text: lowLots.length + ' دفعة رصيد بالجملة أوشكت على النفاد' });
+            }
+            if (alerts.length > 0) {
+                const wrap = document.getElementById('alertsWrap');
+                wrap.classList.remove('hidden');
+                wrap.classList.add('flex');
+                wrap.innerHTML = alerts.map(a => `
+                    <a href="${a.href}" class="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3">
+                        <span class="material-symbols-outlined">${a.icon}</span>
+                        <span class="flex-1 text-[13px] font-semibold">${a.text}</span>
+                        <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                    </a>`).join('');
+            }
+
+            await loadMovementsForDay();
+        })();
+
+        function formatMovementsDayLabel(date) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const d = new Date(date); d.setHours(0,0,0,0);
+            if (d.getTime() === today.getTime()) return 'اليوم';
+            return d.toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'short' });
+        }
+
+        async function shiftMovementsDay(deltaDays) {
+            if (!canManageFinance) return;
+            movementsViewDate.setDate(movementsViewDate.getDate() + deltaDays);
+            // Never navigate into the future
+            const today = new Date(); today.setHours(0,0,0,0);
+            const target = new Date(movementsViewDate); target.setHours(0,0,0,0);
+            if (target.getTime() > today.getTime()) movementsViewDate = new Date();
+            await loadMovementsForDay();
+        }
+
+        async function loadMovementsForDay() {
+            document.getElementById('movementsDayLabel').textContent = formatMovementsDayLabel(movementsViewDate);
+
+            const dayStart = new Date(movementsViewDate); dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+
             const { data: recent } = await goldmindClient
                 .from('cash_movements')
                 .select('direction, amount, description, created_at, invoice_id')
                 .eq('store_id', GOLDMIND_STORE_ID)
-                .order('created_at', { ascending: false })
-                .limit(5);
+                .gte('created_at', dayStart.toISOString())
+                .lt('created_at', dayEnd.toISOString())
+                .order('created_at', { ascending: false });
 
             const container = document.getElementById('recentMovementsEl');
             if (!recent || recent.length === 0) {
-                container.innerHTML = '<div class="p-6 text-center text-on-surface-variant text-sm">لا توجد حركات مسجّلة بعد. أول عملية بيع أو إيداع رح تظهر هون.</div>';
+                container.innerHTML = '<div class="p-6 text-center text-on-surface-variant text-sm">لا توجد حركات بهذا اليوم.</div>';
             } else {
                 container.innerHTML = recent.map(m => {
                     const isIn = m.direction === 'in';
@@ -410,7 +489,7 @@
                         </div>`;
                 }).join('');
             }
-        })();
+        }
     </script>
 
 <!-- Site Navigation Drawer -->
