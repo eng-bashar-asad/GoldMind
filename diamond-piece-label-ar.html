@@ -40,7 +40,9 @@
 <div id="label" class="hidden max-w-xs mx-auto my-8 bg-white shadow rounded-lg border border-gray-200 p-4 text-center">
 <div id="storeName" class="text-sm font-bold mb-1"></div>
 <div id="description" class="text-xs text-gray-600 mb-2 truncate"></div>
-<div id="specs" class="text-[11px] text-gray-500 mb-3"></div>
+<div id="specs" class="text-[11px] text-gray-500 mb-1"></div>
+<div id="fourCs" class="text-[11px] text-gray-500 mb-1"></div>
+<div id="certLine" class="text-[10px] text-gray-400 font-mono mb-3"></div>
 <div id="price" class="text-lg font-extrabold mb-3" dir="ltr"></div>
 <div class="pseudo-barcode w-full"></div>
 <div id="barcodeText" class="font-mono text-xs tracking-widest mt-1" dir="ltr"></div>
@@ -88,6 +90,21 @@
             specParts.push('ذهب ' + (piece.gold_weight_grams || 0) + ' غ عيار ' + (piece.gold_karat || ''));
         }
         document.getElementById('specs').textContent = specParts.join(' &middot; ').replace('&middot;', '·');
+
+        const shapeNames = { round: 'مستدير', princess: 'برنسيس', cushion: 'كوشن', oval: 'بيضاوي', emerald: 'إمرالد', pear: 'كمثرى', marquise: 'ماركيز', heart: 'قلب', radiant: 'راديانت', asscher: 'آشر' };
+        const fourCsParts = [];
+        if (piece.shape) fourCsParts.push(shapeNames[piece.shape] || piece.shape);
+        if (piece.clarity) fourCsParts.push(piece.clarity);
+        if (piece.cut) fourCsParts.push(piece.cut);
+        if (piece.color) fourCsParts.push('لون ' + piece.color);
+        document.getElementById('fourCs').textContent = fourCsParts.join(' · ');
+
+        if (piece.certificate_lab || piece.certificate_number) {
+            const certParts = [];
+            if (piece.certificate_lab) certParts.push(piece.certificate_lab);
+            if (piece.certificate_number) certParts.push(piece.certificate_number);
+            document.getElementById('certLine').textContent = certParts.join(' - ');
+        }
 
         let price = piece.suggested_sale_price;
         if (!price || price <= 0) {
