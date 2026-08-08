@@ -101,6 +101,10 @@
 <label class="block text-[11px] text-on-surface-variant mb-1">البريد الإلكتروني للموظف</label>
 <input id="invite-email" type="email" dir="ltr" placeholder="employee@example.com" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
 </div>
+<div class="mb-3">
+<label class="block text-[11px] text-on-surface-variant mb-1">رقم واتساب الموظف (اختياري)</label>
+<input id="invite-whatsapp" type="tel" dir="ltr" placeholder="971501234567 (بدون + أو أصفار البداية)" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
+</div>
 <p class="text-[11px] text-on-surface-variant mb-2">حدد الصلاحيات التي سيحصل عليها فور دخوله لأول مرة:</p>
 <div id="invite-permissions"></div>
 <button id="invite-send-btn" class="w-full h-12 gold-accent text-white rounded-lg font-semibold text-[13px] mt-3 active:scale-[0.98] transition-all" onclick="sendInvite()">إرسال الدعوة</button>
@@ -213,6 +217,13 @@ function renderStaffCard(staff) {
       </div>
       <span class="material-symbols-outlined ${isOwner ? 'text-secondary' : 'text-outline'} mr-auto shrink-0" style="font-variation-settings: 'FILL' ${isOwner ? 1 : 0};">badge</span>
     </div>
+    <div class="flex items-center gap-2 mb-2">
+      <span class="material-symbols-outlined text-outline shrink-0" style="font-size:16px;">chat</span>
+      <input type="tel" dir="ltr" value="${staff.whatsapp_phone || ''}" placeholder="رقم واتساب (اختياري)"
+        class="flex-1 h-9 border border-outline-variant rounded-lg px-2 text-[12px] bg-background text-on-background"
+        data-staff-whatsapp="${staff.id}"/>
+      <button type="button" class="h-9 px-3 rounded-lg bg-surface-container-low text-[11px] font-semibold text-primary shrink-0" onclick="saveStaffWhatsapp('${staff.id}', this)">حفظ</button>
+    </div>
     <div class="pt-1">${groupsHtml}</div>
   </div>`;
 }
@@ -222,6 +233,23 @@ function toggleGroup(btn) {
   const chev = btn.querySelector('.chev');
   body.classList.toggle('open');
   chev.classList.toggle('open');
+}
+
+async function saveStaffWhatsapp(staffId, btn) {
+  const input = document.querySelector(`input[data-staff-whatsapp="${staffId}"]`);
+  const phone = input.value.trim().replace(/[^0-9]/g, '');
+
+  btn.disabled = true;
+  const { error } = await goldmindClient
+    .from('staff').update({ whatsapp_phone: phone || null }).eq('id', staffId);
+  btn.disabled = false;
+
+  if (error) {
+    showToast('تعذّر حفظ رقم الواتساب: ' + error.message, true);
+    return;
+  }
+  input.value = phone;
+  showToast('تم حفظ رقم الواتساب');
 }
 
 async function onToggle(input) {
@@ -288,6 +316,7 @@ function toggleInviteForm() {
 
 async function sendInvite() {
   const email = document.getElementById('invite-email').value.trim();
+  const whatsapp = document.getElementById('invite-whatsapp').value.trim().replace(/[^0-9]/g, '');
   const btn = document.getElementById('invite-send-btn');
   if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     showToast('فضلاً أدخل بريد إلكتروني صحيح', true);
@@ -306,7 +335,8 @@ async function sendInvite() {
     store_id: GOLDMIND_STORE_ID,
     email: email,
     permissions: permissions,
-    role: 'staff'
+    role: 'staff',
+    whatsapp_phone: whatsapp || null
   });
 
   btn.disabled = false;
@@ -319,6 +349,7 @@ async function sendInvite() {
 
   showToast('تم إرسال الدعوة');
   document.getElementById('invite-email').value = '';
+  document.getElementById('invite-whatsapp').value = '';
   document.getElementById('invite-form').classList.add('hidden');
   loadInvites();
 }
@@ -375,7 +406,7 @@ async function loadStaff() {
   }
 
   const { data: staffRows, error } = await goldmindClient
-    .from('staff').select('id, full_name, role, permissions')
+    .from('staff').select('id, full_name, role, permissions, whatsapp_phone')
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('role', { ascending: false });
 
