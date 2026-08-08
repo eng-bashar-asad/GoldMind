@@ -142,7 +142,7 @@
 <!-- Search bar -->
 <div class="relative mt-4">
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
-<input id="search-input" type="text" placeholder="ابحث بالباركود أو الوصف أو الوزن أو القيراط" class="w-full h-12 bg-surface-container-low border border-outline-variant rounded-lg pr-10 pl-4 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-right text-on-background font-label-md text-label-md"/>
+<input id="search-input" type="text" placeholder="ابحث بالباركود أو الوصف أو الوزن أو القيراط أو رقم الشهادة" class="w-full h-12 bg-surface-container-low border border-outline-variant rounded-lg pr-10 pl-4 outline-none focus:ring-1 focus:ring-primary focus:border-primary transition-all text-right text-on-background font-label-md text-label-md"/>
 </div>
 
 <!-- Summary bar -->
@@ -246,6 +246,20 @@
             ? `<span class="text-on-surface-variant font-label-md text-label-md">+ ذهب ${piece.gold_weight_grams ?? ''} غ عيار ${piece.gold_karat ?? ''}</span>`
             : '';
 
+        const shapeNames = { round: 'مستدير', princess: 'برنسيس', cushion: 'كوشن', oval: 'بيضاوي', emerald: 'إمرالد', pear: 'كمثرى', marquise: 'ماركيز', heart: 'قلب', radiant: 'راديانت', asscher: 'آشر' };
+        const fourCsParts = [];
+        if (piece.shape) fourCsParts.push(shapeNames[piece.shape] || piece.shape);
+        if (piece.clarity) fourCsParts.push(piece.clarity);
+        if (piece.cut) fourCsParts.push(piece.cut);
+        if (piece.color) fourCsParts.push('لون ' + piece.color);
+        const fourCsLine = fourCsParts.length
+            ? `<div class="text-on-surface-variant font-label-md text-label-md mt-1 truncate">${fourCsParts.join(' · ')}</div>`
+            : '';
+
+        const certLine = (piece.certificate_lab || piece.certificate_number)
+            ? `<div class="text-outline text-[11px] font-data-mono mt-1 truncate">${piece.certificate_lab || ''}${piece.certificate_lab && piece.certificate_number ? ' - ' : ''}${piece.certificate_number || ''}</div>`
+            : '';
+
         return `
         <div class="flex items-center gap-4 p-3 bg-surface-container-lowest border border-outline-variant rounded-xl">
             ${photo}
@@ -257,8 +271,10 @@
                 <div class="flex items-center gap-2 mt-1">
                     ${goldLine}
                 </div>
+                ${fourCsLine}
                 <div class="text-on-surface-variant font-label-md text-label-md mt-1 truncate">${piece.description_ar || piece.description_en || ''}</div>
                 <div class="text-outline text-[11px] font-data-mono mt-1 truncate">${piece.barcode ? piece.barcode : 'بدون باركود'}</div>
+                ${certLine}
             </div>
             <div class="flex flex-col gap-2 shrink-0">
                 <a href="diamond-piece-label-ar.html?id=${piece.id}" class="w-7 h-7 rounded-full border border-outline-variant flex items-center justify-center text-on-surface-variant active:scale-95 transition-transform" title="طباعة الملصق">
@@ -309,7 +325,9 @@
                    (p.description_ar && p.description_ar.toLowerCase().includes(q)) ||
                    (p.description_en && p.description_en.toLowerCase().includes(q)) ||
                    (p.diamond_carat && String(p.diamond_carat).includes(q)) ||
-                   (p.gold_weight_grams && String(p.gold_weight_grams).includes(q));
+                   (p.gold_weight_grams && String(p.gold_weight_grams).includes(q)) ||
+                   (p.certificate_number && p.certificate_number.toLowerCase().includes(q)) ||
+                   (p.certificate_lab && p.certificate_lab.toLowerCase().includes(q));
         });
     }
 
