@@ -84,6 +84,11 @@
 <p class="text-[10px] text-outline mt-1">قيمة موجبة = دين على العميل لصالح المحل لم يُسدَّد بعد</p>
 </div>
 
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="customerDocsWrap">
+<span class="text-[11px] font-semibold text-on-surface-variant block mb-2">المستندات المرفوعة (هوية/جواز سفر أو KYC)</span>
+<div class="flex flex-col gap-1.5" id="customerDocsList"></div>
+</div>
+
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex-col gap-3" id="editCustomerForm">
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">اسم العميل</label>
@@ -255,6 +260,7 @@ function showCustomerDetail(customerId) {
   document.getElementById('detail-customer-name').textContent = customer.name;
   document.getElementById('detail-customer-phone').textContent = customer.phone || '';
   loadExtraPhonesForDetail(customerId);
+  loadCustomerDocs(customerId);
   document.getElementById('editCustomerBtn').classList.toggle('hidden', !canEditCustomers);
   document.getElementById('editCustomerBtn').classList.toggle('flex', canEditCustomers);
   document.getElementById('editCustomerForm').classList.add('hidden');
@@ -367,6 +373,37 @@ async function loadExtraPhonesForDetail(customerId) {
     chip.textContent = row.phone;
     wrap.appendChild(chip);
   });
+}
+
+const DOC_CATEGORY_LABELS = { id_document: 'هوية/جواز سفر', kyc: 'مستند KYC' };
+
+async function loadCustomerDocs(customerId) {
+  const docsWrap = document.getElementById('customerDocsWrap');
+  const docsList = document.getElementById('customerDocsList');
+  docsList.innerHTML = '';
+
+  const { data } = await goldmindClient
+    .from('company_kyc_documents')
+    .select('file_url, file_name, document_category, created_at')
+    .eq('owner_type', 'customer')
+    .eq('owner_id', customerId)
+    .order('created_at', { ascending: false });
+
+  if (!data || data.length === 0) {
+    docsWrap.classList.add('hidden');
+    return;
+  }
+
+  docsWrap.classList.remove('hidden');
+  for (const doc of data) {
+    const { data: signed } = await goldmindClient.storage.from('company-kyc-documents').createSignedUrl(doc.file_url, 3600);
+    const row = document.createElement('a');
+    row.href = signed ? signed.signedUrl : '#';
+    row.target = '_blank';
+    row.className = 'flex items-center gap-2 text-[12px] text-secondary underline';
+    row.innerHTML = `<span class="material-symbols-outlined text-[15px]">description</span> ${doc.file_name} <span class="text-outline no-underline">(${DOC_CATEGORY_LABELS[doc.document_category] || doc.document_category})</span>`;
+    docsList.appendChild(row);
+  }
 }
 
 function addEditExtraPhoneRow(value) {

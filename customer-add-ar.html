@@ -164,6 +164,13 @@
 </div>
 </div>
 
+<!-- ID document upload (individual only) -->
+<div id="individual-id-doc-wrap">
+<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">صورة الهوية أو جواز السفر (اختياري)</label>
+<input class="w-full text-sm border border-dashed border-outline-variant rounded-lg px-3 py-3" id="id-doc-files" multiple="" type="file" accept="image/*,.pdf"/>
+<p class="text-[11px] text-outline mt-1 px-1">بتنحفظ بملف العميل داخل حساب الشركة فقط — ما بتظهر إطلاقاً على الفواتير المطبوعة أو المرسلة للعميل.</p>
+</div>
+
 <!-- Extra Phone Numbers -->
 <div>
 <label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">أرقام هاتف إضافية (اختياري)</label>
@@ -248,6 +255,7 @@
         document.getElementById('company-fields').classList.toggle('hidden', !company);
         document.getElementById('company-fields').classList.toggle('flex', company);
         document.getElementById('individual-phone-wrap').classList.toggle('hidden', company);
+        document.getElementById('individual-id-doc-wrap').classList.toggle('hidden', company);
         document.getElementById('customer-name-label').textContent = company ? 'اسم العميل (مختصر/شائع)' : 'اسم العميل';
     }
     setCustomerType(false);
@@ -258,15 +266,15 @@
         messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
     }
 
-    async function uploadKycFiles(customerId) {
-        const filesInput = document.getElementById('kyc-files');
+    async function uploadKycFiles(customerId, inputId, category) {
+        const filesInput = document.getElementById(inputId);
         const files = filesInput.files;
         if (!files || files.length === 0) return { ok: true };
 
         for (let i = 0; i < files.length; i++) {
             const file = files[i];
             const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-            const path = GOLDMIND_STORE_ID + '/customer-' + customerId + '/' + Date.now() + '-' + i + '.' + ext;
+            const path = GOLDMIND_STORE_ID + '/customer-' + customerId + '/' + category + '-' + Date.now() + '-' + i + '.' + ext;
 
             const { error: uploadError } = await goldmindClient.storage
                 .from('company-kyc-documents').upload(path, file, { upsert: false });
@@ -276,6 +284,7 @@
                 store_id: GOLDMIND_STORE_ID,
                 owner_type: 'customer',
                 owner_id: customerId,
+                document_category: category,
                 file_url: path,
                 file_name: file.name,
                 uploaded_by: GOLDMIND_STAFF_ID
@@ -364,9 +373,14 @@
 
         let kycMessage = '';
         if (isCompany) {
-            const kycResult = await uploadKycFiles(inserted.id);
+            const kycResult = await uploadKycFiles(inserted.id, 'kyc-files', 'kyc');
             if (!kycResult.ok) {
                 kycMessage = ' (تنبيه: تعذّر رفع بعض مستندات KYC: ' + kycResult.message + ')';
+            }
+        } else {
+            const idDocResult = await uploadKycFiles(inserted.id, 'id-doc-files', 'id_document');
+            if (!idDocResult.ok) {
+                kycMessage = ' (تنبيه: تعذّر رفع صورة الهوية: ' + idDocResult.message + ')';
             }
         }
 
@@ -397,6 +411,7 @@
         document.getElementById('company-email').value = '';
         document.getElementById('company-phone').value = '';
         document.getElementById('kyc-files').value = '';
+        document.getElementById('id-doc-files').value = '';
         document.getElementById('customer-name').focus();
     });
 </script>
