@@ -42,6 +42,13 @@
     .scroll-hide::-webkit-scrollbar { display: none; }
     .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
     .tab-btn.active { background: #000; color: #fff; }
+    /* Diamond gold-portion toggle switch */
+    .gm-switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+    .gm-switch input { opacity: 0; width: 0; height: 0; }
+    .gm-switch-track { position: absolute; cursor: pointer; inset: 0; background-color: var(--gm-outline-variant, #76777d); transition: .2s; border-radius: 999px; }
+    .gm-switch-track:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s; border-radius: 50%; }
+    .gm-switch input:checked + .gm-switch-track { background-color: var(--gm-primary, #131b2e); }
+    .gm-switch input:checked + .gm-switch-track:before { transform: translateX(-20px); }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
@@ -101,8 +108,9 @@
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة قطعة مشتراة</h2>
 
 <div class="flex bg-surface-container-low rounded-lg p-1 gap-1">
-<button class="tab-btn active flex-1 py-2 rounded-md text-[12px] font-semibold" id="itemModePiece" type="button" onclick="setItemMode('piece')">قطعة فردية</button>
-<button class="tab-btn flex-1 py-2 rounded-md text-[12px] font-semibold" id="itemModeBulk" type="button" onclick="setItemMode('bulk')">رصيد بالجملة (لوت)</button>
+<button class="tab-btn active flex-1 py-2 rounded-md text-[11px] font-semibold" id="itemModePiece" type="button" onclick="setItemMode('piece')">قطعة فردية</button>
+<button class="tab-btn flex-1 py-2 rounded-md text-[11px] font-semibold" id="itemModeBulk" type="button" onclick="setItemMode('bulk')">رصيد بالجملة</button>
+<button class="tab-btn flex-1 py-2 rounded-md text-[11px] font-semibold hidden" id="itemModeDiamond" type="button" onclick="setItemMode('diamond')">قطعة ألماس</button>
 </div>
 <p class="text-[10.5px] text-outline" id="itemModeHint">قطعة واحدة محددة الوزن تُسجَّل بالمخزون فوراً.</p>
 
@@ -110,7 +118,7 @@
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-desc">وصف القطعة (عربي)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-desc" placeholder="خاتم، سبيكة، قطع كسر..." type="text"/>
 </div>
-<div class="grid grid-cols-2 gap-3">
+<div class="grid grid-cols-2 gap-3" id="weight-karat-grid">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-weight" id="manual-weight-label">الوزن (غ)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-weight" step="0.01" type="number"/>
@@ -129,6 +137,123 @@
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="bulk-fab-per-gram">مصنعية الغرام (لحساب الربح لاحقاً)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="bulk-fab-per-gram" placeholder="0.00" step="0.01" type="number"/>
 </div>
+
+<!-- Diamond piece fields (shown only when item mode = diamond) -->
+<div class="hidden space-y-3 border border-dashed border-outline-variant rounded-lg p-3" id="diamond-fields">
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-carat">وزن الماس (قيراط)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="diamond-carat" placeholder="0.00" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-price-per-carat">سعر القيراط</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="diamond-price-per-carat" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-shape">الشكل</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="diamond-shape">
+<option value="">— اختر —</option>
+<option value="round">مستدير Round</option>
+<option value="princess">برنسيس Princess</option>
+<option value="cushion">كوشن Cushion</option>
+<option value="oval">بيضاوي Oval</option>
+<option value="emerald">إمرالد Emerald</option>
+<option value="pear">كمثرى Pear</option>
+<option value="marquise">ماركيز Marquise</option>
+<option value="heart">قلب Heart</option>
+<option value="radiant">راديانت Radiant</option>
+<option value="asscher">آشر Asscher</option>
+</select>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-clarity">النقاء</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="diamond-clarity">
+<option value="">— اختر —</option>
+<option value="FL">FL</option>
+<option value="IF">IF</option>
+<option value="VVS1">VVS1</option>
+<option value="VVS2">VVS2</option>
+<option value="VS1">VS1</option>
+<option value="VS2">VS2</option>
+<option value="SI1">SI1</option>
+<option value="SI2">SI2</option>
+<option value="I1">I1</option>
+<option value="I2">I2</option>
+<option value="I3">I3</option>
+</select>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-cut">القص</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="diamond-cut">
+<option value="">— اختر —</option>
+<option value="excellent">ممتاز Excellent</option>
+<option value="very_good">جيد جداً Very Good</option>
+<option value="good">جيد Good</option>
+<option value="fair">مقبول Fair</option>
+<option value="poor">ضعيف Poor</option>
+</select>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-color">اللون</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="diamond-color">
+<option value="">— اختر —</option>
+<option value="D">D</option>
+<option value="E">E</option>
+<option value="F">F</option>
+<option value="G">G</option>
+<option value="H">H</option>
+<option value="I">I</option>
+<option value="J">J</option>
+<option value="K">K</option>
+<option value="L">L</option>
+<option value="M">M</option>
+</select>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="certificate-lab">جهة الشهادة (اختياري)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="certificate-lab" placeholder="مثال: GIA" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="certificate-number">رقم الشهادة (اختياري)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" dir="ltr" id="certificate-number" placeholder="مثال: 1234567890" type="text"/>
+</div>
+</div>
+<div class="flex items-center justify-between border border-outline-variant rounded-lg px-3 h-12">
+<span class="font-label-md text-label-md font-semibold text-on-background text-[13px]">القطعة فيها جزء ذهب؟</span>
+<label class="gm-switch">
+<input id="diamond-has-gold-toggle" type="checkbox"/>
+<span class="gm-switch-track"></span>
+</label>
+</div>
+<div class="hidden space-y-3" id="diamond-gold-subfields">
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-gold-weight">وزن الذهب (غ)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="diamond-gold-weight" placeholder="0.00" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-gold-karat">العيار</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="diamond-gold-karat">
+<option value="18">18</option>
+<option selected="" value="21">21</option>
+<option value="22">22</option>
+<option value="24">24</option>
+</select>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="diamond-gold-fab-cost">مصنعية الغرام (لحساب الربح لاحقاً)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="diamond-gold-fab-cost" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+</div>
+
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold text-outline" for="manual-price">سعر الشراء</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-price" placeholder="السعر" step="0.01" type="number"/>
@@ -238,20 +363,35 @@
     let selectedTrader = null;
     let selectedPaymentMethod = 'cash';
     let attachmentFile = null;
-    let itemMode = 'piece'; // 'piece' | 'bulk'
-    const cart = []; // { cartId, karat, weight, price, description, mode, fabPerGram }
+    let itemMode = 'piece'; // 'piece' | 'bulk' | 'diamond'
+    let diamondsEnabled = false;
+    const cart = []; // { cartId, karat, weight, price, description, mode, fabPerGram, ...diamond fields }
     let cartCounter = 0;
 
-    // ---------- Item mode toggle (individual piece vs. bulk stock lot) ----------
+    // ---------- Diamonds feature toggle (per-store) ----------
+    async function checkDiamondsEnabled() {
+        const { data } = await goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+        diamondsEnabled = !!(data && data.diamonds_enabled);
+        document.getElementById('itemModeDiamond').classList.toggle('hidden', !diamondsEnabled);
+    }
+    checkDiamondsEnabled();
+
+    // ---------- Item mode toggle (individual piece vs. bulk stock lot vs. diamond piece) ----------
     function setItemMode(mode) {
         itemMode = mode;
         document.getElementById('itemModePiece').classList.toggle('active', mode === 'piece');
         document.getElementById('itemModeBulk').classList.toggle('active', mode === 'bulk');
+        document.getElementById('itemModeDiamond').classList.toggle('active', mode === 'diamond');
         document.getElementById('bulk-fab-per-gram-field').hidden = mode !== 'bulk';
+        document.getElementById('weight-karat-grid').hidden = mode === 'diamond';
+        document.getElementById('diamond-fields').classList.toggle('hidden', mode !== 'diamond');
         document.getElementById('manual-weight-label').textContent = mode === 'bulk' ? 'الوزن الكلي (غ)' : 'الوزن (غ)';
         document.getElementById('itemModeHint').textContent = mode === 'bulk'
             ? 'دفعة/لوت بوزن إجمالي واحد — تُباع لاحقاً بالوزن مباشرة من الرصيد، أو تُحوَّل لقطع مستقلة من صفحة "إنتاج القطع".'
-            : 'قطعة واحدة محددة الوزن تُسجَّل بالمخزون فوراً.';
+            : (mode === 'diamond'
+                ? 'قطعة ألماس تُسجَّل مباشرة بمخزون الماس، مع إمكانية إضافة جزء ذهب اختياري بها.'
+                : 'قطعة واحدة محددة الوزن تُسجَّل بالمخزون فوراً.');
+        updateFabFeeVisibility();
     }
 
     // ---------- Purchase type toggle ----------
@@ -263,9 +403,20 @@
         document.getElementById('retail-block').classList.toggle('hidden', type !== 'buyRetail');
         document.getElementById('counterparty-label').textContent = type === 'buyTrader' ? 'معلومات التاجر' : 'معلومات البائع';
         document.getElementById('payment-options').classList.toggle('hidden', type !== 'buyTrader');
-        document.getElementById('fab-fee-field').classList.toggle('hidden', type !== 'buyTrader');
         if (type !== 'buyTrader') selectPayment('cash');
+        updateFabFeeVisibility();
     }
+
+    // Fabrication-fee field only makes sense for a gold piece/lot bought from a trader —
+    // hidden for diamond items (their cash debt is captured via the item's own price instead).
+    function updateFabFeeVisibility() {
+        document.getElementById('fab-fee-field').classList.toggle('hidden', purchaseType !== 'buyTrader' || itemMode === 'diamond');
+    }
+
+    // Show/hide the optional gold-portion sub-fields inside the diamond form
+    document.getElementById('diamond-has-gold-toggle').addEventListener('change', (e) => {
+        document.getElementById('diamond-gold-subfields').classList.toggle('hidden', !e.target.checked);
+    });
 
     // ---------- Payment toggle ----------
     function selectPayment(mode) {
@@ -369,6 +520,8 @@
 
     // ---------- Manual item entry ----------
     function addManualToCart() {
+        if (itemMode === 'diamond') { addDiamondToCart(); return; }
+
         const weight = parseFloat(document.getElementById('manual-weight').value);
         const karat = parseInt(document.getElementById('manual-karat').value, 10);
         const price = parseFloat(document.getElementById('manual-price').value);
@@ -402,6 +555,68 @@
         renderCart();
     }
 
+    // ---------- Diamond item entry ----------
+    function addDiamondToCart() {
+        const caratInput = document.getElementById('diamond-carat');
+        const pricePerCaratInput = document.getElementById('diamond-price-per-carat');
+        const priceInput = document.getElementById('manual-price');
+        const goldWeightInput = document.getElementById('diamond-gold-weight');
+        [caratInput, pricePerCaratInput, priceInput, goldWeightInput].forEach(el => el.classList.remove('border-error'));
+
+        const carat = parseFloat(caratInput.value);
+        const pricePerCarat = parseFloat(pricePerCaratInput.value);
+        const totalPrice = parseFloat(priceInput.value);
+        const hasGold = document.getElementById('diamond-has-gold-toggle').checked;
+        const goldWeight = hasGold ? parseFloat(goldWeightInput.value) : null;
+        const goldKarat = hasGold ? parseInt(document.getElementById('diamond-gold-karat').value, 10) : null;
+        const goldFabCost = hasGold ? (parseFloat(document.getElementById('diamond-gold-fab-cost').value) || null) : null;
+
+        let valid = true;
+        if (!carat || carat <= 0) { caratInput.classList.add('border-error'); valid = false; }
+        if (!pricePerCarat || pricePerCarat <= 0) { pricePerCaratInput.classList.add('border-error'); valid = false; }
+        if (!totalPrice || totalPrice <= 0) { priceInput.classList.add('border-error'); valid = false; }
+        if (hasGold && (!goldWeight || goldWeight <= 0)) { goldWeightInput.classList.add('border-error'); valid = false; }
+        if (!valid) return;
+
+        cart.push({
+            cartId: ++cartCounter,
+            mode: 'diamond',
+            karat: hasGold ? goldKarat : null,
+            weight: hasGold ? goldWeight : null,
+            price: totalPrice,
+            fabFee: 0,
+            description: document.getElementById('manual-desc').value.trim() || 'قطعة ألماس',
+            diamondCarat: carat,
+            diamondPricePerCarat: pricePerCarat,
+            shape: document.getElementById('diamond-shape').value || null,
+            clarity: document.getElementById('diamond-clarity').value || null,
+            cut: document.getElementById('diamond-cut').value || null,
+            color: document.getElementById('diamond-color').value || null,
+            certLab: document.getElementById('certificate-lab').value.trim() || null,
+            certNumber: document.getElementById('certificate-number').value.trim() || null,
+            hasGold: hasGold,
+            goldWeight: goldWeight,
+            goldKarat: goldKarat,
+            goldFabCost: goldFabCost
+        });
+
+        document.getElementById('manual-desc').value = '';
+        document.getElementById('manual-price').value = '';
+        caratInput.value = '';
+        pricePerCaratInput.value = '';
+        document.getElementById('diamond-shape').value = '';
+        document.getElementById('diamond-clarity').value = '';
+        document.getElementById('diamond-cut').value = '';
+        document.getElementById('diamond-color').value = '';
+        document.getElementById('certificate-lab').value = '';
+        document.getElementById('certificate-number').value = '';
+        document.getElementById('diamond-has-gold-toggle').checked = false;
+        document.getElementById('diamond-gold-subfields').classList.add('hidden');
+        goldWeightInput.value = '';
+        document.getElementById('diamond-gold-fab-cost').value = '';
+        renderCart();
+    }
+
     function removeFromCart(cartId) {
         const idx = cart.findIndex(item => item.cartId === cartId);
         if (idx !== -1) cart.splice(idx, 1);
@@ -415,11 +630,18 @@
             document.getElementById('grand-total').textContent = '0.00 د.إ';
             return;
         }
-        body.innerHTML = cart.map(item => `
+        body.innerHTML = cart.map(item => {
+            const isDiamond = item.mode === 'diamond';
+            const badge = item.mode === 'bulk'
+                ? ' <span class="text-[10px] text-secondary font-semibold">(رصيد)</span>'
+                : (isDiamond ? ' <span class="text-[10px] text-secondary font-semibold">(ماس)</span>' : '');
+            const karatDisplay = isDiamond ? (item.hasGold ? item.karat + 'K' : '—') : item.karat + 'K';
+            const weightDisplay = isDiamond ? item.diamondCarat + ' ct' : item.weight;
+            return `
             <tr>
-                <td class="px-3 py-3"><div class="font-body-md">${item.description || '—'}${item.mode === 'bulk' ? ' <span class="text-[10px] text-secondary font-semibold">(رصيد)</span>' : ''}</div></td>
-                <td class="px-2 py-3 text-center">${item.karat}K</td>
-                <td class="px-2 py-3 text-left">${item.weight}</td>
+                <td class="px-3 py-3"><div class="font-body-md">${item.description || '—'}${badge}</div></td>
+                <td class="px-2 py-3 text-center">${karatDisplay}</td>
+                <td class="px-2 py-3 text-left">${weightDisplay}</td>
                 <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}${item.fabFee ? `<br><span class="text-[10px] text-outline">+مصنعية ${item.fabFee.toFixed(2)}</span>` : ''}</td>
                 <td class="px-2 py-3 text-left">
                     <button onclick="removeFromCart(${item.cartId})" class="text-error">
@@ -427,7 +649,7 @@
                     </button>
                 </td>
             </tr>
-        `).join('');
+        `; }).join('');
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         document.getElementById('grand-total').textContent = total.toFixed(2) + ' د.إ';
     }
@@ -523,7 +745,7 @@
         }
 
         // Individual-piece cart items become new inventory pieces immediately.
-        const pieceCartItems = cart.filter(item => item.mode !== 'bulk');
+        const pieceCartItems = cart.filter(item => item.mode === 'piece');
         const piecesPayload = pieceCartItems.map(item => ({
             store_id: GOLDMIND_STORE_ID,
             barcode: 'GM-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
@@ -572,7 +794,41 @@
             return;
         }
 
-        let pieceIdx = 0, lotIdx = 0;
+        // Diamond cart items become new diamond_pieces rows — separate from the
+        // gold "pieces" inventory, linked to the invoice via invoice_items.diamond_piece_id.
+        const diamondCartItems = cart.filter(item => item.mode === 'diamond');
+        const diamondsPayload = diamondCartItems.map((item, idx) => ({
+            store_id: GOLDMIND_STORE_ID,
+            barcode: 'GM-D-' + Date.now().toString(36).toUpperCase() + '-' + idx + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
+            has_gold: item.hasGold,
+            gold_weight_grams: item.goldWeight,
+            gold_karat: item.goldKarat,
+            gold_cost_fabrication_per_gram: item.goldFabCost,
+            diamond_carat: item.diamondCarat,
+            diamond_price_per_carat: item.diamondPricePerCarat,
+            shape: item.shape,
+            clarity: item.clarity,
+            cut: item.cut,
+            color: item.color,
+            certificate_lab: item.certLab,
+            certificate_number: item.certNumber,
+            description_ar: item.description,
+            status: 'available',
+            created_by: GOLDMIND_STAFF_ID
+        }));
+
+        const { data: newDiamonds, error: diamondsError } = diamondsPayload.length > 0
+            ? await goldmindClient.from('diamond_pieces').insert(diamondsPayload).select()
+            : { data: [], error: null };
+
+        if (diamondsError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ فاتورة الشراء';
+            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة قطعة/قطع الماس: ' + diamondsError.message, true);
+            return;
+        }
+
+        let pieceIdx = 0, lotIdx = 0, diamondIdx = 0;
         const itemsPayload = cart.map(item => {
             if (item.mode === 'bulk') {
                 const lot = newLots[lotIdx++];
@@ -580,7 +836,24 @@
                     invoice_id: invoiceRow.id,
                     piece_id: null,
                     gold_stock_lot_id: lot ? lot.id : null,
+                    diamond_piece_id: null,
                     barcode: null,
+                    karat: item.karat,
+                    weight_grams: item.weight,
+                    accounting_weight_grams: item.weight,
+                    fabrication_fee: 0,
+                    line_total: item.price,
+                    description: item.description
+                };
+            }
+            if (item.mode === 'diamond') {
+                const diamond = newDiamonds[diamondIdx++];
+                return {
+                    invoice_id: invoiceRow.id,
+                    piece_id: null,
+                    gold_stock_lot_id: null,
+                    diamond_piece_id: diamond ? diamond.id : null,
+                    barcode: diamond ? diamond.barcode : null,
                     karat: item.karat,
                     weight_grams: item.weight,
                     accounting_weight_grams: item.weight,
@@ -593,6 +866,8 @@
             return {
                 invoice_id: invoiceRow.id,
                 piece_id: piece ? piece.id : null,
+                gold_stock_lot_id: null,
+                diamond_piece_id: null,
                 barcode: piece ? piece.barcode : null,
                 karat: item.karat,
                 weight_grams: item.weight,
@@ -625,17 +900,36 @@
         // Gold weight and fabrication fee are tracked as two separate debts
         // (24K gold equivalent vs. a plain cash fee amount) in the same row.
         if (selectedPaymentMethod === 'credit' && purchaseType === 'buyTrader') {
-            const movementsPayload = cart.map(item => ({
-                store_id: GOLDMIND_STORE_ID,
-                trader_id: selectedTrader.id,
-                invoice_id: invoiceRow.id,
-                movement_type: 'debt_increase',
-                weight_grams: item.weight,
-                karat: item.karat,
-                gold_24k_equivalent: +(item.weight * (item.karat / 24)).toFixed(3),
-                fab_fee_amount: item.fabFee || 0,
-                notes: item.description || ('فاتورة شراء ' + invoiceNumber)
-            }));
+            const movementsPayload = cart.map(item => {
+                if (item.mode === 'diamond') {
+                    // Diamonds have no gold-equivalent debt of their own — the whole item
+                    // price is owed as a cash debt (fab_fee_amount doubles as the cash-debt
+                    // column, shown on the ledger as "دين نقدي (مصنعية/ألماس)"). If the piece
+                    // also carries a gold portion, that weight still posts its own gold debt.
+                    return {
+                        store_id: GOLDMIND_STORE_ID,
+                        trader_id: selectedTrader.id,
+                        invoice_id: invoiceRow.id,
+                        movement_type: 'debt_increase',
+                        weight_grams: item.hasGold ? item.goldWeight : null,
+                        karat: item.hasGold ? item.goldKarat : null,
+                        gold_24k_equivalent: item.hasGold ? +(item.goldWeight * (item.goldKarat / 24)).toFixed(3) : 0,
+                        fab_fee_amount: item.price,
+                        notes: item.description || ('فاتورة شراء ' + invoiceNumber)
+                    };
+                }
+                return {
+                    store_id: GOLDMIND_STORE_ID,
+                    trader_id: selectedTrader.id,
+                    invoice_id: invoiceRow.id,
+                    movement_type: 'debt_increase',
+                    weight_grams: item.weight,
+                    karat: item.karat,
+                    gold_24k_equivalent: +(item.weight * (item.karat / 24)).toFixed(3),
+                    fab_fee_amount: item.fabFee || 0,
+                    notes: item.description || ('فاتورة شراء ' + invoiceNumber)
+                };
+            });
             await goldmindClient.from('trader_movements').insert(movementsPayload);
         }
 
