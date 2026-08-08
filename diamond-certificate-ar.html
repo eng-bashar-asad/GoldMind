@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>شهادة ماس | GoldMind</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .pseudo-barcode {
+        height: 40px;
+        background-image: repeating-linear-gradient(90deg, #000 0 2px, transparent 2px 4px, #000 4px 5px, transparent 5px 9px, #000 9px 12px, transparent 12px 14px);
+    }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; margin: 0 !important; }
+        #print-wrap { max-width: 100% !important; padding: 0 !important; }
+        #cert-sheet { box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
+        @page { margin: 10mm; }
+    }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<!-- Top bar (screen only) -->
+<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 h-14">
+<button onclick="window.location.href='diamond-inventory-list-ar.html'" class="flex items-center gap-2 text-gray-700">
+<span class="material-symbols-outlined">arrow_forward</span>
+<span class="text-sm font-semibold">مخزون الماس</span>
+</button>
+<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">print</span> طباعة
+</button>
+</div>
+
+<div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
+<div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
+
+<div class="max-w-md mx-auto p-4" id="print-wrap">
+<div id="cert-sheet" class="hidden bg-white shadow-sm p-6 border-4 border-double border-amber-600 rounded-xl">
+
+<!-- Header: logo + store name -->
+<div class="text-center pb-3 mb-4 border-b-2 border-amber-600">
+<img class="hidden mx-auto mb-2 h-14 object-contain" id="store-logo"/>
+<div class="font-bold text-lg" id="store-name"></div>
+<div class="text-[10.5px] text-gray-500 mt-0.5" id="store-info-line"></div>
+<div class="mt-3">
+<div class="font-bold text-[15px] tracking-wide" id="cert-title-ar">شهادة ملكية وجودة قطعة ألماس</div>
+<div class="text-[10.5px] text-gray-500 tracking-widest" dir="ltr" id="cert-title-en">DIAMOND OWNERSHIP &amp; QUALITY CERTIFICATE</div>
+</div>
+</div>
+
+<!-- Certificate meta -->
+<div class="flex justify-between text-[11px] text-gray-600 mb-4">
+<div>
+<div>رقم الشهادة: <span class="font-bold text-gray-900 font-mono" dir="ltr" id="cert-number"></span></div>
+<div>تاريخ الإصدار: <span id="cert-date"></span></div>
+</div>
+<div class="text-left">
+<div id="cert-invoice-line"></div>
+</div>
+</div>
+
+<!-- Photo (if available) -->
+<div class="hidden justify-center mb-4" id="photo-wrap">
+<img class="w-28 h-28 rounded-lg object-cover border border-gray-200" id="piece-photo" alt="صورة القطعة"/>
+</div>
+
+<!-- Owner (only if this piece has been sold) -->
+<div class="hidden bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4 text-[12px]" id="owner-block">
+<div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1">صادرة باسم</div>
+<div class="font-bold" id="owner-name"></div>
+</div>
+
+<!-- Diamond specs grid -->
+<div class="border border-gray-200 rounded-lg overflow-hidden mb-4">
+<table class="w-full text-[12px]">
+<tbody id="specs-table"></tbody>
+</table>
+</div>
+
+<!-- Description -->
+<div class="text-[12px] text-gray-700 mb-4" id="desc-line"></div>
+
+<!-- External lab reference (only if the piece carries an outside certificate) -->
+<div class="hidden bg-gray-50 rounded-lg p-3 mb-4 text-[11.5px] text-gray-600" id="external-cert-block">
+<div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1">مرجع تقييم مختبر خارجي</div>
+<div id="external-cert-text" class="font-mono" dir="ltr"></div>
+</div>
+
+<!-- Disclaimer -->
+<p class="text-[10px] text-gray-400 leading-5 mb-6" id="disclaimer-text"></p>
+
+<!-- Signature / stamp -->
+<div class="flex justify-between items-end text-[11px] text-gray-500 mb-4">
+<div class="flex-1 ml-4">
+<div class="border-b border-gray-400 h-10"></div>
+<div class="mt-1">توقيع وختم المحل</div>
+</div>
+<div class="flex-1 mr-4">
+<div class="border-b border-gray-400 h-10"></div>
+<div class="mt-1">المسؤول المُصدِر</div>
+</div>
+</div>
+
+<div class="pseudo-barcode w-full"></div>
+<div class="font-mono text-[10px] tracking-widest mt-1 text-center" dir="ltr" id="barcode-text"></div>
+
+</div>
+</div>
+
+<script>
+    function getParam(name) {
+        return new URLSearchParams(window.location.search).get(name);
+    }
+
+    const SHAPE_NAMES = { round: 'مستدير Round', princess: 'برنسيس Princess', cushion: 'كوشن Cushion', oval: 'بيضاوي Oval', emerald: 'إمرالد Emerald', pear: 'كمثرى Pear', marquise: 'ماركيز Marquise', heart: 'قلب Heart', radiant: 'راديانت Radiant', asscher: 'آشر Asscher' };
+    const CUT_NAMES = { excellent: 'ممتاز Excellent', very_good: 'جيد جداً Very Good', good: 'جيد Good', fair: 'مقبول Fair', poor: 'ضعيف Poor' };
+
+    function specRow(label, value) {
+        if (!value) return '';
+        return `<tr class="border-b border-gray-100 last:border-0">
+            <td class="px-3 py-2 text-gray-500 bg-gray-50 w-1/3">${label}</td>
+            <td class="px-3 py-2 font-semibold" dir="auto">${value}</td>
+        </tr>`;
+    }
+
+    async function loadCertificate() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const pieceId = getParam('id');
+        const loading = document.getElementById('loading-state');
+        const errorState = document.getElementById('error-state');
+        const sheet = document.getElementById('cert-sheet');
+
+        if (!pieceId) {
+            loading.classList.add('hidden');
+            errorState.textContent = 'لم يتم تحديد قطعة الماس.';
+            errorState.classList.remove('hidden');
+            return;
+        }
+
+        const [{ data: piece, error: pieceError }, { data: store }] = await Promise.all([
+            goldmindClient.from('diamond_pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('stores').select('*').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+        ]);
+
+        if (pieceError || !piece) {
+            loading.classList.add('hidden');
+            errorState.textContent = 'تعذر إيجاد هذه القطعة.';
+            errorState.classList.remove('hidden');
+            return;
+        }
+
+        // Look up the sale, if this piece has already been sold, so the
+        // certificate can be issued in the buyer's name and reference
+        // the actual invoice — otherwise it prints as an in-stock cert.
+        let invoice = null, customer = null;
+        const { data: invoiceItem } = await goldmindClient
+            .from('invoice_items').select('invoice_id').eq('diamond_piece_id', pieceId).maybeSingle();
+        if (invoiceItem && invoiceItem.invoice_id) {
+            const { data: invoiceRow } = await goldmindClient
+                .from('invoices').select('*').eq('id', invoiceItem.invoice_id).maybeSingle();
+            invoice = invoiceRow || null;
+            if (invoice && invoice.customer_id) {
+                const { data: customerRow } = await goldmindClient
+                    .from('customers').select('name').eq('id', invoice.customer_id).maybeSingle();
+                customer = customerRow || null;
+            }
+        }
+
+        loading.classList.add('hidden');
+
+        // ---- Header ----
+        if (store && store.logo_url) {
+            const logo = document.getElementById('store-logo');
+            logo.src = store.logo_url;
+            logo.classList.remove('hidden');
+        }
+        document.getElementById('store-name').textContent = (store && store.name) || 'GoldMind';
+        const infoParts = [];
+        if (store && store.address) infoParts.push(store.address);
+        if (store && store.phone) infoParts.push(store.phone);
+        document.getElementById('store-info-line').textContent = infoParts.join(' · ');
+
+        // ---- Meta ----
+        document.getElementById('cert-number').textContent = piece.barcode || pieceId.slice(0, 12).toUpperCase();
+        const issueDate = invoice ? new Date(invoice.created_at) : new Date();
+        document.getElementById('cert-date').textContent = issueDate.toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' });
+        if (invoice && invoice.invoice_number) {
+            document.getElementById('cert-invoice-line').textContent = 'فاتورة بيع: ' + invoice.invoice_number;
+        }
+
+        // ---- Photo ----
+        if (piece.photo_url) {
+            document.getElementById('piece-photo').src = piece.photo_url;
+            document.getElementById('photo-wrap').classList.remove('hidden');
+            document.getElementById('photo-wrap').classList.add('flex');
+        }
+
+        // ---- Owner ----
+        if (customer && customer.name) {
+            document.getElementById('owner-name').textContent = customer.name;
+            document.getElementById('owner-block').classList.remove('hidden');
+        }
+
+        // ---- Specs table ----
+        const rows = [
+            specRow('وزن الماس', Number(piece.diamond_carat || 0).toFixed(2) + ' قيراط (ct)'),
+            specRow('الشكل (Shape)', piece.shape ? (SHAPE_NAMES[piece.shape] || piece.shape) : ''),
+            specRow('النقاء (Clarity)', piece.clarity || ''),
+            specRow('القص (Cut)', piece.cut ? (CUT_NAMES[piece.cut] || piece.cut) : ''),
+            specRow('اللون (Color)', piece.color || '')
+        ];
+        if (piece.has_gold) {
+            rows.push(specRow('الجزء الذهبي', (piece.gold_weight_grams || 0) + ' غ — عيار ' + (piece.gold_karat || '')));
+        }
+        document.getElementById('specs-table').innerHTML = rows.join('');
+
+        // ---- Description ----
+        const desc = piece.description_ar || piece.description_en || '';
+        document.getElementById('desc-line').textContent = desc ? ('الوصف: ' + desc) : '';
+
+        // ---- External lab reference (GIA etc.), if the piece carries one ----
+        if (piece.certificate_lab || piece.certificate_number) {
+            const parts = [];
+            if (piece.certificate_lab) parts.push(piece.certificate_lab);
+            if (piece.certificate_number) parts.push('#' + piece.certificate_number);
+            document.getElementById('external-cert-text').textContent = parts.join(' ');
+            document.getElementById('external-cert-block').classList.remove('hidden');
+        }
+
+        // ---- Disclaimer ----
+        const storeNameForDisclaimer = (store && store.name) || 'المحل';
+        document.getElementById('disclaimer-text').textContent =
+            'هذه الشهادة صادرة عن ' + storeNameForDisclaimer + ' بناءً على تقييم داخلي لموصفات القطعة، وتُعتمد كإثبات ملكية وجودة صادر عن المحل. '
+            + (piece.certificate_lab ? 'كما ترد أعلاه إشارة إلى تقييم/شهادة مختبر خارجي مستقل.' : 'هذه الشهادة ليست صادرة عن مختبر تصنيف عالمي مستقل (مثل GIA) ما لم يُذكر خلاف ذلك.');
+
+        // ---- Barcode ----
+        document.getElementById('barcode-text').textContent = piece.barcode || pieceId.slice(0, 12).toUpperCase();
+
+        sheet.classList.remove('hidden');
+    }
+
+    loadCertificate();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
