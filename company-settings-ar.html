@@ -108,6 +108,16 @@
 </div>
 <p class="text-[11px] text-outline px-1 -mt-2">التلقائي: البرنامج يرقم الفواتير بالتسلسل. اليدوي: تكتب رقم الفاتورة بنفسك بكل مرة.</p>
 
+<div class="bg-surface-container-low rounded-lg p-3 flex flex-col gap-2">
+<span class="text-[11px] font-semibold text-outline">رقم الفاتورة القادمة (تلقائي)</span>
+<p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="next-invoice-preview">—</p>
+<div class="flex gap-2">
+<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="next-invoice-seq-input" min="1" placeholder="مثال: 1" type="number"/>
+<button type="button" id="reset-invoice-seq-btn" class="h-11 px-4 rounded-lg bg-secondary text-on-secondary text-sm font-semibold whitespace-nowrap">تحديث الرقم</button>
+</div>
+<p class="text-[10.5px] text-outline">بيبدأ العدّ من هالرقم للسنة الحالية. احذر من تعيين رقم أقل من فواتير صادرة فعلياً هالسنة لتجنّب التكرار.</p>
+</div>
+
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="store-vat">نسبة الضريبة (%)</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-vat" step="0.01" type="number"/>
@@ -286,6 +296,40 @@
         }
     }
 
+    function renderNextInvoicePreview(store) {
+        const currentYear = new Date().getFullYear();
+        const nextSeq = store.next_invoice_seq_year === currentYear ? (store.next_invoice_seq || 1) : 1;
+        const prefix = store.invoice_prefix || 'INV';
+        document.getElementById('next-invoice-preview').textContent =
+            prefix + '-' + currentYear + '-' + String(nextSeq).padStart(6, '0');
+        document.getElementById('next-invoice-seq-input').value = nextSeq;
+    }
+
+    document.getElementById('reset-invoice-seq-btn').addEventListener('click', async () => {
+        const input = document.getElementById('next-invoice-seq-input');
+        const newSeq = parseInt(input.value, 10);
+        if (!newSeq || newSeq < 1) {
+            showMessage('فضلاً أدخل رقماً صحيحاً أكبر من صفر.', true);
+            return;
+        }
+        if (!confirm('هل أنت متأكد؟ ستبدأ الفاتورة القادمة بهذا الرقم لهذه السنة. تأكد أنه لا يتعارض مع فواتير صادرة فعلياً.')) return;
+
+        const btn = document.getElementById('reset-invoice-seq-btn');
+        btn.disabled = true;
+        const { error } = await goldmindClient.rpc('reset_invoice_sequence', {
+            target_store_id: GOLDMIND_STORE_ID,
+            new_seq: newSeq
+        });
+        btn.disabled = false;
+
+        if (error) {
+            showMessage('تعذّر تحديث الرقم: ' + error.message, true);
+            return;
+        }
+        showMessage('تم تحديث رقم الفاتورة القادمة بنجاح.', false);
+        loadStore();
+    });
+
     function showMessage(text, isError) {
         messageBox.textContent = text;
         messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
@@ -342,6 +386,8 @@
 
         setFrameStyle(data.invoice_print_frame || 'classic');
         setShapeStyle(data.invoice_print_shape || 'soft');
+
+        renderNextInvoicePreview(data);
 
         form.classList.remove('hidden');
     }

@@ -146,54 +146,54 @@
 <h1 class="font-headline-md text-headline-md font-bold text-primary">الإعدادات</h1>
 </div>
 <div class="flex items-center gap-2">
-<span class="font-label-md text-label-md text-primary px-2 py-1">AR - د.إ</span>
+<span class="font-label-md text-label-md text-primary px-2 py-1" id="headerCurrencyLabel">AR</span>
 </div>
 </header>
 <main class="pt-20 pb-24 px-margin-mobile max-w-md mx-auto">
 <!-- Store Profile -->
 <section class="mb-6">
 <h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">ملف المتجر</h3>
-<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-5 flex items-center gap-4">
-<div class="w-16 h-16 rounded-full gold-accent flex items-center justify-center text-white font-bold text-xl shrink-0">ف</div>
+<a href="company-settings-ar.html" class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-5 flex items-center gap-4 active:bg-surface-container-low transition-colors">
+<div class="w-16 h-16 rounded-full gold-accent flex items-center justify-center text-white font-bold text-xl shrink-0" id="storeAvatar">ف</div>
 <div class="min-w-0">
-<p class="font-headline-md text-headline-md text-on-surface truncate">محل الفارس للذهب</p>
-<p class="font-body-md text-body-md text-on-surface-variant">بوابة المسؤول • حساب بريميوم</p>
+<p class="font-headline-md text-headline-md text-on-surface truncate" id="storeNameLabel">جارِ التحميل...</p>
+<p class="font-body-md text-body-md text-on-surface-variant" id="storeRoleLabel">بوابة المسؤول</p>
 </div>
 <span class="material-symbols-outlined text-outline mr-auto shrink-0">chevron_right</span>
-</div>
+</a>
 </section>
 <!-- Preferences -->
 <section class="mb-6">
 <h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">التفضيلات</h3>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow divide-y divide-outline-variant overflow-hidden">
-<div class="p-4 flex justify-between items-center">
+<a href="company-settings-ar.html" class="p-4 flex justify-between items-center active:bg-surface-container-low transition-colors">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-secondary">language</span>
 <span class="font-label-md text-label-md text-on-surface">اللغة والعملة</span>
 </div>
-<span class="font-body-md text-body-md text-on-surface-variant">AR - د.إ</span>
-</div>
-<div class="p-4 flex justify-between items-center">
+<span class="font-body-md text-body-md text-on-surface-variant" id="currencyLabel">AR - —</span>
+</a>
+<a href="gold-price-ar.html" class="p-4 flex justify-between items-center active:bg-surface-container-low transition-colors">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-secondary">monitoring</span>
-<span class="font-label-md text-label-md text-on-surface">مصدر سعر الذهب</span>
+<span class="font-label-md text-label-md text-on-surface">سعر الذهب</span>
 </div>
-<span class="font-body-md text-body-md text-on-surface-variant">السوق المباشر</span>
-</div>
-<div class="p-4 flex justify-between items-center">
+<span class="material-symbols-outlined text-outline">chevron_left</span>
+</a>
+<a href="company-settings-ar.html" class="p-4 flex justify-between items-center active:bg-surface-container-low transition-colors">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-secondary">receipt_long</span>
 <span class="font-label-md text-label-md text-on-surface">ترقيم الفواتير</span>
 </div>
-<span class="font-body-md text-body-md text-on-surface-variant">INV-00821</span>
-</div>
-<div class="p-4 flex justify-between items-center">
+<span class="font-body-md text-body-md text-on-surface-variant font-data-mono" dir="ltr" id="invoiceNumberLabel">—</span>
+</a>
+<a href="company-settings-ar.html" class="p-4 flex justify-between items-center active:bg-surface-container-low transition-colors">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-secondary">percent</span>
 <span class="font-label-md text-label-md text-on-surface">نسبة الضريبة</span>
 </div>
-<span class="font-body-md text-body-md text-on-surface-variant">5%</span>
-</div>
+<span class="font-body-md text-body-md text-on-surface-variant" id="vatLabel">—</span>
+</a>
 </div>
 </section>
 <!-- Notifications -->
@@ -284,7 +284,7 @@
 </button>
 </div>
 </section>
-<p class="text-center text-[11px] text-outline">GoldMind v1.0 • محل الفارس للذهب</p>
+<p class="text-center text-[11px] text-outline" id="footerLabel">GoldMind v1.0</p>
 </main>
 <!-- BottomNavBar -->
 <nav class="fixed bottom-0 right-0 w-full h-16 bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-around items-center px-margin-mobile shadow-sm">
@@ -320,6 +320,37 @@ document.getElementById('signOutBtn').addEventListener('click', async () => {
     if (!session) return;
     const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
     if (isAdmin) document.getElementById('adminPanelLink').classList.remove('hidden');
+})();
+
+(async function loadStoreSummary() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const { data: store, error } = await goldmindClient
+        .from('stores')
+        .select('name, currency, vat_rate, invoice_prefix, next_invoice_seq, next_invoice_seq_year')
+        .eq('id', GOLDMIND_STORE_ID)
+        .single();
+
+    if (error || !store) return;
+
+    document.getElementById('storeNameLabel').textContent = store.name || '—';
+    document.getElementById('storeAvatar').textContent = (store.name || '؟').trim().charAt(0) || '؟';
+    document.getElementById('footerLabel').textContent = 'GoldMind v1.0 • ' + (store.name || '');
+
+    const currency = store.currency || 'AED';
+    document.getElementById('currencyLabel').textContent = 'AR - ' + currency;
+    document.getElementById('headerCurrencyLabel').textContent = 'AR - ' + currency;
+
+    document.getElementById('vatLabel').textContent = (store.vat_rate != null ? store.vat_rate : 5) + '%';
+
+    // The next invoice number resets to 000001 automatically at the start
+    // of each new calendar year, so preview it correctly either way.
+    const currentYear = new Date().getFullYear();
+    const seqYear = store.next_invoice_seq_year === currentYear ? currentYear : currentYear;
+    const nextSeq = store.next_invoice_seq_year === currentYear ? (store.next_invoice_seq || 1) : 1;
+    const prefix = store.invoice_prefix || 'INV';
+    document.getElementById('invoiceNumberLabel').textContent = prefix + '-' + seqYear + '-' + String(nextSeq).padStart(6, '0');
 })();
 </script>
 <script>
