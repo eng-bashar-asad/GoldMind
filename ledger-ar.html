@@ -62,6 +62,15 @@
 <input id="traderFilterInput" oninput="renderTraders()" placeholder="ابحث باسم التاجر..." class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-surface-container-lowest"/>
 </div>
 
+<!-- Combined balance across every trader — same numbers, just totalled -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4" id="tradersTotalCard">
+<p class="text-[11px] text-on-surface-variant font-semibold mb-2">إجمالي أرصدة كل التجار</p>
+<div class="flex gap-5 text-[14px] font-data-mono font-bold">
+<span id="tradersTotalGold">ذهب: 0.00 غ</span>
+<span id="tradersTotalCash">نقدي: 0.00 د.إ</span>
+</div>
+</div>
+
 <button onclick="toggleAddTraderForm()" class="w-full h-11 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 mb-4">
 <span class="material-symbols-outlined">person_add</span> إضافة تاجر جديد
 </button>
@@ -244,7 +253,25 @@ function showTradersList() {
   document.getElementById('page-title').textContent = 'سجل التجار';
   document.getElementById('trader-detail-view').classList.add('hidden');
   document.getElementById('traders-list-view').classList.remove('hidden');
+  renderTradersTotal();
   renderTraders();
+}
+
+// Grand total across every trader, regardless of the search filter — a
+// manager glancing at the page wants "how much do we owe traders overall"
+// as much as any single trader's balance.
+function renderTradersTotal() {
+  let totalGold = 0, totalCash = 0;
+  traders.forEach(t => {
+    totalGold += traderGoldBalance(t.id);
+    totalCash += traderFeeBalance(t.id);
+  });
+  const goldEl = document.getElementById('tradersTotalGold');
+  const cashEl = document.getElementById('tradersTotalCash');
+  goldEl.textContent = 'ذهب: ' + fmt(Math.abs(totalGold)) + ' غ';
+  goldEl.className = totalGold > 0 ? 'text-error' : (totalGold < 0 ? 'text-success' : '');
+  cashEl.textContent = 'نقدي: ' + fmt(Math.abs(totalCash)) + ' د.إ';
+  cashEl.className = totalCash > 0 ? 'text-error' : (totalCash < 0 ? 'text-success' : '');
 }
 
 function toggleAddTraderForm() {
