@@ -223,22 +223,46 @@ function renderStores() {
   const q = (document.getElementById('storeFilterInput').value || '').trim().toLowerCase();
   const data = q ? allStores.filter(s => s.name.toLowerCase().includes(q)) : allStores;
 
-  document.getElementById('stores-list').innerHTML = data.map(s => `
-    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4 cursor-pointer" onclick="openStoreDetailModal('${s.id}')">
+  const container = document.getElementById('stores-list');
+  container.innerHTML = '';
+  if (data.length === 0) {
+    container.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد شركات مطابقة.</p>';
+    return;
+  }
+  data.forEach(s => {
+    const card = document.createElement('div');
+    card.className = 'bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4 cursor-pointer';
+    card.dataset.storeId = s.id;
+    card.innerHTML = `
       <div class="flex items-center justify-between mb-2">
-        <p class="font-bold text-[15px]">${s.name}</p>
-        <button onclick="event.stopPropagation(); deleteStore('${s.id}', '${s.name.replace(/'/g, "\\'")}')" class="text-error">
+        <p class="font-bold text-[15px]"></p>
+        <button class="text-error delete-store-btn">
           <span class="material-symbols-outlined text-[18px]">delete</span>
         </button>
       </div>
       <div class="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-on-surface-variant">
-        <span>الموظفون: ${s.staff_count}</span>
-        <span>الخطة: ${s.plan_name || '—'}</span>
-        <span>الحالة: ${STATUS_LABELS[s.subscription_status] || s.subscription_status || '—'}</span>
-        <span>تاريخ التسجيل: ${fmtDate(s.created_at)}</span>
-      </div>
-    </div>`).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد شركات مطابقة.</p>';
+        <span>الموظفون: ${gmEscapeHtml(s.staff_count)}</span>
+        <span>الخطة: ${gmEscapeHtml(s.plan_name || '—')}</span>
+        <span>الحالة: ${gmEscapeHtml(STATUS_LABELS[s.subscription_status] || s.subscription_status || '—')}</span>
+        <span>تاريخ التسجيل: ${gmEscapeHtml(fmtDate(s.created_at))}</span>
+      </div>`;
+    card.querySelector('p.font-bold').textContent = s.name;
+    card.querySelector('.delete-store-btn').dataset.storeId = s.id;
+    card.querySelector('.delete-store-btn').dataset.storeName = s.name;
+    container.appendChild(card);
+  });
 }
+
+document.getElementById('stores-list').addEventListener('click', function (e) {
+  const delBtn = e.target.closest('.delete-store-btn');
+  if (delBtn) {
+    e.stopPropagation();
+    deleteStore(delBtn.dataset.storeId, delBtn.dataset.storeName);
+    return;
+  }
+  const card = e.target.closest('[data-store-id]');
+  if (card) openStoreDetailModal(card.dataset.storeId);
+});
 
 async function deleteStore(id, name) {
   if (!confirm('هل أنت متأكد من حذف شركة "' + name + '" نهائياً؟ سيتم حذف كل بياناتها (موظفين، فواتير، مخزون) بدون رجعة.')) return;
@@ -330,10 +354,10 @@ async function openStoreDetailModal(storeId) {
   document.getElementById('storeStaffList').innerHTML = (staff || []).map(m => `
     <div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2">
       <div>
-        <p class="text-[13px] font-semibold" dir="ltr">${m.email}</p>
-        <p class="text-[11px] text-on-surface-variant">${m.role === 'owner' ? 'مالك' : 'موظف'} · انضم ${fmtDate(m.joined_at)}</p>
+        <p class="text-[13px] font-semibold" dir="ltr">${gmEscapeHtml(m.email)}</p>
+        <p class="text-[11px] text-on-surface-variant">${m.role === 'owner' ? 'مالك' : 'موظف'} · انضم ${gmEscapeHtml(fmtDate(m.joined_at))}</p>
       </div>
-      <button onclick="removeStaffMember('${m.staff_id}')" class="text-error"><span class="material-symbols-outlined text-[16px]">person_remove</span></button>
+      <button data-staff-id="${gmEscapeHtml(m.staff_id)}" class="text-error remove-staff-btn"><span class="material-symbols-outlined text-[16px]">person_remove</span></button>
     </div>`).join('') || '<p class="text-[12px] text-on-surface-variant">لا يوجد موظفون بعد.</p>';
 
   if (invErr) { showToast('تعذّر تحميل الدعوات: ' + invErr.message, true); }
@@ -342,12 +366,21 @@ async function openStoreDetailModal(storeId) {
   document.getElementById('storeInviteList').innerHTML = pending.map(i => `
     <div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2">
       <div>
-        <p class="text-[13px] font-semibold" dir="ltr">${i.email}</p>
-        <p class="text-[11px] text-on-surface-variant">${i.role === 'owner' ? 'مالك' : 'موظف'} · دُعي ${fmtDate(i.created_at)}</p>
+        <p class="text-[13px] font-semibold" dir="ltr">${gmEscapeHtml(i.email)}</p>
+        <p class="text-[11px] text-on-surface-variant">${i.role === 'owner' ? 'مالك' : 'موظف'} · دُعي ${gmEscapeHtml(fmtDate(i.created_at))}</p>
       </div>
-      <button onclick="revokeInvite('${i.invite_id}')" class="text-error"><span class="material-symbols-outlined text-[16px]">cancel</span></button>
+      <button data-invite-id="${gmEscapeHtml(i.invite_id)}" class="text-error revoke-invite-btn"><span class="material-symbols-outlined text-[16px]">cancel</span></button>
     </div>`).join('') || '<p class="text-[12px] text-on-surface-variant">لا توجد دعوات معلّقة.</p>';
 }
+
+document.getElementById('storeStaffList').addEventListener('click', function (e) {
+  const btn = e.target.closest('.remove-staff-btn');
+  if (btn) removeStaffMember(btn.dataset.staffId);
+});
+document.getElementById('storeInviteList').addEventListener('click', function (e) {
+  const btn = e.target.closest('.revoke-invite-btn');
+  if (btn) revokeInvite(btn.dataset.inviteId);
+});
 
 function closeStoreDetailModal() {
   const modal = document.getElementById('storeDetailModal');
@@ -449,15 +482,20 @@ async function loadSupportRequests() {
   document.getElementById('support-list').innerHTML = data.map(r => `
     <div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
       <div class="flex items-center justify-between mb-1">
-        <p class="font-bold text-[14px]">${r.subject}</p>
-        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${r.status === 'resolved' ? 'bg-success-container text-success' : r.status === 'in_progress' ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant'}">${STATUS_LABELS[r.status] || r.status}</span>
+        <p class="font-bold text-[14px]">${gmEscapeHtml(r.subject)}</p>
+        <span class="text-[10px] font-semibold px-2 py-0.5 rounded-full ${r.status === 'resolved' ? 'bg-success-container text-success' : r.status === 'in_progress' ? 'bg-secondary-container text-on-secondary-container' : 'bg-surface-container-high text-on-surface-variant'}">${gmEscapeHtml(STATUS_LABELS[r.status] || r.status)}</span>
       </div>
-      <p class="text-[11px] text-on-surface-variant mb-2">من: ${r.store_name} — ${fmtDate(r.created_at)}</p>
-      <p class="text-[13px] mb-2">${r.message}</p>
-      ${r.admin_reply ? `<div class="bg-surface-container-low rounded-lg p-2 text-[12px] mb-2"><strong>ردك:</strong> ${r.admin_reply}</div>` : ''}
-      <button onclick="openReplyModal('${r.id}', '${r.status}', '${(r.admin_reply || '').replace(/'/g, "\\'")}')" class="text-secondary text-[12px] font-semibold">الرد / تحديث الحالة</button>
+      <p class="text-[11px] text-on-surface-variant mb-2">من: ${gmEscapeHtml(r.store_name)} — ${gmEscapeHtml(fmtDate(r.created_at))}</p>
+      <p class="text-[13px] mb-2">${gmEscapeHtml(r.message)}</p>
+      ${r.admin_reply ? `<div class="bg-surface-container-low rounded-lg p-2 text-[12px] mb-2"><strong>ردك:</strong> ${gmEscapeHtml(r.admin_reply)}</div>` : ''}
+      <button data-request-id="${gmEscapeHtml(r.id)}" data-status="${gmEscapeHtml(r.status)}" data-reply="${gmEscapeHtml(r.admin_reply || '')}" class="text-secondary text-[12px] font-semibold open-reply-btn">الرد / تحديث الحالة</button>
     </div>`).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد طلبات دعم بعد.</p>';
 }
+
+document.getElementById('support-list').addEventListener('click', function (e) {
+  const btn = e.target.closest('.open-reply-btn');
+  if (btn) openReplyModal(btn.dataset.requestId, btn.dataset.status, btn.dataset.reply);
+});
 
 function openReplyModal(id, status, existingReply) {
   replyingRequestId = id;
@@ -495,10 +533,10 @@ async function toggleAdminUsernames() {
   if (box.classList.contains('hidden') || adminUsernamesLoaded) return;
 
   const { data, error } = await goldmindClient.rpc('admin_list_platform_admin_accounts');
-  if (error) { box.innerHTML = '<span class="text-error">تعذّر التحميل: ' + error.message + '</span>'; return; }
+  if (error) { box.innerHTML = '<span class="text-error">تعذّر التحميل: ' + gmEscapeHtml(error.message) + '</span>'; return; }
   adminUsernamesLoaded = true;
   box.innerHTML = (data || []).map(a =>
-    `<div class="flex items-center justify-between"><span dir="ltr">${a.email}</span><span class="font-semibold">${a.username || '— لم يُفعَّل بعد —'}</span></div>`
+    `<div class="flex items-center justify-between"><span dir="ltr">${gmEscapeHtml(a.email)}</span><span class="font-semibold">${gmEscapeHtml(a.username) || '— لم يُفعَّل بعد —'}</span></div>`
   ).join('') || '<span class="text-on-surface-variant">لا يوجد حسابات</span>';
 }
 
