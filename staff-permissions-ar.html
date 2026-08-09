@@ -89,10 +89,48 @@
 
 <section class="mb-6">
 <div class="flex items-center justify-between mb-3">
-<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">دعوة موظف جديد</h3>
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة موظف</h3>
+</div>
+<button id="direct-add-toggle-btn" class="w-full h-12 gold-accent text-white rounded-xl flex items-center justify-center gap-2 mb-3 active:scale-[0.98] transition-all" onclick="toggleDirectAddForm()">
+<span class="material-symbols-outlined">person_add</span>
+<span class="font-label-md text-label-md">إضافة موظف</span>
+</button>
+
+<div id="direct-add-form" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
+<div class="mb-3">
+<label class="block text-[11px] text-on-surface-variant mb-1">اسم الموظف</label>
+<input id="direct-name" type="text" placeholder="مثال: أحمد محمد" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
+</div>
+<div class="mb-3">
+<label class="block text-[11px] text-on-surface-variant mb-1">البريد الإلكتروني</label>
+<input id="direct-email" type="email" dir="ltr" placeholder="employee@example.com" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
+</div>
+<div class="mb-3">
+<label class="block text-[11px] text-on-surface-variant mb-1">رقم واتساب الموظف</label>
+<input id="direct-whatsapp" type="tel" dir="ltr" placeholder="971501234567 (بدون + أو أصفار البداية)" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
+</div>
+<p class="text-[11px] text-on-surface-variant mb-2">حدد صلاحيات الموظف:</p>
+<div id="direct-permissions"></div>
+<button id="direct-add-btn" class="w-full h-12 gold-accent text-white rounded-lg font-semibold text-[13px] mt-3 active:scale-[0.98] transition-all" onclick="submitDirectAdd()">إضافة الموظف</button>
+<p class="text-error text-[12px] hidden mt-2" id="direct-add-error"></p>
+</div>
+
+<div id="direct-add-result" class="hidden bg-surface-container-lowest border-2 border-secondary rounded-xl luxury-shadow p-4 mt-3">
+<p class="text-[13px] font-bold mb-1">تم إنشاء حساب <span id="result-name"></span> ✅</p>
+<p class="text-[11px] text-on-surface-variant mb-3">اضغط الزر تحت لفتح واتساب برسالة جاهزة فيها بيانات الدخول — راجعها وأرسلها.</p>
+<a id="whatsapp-send-link" href="#" target="_blank" rel="noopener" class="w-full h-12 rounded-lg font-semibold text-[13px] flex items-center justify-center gap-2 text-white" style="background:#25D366;">
+<span class="material-symbols-outlined">chat</span> إرسال عبر واتساب
+</a>
+<button onclick="document.getElementById('direct-add-result').classList.add('hidden')" class="w-full h-10 text-on-surface-variant text-[12px] mt-2">إغلاق</button>
+</div>
+</section>
+
+<section class="mb-6">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">أو: دعوة بالبريد الإلكتروني</h3>
 </div>
 <button id="invite-toggle-btn" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 mb-3 active:scale-[0.98] transition-all" onclick="toggleInviteForm()">
-<span class="material-symbols-outlined">person_add</span>
+<span class="material-symbols-outlined">mail</span>
 <span class="font-label-md text-label-md">دعوة موظف بالبريد الإلكتروني</span>
 </button>
 
@@ -117,8 +155,11 @@
 </section>
 
 <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-8 text-[12px] text-on-surface-variant leading-5">
+<span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">bolt</span>
+"إضافة موظف" تنشئ حساب الموظف فوراً بدون انتظار أي إيميل — بترجعلك كلمة سر مؤقتة وبتفتحلك واتساب برسالة جاهزة فيها رابط الدخول وبياناته، وكل يلي عليك تسويه هو ضغطة إرسال.
+<br/><br/>
 <span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">info</span>
-بعد إرسال الدعوة، اطلب من الموظف فتح رابط المتجر وتسجيل الدخول بنفس البريد المدعو عبر رمز OTP، ويختار اسم شركتك من البحث — بيدخل مباشرة بالصلاحيات يلي حددتها.
+أما "دعوة بالبريد الإلكتروني" فبتستنى الموظف يفتح الإيميل ويسجّل دخول بنفسه بأول مرة عبر رمز OTP.
 <br/><br/>
 <span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">lock</span>
 بطاقة المالك دائماً مقفلة على "الكل مفعّل" — المالك يملك كل الصلاحيات تلقائياً ولا حاجة لتعديلها.
@@ -281,13 +322,13 @@ async function onToggle(input) {
   showToast('تم تحديث الصلاحية');
 }
 
-function renderInvitePermissionChecklist() {
+function renderPermissionChecklist(containerId, dataAttr) {
   const html = PERMISSION_GROUPS.map((group) => {
     const rows = group.keys.map(([key, label]) => `
       <div class="flex items-center justify-between py-1.5">
         <span class="text-[12px] text-on-surface-variant">${label}</span>
         <label class="switch">
-          <input type="checkbox" data-invite-key="${key}"/>
+          <input type="checkbox" data-${dataAttr}-key="${key}"/>
           <span class="slider"></span>
         </label>
       </div>`).join('');
@@ -302,7 +343,11 @@ function renderInvitePermissionChecklist() {
       <div class="cat-body px-1 pb-1">${rows}</div>
     </div>`;
   }).join('');
-  document.getElementById('invite-permissions').innerHTML = html;
+  document.getElementById(containerId).innerHTML = html;
+}
+
+function renderInvitePermissionChecklist() {
+  renderPermissionChecklist('invite-permissions', 'invite');
 }
 
 function toggleInviteForm() {
@@ -312,6 +357,77 @@ function toggleInviteForm() {
     renderInvitePermissionChecklist();
     document.getElementById('invite-permissions').dataset.rendered = '1';
   }
+}
+
+// ---------- Direct add (no email invite — instant account + WhatsApp handoff) ----------
+
+function renderDirectPermissionChecklist() {
+  renderPermissionChecklist('direct-permissions', 'direct');
+}
+
+function toggleDirectAddForm() {
+  const form = document.getElementById('direct-add-form');
+  form.classList.toggle('hidden');
+  document.getElementById('direct-add-result').classList.add('hidden');
+  if (!form.classList.contains('hidden') && !document.getElementById('direct-permissions').dataset.rendered) {
+    renderDirectPermissionChecklist();
+    document.getElementById('direct-permissions').dataset.rendered = '1';
+  }
+}
+
+async function submitDirectAdd() {
+  const name = document.getElementById('direct-name').value.trim();
+  const email = document.getElementById('direct-email').value.trim();
+  const whatsapp = document.getElementById('direct-whatsapp').value.trim().replace(/[^0-9]/g, '');
+  const errEl = document.getElementById('direct-add-error');
+  errEl.classList.add('hidden');
+
+  if (!name) { errEl.textContent = 'فضلاً أدخل اسم الموظف'; errEl.classList.remove('hidden'); return; }
+  if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = 'فضلاً أدخل بريد إلكتروني صحيح'; errEl.classList.remove('hidden'); return; }
+  if (!whatsapp) { errEl.textContent = 'فضلاً أدخل رقم واتساب الموظف'; errEl.classList.remove('hidden'); return; }
+
+  const permissions = {};
+  document.querySelectorAll('#direct-permissions input[data-direct-key]').forEach(input => {
+    permissions[input.dataset.directKey] = input.checked;
+  });
+
+  const btn = document.getElementById('direct-add-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الإضافة...';
+
+  const { data, error } = await goldmindClient.functions.invoke('add-staff-direct', {
+    body: { store_id: GOLDMIND_STORE_ID, full_name: name, email, whatsapp_phone: whatsapp, permissions }
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'إضافة الموظف';
+
+  if (error || (data && data.error)) {
+    errEl.textContent = 'تعذّر إضافة الموظف: ' + ((data && data.error) || error.message);
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const loginUrl = window.location.href.replace('staff-permissions-ar.html', 'login-entry-ar.html')
+    .split('?')[0] + '?mode=quick&email=' + encodeURIComponent(email);
+  const message = 'مرحباً ' + name + ' 👋\n' +
+    'تم إنشاء حسابك على GoldMind.\n\n' +
+    'رابط الدخول: ' + loginUrl + '\n' +
+    'البريد: ' + email + '\n' +
+    'كلمة السر المؤقتة: ' + data.temp_password + '\n\n' +
+    '(تقدر تغيّرها لاحقاً من الإعدادات)';
+
+  document.getElementById('result-name').textContent = name;
+  document.getElementById('whatsapp-send-link').href = 'https://wa.me/' + whatsapp + '?text=' + encodeURIComponent(message);
+  document.getElementById('direct-add-result').classList.remove('hidden');
+  document.getElementById('direct-add-form').classList.add('hidden');
+
+  document.getElementById('direct-name').value = '';
+  document.getElementById('direct-email').value = '';
+  document.getElementById('direct-whatsapp').value = '';
+  document.querySelectorAll('#direct-permissions input[data-direct-key]').forEach(i => i.checked = false);
+
+  loadStaff();
 }
 
 async function sendInvite() {
