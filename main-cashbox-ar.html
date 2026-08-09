@@ -106,7 +106,7 @@ async function loadEntries() {
     .order('created_at', { ascending: false });
 
   if (error) {
-    document.getElementById('entries-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
+    document.getElementById('entries-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</p>`;
     return;
   }
 
@@ -154,8 +154,8 @@ async function loadEntries() {
             <span class="font-bold text-[14px] font-data-mono ${isIn?'text-success':'text-error'}">${isIn?'+':'-'}${fmt(m.amount)} ${m.currency||'AED'}</span>
             <span class="text-[11px] text-on-surface-variant">${date}</span>
           </div>
-          <p class="text-[12px]">${m.description || '—'}</p>
-          <p class="text-[11px] text-on-surface-variant mt-1">${(m.staff && m.staff.full_name) || ''}${m.invoice_id ? ' · مرتبطة بفاتورة' : ''}</p>
+          <p class="text-[12px]">${gmEscapeHtml(m.description) || '—'}</p>
+          <p class="text-[11px] text-on-surface-variant mt-1">${gmEscapeHtml((m.staff && m.staff.full_name) || '')}${m.invoice_id ? ' · مرتبطة بفاتورة' : ''}</p>
         </div>`;
     }).join('');
   }
