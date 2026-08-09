@@ -315,6 +315,19 @@ document.getElementById('signOutBtn').addEventListener('click', async () => {
     window.location.href = 'login-entry-ar.html';
 });
 
+// Shrinks an element's font size in steps until its text fits without
+// being cut off/ellipsized — a long store name was getting truncated
+// into an unreadable "...Fares Gold Shop" instead of just sizing down.
+function fitStoreName(el) {
+    if (!el) return;
+    const sizes = [24, 20, 17, 15, 13];
+    el.style.fontSize = '';
+    for (let i = 0; i < sizes.length; i++) {
+        if (el.scrollWidth <= el.clientWidth) return;
+        el.style.fontSize = sizes[i] + 'px';
+    }
+}
+
 (async function checkAdmin() {
     const { data: { session } } = await goldmindClient.auth.getSession();
     if (!session) return;
@@ -335,6 +348,7 @@ document.getElementById('signOutBtn').addEventListener('click', async () => {
     if (error || !store) return;
 
     document.getElementById('storeNameLabel').textContent = store.name || '—';
+    fitStoreName(document.getElementById('storeNameLabel'));
     document.getElementById('storeAvatar').textContent = (store.name || '؟').trim().charAt(0) || '؟';
     document.getElementById('footerLabel').textContent = 'GoldMind v1.0 • ' + (store.name || '');
 
