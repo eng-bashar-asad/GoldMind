@@ -198,6 +198,16 @@ function setMode(mode) {
     document.getElementById('quickPanel').classList.toggle('hidden', mode !== 'quick');
 }
 
+// Lets a direct link (e.g. the WhatsApp message a manager sends a newly
+// added employee) open straight into the quick-login tab instead of the
+// default "join my company" search tab, and optionally pre-fill the email.
+(function () {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('mode') === 'quick') setMode('quick');
+    const prefillEmail = params.get('email');
+    if (prefillEmail) document.getElementById('quickIdentifier').value = prefillEmail;
+})();
+
 function closeCompanyResults() {
     document.getElementById('companyResults').classList.add('hidden');
     document.getElementById('companyInputWrap').classList.remove('rounded-b-none');
