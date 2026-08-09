@@ -195,7 +195,7 @@ async function load() {
   document.getElementById('items-tbody').innerHTML = rows.map(r => `
     <tr class="border-t border-outline-variant ${r.isReturn ? 'bg-error-container/20' : ''}">
       <td class="px-3 py-2">${(r.inv && r.inv.invoice_number) || '—'}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">(مرتجع)</span>' : ''}</td>
-      <td class="px-3 py-2">${r.it.barcode || r.it.description || '—'}</td>
+      <td class="px-3 py-2">${gmEscapeHtml(r.it.barcode || r.it.description || '—')}</td>
       <td class="px-3 py-2 font-data-mono">${r.it.diamond ? (Number(r.it.diamond.diamond_carat).toFixed(2) + ' ct' + (r.it.diamond.has_gold ? ` + ${r.displayWeight}غ/ع${r.it.karat}` : '')) : `${r.displayWeight}غ / ع${r.it.karat}${r.displayWeight !== r.weight ? ` <span class="text-outline">(محاسبة: ${r.weight}غ)</span>` : ''}`}</td>
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono">${r.goldValue.toFixed(2)}${r.isEstimated ? ' <span class=\"text-outline\">(تقديري)</span>' : ''}</td>
