@@ -122,14 +122,14 @@
                 const { data: signed } = await goldmindClient.storage.from('company-kyc-documents').createSignedUrl(doc.file_url, 3600);
                 const url = signed ? signed.signedUrl : '#';
                 return `<a href="${url}" target="_blank" class="flex items-center gap-2 text-[12px] text-secondary underline">
-                    <span class="material-symbols-outlined text-[15px]">description</span> ${doc.file_name}
+                    <span class="material-symbols-outlined text-[15px]">description</span> ${gmEscapeHtml(doc.file_name)}
                 </a>`;
             }));
 
             return `
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4">
-                <div class="font-bold text-[14px]">${row.customer.legal_name || row.customer.name}</div>
-                <div class="text-[11px] text-on-surface-variant mb-2">${row.customer.name}${row.customer.tax_number ? ' • TRN: ' + row.customer.tax_number : ''}</div>
+                <div class="font-bold text-[14px]">${gmEscapeHtml(row.customer.legal_name || row.customer.name)}</div>
+                <div class="text-[11px] text-on-surface-variant mb-2">${gmEscapeHtml(row.customer.name)}${row.customer.tax_number ? ' • TRN: ' + gmEscapeHtml(row.customer.tax_number) : ''}</div>
                 <div class="flex flex-col gap-1.5 pt-2 border-t border-outline-variant">${docsHtml.join('')}</div>
             </div>`;
         }));
