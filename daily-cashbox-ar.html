@@ -52,6 +52,7 @@
 <main class="pb-32 max-w-md mx-auto px-4">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية الوصول للصندوق اليومي.</div>
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
 
@@ -469,6 +470,15 @@ async function load() {
   if (!session) return;
 
   const { data: staffRow } = await goldmindClient.from('staff').select('permissions, role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+
+  const isOwner = staffRow && staffRow.role === 'owner';
+  const canAccess = isOwner || (staffRow && staffRow.permissions && staffRow.permissions.manage_daily_cashbox === true);
+  if (!canAccess) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
   canManageDates = !!(staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.view_profit_report)));
   document.getElementById('day-nav').classList.toggle('hidden', !canManageDates);
   document.getElementById('day-nav').classList.toggle('flex', canManageDates);
