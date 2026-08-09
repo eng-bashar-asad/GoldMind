@@ -207,8 +207,8 @@
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="inventory-add.html"><span class="material-symbols-outlined text-xl mb-1">inventory_2</span><span class="text-[10.5px] font-medium leading-tight text-center">إضافة قطعة</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="stock-production-ar.html"><span class="material-symbols-outlined text-xl mb-1">precision_manufacturing</span><span class="text-[10.5px] font-medium leading-tight text-center">إنتاج القطع</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="inventory-list-ar.html"><span class="material-symbols-outlined text-xl mb-1">inventory_2</span><span class="text-[10.5px] font-medium leading-tight text-center">المخزن</span></a>
-<a class="quick-action-icon diamond-feature flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="diamond-inventory-add.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[10.5px] font-medium leading-tight text-center">إضافة ألماسة</span></a>
-<a class="quick-action-icon diamond-feature flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="diamond-inventory-list-ar.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[10.5px] font-medium leading-tight text-center">مخزون الألماس</span></a>
+<a class="quick-action-icon diamond-feature hidden flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="diamond-inventory-add.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[10.5px] font-medium leading-tight text-center">إضافة ألماسة</span></a>
+<a class="quick-action-icon diamond-feature hidden flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="diamond-inventory-list-ar.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[10.5px] font-medium leading-tight text-center">مخزون الألماس</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_customers" href="customer-add-ar.html"><span class="material-symbols-outlined text-xl mb-1">person_add</span><span class="text-[10.5px] font-medium leading-tight text-center">إضافة عميل</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_customers" href="customer-debts-ar.html"><span class="material-symbols-outlined text-xl mb-1">account_balance_wallet</span><span class="text-[10.5px] font-medium leading-tight text-center">كشف حساب</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_reports" href="reports-ar.html"><span class="material-symbols-outlined text-xl mb-1">analytics</span><span class="text-[10.5px] font-medium leading-tight text-center">التقارير</span></a>
@@ -339,9 +339,16 @@
             });
 
             // Diamond quick-actions only show for stores that turned the
-            // diamonds feature on in company settings (independent of permissions above)
-            if (!store || !store.diamonds_enabled) {
-                document.querySelectorAll('.diamond-feature').forEach(function (el) { el.remove(); });
+            // diamonds feature on in company settings (independent of permissions above).
+            // They start hidden in the HTML (not shown-then-removed) so a
+            // gold-only store never sees a flash of the icon on refresh
+            // while this fetch is still in flight.
+            if (store && store.diamonds_enabled) {
+                document.querySelectorAll('.diamond-feature').forEach(function (el) {
+                    el.classList.remove('hidden');
+                    el.classList.add('flex');
+                });
+            } else {
                 for (let i = GOLDMIND_SEARCH_INDEX.length - 1; i >= 0; i--) {
                     if (GOLDMIND_SEARCH_INDEX[i].href.indexOf('diamond') !== -1) GOLDMIND_SEARCH_INDEX.splice(i, 1);
                 }
