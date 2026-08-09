@@ -87,6 +87,15 @@ function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
 }
+function escapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 
 async function load() {
   if (!invoiceId) { showNotFound(); return; }
@@ -123,7 +132,7 @@ async function load() {
   const items = row.items || [];
   document.getElementById('itemsBody').innerHTML = items.map(item => `
     <tr>
-      <td class="py-2">${item.description || '—'}</td>
+      <td class="py-2">${escapeHtml(item.description) || '—'}</td>
       <td class="py-2 text-center">${item.karat}K</td>
       <td class="py-2 text-center">${item.weight_grams}</td>
       <td class="py-2 text-left font-semibold">${fmt(item.line_total)}</td>
