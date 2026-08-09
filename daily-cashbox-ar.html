@@ -226,7 +226,7 @@ async function loadAll() {
     .order('created_at', { ascending: true });
 
   if (error) {
-    document.getElementById('entries-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
+    document.getElementById('entries-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</p>`;
     return;
   }
 
@@ -277,14 +277,14 @@ function renderAll() {
       return `
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="entry-${e.id}">
           <div class="flex items-center justify-between mb-1">
-            <span class="font-bold text-[14px]">${e.operation_type}</span>
+            <span class="font-bold text-[14px]">${gmEscapeHtml(e.operation_type)}</span>
             <span class="text-[11px] text-on-surface-variant">${time}</span>
           </div>
           <div class="flex items-center justify-between">
             <span class="font-bold text-[15px] font-data-mono ${isIn ? 'text-success' : 'text-error'}">${isIn ? '+' : '-'}${fmt(e.amount)} ${e.currency}</span>
-            <span class="text-[11px] text-on-surface-variant">${(e.staff && e.staff.full_name) || ''}</span>
+            <span class="text-[11px] text-on-surface-variant">${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</span>
           </div>
-          ${e.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${e.notes}</p>` : ''}
+          ${e.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(e.notes)}</p>` : ''}
           <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
             <button onclick="toggleEditEntry('${e.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1">
               <span class="material-symbols-outlined text-[16px]">edit</span> تعديل
@@ -298,7 +298,7 @@ function renderAll() {
               <button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border ${isIn ? 'bg-success text-white border-success' : 'border-outline-variant'}" id="edit-dir-in-${e.id}" onclick="setEditDirection('${e.id}', 'in')">دخول كاش</button>
               <button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border ${!isIn ? 'bg-error text-white border-error' : 'border-outline-variant'}" id="edit-dir-out-${e.id}" onclick="setEditDirection('${e.id}', 'out')">خروج كاش</button>
             </div>
-            <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="edit-type-${e.id}" value="${(e.operation_type || '').replace(/"/g, '&quot;')}"/>
+            <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="edit-type-${e.id}" value="${gmEscapeHtml(e.operation_type || '')}"/>
             <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" id="edit-amount-${e.id}" type="number" step="0.01" dir="ltr" value="${e.amount}"/>
             <select class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="edit-currency-${e.id}">
               <option value="AED" ${e.currency === 'AED' ? 'selected' : ''}>درهم إماراتي (AED)</option>
@@ -308,7 +308,7 @@ function renderAll() {
               <option value="EUR" ${e.currency === 'EUR' ? 'selected' : ''}>يورو (EUR)</option>
               <option value="GBP" ${e.currency === 'GBP' ? 'selected' : ''}>جنيه إسترليني (GBP)</option>
             </select>
-            <textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]" id="edit-notes-${e.id}">${e.notes || ''}</textarea>
+            <textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]" id="edit-notes-${e.id}">${gmEscapeHtml(e.notes || '')}</textarea>
             <div class="flex gap-2">
               <button onclick="saveEditEntry('${e.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
               <button onclick="toggleEditEntry('${e.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
@@ -460,8 +460,8 @@ async function buildDailyReport() {
 
   listEl.innerHTML = managers.map(m => `
     <a class="h-11 flex items-center justify-center gap-2 bg-success text-white rounded-lg text-sm font-semibold"
-       href="https://wa.me/${m.whatsapp_phone}?text=${encodeURIComponent(reportText)}" target="_blank" rel="noopener">
-      <span class="material-symbols-outlined text-[18px]">send</span> إرسال لـ ${m.full_name}
+       href="https://wa.me/${encodeURIComponent(m.whatsapp_phone)}?text=${encodeURIComponent(reportText)}" target="_blank" rel="noopener">
+      <span class="material-symbols-outlined text-[18px]">send</span> إرسال لـ ${gmEscapeHtml(m.full_name)}
     </a>`).join('');
 }
 
