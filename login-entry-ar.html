@@ -249,11 +249,24 @@ document.getElementById('companySearch').addEventListener('input', function () {
             openCompanyResults();
             return;
         }
-        resultsBox.innerHTML = data.map(c =>
-            `<div class="company-result px-4 py-3 text-sm cursor-pointer text-white/90" onclick="selectCompany('${c.id}', '${c.name.replace(/'/g, "\\'")}')">${c.name}</div>`
-        ).join('');
+        resultsBox.innerHTML = '';
+        data.forEach(function (c) {
+            const row = document.createElement('div');
+            row.className = 'company-result px-4 py-3 text-sm cursor-pointer text-white/90';
+            row.textContent = c.name;
+            row.dataset.companyId = c.id;
+            row.dataset.companyName = c.name;
+            resultsBox.appendChild(row);
+        });
         openCompanyResults();
     }, 150);
+});
+
+document.getElementById('companyResults').addEventListener('click', function (e) {
+    const row = e.target.closest('.company-result');
+    if (row) {
+        selectCompany(row.dataset.companyId, row.dataset.companyName);
+    }
 });
 
 document.addEventListener('click', function (e) {
