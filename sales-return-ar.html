@@ -138,22 +138,46 @@ async function searchInvoice() {
   const { data: items } = await goldmindClient
     .from('invoice_items').select('*').eq('invoice_id', invoice.id);
 
-  // Exclude items already returned in a previous return invoice
+  // Exclude items already returned in a previous return invoice.
+  // Individual pieces/diamonds have a stable id we can match directly.
+  // Bulk stock-lot lines don't (a lot can appear on more than one line),
+  // so instead we cap by weight: track how much weight was already
+  // returned per lot for this specific invoice, and drop bulk lines once
+  // that lot's returned weight has caught up with what was sold from it.
   const { data: priorReturns } = await goldmindClient
     .from('invoices').select('id').eq('related_invoice_id', invoice.id).eq('type', 'return');
   let alreadyReturnedPieceIds = new Set();
   let alreadyReturnedDiamondIds = new Set();
+  const returnedWeightByLot = {};
   if (priorReturns && priorReturns.length > 0) {
     const { data: returnedItems } = await goldmindClient
-      .from('invoice_items').select('piece_id, diamond_piece_id').in('invoice_id', priorReturns.map(r => r.id));
+      .from('invoice_items').select('piece_id, diamond_piece_id, gold_stock_lot_id, weight_grams').in('invoice_id', priorReturns.map(r => r.id));
     alreadyReturnedPieceIds = new Set((returnedItems || []).map(r => r.piece_id).filter(Boolean));
     alreadyReturnedDiamondIds = new Set((returnedItems || []).map(r => r.diamond_piece_id).filter(Boolean));
+    (returnedItems || []).forEach(r => {
+      if (r.gold_stock_lot_id) {
+        returnedWeightByLot[r.gold_stock_lot_id] = (returnedWeightByLot[r.gold_stock_lot_id] || 0) + Number(r.weight_grams || 0);
+      }
+    });
   }
 
-  originalItems = (items || []).filter(it =>
-    (!it.piece_id || !alreadyReturnedPieceIds.has(it.piece_id)) &&
-    (!it.diamond_piece_id || !alreadyReturnedDiamondIds.has(it.diamond_piece_id))
-  );
+  const remainingWeightByLot = {};
+  originalItems = (items || []).filter(it => {
+    if (it.piece_id) return !alreadyReturnedPieceIds.has(it.piece_id);
+    if (it.diamond_piece_id) return !alreadyReturnedDiamondIds.has(it.diamond_piece_id);
+    if (it.gold_stock_lot_id) {
+      if (!(it.gold_stock_lot_id in remainingWeightByLot)) {
+        remainingWeightByLot[it.gold_stock_lot_id] = returnedWeightByLot[it.gold_stock_lot_id] || 0;
+      }
+      const remaining = remainingWeightByLot[it.gold_stock_lot_id];
+      if (remaining >= Number(it.weight_grams || 0)) {
+        remainingWeightByLot[it.gold_stock_lot_id] = remaining - Number(it.weight_grams || 0);
+        return false; // this line's weight was already covered by a prior return
+      }
+      return true;
+    }
+    return true;
+  });
   selectedItemIds = new Set();
 
   document.getElementById('orig-number').textContent = invoice.invoice_number;
