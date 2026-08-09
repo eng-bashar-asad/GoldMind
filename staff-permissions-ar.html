@@ -252,19 +252,19 @@ function renderStaffCard(staff) {
 
   return `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
     <div class="flex items-center gap-3 mb-1">
-      <div class="w-11 h-11 rounded-full ${avatarClass} flex items-center justify-center text-white font-bold shrink-0">${initials(staff.full_name)}</div>
+      <div class="w-11 h-11 rounded-full ${avatarClass} flex items-center justify-center text-white font-bold shrink-0">${gmEscapeHtml(initials(staff.full_name))}</div>
       <div class="min-w-0">
-        <p class="font-label-md text-label-md font-semibold text-on-surface truncate">${staff.full_name || 'بدون اسم'}</p>
+        <p class="font-label-md text-label-md font-semibold text-on-surface truncate">${gmEscapeHtml(staff.full_name) || 'بدون اسم'}</p>
         <p class="text-[11px] text-on-surface-variant">${isOwner ? 'مالك المتجر — كل الصلاحيات' : 'موظف'}</p>
       </div>
-      ${(!isOwner && staff.id !== currentStaffId) ? `<button type="button" onclick="deleteStaff('${staff.id}', '${(staff.full_name || 'هذا الموظف').replace(/'/g, "\\'")}')" class="text-error shrink-0" title="حذف الموظف">
+      ${(!isOwner && staff.id !== currentStaffId) ? `<button type="button" onclick="deleteStaff('${staff.id}', '${gmEscapeHtml(staff.full_name || 'هذا الموظف').replace(/'/g, "\\'")}')" class="text-error shrink-0" title="حذف الموظف">
         <span class="material-symbols-outlined" style="font-size:20px;">person_remove</span>
       </button>` : ''}
       <span class="material-symbols-outlined ${isOwner ? 'text-secondary' : 'text-outline'} ${(!isOwner && staff.id !== currentStaffId) ? '' : 'mr-auto'} shrink-0" style="font-variation-settings: 'FILL' ${isOwner ? 1 : 0};">badge</span>
     </div>
     <div class="flex items-center gap-2 mb-2">
       <span class="material-symbols-outlined text-outline shrink-0" style="font-size:16px;">chat</span>
-      <input type="tel" dir="ltr" value="${staff.whatsapp_phone || ''}" placeholder="رقم واتساب (اختياري)"
+      <input type="tel" dir="ltr" value="${gmEscapeHtml(staff.whatsapp_phone || '')}" placeholder="رقم واتساب (اختياري)"
         class="flex-1 h-9 border border-outline-variant rounded-lg px-2 text-[12px] bg-background text-on-background"
         data-staff-whatsapp="${staff.id}"/>
       <button type="button" class="h-9 px-3 rounded-lg bg-surface-container-low text-[11px] font-semibold text-primary shrink-0" onclick="saveStaffWhatsapp('${staff.id}', this)">حفظ</button>
@@ -513,7 +513,7 @@ async function loadInvites() {
   document.getElementById('invites-list').innerHTML = invites.map(inv => `
     <div class="bg-surface-container-lowest border border-outline-variant rounded-lg p-3 flex items-center justify-between">
       <div class="min-w-0">
-        <p class="text-[13px] font-semibold text-on-surface truncate" dir="ltr">${inv.email}</p>
+        <p class="text-[13px] font-semibold text-on-surface truncate" dir="ltr">${gmEscapeHtml(inv.email)}</p>
         <p class="text-[11px] text-on-surface-variant">بانتظار أول تسجيل دخول</p>
       </div>
       <button class="text-error text-[12px] font-semibold shrink-0" onclick="revokeInvite('${inv.id}')">إلغاء</button>
