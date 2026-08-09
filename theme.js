@@ -7,6 +7,22 @@
 // --gm-bg-elevated = light page background (used by all other pages' body)
 // --gm-surface-*   = white/near-white card surfaces, same across all pages
 
+// Shared HTML-escaping helper. Any value that came from user/DB input
+// (customer/company/trader/staff names, notes, search results, etc.)
+// and gets injected into the page via innerHTML/template strings must
+// be passed through this first, or a maliciously-named record could
+// inject and execute arbitrary script in any visitor's browser
+// (stored XSS). Safe for null/undefined (returns empty string).
+function gmEscapeHtml(value) {
+  if (value === null || value === undefined) return '';
+  return String(value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
 const GOLDMIND_THEMES = {
   'royal-gold': {
     label: 'الذهبي الملكي',
