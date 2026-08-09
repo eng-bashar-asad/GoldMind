@@ -37,6 +37,7 @@
 <style>
     html { font-size: 87.5%; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .stat-icon { font-variation-settings: 'FILL' 0, 'wght' 250 !important; }
     .period-tab.active { background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,0.08); color: #000; }
     .period-tab:not(.active) { color: #45464d; }
 </style>
@@ -94,20 +95,31 @@
 <div id="summary-view">
 <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
 <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
-<div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined text-on-secondary-container">payments</span></div>
+<div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-secondary-container">payments</span></div>
 <p class="text-[12px] text-on-surface-variant mb-1">إجمالي المبيعات (صافي)</p>
 <h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-total-sales">0</h2>
 <p class="text-[10px] text-outline mt-1" id="returns-note"></p>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
-<div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined text-on-secondary-container">trending_up</span></div>
+<div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-secondary-container">trending_up</span></div>
 <p class="text-[12px] text-on-surface-variant mb-1">صافي الربح (تقديري)</p>
 <h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-net-profit">0</h2>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
-<div class="p-2.5 bg-surface-container-low rounded-lg w-fit mb-3"><span class="material-symbols-outlined text-on-surface-variant">monitor_weight</span></div>
+<div class="p-2.5 bg-surface-container-low rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-surface-variant">monitor_weight</span></div>
 <p class="text-[12px] text-on-surface-variant mb-1">وزن الذهب المباع</p>
 <h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-gold-weight">0 جم</h2>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
+<div class="p-2.5 bg-surface-container-low rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-surface-variant">move_down</span></div>
+<p class="text-[12px] text-on-surface-variant mb-1">وزن ذهب داخل (صافي، عيار ٢٤)</p>
+<h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-gold-in">0 جم</h2>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
+<div class="p-2.5 bg-surface-container-low rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-surface-variant">inventory_2</span></div>
+<p class="text-[12px] text-on-surface-variant mb-1">وزن ذهب متوفر (صافي، عيار ٢٤)</p>
+<h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-gold-available">0 جم</h2>
+<p class="text-[10px] text-outline mt-1">الرصيد الحالي بالمخزون — بغض النظر عن الفترة المختارة</p>
 </div>
 </div>
 
@@ -287,6 +299,35 @@ async function loadReport() {
   }
   document.getElementById('stat-net-profit').textContent = fmt(totalProfit);
   document.getElementById('stat-gold-weight').textContent = fmt(totalWeight) + ' جم';
+
+  // Gold weight purchased during the period (buyTrader + buyRetail),
+  // every karat normalized to a single 24K-equivalent figure.
+  const { data: goldPurchaseInvoices } = await goldmindClient
+    .from('invoices').select('id')
+    .eq('store_id', GOLDMIND_STORE_ID).in('type', ['buyTrader', 'buyRetail']).neq('status', 'cancelled')
+    .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString());
+
+  let goldIn24k = 0;
+  if (goldPurchaseInvoices && goldPurchaseInvoices.length > 0) {
+    const { data: pItems } = await goldmindClient
+      .from('invoice_items').select('weight_grams, karat').in('invoice_id', goldPurchaseInvoices.map(i => i.id));
+    (pItems || []).forEach(it => {
+      if (it.weight_grams && it.karat) goldIn24k += Number(it.weight_grams) * (Number(it.karat) / 24);
+    });
+  }
+  document.getElementById('stat-gold-in').textContent = fmt(goldIn24k) + ' جم';
+
+  // Gold weight currently in stock (individual pieces + bulk lots), same
+  // 24K normalization — a live snapshot, independent of the period tabs.
+  const [{ data: availablePieces }, { data: stockLots }] = await Promise.all([
+    goldmindClient.from('pieces').select('weight_grams, karat').eq('store_id', GOLDMIND_STORE_ID).eq('status', 'available'),
+    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining, karat').eq('store_id', GOLDMIND_STORE_ID)
+  ]);
+  let goldAvailable24k = 0;
+  (availablePieces || []).forEach(p => { if (p.weight_grams && p.karat) goldAvailable24k += Number(p.weight_grams) * (Number(p.karat) / 24); });
+  (stockLots || []).forEach(l => { if (l.weight_grams_remaining && l.karat) goldAvailable24k += Number(l.weight_grams_remaining) * (Number(l.karat) / 24); });
+  document.getElementById('stat-gold-available').textContent = fmt(goldAvailable24k) + ' جم';
+
   document.getElementById('invoices-count').textContent = salesInvoices.length;
 
   const PAYMENT_LABELS = { cash: 'نقدي', bank: 'فيزا/بنك', credit: 'دين' };
