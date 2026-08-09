@@ -142,13 +142,18 @@ async function searchInvoice() {
   const { data: priorReturns } = await goldmindClient
     .from('invoices').select('id').eq('related_invoice_id', invoice.id).eq('type', 'return');
   let alreadyReturnedPieceIds = new Set();
+  let alreadyReturnedDiamondIds = new Set();
   if (priorReturns && priorReturns.length > 0) {
     const { data: returnedItems } = await goldmindClient
-      .from('invoice_items').select('piece_id').in('invoice_id', priorReturns.map(r => r.id));
-    alreadyReturnedPieceIds = new Set((returnedItems || []).map(r => r.piece_id));
+      .from('invoice_items').select('piece_id, diamond_piece_id').in('invoice_id', priorReturns.map(r => r.id));
+    alreadyReturnedPieceIds = new Set((returnedItems || []).map(r => r.piece_id).filter(Boolean));
+    alreadyReturnedDiamondIds = new Set((returnedItems || []).map(r => r.diamond_piece_id).filter(Boolean));
   }
 
-  originalItems = (items || []).filter(it => !it.piece_id || !alreadyReturnedPieceIds.has(it.piece_id));
+  originalItems = (items || []).filter(it =>
+    (!it.piece_id || !alreadyReturnedPieceIds.has(it.piece_id)) &&
+    (!it.diamond_piece_id || !alreadyReturnedDiamondIds.has(it.diamond_piece_id))
+  );
   selectedItemIds = new Set();
 
   document.getElementById('orig-number').textContent = invoice.invoice_number;
@@ -175,15 +180,20 @@ function renderItems() {
     updateTotal();
     return;
   }
-  listEl.innerHTML = originalItems.map(it => `
+  listEl.innerHTML = originalItems.map(it => {
+    const subLine = it.diamond_piece_id
+      ? 'قطعة ألماس' + (it.weight_grams ? ` + ${it.weight_grams}غ عيار ${it.karat}` : '')
+      : `${it.weight_grams}غ / عيار ${it.karat}`;
+    return `
     <label class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-xl p-3 cursor-pointer">
       <input type="checkbox" class="w-5 h-5" onchange="toggleItem('${it.id}', this.checked)"/>
       <div class="flex-1">
         <p class="text-[13px] font-semibold">${it.description || it.barcode || '—'}</p>
-        <p class="text-[11px] text-on-surface-variant font-data-mono">${it.weight_grams}غ / عيار ${it.karat}</p>
+        <p class="text-[11px] text-on-surface-variant font-data-mono">${subLine}</p>
       </div>
       <span class="font-data-mono font-bold text-[13px]">${fmt(it.line_total)}</span>
-    </label>`).join('');
+    </label>`;
+  }).join('');
 }
 
 function toggleItem(itemId, checked) {
@@ -253,6 +263,8 @@ async function submitReturn() {
   const itemsPayload = itemsToReturn.map(it => ({
     invoice_id: returnInvoice.id,
     piece_id: it.piece_id,
+    gold_stock_lot_id: it.gold_stock_lot_id,
+    diamond_piece_id: it.diamond_piece_id,
     barcode: it.barcode,
     karat: it.karat,
     weight_grams: it.weight_grams,
@@ -265,10 +277,33 @@ async function submitReturn() {
   }));
   await goldmindClient.from('invoice_items').insert(itemsPayload);
 
-  // Returned pieces go back into available inventory
+  // Returned individual pieces go back into available inventory
   const pieceIds = itemsToReturn.filter(it => it.piece_id).map(it => it.piece_id);
   if (pieceIds.length > 0) {
     await goldmindClient.from('pieces').update({ status: 'available' }).in('id', pieceIds);
+  }
+
+  // Returned diamond pieces go back into available diamond inventory
+  const diamondIds = itemsToReturn.filter(it => it.diamond_piece_id).map(it => it.diamond_piece_id);
+  if (diamondIds.length > 0) {
+    await goldmindClient.from('diamond_pieces').update({ status: 'available' }).in('id', diamondIds);
+  }
+
+  // Returned bulk-lot weight goes back onto its gold_stock_lots balance
+  const bulkReturns = itemsToReturn.filter(it => it.gold_stock_lot_id && it.weight_grams);
+  if (bulkReturns.length > 0) {
+    const weightByLot = {};
+    bulkReturns.forEach(it => {
+      weightByLot[it.gold_stock_lot_id] = (weightByLot[it.gold_stock_lot_id] || 0) + Number(it.weight_grams);
+    });
+    for (const lotId of Object.keys(weightByLot)) {
+      const { data: lot } = await goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('id', lotId).maybeSingle();
+      if (lot) {
+        await goldmindClient.from('gold_stock_lots').update({
+          weight_grams_remaining: Number(lot.weight_grams_remaining) + weightByLot[lotId]
+        }).eq('id', lotId);
+      }
+    }
   }
 
   // Money/debt side of the return, dated today (the real event date)
