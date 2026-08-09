@@ -453,7 +453,7 @@
             .limit(8);
 
         if (error) {
-            traderResults.innerHTML = `<div class="text-error text-sm">خطأ بالبحث: ${error.message}</div>`;
+            traderResults.innerHTML = `<div class="text-error text-sm">خطأ بالبحث: ${gmEscapeHtml(error.message)}</div>`;
             return;
         }
         if (!data || data.length === 0) {
@@ -463,8 +463,8 @@
         traderResults.innerHTML = data.map(t => `
             <div class="flex items-center justify-between bg-surface-container-low rounded-lg p-3 cursor-pointer active:scale-[0.98] transition-all" onclick='pickTrader(${JSON.stringify(t).replace(/'/g, "&apos;")})'>
                 <div>
-                    <div class="font-bold">${t.name}</div>
-                    <div class="text-on-surface-variant text-sm font-data-mono" dir="ltr">${t.phone || ''}</div>
+                    <div class="font-bold">${gmEscapeHtml(t.name)}</div>
+                    <div class="text-on-surface-variant text-sm font-data-mono" dir="ltr">${gmEscapeHtml(t.phone || '')}</div>
                 </div>
                 <span class="material-symbols-outlined text-primary">chevron_left</span>
             </div>
@@ -639,7 +639,7 @@
             const weightDisplay = isDiamond ? item.diamondCarat + ' ct' : item.weight;
             return `
             <tr>
-                <td class="px-3 py-3"><div class="font-body-md">${item.description || '—'}${badge}</div></td>
+                <td class="px-3 py-3"><div class="font-body-md">${gmEscapeHtml(item.description || '—')}${badge}</div></td>
                 <td class="px-2 py-3 text-center">${karatDisplay}</td>
                 <td class="px-2 py-3 text-left">${weightDisplay}</td>
                 <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}${item.fabFee ? `<br><span class="text-[10px] text-outline">+مصنعية ${item.fabFee.toFixed(2)}</span>` : ''}</td>
