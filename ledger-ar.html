@@ -223,7 +223,7 @@ async function load() {
   document.getElementById('loading-state').classList.add('hidden');
 
   if (tErr) {
-    document.getElementById('traders-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${tErr.message}</p>`;
+    document.getElementById('traders-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(tErr.message)}</p>`;
     document.getElementById('traders-list-view').classList.remove('hidden');
     return;
   }
@@ -419,8 +419,8 @@ function renderTraders() {
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 cursor-pointer" onclick="showTraderDetail('${t.id}')">
         <div class="flex items-center justify-between mb-1">
           <div>
-            <p class="font-bold text-[14px]">${t.name}</p>
-            <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr">${t.phone || ''}</p>
+            <p class="font-bold text-[14px]">${gmEscapeHtml(t.name)}</p>
+            <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr">${gmEscapeHtml(t.phone || '')}</p>
           </div>
         </div>
         <div class="flex gap-4 text-[12px] font-data-mono mt-1">
@@ -474,8 +474,8 @@ function showTraderDetail(traderId) {
           <span class="text-[11px] text-on-surface-variant">${date}</span>
         </div>
         <p class="text-[12px] font-data-mono">${m.weight_grams ? `${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : ''}${(m.fab_fee_amount && Number(m.fab_fee_amount) > 0) ? ` ${m.weight_grams ? '+' : ''}${diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية'} ${fmt(m.fab_fee_amount)} د.إ` : ''}</p>
-        ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${m.notes}</p>` : ''}
-        ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${m.invoice.invoice_number}</p>` : ''}
+        ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
+        ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
       </div>`;
   }).join('');
 }
