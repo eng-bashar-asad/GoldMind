@@ -346,15 +346,15 @@ function renderEntries(entries) {
     const staffName = e.staff ? (e.staff.full_name || 'موظف') : 'النظام';
     return `<tr class="hover:bg-surface-container transition-colors">
       <td class="px-6 py-4 whitespace-nowrap">
-        <p class="font-label-md text-label-md text-on-surface">${staffName}</p>
+        <p class="font-label-md text-label-md text-on-surface">${gmEscapeHtml(staffName)}</p>
       </td>
       <td class="px-6 py-4">
         <div class="flex items-center gap-2">
           <span class="material-symbols-outlined ${meta.color} text-[20px]">${meta.icon}</span>
-          <span class="font-label-md text-label-md">${ACTION_LABELS[e.action_type] || e.action_type}</span>
+          <span class="font-label-md text-label-md">${gmEscapeHtml(ACTION_LABELS[e.action_type] || e.action_type)}</span>
         </div>
       </td>
-      <td class="px-6 py-4"><p class="text-body-md text-on-surface-variant">${e.description || ''}</p></td>
+      <td class="px-6 py-4"><p class="text-body-md text-on-surface-variant">${gmEscapeHtml(e.description || '')}</p></td>
       <td class="px-6 py-4 whitespace-nowrap"><p class="font-data-mono text-data-mono text-on-surface">${fmtTime(e.created_at)}</p></td>
       <td class="px-6 py-4"></td>
     </tr>`;
@@ -371,7 +371,7 @@ async function loadActivity() {
 
   if (error) {
     document.getElementById('activity-tbody').innerHTML =
-      `<tr><td colspan="5" class="text-center text-error text-sm py-10">تعذّر تحميل السجل: ${error.message}</td></tr>`;
+      `<tr><td colspan="5" class="text-center text-error text-sm py-10">تعذّر تحميل السجل: ${gmEscapeHtml(error.message)}</td></tr>`;
     return;
   }
 
@@ -389,7 +389,7 @@ async function loadActivity() {
   const staffSelect = document.getElementById('staffFilterSelect');
   const staffNames = [...new Set(allEntries.map(e => e.staff && e.staff.full_name).filter(Boolean))].sort();
   staffSelect.innerHTML = '<option value="all">كل الموظفين</option>' +
-    staffNames.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+    staffNames.map(n => `<option value="${gmEscapeHtml(n)}">${gmEscapeHtml(n)}</option>`).join('');
 
   renderEntries(allEntries);
 }
