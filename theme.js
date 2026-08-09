@@ -240,15 +240,21 @@ goldmindLoadSavedTheme();
 // (text-on-surface-variant, text-outline) were designed to sit on a white
 // card — they're a mid/dark grey, readable there. Several pages use them
 // directly on the page's own dark background (intro paragraphs under a
-// header, empty-state messages, small captions next to icons) instead of
-// inside a card, so that same dark grey becomes near-invisible on the
-// dark navy/teal/purple page background every theme uses. Rather than
-// hunting every such paragraph across ~35 pages (and every one added
-// later), default both classes to a translucent white (readable against
-// any dark theme background) and only switch them back to the card-mode
-// grey when they actually are nested inside a light surface — pure CSS,
-// so it also covers content injected later. An element's own inline
-// style or a more specific rule still wins as usual.
+// header, empty-state messages, small captions next to icons, floating
+// form-field labels) instead of inside a card, so that same dark grey
+// becomes near-invisible on the dark navy/teal/purple page background
+// every theme uses. First attempt used a translucent white, but that
+// still read as too washed out (small/tracked-out label text especially).
+// Switched to each theme's own --gm-outline-variant — already a solid,
+// per-theme-tuned light tone proven visible against these dark
+// backgrounds (it's what draws every card/input border already). Rather
+// than hunting every such paragraph across ~35 pages (and every one added
+// later), default both classes to that color and only switch them back
+// to the card-mode grey when they actually are nested inside a light
+// surface — pure CSS, so it also covers content injected later.
+// !important guards against Tailwind's own same-specificity utility
+// (e.g. the page-local ".text-outline { color: #76777d }") winning on
+// injection-order alone; a genuinely more specific rule still wins.
 (function () {
   const lightSurfaces = ['bg-surface-container-lowest', 'bg-surface-container-low', 'bg-surface-container', 'bg-surface-container-high', 'bg-surface-container-highest', 'bg-white'];
   const mutedClasses = ['text-on-surface-variant', 'text-outline'];
@@ -262,10 +268,29 @@ goldmindLoadSavedTheme();
   const style = document.createElement('style');
   style.textContent = `
     .text-on-surface-variant, .text-outline {
-      color: rgba(255, 255, 255, 0.62);
+      color: var(--gm-outline-variant, #c6c6cd) !important;
     }
     ${overrideSelectors.join(',\n    ')} {
-      color: var(--gm-on-surface-variant, #45464d);
+      color: var(--gm-on-surface-variant, #45464d) !important;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// Fourth shape: the dark, see-through inputs deliberately excluded from
+// the earlier white-background input fix (bg-transparent + text-on-
+// background — barcode/weight/description fields on inventory-add.html
+// etc.) never got a placeholder color at all, so the browser's own
+// default (assumes a light input background) rendered their placeholder
+// hint text almost invisible against the dark page. Give them the same
+// visible, per-theme outline-variant tone as the muted-text fix above.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    input.text-on-background::placeholder,
+    textarea.text-on-background::placeholder {
+      color: var(--gm-outline-variant, #c6c6cd);
+      opacity: 0.85;
     }
   `;
   document.head.appendChild(style);
