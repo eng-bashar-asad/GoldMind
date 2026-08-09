@@ -288,6 +288,20 @@
             return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
+        // Shrinks a stat number's font size in steps until it fits its box
+        // without being cut off/ellipsized — long balances (e.g. a cash
+        // balance in the tens/hundreds of thousands) were getting truncated
+        // into an unreadable "...00.00" instead of just displaying smaller.
+        function fitStatNumber(el) {
+            if (!el) return;
+            const sizes = [24, 20, 17, 15, 13];
+            el.style.fontSize = '';
+            for (let i = 0; i < sizes.length; i++) {
+                if (el.scrollWidth <= el.clientWidth) return;
+                el.style.fontSize = sizes[i] + 'px';
+            }
+        }
+
         function showQuickActionToast(message) {
             let toast = document.getElementById('quickActionToast');
             if (!toast) {
@@ -379,6 +393,7 @@
             let cashBalance = 0;
             (mainMovs || []).forEach(m => cashBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount));
             document.getElementById('cashBalanceEl').textContent = fmt(cashBalance);
+            fitStatNumber(document.getElementById('cashBalanceEl'));
 
             // Traders' box
             const { data: traderMovs } = await goldmindClient
@@ -399,6 +414,8 @@
             const todaySales = (todayInvoices || []).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
             document.getElementById('todaySalesEl').textContent = fmt(todaySales);
             document.getElementById('todayInvoiceCountEl').textContent = (todayInvoices || []).length;
+            fitStatNumber(document.getElementById('todaySalesEl'));
+            fitStatNumber(document.getElementById('todayInvoiceCountEl'));
 
             // Real alerts — replaces the old dead "التنبيهات" button
             const alerts = [];
