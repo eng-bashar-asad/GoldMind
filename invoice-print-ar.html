@@ -282,12 +282,12 @@
 
         function buildStoreInfoRows(labels) {
             const rows = [];
-            if (store.address) rows.push(`<div>${labels.address}: ${store.address}</div>`);
-            if (store.phone) rows.push(`<div>${labels.phone}: <span dir="ltr" style="unicode-bidi: embed;">${store.phone}</span></div>`);
-            if (store.website_url) rows.push(`<div>${labels.website}: <span dir="ltr" style="unicode-bidi: embed;">${store.website_url}</span></div>`);
-            if (store.social_instagram) rows.push(`<div>${labels.instagram}: <span dir="ltr" style="unicode-bidi: embed;">${store.social_instagram}</span></div>`);
-            if (store.social_tiktok) rows.push(`<div>${labels.tiktok}: <span dir="ltr" style="unicode-bidi: embed;">${store.social_tiktok}</span></div>`);
-            if (store.social_snapchat) rows.push(`<div>${labels.snapchat}: <span dir="ltr" style="unicode-bidi: embed;">${store.social_snapchat}</span></div>`);
+            if (store.address) rows.push(`<div>${labels.address}: ${gmEscapeHtml(store.address)}</div>`);
+            if (store.phone) rows.push(`<div>${labels.phone}: <span dir="ltr" style="unicode-bidi: embed;">${gmEscapeHtml(store.phone)}</span></div>`);
+            if (store.website_url) rows.push(`<div>${labels.website}: <span dir="ltr" style="unicode-bidi: embed;">${gmEscapeHtml(store.website_url)}</span></div>`);
+            if (store.social_instagram) rows.push(`<div>${labels.instagram}: <span dir="ltr" style="unicode-bidi: embed;">${gmEscapeHtml(store.social_instagram)}</span></div>`);
+            if (store.social_tiktok) rows.push(`<div>${labels.tiktok}: <span dir="ltr" style="unicode-bidi: embed;">${gmEscapeHtml(store.social_tiktok)}</span></div>`);
+            if (store.social_snapchat) rows.push(`<div>${labels.snapchat}: <span dir="ltr" style="unicode-bidi: embed;">${gmEscapeHtml(store.social_snapchat)}</span></div>`);
             return rows.join('');
         }
 
@@ -393,7 +393,7 @@
 
             return `
                 <tr>
-                    <td class="py-2">${item.description || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${item.description_en}</span>` : ''}</td>
+                    <td class="py-2">${gmEscapeHtml(item.description) || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${gmEscapeHtml(item.description_en)}</span>` : ''}</td>
                     <td class="py-2 text-center">${item.karat}K</td>
                     <td class="py-2 text-center">${item.weight_grams}</td>
                     <td class="py-2 text-left font-semibold">${fmt(full)}</td>
@@ -411,8 +411,8 @@
         if (diamondItems.length > 0) {
             const certBox = document.getElementById('diamond-cert-buttons');
             certBox.innerHTML = diamondItems.map(item => `
-                <a href="diamond-certificate-ar.html?id=${item.diamond_piece_id}" class="flex items-center justify-center gap-2 bg-white border border-amber-300 text-amber-800 px-3 py-2 rounded-lg text-sm font-semibold">
-                    <span class="material-symbols-outlined text-[18px]">workspace_premium</span> طباعة شهادة الماس${diamondItems.length > 1 ? ' — ' + (item.description || '') : ''}
+                <a href="diamond-certificate-ar.html?id=${encodeURIComponent(item.diamond_piece_id)}" class="flex items-center justify-center gap-2 bg-white border border-amber-300 text-amber-800 px-3 py-2 rounded-lg text-sm font-semibold">
+                    <span class="material-symbols-outlined text-[18px]">workspace_premium</span> طباعة شهادة الماس${diamondItems.length > 1 ? ' — ' + gmEscapeHtml(item.description || '') : ''}
                 </a>
             `).join('');
             certBox.classList.remove('hidden');
