@@ -257,7 +257,10 @@ function renderStaffCard(staff) {
         <p class="font-label-md text-label-md font-semibold text-on-surface truncate">${staff.full_name || 'بدون اسم'}</p>
         <p class="text-[11px] text-on-surface-variant">${isOwner ? 'مالك المتجر — كل الصلاحيات' : 'موظف'}</p>
       </div>
-      <span class="material-symbols-outlined ${isOwner ? 'text-secondary' : 'text-outline'} mr-auto shrink-0" style="font-variation-settings: 'FILL' ${isOwner ? 1 : 0};">badge</span>
+      ${(!isOwner && staff.id !== currentStaffId) ? `<button type="button" onclick="deleteStaff('${staff.id}', '${(staff.full_name || 'هذا الموظف').replace(/'/g, "\\'")}')" class="text-error shrink-0" title="حذف الموظف">
+        <span class="material-symbols-outlined" style="font-size:20px;">person_remove</span>
+      </button>` : ''}
+      <span class="material-symbols-outlined ${isOwner ? 'text-secondary' : 'text-outline'} ${(!isOwner && staff.id !== currentStaffId) ? '' : 'mr-auto'} shrink-0" style="font-variation-settings: 'FILL' ${isOwner ? 1 : 0};">badge</span>
     </div>
     <div class="flex items-center gap-2 mb-2">
       <span class="material-symbols-outlined text-outline shrink-0" style="font-size:16px;">chat</span>
@@ -275,6 +278,23 @@ function toggleGroup(btn) {
   const chev = btn.querySelector('.chev');
   body.classList.toggle('open');
   chev.classList.toggle('open');
+}
+
+async function deleteStaff(staffId, name) {
+  if (!confirm('هل أنت متأكد من حذف "' + name + '" من الموظفين؟ هذا الإجراء نهائي — بيفقد وصوله للمتجر فوراً، ولازم يُضاف من جديد لو حبيت ترجعه لاحقاً.')) {
+    return;
+  }
+
+  const { error } = await goldmindClient
+    .from('staff').delete().eq('id', staffId).eq('store_id', GOLDMIND_STORE_ID);
+
+  if (error) {
+    showToast('تعذّر حذف الموظف: ' + error.message, true);
+    return;
+  }
+
+  showToast('تم حذف الموظف');
+  loadStaff();
 }
 
 async function saveStaffWhatsapp(staffId, btn) {
