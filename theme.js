@@ -235,3 +235,38 @@ goldmindLoadSavedTheme();
   `;
   document.head.appendChild(style);
 })();
+
+// Third shape of the same problem: muted "hint"/secondary text classes
+// (text-on-surface-variant, text-outline) were designed to sit on a white
+// card — they're a mid/dark grey, readable there. Several pages use them
+// directly on the page's own dark background (intro paragraphs under a
+// header, empty-state messages, small captions next to icons) instead of
+// inside a card, so that same dark grey becomes near-invisible on the
+// dark navy/teal/purple page background every theme uses. Rather than
+// hunting every such paragraph across ~35 pages (and every one added
+// later), default both classes to a translucent white (readable against
+// any dark theme background) and only switch them back to the card-mode
+// grey when they actually are nested inside a light surface — pure CSS,
+// so it also covers content injected later. An element's own inline
+// style or a more specific rule still wins as usual.
+(function () {
+  const lightSurfaces = ['bg-surface-container-lowest', 'bg-surface-container-low', 'bg-surface-container', 'bg-surface-container-high', 'bg-surface-container-highest', 'bg-white'];
+  const mutedClasses = ['text-on-surface-variant', 'text-outline'];
+  const overrideSelectors = [];
+  lightSurfaces.forEach(function (surface) {
+    mutedClasses.forEach(function (cls) {
+      overrideSelectors.push('.' + surface + ' .' + cls);
+      overrideSelectors.push('.' + surface + '.' + cls);
+    });
+  });
+  const style = document.createElement('style');
+  style.textContent = `
+    .text-on-surface-variant, .text-outline {
+      color: rgba(255, 255, 255, 0.62);
+    }
+    ${overrideSelectors.join(',\n    ')} {
+      color: var(--gm-on-surface-variant, #45464d);
+    }
+  `;
+  document.head.appendChild(style);
+})();
