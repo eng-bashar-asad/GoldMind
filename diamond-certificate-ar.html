@@ -229,20 +229,29 @@
             return;
         }
 
-        // Look up the sale, if this piece has already been sold, so the
-        // certificate can be issued in the buyer's name and reference
-        // the actual invoice — otherwise it prints as an in-stock cert.
+        // Look up the sale, if this piece is currently sold, so the certificate
+        // can be issued in the buyer's name and reference the actual invoice —
+        // otherwise (available, or returned back to stock) it prints as an
+        // in-stock cert. A piece can have several invoice_items rows over its
+        // life (sale, return, re-sale...), so once sold we pick the most
+        // recent *sale*-type invoice rather than assuming a single row.
         let invoice = null, customer = null;
-        const { data: invoiceItem } = await goldmindClient
-            .from('invoice_items').select('invoice_id').eq('diamond_piece_id', pieceId).maybeSingle();
-        if (invoiceItem && invoiceItem.invoice_id) {
-            const { data: invoiceRow } = await goldmindClient
-                .from('invoices').select('*').eq('id', invoiceItem.invoice_id).maybeSingle();
-            invoice = invoiceRow || null;
-            if (invoice && invoice.customer_id) {
-                const { data: customerRow } = await goldmindClient
-                    .from('customers').select('name').eq('id', invoice.customer_id).maybeSingle();
-                customer = customerRow || null;
+        if (piece.status === 'sold') {
+            const { data: invoiceItems } = await goldmindClient
+                .from('invoice_items').select('invoice_id').eq('diamond_piece_id', pieceId);
+            const invoiceIds = (invoiceItems || []).map(r => r.invoice_id).filter(Boolean);
+            if (invoiceIds.length > 0) {
+                const { data: candidateInvoices } = await goldmindClient
+                    .from('invoices').select('*').in('id', invoiceIds).eq('type', 'sale')
+                    .order('created_at', { ascending: false }).limit(1);
+                if (candidateInvoices && candidateInvoices.length > 0) {
+                    invoice = candidateInvoices[0];
+                    if (invoice.customer_id) {
+                        const { data: customerRow } = await goldmindClient
+                            .from('customers').select('name').eq('id', invoice.customer_id).maybeSingle();
+                        customer = customerRow || null;
+                    }
+                }
             }
         }
 
