@@ -57,6 +57,9 @@
         const session = await requireGoldMindSession('login-entry-ar.html');
         if (!session) return;
 
+        const { data: __store } = await goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+        if (!__store || !__store.diamonds_enabled) { window.location.href = 'index-ar.html'; return; }
+
         const pieceId = getParam('id');
         const loading = document.getElementById('loading');
         const errorBox = document.getElementById('error-box');
