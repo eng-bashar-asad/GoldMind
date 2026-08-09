@@ -214,16 +214,6 @@
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_reports" href="reports-ar.html"><span class="material-symbols-outlined text-xl mb-1">analytics</span><span class="text-[10.5px] font-medium leading-tight text-center">التقارير</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_repairs" href="repairs-ar.html"><span class="material-symbols-outlined text-xl mb-1">build</span><span class="text-[10.5px] font-medium leading-tight text-center">الصيانة</span></a>
 </div></section>
-<!-- Traders' box (supplementary, smaller) -->
-<section class="mb-6">
-<div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow flex items-center justify-between">
-<div>
-<span class="font-label-md text-label-md text-on-surface-variant block mb-1">صندوق التجار</span>
-<div class="font-headline-md text-headline-md font-semibold text-primary" id="tradersBoxEl">0.00</div>
-</div>
-<span class="material-symbols-outlined text-secondary text-2xl">account_balance</span>
-</div>
-</section>
 <!-- Quick Actions -->
 <!-- Recent Movements Log -->
 <section class="mb-4">
@@ -394,14 +384,6 @@
             (mainMovs || []).forEach(m => cashBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount));
             document.getElementById('cashBalanceEl').textContent = fmt(cashBalance);
             fitStatNumber(document.getElementById('cashBalanceEl'));
-
-            // Traders' box
-            const { data: traderMovs } = await goldmindClient
-                .from('cash_movements').select('direction, amount')
-                .eq('store_id', GOLDMIND_STORE_ID).eq('box', 'traders');
-            let tradersBalance = 0;
-            (traderMovs || []).forEach(m => tradersBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount));
-            document.getElementById('tradersBoxEl').textContent = fmt(tradersBalance);
 
             // Today's sales + invoice count (real invoice type is 'sale', not
             // 'sell' — fixing a real bug that made this card always read 0.00)
