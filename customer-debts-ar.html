@@ -231,20 +231,35 @@ function renderCustomers() {
     .slice()
     .sort((a, b) => customerBalance(b.id) - customerBalance(a.id));
 
-  document.getElementById('customers-list').innerHTML = list.map(c => {
+  const container = document.getElementById('customers-list');
+  container.innerHTML = '';
+  if (list.length === 0) {
+    container.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>';
+    return;
+  }
+  list.forEach(c => {
     const bal = customerBalance(c.id);
-    return `
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 cursor-pointer" onclick="showCustomerDetail('${c.id}')">
+    const card = document.createElement('div');
+    card.className = 'bg-surface-container-lowest border border-outline-variant rounded-xl p-4 cursor-pointer';
+    card.dataset.customerId = c.id;
+    card.innerHTML = `
         <div class="flex items-center justify-between">
           <div>
-            <p class="font-bold text-[14px]">${c.name}</p>
-            <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr">${c.phone || ''}</p>
+            <p class="font-bold text-[14px]"></p>
+            <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr"></p>
           </div>
           <span class="font-bold text-[14px] font-data-mono ${bal > 0 ? 'text-error' : 'text-success'}">${fmt(Math.abs(bal))}</span>
-        </div>
-      </div>`;
-  }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>';
+        </div>`;
+    card.querySelector('p.font-bold').textContent = c.name;
+    card.querySelectorAll('p')[1].textContent = c.phone || '';
+    container.appendChild(card);
+  });
 }
+
+document.getElementById('customers-list').addEventListener('click', function (e) {
+  const card = e.target.closest('[data-customer-id]');
+  if (card) showCustomerDetail(card.dataset.customerId);
+});
 
 function showCustomerDetail(customerId) {
   currentCustomerId = customerId;
@@ -288,12 +303,12 @@ function showCustomerDetail(customerId) {
     return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${MOVEMENT_LABELS[m.movement_type] || m.movement_type}</span>
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${gmEscapeHtml(MOVEMENT_LABELS[m.movement_type] || m.movement_type)}</span>
           <span class="text-[11px] text-on-surface-variant">${date}</span>
         </div>
         <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-error' : 'text-success'}">${isIncrease ? '+' : '-'}${fmt(m.cash_amount)}</p>
-        ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${m.notes}</p>` : ''}
-        ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${m.invoice.invoice_number}</p>` : ''}
+        ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
+        ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
       </div>`;
   }).join('');
 }
@@ -401,7 +416,7 @@ async function loadCustomerDocs(customerId) {
     row.href = signed ? signed.signedUrl : '#';
     row.target = '_blank';
     row.className = 'flex items-center gap-2 text-[12px] text-secondary underline';
-    row.innerHTML = `<span class="material-symbols-outlined text-[15px]">description</span> ${doc.file_name} <span class="text-outline no-underline">(${DOC_CATEGORY_LABELS[doc.document_category] || doc.document_category})</span>`;
+    row.innerHTML = `<span class="material-symbols-outlined text-[15px]">description</span> ${gmEscapeHtml(doc.file_name)} <span class="text-outline no-underline">(${gmEscapeHtml(DOC_CATEGORY_LABELS[doc.document_category] || doc.document_category)})</span>`;
     docsList.appendChild(row);
   }
 }
@@ -411,7 +426,7 @@ function addEditExtraPhoneRow(value) {
   const row = document.createElement('div');
   row.className = 'flex gap-2 items-center';
   row.innerHTML = `
-    <input class="flex-1 h-10 border border-outline-variant rounded-lg px-3 text-sm font-data-mono edit-extra-phone-input" dir="ltr" placeholder="رقم هاتف إضافي" value="${value ? value.replace(/"/g, '&quot;') : ''}"/>
+    <input class="flex-1 h-10 border border-outline-variant rounded-lg px-3 text-sm font-data-mono edit-extra-phone-input" dir="ltr" placeholder="رقم هاتف إضافي" value="${gmEscapeHtml(value || '')}"/>
     <button type="button" class="h-10 w-10 flex items-center justify-center rounded-lg border border-outline-variant text-error remove-edit-extra-phone-btn">
       <span class="material-symbols-outlined text-[16px]">delete</span>
     </button>
