@@ -432,7 +432,7 @@
             .eq('status', 'available');
 
         if (error) {
-            box.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${error.message}</div>`;
+            box.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${gmEscapeHtml(error.message)}</div>`;
             return;
         }
 
@@ -461,10 +461,10 @@
                 <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0">
                         <div class="font-data-mono font-bold text-sm">${specParts.join(' · ')}</div>
-                        <div class="text-outline text-[11px] font-data-mono truncate">${piece.barcode || 'بدون باركود'}</div>
+                        <div class="text-outline text-[11px] font-data-mono truncate">${gmEscapeHtml(piece.barcode) || 'بدون باركود'}</div>
                     </div>
                 </div>
-                <input type="text" placeholder="وصف القطعة" class="w-full h-10 border border-outline-variant rounded px-3 text-right diamond-desc-input" value="${(piece.description_ar || '').replace(/"/g, '&quot;')}"/>
+                <input type="text" placeholder="وصف القطعة" class="w-full h-10 border border-outline-variant rounded px-3 text-right diamond-desc-input" value="${gmEscapeHtml(piece.description_ar || '')}"/>
                 <div class="flex items-center gap-2">
                     <input type="number" placeholder="السعر" class="flex-1 h-10 border border-outline-variant rounded px-2 text-left font-data-mono diamond-price-input" value="${suggested ? suggested.toFixed(2) : ''}"/>
                     <button onclick='confirmAddDiamondPiece(${JSON.stringify(piece).replace(/'/g, "&apos;")}, this)' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all shrink-0">
@@ -538,7 +538,7 @@
             .limit(8);
 
         if (error) {
-            customerResults.innerHTML = `<div class="text-error text-sm">خطأ بالبحث: ${error.message}</div>`;
+            customerResults.innerHTML = `<div class="text-error text-sm">خطأ بالبحث: ${gmEscapeHtml(error.message)}</div>`;
             return;
         }
 
@@ -550,8 +550,8 @@
         customerResults.innerHTML = data.map(c => `
             <div class="flex items-center justify-between bg-surface-container-low rounded-lg p-3 cursor-pointer active:scale-[0.98] transition-all" onclick='pickCustomer(${JSON.stringify(c).replace(/'/g, "&apos;")})'>
                 <div>
-                    <div class="font-bold">${c.name}</div>
-                    <div class="text-on-surface-variant text-sm font-data-mono" dir="ltr">${c.phone || ''}</div>
+                    <div class="font-bold">${gmEscapeHtml(c.name)}</div>
+                    <div class="text-on-surface-variant text-sm font-data-mono" dir="ltr">${gmEscapeHtml(c.phone || '')}</div>
                 </div>
                 <span class="material-symbols-outlined text-primary">chevron_left</span>
             </div>
@@ -601,7 +601,7 @@
             .maybeSingle();
 
         if (error) {
-            barcodeResult.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${error.message}</div>`;
+            barcodeResult.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${gmEscapeHtml(error.message)}</div>`;
             return;
         }
 
@@ -616,10 +616,10 @@
                 <div class="flex items-center justify-between gap-2">
                     <div class="min-w-0">
                         <div class="font-data-mono font-bold text-sm">${data.weight_grams} غ &middot; عيار ${data.karat}</div>
-                        <div class="text-outline text-[11px] font-data-mono truncate">${data.barcode}</div>
+                        <div class="text-outline text-[11px] font-data-mono truncate">${gmEscapeHtml(data.barcode)}</div>
                     </div>
                 </div>
-                <input type="text" placeholder="وصف القطعة (خاتم، حلق...)" class="w-full h-10 border border-outline-variant rounded px-3 text-right" id="barcode-desc-input" value="${(data.description_ar || '').replace(/"/g, '&quot;')}"/>
+                <input type="text" placeholder="وصف القطعة (خاتم، حلق...)" class="w-full h-10 border border-outline-variant rounded px-3 text-right" id="barcode-desc-input" value="${gmEscapeHtml(data.description_ar || '')}"/>
                 <div class="flex items-center gap-2">
                     <input type="number" placeholder="السعر" class="flex-1 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input"/>
                     <button onclick='confirmAddBarcodePiece(${JSON.stringify(data).replace(/'/g, "&apos;")})' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all shrink-0">
@@ -710,8 +710,8 @@
         body.innerHTML = cart.map(item => `
             <tr>
                 <td class="px-3 py-3">
-                    <div class="font-body-md">${item.description || '—'}${item.mode === 'stock' ? ' <span class="text-[10px] text-secondary font-semibold">(من الرصيد)</span>' : ''}${item.mode === 'diamond' ? ' <span class="text-[10px] text-secondary font-semibold">(ماس)</span>' : ''}</div>
-                    <div class="text-outline text-[10px] font-data-mono">${item.barcode || ''}</div>
+                    <div class="font-body-md">${gmEscapeHtml(item.description) || '—'}${item.mode === 'stock' ? ' <span class="text-[10px] text-secondary font-semibold">(من الرصيد)</span>' : ''}${item.mode === 'diamond' ? ' <span class="text-[10px] text-secondary font-semibold">(ماس)</span>' : ''}</div>
+                    <div class="text-outline text-[10px] font-data-mono">${gmEscapeHtml(item.barcode || '')}</div>
                 </td>
                 <td class="px-2 py-3 text-center">${item.mode === 'diamond' ? (item.karat ? item.karat + 'K' : 'ماس') : item.karat + 'K'}</td>
                 <td class="px-2 py-3 text-left">${item.mode === 'diamond' ? item.weight + ' ct' : item.weight}</td>
