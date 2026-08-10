@@ -91,6 +91,28 @@
 </div>
 </div>
 
+<!-- Type / Category -->
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="piece-type">النوع</label>
+<select class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="piece-type">
+<option value="">اختر النوع</option>
+</select>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="category1">صنف ١ (الموديل)</label>
+<select class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="category1">
+<option value="">اختر صنف ١</option>
+</select>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline" for="category2">صنف ٢</label>
+<select class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="category2">
+<option value="">اختر صنف ٢</option>
+</select>
+</div>
+</div>
+
 <!-- Color -->
 <div class="flex flex-col gap-2">
 <span class="text-[11px] font-semibold text-outline">اللون</span>
@@ -175,6 +197,85 @@ function setColor(color) {
 }
 document.querySelectorAll('.color-btn').forEach(btn => btn.addEventListener('click', () => setColor(btn.dataset.color)));
 
+// ---------- Type / Category expandable dropdowns ----------
+const ADD_NEW_VALUE = '__add_new__';
+const classificationCache = {};
+
+async function loadClassificationOptions(selectId, fieldKey, label, selectedValue) {
+  const select = document.getElementById(selectId);
+  const { data, error } = await goldmindClient
+    .from('piece_classification_options')
+    .select('value')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .eq('field_key', fieldKey)
+    .order('value', { ascending: true });
+
+  if (error) { console.error('classification load error', fieldKey, error); return; }
+
+  classificationCache[fieldKey] = (data || []).map(r => r.value);
+  renderClassificationSelect(select, fieldKey, label, selectedValue);
+}
+
+function renderClassificationSelect(select, fieldKey, label, selectedValue) {
+  const current = selectedValue !== undefined ? selectedValue : select.value;
+  select.innerHTML = '';
+  const emptyOpt = document.createElement('option');
+  emptyOpt.value = '';
+  emptyOpt.textContent = 'اختر ' + label;
+  select.appendChild(emptyOpt);
+
+  (classificationCache[fieldKey] || []).forEach(v => {
+    const opt = document.createElement('option');
+    opt.value = v;
+    opt.textContent = v;
+    select.appendChild(opt);
+  });
+
+  const addOpt = document.createElement('option');
+  addOpt.value = ADD_NEW_VALUE;
+  addOpt.textContent = '+ إضافة صنف جديد...';
+  select.appendChild(addOpt);
+
+  if (current && (classificationCache[fieldKey] || []).includes(current)) {
+    select.value = current;
+  }
+}
+
+async function handleClassificationChange(selectId, fieldKey, label) {
+  const select = document.getElementById(selectId);
+  if (select.value !== ADD_NEW_VALUE) return;
+
+  const newValue = (prompt('أدخل قيمة ' + label + ' الجديدة:') || '').trim();
+  if (!newValue) { renderClassificationSelect(select, fieldKey, label, ''); return; }
+
+  if ((classificationCache[fieldKey] || []).includes(newValue)) {
+    renderClassificationSelect(select, fieldKey, label, newValue);
+    return;
+  }
+
+  const { error } = await goldmindClient.from('piece_classification_options').insert({
+    store_id: GOLDMIND_STORE_ID,
+    field_key: fieldKey,
+    value: newValue,
+    created_by: GOLDMIND_STAFF_ID
+  });
+
+  if (error && error.code !== '23505') {
+    alert('تعذّر إضافة الصنف: ' + error.message);
+    renderClassificationSelect(select, fieldKey, label, '');
+    return;
+  }
+
+  if (!classificationCache[fieldKey]) classificationCache[fieldKey] = [];
+  classificationCache[fieldKey].push(newValue);
+  classificationCache[fieldKey].sort((a, b) => a.localeCompare(b, 'ar'));
+  renderClassificationSelect(select, fieldKey, label, newValue);
+}
+
+document.getElementById('piece-type').addEventListener('change', () => handleClassificationChange('piece-type', 'type', 'النوع'));
+document.getElementById('category1').addEventListener('change', () => handleClassificationChange('category1', 'category1', 'صنف ١'));
+document.getElementById('category2').addEventListener('change', () => handleClassificationChange('category2', 'category2', 'صنف ٢'));
+
 function showMessage(text, isError) {
   const box = document.getElementById('save-message');
   box.textContent = text;
@@ -221,6 +322,9 @@ async function load() {
   document.getElementById('karat').value = piece.karat;
   document.getElementById('status').value = piece.status;
   setColor(piece.color || 'Gold');
+  loadClassificationOptions('piece-type', 'type', 'النوع', piece.piece_type || '');
+  loadClassificationOptions('category1', 'category1', 'صنف ١', piece.category1 || '');
+  loadClassificationOptions('category2', 'category2', 'صنف ٢', piece.category2 || '');
 
   if (piece.photo_url) {
     photoPreview.src = piece.photo_url;
@@ -274,7 +378,10 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     karat: karat,
     color: selectedColor,
     status: status,
-    photo_url: photoUrl
+    photo_url: photoUrl,
+    piece_type: document.getElementById('piece-type').value || null,
+    category1: document.getElementById('category1').value || null,
+    category2: document.getElementById('category2').value || null
   }).eq('id', currentPiece.id);
 
   btn.disabled = false;

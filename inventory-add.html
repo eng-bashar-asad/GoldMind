@@ -195,6 +195,34 @@
 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
 </div>
 </div>
+
+<!-- Type / Category Selectors -->
+<div class="grid grid-cols-1 gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="piece-type">النوع</label>
+<select class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none font-label-md text-on-background" id="piece-type">
+<option value="">اختر النوع</option>
+</select>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="category1">صنف ١ (الموديل)</label>
+<select class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none font-label-md text-on-background" id="category1">
+<option value="">اختر صنف ١</option>
+</select>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="category2">صنف ٢</label>
+<select class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none font-label-md text-on-background" id="category2">
+<option value="">اختر صنف ٢</option>
+</select>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+</div>
+</div>
+
 <!-- Color Selector -->
 <div class="space-y-3">
 <span class="text-[11px] font-semibold text-outline tracking-wider uppercase px-1">لون المعدن</span>
@@ -320,6 +348,96 @@
             photoRemoveBtn.classList.remove('flex');
         }
 
+        // ---------- Type / Category expandable dropdowns ----------
+        const ADD_NEW_VALUE = '__add_new__';
+        const classificationCache = {}; // field_key -> array of values already loaded
+
+        async function loadClassificationOptions(selectId, fieldKey, label) {
+            const select = document.getElementById(selectId);
+            const { data, error } = await goldmindClient
+                .from('piece_classification_options')
+                .select('value')
+                .eq('store_id', GOLDMIND_STORE_ID)
+                .eq('field_key', fieldKey)
+                .order('value', { ascending: true });
+
+            if (error) {
+                console.error('classification load error', fieldKey, error);
+                return;
+            }
+
+            classificationCache[fieldKey] = (data || []).map(r => r.value);
+            renderClassificationSelect(select, fieldKey, label);
+        }
+
+        function renderClassificationSelect(select, fieldKey, label, selectedValue) {
+            const current = selectedValue !== undefined ? selectedValue : select.value;
+            select.innerHTML = '';
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = 'اختر ' + label;
+            select.appendChild(emptyOpt);
+
+            (classificationCache[fieldKey] || []).forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v;
+                select.appendChild(opt);
+            });
+
+            const addOpt = document.createElement('option');
+            addOpt.value = ADD_NEW_VALUE;
+            addOpt.textContent = '+ إضافة صنف جديد...';
+            select.appendChild(addOpt);
+
+            if (current && (classificationCache[fieldKey] || []).includes(current)) {
+                select.value = current;
+            }
+        }
+
+        async function handleClassificationChange(selectId, fieldKey, label) {
+            const select = document.getElementById(selectId);
+            if (select.value !== ADD_NEW_VALUE) return;
+
+            const newValue = (prompt('أدخل قيمة ' + label + ' الجديدة:') || '').trim();
+            if (!newValue) {
+                renderClassificationSelect(select, fieldKey, label, '');
+                return;
+            }
+
+            // Already exists locally? just select it.
+            if ((classificationCache[fieldKey] || []).includes(newValue)) {
+                renderClassificationSelect(select, fieldKey, label, newValue);
+                return;
+            }
+
+            const { error } = await goldmindClient.from('piece_classification_options').insert({
+                store_id: GOLDMIND_STORE_ID,
+                field_key: fieldKey,
+                value: newValue,
+                created_by: GOLDMIND_STAFF_ID
+            });
+
+            if (error && error.code !== '23505') { // ignore duplicate races
+                alert('تعذّر إضافة الصنف: ' + error.message);
+                renderClassificationSelect(select, fieldKey, label, '');
+                return;
+            }
+
+            if (!classificationCache[fieldKey]) classificationCache[fieldKey] = [];
+            classificationCache[fieldKey].push(newValue);
+            classificationCache[fieldKey].sort((a, b) => a.localeCompare(b, 'ar'));
+            renderClassificationSelect(select, fieldKey, label, newValue);
+        }
+
+        loadClassificationOptions('piece-type', 'type', 'النوع');
+        loadClassificationOptions('category1', 'category1', 'صنف ١');
+        loadClassificationOptions('category2', 'category2', 'صنف ٢');
+
+        document.getElementById('piece-type').addEventListener('change', () => handleClassificationChange('piece-type', 'type', 'النوع'));
+        document.getElementById('category1').addEventListener('change', () => handleClassificationChange('category1', 'category1', 'صنف ١'));
+        document.getElementById('category2').addEventListener('change', () => handleClassificationChange('category2', 'category2', 'صنف ٢'));
+
         function generateBarcode() {
             const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
             return 'GM-' + Date.now().toString(36).toUpperCase() + '-' + rand;
@@ -422,6 +540,9 @@
                 cost_fabrication_per_gram: parseFloat(document.getElementById('fab-cost').value) || null,
                 description_ar: document.getElementById('desc-ar').value.trim() || null,
                 description_en: document.getElementById('desc-en').value.trim() || null,
+                piece_type: document.getElementById('piece-type').value || null,
+                category1: document.getElementById('category1').value || null,
+                category2: document.getElementById('category2').value || null,
                 karat: karat,
                 color: selectedColor,
                 status: 'available',
@@ -443,6 +564,9 @@
             document.getElementById('fab-cost').value = '';
             document.getElementById('desc-ar').value = '';
             document.getElementById('desc-en').value = '';
+            renderClassificationSelect(document.getElementById('piece-type'), 'type', 'النوع', '');
+            renderClassificationSelect(document.getElementById('category1'), 'category1', 'صنف ١', '');
+            renderClassificationSelect(document.getElementById('category2'), 'category2', 'صنف ٢', '');
             document.getElementById('weight').focus();
             removePhoto();
         });
