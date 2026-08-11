@@ -37,6 +37,8 @@
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
     .settle-tab-btn.active { background: #000; color: #fff; }
     .settle-tab-btn:not(.active) { color: #45464d; }
+    .currency-btn.active { background: #000; color: #fff; }
+    .currency-btn:not(.active) { color: #45464d; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
@@ -52,6 +54,13 @@
 </div>
 </header>
 <main class="pb-32 max-w-md mx-auto px-4">
+
+<div class="flex justify-end pt-3">
+<div class="flex rounded-lg border border-outline-variant overflow-hidden text-[11px] font-semibold" id="currencyToggle">
+<button type="button" onclick="setDisplayCurrency('AED')" class="currency-btn px-3 h-8" data-currency="AED">د.إ AED</button>
+<button type="button" onclick="setDisplayCurrency('USD')" class="currency-btn px-3 h-8" data-currency="USD">$ USD</button>
+</div>
+</div>
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
@@ -145,7 +154,7 @@
 <span class="font-bold text-[16px] font-data-mono" id="detail-fee-balance">0.00 د.إ</span>
 </div>
 </div>
-<p class="text-[10px] text-outline mt-1" id="cashDebtHint">قيمة موجبة = دين علينا للتاجر لم يُسوَّ بعد. الذهب والمصنعية دينان منفصلان تماماً.</p>
+<p class="text-[10px] text-outline mt-1" id="cashDebtHint">قيمة موجبة (خضراء) = التاجر مديون للمحل. قيمة سالبة (حمراء) = المحل مديون للتاجر. الذهب دائماً بمكافئ عيار ٢٤ الصافي؛ الذهب والمصنعية دينان منفصلان تماماً.</p>
 </div>
 
 <div class="grid grid-cols-2 gap-2">
@@ -178,7 +187,7 @@
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gs-accounting-weight" oninput="recomputeGiveStockPreview()" step="0.01" type="number"/>
 </div>
 <div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">مصنعية للغرام (د.إ)</label>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="gs-fab-per-gram-label">مصنعية للغرام (د.إ)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gs-fab-per-gram" oninput="recomputeGiveStockPreview()" step="0.01" type="number"/>
 </div>
 </div>
@@ -212,7 +221,7 @@
 </div>
 </div>
 <div class="hidden mb-3" id="settle-cash-fields">
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ المدفوع (د.إ)</label>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="settle-cash-amount-label">المبلغ المدفوع (د.إ)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-cash-amount" step="0.01" type="number"/>
 </div>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="settle-notes" placeholder="ملاحظة (اختياري)"></textarea>
@@ -237,6 +246,48 @@ function fmt(n) {
   return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
 }
 
+// AED is pegged to USD at a fixed official rate (does not float), so a
+// hardcoded conversion factor is safe here rather than a live FX lookup.
+const AED_PER_USD = 3.6725;
+let displayCurrency = localStorage.getItem('gm_trader_currency') === 'USD' ? 'USD' : 'AED';
+
+function currencyUnitLabel() {
+  return displayCurrency === 'USD' ? '$' : 'د.إ';
+}
+// All cash/fee amounts are stored in AED in the database; this only
+// converts for on-screen display.
+function fmtMoney(amountAed) {
+  const amount = displayCurrency === 'USD' ? Number(amountAed || 0) / AED_PER_USD : Number(amountAed || 0);
+  return fmt(amount) + ' ' + currencyUnitLabel();
+}
+// Converts a value the employee typed in the currently selected display
+// currency back into AED for storage, since the ledger's base currency is AED.
+function toAed(amount) {
+  const n = Number(amount || 0);
+  return displayCurrency === 'USD' ? n * AED_PER_USD : n;
+}
+
+function setDisplayCurrency(currency) {
+  displayCurrency = currency === 'USD' ? 'USD' : 'AED';
+  localStorage.setItem('gm_trader_currency', displayCurrency);
+  document.querySelectorAll('.currency-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === displayCurrency));
+  const unit = currencyUnitLabel();
+  document.getElementById('gs-fab-per-gram-label').textContent = `مصنعية للغرام (${unit})`;
+  document.getElementById('settle-cash-amount-label').textContent = `المبلغ المدفوع (${unit})`;
+  if (traders.length) {
+    renderTradersTotal();
+    renderTraders();
+    if (currentTraderId) showTraderDetail(currentTraderId);
+    recomputeGiveStockPreview();
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.currency-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === displayCurrency));
+  const unit = currencyUnitLabel();
+  document.getElementById('gs-fab-per-gram-label').textContent = `مصنعية للغرام (${unit})`;
+  document.getElementById('settle-cash-amount-label').textContent = `المبلغ المدفوع (${unit})`;
+});
+
 const MOVEMENT_LABELS = { debt_increase: 'استلام ذهب (زيادة دين)', debt_decrease: 'تسوية / دفعة (تخفيض دين)' };
 
 function movementLabel(m) {
@@ -260,7 +311,7 @@ async function load() {
   // the screen doesn't introduce a concept they never use.
   if (diamondsEnabled) {
     document.getElementById('cashDebtLabel').textContent = 'دين نقدي (مصنعية/ألماس)';
-    document.getElementById('cashDebtHint').textContent = 'قيمة موجبة = دين علينا للتاجر لم يُسوَّ بعد. دين الذهب والدين النقدي (مصنعية أو ألماس) منفصلان تماماً.';
+    document.getElementById('cashDebtHint').textContent = 'قيمة موجبة (خضراء) = التاجر مديون للمحل. قيمة سالبة (حمراء) = المحل مديون للتاجر. الذهب دائماً بمكافئ عيار ٢٤ الصافي؛ دين الذهب والدين النقدي (مصنعية أو ألماس) منفصلان تماماً.';
     document.getElementById('settleTabCash').textContent = 'تسوية نقدية (مصنعية/ألماس)';
   }
 
@@ -282,14 +333,16 @@ async function load() {
   showTradersList();
 }
 
+// Positive = the trader owes the shop (we're owed). Negative = the shop
+// owes the trader. Gold is always tracked in pure 24K-equivalent grams.
 function traderGoldBalance(traderId) {
   const moves = movementsByTrader[traderId] || [];
-  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? Number(m.gold_24k_equivalent || 0) : -Number(m.gold_24k_equivalent || 0)), 0);
+  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? -Number(m.gold_24k_equivalent || 0) : Number(m.gold_24k_equivalent || 0)), 0);
 }
 
 function traderFeeBalance(traderId) {
   const moves = movementsByTrader[traderId] || [];
-  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? Number(m.fab_fee_amount || 0) : -Number(m.fab_fee_amount || 0)), 0);
+  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0)), 0);
 }
 
 function showTradersList() {
@@ -313,9 +366,9 @@ function renderTradersTotal() {
   const goldEl = document.getElementById('tradersTotalGold');
   const cashEl = document.getElementById('tradersTotalCash');
   goldEl.textContent = 'ذهب: ' + fmt(Math.abs(totalGold)) + ' غ';
-  goldEl.className = totalGold > 0 ? 'text-error' : (totalGold < 0 ? 'text-success' : '');
-  cashEl.textContent = 'نقدي: ' + fmt(Math.abs(totalCash)) + ' د.إ';
-  cashEl.className = totalCash > 0 ? 'text-error' : (totalCash < 0 ? 'text-success' : '');
+  goldEl.className = totalGold > 0 ? 'text-success' : (totalGold < 0 ? 'text-error' : '');
+  cashEl.textContent = 'نقدي: ' + fmtMoney(Math.abs(totalCash));
+  cashEl.className = totalCash > 0 ? 'text-success' : (totalCash < 0 ? 'text-error' : '');
 }
 
 function toggleAddTraderForm() {
@@ -468,8 +521,8 @@ function renderTraders() {
           </div>
         </div>
         <div class="flex gap-4 text-[12px] font-data-mono mt-1">
-          <span class="${goldBal > 0 ? 'text-error' : 'text-success'}">ذهب: ${fmt(Math.abs(goldBal))} غ</span>
-          <span class="${feeBal > 0 ? 'text-error' : 'text-success'}">نقدي: ${fmt(Math.abs(feeBal))} د.إ</span>
+          <span class="${goldBal > 0 ? 'text-success' : (goldBal < 0 ? 'text-error' : '')}">ذهب: ${fmt(Math.abs(goldBal))} غ</span>
+          <span class="${feeBal > 0 ? 'text-success' : (feeBal < 0 ? 'text-error' : '')}">نقدي: ${fmtMoney(Math.abs(feeBal))}</span>
         </div>
       </div>`;
   }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد تجار مطابقون. يُضافون تلقائياً عند إنشاء أول فاتورة شراء منهم.</p>';
@@ -493,10 +546,10 @@ function showTraderDetail(traderId) {
   const feeBal = traderFeeBalance(traderId);
   const goldEl = document.getElementById('detail-gold-balance');
   goldEl.textContent = fmt(Math.abs(goldBal)) + ' غ';
-  goldEl.className = 'font-bold text-[16px] font-data-mono ' + (goldBal > 0 ? 'text-error' : 'text-success');
+  goldEl.className = 'font-bold text-[16px] font-data-mono ' + (goldBal > 0 ? 'text-success' : (goldBal < 0 ? 'text-error' : ''));
   const feeEl = document.getElementById('detail-fee-balance');
-  feeEl.textContent = fmt(Math.abs(feeBal)) + ' د.إ';
-  feeEl.className = 'font-bold text-[16px] font-data-mono ' + (feeBal > 0 ? 'text-error' : 'text-success');
+  feeEl.textContent = fmtMoney(Math.abs(feeBal));
+  feeEl.className = 'font-bold text-[16px] font-data-mono ' + (feeBal > 0 ? 'text-success' : (feeBal < 0 ? 'text-error' : ''));
 
   const moves = movementsByTrader[traderId] || [];
   const listEl = document.getElementById('movements-list');
@@ -517,7 +570,7 @@ function showTraderDetail(traderId) {
       ? `${m.weight_grams}غ قائم${m.accounting_weight_grams ? ` / ${m.accounting_weight_grams}غ محاسبي` : ''} عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)`
       : (m.weight_grams ? `${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : '');
     const feeLine = (m.fab_fee_amount && Number(m.fab_fee_amount) > 0)
-      ? ` ${weightLine ? '+' : ''}${isStockGiven ? `مصنعية (${fmt(m.fab_fee_per_gram)} د.إ/غ)` : (diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية')} ${fmt(m.fab_fee_amount)} د.إ`
+      ? ` ${weightLine ? '+' : ''}${isStockGiven ? `مصنعية (${fmtMoney(m.fab_fee_per_gram)}/غ)` : (diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية')} ${fmtMoney(m.fab_fee_amount)}`
       : '';
     return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
@@ -562,7 +615,10 @@ function recomputeGiveStockPreview() {
   const accounting = parseFloat(document.getElementById('gs-accounting-weight').value) || 0;
   const perGram = parseFloat(document.getElementById('gs-fab-per-gram').value) || 0;
   document.getElementById('gs-preview-gold').textContent = fmt(gross * (karat / 24)) + ' غ';
-  document.getElementById('gs-preview-fee').textContent = fmt(accounting * perGram) + ' د.إ';
+  // perGram is typed in whichever currency is currently selected, so the
+  // preview total is shown in that same currency (not converted via fmtMoney,
+  // which expects an AED-based amount).
+  document.getElementById('gs-preview-fee').textContent = fmt(accounting * perGram) + ' ' + currencyUnitLabel();
 }
 
 async function submitGiveStock() {
@@ -572,7 +628,9 @@ async function submitGiveStock() {
   const gross = parseFloat(document.getElementById('gs-gross-weight').value);
   const karat = parseInt(document.getElementById('gs-karat').value, 10);
   const accounting = parseFloat(document.getElementById('gs-accounting-weight').value);
-  const perGram = parseFloat(document.getElementById('gs-fab-per-gram').value) || 0;
+  // Convert the entered per-gram rate from the display currency into AED,
+  // since trader_movements always stores amounts in AED as the base currency.
+  const perGramAed = toAed(parseFloat(document.getElementById('gs-fab-per-gram').value) || 0);
   const notes = document.getElementById('gs-notes').value.trim();
 
   if (!gross || gross <= 0) {
@@ -594,8 +652,8 @@ async function submitGiveStock() {
     karat: karat,
     gold_24k_equivalent: +(gross * (karat / 24)).toFixed(3),
     accounting_weight_grams: accounting,
-    fab_fee_per_gram: perGram,
-    fab_fee_amount: +(accounting * perGram).toFixed(2),
+    fab_fee_per_gram: perGramAed,
+    fab_fee_amount: +(accounting * perGramAed).toFixed(2),
     source: 'stock_given',
     notes: notes || 'إعطاء بضاعة للتاجر'
   };
@@ -674,7 +732,7 @@ async function submitSettlement() {
       weight_grams: 0,
       karat: null,
       gold_24k_equivalent: 0,
-      fab_fee_amount: amount,
+      fab_fee_amount: toAed(amount),
       notes: notes || (diamondsEnabled ? 'تسوية نقدية (مصنعية/ألماس)' : 'تسوية مصنعية نقدية')
     };
   }
