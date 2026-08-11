@@ -63,6 +63,11 @@
 
 <div id="page-content" class="hidden">
 
+<div id="locked-banner" class="hidden bg-error-container text-on-error-container rounded-xl p-4 mb-4 text-[12.5px] leading-5 flex items-start gap-2">
+<span class="material-symbols-outlined" style="font-size:18px;">lock</span>
+<span>انتهى اشتراك المتجر. الرجاء التواصل مع الإدارة لتجديد الاشتراك لاستعادة كامل الصلاحيات.</span>
+</div>
+
 <!-- Current status -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-5 mb-6">
 <div class="flex items-center justify-between mb-3">
@@ -78,6 +83,21 @@
 </div>
 </section>
 
+<!-- Usage vs plan limits -->
+<section id="usage-section" class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-5 mb-6">
+<span class="font-label-md text-label-md text-on-surface-variant block mb-3">الاستخدام مقابل حدود الخطة</span>
+<div class="mb-3">
+<div class="flex justify-between text-[12.5px] mb-1"><span>الموظفون</span><span id="staff-usage-text" class="font-semibold"></span></div>
+<div class="h-2 rounded-full bg-surface-container-high overflow-hidden"><div id="staff-usage-bar" class="h-full gold-accent" style="width:0%"></div></div>
+<p id="staff-usage-note" class="text-[11px] text-on-surface-variant mt-1"></p>
+</div>
+<div id="branch-usage-wrap" class="hidden">
+<div class="flex justify-between text-[12.5px] mb-1"><span>الفروع</span><span id="branch-usage-text" class="font-semibold"></span></div>
+<div class="h-2 rounded-full bg-surface-container-high overflow-hidden"><div id="branch-usage-bar" class="h-full gold-accent" style="width:0%"></div></div>
+<p id="branch-usage-note" class="text-[11px] text-on-surface-variant mt-1"></p>
+</div>
+</section>
+
 <!-- Plans comparison -->
 <section class="mb-6">
 <h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">الخطط المتاحة</h3>
@@ -85,28 +105,30 @@
 </section>
 
 <div id="admin-panel" class="hidden bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-6">
-<p class="text-[12.5px] font-semibold text-on-surface mb-3">تحكم إداري بالاشتراك</p>
+<p class="text-[12.5px] font-semibold text-on-surface mb-3">تسجيل دفعة اشتراك (إدارة المنصة)</p>
 <div class="flex flex-col gap-3">
 <div>
-<label class="block text-[11px] text-on-surface-variant mb-1">الخطة</label>
+<label class="block text-[11px] text-on-surface-variant mb-1">مدة التجديد (أشهر)</label>
+<select id="admin-months-select" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest">
+<option value="1">شهر واحد</option>
+<option value="12" selected>سنة كاملة</option>
+</select>
+</div>
+<div>
+<label class="block text-[11px] text-on-surface-variant mb-1">الخطة عند التجديد</label>
 <select id="admin-plan-select" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest"></select>
 </div>
 <div>
-<label class="block text-[11px] text-on-surface-variant mb-1">حالة الاشتراك</label>
-<select id="admin-status-select" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest">
-<option value="trialing">تجريبي</option>
-<option value="active">فعّال</option>
-<option value="past_due">متأخر بالدفع</option>
-<option value="canceled">ملغى</option>
-</select>
+<label class="block text-[11px] text-on-surface-variant mb-1">مرجع الدفعة (اختياري)</label>
+<input id="admin-payment-ref" type="text" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest" placeholder="رقم تحويل بنكي، إيصال..."/>
 </div>
-<button id="admin-save-btn" class="h-12 gold-accent text-white rounded-lg font-semibold text-[13px] active:scale-[0.98] transition-all">حفظ التغييرات</button>
+<button id="admin-save-btn" class="h-12 gold-accent text-white rounded-lg font-semibold text-[13px] active:scale-[0.98] transition-all">تسجيل الدفعة وتفعيل الاشتراك</button>
 </div>
 </div>
 
 <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-8 text-[12px] text-on-surface-variant leading-5">
 <span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">info</span>
-الدفع الإلكتروني للاشتراك سيُفعّل قريباً عبر شركة الدفع/النتورك. حالياً تُدار حالة الاشتراك يدوياً من الإدارة.
+الدفع الإلكتروني للاشتراك سيُفعّل قريباً عبر شركة الدفع/النتورك. حالياً تُسجَّل الدفعات يدوياً من فريق المنصة بعد استلامها، وترقيات عدد الموظفين تتم تلقائياً عند تجاوز الحد.
 </div>
 
 </div>
@@ -118,6 +140,8 @@
 const STATUS_LABELS = {
   trialing: { text: 'تجريبي', class: 'bg-secondary-container text-on-secondary-container' },
   active: { text: 'فعّال', class: 'bg-success-container text-success' },
+  grace: { text: 'انتهت المدة - فترة سماح', class: 'bg-error-container text-on-error-container' },
+  expired: { text: 'منتهي', class: 'bg-error-container text-on-error-container' },
   past_due: { text: 'متأخر بالدفع', class: 'bg-error-container text-on-error-container' },
   canceled: { text: 'ملغى', class: 'bg-surface-container-high text-on-surface-variant' }
 };
@@ -161,21 +185,49 @@ function renderPlans(plans, currentPlanId) {
         <p class="font-headline-md text-[17px] font-bold text-primary">${plan.name_ar}</p>
         ${isActive ? '<span class="text-[10px] font-bold text-secondary bg-secondary-container px-2 py-0.5 rounded-full">خطتك الحالية</span>' : ''}
       </div>
-      <p class="text-[13px] text-on-surface-variant mb-3">${plan.price_monthly} / شهرياً &nbsp;·&nbsp; ${plan.price_yearly} / سنوياً</p>
+      <p class="text-[13px] text-on-surface-variant mb-3">${plan.is_custom ? 'تسعير مخصص' : '$' + plan.price_yearly + ' / سنوياً'}</p>
       <div class="flex flex-col gap-1.5 pt-3 border-t border-outline-variant">${features}</div>
-      ${plan.max_staff ? `<p class="text-[11px] text-on-surface-variant mt-3">حتى ${plan.max_staff} موظفين</p>` : `<p class="text-[11px] text-on-surface-variant mt-3">عدد موظفين غير محدود</p>`}
+      <div class="pt-3 mt-3 border-t border-outline-variant text-[11px] text-on-surface-variant flex flex-col gap-1">
+        ${plan.is_custom ? '<p>عدد فروع وموظفين غير محدود (تواصل مع المبيعات)</p>' :
+          `<p>${plan.included_staff} موظفين ضمن الخطة${plan.extra_staff_price ? ` (+$${plan.extra_staff_price}/موظف إضافي)` : ''}</p>
+           <p>${plan.included_branches} فرع${plan.max_branches && plan.max_branches > 1 ? ` (حتى ${plan.max_branches} فروع بـ $${plan.extra_branch_price}/فرع)` : ''}</p>`}
+      </div>
     </div>`;
   }).join('');
+}
+
+function usageBar(barEl, textEl, noteEl, current, included, extraPrice, extraLabel, unlimited) {
+  if (unlimited) {
+    barEl.style.width = '100%';
+    textEl.textContent = current + ' / غير محدود';
+    noteEl.textContent = '';
+    return;
+  }
+  const pct = included ? Math.min(100, Math.round((current / included) * 100)) : 0;
+  barEl.style.width = pct + '%';
+  barEl.classList.toggle('bg-error', current > included);
+  textEl.textContent = current + ' / ' + (included ?? '—');
+  if (included != null && current > included && extraPrice != null) {
+    noteEl.textContent = `تجاوزت العدد المشمول بـ ${current - included} — تُحتسب ${extraPrice}$ ${extraLabel} إضافي حتى الترقية التلقائية`;
+  } else {
+    noteEl.textContent = '';
+  }
 }
 
 async function load() {
   const session = await requireGoldMindSession();
   if (!session) return;
 
+  const status = await goldMindSubscriptionGuard();
+  if (new URLSearchParams(window.location.search).get('locked') === '1') {
+    document.getElementById('locked-banner').classList.remove('hidden');
+  }
+
   const { data: me } = await goldmindClient
     .from('staff').select('role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).single();
 
-  const canManageSub = me && (me.role === 'owner' || (me.permissions && me.permissions.manage_subscription === true));
+  const { data: isPlatformAdmin } = await goldmindClient
+    .from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
 
   const { data: plans, error: plansErr } = await goldmindClient
     .from('plans').select('*').eq('is_active', true).order('sort_order');
@@ -190,7 +242,7 @@ async function load() {
     return;
   }
 
-  const statusInfo = STATUS_LABELS[sub.status] || { text: sub.status, class: 'bg-surface-container-high' };
+  const statusInfo = STATUS_LABELS[status] || STATUS_LABELS[sub.status] || { text: status || sub.status, class: 'bg-surface-container-high' };
   const badge = document.getElementById('status-badge');
   badge.textContent = statusInfo.text;
   badge.className = 'text-[11px] font-semibold px-3 py-1 rounded-full ' + statusInfo.class;
@@ -203,29 +255,48 @@ async function load() {
 
   renderPlans(plans, sub.plan_id);
 
-  if (canManageSub) {
+  // Usage vs. plan limits
+  const { data: staffLimit } = await goldmindClient.rpc('check_staff_limit', { p_store_id: GOLDMIND_STORE_ID });
+  const sl = staffLimit && staffLimit[0];
+  if (sl) {
+    usageBar(
+      document.getElementById('staff-usage-bar'), document.getElementById('staff-usage-text'),
+      document.getElementById('staff-usage-note'), sl.current_count, sl.included_count, sl.extra_price, 'شهرياً لكل موظف', false
+    );
+  }
+
+  const { data: storeRow } = await goldmindClient.from('stores').select('organization_id').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  if (storeRow && storeRow.organization_id) {
+    const { data: branchLimit } = await goldmindClient.rpc('check_branch_limit', { p_organization_id: storeRow.organization_id });
+    const bl = branchLimit && branchLimit[0];
+    if (bl) {
+      document.getElementById('branch-usage-wrap').classList.remove('hidden');
+      usageBar(
+        document.getElementById('branch-usage-bar'), document.getElementById('branch-usage-text'),
+        document.getElementById('branch-usage-note'), bl.current_count, bl.max_count, bl.extra_price, 'سنوياً لكل فرع', bl.max_count == null
+      );
+    }
+  }
+
+  if (isPlatformAdmin) {
     const panel = document.getElementById('admin-panel');
     panel.classList.remove('hidden');
     const planSelect = document.getElementById('admin-plan-select');
     planSelect.innerHTML = plans.map(p => `<option value="${p.id}" ${p.id === sub.plan_id ? 'selected' : ''}>${p.name_ar}</option>`).join('');
-    document.getElementById('admin-status-select').value = sub.status;
 
     document.getElementById('admin-save-btn').addEventListener('click', async () => {
       const btn = document.getElementById('admin-save-btn');
       btn.disabled = true;
       btn.textContent = 'جارِ الحفظ...';
-      const { error } = await goldmindClient
-        .from('subscriptions')
-        .update({
-          plan_id: planSelect.value,
-          status: document.getElementById('admin-status-select').value,
-          updated_at: new Date().toISOString()
-        })
-        .eq('store_id', GOLDMIND_STORE_ID);
+      const months = parseInt(document.getElementById('admin-months-select').value, 10);
+      const paymentRef = document.getElementById('admin-payment-ref').value.trim() || null;
+      const { error } = await goldmindClient.rpc('record_subscription_payment', {
+        p_store_id: GOLDMIND_STORE_ID, p_months: months, p_payment_ref: paymentRef, p_plan_id: planSelect.value
+      });
       btn.disabled = false;
-      btn.textContent = 'حفظ التغييرات';
+      btn.textContent = 'تسجيل الدفعة وتفعيل الاشتراك';
       if (error) { showToast('خطأ: ' + error.message, true); return; }
-      showToast('تم تحديث الاشتراك');
+      showToast('تم تسجيل الدفعة وتفعيل الاشتراك');
       load();
     });
   }
