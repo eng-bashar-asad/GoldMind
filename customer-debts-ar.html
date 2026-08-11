@@ -146,7 +146,13 @@
 <p class="text-error text-[12px] hidden mt-2" id="settle-error"></p>
 </div>
 
-<h3 class="font-semibold text-[13px] mt-2">سجل الحركات</h3>
+<div class="flex items-center justify-between gap-2 mt-2">
+<h3 class="font-semibold text-[13px]">سجل الحركات</h3>
+<div class="flex items-center gap-1.5">
+<input id="movementsMonthFilter" type="month" onchange="renderMovementsList()" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] bg-surface-container-lowest font-data-mono" dir="ltr"/>
+<button onclick="clearMovementsMonthFilter()" id="clearMonthFilterBtn" class="hidden h-9 px-2 text-[11px] text-secondary font-semibold">الكل</button>
+</div>
+</div>
 <div id="movements-list" class="flex flex-col gap-2"></div>
 <p id="empty-movements" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات مسجّلة بعد.</p>
 
@@ -286,12 +292,28 @@ function showCustomerDetail(customerId) {
   balEl.textContent = fmt(Math.abs(bal));
   balEl.className = 'font-bold text-[18px] font-data-mono ' + (bal > 0 ? 'text-error' : 'text-success');
 
-  const moves = movementsByCustomer[customerId] || [];
+  document.getElementById('movementsMonthFilter').value = '';
+  document.getElementById('clearMonthFilterBtn').classList.add('hidden');
+  renderMovementsList();
+}
+
+function clearMovementsMonthFilter() {
+  document.getElementById('movementsMonthFilter').value = '';
+  renderMovementsList();
+}
+
+function renderMovementsList() {
+  const monthVal = document.getElementById('movementsMonthFilter').value; // 'YYYY-MM' or ''
+  document.getElementById('clearMonthFilterBtn').classList.toggle('hidden', !monthVal);
+
+  const allMoves = movementsByCustomer[currentCustomerId] || [];
+  const moves = monthVal ? allMoves.filter(m => (m.created_at || '').slice(0, 7) === monthVal) : allMoves;
   const listEl = document.getElementById('movements-list');
   const emptyEl = document.getElementById('empty-movements');
 
   if (moves.length === 0) {
     listEl.innerHTML = '';
+    emptyEl.textContent = monthVal ? 'لا توجد حركات بهذا الشهر.' : 'لا توجد حركات مسجّلة بعد.';
     emptyEl.classList.remove('hidden');
     return;
   }
