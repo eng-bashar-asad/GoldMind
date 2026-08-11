@@ -91,11 +91,6 @@
 <div class="h-2 rounded-full bg-surface-container-high overflow-hidden"><div id="staff-usage-bar" class="h-full gold-accent" style="width:0%"></div></div>
 <p id="staff-usage-note" class="text-[11px] text-on-surface-variant mt-1"></p>
 </div>
-<div id="branch-usage-wrap" class="hidden">
-<div class="flex justify-between text-[12.5px] mb-1"><span>الفروع</span><span id="branch-usage-text" class="font-semibold"></span></div>
-<div class="h-2 rounded-full bg-surface-container-high overflow-hidden"><div id="branch-usage-bar" class="h-full gold-accent" style="width:0%"></div></div>
-<p id="branch-usage-note" class="text-[11px] text-on-surface-variant mt-1"></p>
-</div>
 </section>
 
 <!-- Plans comparison -->
@@ -187,10 +182,9 @@ function renderPlans(plans, currentPlanId) {
       </div>
       <p class="text-[13px] text-on-surface-variant mb-3">${plan.is_custom ? 'تسعير مخصص' : '$' + plan.price_yearly + ' / سنوياً'}</p>
       <div class="flex flex-col gap-1.5 pt-3 border-t border-outline-variant">${features}</div>
-      <div class="pt-3 mt-3 border-t border-outline-variant text-[11px] text-on-surface-variant flex flex-col gap-1">
-        ${plan.is_custom ? '<p>عدد فروع وموظفين غير محدود (تواصل مع المبيعات)</p>' :
-          `<p>${plan.included_staff} موظفين ضمن الخطة${plan.extra_staff_price ? ` (+$${plan.extra_staff_price}/موظف إضافي)` : ''}</p>
-           <p>${plan.included_branches} فرع${plan.max_branches && plan.max_branches > 1 ? ` (حتى ${plan.max_branches} فروع بـ $${plan.extra_branch_price}/فرع)` : ''}</p>`}
+      <div class="pt-3 mt-3 border-t border-outline-variant text-[11px] text-on-surface-variant">
+        ${plan.is_custom ? '<p>عدد موظفين غير محدود (تواصل مع المبيعات)</p>' :
+          `<p>${plan.included_staff} موظفين ضمن الخطة${plan.extra_staff_price ? ` (+$${plan.extra_staff_price}/موظف إضافي)` : ''}</p>`}
       </div>
     </div>`;
   }).join('');
@@ -255,6 +249,17 @@ async function load() {
 
   renderPlans(plans, sub.plan_id);
 
+  const { data: storeRow } = await goldmindClient.from('stores').select('organization_id').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  if (storeRow && storeRow.organization_id) {
+    const { data: branchCount } = await goldmindClient.rpc('get_branch_count', { p_organization_id: storeRow.organization_id });
+    if (branchCount && branchCount > 1) {
+      const note = document.createElement('div');
+      note.className = 'bg-surface-container-low border border-outline-variant rounded-xl p-3 mb-6 text-[11.5px] text-on-surface-variant leading-5';
+      note.textContent = `هذا الفرع أحد ${branchCount} فروع مرتبطة بنفس المنشأة، ولكل فرع اشتراكه وفوترته الضريبية المستقلة.`;
+      document.getElementById('usage-section').insertAdjacentElement('afterend', note);
+    }
+  }
+
   // Usage vs. plan limits
   const { data: staffLimit } = await goldmindClient.rpc('check_staff_limit', { p_store_id: GOLDMIND_STORE_ID });
   const sl = staffLimit && staffLimit[0];
@@ -263,19 +268,6 @@ async function load() {
       document.getElementById('staff-usage-bar'), document.getElementById('staff-usage-text'),
       document.getElementById('staff-usage-note'), sl.current_count, sl.included_count, sl.extra_price, 'شهرياً لكل موظف', false
     );
-  }
-
-  const { data: storeRow } = await goldmindClient.from('stores').select('organization_id').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-  if (storeRow && storeRow.organization_id) {
-    const { data: branchLimit } = await goldmindClient.rpc('check_branch_limit', { p_organization_id: storeRow.organization_id });
-    const bl = branchLimit && branchLimit[0];
-    if (bl) {
-      document.getElementById('branch-usage-wrap').classList.remove('hidden');
-      usageBar(
-        document.getElementById('branch-usage-bar'), document.getElementById('branch-usage-text'),
-        document.getElementById('branch-usage-note'), bl.current_count, bl.max_count, bl.extra_price, 'سنوياً لكل فرع', bl.max_count == null
-      );
-    }
   }
 
   if (isPlatformAdmin) {
