@@ -743,6 +743,20 @@ async function submitSettlement() {
 
   const { error } = await goldmindClient.from('trader_movements').insert(movement);
 
+  if (!error && settleMode === 'cash') {
+    // Real cash leaving the register right now -> reflect it in the daily
+    // cash box, same as customer debt settlements already do.
+    const trader = traders.find(t => t.id === currentTraderId);
+    await goldmindClient.from('cash_movements').insert({
+      store_id: GOLDMIND_STORE_ID,
+      box: 'main',
+      direction: 'out',
+      amount: movement.fab_fee_amount,
+      description: 'تسوية مصنعية نقدية - ' + (trader ? trader.name : 'تاجر'),
+      created_by: GOLDMIND_STAFF_ID
+    });
+  }
+
   btn.disabled = false;
   btn.textContent = 'حفظ التسوية';
 
