@@ -247,7 +247,7 @@
 </div>
 </div>
 
-<div class="grid grid-cols-3 gap-3">
+<div class="grid grid-cols-2 gap-3">
 <button class="flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95" id="pay-cash" onclick="selectPayment('cash')">
 <span class="material-symbols-outlined mb-1">payments</span>
 <span class="font-label-md text-label-md">نقدي</span>
@@ -256,10 +256,26 @@
 <span class="material-symbols-outlined mb-1">credit_card</span>
 <span class="font-label-md text-label-md">فيزا / بنك</span>
 </button>
+<button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95" id="pay-mixed" onclick="selectPayment('mixed')">
+<span class="material-symbols-outlined mb-1">call_split</span>
+<span class="font-label-md text-label-md">جزئي (نقدي + فيزا)</span>
+</button>
 <button class="flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95" id="pay-credit" onclick="selectPayment('credit')">
 <span class="material-symbols-outlined mb-1">receipt_long</span>
 <span class="font-label-md text-label-md">دين</span>
 </button>
+</div>
+
+<div id="mixed-payment-fields" class="hidden flex-col gap-3 mt-3 bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<div>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">المبلغ نقداً</label>
+<input id="mixed-cash-amount" type="number" step="0.01" oninput="onMixedAmountInput()" class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono"/>
+</div>
+<div>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">المبلغ فيزا / بنك</label>
+<input id="mixed-bank-amount" type="number" step="0.01" oninput="onMixedAmountInput()" class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono"/>
+</div>
+<p class="text-[12px] font-semibold" id="mixed-remaining-note"></p>
 </div>
 
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
@@ -506,12 +522,41 @@
         selectedPaymentMethod = mode;
         const cashBtn = document.getElementById('pay-cash');
         const bankBtn = document.getElementById('pay-bank');
+        const mixedBtn = document.getElementById('pay-mixed');
         const creditBtn = document.getElementById('pay-credit');
         const active = 'flex flex-col items-center justify-center p-4 rounded-xl border border-primary bg-primary text-white transition-all active:scale-95';
         const inactive = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
         cashBtn.className = mode === 'cash' ? active : inactive;
         bankBtn.className = mode === 'bank' ? active : inactive;
+        mixedBtn.className = mode === 'mixed' ? active : inactive;
         creditBtn.className = mode === 'credit' ? active : inactive;
+
+        const mixedFields = document.getElementById('mixed-payment-fields');
+        mixedFields.classList.toggle('hidden', mode !== 'mixed');
+        mixedFields.classList.toggle('flex', mode === 'mixed');
+        if (mode === 'mixed') onMixedAmountInput();
+    }
+
+    function getMixedAmounts() {
+        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        const cashAmt = parseFloat(document.getElementById('mixed-cash-amount').value) || 0;
+        const bankAmt = parseFloat(document.getElementById('mixed-bank-amount').value) || 0;
+        return { total, cashAmt, bankAmt, remaining: +(total - cashAmt - bankAmt).toFixed(2) };
+    }
+
+    function onMixedAmountInput() {
+        const { remaining } = getMixedAmounts();
+        const note = document.getElementById('mixed-remaining-note');
+        if (Math.abs(remaining) < 0.01) {
+            note.textContent = 'المبلغان يغطّيان الإجمالي بالكامل';
+            note.className = 'text-[12px] font-semibold text-success';
+        } else if (remaining > 0) {
+            note.textContent = 'المتبقي غير مُدخل: ' + remaining.toFixed(2);
+            note.className = 'text-[12px] font-semibold text-error';
+        } else {
+            note.textContent = 'المبلغ المُدخل أكبر من الإجمالي بـ ' + Math.abs(remaining).toFixed(2);
+            note.className = 'text-[12px] font-semibold text-error';
+        }
     }
 
     // ---------- Customer search ----------
@@ -761,6 +806,19 @@
 
         const { data: { session } } = await goldmindClient.auth.getSession();
         const total = cart.reduce((sum, item) => sum + item.price, 0);
+
+        let mixedCashAmt = 0, mixedBankAmt = 0;
+        if (selectedPaymentMethod === 'mixed') {
+            const m = getMixedAmounts();
+            if (Math.abs(m.remaining) >= 0.01) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'حفظ الفاتورة';
+                showMessage('مجموع المبلغ النقدي والفيزا لازم يساوي إجمالي الفاتورة بالضبط', true);
+                return;
+            }
+            mixedCashAmt = m.cashAmt;
+            mixedBankAmt = m.bankAmt;
+        }
         const { data: invoiceNumber, error: numError } = await goldmindClient.rpc('next_invoice_number', { target_store_id: GOLDMIND_STORE_ID, prefix: 'INV' });
         if (numError) {
             saveBtn.disabled = false;
@@ -785,6 +843,8 @@
                 type: 'sale',
                 customer_id: selectedCustomer.id,
                 payment_method: selectedPaymentMethod,
+                cash_paid_amount: selectedPaymentMethod === 'mixed' ? mixedCashAmt : null,
+                bank_paid_amount: selectedPaymentMethod === 'mixed' ? mixedBankAmt : null,
                 fabrication_fees: 0,
                 vat_amount: 0,
                 total_amount: total,
@@ -863,14 +923,17 @@
             }
         }
 
-        // Cash/bank sale -> record as a cash-in movement so the daily cash box reflects it
-        if (selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'bank') {
+        // Cash/bank/mixed sale -> record as a cash-in movement so the daily cash box reflects it
+        if (selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'bank' || selectedPaymentMethod === 'mixed') {
+            const desc = selectedPaymentMethod === 'mixed'
+                ? `تحصيل فاتورة بيع ${invoiceNumber} (جزئي: ${mixedCashAmt.toFixed(2)} نقدي + ${mixedBankAmt.toFixed(2)} فيزا/بنك)`
+                : 'تحصيل فاتورة بيع ' + invoiceNumber;
             await goldmindClient.from('cash_movements').insert({
                 store_id: GOLDMIND_STORE_ID,
                 box: 'main',
                 direction: 'in',
                 amount: total,
-                description: 'تحصيل فاتورة بيع ' + invoiceNumber,
+                description: desc,
                 created_by: GOLDMIND_STAFF_ID,
                 invoice_id: invoiceRow.id
             });

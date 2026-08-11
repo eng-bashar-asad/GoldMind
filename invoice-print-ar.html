@@ -361,8 +361,11 @@
         // ---- Invoice meta ----
         document.getElementById('inv-number').textContent = invoice.invoice_number || invoice.id;
         document.getElementById('inv-date').textContent = new Date(invoice.created_at).toLocaleDateString('ar-AE-u-nu-latn');
-        const paymentLabels = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين' };
+        const paymentLabels = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'جزئي (نقدي + فيزا)' };
         document.getElementById('inv-payment').textContent = paymentLabels[invoice.payment_method] || invoice.payment_method || '';
+        if (invoice.payment_method === 'mixed' && (invoice.cash_paid_amount != null || invoice.bank_paid_amount != null)) {
+            document.getElementById('inv-payment').textContent += ` (نقدي ${Number(invoice.cash_paid_amount || 0).toFixed(2)} + فيزا/بنك ${Number(invoice.bank_paid_amount || 0).toFixed(2)})`;
+        }
         document.getElementById('inv-creator').textContent = creator && creator.full_name ? creator.full_name : '—';
 
         if (invoice.status === 'cancelled') {
