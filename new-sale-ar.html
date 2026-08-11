@@ -61,6 +61,13 @@
                       "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
                       "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
                       "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}]
+              },
+              "spacing": {
+                      "margin-desktop": "40px",
+                      "gutter": "24px",
+                      "unit": "4px",
+                      "margin-mobile": "16px",
+                      "container-max": "1440px"
               }
             },
           },
@@ -80,14 +87,54 @@
     </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
-<body class="bg-background font-body-md text-on-background antialiased pb-24">
-<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-4 w-full h-16 sticky top-0 z-50 border-b border-outline-variant">
+<body class="bg-background font-body-md text-on-background antialiased min-h-screen flex flex-col md:flex-row-reverse overflow-x-hidden">
+<!-- Navigation Drawer (Desktop) -->
+<aside class="hidden md:flex flex-col h-full fixed right-0 top-0 w-[280px] z-50 bg-surface-container-lowest border-l border-outline-variant rtl overflow-y-auto">
+<div class="p-8 flex flex-col gap-6">
 <div class="flex items-center gap-3">
-<button onclick="window.location.href='index-ar.html'" class="material-symbols-outlined cursor-pointer active:opacity-80">arrow_forward</button>
+<div class="w-10 h-10 bg-primary flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">stars</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">جولد مايند</h1>
+</div>
+</div>
+<nav class="flex flex-col gap-1 mt-8">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="index-ar.html">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">لوحة التحكم</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="inventory-list-ar.html">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-md text-label-md">المخزن</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-primary font-bold border-r-4 border-secondary bg-surface-container transition-all cursor-pointer" href="new-sale-ar.html">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">receipt_long</span>
+<span class="font-label-md text-label-md">الفواتير</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="ledger-ar.html">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-label-md text-label-md">السجلات</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="settings-ar.html">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">الإعدادات</span>
+</a>
+</nav>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:mr-[280px] pb-24 md:pb-8 flex flex-col">
+<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full h-16 sticky top-0 z-40 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<button onclick="window.location.href='index-ar.html'" class="md:hidden material-symbols-outlined cursor-pointer active:opacity-80">arrow_forward</button>
 <h1 class="font-headline-md text-headline-md font-bold text-primary">بيع جديد</h1>
 </div>
 </header>
-<main class="max-w-md lg:max-w-3xl mx-auto px-4 pt-6 space-y-6">
+<div class="px-margin-mobile md:px-margin-desktop py-6 md:py-8 max-w-container-max mx-auto w-full">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+<!-- Item-entry column -->
+<div class="lg:col-span-2 flex flex-col gap-6">
 
 <!-- Client Info Section -->
 <section class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm">
@@ -215,6 +262,10 @@
 <div id="diamond-search-results" class="space-y-2"></div>
 </section>
 
+</div>
+<!-- Cart + checkout column (sticky on desktop) -->
+<div class="lg:col-span-1 flex flex-col gap-6 lg:sticky lg:top-24">
+
 <!-- Cart / Invoice Items Table -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
 <div class="px-4 py-3 bg-secondary">
@@ -285,9 +336,13 @@
                 حفظ الفاتورة
             </button>
 </section>
+
+</div>
+</div>
+</div>
 </main>
 
-<nav class="fixed bottom-0 w-full flex justify-around items-center px-4 py-2 bg-surface-container-lowest border-t border-outline-variant shadow-sm z-50">
+<nav class="md:hidden fixed bottom-0 w-full flex justify-around items-center px-4 py-2 bg-surface-container-lowest border-t border-outline-variant shadow-sm z-50">
 <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="index-ar.html">
 <span class="material-symbols-outlined">dashboard</span>
 <span class="font-label-md text-label-md">لوحة التحكم</span>
