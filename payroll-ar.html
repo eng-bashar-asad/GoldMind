@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الرواتب والموارد البشرية | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .settle-tab-btn.active { background: #000; color: #fff; }
+    .settle-tab-btn:not(.active) { color: #45464d; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">الرواتب والموارد البشرية</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية إدارة الرواتب.</div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-5">
+
+<div class="grid grid-cols-2 gap-3">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<p class="text-[11px] text-on-surface-variant mb-1">إجمالي الرواتب الشهرية</p>
+<p class="font-bold text-[18px] font-data-mono" id="stat-total-salary">0.00</p>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<p class="text-[11px] text-on-surface-variant mb-1">عدد الموظفين على راتب</p>
+<p class="font-bold text-[18px] font-data-mono" id="stat-staff-count">0</p>
+</div>
+</div>
+
+<div>
+<h2 class="font-semibold text-[13px] mb-2 px-1">الموظفون</h2>
+<div class="flex flex-col gap-3" id="staff-list"></div>
+</div>
+
+<div>
+<h2 class="font-semibold text-[13px] mb-2 px-1">سجل الدفعات الأخيرة</h2>
+<div class="flex flex-col gap-2" id="payments-history"></div>
+<p class="hidden text-center text-on-surface-variant text-[12px] py-6" id="history-empty">لا توجد دفعات مسجّلة بعد.</p>
+</div>
+
+</div>
+</main>
+
+<script>
+let currencyLabel = 'AED';
+let staffRows = [];
+let salaryByStaff = {};
+let lastPaymentByStaff = {};
+
+function fmt(n) {
+  return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function currentPeriod() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+function periodLabel(period) {
+  if (!period) return '—';
+  const [y, m] = period.split('-');
+  const months = ['يناير','فبراير','مارس','أبريل','مايو','يونيو','يوليو','أغسطس','سبتمبر','أكتوبر','نوفمبر','ديسمبر'];
+  const idx = parseInt(m, 10) - 1;
+  return (months[idx] || m) + ' ' + y;
+}
+
+async function loadStore() {
+  const { data } = await goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  currencyLabel = (data && data.currency) || 'AED';
+}
+
+async function findOrCreatePayrollCategory() {
+  const { data: existing } = await goldmindClient
+    .from('expense_categories').select('id').eq('store_id', GOLDMIND_STORE_ID).eq('name', 'رواتب').maybeSingle();
+  if (existing) return existing.id;
+  const { data: created, error } = await goldmindClient
+    .from('expense_categories').insert({ store_id: GOLDMIND_STORE_ID, name: 'رواتب' }).select().single();
+  if (error) return null;
+  return created.id;
+}
+
+function toggleGivePayForm(staffId) {
+  document.querySelectorAll('[id^="pay-form-"]').forEach(el => {
+    if (el.id !== 'pay-form-' + staffId) el.classList.add('hidden');
+  });
+  document.getElementById('pay-form-' + staffId).classList.toggle('hidden');
+}
+
+function recomputePayPreview(staffId) {
+  const base = parseFloat(document.getElementById('pf-base-' + staffId).value) || 0;
+  const bonus = parseFloat(document.getElementById('pf-bonus-' + staffId).value) || 0;
+  const deduction = parseFloat(document.getElementById('pf-deduction-' + staffId).value) || 0;
+  const net = base + bonus - deduction;
+  document.getElementById('pf-net-' + staffId).textContent = fmt(net) + ' ' + currencyLabel;
+}
+
+async function saveSalary(staffId) {
+  const input = document.getElementById('salary-input-' + staffId);
+  const amount = parseFloat(input.value) || 0;
+  const { error } = await goldmindClient.from('staff_salaries').upsert({
+    store_id: GOLDMIND_STORE_ID,
+    staff_id: staffId,
+    monthly_salary: amount,
+    updated_by: GOLDMIND_STAFF_ID,
+    updated_at: new Date().toISOString()
+  }, { onConflict: 'store_id,staff_id' });
+  if (error) { alert('تعذّر حفظ الراتب: ' + error.message); return; }
+  salaryByStaff[staffId] = amount;
+  document.getElementById('pf-base-' + staffId).value = amount;
+  recomputePayPreview(staffId);
+  renderStats();
+}
+
+async function submitPayroll(staffId, staffName) {
+  const period = document.getElementById('pf-period-' + staffId).value || currentPeriod();
+  const base = parseFloat(document.getElementById('pf-base-' + staffId).value) || 0;
+  const bonus = parseFloat(document.getElementById('pf-bonus-' + staffId).value) || 0;
+  const deduction = parseFloat(document.getElementById('pf-deduction-' + staffId).value) || 0;
+  const notes = document.getElementById('pf-notes-' + staffId).value.trim();
+  const net = base + bonus - deduction;
+  const errEl = document.getElementById('pf-error-' + staffId);
+  errEl.classList.add('hidden');
+
+  if (net <= 0) {
+    errEl.textContent = 'الصافي يجب أن يكون أكبر من صفر';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('pf-btn-' + staffId);
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('payroll_payments').insert({
+    store_id: GOLDMIND_STORE_ID,
+    staff_id: staffId,
+    pay_period: period,
+    base_salary: base,
+    bonus: bonus,
+    deduction: deduction,
+    net_amount: net,
+    notes: notes || null,
+    created_by: GOLDMIND_STAFF_ID
+  });
+
+  if (error) {
+    btn.disabled = false;
+    btn.textContent = 'حفظ ودفع';
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const categoryId = await findOrCreatePayrollCategory();
+  const desc = 'راتب ' + staffName + ' — ' + periodLabel(period);
+  if (categoryId) {
+    await goldmindClient.from('expense_entries').insert({
+      store_id: GOLDMIND_STORE_ID,
+      category_id: categoryId,
+      amount: net,
+      description: desc,
+      created_by: GOLDMIND_STAFF_ID
+    });
+  }
+  await goldmindClient.from('cash_movements').insert({
+    store_id: GOLDMIND_STORE_ID,
+    box: 'main',
+    direction: 'out',
+    amount: net,
+    description: desc,
+    created_by: GOLDMIND_STAFF_ID
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ ودفع';
+  document.getElementById('pf-bonus-' + staffId).value = '';
+  document.getElementById('pf-deduction-' + staffId).value = '';
+  document.getElementById('pf-notes-' + staffId).value = '';
+  document.getElementById('pay-form-' + staffId).classList.add('hidden');
+  await loadPayments();
+  renderStaffList();
+  renderPayments();
+}
+
+function renderStats() {
+  const total = Object.values(salaryByStaff).reduce((s, v) => s + Number(v || 0), 0);
+  const count = Object.values(salaryByStaff).filter(v => Number(v) > 0).length;
+  document.getElementById('stat-total-salary').textContent = fmt(total) + ' ' + currencyLabel;
+  document.getElementById('stat-staff-count').textContent = count;
+}
+
+function renderStaffList() {
+  const list = document.getElementById('staff-list');
+  list.innerHTML = staffRows.map(s => {
+    const salary = salaryByStaff[s.id] || 0;
+    const last = lastPaymentByStaff[s.id];
+    return `
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+        <div class="flex items-center justify-between mb-2">
+          <div>
+            <p class="font-semibold text-[14px]">${gmEscapeHtml(s.full_name || '—')}</p>
+            <p class="text-[11px] text-on-surface-variant">${s.role === 'owner' ? 'مالك' : (gmEscapeHtml(s.role || ''))}${last ? ' · آخر دفعة: ' + periodLabel(last) : ' · لا يوجد دفعات سابقة'}</p>
+          </div>
+          <button onclick="toggleGivePayForm('${s.id}')" class="h-9 px-3 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center gap-1">
+            <span class="material-symbols-outlined text-[16px]">payments</span> دفع راتب
+          </button>
+        </div>
+        <div class="flex items-center gap-2">
+          <label class="text-[11px] text-on-surface-variant">الراتب الشهري المرجعي:</label>
+          <input class="flex-1 h-9 border border-outline-variant rounded-lg px-2 font-data-mono text-[13px]" id="salary-input-${s.id}" type="number" step="0.01" value="${salary}"/>
+          <button onclick="saveSalary('${s.id}')" class="h-9 px-3 bg-surface-container-low border border-outline-variant rounded-lg text-[11px] font-semibold">حفظ</button>
+        </div>
+
+        <div class="hidden bg-surface-container-low rounded-lg p-3 mt-3" id="pay-form-${s.id}">
+          <div class="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <label class="block text-[10px] font-semibold text-on-surface-variant mb-1">الفترة</label>
+              <input class="w-full h-9 border border-outline-variant rounded-lg px-2 text-[12px]" id="pf-period-${s.id}" type="month" value="${currentPeriod()}"/>
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-on-surface-variant mb-1">الراتب الأساسي</label>
+              <input class="w-full h-9 border border-outline-variant rounded-lg px-2 font-data-mono text-[12px]" id="pf-base-${s.id}" type="number" step="0.01" value="${salary}" oninput="recomputePayPreview('${s.id}')"/>
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-on-surface-variant mb-1">مكافأة</label>
+              <input class="w-full h-9 border border-outline-variant rounded-lg px-2 font-data-mono text-[12px]" id="pf-bonus-${s.id}" type="number" step="0.01" value="0" oninput="recomputePayPreview('${s.id}')"/>
+            </div>
+            <div>
+              <label class="block text-[10px] font-semibold text-on-surface-variant mb-1">خصم</label>
+              <input class="w-full h-9 border border-outline-variant rounded-lg px-2 font-data-mono text-[12px]" id="pf-deduction-${s.id}" type="number" step="0.01" value="0" oninput="recomputePayPreview('${s.id}')"/>
+            </div>
+          </div>
+          <div class="flex justify-between items-center bg-surface-container-lowest rounded-lg px-3 py-2 mb-2 text-[12px]">
+            <span class="text-on-surface-variant">الصافي</span>
+            <span class="font-bold font-data-mono" id="pf-net-${s.id}">${fmt(salary)} ${currencyLabel}</span>
+          </div>
+          <textarea class="w-full h-14 border border-outline-variant rounded-lg px-2 py-1.5 text-[12px] mb-2" id="pf-notes-${s.id}" placeholder="ملاحظة (اختياري)"></textarea>
+          <button onclick="submitPayroll('${s.id}', '${(s.full_name || '').replace(/'/g, '')}')" id="pf-btn-${s.id}" class="w-full h-10 bg-primary text-on-primary rounded-lg text-[13px] font-semibold">حفظ ودفع</button>
+          <p class="text-error text-[11px] hidden mt-2 text-center" id="pf-error-${s.id}"></p>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+let allPayments = [];
+async function loadPayments() {
+  const { data } = await goldmindClient
+    .from('payroll_payments')
+    .select('id, staff_id, pay_period, net_amount, created_at')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: false })
+    .limit(30);
+  allPayments = data || [];
+  lastPaymentByStaff = {};
+  allPayments.forEach(p => {
+    if (!lastPaymentByStaff[p.staff_id]) lastPaymentByStaff[p.staff_id] = p.pay_period;
+  });
+}
+
+function renderPayments() {
+  const box = document.getElementById('payments-history');
+  const empty = document.getElementById('history-empty');
+  if (!allPayments.length) {
+    box.innerHTML = '';
+    empty.classList.remove('hidden');
+    return;
+  }
+  empty.classList.add('hidden');
+  const staffNameById = {};
+  staffRows.forEach(s => staffNameById[s.id] = s.full_name);
+  box.innerHTML = allPayments.map(p => `
+    <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex items-center justify-between">
+      <div>
+        <p class="text-[13px] font-semibold">${gmEscapeHtml(staffNameById[p.staff_id] || '—')}</p>
+        <p class="text-[11px] text-on-surface-variant">${periodLabel(p.pay_period)}</p>
+      </div>
+      <span class="font-data-mono font-semibold text-[13px]">${fmt(p.net_amount)} ${currencyLabel}</span>
+    </div>
+  `).join('');
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: myStaffRow } = await goldmindClient.from('staff').select('permissions, role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canManage = myStaffRow && (myStaffRow.role === 'owner' || (myStaffRow.permissions && myStaffRow.permissions.manage_payroll === true));
+
+  document.getElementById('loading-state').classList.add('hidden');
+  if (!canManage) {
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
+  await loadStore();
+
+  const { data: staffData } = await goldmindClient
+    .from('staff').select('id, full_name, role').eq('store_id', GOLDMIND_STORE_ID).order('full_name');
+  staffRows = staffData || [];
+
+  const { data: salaryData } = await goldmindClient
+    .from('staff_salaries').select('staff_id, monthly_salary').eq('store_id', GOLDMIND_STORE_ID);
+  salaryByStaff = {};
+  (salaryData || []).forEach(row => salaryByStaff[row.staff_id] = row.monthly_salary);
+
+  await loadPayments();
+
+  renderStats();
+  renderStaffList();
+  renderPayments();
+
+  document.getElementById('page-content').classList.remove('hidden');
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
