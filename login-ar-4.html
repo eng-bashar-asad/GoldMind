@@ -16,9 +16,9 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <style>
         html { font-size: 87.5%; }
-    .logo-tilt-wrap { position: relative; left: 50%; right: 50%; margin-left: -50vw; margin-right: -50vw; width: 100vw; max-width: 100vw; aspect-ratio: 1408 / 900; margin-bottom: 1.25rem; padding: 0 0 1rem 0; perspective: 700px; }
-    .logo-tilt-inner { width: 100%; height: 100%; transform-style: preserve-3d; transition: transform 0.15s ease-out; position: relative; }
-    .logo-tilt-img { width: 100%; height: 100%; object-fit: contain; display: block; }
+    .logo-tilt-wrap { position: relative; left: 50%; right: 50%; margin-left: -50vw; margin-right: -50vw; width: 100vw; max-width: 100vw; aspect-ratio: 1408 / 900; margin-bottom: 1.25rem; padding: 0 0 1rem 0; }
+    .logo-tilt-inner { width: 100%; height: 100%; position: relative; }
+    .logo-tilt-img { width: 100%; height: 100%; display: block; border: 0; pointer-events: none; }
     .logo-tilt-glare { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s ease-out; pointer-events: none; mix-blend-mode: screen; }
 
         :root {
@@ -135,7 +135,7 @@
 <div class="mb-10 text-center animate-fade-in">
 <div class="logo-tilt-wrap" id="logoTiltWrap">
 <div class="logo-tilt-inner" id="logoTiltInner">
-<img src="logo-full-banner.svg" alt="GoldMind" class="logo-tilt-img"/>
+<object type="image/svg+xml" data="logo-interactive.svg" class="logo-tilt-img" id="logoTiltObject" aria-label="GoldMind"></object>
 <div class="logo-tilt-glare"></div>
 </div>
 <div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl -z-10"></div>
@@ -436,28 +436,42 @@ if ('serviceWorker' in navigator) {
 </script>
 
 <script>
-(function initLogoTilt() {
+(function initLogoParallax() {
   if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
   const wrap = document.getElementById('logoTiltWrap');
   const inner = document.getElementById('logoTiltInner');
-  if (!wrap || !inner) return;
+  const obj = document.getElementById('logoTiltObject');
+  if (!wrap || !inner || !obj) return;
   const glare = inner.querySelector('.logo-tilt-glare');
-  const maxTilt = 16;
+  const maxShift = 14;
+  let layerBack, layerMid, layerFront;
+
+  function bindLayers() {
+    const doc = obj.contentDocument;
+    if (!doc) return;
+    layerBack = doc.getElementById('layer-back');
+    layerMid = doc.getElementById('layer-mid');
+    layerFront = doc.getElementById('layer-front');
+  }
+  obj.addEventListener('load', bindLayers);
+  bindLayers();
 
   window.addEventListener('mousemove', function (e) {
     const dx = Math.max(-1, Math.min(1, (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2)));
     const dy = Math.max(-1, Math.min(1, (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2)));
-    const rotateY = dx * maxTilt;
-    const rotateX = -dy * maxTilt;
-    inner.style.transform = 'rotateX(' + rotateX + 'deg) rotateY(' + rotateY + 'deg) scale(1.06)';
+    if (layerBack) layerBack.style.transform = 'translate(' + (dx * maxShift * 0.3) + 'px,' + (dy * maxShift * 0.3) + 'px)';
+    if (layerMid) layerMid.style.transform = 'translate(' + (dx * maxShift * 0.6) + 'px,' + (dy * maxShift * 0.6) + 'px)';
+    if (layerFront) layerFront.style.transform = 'translate(' + (dx * maxShift) + 'px,' + (dy * maxShift) + 'px)';
     if (glare) {
-      glare.style.opacity = '0.45';
-      glare.style.background = 'radial-gradient(circle at ' + (50 + dx * 30) + '% ' + (50 + dy * 30) + '%, rgba(255,255,255,0.4), transparent 60%)';
+      glare.style.opacity = '0.35';
+      glare.style.background = 'radial-gradient(circle at ' + (50 + dx * 30) + '% ' + (50 + dy * 30) + '%, rgba(255,255,255,0.35), transparent 60%)';
     }
   });
 
   wrap.addEventListener('mouseleave', function () {
-    inner.style.transform = 'rotateX(0deg) rotateY(0deg) scale(1)';
+    if (layerBack) layerBack.style.transform = 'translate(0px,0px)';
+    if (layerMid) layerMid.style.transform = 'translate(0px,0px)';
+    if (layerFront) layerFront.style.transform = 'translate(0px,0px)';
     if (glare) glare.style.opacity = '0';
   });
 })();
