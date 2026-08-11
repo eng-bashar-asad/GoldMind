@@ -129,24 +129,70 @@
     }
   </style>
   </head>
-<body class="bg-background text-on-background font-body-md selection:bg-secondary-container selection:text-on-secondary-container">
+<body class="bg-background text-on-background min-h-screen flex flex-col md:flex-row-reverse overflow-x-hidden font-body-md selection:bg-secondary-container selection:text-on-secondary-container">
+<!-- Navigation Drawer (Desktop) -->
+<aside class="hidden md:flex flex-col h-full fixed right-0 top-0 w-[280px] z-50 bg-surface-container-lowest border-l border-outline-variant rtl overflow-y-auto">
+<div class="p-8 flex flex-col gap-6">
+<div class="flex items-center gap-3">
+<div class="w-10 h-10 bg-primary flex items-center justify-center rounded">
+<span class="material-symbols-outlined text-white" style="font-variation-settings: 'FILL' 1;">stars</span>
+</div>
+<div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">جولد مايند</h1>
+<p class="font-label-md text-label-md text-on-surface-variant">AR - د.إ</p>
+</div>
+</div>
+<nav class="flex flex-col gap-1 mt-8">
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="index-ar.html">
+<span class="material-symbols-outlined">dashboard</span>
+<span class="font-label-md text-label-md">لوحة التحكم</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-primary font-bold border-r-4 border-secondary bg-surface-container transition-all cursor-pointer" href="inventory-list-ar.html">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
+<span class="font-label-md text-label-md">المخزون</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="new-sale-ar.html">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-label-md text-label-md">الفواتير</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="staff-permissions-ar.html">
+<span class="material-symbols-outlined">badge</span>
+<span class="font-label-md text-label-md">الموظفين</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="audit-log-ar.html">
+<span class="material-symbols-outlined">analytics</span>
+<span class="font-label-md text-label-md">سجل النشاط</span>
+</a>
+<a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="settings-ar.html">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-label-md">الإعدادات</span>
+</a>
+</nav>
+</div>
+</aside>
+<!-- Main Content Area -->
+<main class="flex-1 md:mr-[280px] pb-32 md:pb-8 flex flex-col">
 <!-- Top Navigation Bar -->
-<header class="bg-surface-container-lowest text-primary docked full-width top-0 border-b border-outline-variant z-50 sticky">
-<div class="flex justify-between items-center px-margin-mobile w-full h-16">
+<header class="bg-surface-container-lowest text-primary w-full top-0 border-b border-outline-variant z-40 sticky">
+<div class="flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full h-16">
 <div class="flex items-center gap-4">
-<button onclick="window.location.href='index-ar.html'" class="cursor-pointer active:opacity-80 p-2 hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center">
+<button class="md:hidden cursor-pointer active:opacity-80 p-2 hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center" onclick="window.location.href='index-ar.html'">
 <span class="material-symbols-outlined">arrow_forward</span>
 </button>
-<h1 class="font-headline-md text-headline-md font-bold text-primary">جولد مايند</h1>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">إضافة قطعة جديدة</h1>
 </div>
-<div class="flex items-center">
+<div class="hidden md:flex items-center">
 <span class="font-label-md text-label-md text-on-surface-variant">AR - د.إ</span>
 </div>
 </div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-3xl mx-auto">
+<!-- Page Content -->
+<div class="px-margin-mobile md:px-margin-desktop py-6 md:py-8 max-w-container-max mx-auto w-full">
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
+<!-- Photo + Barcode column (sticky on desktop) -->
+<div class="lg:col-span-1 flex flex-col gap-4 lg:sticky lg:top-24">
 <!-- Camera Section -->
-<section class="p-margin-mobile">
+<section>
 <input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
 <div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200" id="photo-trigger" onclick="document.getElementById('photo-input').click()">
 <div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
@@ -160,9 +206,8 @@
 </button>
 </div>
 </section>
-</section>
 <!-- Barcode Section -->
-<section class="px-margin-mobile py-2 flex flex-col gap-4">
+<section class="py-2 flex flex-col gap-4">
 <button type="button" onclick="document.getElementById('barcode-id').focus()" class="w-full h-14 bg-primary text-on-primary rounded-lg flex items-center justify-center gap-3 active:scale-95 duration-200 transition-all font-semibold shadow-sm">
 <span class="material-symbols-outlined">barcode_scanner</span>
 <span class="font-label-md text-label-md">أدخل الباركود أو اتركه فارغاً للتوليد التلقائي</span>
@@ -172,8 +217,11 @@
 <input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="barcode-id" placeholder="أدخله يدوياً" type="text"/>
 </div>
 </section>
+</div>
+<!-- Form fields column -->
+<div class="lg:col-span-2 flex flex-col gap-6">
 <!-- Form Fields -->
-<section class="px-margin-mobile py-6 flex flex-col gap-6">
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col gap-6">
 <div class="grid grid-cols-2 gap-4">
 <!-- Weight Input -->
 <div class="relative">
@@ -282,9 +330,12 @@
                 </button>
 </div>
 </section>
+</div>
+</div>
+</div>
 </main>
-<!-- Bottom Navigation Bar -->
-<nav class="fixed bottom-0 w-full flex justify-around items-center px-margin-mobile py-2 bg-surface-container-lowest text-primary docked full-width z-50 border-t border-outline-variant shadow-sm h-16">
+<!-- Bottom Navigation Bar (Mobile) -->
+<nav class="md:hidden fixed bottom-0 w-full flex justify-around items-center px-margin-mobile py-2 bg-surface-container-lowest text-primary docked full-width z-50 border-t border-outline-variant shadow-sm h-16">
 <!-- Dashboard -->
 <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="index-ar.html">
 <span class="material-symbols-outlined" data-icon="dashboard">dashboard</span>
