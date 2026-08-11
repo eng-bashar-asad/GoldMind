@@ -83,6 +83,27 @@ function goldMindSetActiveStore(storeId) {
     window.location.href = 'index-ar.html';
 }
 
+// Checks the store's subscription status (computed live server-side, no
+// background job needed -- safe even if the free-tier project was paused).
+// Call after requireGoldMindSession() on pages that should be locked once a
+// subscription has expired. Owners/platform admins are never redirected so
+// they can always reach subscription-ar.html to renew; everyone else gets
+// sent there with a message. Returns the status string either way.
+async function goldMindSubscriptionGuard() {
+    if (!GOLDMIND_STORE_ID) return null;
+    const { data: status } = await goldmindClient.rpc('get_subscription_status', { p_store_id: GOLDMIND_STORE_ID });
+    if (status === 'expired' || status === 'canceled') {
+        const { data: me } = await goldmindClient
+            .from('staff').select('role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+        const isOwner = me && me.role === 'owner';
+        if (!isOwner && !window.location.pathname.endsWith('subscription-ar.html')) {
+            window.location.href = 'subscription-ar.html?locked=1';
+            return status;
+        }
+    }
+    return status;
+}
+
 // Sign the user out and send them back to the login screen.
 // Confirms first since it's a destructive/navigational action.
 // Pass a redirectTo (e.g. 'admin-login-ar.html') for pages that live outside
