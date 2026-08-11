@@ -18,6 +18,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -136,7 +137,12 @@
 </table>
 
 <!-- Totals: subtotal / VAT / grand total, stacked, aligned left -->
-<div class="border-t-2 border-gray-800 pt-3 text-[12px]" style="width: 62%; margin-inline-start: auto;">
+<div class="flex items-start justify-between gap-3 mb-4">
+<div id="einvoice-qr-box" class="hidden flex-col items-center gap-1 shrink-0">
+<div id="einvoice-qr"></div>
+<p class="text-[8px] text-gray-400 text-center leading-tight w-24">جاهزية فاتورة إلكترونية<br/>بانتظار التسجيل الرسمي</p>
+</div>
+<div class="border-t-2 border-gray-800 pt-3 text-[12px] flex-1" style="width: 62%; margin-inline-start: auto;">
 <div class="flex justify-between text-gray-600">
 <span>الإجمالي قبل الضريبة</span>
 <span id="sum-before-tax"></span>
@@ -148,6 +154,7 @@
 <div class="flex justify-between font-bold text-base pt-1 border-t border-gray-200 mt-1">
 <span>الإجمالي الكامل</span>
 <span id="sum-total"></span>
+</div>
 </div>
 </div>
 
@@ -197,6 +204,52 @@
 
     function fmt(n) {
         return (Math.round((n + Number.EPSILON) * 100) / 100).toFixed(2);
+    }
+
+    // ---- E-invoice readiness QR helpers ----
+    // TLV (tag-length-value) encoding of seller name / TRN / timestamp /
+    // total / VAT amount, base64-encoded — the standard field shape GCC tax
+    // authorities scan from a simplified tax invoice QR code.
+    function tlvField(tag, value) {
+        const valueBytes = new TextEncoder().encode(String(value));
+        const bytes = new Uint8Array(2 + valueBytes.length);
+        bytes[0] = tag;
+        bytes[1] = valueBytes.length;
+        bytes.set(valueBytes, 2);
+        return bytes;
+    }
+
+    function buildEinvoiceQrBase64({ sellerName, trn, timestampIso, total, vatAmount }) {
+        const fields = [
+            tlvField(1, sellerName || ''),
+            tlvField(2, trn || ''),
+            tlvField(3, timestampIso),
+            tlvField(4, Number(total || 0).toFixed(2)),
+            tlvField(5, Number(vatAmount || 0).toFixed(2))
+        ];
+        const totalLength = fields.reduce((sum, f) => sum + f.length, 0);
+        const combined = new Uint8Array(totalLength);
+        let offset = 0;
+        fields.forEach(f => { combined.set(f, offset); offset += f.length; });
+        let binary = '';
+        combined.forEach(b => { binary += String.fromCharCode(b); });
+        return btoa(binary);
+    }
+
+    function renderEinvoiceQr(data) {
+        const box = document.getElementById('einvoice-qr-box');
+        const holder = document.getElementById('einvoice-qr');
+        holder.innerHTML = '';
+        try {
+            const base64 = buildEinvoiceQrBase64(data);
+            new QRCode(holder, { text: base64, width: 90, height: 90, correctLevel: QRCode.CorrectLevel.M });
+            box.classList.remove('hidden');
+            box.classList.add('flex');
+        } catch (e) {
+            // Fail silently — the printed invoice is still complete and
+            // legally usable without the QR; it just won't show one.
+            box.classList.add('hidden');
+        }
     }
 
     const PRINT_FRAME_CLASSES = {
@@ -405,6 +458,24 @@
         document.getElementById('sum-before-tax').textContent = fmt(sumBeforeTax) + ' ' + (store.currency || 'AED');
         document.getElementById('sum-tax').textContent = fmt(sumTax) + ' ' + (store.currency || 'AED');
         document.getElementById('sum-total').textContent = fmt(sumTotal) + ' ' + (store.currency || 'AED');
+
+        // ---- E-invoice readiness QR (TLV/base64, the same encoding GCC tax
+        // authorities use for the simplified-invoice QR) ----
+        // This only prepares the invoice data in the standard shape; it is
+        // NOT a substitute for formal registration with the tax authority
+        // (FTA/ZATCA), which requires a trade license and business
+        // registration the store doesn't have yet. Shown only when a TRN is
+        // on file, matching the same condition used for the printed "TRN:"
+        // legal line above.
+        if (store.tax_number && window.QRCode) {
+            renderEinvoiceQr({
+                sellerName: store.name || '',
+                trn: store.tax_number,
+                timestampIso: new Date(invoice.created_at).toISOString(),
+                total: sumTotal,
+                vatAmount: sumTax
+            });
+        }
 
         // ---- Diamond certificate quick-print (screen only, per sold diamond piece) ----
         const diamondItems = (items || []).filter(item => item.diamond_piece_id);
