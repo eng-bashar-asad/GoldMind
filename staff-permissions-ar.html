@@ -75,6 +75,7 @@
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow">
 <span class="font-label-md text-label-md text-on-surface-variant block mb-1">إجمالي الموظفين</span>
 <div id="stat-total" class="font-headline-md text-headline-md font-bold text-primary">0</div>
+<div id="stat-total-limit" class="text-[10.5px] text-on-surface-variant mt-1"></div>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl luxury-shadow">
 <span class="font-label-md text-label-md text-on-surface-variant block mb-1">صلاحيات كاملة (مالك)</span>
@@ -559,6 +560,18 @@ async function loadStaff() {
   document.getElementById('staff-list').innerHTML = staffRows.map(renderStaffCard).join('');
   document.getElementById('page-content').classList.remove('hidden');
   loadInvites();
+
+  const { data: staffLimit } = await goldmindClient.rpc('check_staff_limit', { p_store_id: GOLDMIND_STORE_ID });
+  const sl = staffLimit && staffLimit[0];
+  if (sl && sl.included_count != null) {
+    const limitEl = document.getElementById('stat-total-limit');
+    if (sl.current_count > sl.included_count) {
+      limitEl.textContent = `من أصل ${sl.included_count} ضمن الخطة — ستتم الترقية تلقائياً عند بلوغ ${sl.upgrade_threshold ?? '—'}`;
+      limitEl.classList.add('text-secondary', 'font-semibold');
+    } else {
+      limitEl.textContent = `من أصل ${sl.included_count} ضمن الخطة الحالية`;
+    }
+  }
 }
 
 loadStaff();
