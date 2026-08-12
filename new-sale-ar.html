@@ -229,13 +229,18 @@
 </div>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-weight">الوزن المباع (غ)</label>
-<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-weight" step="0.01" type="number"/>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-gross-weight">الوزن القائم (غ)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-gross-weight" oninput="onStockGrossWeightInput()" step="0.01" type="number"/>
 </div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-accounting-weight">الوزن المحاسبي (غ)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-accounting-weight" step="0.01" type="number"/>
+</div>
+</div>
+<p class="text-[10px] text-on-surface-variant -mt-1">الوزن القائم هو يلي بيُطبع بالفاتورة وبيتخصم فعلياً من رصيد الجملة. الوزن المحاسبي (لو اختلف بسبب فص أو فرق دقة) يُستخدم فقط بحساب قيمة الذهب والربح.</p>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-price">السعر</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-price" step="0.01" type="number"/>
-</div>
 </div>
 <div class="relative hidden" id="stock-fab-wrap">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-fab-fee">مصنعية هذه القطعة (د.إ)</label>
@@ -443,9 +448,24 @@
         document.getElementById('stock-photo-label').textContent = stockPhotoFile ? stockPhotoFile.name : 'تصوير القطعة (اختياري)';
     });
 
+    // Accounting weight defaults to the gross/standing weight and stays in
+    // sync until the user edits it directly (same pattern as the trader
+    // give/receive-stock forms), so the common case needs no extra typing.
+    let stockAccountingWeightTouched = false;
+    function onStockGrossWeightInput() {
+        if (!stockAccountingWeightTouched) {
+            document.getElementById('stock-accounting-weight').value = document.getElementById('stock-gross-weight').value;
+        }
+    }
+    document.addEventListener('DOMContentLoaded', () => {
+        const accEl = document.getElementById('stock-accounting-weight');
+        if (accEl) accEl.addEventListener('input', () => { stockAccountingWeightTouched = true; });
+    });
+
     function addStockSaleToCart() {
         const lotId = document.getElementById('stock-lot-select').value;
-        const weight = parseFloat(document.getElementById('stock-weight').value);
+        const grossWeight = parseFloat(document.getElementById('stock-gross-weight').value);
+        const accountingWeight = parseFloat(document.getElementById('stock-accounting-weight').value);
         const price = parseFloat(document.getElementById('stock-price').value);
         const errEl = document.getElementById('stock-lot-error');
         errEl.classList.add('hidden');
@@ -456,8 +476,8 @@
             errEl.classList.remove('hidden');
             return;
         }
-        if (!weight || weight <= 0 || !price || price <= 0) {
-            errEl.textContent = 'فضلاً أدخل وزناً وسعراً صحيحين.';
+        if (!grossWeight || grossWeight <= 0 || !accountingWeight || accountingWeight <= 0 || !price || price <= 0) {
+            errEl.textContent = 'فضلاً أدخل الوزن القائم والمحاسبي والسعر بشكل صحيح.';
             errEl.classList.remove('hidden');
             return;
         }
@@ -481,22 +501,22 @@
         }
 
         const availableInLot = Number(lot.weight_grams_remaining) - (reservedByLot[lot.id] || 0);
-        if (weight > availableInLot) {
+        if (grossWeight > availableInLot) {
             // This lot doesn't have enough — list the other lots (same karat)
             // that DO have enough weight so the employee can pick one instead.
             const alternatives = stockLotsCache
-                .filter(l => l.id !== lot.id && (Number(l.weight_grams_remaining) - (reservedByLot[l.id] || 0)) >= weight)
+                .filter(l => l.id !== lot.id && (Number(l.weight_grams_remaining) - (reservedByLot[l.id] || 0)) >= grossWeight)
                 .map(l => {
                     const available = (Number(l.weight_grams_remaining) - (reservedByLot[l.id] || 0)).toFixed(2);
                     return `<button type="button" onclick="document.getElementById('stock-lot-select').value='${l.id}'" class="underline">دفعة متبقي ${available}غ</button>`;
                 });
-            errEl.innerHTML = `هذه الدفعة لا تحوي ${weight}غ (المتوفر ${availableInLot.toFixed(2)}غ فقط).` +
+            errEl.innerHTML = `هذه الدفعة لا تحوي ${grossWeight}غ (المتوفر ${availableInLot.toFixed(2)}غ فقط).` +
                 (alternatives.length > 0 ? '<br>دفعات أخرى تكفي: ' + alternatives.join('، ') : '<br>لا توجد دفعة أخرى بنفس العيار تكفي هذا الوزن — يمكن إنتاج قطع جديدة من صفحة "إنتاج القطع".');
             errEl.classList.remove('hidden');
             return;
         }
 
-        reservedByLot[lot.id] = (reservedByLot[lot.id] || 0) + weight;
+        reservedByLot[lot.id] = (reservedByLot[lot.id] || 0) + grossWeight;
         if (isPooled) reservedByLot[lot.id + '_fee'] = (reservedByLot[lot.id + '_fee'] || 0) + manualFabFee;
 
         cart.push({
@@ -504,7 +524,8 @@
             mode: 'stock',
             lotId: lot.id,
             karat: lot.karat,
-            weight: weight,
+            weight: grossWeight,
+            accountingWeight: accountingWeight,
             price: price,
             isPooled: isPooled,
             fabPerGram: Number(lot.cost_fabrication_per_gram) || 0,
@@ -514,7 +535,9 @@
         });
 
         document.getElementById('stock-desc').value = '';
-        document.getElementById('stock-weight').value = '';
+        document.getElementById('stock-gross-weight').value = '';
+        document.getElementById('stock-accounting-weight').value = '';
+        stockAccountingWeightTouched = false;
         document.getElementById('stock-price').value = '';
         document.getElementById('stock-fab-fee').value = '';
         document.getElementById('stock-photo-input').value = '';
@@ -981,7 +1004,7 @@
             barcode: item.barcode,
             karat: item.karat,
             weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : item.weight,
-            accounting_weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : (item.piece ? (item.piece.accounting_weight_grams || item.piece.weight_grams) : item.weight),
+            accounting_weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : (item.piece ? (item.piece.accounting_weight_grams || item.piece.weight_grams) : (item.mode === 'stock' ? item.accountingWeight : item.weight)),
             fabrication_fee: item.mode === 'stock' && item.isPooled ? item.manualFabFee : 0,
             line_total: item.price,
             description: (item.piece && item.piece.description_ar) || item.description,
