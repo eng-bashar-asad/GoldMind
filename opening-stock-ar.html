@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>بضاعة أول المدة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { min-height: max(884px, 100dvh); }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">بضاعة أول المدة</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-2xl mx-auto px-4 lg:px-8">
+
+<p class="text-[12px] text-on-surface-variant leading-5 py-4">
+سجّل هون الذهب يلي موجود عندك فعلياً (وزن إجمالي + مجموع مصنعية واحد) بدون تسجيل قطع مفردة ولا ربطه بتاجر. لما تبيع منها لاحقاً بفاتورة المبيعات (بيع من الرصيد بالجملة)، بتكتب مصنعية كل قطعة يدوياً وبتتخصم من نفس هالمجموع، مش بمعدل ثابت للغرام.
+</p>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4">
+<h2 class="font-semibold text-[14px] mb-3">إضافة دفعة بضاعة أول المدة</h2>
+<div class="grid grid-cols-2 gap-3 mb-3">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العيار</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="os-karat">
+<option value="18">18</option>
+<option selected value="21">21</option>
+<option value="22">22</option>
+<option value="24">24</option>
+</select>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن الإجمالي (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="os-weight" oninput="recomputeOpeningStockPreview()" step="0.01" type="number"/>
+</div>
+</div>
+<div class="mb-3">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">مجموع المصنعية (د.إ) — لكل الدفعة</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="os-fab-total" oninput="recomputeOpeningStockPreview()" step="0.01" type="number"/>
+</div>
+<div class="bg-surface-container-low rounded-lg p-3 mb-3 text-[12px]" id="os-preview">
+متوسط المصنعية للغرام: <span class="font-data-mono font-semibold" id="os-preview-rate">0.00</span> د.إ/غ (لأغراض العرض فقط — التصفية الفعلية تكون حسب المصنعية اليدوية لكل قطعة عند البيع)
+</div>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="os-notes" placeholder="ملاحظة (اختياري)"></textarea>
+<button onclick="submitOpeningStock()" id="os-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الدفعة</button>
+<p class="text-error text-[12px] hidden mt-2" id="os-error"></p>
+<p class="text-success text-[12px] hidden mt-2" id="os-success">تم الحفظ بنجاح.</p>
+</div>
+
+<h3 class="font-semibold text-[13px] mt-2 mb-2">دفعات بضاعة أول المدة الحالية</h3>
+<div id="os-list" class="flex flex-col gap-2"></div>
+<p id="os-empty" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد دفعات مسجّلة بعد.</p>
+
+</main>
+
+<script>
+function fmt(n) {
+  return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+}
+
+(async function __enforcePermission() {
+    await requireGoldMindSession('login-entry-ar.html');
+    const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const __allowed = __staffPerm && __staffPerm.role === 'owner';
+    if (!__allowed) { alert('هذه الشاشة مخصّصة لمالك الحساب فقط.'); window.location.href = 'index-ar.html'; }
+})();
+
+function recomputeOpeningStockPreview() {
+  const weight = parseFloat(document.getElementById('os-weight').value) || 0;
+  const total = parseFloat(document.getElementById('os-fab-total').value) || 0;
+  const rate = weight > 0 ? total / weight : 0;
+  document.getElementById('os-preview-rate').textContent = fmt(rate);
+}
+
+async function submitOpeningStock() {
+  const errEl = document.getElementById('os-error');
+  const okEl = document.getElementById('os-success');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  const karat = parseInt(document.getElementById('os-karat').value, 10);
+  const weight = parseFloat(document.getElementById('os-weight').value);
+  const fabTotal = parseFloat(document.getElementById('os-fab-total').value);
+  const notes = document.getElementById('os-notes').value.trim();
+
+  if (!weight || weight <= 0) {
+    errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (isNaN(fabTotal) || fabTotal < 0) {
+    errEl.textContent = 'فضلاً أدخل مجموع مصنعية صحيح (يمكن أن يكون صفراً)';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('os-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('gold_stock_lots').insert({
+    store_id: GOLDMIND_STORE_ID,
+    karat: karat,
+    weight_grams_total: weight,
+    weight_grams_remaining: weight,
+    cost_fabrication_per_gram: +(fabTotal / weight).toFixed(4),
+    fabrication_pool_total: fabTotal,
+    fabrication_pool_remaining: fabTotal,
+    trader_id: null,
+    notes: notes || 'بضاعة أول المدة',
+    created_by: GOLDMIND_STAFF_ID
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ الدفعة';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  okEl.classList.remove('hidden');
+  document.getElementById('os-weight').value = '';
+  document.getElementById('os-fab-total').value = '';
+  document.getElementById('os-notes').value = '';
+  recomputeOpeningStockPreview();
+  load();
+}
+
+async function load() {
+  const { data, error } = await goldmindClient
+    .from('gold_stock_lots')
+    .select('*')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .not('fabrication_pool_total', 'is', null)
+    .order('created_at', { ascending: false });
+
+  const listEl = document.getElementById('os-list');
+  const emptyEl = document.getElementById('os-empty');
+
+  if (error || !data || data.length === 0) {
+    listEl.innerHTML = '';
+    emptyEl.classList.remove('hidden');
+    return;
+  }
+  emptyEl.classList.add('hidden');
+
+  listEl.innerHTML = data.map(lot => {
+    const date = new Date(lot.created_at).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
+    return `
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[13px] font-semibold">عيار ${lot.karat}</span>
+          <span class="text-[11px] text-on-surface-variant">${date}</span>
+        </div>
+        <p class="text-[12px] font-data-mono">الوزن المتبقي: ${fmt(lot.weight_grams_remaining)}غ / أصل ${fmt(lot.weight_grams_total)}غ</p>
+        <p class="text-[12px] font-data-mono">المصنعية المتبقية: ${fmt(lot.fabrication_pool_remaining)} د.إ / أصل ${fmt(lot.fabrication_pool_total)} د.إ</p>
+        ${lot.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(lot.notes)}</p>` : ''}
+      </div>`;
+  }).join('');
+}
+
+load();
+</script>
+</body></html>

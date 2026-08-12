@@ -170,7 +170,12 @@ async function load() {
     const goldValue = sign * (weight * goldPrice);
     const beforeTax = revenue / vatMultiplier;
     const vat = revenue - beforeTax;
-    const fabCost = sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || ((it.diamond && it.diamond.has_gold && it.diamond.gold_cost_fabrication_per_gram) || 0)));
+    // Pooled opening-stock lots carry a manually entered fee per piece
+    // (stored directly on the invoice_item) instead of a fixed per-gram
+    // rate — prefer that stored amount when present, over the lot/piece rate.
+    const fabCost = it.lot && it.fabrication_fee
+      ? sign * Number(it.fabrication_fee)
+      : sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || ((it.diamond && it.diamond.has_gold && it.diamond.gold_cost_fabrication_per_gram) || 0)));
     // Diamond-sourced lines carry their own acquisition cost (carat × price/carat),
     // separate from any gold portion already priced above.
     const diamondCost = it.diamond ? sign * (Number(it.diamond.diamond_carat || 0) * Number(it.diamond.diamond_price_per_carat || 0)) : 0;

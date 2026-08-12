@@ -220,7 +220,7 @@
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-lot-select">الدفعة (اللوت)</label>
-<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-lot-select"></select>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-lot-select" onchange="onStockLotSelected()"></select>
 </div>
 </div>
 <div class="relative">
@@ -236,6 +236,11 @@
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-price">السعر</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-price" step="0.01" type="number"/>
 </div>
+</div>
+<div class="relative hidden" id="stock-fab-wrap">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-fab-fee">مصنعية هذه القطعة (د.إ)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-fab-fee" step="0.01" type="number"/>
+<p class="text-[10px] text-on-surface-variant mt-1">هذه الدفعة "بضاعة أول المدة" — لا يوجد سعر مصنعية ثابت للغرام، اكتب مصنعية هذه القطعة تحديداً وبتنخصم من مجموع المصنعية المتبقي بالدفعة.</p>
 </div>
 <div>
 <input accept="image/*" capture="environment" class="hidden" id="stock-photo-input" type="file"/>
@@ -414,8 +419,22 @@
 
         select.innerHTML = stockLotsCache.map(lot => {
             const available = (Number(lot.weight_grams_remaining) - (reservedByLot[lot.id] || 0)).toFixed(2);
-            return `<option value="${lot.id}">متبقي ${available}غ (مصنعية ${Number(lot.cost_fabrication_per_gram).toFixed(2)}/غ، من أصل ${lot.weight_grams_total}غ)</option>`;
+            const isPooled = lot.fabrication_pool_remaining !== null && lot.fabrication_pool_remaining !== undefined;
+            const label = isPooled
+                ? `متبقي ${available}غ (بضاعة أول المدة — مصنعية متبقية ${Number(lot.fabrication_pool_remaining).toFixed(2)} د.إ، من أصل ${lot.weight_grams_total}غ)`
+                : `متبقي ${available}غ (مصنعية ${Number(lot.cost_fabrication_per_gram).toFixed(2)}/غ، من أصل ${lot.weight_grams_total}غ)`;
+            return `<option value="${lot.id}">${label}</option>`;
         }).join('');
+        onStockLotSelected();
+    }
+
+    function onStockLotSelected() {
+        const lotId = document.getElementById('stock-lot-select').value;
+        const lot = stockLotsCache.find(l => l.id === lotId);
+        const wrap = document.getElementById('stock-fab-wrap');
+        const isPooled = lot && lot.fabrication_pool_remaining !== null && lot.fabrication_pool_remaining !== undefined;
+        wrap.classList.toggle('hidden', !isPooled);
+        if (!isPooled) document.getElementById('stock-fab-fee').value = '';
     }
 
     let stockPhotoFile = null;
@@ -443,6 +462,24 @@
             return;
         }
 
+        const isPooled = lot.fabrication_pool_remaining !== null && lot.fabrication_pool_remaining !== undefined;
+        let manualFabFee = 0;
+        if (isPooled) {
+            manualFabFee = parseFloat(document.getElementById('stock-fab-fee').value);
+            if (isNaN(manualFabFee) || manualFabFee < 0) {
+                errEl.textContent = 'فضلاً أدخل مصنعية هذه القطعة (يمكن صفراً، لكن الحقل مطلوب).';
+                errEl.classList.remove('hidden');
+                return;
+            }
+            const reservedFee = reservedByLot[lot.id + '_fee'] || 0;
+            const availableFee = Number(lot.fabrication_pool_remaining) - reservedFee;
+            if (manualFabFee > availableFee) {
+                errEl.textContent = `مصنعية هذه القطعة (${manualFabFee.toFixed(2)}) أكبر من المصنعية المتبقية بالدفعة (${availableFee.toFixed(2)} د.إ).`;
+                errEl.classList.remove('hidden');
+                return;
+            }
+        }
+
         const availableInLot = Number(lot.weight_grams_remaining) - (reservedByLot[lot.id] || 0);
         if (weight > availableInLot) {
             // This lot doesn't have enough — list the other lots (same karat)
@@ -460,6 +497,7 @@
         }
 
         reservedByLot[lot.id] = (reservedByLot[lot.id] || 0) + weight;
+        if (isPooled) reservedByLot[lot.id + '_fee'] = (reservedByLot[lot.id + '_fee'] || 0) + manualFabFee;
 
         cart.push({
             cartId: ++cartCounter,
@@ -468,7 +506,9 @@
             karat: lot.karat,
             weight: weight,
             price: price,
+            isPooled: isPooled,
             fabPerGram: Number(lot.cost_fabrication_per_gram) || 0,
+            manualFabFee: isPooled ? manualFabFee : 0,
             description: document.getElementById('stock-desc').value.trim() || null,
             photoFile: stockPhotoFile
         });
@@ -476,10 +516,11 @@
         document.getElementById('stock-desc').value = '';
         document.getElementById('stock-weight').value = '';
         document.getElementById('stock-price').value = '';
+        document.getElementById('stock-fab-fee').value = '';
         document.getElementById('stock-photo-input').value = '';
         stockPhotoFile = null;
         document.getElementById('stock-photo-label').textContent = 'تصوير القطعة (اختياري)';
-        loadStockLots(); // refresh remaining-weight labels
+        loadStockLots(); // refresh remaining-weight/fee labels
         renderCart();
     }
 
@@ -941,7 +982,7 @@
             karat: item.karat,
             weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : item.weight,
             accounting_weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : (item.piece ? (item.piece.accounting_weight_grams || item.piece.weight_grams) : item.weight),
-            fabrication_fee: 0,
+            fabrication_fee: item.mode === 'stock' && item.isPooled ? item.manualFabFee : 0,
             line_total: item.price,
             description: (item.piece && item.piece.description_ar) || item.description,
             description_en: item.piece ? item.piece.description_en : null,
@@ -968,13 +1009,16 @@
             await goldmindClient.from('diamond_pieces').update({ status: 'sold' }).in('id', diamondPieceIds);
         }
 
-        // Deduct the sold weight from each bulk stock lot used in this sale.
+        // Deduct the sold weight (and, for pooled opening-stock lots, the
+        // manually entered fabrication fee) from each bulk stock lot used.
         const stockItems = cart.filter(item => item.mode === 'stock');
         let stockConsumeWarning = '';
         for (const item of stockItems) {
-            const { error: consumeError } = await goldmindClient.rpc('consume_gold_stock_lot', { target_lot_id: item.lotId, amount: item.weight });
+            const { error: consumeError } = item.isPooled
+                ? await goldmindClient.rpc('consume_gold_stock_lot_pooled', { target_lot_id: item.lotId, weight_amount: item.weight, fee_amount: item.manualFabFee })
+                : await goldmindClient.rpc('consume_gold_stock_lot', { target_lot_id: item.lotId, amount: item.weight });
             if (consumeError) {
-                stockConsumeWarning = ' (تنبيه: تعذّر خصم الوزن من رصيد الجملة لبعض القطع — راجع الرصيد يدوياً: ' + consumeError.message + ')';
+                stockConsumeWarning = ' (تنبيه: تعذّر خصم الوزن/المصنعية من رصيد الجملة لبعض القطع — راجع الرصيد يدوياً: ' + consumeError.message + ')';
             }
         }
 

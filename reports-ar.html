@@ -287,7 +287,9 @@ async function loadReport() {
       const revenue = Number(it.line_total) || 0;
       const goldValue = weight * goldPrice;
       const vat = revenue - (revenue / vatMultiplier);
-      const fabCost = weight * ((it.piece && it.piece.cost_fabrication_per_gram) || 0);
+      // Pooled opening-stock lots store a manually entered fee directly on
+      // the invoice_item (see profit-report-ar.html for the fuller version).
+      const fabCost = it.fabrication_fee ? Number(it.fabrication_fee) : (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || 0));
       totalProfit += revenue - goldValue - vat - fabCost;
     });
   }
