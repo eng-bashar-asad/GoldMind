@@ -311,3 +311,22 @@ goldmindLoadSavedTheme();
   `;
   document.head.appendChild(style);
 })();
+
+// Fifth shape: same placeholder-legibility gap, but for the WHITE-background
+// inputs from the second fix above (company-settings, ledger forms, etc.).
+// Their typed text is now dark (on-surface) via that fix, but an empty
+// field's placeholder still used the browser's own default grey, which
+// reads as too faint/washed-out on some devices. Give those placeholders
+// a deliberate, readable mid-grey tied to the theme instead.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    input:not(.bg-transparent):not(.text-on-background)::placeholder,
+    select:not(.bg-transparent):not(.text-on-background)::placeholder,
+    textarea:not(.bg-transparent):not(.text-on-background)::placeholder {
+      color: var(--gm-on-surface-variant, #45464d);
+      opacity: 0.75;
+    }
+  `;
+  document.head.appendChild(style);
+})();

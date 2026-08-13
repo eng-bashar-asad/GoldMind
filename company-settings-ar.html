@@ -49,6 +49,8 @@
 </button>
 <h1 class="font-headline-md text-headline-md font-bold">بيانات الشركة</h1>
 </div>
+<span class="text-[11px] font-semibold text-on-surface-variant bg-surface-container-low px-3 py-1.5 rounded-full" id="active-store-badge"></span>
+<a href="switch-branch-ar.html" class="text-[11px] font-semibold text-primary underline shrink-0">تبديل</a>
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
@@ -456,6 +458,9 @@
         const file = this.files[0];
         if (!file) return;
 
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
         const errEl = document.getElementById('store-logo-upload-error');
         const labelEl = document.getElementById('store-logo-upload-label');
         errEl.classList.add('hidden');
@@ -502,6 +507,7 @@
         }
 
         document.getElementById('store-name').value = data.name || '';
+        document.getElementById('active-store-badge').textContent = data.name || '';
         document.getElementById('store-country').value = data.country || '';
         document.getElementById('store-currency').value = data.currency || 'AED';
         document.getElementById('store-address').value = data.address || '';
