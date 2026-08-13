@@ -424,6 +424,15 @@ document.getElementById('quickForm').addEventListener('submit', async function (
         return;
     }
 
+    // Accounts with more than one company must explicitly pick which one
+    // to work in on every fresh login — never silently reuse whichever
+    // company was active last time, even if it's still a valid membership.
+    // (Within a session, navigating between pages still remembers the
+    // just-picked company via this same key — only a brand-new login clears it.)
+    if (memberships.length > 1) {
+        localStorage.removeItem('goldmind_active_store');
+    }
+
     window.location.href = 'index-ar.html';
 });
 </script>
