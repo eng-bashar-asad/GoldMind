@@ -81,6 +81,10 @@
 <span class="text-[13px] text-on-surface-variant">رصيد الدين (نقدي)</span>
 <span class="font-bold text-[18px] font-data-mono" id="detail-balance">0.00</span>
 </div>
+<div class="mt-1 flex justify-between items-center">
+<span class="text-[13px] text-on-surface-variant">رصيد الذهب (مكافئ عيار ٢٤)</span>
+<span class="font-bold text-[15px] font-data-mono" id="detail-gold-balance">0.00 غ</span>
+</div>
 <p class="text-[10px] text-outline mt-1">قيمة موجبة = دين على العميل لصالح المحل لم يُسدَّد بعد</p>
 </div>
 
@@ -131,9 +135,14 @@
 <p class="text-error text-[12px] hidden" id="editCustomerError"></p>
 </div>
 
-<button onclick="toggleSettleForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2">
-<span class="material-symbols-outlined">payments</span> تسجيل دفعة من العميل
+<div class="grid grid-cols-2 gap-2">
+<button onclick="toggleSettleForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
+<span class="material-symbols-outlined text-[19px]">payments</span> تسجيل دفعة من العميل
 </button>
+<button onclick="toggleOpeningBalanceForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
+<span class="material-symbols-outlined text-[19px]">history</span> رصيد سابق
+</button>
+</div>
 <a id="printStatementLink" href="#" target="_blank" class="w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">print</span> طباعة كشف حساب
 </a>
@@ -144,6 +153,40 @@
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="settle-notes" placeholder="ملاحظة (اختياري)"></textarea>
 <button onclick="submitSettlement()" id="settle-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الدفعة</button>
 <p class="text-error text-[12px] hidden mt-2" id="settle-error"></p>
+</div>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="opening-balance-form">
+<p class="text-[12px] text-on-surface-variant mb-3">لتسجيل رصيد كان موجوداً مع العميل قبل الاشتراك بالبرنامج — لا يؤثر على صندوق المحل النقدي ولا على المخزون، فقط يضبط رصيد العميل.</p>
+<div class="grid grid-cols-2 gap-2 mb-3" id="ob-direction-toggle">
+<button type="button" onclick="setObDirection('receivable')" class="ob-dir-btn h-11 rounded-lg border font-semibold text-[13px]" data-dir="receivable">قبض (العميل مديون للمحل)</button>
+<button type="button" onclick="setObDirection('payable')" class="ob-dir-btn h-11 rounded-lg border font-semibold text-[13px]" data-dir="payable">صرف (المحل مديون للعميل)</button>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-3" id="ob-type-toggle">
+<button type="button" onclick="setObType('cash')" class="ob-type-btn h-11 rounded-lg border font-semibold text-[13px]" data-type="cash">درهم (نقدي)</button>
+<button type="button" onclick="setObType('gold')" class="ob-type-btn h-11 rounded-lg border font-semibold text-[13px]" data-type="gold">معادن (ذهب)</button>
+</div>
+<div id="ob-cash-fields">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ (درهم)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="ob-cash-amount" step="0.01" type="number"/>
+</div>
+<div class="hidden grid grid-cols-2 gap-3 mb-3" id="ob-gold-fields">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="ob-gold-weight" step="0.01" type="number"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العيار</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="ob-gold-karat">
+<option value="18">18</option>
+<option selected value="21">21</option>
+<option value="22">22</option>
+<option value="24">24</option>
+</select>
+</div>
+</div>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="ob-notes" placeholder="ملاحظة (اختياري)"></textarea>
+<button onclick="submitOpeningBalance()" id="ob-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الرصيد السابق</button>
+<p class="text-error text-[12px] hidden mt-2" id="ob-error"></p>
 </div>
 
 <div class="flex items-center justify-between gap-2 mt-2">
@@ -178,6 +221,11 @@ function fmt(n) {
 }
 
 const MOVEMENT_LABELS = { debt_increase: 'فاتورة بيع بالدين', debt_decrease: 'دفعة من العميل' };
+
+function movementLabel(m) {
+  if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
+  return MOVEMENT_LABELS[m.movement_type] || m.movement_type;
+}
 
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
@@ -221,6 +269,11 @@ async function load() {
 function customerBalance(customerId) {
   const moves = movementsByCustomer[customerId] || [];
   return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? Number(m.cash_amount || 0) : -Number(m.cash_amount || 0)), 0);
+}
+
+function customerGoldBalance(customerId) {
+  const moves = movementsByCustomer[customerId] || [];
+  return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? Number(m.gold_grams_24k || 0) : -Number(m.gold_grams_24k || 0)), 0);
 }
 
 function showCustomersList() {
@@ -276,6 +329,7 @@ function showCustomerDetail(customerId) {
   document.getElementById('customers-list-view').classList.add('hidden');
   document.getElementById('customer-detail-view').classList.remove('hidden');
   document.getElementById('settle-form').classList.add('hidden');
+  document.getElementById('opening-balance-form').classList.add('hidden');
   document.getElementById('printStatementLink').href = 'customer-debts-print-ar.html?id=' + customerId;
 
   document.getElementById('detail-customer-name').textContent = customer.name;
@@ -291,6 +345,11 @@ function showCustomerDetail(customerId) {
   const balEl = document.getElementById('detail-balance');
   balEl.textContent = fmt(Math.abs(bal));
   balEl.className = 'font-bold text-[18px] font-data-mono ' + (bal > 0 ? 'text-error' : 'text-success');
+
+  const goldBal = customerGoldBalance(customerId);
+  const goldBalEl = document.getElementById('detail-gold-balance');
+  goldBalEl.textContent = fmt(Math.abs(goldBal)) + ' غ';
+  goldBalEl.className = 'font-bold text-[15px] font-data-mono ' + (goldBal > 0 ? 'text-error' : (goldBal < 0 ? 'text-success' : ''));
 
   document.getElementById('movementsMonthFilter').value = '';
   document.getElementById('clearMonthFilterBtn').classList.add('hidden');
@@ -322,13 +381,14 @@ function renderMovementsList() {
   listEl.innerHTML = moves.map(m => {
     const isIncrease = m.movement_type === 'debt_increase';
     const date = new Date(m.created_at).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
+    const goldLine = Number(m.gold_grams_24k || 0) !== 0 ? ` <span class="font-data-mono">${isIncrease ? '+' : '-'}${fmt(Math.abs(m.gold_grams_24k))}غ</span>` : '';
     return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${gmEscapeHtml(MOVEMENT_LABELS[m.movement_type] || m.movement_type)}</span>
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${gmEscapeHtml(movementLabel(m))}</span>
           <span class="text-[11px] text-on-surface-variant">${date}</span>
         </div>
-        <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-error' : 'text-success'}">${isIncrease ? '+' : '-'}${fmt(m.cash_amount)}</p>
+        <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-error' : 'text-success'}">${Number(m.cash_amount || 0) !== 0 ? (isIncrease ? '+' : '-') + fmt(m.cash_amount) : ''}${goldLine}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
         ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
       </div>`;
@@ -336,7 +396,102 @@ function renderMovementsList() {
 }
 
 function toggleSettleForm() {
+  document.getElementById('opening-balance-form').classList.add('hidden');
   document.getElementById('settle-form').classList.toggle('hidden');
+}
+
+let obDirection = 'receivable'; // 'receivable' = عميل مديون للمحل (قبض), 'payable' = المحل مديون للعميل (صرف)
+let obType = 'cash'; // 'cash' | 'gold'
+
+function setObDirection(dir) {
+  obDirection = dir;
+  document.querySelectorAll('.ob-dir-btn').forEach(function (btn) {
+    const active = btn.dataset.dir === dir;
+    btn.className = 'ob-dir-btn h-11 rounded-lg border font-semibold text-[13px] ' +
+      (active ? 'border-2 border-primary bg-primary text-white' : 'border-outline-variant bg-white text-on-surface-variant');
+  });
+}
+
+function setObType(type) {
+  obType = type;
+  document.querySelectorAll('.ob-type-btn').forEach(function (btn) {
+    const active = btn.dataset.type === type;
+    btn.className = 'ob-type-btn h-11 rounded-lg border font-semibold text-[13px] ' +
+      (active ? 'border-2 border-primary bg-primary text-white' : 'border-outline-variant bg-white text-on-surface-variant');
+  });
+  document.getElementById('ob-cash-fields').classList.toggle('hidden', type !== 'cash');
+  document.getElementById('ob-gold-fields').classList.toggle('hidden', type !== 'gold');
+  document.getElementById('ob-gold-fields').classList.toggle('grid', type === 'gold');
+}
+
+function toggleOpeningBalanceForm() {
+  document.getElementById('settle-form').classList.add('hidden');
+  document.getElementById('opening-balance-form').classList.toggle('hidden');
+  setObDirection('receivable');
+  setObType('cash');
+}
+
+async function submitOpeningBalance() {
+  const errEl = document.getElementById('ob-error');
+  errEl.classList.add('hidden');
+
+  const notes = document.getElementById('ob-notes').value.trim();
+  let cashAmount = 0, goldWeight = 0, goldKarat = 24, gold24k = 0;
+
+  if (obType === 'cash') {
+    cashAmount = parseFloat(document.getElementById('ob-cash-amount').value);
+    if (!cashAmount || cashAmount <= 0) {
+      errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+  } else {
+    goldWeight = parseFloat(document.getElementById('ob-gold-weight').value);
+    goldKarat = parseInt(document.getElementById('ob-gold-karat').value, 10);
+    if (!goldWeight || goldWeight <= 0) {
+      errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    gold24k = +(goldWeight * (goldKarat / 24)).toFixed(3);
+  }
+
+  // customer_debts sign convention: debt_increase = customer owes the shop
+  // more (receivable, "قبض"); debt_decrease = the shop owes the customer
+  // ("صرف"). This never touches cash_movements — it's a balance-only entry.
+  const movementType = obDirection === 'receivable' ? 'debt_increase' : 'debt_decrease';
+
+  const btn = document.getElementById('ob-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('customer_debts').insert({
+    store_id: GOLDMIND_STORE_ID,
+    customer_id: currentCustomerId,
+    movement_type: movementType,
+    cash_amount: cashAmount,
+    gold_grams_24k: gold24k,
+    source: 'opening_balance',
+    notes: notes || 'رصيد سابق (قبل الاشتراك بالبرنامج)',
+    created_by: GOLDMIND_STAFF_ID
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ الرصيد السابق';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('ob-cash-amount').value = '';
+  document.getElementById('ob-gold-weight').value = '';
+  document.getElementById('ob-notes').value = '';
+  document.getElementById('opening-balance-form').classList.add('hidden');
+  const customerIdToReopen = currentCustomerId;
+  await load();
+  showCustomerDetail(customerIdToReopen);
 }
 
 async function submitSettlement() {
@@ -389,6 +544,7 @@ async function submitSettlement() {
   document.getElementById('settle-amount').value = '';
   document.getElementById('settle-notes').value = '';
   document.getElementById('settle-form').classList.add('hidden');
+  document.getElementById('opening-balance-form').classList.add('hidden');
   const customerIdToReopen = currentCustomerId;
   await load();
   showCustomerDetail(customerIdToReopen);

@@ -157,7 +157,7 @@
 <p class="text-[10px] text-outline mt-1" id="cashDebtHint">قيمة موجبة (خضراء) = التاجر مديون للمحل. قيمة سالبة (حمراء) = المحل مديون للتاجر. الذهب دائماً بمكافئ عيار ٢٤ الصافي؛ الذهب والمصنعية دينان منفصلان تماماً.</p>
 </div>
 
-<div class="grid grid-cols-3 gap-2">
+<div class="grid grid-cols-2 gap-2">
 <button onclick="toggleSettleForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
 <span class="material-symbols-outlined text-[19px]">handshake</span> تسوية / دفعة
 </button>
@@ -167,6 +167,43 @@
 <button onclick="toggleGiveStockForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
 <span class="material-symbols-outlined text-[19px]">local_shipping</span> إخراج بضاعة
 </button>
+<button onclick="toggleTraderOpeningBalanceForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
+<span class="material-symbols-outlined text-[19px]">history</span> رصيد سابق
+</button>
+</div>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-opening-balance-form">
+<p class="text-[12px] text-on-surface-variant mb-3">لتسجيل رصيد كان موجوداً مع التاجر قبل الاشتراك بالبرنامج — لا يؤثر على صندوق المحل النقدي ولا على المخزون، فقط يضبط رصيد التاجر.</p>
+<div class="grid grid-cols-2 gap-2 mb-3" id="tob-direction-toggle">
+<button type="button" onclick="setTobDirection('receivable')" class="tob-dir-btn h-11 rounded-lg border font-semibold text-[13px]" data-dir="receivable">قبض (التاجر مديون للمحل)</button>
+<button type="button" onclick="setTobDirection('payable')" class="tob-dir-btn h-11 rounded-lg border font-semibold text-[13px]" data-dir="payable">صرف (المحل مديون للتاجر)</button>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-3" id="tob-type-toggle">
+<button type="button" onclick="setTobType('cash')" class="tob-type-btn h-11 rounded-lg border font-semibold text-[13px]" data-type="cash">درهم (نقدي)</button>
+<button type="button" onclick="setTobType('gold')" class="tob-type-btn h-11 rounded-lg border font-semibold text-[13px]" data-type="gold">معادن (ذهب)</button>
+</div>
+<div id="tob-cash-fields">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ (د.إ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="tob-cash-amount" step="0.01" type="number"/>
+</div>
+<div class="hidden grid grid-cols-2 gap-3 mb-3" id="tob-gold-fields">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="tob-gold-weight" step="0.01" type="number"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العيار</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="tob-gold-karat">
+<option value="18">18</option>
+<option selected value="21">21</option>
+<option value="22">22</option>
+<option value="24">24</option>
+</select>
+</div>
+</div>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="tob-notes" placeholder="ملاحظة (اختياري)"></textarea>
+<button onclick="submitTraderOpeningBalance()" id="tob-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الرصيد السابق</button>
+<p class="text-error text-[12px] hidden mt-2" id="tob-error"></p>
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="receive-stock-form">
@@ -330,6 +367,7 @@ const MOVEMENT_LABELS = { debt_increase: 'استلام ذهب (زيادة دين
 function movementLabel(m) {
   if (m.source === 'stock_given') return 'إخراج بضاعة (تسليم للتاجر)';
   if (m.source === 'stock_received') return 'إدخال بضاعة (استلام من التاجر)';
+  if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
   return MOVEMENT_LABELS[m.movement_type] || m.movement_type;
 }
 
@@ -604,11 +642,12 @@ function showTraderDetail(traderId) {
     const isIncrease = m.movement_type === 'debt_increase';
     const date = new Date(m.created_at).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
     const isStockMovement = m.source === 'stock_given' || m.source === 'stock_received';
+    const isOpeningBalance = m.source === 'opening_balance';
     const weightLine = isStockMovement
       ? `${m.weight_grams}غ قائم${m.accounting_weight_grams ? ` / ${m.accounting_weight_grams}غ محاسبي` : ''} عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)`
       : (m.weight_grams ? `${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : '');
     const feeLine = (m.fab_fee_amount && Number(m.fab_fee_amount) > 0)
-      ? ` ${weightLine ? '+' : ''}${isStockMovement ? `مصنعية (${fmtMoney(m.fab_fee_per_gram)}/غ)` : (diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية')} ${fmtMoney(m.fab_fee_amount)}`
+      ? ` ${weightLine ? '+' : ''}${isStockMovement ? `مصنعية (${fmtMoney(m.fab_fee_per_gram)}/غ)` : (isOpeningBalance ? 'نقدي' : (diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية'))} ${fmtMoney(m.fab_fee_amount)}`
       : '';
     return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
@@ -626,6 +665,7 @@ function showTraderDetail(traderId) {
 function toggleSettleForm() {
   document.getElementById('give-stock-form').classList.add('hidden');
   document.getElementById('receive-stock-form').classList.add('hidden');
+  document.getElementById('trader-opening-balance-form').classList.add('hidden');
   document.getElementById('settle-form').classList.toggle('hidden');
   setSettleMode('gold');
 }
@@ -633,13 +673,115 @@ function toggleSettleForm() {
 function toggleGiveStockForm() {
   document.getElementById('settle-form').classList.add('hidden');
   document.getElementById('receive-stock-form').classList.add('hidden');
+  document.getElementById('trader-opening-balance-form').classList.add('hidden');
   document.getElementById('give-stock-form').classList.toggle('hidden');
 }
 
 function toggleReceiveStockForm() {
   document.getElementById('settle-form').classList.add('hidden');
   document.getElementById('give-stock-form').classList.add('hidden');
+  document.getElementById('trader-opening-balance-form').classList.add('hidden');
   document.getElementById('receive-stock-form').classList.toggle('hidden');
+}
+
+let tobDirection = 'receivable'; // 'receivable' = التاجر مديون للمحل (قبض), 'payable' = المحل مديون للتاجر (صرف)
+let tobType = 'cash';
+
+function setTobDirection(dir) {
+  tobDirection = dir;
+  document.querySelectorAll('.tob-dir-btn').forEach(function (btn) {
+    const active = btn.dataset.dir === dir;
+    btn.className = 'tob-dir-btn h-11 rounded-lg border font-semibold text-[13px] ' +
+      (active ? 'border-2 border-primary bg-primary text-white' : 'border-outline-variant bg-white text-on-surface-variant');
+  });
+}
+
+function setTobType(type) {
+  tobType = type;
+  document.querySelectorAll('.tob-type-btn').forEach(function (btn) {
+    const active = btn.dataset.type === type;
+    btn.className = 'tob-type-btn h-11 rounded-lg border font-semibold text-[13px] ' +
+      (active ? 'border-2 border-primary bg-primary text-white' : 'border-outline-variant bg-white text-on-surface-variant');
+  });
+  document.getElementById('tob-cash-fields').classList.toggle('hidden', type !== 'cash');
+  document.getElementById('tob-gold-fields').classList.toggle('hidden', type !== 'gold');
+  document.getElementById('tob-gold-fields').classList.toggle('grid', type === 'gold');
+}
+
+function toggleTraderOpeningBalanceForm() {
+  document.getElementById('settle-form').classList.add('hidden');
+  document.getElementById('give-stock-form').classList.add('hidden');
+  document.getElementById('receive-stock-form').classList.add('hidden');
+  document.getElementById('trader-opening-balance-form').classList.toggle('hidden');
+  setTobDirection('receivable');
+  setTobType('cash');
+}
+
+async function submitTraderOpeningBalance() {
+  const errEl = document.getElementById('tob-error');
+  errEl.classList.add('hidden');
+
+  const notes = document.getElementById('tob-notes').value.trim();
+  let cashAmountAed = 0, goldWeight = 0, goldKarat = 24, gold24k = 0;
+
+  if (tobType === 'cash') {
+    const enteredAmount = parseFloat(document.getElementById('tob-cash-amount').value);
+    if (!enteredAmount || enteredAmount <= 0) {
+      errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    cashAmountAed = enteredAmount; // field is fixed to AED, no currency conversion needed
+  } else {
+    goldWeight = parseFloat(document.getElementById('tob-gold-weight').value);
+    goldKarat = parseInt(document.getElementById('tob-gold-karat').value, 10);
+    if (!goldWeight || goldWeight <= 0) {
+      errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    gold24k = +(goldWeight * (goldKarat / 24)).toFixed(3);
+  }
+
+  // trader_movements sign convention: debt_decrease increases the "trader
+  // owes the shop" balance (قبض); debt_increase increases the "shop owes
+  // the trader" balance (صرف). Never touches cash_movements — balance-only.
+  const movementType = tobDirection === 'receivable' ? 'debt_decrease' : 'debt_increase';
+
+  const btn = document.getElementById('tob-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const movement = {
+    store_id: GOLDMIND_STORE_ID,
+    trader_id: currentTraderId,
+    movement_type: movementType,
+    weight_grams: goldWeight || null,
+    karat: tobType === 'gold' ? goldKarat : null,
+    gold_24k_equivalent: gold24k,
+    fab_fee_amount: cashAmountAed,
+    source: 'opening_balance',
+    notes: notes || 'رصيد سابق (قبل الاشتراك بالبرنامج)'
+  };
+
+  const { error } = await goldmindClient.from('trader_movements').insert(movement);
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ الرصيد السابق';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('tob-cash-amount').value = '';
+  document.getElementById('tob-gold-weight').value = '';
+  document.getElementById('tob-notes').value = '';
+  document.getElementById('trader-opening-balance-form').classList.add('hidden');
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
 }
 
 // Accounting weight defaults to the gross/standing weight and stays in sync
