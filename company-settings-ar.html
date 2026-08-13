@@ -195,6 +195,46 @@
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-license" type="text"/>
 </div>
 
+<div class="border-t border-outline-variant pt-5 mt-1">
+<h3 class="font-label-md text-label-md text-secondary font-bold mb-1">الفوترة الإلكترونية (PINT-AE)</h3>
+<p class="text-[11px] text-on-surface-variant leading-5 mb-4">حقول إضافية تتطلبها مواصفة الفوترة الإلكترونية الإماراتية الرسمية. تعبئتها الآن تجهّز فواتيرك للتوليد بصيغة XML المتوافقة — الإرسال الفعلي لهيئة الضرائب لا يتم إلا بعد التعاقد مع مزوّد خدمة معتمد (ASP) لاحقاً.</p>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-legal-name">الاسم القانوني الكامل (كما بالرخصة)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-legal-name" type="text"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-legal-reg-type">نوع رقم التسجيل القانوني</label>
+<select class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-legal-reg-type">
+<option value="">— اختر —</option>
+<option value="TL">رخصة تجارية (Trade License)</option>
+<option value="CR">سجل تجاري (Commercial Registration)</option>
+<option value="FZ">تسجيل منطقة حرة (Free Zone)</option>
+<option value="PASS">جواز سفر (لغير المسجّلين)</option>
+</select>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-emirate">الإمارة</label>
+<select class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-emirate">
+<option value="">— اختر —</option>
+<option value="DXB">دبي</option>
+<option value="AUH">أبوظبي</option>
+<option value="SHJ">الشارقة</option>
+<option value="AJM">عجمان</option>
+<option value="RAK">رأس الخيمة</option>
+<option value="FUJ">الفجيرة</option>
+<option value="UAQ">أم القيوين</option>
+</select>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-peppol-id">معرّف Peppol (يُعطى من مزوّد الخدمة المعتمد لاحقاً)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-peppol-id" placeholder="غير متوفر بعد" type="text"/>
+</div>
+
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-logo">رابط اللوغو (اختياري)</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-logo" placeholder="https://..." type="text"/>
@@ -420,6 +460,10 @@
         document.getElementById('store-cr').value = data.commercial_registration_number || '';
         document.getElementById('store-tax').value = data.tax_number || '';
         document.getElementById('store-license').value = data.license_number || '';
+        document.getElementById('store-legal-name').value = data.legal_name || '';
+        document.getElementById('store-legal-reg-type').value = data.legal_registration_id_type || '';
+        document.getElementById('store-emirate').value = data.emirate_code || '';
+        document.getElementById('store-peppol-id').value = data.peppol_endpoint_id || '';
         setNumberingMode(data.invoice_numbering_mode || 'auto');
         logoInput.value = data.logo_url || '';
         updateLogoPreview();
@@ -455,6 +499,10 @@
         const cr = document.getElementById('store-cr').value.trim();
         const tax = document.getElementById('store-tax').value.trim();
         const license = document.getElementById('store-license').value.trim();
+        const legalName = document.getElementById('store-legal-name').value.trim();
+        const legalRegType = document.getElementById('store-legal-reg-type').value;
+        const emirate = document.getElementById('store-emirate').value;
+        const peppolId = document.getElementById('store-peppol-id').value.trim();
         const logo = logoInput.value.trim();
 
         if (!name) {
@@ -487,6 +535,10 @@
                 commercial_registration_number: cr || null,
                 tax_number: tax || null,
                 license_number: license || null,
+                legal_name: legalName || null,
+                legal_registration_id_type: legalRegType || null,
+                emirate_code: emirate || null,
+                peppol_endpoint_id: peppolId || null,
                 invoice_numbering_mode: numberingMode,
                 invoice_print_frame: selectedFrameStyle,
                 invoice_print_shape: selectedShapeStyle,

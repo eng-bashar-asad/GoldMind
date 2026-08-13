@@ -17,6 +17,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
+<script src="pint-ae.js"></script>
 <script src="theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -67,6 +68,10 @@
 <button class="hidden items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg text-sm font-semibold" id="restore-invoice-btn" onclick="restoreInvoiceFlow()">
 <span class="material-symbols-outlined">restore</span>
                 استعادة الفاتورة
+            </button>
+<button class="hidden items-center gap-2 bg-purple-50 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-sm font-semibold" id="einvoice-btn" onclick="generateEinvoiceXml()">
+<span class="material-symbols-outlined">description</span>
+                XML إلكترونية
             </button>
 </div>
 
@@ -493,6 +498,15 @@
             certBox.classList.add('flex');
         }
 
+        // ---- E-invoice XML (PINT-AE) generation — sale/credit-note only,
+        // prep for a future Accredited Service Provider (ASP) integration ----
+        if ((invoice.type === 'sale' || invoice.type === 'return') && invoice.status !== 'cancelled') {
+            window.__einvoiceData = { store, invoice, customer, items: items || [] };
+            const eBtn = document.getElementById('einvoice-btn');
+            eBtn.classList.remove('hidden');
+            eBtn.classList.add('flex');
+        }
+
         // ---- WhatsApp share (free wa.me text link, same convention used
         // by repairs/daily-cashbox — no paid Business API) ----
         if (invoice.status !== 'cancelled') {
@@ -530,6 +544,50 @@
     }
 
     loadInvoice();
+
+    async function generateEinvoiceXml() {
+        const d = window.__einvoiceData;
+        if (!d) return;
+
+        const btn = document.getElementById('einvoice-btn');
+        btn.disabled = true;
+
+        // Credit notes must reference the original invoice's number (IBT-025).
+        let relatedInvoiceNumber = null;
+        if (d.invoice.type === 'return' && d.invoice.related_invoice_id) {
+            const { data: orig } = await goldmindClient.from('invoices').select('invoice_number').eq('id', d.invoice.related_invoice_id).maybeSingle();
+            relatedInvoiceNumber = orig ? orig.invoice_number : null;
+        }
+
+        const xml = buildPintAeXml({
+            store: d.store,
+            invoice: Object.assign({}, d.invoice, { related_invoice_number: relatedInvoiceNumber }),
+            customer: d.customer,
+            items: d.items
+        });
+
+        // Save for reference/audit — also gives us a stable UUID + a record
+        // that this invoice has a compliant XML ready for an ASP later.
+        const uuidMatch = xml.match(/<cbc:UUID>([^<]+)<\/cbc:UUID>/);
+        await goldmindClient.from('invoices').update({
+            einvoice_xml: xml,
+            einvoice_uuid: uuidMatch ? uuidMatch[1] : null,
+            einvoice_status: 'generated'
+        }).eq('id', window.__currentInvoiceId);
+
+        // Offer the XML file for download.
+        const blob = new Blob([xml], { type: 'application/xml' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = (d.invoice.invoice_number || 'invoice') + '-pint-ae.xml';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+
+        btn.disabled = false;
+    }
 
     async function cancelInvoiceFlow() {
         if (!confirm('هل أنت متأكد من إلغاء هذه الفاتورة؟ رقمها يضل محفوظ بالسجل بشكل دائم ومعلَّم كملغاة (ما بينحذف نهائياً).')) return;
