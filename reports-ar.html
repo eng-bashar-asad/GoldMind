@@ -121,6 +121,12 @@
 <h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-gold-available">0 جم</h2>
 <p class="text-[10px] text-outline mt-1">الرصيد الحالي بالمخزون — بغض النظر عن الفترة المختارة</p>
 </div>
+<div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
+<div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-secondary-container">account_balance</span></div>
+<p class="text-[12px] text-on-surface-variant mb-1">إجمالي رصيد الذهب الشامل (صافي، عيار ٢٤)</p>
+<h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-gold-total-with-traders">0 جم</h2>
+<p class="text-[10px] text-outline mt-1">المخزون + ذهب مستحق من التجار − ذهب مستحق للتجار</p>
+</div>
 </div>
 
 <h3 class="font-bold text-[15px] mb-3">فواتير البيع بالفترة (<span id="invoices-count">0</span>)</h3>
@@ -329,6 +335,18 @@ async function loadReport() {
   (availablePieces || []).forEach(p => { if (p.weight_grams && p.karat) goldAvailable24k += Number(p.weight_grams) * (Number(p.karat) / 24); });
   (stockLots || []).forEach(l => { if (l.weight_grams_remaining && l.karat) goldAvailable24k += Number(l.weight_grams_remaining) * (Number(l.karat) / 24); });
   document.getElementById('stat-gold-available').textContent = fmt(goldAvailable24k) + ' جم';
+
+  // Comprehensive net gold position: in-shop stock (pieces + bulk lots)
+  // PLUS gold owed to the shop by traders MINUS gold the shop owes traders.
+  // Same sign convention as ledger-ar.html: debt_decrease increases the
+  // "trader owes the shop" balance, debt_increase increases "shop owes trader".
+  const { data: allTraderMoves } = await goldmindClient
+    .from('trader_movements').select('movement_type, gold_24k_equivalent').eq('store_id', GOLDMIND_STORE_ID);
+  let netTraderGold24k = 0;
+  (allTraderMoves || []).forEach(m => {
+    netTraderGold24k += (m.movement_type === 'debt_decrease' ? 1 : -1) * Number(m.gold_24k_equivalent || 0);
+  });
+  document.getElementById('stat-gold-total-with-traders').textContent = fmt(goldAvailable24k + netTraderGold24k) + ' جم';
 
   document.getElementById('invoices-count').textContent = salesInvoices.length;
 
