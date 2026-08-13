@@ -249,6 +249,14 @@
 <p class="text-[11px] text-outline mt-1 px-1">إذا تركته فارغاً، لن يظهر أي لوغو بالفاتورة المطبوعة.</p>
 </div>
 
+<div>
+<input accept="image/*" class="hidden" id="store-logo-file-input" type="file"/>
+<button type="button" onclick="document.getElementById('store-logo-file-input').click()" class="w-full h-12 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-primary text-[13px] font-semibold">
+<span class="material-symbols-outlined text-[18px]">upload</span> <span id="store-logo-upload-label">رفع صورة من الجهاز</span>
+</button>
+<p class="text-error text-[11px] hidden mt-1 px-1" id="store-logo-upload-error"></p>
+</div>
+
 <div id="logo-preview-wrap" class="hidden">
 <span class="text-[11px] font-semibold text-outline block mb-2">معاينة اللوغو</span>
 <img id="logo-preview" class="h-16 object-contain border border-outline-variant rounded-lg p-2 bg-white"/>
@@ -443,6 +451,37 @@
         }
     }
     logoInput.addEventListener('input', updateLogoPreview);
+
+    document.getElementById('store-logo-file-input').addEventListener('change', async function () {
+        const file = this.files[0];
+        if (!file) return;
+
+        const errEl = document.getElementById('store-logo-upload-error');
+        const labelEl = document.getElementById('store-logo-upload-label');
+        errEl.classList.add('hidden');
+        labelEl.textContent = 'جارِ الرفع...';
+
+        const ext = (file.name.split('.').pop() || 'png').toLowerCase();
+        const path = GOLDMIND_STORE_ID + '/logo.' + ext;
+
+        const { error: upErr } = await goldmindClient.storage.from('store-logos').upload(path, file, { upsert: true });
+
+        if (upErr) {
+            errEl.textContent = 'تعذّر رفع الصورة: ' + upErr.message;
+            errEl.classList.remove('hidden');
+            labelEl.textContent = 'رفع صورة من الجهاز';
+            return;
+        }
+
+        const { data: pub } = goldmindClient.storage.from('store-logos').getPublicUrl(path);
+        // Cache-bust so the new logo shows immediately even though the path
+        // (and therefore the URL) is the same as any previous upload.
+        const url = pub.publicUrl + '?t=' + Date.now();
+        logoInput.value = url;
+        updateLogoPreview();
+        labelEl.textContent = 'رفع صورة من الجهاز';
+        this.value = '';
+    });
 
     async function loadStore() {
         const session = await requireGoldMindSession('login-entry-ar.html');
