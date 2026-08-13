@@ -236,6 +236,14 @@
 </div>
 
 <div class="relative">
+<p class="text-[11px] text-outline mb-3">إذا كان هذا الحساب استخدامه داخلي فقط (مو نشاط تجاري حقيقي مسجّل لدى FTA)، عطّل الفوترة الإلكترونية له بالكامل — ما رح يظهر زر توليد XML على أي فاتورة بهذا الحساب حتى لو العميل شركة.</p>
+<div class="flex gap-3">
+<button type="button" id="einvoice-off-btn" onclick="setEinvoiceDisabled(true)" class="flex-1 h-14 rounded-lg border font-semibold transition-all">معطّلة (حساب داخلي)</button>
+<button type="button" id="einvoice-on-btn" onclick="setEinvoiceDisabled(false)" class="flex-1 h-14 rounded-lg border font-semibold transition-all">مفعّلة</button>
+</div>
+</div>
+
+<div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-logo">رابط اللوغو (اختياري)</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-logo" placeholder="https://..." type="text"/>
 <p class="text-[11px] text-outline mt-1 px-1">إذا تركته فارغاً، لن يظهر أي لوغو بالفاتورة المطبوعة.</p>
@@ -299,6 +307,17 @@
         onBtn.className = value ? active : inactive;
     }
 
+    let einvoiceDisabled = false;
+    function setEinvoiceDisabled(value) {
+        einvoiceDisabled = value;
+        const offBtn = document.getElementById('einvoice-off-btn');
+        const onBtn = document.getElementById('einvoice-on-btn');
+        const active = 'flex-1 h-14 rounded-lg border-2 border-primary bg-primary text-white font-semibold transition-all';
+        const inactive = 'flex-1 h-14 rounded-lg border border-outline-variant bg-white text-on-surface-variant font-semibold transition-all';
+        offBtn.className = value ? active : inactive;
+        onBtn.className = value ? inactive : active;
+    }
+
     let numberingMode = 'auto';
     function setNumberingMode(mode) {
         numberingMode = mode;
@@ -358,6 +377,7 @@
     setFrameStyle(selectedFrameStyle);
     setShapeStyle(selectedShapeStyle);
     setDiamondsEnabled(diamondsEnabled);
+    setEinvoiceDisabled(einvoiceDisabled);
 
     const countryCurrencyMap = {
         'AE': 'AED', 'SA': 'SAR', 'KW': 'KWD', 'QA': 'QAR', 'BH': 'BHD',
@@ -464,6 +484,7 @@
         document.getElementById('store-legal-reg-type').value = data.legal_registration_id_type || '';
         document.getElementById('store-emirate').value = data.emirate_code || '';
         document.getElementById('store-peppol-id').value = data.peppol_endpoint_id || '';
+        setEinvoiceDisabled(data.einvoice_disabled === true);
         setNumberingMode(data.invoice_numbering_mode || 'auto');
         logoInput.value = data.logo_url || '';
         updateLogoPreview();
@@ -539,6 +560,7 @@
                 legal_registration_id_type: legalRegType || null,
                 emirate_code: emirate || null,
                 peppol_endpoint_id: peppolId || null,
+                einvoice_disabled: einvoiceDisabled,
                 invoice_numbering_mode: numberingMode,
                 invoice_print_frame: selectedFrameStyle,
                 invoice_print_shape: selectedShapeStyle,
