@@ -498,9 +498,12 @@
             certBox.classList.add('flex');
         }
 
-        // ---- E-invoice XML (PINT-AE) generation — sale/credit-note only,
-        // prep for a future Accredited Service Provider (ASP) integration ----
-        if ((invoice.type === 'sale' || invoice.type === 'return') && invoice.status !== 'cancelled') {
+        // ---- E-invoice XML (PINT-AE) generation — sale/credit-note to a
+        // COMPANY customer only. UAE e-invoicing is mandatory for B2B/B2G;
+        // B2C (individual walk-in customers) is exempt at every phase so
+        // far, so hiding this for individual customers keeps staff from
+        // generating a file that serves no purpose on everyday sales. ----
+        if ((invoice.type === 'sale' || invoice.type === 'return') && invoice.status !== 'cancelled' && customer && customer.is_company) {
             window.__einvoiceData = { store, invoice, customer, items: items || [] };
             const eBtn = document.getElementById('einvoice-btn');
             eBtn.classList.remove('hidden');
