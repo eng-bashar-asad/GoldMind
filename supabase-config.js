@@ -27,6 +27,53 @@ let GOLDMIND_STAFF_ID = null;
 
 const goldmindClient = supabase.createClient(GOLDMIND_SUPABASE_URL, GOLDMIND_SUPABASE_KEY);
 
+// ---- Idle timeout: auto sign-out after 2 hours with no activity ----
+const GOLDMIND_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+const GOLDMIND_IDLE_KEY = 'goldmind_last_activity';
+const GOLDMIND_IDLE_TOUCH_MIN_INTERVAL_MS = 60 * 1000; // don't write on every single click
+
+function goldmindTouchActivity() {
+    localStorage.setItem(GOLDMIND_IDLE_KEY, Date.now().toString());
+}
+
+// Returns true if the session was idle too long and has now been signed out.
+async function goldmindEnforceIdleTimeout() {
+    const last = parseInt(localStorage.getItem(GOLDMIND_IDLE_KEY), 10);
+    if (last && (Date.now() - last) > GOLDMIND_IDLE_TIMEOUT_MS) {
+        GOLDMIND_STORE_ID = null;
+        GOLDMIND_STAFF_ID = null;
+        localStorage.removeItem(GOLDMIND_IDLE_KEY);
+        await goldmindClient.auth.signOut();
+        if (!window.location.pathname.endsWith('login-entry-ar.html')) {
+            window.location.href = 'login-entry-ar.html?idle=1';
+        }
+        return true;
+    }
+    goldmindTouchActivity();
+    return false;
+}
+
+// Keep the activity timestamp fresh while a page is actually being used,
+// throttled so it's not writing to localStorage on every keystroke/click.
+(function () {
+    let lastTouch = 0;
+    function throttledTouch() {
+        const now = Date.now();
+        if (now - lastTouch > GOLDMIND_IDLE_TOUCH_MIN_INTERVAL_MS) {
+            lastTouch = now;
+            goldmindTouchActivity();
+        }
+    }
+    ['click', 'keydown', 'touchstart', 'scroll'].forEach(function (evt) {
+        window.addEventListener(evt, throttledTouch, { passive: true });
+    });
+    // Also catch a tab left open and idle with no interaction at all —
+    // checked periodically so it doesn't need a page navigation to trigger.
+    setInterval(function () {
+        if (GOLDMIND_STORE_ID) goldmindEnforceIdleTimeout();
+    }, 60 * 1000);
+})();
+
 // Redirect to the login entry screen if there's no active session.
 // Also resolves GOLDMIND_STORE_ID/GOLDMIND_STAFF_ID to the current user's
 // active branch. If the account belongs to more than one branch and none is
@@ -38,6 +85,9 @@ async function requireGoldMindSession(redirectTo) {
         window.location.href = redirectTo || 'login-entry-ar.html';
         return null;
     }
+
+    const timedOut = await goldmindEnforceIdleTimeout();
+    if (timedOut) return null;
 
     // Mandatory privacy-policy acceptance gate — applies to every user (owner
     // or staff), regardless of how they signed up. Skipped only on the gate
@@ -112,6 +162,7 @@ async function goldMindSignOut(redirectTo) {
     if (!confirm('هل تريد تسجيل الخروج؟')) return;
     GOLDMIND_STORE_ID = null;
     GOLDMIND_STAFF_ID = null;
+    localStorage.removeItem(GOLDMIND_IDLE_KEY);
     await goldmindClient.auth.signOut();
     window.location.href = redirectTo || 'login-entry-ar.html';
 }
