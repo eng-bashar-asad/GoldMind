@@ -299,7 +299,6 @@ const GOLDMIND_THEMES = {
   'warm-ingot': {
     label: 'المسبوكة الهادئة',
     swatch: ['#9C8552', '#F3EEDF', '#EFE7D2'],
-    displayFont: true,
     lightCanvas: true,
     vars: {
       '--gm-bg': '#F3EEDF',
