@@ -313,7 +313,7 @@ const GOLDMIND_THEMES = {
       '--gm-secondary': '#7A6640',
       '--gm-on-surface': '#211D17',
       '--gm-on-surface-variant': '#6B6355',
-      '--gm-outline-variant': '#E3DCCB'
+      '--gm-outline-variant': '#CBBF9E'
     }
   },
 };
@@ -479,6 +479,43 @@ goldmindLoadSavedTheme();
     textarea:not(.bg-transparent):not(.text-on-background)::placeholder {
       color: var(--gm-on-surface-variant, #45464d);
       opacity: 0.75;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// Sixth shape: the "warm-ingot" theme (and any future theme with
+// lightCanvas:true) uses a light page canvas instead of the dark one every
+// other theme uses. .text-on-primary / body.text-on-background were always
+// safe to assume "light text, because the canvas under it is dark" — that
+// assumption breaks here. Default them to dark ink (on-surface) site-wide
+// for this theme, then explicitly restore the light color wherever
+// text-on-primary sits together with bg-primary on the same element (the
+// standard "solid dark button" pattern used across ~30 pages) or bg-accent,
+// since those chips stay dark/brass on purpose and still need light text.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    html.gm-light-canvas .text-on-primary,
+    html.gm-light-canvas .text-on-background {
+      color: var(--gm-on-surface, #191c1e);
+    }
+    html.gm-light-canvas .bg-primary.text-on-primary,
+    html.gm-light-canvas .bg-accent.text-on-primary {
+      color: var(--gm-on-primary, #ffffff);
+    }
+    html.gm-light-canvas input.text-on-background::placeholder,
+    html.gm-light-canvas textarea.text-on-background::placeholder {
+      color: var(--gm-on-surface-variant, #45464d);
+      opacity: 0.75;
+    }
+    /* On a light canvas, muted/hint text (text-on-surface-variant, text-
+       outline) no longer needs the "made visible against a dark page"
+       swap to outline-variant — the canvas is now as light as a card, so
+       the normal card-tone muted color already reads fine everywhere. */
+    html.gm-light-canvas .text-on-surface-variant,
+    html.gm-light-canvas .text-outline {
+      color: var(--gm-on-surface-variant, #45464d) !important;
     }
   `;
   document.head.appendChild(style);
