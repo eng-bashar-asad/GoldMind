@@ -644,8 +644,23 @@ function showTraderDetail(traderId) {
         <p class="text-[12px] font-data-mono">${weightLine}${feeLine}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
         ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
+        ${isOpeningBalance ? `<button onclick="deleteOpeningBalanceMovement('${m.id}')" class="mt-2 text-[11px] text-error font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف لإعادة الإدخال</button>` : ''}
       </div>`;
   }).join('');
+}
+
+async function deleteOpeningBalanceMovement(movementId) {
+  if (!confirm('هل تريد حذف الرصيد السابق؟ يمكنك إدخاله من جديد بالقيمة الصحيحة بعد الحذف.')) return;
+
+  const { error } = await goldmindClient.from('trader_movements').delete().eq('id', movementId);
+  if (error) {
+    alert('تعذّر الحذف: ' + error.message);
+    return;
+  }
+
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
 }
 
 function toggleSettleForm() {
