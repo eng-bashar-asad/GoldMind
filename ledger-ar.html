@@ -494,6 +494,15 @@ async function submitNewTrader() {
     return;
   }
 
+  const nameExists = traders.some(function (t) {
+    return (t.name || '').trim().toLowerCase() === name.toLowerCase();
+  });
+  if (nameExists) {
+    errEl.textContent = 'يوجد تاجر آخر بنفس الاسم مسجّل مسبقاً';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
   const legalName = document.getElementById('traderLegalName').value.trim();
   if (traderIsCompany && !legalName) {
     errEl.textContent = 'فضلاً أدخل اسم الشركة القانوني';
