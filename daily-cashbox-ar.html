@@ -93,6 +93,11 @@
 <option value="GBP">جنيه إسترليني (GBP)</option>
 </select>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="notesInput" placeholder="ملاحظة / وصف إضافي (اختياري)"></textarea>
+<div class="mb-3">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">رمز الربط (اختياري) — استخدم نفس الرمز لعمليتين مرتبطتين ببعض، وبتاخذوا نفس لون الخلفية بالجدول</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="linkGroupInput" placeholder="مثال: زبونة حنان" list="linkGroupsList"/>
+<datalist id="linkGroupsList"></datalist>
+</div>
 <button onclick="submitEntry()" id="submitBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ العملية</button>
 <p class="text-error text-[12px] hidden mt-2" id="addFormError"></p>
 </div>
@@ -112,8 +117,50 @@
 <h2 class="font-semibold text-[13px]" id="entries-heading">عمليات اليوم</h2>
 <button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold" id="fullHistoryToggle">عرض كل العمليات</button>
 </div>
-<div id="entries-list" class="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3"></div>
+<div class="overflow-x-auto rounded-xl border border-outline-variant">
+<table class="w-full text-[12px] border-collapse" id="cashbox-table">
+<thead>
+<tr>
+<th colspan="2" class="bg-error/10 text-error font-bold py-2 text-[13px] border-b border-outline-variant">الصادر</th>
+<th colspan="2" class="bg-success/10 text-success font-bold py-2 text-[13px] border-b border-outline-variant border-r-2 border-outline-variant">الداخل</th>
+</tr>
+</thead>
+<tbody id="cashbox-table-body"></tbody>
+</table>
+</div>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد عمليات مسجّلة اليوم بعد.</p>
+
+<!-- Single reusable edit modal (instead of a per-row hidden panel — keeps
+     each table row compact like the Excel sheet this replaces) -->
+<div class="hidden fixed inset-0 bg-black/50 z-[60] items-end lg:items-center justify-center" id="editModal">
+<div class="bg-surface-container-lowest w-full lg:w-96 lg:rounded-2xl rounded-t-2xl p-4 max-h-[85vh] overflow-y-auto">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-bold text-[15px]">تعديل العملية</h3>
+<button onclick="closeEditModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined">close</span></button>
+</div>
+<div class="flex gap-2 mb-3">
+<button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border" id="modalDirIn" onclick="setModalDirection('in')">دخول كاش</button>
+<button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border" id="modalDirOut" onclick="setModalDirection('out')">خروج كاش</button>
+</div>
+<input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2" id="modalOpType" placeholder="نوع العملية"/>
+<input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2 font-data-mono" id="modalAmount" type="number" step="0.01" dir="ltr" placeholder="المبلغ"/>
+<select class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2" id="modalCurrency">
+<option value="AED">درهم إماراتي (AED)</option>
+<option value="USD">دولار أمريكي (USD)</option>
+<option value="SAR">ريال سعودي (SAR)</option>
+<option value="EGP">جنيه مصري (EGP)</option>
+<option value="EUR">يورو (EUR)</option>
+<option value="GBP">جنيه إسترليني (GBP)</option>
+</select>
+<textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-2" id="modalNotes" placeholder="ملاحظة"></textarea>
+<input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-3" id="modalLinkGroup" placeholder="رمز الربط (اختياري)" list="linkGroupsList"/>
+<p class="text-error text-[12px] hidden mb-2" id="modalError"></p>
+<div class="flex gap-2">
+<button onclick="saveModalEdit()" class="flex-1 h-10 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
+<button onclick="deleteModalEntry()" class="flex-1 h-10 border border-error text-error rounded-lg text-[12px] font-semibold">حذف</button>
+</div>
+</div>
+</div>
 
 </div>
 </main>
@@ -210,6 +257,7 @@ async function submitEntry() {
     amount: amount,
     currency: currency,
     notes: notes || null,
+    link_group: document.getElementById('linkGroupInput').value.trim() || null,
     created_by: GOLDMIND_STAFF_ID
   };
 
@@ -239,6 +287,7 @@ async function submitEntry() {
   document.getElementById('opTypeInput').value = '';
   document.getElementById('amountInput').value = '';
   document.getElementById('notesInput').value = '';
+  document.getElementById('linkGroupInput').value = '';
   document.getElementById('addForm').classList.add('hidden');
   reportPanelLoaded = false;
   document.getElementById('reportPanel').classList.add('hidden');
@@ -253,12 +302,24 @@ async function loadAll() {
     .order('created_at', { ascending: true });
 
   if (error) {
-    document.getElementById('entries-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</p>`;
+    document.getElementById('cashbox-table-body').innerHTML = `<tr><td colspan="4" class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</td></tr>`;
     return;
   }
 
   allEntries = data || [];
   renderAll();
+}
+
+// Deterministic pastel background per link_group tag — same text always
+// gets the same color (a simple string hash into a fixed palette), so the
+// user can "color-link" related in/out entries the same way they did by
+// hand in Excel, just by typing the same tag instead of manually coloring.
+const GM_LINK_PALETTE = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#FFEDD5', '#E0E7FF', '#CFFAFE', '#FEE2E2'];
+function gmLinkColorFor(group) {
+  if (!group) return null;
+  let hash = 0;
+  for (let i = 0; i < group.length; i++) hash = (hash * 31 + group.charCodeAt(i)) >>> 0;
+  return GM_LINK_PALETTE[hash % GM_LINK_PALETTE.length];
 }
 
 function renderAll() {
@@ -291,104 +352,114 @@ function renderAll() {
     }).join('');
   }
 
-  const listEl = document.getElementById('entries-list');
+  // Datalist of existing link-group tags, for both the add form and the
+  // edit modal, so the user can reuse an exact tag with one tap instead
+  // of retyping it (a typo would silently break the color match).
+  const allTags = [...new Set(allEntries.map(e => e.link_group).filter(Boolean))];
+  document.getElementById('linkGroupsList').innerHTML = allTags.map(t => `<option value="${gmEscapeHtml(t)}"></option>`).join('');
+
+  const bodyEl = document.getElementById('cashbox-table-body');
   const emptyEl = document.getElementById('empty-state');
   const entriesToShow = showFullHistory ? allEntries : todayEntries;
   if (showFullHistory) {
     document.getElementById('entries-heading').textContent = 'كل العمليات';
     emptyEl.textContent = 'لا توجد عمليات مسجّلة بعد.';
   }
+
   if (entriesToShow.length === 0) {
-    listEl.innerHTML = '';
+    bodyEl.innerHTML = '';
+    document.getElementById('cashbox-table').classList.add('hidden');
     emptyEl.classList.remove('hidden');
-  } else {
-    emptyEl.classList.add('hidden');
-    listEl.innerHTML = entriesToShow.slice().reverse().map(e => {
-      const isIn = e.direction === 'in';
-      const time = showFullHistory
-        ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + gmFormatDateTime(e.created_at, { hour: '2-digit', minute: '2-digit' })
-        : gmFormatDateTime(e.created_at, { hour: '2-digit', minute: '2-digit' });
-      return `
-        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="entry-${e.id}">
-          <div class="flex items-center justify-between mb-1">
-            <span class="font-bold text-[14px]">${gmEscapeHtml(e.operation_type)}</span>
-            <span class="text-[11px] text-on-surface-variant">${time}</span>
-          </div>
-          <div class="flex items-center justify-between">
-            <span class="font-bold text-[15px] font-data-mono ${isIn ? 'text-success' : 'text-error'}">${isIn ? '+' : '-'}${fmt(e.amount)} ${e.currency}</span>
-            <span class="text-[11px] text-on-surface-variant">${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</span>
-          </div>
-          ${e.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(e.notes)}</p>` : ''}
-          <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
-            <button onclick="toggleEditEntry('${e.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1">
-              <span class="material-symbols-outlined text-[16px]">edit</span> تعديل
-            </button>
-            <button onclick="deleteEntry('${e.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1">
-              <span class="material-symbols-outlined text-[16px]">delete</span> حذف
-            </button>
-          </div>
-          <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-form-${e.id}">
-            <div class="flex gap-2">
-              <button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border ${isIn ? 'bg-success text-white border-success' : 'border-outline-variant'}" id="edit-dir-in-${e.id}" onclick="setEditDirection('${e.id}', 'in')">دخول كاش</button>
-              <button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border ${!isIn ? 'bg-error text-white border-error' : 'border-outline-variant'}" id="edit-dir-out-${e.id}" onclick="setEditDirection('${e.id}', 'out')">خروج كاش</button>
-            </div>
-            <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="edit-type-${e.id}" value="${gmEscapeHtml(e.operation_type || '')}"/>
-            <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" id="edit-amount-${e.id}" type="number" step="0.01" dir="ltr" value="${e.amount}"/>
-            <select class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="edit-currency-${e.id}">
-              <option value="AED" ${e.currency === 'AED' ? 'selected' : ''}>درهم إماراتي (AED)</option>
-              <option value="USD" ${e.currency === 'USD' ? 'selected' : ''}>دولار أمريكي (USD)</option>
-              <option value="SAR" ${e.currency === 'SAR' ? 'selected' : ''}>ريال سعودي (SAR)</option>
-              <option value="EGP" ${e.currency === 'EGP' ? 'selected' : ''}>جنيه مصري (EGP)</option>
-              <option value="EUR" ${e.currency === 'EUR' ? 'selected' : ''}>يورو (EUR)</option>
-              <option value="GBP" ${e.currency === 'GBP' ? 'selected' : ''}>جنيه إسترليني (GBP)</option>
-            </select>
-            <textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]" id="edit-notes-${e.id}">${gmEscapeHtml(e.notes || '')}</textarea>
-            <div class="flex gap-2">
-              <button onclick="saveEditEntry('${e.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
-              <button onclick="toggleEditEntry('${e.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
-            </div>
-            <p class="text-error text-[11px] hidden" id="edit-error-${e.id}"></p>
-          </div>
-        </div>`;
-    }).join('');
+    return;
   }
+  document.getElementById('cashbox-table').classList.remove('hidden');
+  emptyEl.classList.add('hidden');
+
+  // Two independent flowing columns (out / in), most recent first within
+  // each — same layout idea as the reference Excel sheet: الصادر and
+  // الداخل aren't paired row-by-row, they're just two separate lists
+  // sharing one table, with same-color cells marking related entries.
+  const outEntries = entriesToShow.filter(e => e.direction === 'out').slice().reverse();
+  const inEntries = entriesToShow.filter(e => e.direction === 'in').slice().reverse();
+  const rowCount = Math.max(outEntries.length, inEntries.length);
+
+  function cellHtml(e) {
+    if (!e) return '<td></td><td></td>';
+    const color = gmLinkColorFor(e.link_group);
+    const styleAttr = color ? ` style="background:${color}"` : '';
+    const dateLabel = showFullHistory ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit' }) + ' ' : '';
+    return `
+      <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>
+        <div class="font-semibold">${gmEscapeHtml(e.operation_type)}</div>
+        ${e.notes ? `<div class="text-[10px] text-on-surface-variant">${gmEscapeHtml(e.notes)}</div>` : ''}
+        <div class="text-[10px] text-on-surface-variant">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
+      </td>
+      <td class="px-2 py-2 border-b border-outline-variant text-center font-bold font-data-mono cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>${fmt(e.amount)}<div class="text-[9px] font-normal">${e.currency}</div></td>`;
+  }
+
+  let rowsHtml = '';
+  for (let i = 0; i < rowCount; i++) {
+    rowsHtml += '<tr>' + cellHtml(outEntries[i]) + cellHtml(inEntries[i]) + '</tr>';
+  }
+  bodyEl.innerHTML = rowsHtml;
 }
 
-const editDirections = {};
+// -----------------------------------------------------------------------
+// Single reusable edit modal — replaces the old per-card inline edit
+// panel (one hidden form per entry) now that entries render as compact
+// table rows instead of cards.
+let modalEntryId = null;
+let modalDirection = 'in';
 
-function toggleEditEntry(id) {
-  const form = document.getElementById('edit-form-' + id);
-  form.classList.toggle('hidden');
-  form.classList.toggle('flex');
+function setModalDirection(dir) {
+  modalDirection = dir;
+  document.getElementById('modalDirIn').className = 'flex-1 h-9 rounded-lg text-[12px] font-semibold border ' + (dir === 'in' ? 'bg-success text-white border-success' : 'border-outline-variant');
+  document.getElementById('modalDirOut').className = 'flex-1 h-9 rounded-lg text-[12px] font-semibold border ' + (dir === 'out' ? 'bg-error text-white border-error' : 'border-outline-variant');
 }
 
-function setEditDirection(id, dir) {
-  editDirections[id] = dir;
-  document.getElementById('edit-dir-in-' + id).className = 'flex-1 h-9 rounded-lg text-[12px] font-semibold border ' + (dir === 'in' ? 'bg-success text-white border-success' : 'border-outline-variant');
-  document.getElementById('edit-dir-out-' + id).className = 'flex-1 h-9 rounded-lg text-[12px] font-semibold border ' + (dir === 'out' ? 'bg-error text-white border-error' : 'border-outline-variant');
+function openEditModal(id) {
+  const e = allEntries.find(x => x.id === id);
+  if (!e) return;
+  modalEntryId = id;
+  setModalDirection(e.direction);
+  document.getElementById('modalOpType').value = e.operation_type || '';
+  document.getElementById('modalAmount').value = e.amount;
+  document.getElementById('modalCurrency').value = e.currency;
+  document.getElementById('modalNotes').value = e.notes || '';
+  document.getElementById('modalLinkGroup').value = e.link_group || '';
+  document.getElementById('modalError').classList.add('hidden');
+  const modal = document.getElementById('editModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
 }
 
-async function saveEditEntry(id) {
-  const opType = document.getElementById('edit-type-' + id).value.trim();
-  const amount = parseFloat(document.getElementById('edit-amount-' + id).value);
-  const currency = document.getElementById('edit-currency-' + id).value;
-  const notes = document.getElementById('edit-notes-' + id).value.trim();
-  const errEl = document.getElementById('edit-error-' + id);
+function closeEditModal() {
+  const modal = document.getElementById('editModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  modalEntryId = null;
+}
+
+async function saveModalEdit() {
+  const opType = document.getElementById('modalOpType').value.trim();
+  const amount = parseFloat(document.getElementById('modalAmount').value);
+  const currency = document.getElementById('modalCurrency').value;
+  const notes = document.getElementById('modalNotes').value.trim();
+  const linkGroup = document.getElementById('modalLinkGroup').value.trim();
+  const errEl = document.getElementById('modalError');
   errEl.classList.add('hidden');
 
   if (!opType) { errEl.textContent = 'فضلاً اكتب نوع العملية'; errEl.classList.remove('hidden'); return; }
   if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
 
-  const originalEntry = todayEntries.find(e => e.id === id);
-  const direction = editDirections[id] || (originalEntry ? originalEntry.direction : 'in');
-
   const { error } = await goldmindClient.from('daily_cash_log').update({
     operation_type: opType,
-    direction: direction,
+    direction: modalDirection,
     amount: amount,
     currency: currency,
-    notes: notes || null
-  }).eq('id', id);
+    notes: notes || null,
+    link_group: linkGroup || null
+  }).eq('id', modalEntryId);
 
   if (error) {
     errEl.textContent = 'تعذّر الحفظ: ' + error.message;
@@ -396,24 +467,28 @@ async function saveEditEntry(id) {
     return;
   }
 
+  closeEditModal();
   reportPanelLoaded = false;
   document.getElementById('reportPanel').classList.add('hidden');
   await loadAll();
 }
 
-async function deleteEntry(id) {
+async function deleteModalEntry() {
+  if (!modalEntryId) return;
   if (!confirm('هل أنت متأكد من حذف هذه العملية نهائياً؟ الرصيد رح يتحدّث تلقائياً.')) return;
 
-  const { error } = await goldmindClient.from('daily_cash_log').delete().eq('id', id);
+  const { error } = await goldmindClient.from('daily_cash_log').delete().eq('id', modalEntryId);
   if (error) {
     alert('تعذّر الحذف: ' + error.message);
     return;
   }
 
+  closeEditModal();
   reportPanelLoaded = false;
   document.getElementById('reportPanel').classList.add('hidden');
   await loadAll();
 }
+
 
 function openPrintView() {
   const dateStr = localDateStr(selectedDate);
