@@ -37,8 +37,6 @@
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
     .settle-tab-btn.active { background: #000; color: #fff; }
     .settle-tab-btn:not(.active) { color: #45464d; }
-    .currency-btn.active { background: #000; color: #fff; }
-    .currency-btn:not(.active) { color: #45464d; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
@@ -54,13 +52,6 @@
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-4xl mx-auto px-4 lg:px-8">
-
-<div class="flex justify-end pt-3">
-<div class="flex rounded-lg border border-outline-variant overflow-hidden text-[11px] font-semibold" id="currencyToggle">
-<button type="button" onclick="setDisplayCurrency('AED')" class="currency-btn px-3 h-8" data-currency="AED">د.إ AED</button>
-<button type="button" onclick="setDisplayCurrency('USD')" class="currency-btn px-3 h-8" data-currency="USD">$ USD</button>
-</div>
-</div>
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
@@ -320,43 +311,20 @@ function fmt(n) {
   return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
 }
 
-// AED is pegged to USD at a fixed official rate (does not float), so a
-// hardcoded conversion factor is safe here rather than a live FX lookup.
-const AED_PER_USD = 3.6725;
-let displayCurrency = localStorage.getItem('gm_trader_currency') === 'USD' ? 'USD' : 'AED';
+// Trader cash/fee amounts are always entered and stored directly in the
+// store's own base currency (gmStore.currency) — no conversion happens
+// on the way in. fmtMoney only adds the store's optional secondary
+// currency alongside it for display, via the shared theme.js helper.
+let gmStore = null;
 
 function currencyUnitLabel() {
-  return displayCurrency === 'USD' ? '$' : 'د.إ';
+  return (gmStore && gmStore.currency) || '';
 }
-// All cash/fee amounts are stored in AED in the database; this only
-// converts for on-screen display.
-function fmtMoney(amountAed) {
-  const amount = displayCurrency === 'USD' ? Number(amountAed || 0) / AED_PER_USD : Number(amountAed || 0);
-  return fmt(amount) + ' ' + currencyUnitLabel();
-}
-// Converts a value the employee typed in the currently selected display
-// currency back into AED for storage, since the ledger's base currency is AED.
-function toAed(amount) {
-  const n = Number(amount || 0);
-  return displayCurrency === 'USD' ? n * AED_PER_USD : n;
+function fmtMoney(amount) {
+  return gmFormatDualCurrency(amount, gmStore);
 }
 
-function setDisplayCurrency(currency) {
-  displayCurrency = currency === 'USD' ? 'USD' : 'AED';
-  localStorage.setItem('gm_trader_currency', displayCurrency);
-  document.querySelectorAll('.currency-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === displayCurrency));
-  const unit = currencyUnitLabel();
-  document.getElementById('gs-fab-per-gram-label').textContent = `مصنعية للغرام (${unit})`;
-  document.getElementById('settle-cash-amount-label').textContent = `المبلغ المدفوع (${unit})`;
-  if (traders.length) {
-    renderTradersTotal();
-    renderTraders();
-    if (currentTraderId) showTraderDetail(currentTraderId);
-    recomputeGiveStockPreview();
-  }
-}
 document.addEventListener('DOMContentLoaded', () => {
-  document.querySelectorAll('.currency-btn').forEach(b => b.classList.toggle('active', b.dataset.currency === displayCurrency));
   const unit = currencyUnitLabel();
   document.getElementById('gs-fab-per-gram-label').textContent = `مصنعية للغرام (${unit})`;
   document.getElementById('settle-cash-amount-label').textContent = `المبلغ المدفوع (${unit})`;
@@ -378,8 +346,13 @@ async function load() {
   const [{ data: traderRows, error: tErr }, { data: moveRows, error: mErr }, { data: storeRow }] = await Promise.all([
     goldmindClient.from('traders').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
     goldmindClient.from('trader_movements').select('*, invoice:invoice_id(invoice_number)').eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }),
-    goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+    goldmindClient.from('stores').select('diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
   ]);
+
+  gmStore = storeRow || null;
+  const unit = currencyUnitLabel();
+  document.getElementById('gs-fab-per-gram-label').textContent = `مصنعية للغرام (${unit})`;
+  document.getElementById('settle-cash-amount-label').textContent = `المبلغ المدفوع (${unit})`;
 
   diamondsEnabled = !!(storeRow && storeRow.diamonds_enabled);
   // The cash-debt label only mentions diamonds for stores that actually use
@@ -823,9 +796,8 @@ async function submitReceiveStock() {
   const gross = parseFloat(document.getElementById('rs-gross-weight').value);
   const karat = parseInt(document.getElementById('rs-karat').value, 10);
   const accounting = parseFloat(document.getElementById('rs-accounting-weight').value);
-  // Convert the entered per-gram rate from the display currency into AED,
-  // since trader_movements always stores amounts in AED as the base currency.
-  const perGramAed = toAed(parseFloat(document.getElementById('rs-fab-per-gram').value) || 0);
+  // Amount is entered directly in the store's base currency, no conversion needed.
+  const perGramAed = parseFloat(document.getElementById('rs-fab-per-gram').value) || 0;
   const notes = document.getElementById('rs-notes').value.trim();
 
   if (!gross || gross <= 0) {
@@ -899,9 +871,8 @@ async function submitGiveStock() {
   const gross = parseFloat(document.getElementById('gs-gross-weight').value);
   const karat = parseInt(document.getElementById('gs-karat').value, 10);
   const accounting = parseFloat(document.getElementById('gs-accounting-weight').value);
-  // Convert the entered per-gram rate from the display currency into AED,
-  // since trader_movements always stores amounts in AED as the base currency.
-  const perGramAed = toAed(parseFloat(document.getElementById('gs-fab-per-gram').value) || 0);
+  // Amount is entered directly in the store's base currency, no conversion needed.
+  const perGramAed = parseFloat(document.getElementById('gs-fab-per-gram').value) || 0;
   const notes = document.getElementById('gs-notes').value.trim();
 
   if (!gross || gross <= 0) {
@@ -1003,7 +974,7 @@ async function submitSettlement() {
       weight_grams: 0,
       karat: null,
       gold_24k_equivalent: 0,
-      fab_fee_amount: toAed(amount),
+      fab_fee_amount: amount,
       notes: notes || (diamondsEnabled ? 'تسوية نقدية (مصنعية/ألماس)' : 'تسوية مصنعية نقدية')
     };
   }
