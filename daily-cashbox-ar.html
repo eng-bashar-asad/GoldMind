@@ -105,7 +105,10 @@
 <div id="reportRecipients" class="flex flex-col gap-2"></div>
 </div>
 
-<h2 class="font-semibold text-[13px] mt-2" id="entries-heading">عمليات اليوم</h2>
+<div class="flex items-center justify-between mt-2">
+<h2 class="font-semibold text-[13px]" id="entries-heading">عمليات اليوم</h2>
+<button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold" id="fullHistoryToggle">عرض كل العمليات</button>
+</div>
 <div id="entries-list" class="flex flex-col gap-2 lg:grid lg:grid-cols-2 lg:gap-3"></div>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد عمليات مسجّلة اليوم بعد.</p>
 
@@ -118,6 +121,16 @@ let allEntries = []; // every entry ever (for computing running balance)
 let todayEntries = []; // entries for the currently selected day
 let canManageDates = false; // owner/manager only: view/add/edit entries on days other than today
 let selectedDate = new Date(); selectedDate.setHours(0, 0, 0, 0);
+let showFullHistory = false; // when true, entries-list shows every entry ever, not just the selected day
+
+function toggleFullHistory() {
+  showFullHistory = !showFullHistory;
+  document.getElementById('fullHistoryToggle').textContent = showFullHistory ? 'عرض عمليات اليوم فقط' : 'عرض كل العمليات';
+  const navVisible = canManageDates && !showFullHistory;
+  document.getElementById('day-nav').classList.toggle('hidden', !navVisible);
+  document.getElementById('day-nav').classList.toggle('flex', navVisible);
+  renderAll();
+}
 
 function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -266,14 +279,21 @@ function renderAll() {
 
   const listEl = document.getElementById('entries-list');
   const emptyEl = document.getElementById('empty-state');
-  if (todayEntries.length === 0) {
+  const entriesToShow = showFullHistory ? allEntries : todayEntries;
+  if (showFullHistory) {
+    document.getElementById('entries-heading').textContent = 'كل العمليات';
+    emptyEl.textContent = 'لا توجد عمليات مسجّلة بعد.';
+  }
+  if (entriesToShow.length === 0) {
     listEl.innerHTML = '';
     emptyEl.classList.remove('hidden');
   } else {
     emptyEl.classList.add('hidden');
-    listEl.innerHTML = todayEntries.slice().reverse().map(e => {
+    listEl.innerHTML = entriesToShow.slice().reverse().map(e => {
       const isIn = e.direction === 'in';
-      const time = new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' });
+      const time = showFullHistory
+        ? new Date(e.created_at).toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' })
+        : new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' });
       return `
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="entry-${e.id}">
           <div class="flex items-center justify-between mb-1">
