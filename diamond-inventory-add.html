@@ -464,7 +464,12 @@
             }
 
             if (!barcode) {
-                barcode = generateBarcode();
+                const { data: generated, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'diamond' });
+                if (bcError) {
+                    showMessage('تعذّر توليد رقم القطعة: ' + bcError.message, true);
+                    return;
+                }
+                barcode = generated;
             }
 
             saveBtn.disabled = true;

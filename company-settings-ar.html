@@ -126,6 +126,41 @@
 </div>
 
 <div class="border-t border-outline-variant pt-5 mt-1">
+<h3 class="font-label-md text-label-md text-secondary font-bold mb-1">ترقيم القطع (الباركود)</h3>
+<p class="text-[11px] text-on-surface-variant leading-5 mb-4">حدّد حرف/رمز ثابت أول باركود كل نوع قطعة، ورقم البداية (مفيد إذا كنت لسا بأول اشتراكك وعندك ترقيم قديم من نظام سابق). كل قطعة جديدة تتسجّل تلقائياً بهالتسلسل — ذهب برمز لحاله بمستودعه، وألماس برمز لحاله بمستودعه.</p>
+</div>
+
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="gold-prefix-input">رمز قطع الذهب</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-center font-data-mono uppercase" dir="ltr" id="gold-prefix-input" maxlength="4" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="diamond-prefix-input">رمز قطع الألماس</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-center font-data-mono uppercase" dir="ltr" id="diamond-prefix-input" maxlength="4" type="text"/>
+</div>
+</div>
+
+<div class="bg-surface-container-low rounded-lg p-3 flex flex-col gap-2">
+<span class="text-[11px] font-semibold text-outline">رقم قطعة الذهب القادمة</span>
+<p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="next-gold-piece-preview">—</p>
+<div class="flex gap-2">
+<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="next-gold-seq-input" min="1" placeholder="مثال: 100001" type="number"/>
+<button type="button" id="reset-gold-seq-btn" class="h-11 px-4 rounded-lg bg-secondary text-on-secondary text-sm font-semibold whitespace-nowrap">تحديث الرقم</button>
+</div>
+</div>
+
+<div class="bg-surface-container-low rounded-lg p-3 flex flex-col gap-2">
+<span class="text-[11px] font-semibold text-outline">رقم قطعة الألماس القادمة</span>
+<p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="next-diamond-piece-preview">—</p>
+<div class="flex gap-2">
+<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="next-diamond-seq-input" min="1" placeholder="مثال: 100001" type="number"/>
+<button type="button" id="reset-diamond-seq-btn" class="h-11 px-4 rounded-lg bg-secondary text-on-secondary text-sm font-semibold whitespace-nowrap">تحديث الرقم</button>
+</div>
+<p class="text-[10.5px] text-outline">احذر من تعيين رقم أقل من قطع مسجّلة فعلياً لتجنّب التكرار.</p>
+</div>
+
+<div class="border-t border-outline-variant pt-5 mt-1">
 <h3 class="font-label-md text-label-md text-secondary font-bold mb-4">بيانات التواصل</h3>
 </div>
 
@@ -412,6 +447,47 @@
         document.getElementById('next-invoice-seq-input').value = nextSeq;
     }
 
+    function renderNextPiecePreview(store) {
+        document.getElementById('gold-prefix-input').value = store.piece_barcode_prefix_gold || 'G';
+        document.getElementById('diamond-prefix-input').value = store.piece_barcode_prefix_diamond || 'D';
+        document.getElementById('next-gold-piece-preview').textContent =
+            (store.piece_barcode_prefix_gold || 'G') + (store.next_piece_seq_gold || 1);
+        document.getElementById('next-gold-seq-input').value = store.next_piece_seq_gold || 1;
+        document.getElementById('next-diamond-piece-preview').textContent =
+            (store.piece_barcode_prefix_diamond || 'D') + (store.next_piece_seq_diamond || 1);
+        document.getElementById('next-diamond-seq-input').value = store.next_piece_seq_diamond || 1;
+    }
+
+    async function resetPieceSeq(category) {
+        const inputId = category === 'diamond' ? 'next-diamond-seq-input' : 'next-gold-seq-input';
+        const btnId = category === 'diamond' ? 'reset-diamond-seq-btn' : 'reset-gold-seq-btn';
+        const input = document.getElementById(inputId);
+        const newSeq = parseInt(input.value, 10);
+        if (!newSeq || newSeq < 1) {
+            showMessage('فضلاً أدخل رقماً صحيحاً أكبر من صفر.', true);
+            return;
+        }
+        if (!confirm('هل أنت متأكد؟ ستبدأ القطعة القادمة من هذا النوع بهذا الرقم. تأكد أنه لا يتعارض مع قطع مسجّلة فعلياً.')) return;
+
+        const btn = document.getElementById(btnId);
+        btn.disabled = true;
+        const { error } = await goldmindClient.rpc('reset_piece_barcode_sequence', {
+            target_store_id: GOLDMIND_STORE_ID,
+            category: category,
+            new_seq: newSeq
+        });
+        btn.disabled = false;
+
+        if (error) {
+            showMessage('تعذّر تحديث الرقم: ' + error.message, true);
+            return;
+        }
+        showMessage('تم تحديث الرقم بنجاح.', false);
+        loadStore();
+    }
+    document.getElementById('reset-gold-seq-btn').addEventListener('click', () => resetPieceSeq('gold'));
+    document.getElementById('reset-diamond-seq-btn').addEventListener('click', () => resetPieceSeq('diamond'));
+
     document.getElementById('reset-invoice-seq-btn').addEventListener('click', async () => {
         const input = document.getElementById('next-invoice-seq-input');
         const newSeq = parseInt(input.value, 10);
@@ -539,6 +615,7 @@
         setDiamondsEnabled(data.diamonds_enabled === true);
 
         renderNextInvoicePreview(data);
+        renderNextPiecePreview(data);
 
         form.classList.remove('hidden');
     }
@@ -569,6 +646,8 @@
         const legalRegType = document.getElementById('store-legal-reg-type').value;
         const emirate = document.getElementById('store-emirate').value;
         const peppolId = document.getElementById('store-peppol-id').value.trim();
+        const goldPrefix = document.getElementById('gold-prefix-input').value.trim().toUpperCase() || 'G';
+        const diamondPrefix = document.getElementById('diamond-prefix-input').value.trim().toUpperCase() || 'D';
         const logo = logoInput.value.trim();
 
         if (!name) {
@@ -606,6 +685,8 @@
                 emirate_code: emirate || null,
                 peppol_endpoint_id: peppolId || null,
                 einvoice_disabled: einvoiceDisabled,
+                piece_barcode_prefix_gold: goldPrefix,
+                piece_barcode_prefix_diamond: diamondPrefix,
                 invoice_numbering_mode: numberingMode,
                 invoice_print_frame: selectedFrameStyle,
                 invoice_print_shape: selectedShapeStyle,

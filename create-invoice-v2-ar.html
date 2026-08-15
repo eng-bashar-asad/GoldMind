@@ -746,15 +746,25 @@
 
         // Individual-piece cart items become new inventory pieces immediately.
         const pieceCartItems = cart.filter(item => item.mode === 'piece');
-        const piecesPayload = pieceCartItems.map(item => ({
-            store_id: GOLDMIND_STORE_ID,
-            barcode: 'GM-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
-            weight_grams: item.weight,
-            karat: item.karat,
-            description_ar: item.description,
-            status: 'available',
-            created_by: GOLDMIND_STAFF_ID
-        }));
+        const piecesPayload = [];
+        for (const item of pieceCartItems) {
+            const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
+            if (bcError) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'حفظ فاتورة الشراء';
+                showMessage('تم حفظ الفاتورة لكن تعذّر توليد رقم قطعة: ' + bcError.message, true);
+                return;
+            }
+            piecesPayload.push({
+                store_id: GOLDMIND_STORE_ID,
+                barcode: barcode,
+                weight_grams: item.weight,
+                karat: item.karat,
+                description_ar: item.description,
+                status: 'available',
+                created_by: GOLDMIND_STAFF_ID
+            });
+        }
 
         const { data: newPieces, error: piecesError } = piecesPayload.length > 0
             ? await goldmindClient.from('pieces').insert(piecesPayload).select()
@@ -797,25 +807,35 @@
         // Diamond cart items become new diamond_pieces rows — separate from the
         // gold "pieces" inventory, linked to the invoice via invoice_items.diamond_piece_id.
         const diamondCartItems = cart.filter(item => item.mode === 'diamond');
-        const diamondsPayload = diamondCartItems.map((item, idx) => ({
-            store_id: GOLDMIND_STORE_ID,
-            barcode: 'GM-D-' + Date.now().toString(36).toUpperCase() + '-' + idx + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
-            has_gold: item.hasGold,
-            gold_weight_grams: item.goldWeight,
-            gold_karat: item.goldKarat,
-            gold_cost_fabrication_per_gram: item.goldFabCost,
-            diamond_carat: item.diamondCarat,
-            diamond_price_per_carat: item.diamondPricePerCarat,
-            shape: item.shape,
-            clarity: item.clarity,
-            cut: item.cut,
-            color: item.color,
-            certificate_lab: item.certLab,
-            certificate_number: item.certNumber,
-            description_ar: item.description,
-            status: 'available',
-            created_by: GOLDMIND_STAFF_ID
-        }));
+        const diamondsPayload = [];
+        for (const item of diamondCartItems) {
+            const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'diamond' });
+            if (bcError) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'حفظ فاتورة الشراء';
+                showMessage('تم حفظ الفاتورة لكن تعذّر توليد رقم قطعة ألماس: ' + bcError.message, true);
+                return;
+            }
+            diamondsPayload.push({
+                store_id: GOLDMIND_STORE_ID,
+                barcode: barcode,
+                has_gold: item.hasGold,
+                gold_weight_grams: item.goldWeight,
+                gold_karat: item.goldKarat,
+                gold_cost_fabrication_per_gram: item.goldFabCost,
+                diamond_carat: item.diamondCarat,
+                diamond_price_per_carat: item.diamondPricePerCarat,
+                shape: item.shape,
+                clarity: item.clarity,
+                cut: item.cut,
+                color: item.color,
+                certificate_lab: item.certLab,
+                certificate_number: item.certNumber,
+                description_ar: item.description,
+                status: 'available',
+                created_by: GOLDMIND_STAFF_ID
+            });
+        }
 
         const { data: newDiamonds, error: diamondsError } = diamondsPayload.length > 0
             ? await goldmindClient.from('diamond_pieces').insert(diamondsPayload).select()

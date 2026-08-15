@@ -230,16 +230,25 @@
             return;
         }
 
-        const piecesPayload = rows.map(r => ({
-            store_id: GOLDMIND_STORE_ID,
-            barcode: 'GM-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
-            weight_grams: Number(r.weight),
-            karat: lot.karat,
-            cost_fabrication_per_gram: lot.cost_fabrication_per_gram,
-            description_ar: r.description || null,
-            status: 'available',
-            created_by: GOLDMIND_STAFF_ID
-        }));
+        const piecesPayload = [];
+        for (const r of rows) {
+            const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
+            if (bcError) {
+                errEl.textContent = 'تعذّر توليد رقم القطعة: ' + bcError.message;
+                errEl.classList.remove('hidden');
+                return;
+            }
+            piecesPayload.push({
+                store_id: GOLDMIND_STORE_ID,
+                barcode: barcode,
+                weight_grams: Number(r.weight),
+                karat: lot.karat,
+                cost_fabrication_per_gram: lot.cost_fabrication_per_gram,
+                description_ar: r.description || null,
+                status: 'available',
+                created_by: GOLDMIND_STAFF_ID
+            });
+        }
 
         const { error: piecesError } = await goldmindClient.from('pieces').insert(piecesPayload);
         if (piecesError) {

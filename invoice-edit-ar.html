@@ -335,9 +335,10 @@ async function saveEdit() {
   for (const it of newItems) {
     let pieceId = it.piece_id;
     if (!pieceId && isTrader) {
+      const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
       const { data: newPiece } = await goldmindClient.from('pieces').insert({
         store_id: GOLDMIND_STORE_ID,
-        barcode: 'GM-' + Date.now().toString(36).toUpperCase() + '-' + Math.random().toString(36).slice(2, 6).toUpperCase(),
+        barcode: bcError ? null : barcode,
         weight_grams: it.weight_grams, karat: it.karat, description_ar: it.description,
         status: 'available', created_by: GOLDMIND_STAFF_ID
       }).select().single();
