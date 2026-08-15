@@ -517,6 +517,28 @@
             fitStatNumber(document.getElementById('todaySalesEl'));
             fitStatNumber(document.getElementById('todayInvoiceCountEl'));
 
+            // Themes with a lazily-loaded display font (e.g. "المسبوكة
+            // الهادئة") can finish loading the font AFTER the fits above
+            // already ran on the fallback font's (narrower) metrics —
+            // the real font then renders wider and overflows again with
+            // nothing to re-fit it. Re-run the fits once every font the
+            // page uses has actually finished loading.
+            if (document.fonts && document.fonts.ready) {
+                document.fonts.ready.then(() => {
+                    fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
+                    fitStatNumber(document.getElementById('todaySalesEl'));
+                    fitStatNumber(document.getElementById('todayInvoiceCountEl'));
+                });
+            }
+            // Extra safety net in case the font finishes swapping slightly
+            // after document.fonts.ready already resolved (seen with
+            // display=swap Google Fonts links on a slow connection).
+            setTimeout(() => {
+                fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
+                fitStatNumber(document.getElementById('todaySalesEl'));
+                fitStatNumber(document.getElementById('todayInvoiceCountEl'));
+            }, 1000);
+
             // Real alerts — replaces the old dead "التنبيهات" button
             const alerts = [];
             const { count: unpaidCount } = await goldmindClient
