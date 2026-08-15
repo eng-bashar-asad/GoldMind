@@ -134,6 +134,17 @@ function toggleFullHistory() {
 
 function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// selectedDate.toISOString().slice(0,10) computes the UTC calendar date of
+// local midnight, which is wrong for any positive UTC-offset timezone (e.g.
+// Dubai, UTC+4) — it silently returns YESTERDAY's date. This returns the
+// correct local calendar date string instead.
+function localDateStr(d) {
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 function isToday(d) {
   const t = new Date(); t.setHours(0, 0, 0, 0);
   return d.getTime() === t.getTime();
@@ -153,7 +164,7 @@ function shiftDay(delta) {
   d.setDate(d.getDate() + delta);
   selectedDate = d;
   updateDayNav();
-  document.getElementById('addFormDate').value = selectedDate.toISOString().slice(0, 10);
+  document.getElementById('addFormDate').value = localDateStr(selectedDate);
   reportPanelLoaded = false;
   document.getElementById('reportPanel').classList.add('hidden');
   renderAll();
@@ -169,8 +180,8 @@ function toggleAddForm() {
   document.getElementById('addForm').classList.toggle('hidden');
   if (canManageDates) {
     document.getElementById('addFormDateWrap').classList.remove('hidden');
-    document.getElementById('addFormDate').value = selectedDate.toISOString().slice(0, 10);
-    document.getElementById('addFormDate').max = new Date().toISOString().slice(0, 10);
+    document.getElementById('addFormDate').value = localDateStr(selectedDate);
+    document.getElementById('addFormDate').max = localDateStr(new Date());
   }
 }
 
@@ -402,7 +413,7 @@ async function deleteEntry(id) {
 }
 
 function openPrintView() {
-  const dateStr = selectedDate.toISOString().slice(0, 10);
+  const dateStr = localDateStr(selectedDate);
   window.open('daily-cashbox-print-ar.html?date=' + dateStr, '_blank');
 }
 
@@ -451,7 +462,7 @@ async function buildDailyReport() {
     return `${cur}: ${fmt(total)}`;
   }).join('\n') || 'لا يوجد رصيد';
 
-  const dateStr = selectedDate.toISOString().slice(0, 10);
+  const dateStr = localDateStr(selectedDate);
   const printLink = window.location.origin + window.location.pathname.replace('daily-cashbox-ar.html', 'daily-cashbox-print-ar.html') + '?date=' + dateStr;
   const fileLine = `\n📎 الكشف القابل للطباعة:\n${printLink}`;
 
