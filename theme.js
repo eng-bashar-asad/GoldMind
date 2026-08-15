@@ -23,6 +23,35 @@ function gmEscapeHtml(value) {
     .replace(/'/g, '&#39;');
 }
 
+// Formats a plain number with Latin digits, thousands separators, and up
+// to 2 decimal places (trailing zeros trimmed). Never Arabic-Indic digits,
+// per the app-wide numeral convention.
+function gmFormatNumber(value) {
+  const num = Number(value);
+  if (!isFinite(num)) return '0';
+  return num.toLocaleString('en-US', { maximumFractionDigits: 2 });
+}
+
+// Formats a money amount in the store's base currency, with the
+// store's optional secondary currency shown alongside it in parentheses
+// (display-only live conversion — nothing is stored in the secondary
+// currency). `store` is the loaded stores row (needs .currency,
+// .secondary_currency, .secondary_currency_rate). `amount` is always
+// assumed to already be in the store's base currency.
+// Falls back gracefully to a single-currency string when no secondary
+// currency/rate is configured, or when store is missing.
+function gmFormatDualCurrency(amount, store) {
+  const base = (store && store.currency) || '';
+  const baseStr = gmFormatNumber(amount) + (base ? ' ' + base : '');
+  if (!store || !store.secondary_currency || !store.secondary_currency_rate) {
+    return baseStr;
+  }
+  const rate = Number(store.secondary_currency_rate);
+  if (!isFinite(rate) || rate <= 0) return baseStr;
+  const converted = Number(amount) * rate;
+  return baseStr + ' (' + gmFormatNumber(converted) + ' ' + store.secondary_currency + ')';
+}
+
 const GOLDMIND_THEMES = {
   'royal-gold': {
     label: 'الذهبي الملكي',
