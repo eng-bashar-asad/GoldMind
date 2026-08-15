@@ -369,7 +369,7 @@
         const paymentLabels = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'جزئي (نقدي + فيزا)' };
         document.getElementById('inv-payment').textContent = paymentLabels[invoice.payment_method] || invoice.payment_method || '';
         if (invoice.payment_method === 'mixed' && (invoice.cash_paid_amount != null || invoice.bank_paid_amount != null)) {
-            document.getElementById('inv-payment').textContent += ` (نقدي ${Number(invoice.cash_paid_amount || 0).toFixed(2)} + فيزا/بنك ${Number(invoice.bank_paid_amount || 0).toFixed(2)})`;
+            document.getElementById('inv-payment').textContent += ` (نقدي ${gmFormatDualCurrency(invoice.cash_paid_amount || 0, store)} + فيزا/بنك ${gmFormatDualCurrency(invoice.bank_paid_amount || 0, store)})`;
         }
         document.getElementById('inv-creator').textContent = creator && creator.full_name ? creator.full_name : '—';
 

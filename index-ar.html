@@ -368,7 +368,7 @@
 
             // Store name
             const { data: store } = await goldmindClient
-                .from('stores').select('name, diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+                .from('stores').select('name, diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
             if (store) { document.getElementById('storeNameEl').textContent = store.name; fitStatNumber(document.getElementById('storeNameEl')); }
 
             // Staff name / role for the welcome line
@@ -436,13 +436,21 @@
                 }
             }
 
-            // Cash balance (main box) = sum(in) - sum(out)
+            // Cash balance (main box) = sum(in) - sum(out), base currency only.
+            // cash_movements can carry other currencies (see main-cashbox-ar.html's
+            // per-currency breakdown); the headline dashboard card sticks to the
+            // store's base currency and leaves the full multi-currency split to
+            // that dedicated page.
+            const baseCurrency = (store && store.currency) || 'AED';
             const { data: mainMovs } = await goldmindClient
-                .from('cash_movements').select('direction, amount')
+                .from('cash_movements').select('direction, amount, currency')
                 .eq('store_id', GOLDMIND_STORE_ID).eq('box', 'main');
             let cashBalance = 0;
-            (mainMovs || []).forEach(m => cashBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount));
-            document.getElementById('cashBalanceEl').textContent = fmt(cashBalance);
+            (mainMovs || []).forEach(m => {
+                if ((m.currency || baseCurrency) !== baseCurrency) return;
+                cashBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount);
+            });
+            document.getElementById('cashBalanceEl').textContent = gmFormatDualCurrency(cashBalance, store);
             fitStatNumber(document.getElementById('cashBalanceEl'));
 
             // Today's sales + invoice count (real invoice type is 'sale', not
@@ -454,7 +462,7 @@
                 .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
                 .gte('created_at', todayStart.toISOString());
             const todaySales = (todayInvoices || []).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
-            document.getElementById('todaySalesEl').textContent = fmt(todaySales);
+            document.getElementById('todaySalesEl').textContent = gmFormatDualCurrency(todaySales, store);
             document.getElementById('todayInvoiceCountEl').textContent = (todayInvoices || []).length;
             fitStatNumber(document.getElementById('todaySalesEl'));
             fitStatNumber(document.getElementById('todayInvoiceCountEl'));
@@ -511,13 +519,17 @@
             const dayStart = new Date(movementsViewDate); dayStart.setHours(0, 0, 0, 0);
             const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
 
-            const { data: recent } = await goldmindClient
-                .from('cash_movements')
-                .select('direction, amount, description, created_at, invoice_id')
-                .eq('store_id', GOLDMIND_STORE_ID)
-                .gte('created_at', dayStart.toISOString())
-                .lt('created_at', dayEnd.toISOString())
-                .order('created_at', { ascending: false });
+            const [{ data: recent }, { data: store }] = await Promise.all([
+                goldmindClient
+                    .from('cash_movements')
+                    .select('direction, amount, currency, description, created_at, invoice_id')
+                    .eq('store_id', GOLDMIND_STORE_ID)
+                    .gte('created_at', dayStart.toISOString())
+                    .lt('created_at', dayEnd.toISOString())
+                    .order('created_at', { ascending: false }),
+                goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            ]);
+            const baseCurrency = (store && store.currency) || 'AED';
 
             const container = document.getElementById('recentMovementsEl');
             if (!recent || recent.length === 0) {
@@ -527,6 +539,10 @@
                     const isIn = m.direction === 'in';
                     const dateStr = new Date(m.created_at).toLocaleString('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
                     const clickable = !!m.invoice_id;
+                    const cur = m.currency || baseCurrency;
+                    const amountLabel = cur === baseCurrency
+                        ? gmFormatDualCurrency(m.amount, store)
+                        : fmt(m.amount) + ' ' + cur;
                     return `
                         <div class="p-4 flex justify-between items-center hover:bg-surface-container-low transition-colors ${clickable ? 'cursor-pointer active:opacity-70' : ''}" ${clickable ? `onclick="window.location.href='invoice-print-ar.html?id=${m.invoice_id}'"` : ''}>
                             <div class="flex items-center gap-3">
@@ -540,8 +556,7 @@
                             </div>
                             <div class="flex items-center gap-2">
                                 <div class="text-left">
-                                    <p class="font-data-mono text-data-mono font-bold ${isIn ? 'text-green-600' : 'text-red-600'}">${isIn ? '+' : '-'}${fmt(m.amount)}</p>
-                                    <p class="text-[10px] text-on-surface-variant">د.إ</p>
+                                    <p class="font-data-mono text-data-mono font-bold ${isIn ? 'text-green-600' : 'text-red-600'}">${isIn ? '+' : '-'}${amountLabel}</p>
                                 </div>
                                 ${clickable ? '<span class="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_left</span>' : ''}
                             </div>
