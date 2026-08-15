@@ -90,6 +90,21 @@
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-currency" placeholder="AED" type="text"/>
 </div>
 
+<div class="border border-outline-variant rounded-lg p-4 flex flex-col gap-3">
+<p class="text-[13px] font-semibold text-on-surface">عملة ثانوية (اختياري)</p>
+<p class="text-[11px] text-outline">إذا فعّلتها، بتنعرض بجانب العملة الأساسية بكل مكان تظهر فيه المبالغ (الفواتير، المبيعات، كشف التاجر، التقارير، دفتر الصندوق) — للعرض فقط، ما بتنخزن بقاعدة البيانات.</p>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-secondary-currency">رمز العملة الثانوية</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-secondary-currency" placeholder="USD" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-secondary-rate">سعر الصرف (1 [عملة أساسية] = ؟ [عملة ثانوية])</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-secondary-rate" placeholder="0.27" step="0.0001" type="number"/>
+</div>
+<p class="text-[11px] text-outline px-1" id="secondary-rate-updated-label"></p>
+<button class="h-11 rounded-lg border border-outline-variant text-[13px] font-semibold text-on-surface hover:bg-surface-container-low transition" id="save-secondary-currency-btn" type="button">حفظ العملة الثانوية وسعر الصرف</button>
+</div>
+
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-address">العنوان</label>
 <textarea class="w-full h-24 border border-outline-variant rounded-lg px-4 py-3 focus:ring-1 focus:ring-primary outline-none text-right resize-none" id="store-address" placeholder="الشارع، المدينة، الدولة"></textarea>
@@ -438,6 +453,16 @@
         }
     }
 
+    function renderSecondaryRateUpdatedLabel(updatedAt) {
+        const label = document.getElementById('secondary-rate-updated-label');
+        if (!updatedAt) {
+            label.textContent = '';
+            return;
+        }
+        const d = new Date(updatedAt);
+        label.textContent = 'آخر تحديث لسعر الصرف: ' + d.toLocaleDateString('en-US') + ' ' + d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    }
+
     function renderNextInvoicePreview(store) {
         const currentYear = new Date().getFullYear();
         const nextSeq = store.next_invoice_seq_year === currentYear ? (store.next_invoice_seq || 1) : 1;
@@ -519,6 +544,49 @@
         messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
     }
 
+    document.getElementById('save-secondary-currency-btn').addEventListener('click', async () => {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const secCurrency = document.getElementById('store-secondary-currency').value.trim().toUpperCase();
+        const secRateInput = document.getElementById('store-secondary-rate').value;
+        const secRate = secRateInput === '' ? null : parseFloat(secRateInput);
+
+        if (secCurrency && (secRate === null || isNaN(secRate) || secRate <= 0)) {
+            showMessage('فضلاً أدخل سعر صرف صحيح أكبر من صفر عند تحديد عملة ثانوية.', true);
+            return;
+        }
+        if (!secCurrency && secRateInput !== '') {
+            showMessage('فضلاً أدخل رمز العملة الثانوية، أو امسح سعر الصرف لإلغاء العملة الثانوية.', true);
+            return;
+        }
+
+        const btn = document.getElementById('save-secondary-currency-btn');
+        btn.disabled = true;
+        btn.textContent = 'جارِ الحفظ...';
+
+        const { data, error } = await goldmindClient
+            .from('stores')
+            .update({
+                secondary_currency: secCurrency || null,
+                secondary_currency_rate: secCurrency ? secRate : null,
+                secondary_currency_rate_updated_at: secCurrency ? new Date().toISOString() : null
+            })
+            .eq('id', GOLDMIND_STORE_ID)
+            .select('secondary_currency_rate_updated_at')
+            .single();
+
+        btn.disabled = false;
+        btn.textContent = 'حفظ العملة الثانوية وسعر الصرف';
+
+        if (error) {
+            showMessage('تعذّر حفظ العملة الثانوية: ' + error.message, true);
+            return;
+        }
+        renderSecondaryRateUpdatedLabel(data ? data.secondary_currency_rate_updated_at : null);
+        showMessage('تم حفظ العملة الثانوية وسعر الصرف بنجاح.', false);
+    });
+
     function updateLogoPreview() {
         const url = logoInput.value.trim();
         if (url) {
@@ -586,6 +654,9 @@
         document.getElementById('active-store-badge').textContent = data.name || '';
         document.getElementById('store-country').value = data.country || '';
         document.getElementById('store-currency').value = data.currency || 'AED';
+        document.getElementById('store-secondary-currency').value = data.secondary_currency || '';
+        document.getElementById('store-secondary-rate').value = data.secondary_currency_rate != null ? data.secondary_currency_rate : '';
+        renderSecondaryRateUpdatedLabel(data.secondary_currency_rate_updated_at);
         document.getElementById('store-address').value = data.address || '';
         document.getElementById('store-phone').value = data.phone || '';
         document.getElementById('store-vat').value = data.vat_rate != null ? data.vat_rate : 5;
