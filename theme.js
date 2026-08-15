@@ -412,6 +412,112 @@ function gmEnsureDisplayFont() {
   document.head.appendChild(style);
 }
 
+// -----------------------------------------------------------------------
+// App-wide font picker (settings → مظهر التطبيق). Lets the user pick a
+// font family for the whole app, independent of theme colors. The list
+// mixes system fonts (no loading needed — Times New Roman, Arial, etc,
+// same idea as Word's font list) and Google-hosted Arabic/Latin fonts
+// (loaded lazily only when actually selected). Because a browser
+// automatically falls back to the page's default font for any character
+// a chosen font doesn't cover, picking a Latin-only font like "Times New
+// Roman" naturally only affects Latin text/numbers and leaves Arabic
+// labels on the site's normal Arabic font — no language-detection needed.
+const GOLDMIND_FONTS = {
+  'default': { label: 'افتراضي التطبيق', family: null },
+  'times-new-roman': { label: 'Times New Roman', family: '"Times New Roman", Times, serif' },
+  'georgia': { label: 'Georgia', family: 'Georgia, "Times New Roman", serif' },
+  'arial': { label: 'Arial', family: 'Arial, Helvetica, sans-serif' },
+  'tahoma': { label: 'Tahoma', family: 'Tahoma, Geneva, sans-serif' },
+  'verdana': { label: 'Verdana', family: 'Verdana, Geneva, sans-serif' },
+  'trebuchet-ms': { label: 'Trebuchet MS', family: '"Trebuchet MS", sans-serif' },
+  'cairo': { label: 'Cairo', family: '"Cairo", sans-serif', google: 'Cairo:wght@400;500;600;700' },
+  'tajawal': { label: 'Tajawal', family: '"Tajawal", sans-serif', google: 'Tajawal:wght@400;500;700' },
+  'almarai': { label: 'Almarai', family: '"Almarai", sans-serif', google: 'Almarai:wght@400;700' },
+  'amiri': { label: 'أميري (Amiri)', family: '"Amiri", serif', google: 'Amiri:wght@400;700' },
+  'noto-kufi-arabic': { label: 'Noto Kufi Arabic', family: '"Noto Kufi Arabic", sans-serif', google: 'Noto+Kufi+Arabic:wght@400;500;700' },
+  'playfair-display': { label: 'Playfair Display', family: '"Playfair Display", serif', google: 'Playfair+Display:wght@500;600;700' },
+};
+
+let gmFontOverrideInjected = false;
+let gmFontsLoaded = {};
+let gmFontReady = true;
+let gmFontCallbacks = [];
+
+// Same idea as gmOnDisplayFontReady above, but for the user-chosen
+// app-wide font: fires only once the real glyph data has finished
+// loading (not just once the request started), so pages that need to
+// re-measure text (e.g. the dashboard's fitStatNumber) never race a font
+// swap that hasn't actually happened yet.
+function gmOnFontReady(callback) {
+  if (typeof callback !== 'function') return;
+  if (gmFontReady) { callback(); return; }
+  gmFontCallbacks.push(callback);
+}
+
+function gmFireFontReady() {
+  gmFontReady = true;
+  const callbacks = gmFontCallbacks;
+  gmFontCallbacks = [];
+  callbacks.forEach(function (cb) { cb(); });
+}
+
+function gmEnsureFontOverrideStyle() {
+  if (gmFontOverrideInjected) return;
+  gmFontOverrideInjected = true;
+  const style = document.createElement('style');
+  style.id = 'gm-font-override';
+  style.textContent = 'body, button, input, select, textarea, ' +
+    '.font-headline-md, .font-headline-sm, .font-headline-lg, ' +
+    '.font-body-md, .font-body-lg, .font-label-md, .font-label-sm, ' +
+    '.font-display-lg, .font-display-lg-mobile { font-family: var(--gm-font-family) !important; }';
+  document.head.appendChild(style);
+}
+
+function goldmindApplyFont(key) {
+  const font = GOLDMIND_FONTS[key] || GOLDMIND_FONTS['default'];
+  localStorage.setItem('goldmind_font', key);
+  const existingOverride = document.getElementById('gm-font-override');
+  if (!font.family) {
+    // Back to the app's own per-page default font — remove our override
+    // entirely rather than leaving an empty CSS variable behind, which
+    // would otherwise make font-family compute as invalid.
+    if (existingOverride) existingOverride.remove();
+    gmFontOverrideInjected = false;
+    gmFireFontReady();
+    return;
+  }
+  document.documentElement.style.setProperty('--gm-font-family', font.family);
+  gmEnsureFontOverrideStyle();
+  if (!font.google) {
+    gmFireFontReady();
+    return;
+  }
+  if (gmFontsLoaded[key]) {
+    gmFireFontReady();
+    return;
+  }
+  gmFontsLoaded[key] = true;
+  gmFontReady = false;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=' + font.google + '&display=swap';
+  const familyNameOnly = font.family.split(',')[0].replace(/"/g, '');
+  link.onload = function () {
+    if (document.fonts && document.fonts.load) {
+      document.fonts.load('16px ' + familyNameOnly).then(gmFireFontReady).catch(gmFireFontReady);
+    } else {
+      gmFireFontReady();
+    }
+  };
+  setTimeout(gmFireFontReady, 4000);
+  document.head.appendChild(link);
+}
+
+function goldmindLoadSavedFont() {
+  const saved = localStorage.getItem('goldmind_font') || 'default';
+  goldmindApplyFont(saved);
+}
+
 
 function goldmindLoadSavedTheme() {
   const saved = localStorage.getItem('goldmind_theme') || 'royal-gold';
@@ -421,6 +527,7 @@ function goldmindLoadSavedTheme() {
 
 // Apply immediately on script load (before first paint as much as possible)
 goldmindLoadSavedTheme();
+goldmindLoadSavedFont();
 
 // Body text is intentionally light (on-primary) so it reads on the dark
 // page background used site-wide. But that means any plain text sitting
