@@ -184,6 +184,7 @@
 <div class="text-center px-1">
 <div class="font-headline-md text-headline-md font-bold text-secondary truncate" id="dailyCashboxBalanceEl">0.00</div>
 <span class="text-[10px] text-on-surface-variant">كاش الصندوق</span>
+<div class="hidden text-[9px] text-on-surface-variant font-data-mono mt-0.5 truncate" id="dailyCashboxOtherCurrenciesEl"></div>
 </div>
 <div class="text-center px-1">
 <div class="font-headline-md text-headline-md font-bold text-primary truncate" id="todayInvoiceCountEl">0</div>
@@ -437,19 +438,34 @@
             }
 
             // Daily cashbox balance (all-time running total from the manual
-            // drawer journal) — base currency only, same logic as
-            // daily-cashbox-ar.html's "الرصيد الحالي" card.
+            // drawer journal) — base currency only in the headline number,
+            // same logic as daily-cashbox-ar.html's "الرصيد الحالي" card.
+            // Other currencies (if the owner ever logged any) are NOT
+            // silently dropped — they're listed in a small line underneath
+            // so nothing goes unnoticed.
             const baseCurrency = (store && store.currency) || 'AED';
             const { data: cashboxEntries } = await goldmindClient
                 .from('daily_cash_log').select('direction, amount, currency')
                 .eq('store_id', GOLDMIND_STORE_ID);
-            let dailyCashboxBalance = 0;
+            const cashboxTotalsByCurrency = {};
             (cashboxEntries || []).forEach(e => {
-                if ((e.currency || baseCurrency) !== baseCurrency) return;
-                dailyCashboxBalance += (e.direction === 'in' ? 1 : -1) * Number(e.amount);
+                const cur = e.currency || baseCurrency;
+                const delta = (e.direction === 'in' ? 1 : -1) * Number(e.amount);
+                cashboxTotalsByCurrency[cur] = (cashboxTotalsByCurrency[cur] || 0) + delta;
             });
+            const dailyCashboxBalance = cashboxTotalsByCurrency[baseCurrency] || 0;
             document.getElementById('dailyCashboxBalanceEl').textContent = gmFormatDualCurrency(dailyCashboxBalance, store);
             fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
+
+            const otherCurrencyLine = Object.keys(cashboxTotalsByCurrency)
+                .filter(cur => cur !== baseCurrency)
+                .map(cur => '+ ' + gmFormatNumber(cashboxTotalsByCurrency[cur]) + ' ' + cur)
+                .join(' · ');
+            const otherCurrenciesEl = document.getElementById('dailyCashboxOtherCurrenciesEl');
+            if (otherCurrencyLine) {
+                otherCurrenciesEl.textContent = otherCurrencyLine;
+                otherCurrenciesEl.classList.remove('hidden');
+            }
 
             // Today's sales + invoice count (real invoice type is 'sale', not
             // 'sell' — fixing a real bug that made this card always read 0.00)
