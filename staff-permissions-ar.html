@@ -464,7 +464,16 @@ async function submitDirectAdd() {
   btn.textContent = 'إضافة الموظف';
 
   if (error || (data && data.error)) {
-    errEl.textContent = 'تعذّر إضافة الموظف: ' + ((data && data.error) || error.message);
+    let detail = (data && data.error) || error.message;
+    // supabase-js only gives a generic "non-2xx status" message by default —
+    // the edge function's actual reason is in the raw HTTP response body.
+    if (error && error.context && typeof error.context.json === 'function') {
+      try {
+        const body = await error.context.json();
+        if (body && body.error) detail = body.error;
+      } catch (_) { /* response wasn't JSON — keep the generic message */ }
+    }
+    errEl.textContent = 'تعذّر إضافة الموظف: ' + detail;
     errEl.classList.remove('hidden');
     return;
   }
