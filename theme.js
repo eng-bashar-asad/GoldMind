@@ -353,12 +353,57 @@ function goldmindApplyTheme(name) {
 // Loaded lazily and only once, and scoped via the data-gm-display-font
 // attribute set above so it never affects other themes or a stale cache.
 let gmDisplayFontLoaded = false;
+let gmDisplayFontReady = false;
+let gmDisplayFontCallbacks = [];
+
+// Lets a page register a callback to run once the lazily-loaded display
+// font (if this theme uses one) has actually finished loading its real
+// glyph data — not just once its stylesheet request was kicked off. Pages
+// use this to re-run any text-fitting logic that may have measured against
+// the fallback font before the real one swapped in. If the current theme
+// has no display font, the callback fires immediately (nothing to wait for).
+function gmOnDisplayFontReady(callback) {
+  if (typeof callback !== 'function') return;
+  const usesDisplayFont = document.documentElement.getAttribute('data-gm-display-font') === '1';
+  if (!usesDisplayFont || gmDisplayFontReady) {
+    callback();
+    return;
+  }
+  gmDisplayFontCallbacks.push(callback);
+}
+
+function gmFireDisplayFontReady() {
+  if (gmDisplayFontReady) return;
+  gmDisplayFontReady = true;
+  const callbacks = gmDisplayFontCallbacks;
+  gmDisplayFontCallbacks = [];
+  callbacks.forEach(function (cb) { cb(); });
+}
+
 function gmEnsureDisplayFont() {
   if (gmDisplayFontLoaded) return;
   gmDisplayFontLoaded = true;
   const link = document.createElement('link');
   link.rel = 'stylesheet';
   link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap';
+  // The stylesheet finishing to download only means the @font-face rules
+  // are registered — the actual WOFF2 glyph data can still be fetching.
+  // document.fonts.load() gives a promise that resolves only once the
+  // real glyphs are ready to paint, which is what re-fitting text needs.
+  link.onload = function () {
+    if (document.fonts && document.fonts.load) {
+      Promise.all([
+        document.fonts.load('600 16px Fraunces'),
+        document.fonts.load('500 16px Fraunces')
+      ]).then(gmFireDisplayFontReady).catch(gmFireDisplayFontReady);
+    } else {
+      gmFireDisplayFontReady();
+    }
+  };
+  // Safety net: if the stylesheet load event never fires for any reason
+  // (blocked request, unusual browser behavior), don't leave callers
+  // waiting forever — fire after a generous timeout regardless.
+  setTimeout(gmFireDisplayFontReady, 4000);
   document.head.appendChild(link);
   const style = document.createElement('style');
   style.textContent = '[data-gm-display-font="1"] .font-headline-md, ' +
@@ -367,6 +412,7 @@ function gmEnsureDisplayFont() {
     '[data-gm-display-font="1"] .font-headline-xl-mobile { font-family: "Fraunces", serif; letter-spacing: -0.01em; }';
   document.head.appendChild(style);
 }
+
 
 function goldmindLoadSavedTheme() {
   const saved = localStorage.getItem('goldmind_theme') || 'royal-gold';
