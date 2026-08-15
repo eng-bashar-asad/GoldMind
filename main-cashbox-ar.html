@@ -97,13 +97,16 @@ function setPeriod(period) {
 async function loadEntries() {
   const { start, end } = computeRange(currentPeriod);
 
-  const { data, error } = await goldmindClient
-    .from('cash_movements')
-    .select('id, direction, amount, currency, description, created_at, invoice_id, staff:created_by(full_name)')
-    .eq('store_id', GOLDMIND_STORE_ID)
-    .eq('box', 'main')
-    .gte('created_at', start.toISOString()).lte('created_at', end.toISOString())
-    .order('created_at', { ascending: false });
+  const [{ data, error }, { data: store }] = await Promise.all([
+    goldmindClient
+      .from('cash_movements')
+      .select('id, direction, amount, currency, description, created_at, invoice_id, staff:created_by(full_name)')
+      .eq('store_id', GOLDMIND_STORE_ID)
+      .eq('box', 'main')
+      .gte('created_at', start.toISOString()).lte('created_at', end.toISOString())
+      .order('created_at', { ascending: false }),
+    goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+  ]);
 
   if (error) {
     document.getElementById('entries-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</p>`;
@@ -122,18 +125,20 @@ async function loadEntries() {
 
   const balancesEl = document.getElementById('balances-by-currency');
   const currencies = Object.keys(byCurrency);
+  const baseCurrency = (store && store.currency) || 'AED';
   balancesEl.innerHTML = currencies.length === 0
     ? '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-center text-on-surface-variant text-sm">لا توجد حركات بهذه الفترة.</div>'
     : currencies.map(cur => {
         const t = byCurrency[cur];
         const net = t.in - t.out;
+        const isBase = cur === baseCurrency;
         return `
           <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
             <div class="text-[11px] font-bold text-secondary mb-1">${cur}</div>
             <div class="grid grid-cols-3 gap-2 text-center">
-              <div><p class="text-[10px] text-on-surface-variant">دخل</p><p class="font-bold text-[14px] font-data-mono text-success">${fmt(t.in)}</p></div>
-              <div><p class="text-[10px] text-on-surface-variant">خرج</p><p class="font-bold text-[14px] font-data-mono text-error">${fmt(t.out)}</p></div>
-              <div><p class="text-[10px] text-on-surface-variant">صافي</p><p class="font-bold text-[14px] font-data-mono ${net>=0?'text-success':'text-error'}">${fmt(net)}</p></div>
+              <div><p class="text-[10px] text-on-surface-variant">دخل</p><p class="font-bold text-[14px] font-data-mono text-success">${isBase ? gmFormatDualCurrency(t.in, store) : fmt(t.in)}</p></div>
+              <div><p class="text-[10px] text-on-surface-variant">خرج</p><p class="font-bold text-[14px] font-data-mono text-error">${isBase ? gmFormatDualCurrency(t.out, store) : fmt(t.out)}</p></div>
+              <div><p class="text-[10px] text-on-surface-variant">صافي</p><p class="font-bold text-[14px] font-data-mono ${net>=0?'text-success':'text-error'}">${isBase ? gmFormatDualCurrency(net, store) : fmt(net)}</p></div>
             </div>
           </div>`;
       }).join('');
@@ -148,10 +153,14 @@ async function loadEntries() {
     listEl.innerHTML = entries.map(m => {
       const isIn = m.direction === 'in';
       const date = new Date(m.created_at).toLocaleString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const cur = m.currency || 'AED';
+      const amountLabel = cur === baseCurrency
+        ? (isIn ? '+' : '-') + gmFormatDualCurrency(m.amount, store)
+        : (isIn ? '+' : '-') + fmt(m.amount) + ' ' + cur;
       return `
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
           <div class="flex items-center justify-between mb-1">
-            <span class="font-bold text-[14px] font-data-mono ${isIn?'text-success':'text-error'}">${isIn?'+':'-'}${fmt(m.amount)} ${m.currency||'AED'}</span>
+            <span class="font-bold text-[14px] font-data-mono ${isIn?'text-success':'text-error'}">${amountLabel}</span>
             <span class="text-[11px] text-on-surface-variant">${date}</span>
           </div>
           <p class="text-[12px]">${gmEscapeHtml(m.description) || '—'}</p>
