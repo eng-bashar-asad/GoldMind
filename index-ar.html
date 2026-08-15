@@ -182,16 +182,16 @@
 <section class="mb-5 lg:mb-8">
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl lg:rounded-2xl luxury-shadow p-4 lg:p-7 grid grid-cols-3 divide-x divide-x-reverse divide-outline-variant">
 <div class="text-center px-1">
-<div class="font-headline-md text-headline-md font-bold text-secondary truncate" id="todaySalesEl">0.00</div>
-<span class="text-[10px] text-on-surface-variant">مبيعات اليوم</span>
+<div class="font-headline-md text-headline-md font-bold text-secondary truncate" id="dailyCashboxBalanceEl">0.00</div>
+<span class="text-[10px] text-on-surface-variant">كاش الصندوق</span>
 </div>
 <div class="text-center px-1">
 <div class="font-headline-md text-headline-md font-bold text-primary truncate" id="todayInvoiceCountEl">0</div>
 <span class="text-[10px] text-on-surface-variant">فواتير اليوم</span>
 </div>
 <div class="text-center px-1">
-<div class="font-headline-md text-headline-md font-bold text-primary truncate" id="cashBalanceEl">0.00</div>
-<span class="text-[10px] text-on-surface-variant">الرصيد النقدي</span>
+<div class="font-headline-md text-headline-md font-bold text-primary truncate" id="todaySalesEl">0.00</div>
+<span class="text-[10px] text-on-surface-variant">مبيعات اليوم</span>
 </div>
 </div>
 </section>
@@ -436,22 +436,20 @@
                 }
             }
 
-            // Cash balance (main box) = sum(in) - sum(out), base currency only.
-            // cash_movements can carry other currencies (see main-cashbox-ar.html's
-            // per-currency breakdown); the headline dashboard card sticks to the
-            // store's base currency and leaves the full multi-currency split to
-            // that dedicated page.
+            // Daily cashbox balance (all-time running total from the manual
+            // drawer journal) — base currency only, same logic as
+            // daily-cashbox-ar.html's "الرصيد الحالي" card.
             const baseCurrency = (store && store.currency) || 'AED';
-            const { data: mainMovs } = await goldmindClient
-                .from('cash_movements').select('direction, amount, currency')
-                .eq('store_id', GOLDMIND_STORE_ID).eq('box', 'main');
-            let cashBalance = 0;
-            (mainMovs || []).forEach(m => {
-                if ((m.currency || baseCurrency) !== baseCurrency) return;
-                cashBalance += (m.direction === 'in' ? 1 : -1) * Number(m.amount);
+            const { data: cashboxEntries } = await goldmindClient
+                .from('daily_cash_log').select('direction, amount, currency')
+                .eq('store_id', GOLDMIND_STORE_ID);
+            let dailyCashboxBalance = 0;
+            (cashboxEntries || []).forEach(e => {
+                if ((e.currency || baseCurrency) !== baseCurrency) return;
+                dailyCashboxBalance += (e.direction === 'in' ? 1 : -1) * Number(e.amount);
             });
-            document.getElementById('cashBalanceEl').textContent = gmFormatDualCurrency(cashBalance, store);
-            fitStatNumber(document.getElementById('cashBalanceEl'));
+            document.getElementById('dailyCashboxBalanceEl').textContent = gmFormatDualCurrency(dailyCashboxBalance, store);
+            fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
 
             // Today's sales + invoice count (real invoice type is 'sale', not
             // 'sell' — fixing a real bug that made this card always read 0.00)

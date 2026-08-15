@@ -269,6 +269,13 @@
 </div>
 <span class="material-symbols-outlined text-outline">chevron_left</span>
 </a>
+<a href="main-cashbox-ar.html" class="hidden w-full p-4 flex justify-between items-center text-right active:bg-surface-container-low transition-colors" id="mainCashboxLink">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">account_balance</span>
+<span class="font-label-md text-label-md text-on-surface">الرصيد النقدي (الصندوق الرئيسي)</span>
+</div>
+<span class="material-symbols-outlined text-outline">chevron_left</span>
+</a>
 <a href="admin-panel-ar.html" class="hidden w-full p-4 flex justify-between items-center text-right active:bg-surface-container-low transition-colors" id="adminPanelLink">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-secondary">admin_panel_settings</span>
@@ -333,6 +340,15 @@ function fitStoreName(el) {
     if (!session) return;
     const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
     if (isAdmin) document.getElementById('adminPanelLink').classList.remove('hidden');
+})();
+
+(async function checkCashboxAccess() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session || !GOLDMIND_STAFF_ID) return;
+    const { data: staffRow } = await goldmindClient
+        .from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const canView = staffRow && (staffRow.role === 'owner' || staffRow.permissions?.view_profit_report);
+    if (canView) document.getElementById('mainCashboxLink').classList.remove('hidden');
 })();
 
 (async function loadStoreSummary() {
