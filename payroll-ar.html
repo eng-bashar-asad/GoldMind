@@ -84,7 +84,7 @@
 </main>
 
 <script>
-let currencyLabel = 'AED';
+let gmStore = null;
 let staffRows = [];
 let salaryByStaff = {};
 let lastPaymentByStaff = {};
@@ -107,8 +107,8 @@ function periodLabel(period) {
 }
 
 async function loadStore() {
-  const { data } = await goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-  currencyLabel = (data && data.currency) || 'AED';
+  const { data } = await goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  gmStore = data || null;
 }
 
 async function findOrCreatePayrollCategory() {
@@ -133,7 +133,7 @@ function recomputePayPreview(staffId) {
   const bonus = parseFloat(document.getElementById('pf-bonus-' + staffId).value) || 0;
   const deduction = parseFloat(document.getElementById('pf-deduction-' + staffId).value) || 0;
   const net = base + bonus - deduction;
-  document.getElementById('pf-net-' + staffId).textContent = fmt(net) + ' ' + currencyLabel;
+  document.getElementById('pf-net-' + staffId).textContent = gmFormatDualCurrency(net, gmStore);
 }
 
 async function saveSalary(staffId) {
@@ -227,7 +227,7 @@ async function submitPayroll(staffId, staffName) {
 function renderStats() {
   const total = Object.values(salaryByStaff).reduce((s, v) => s + Number(v || 0), 0);
   const count = Object.values(salaryByStaff).filter(v => Number(v) > 0).length;
-  document.getElementById('stat-total-salary').textContent = fmt(total) + ' ' + currencyLabel;
+  document.getElementById('stat-total-salary').textContent = gmFormatDualCurrency(total, gmStore);
   document.getElementById('stat-staff-count').textContent = count;
 }
 
@@ -274,7 +274,7 @@ function renderStaffList() {
           </div>
           <div class="flex justify-between items-center bg-surface-container-lowest rounded-lg px-3 py-2 mb-2 text-[12px]">
             <span class="text-on-surface-variant">الصافي</span>
-            <span class="font-bold font-data-mono" id="pf-net-${s.id}">${fmt(salary)} ${currencyLabel}</span>
+            <span class="font-bold font-data-mono" id="pf-net-${s.id}">${gmFormatDualCurrency(salary, gmStore)}</span>
           </div>
           <textarea class="w-full h-14 border border-outline-variant rounded-lg px-2 py-1.5 text-[12px] mb-2" id="pf-notes-${s.id}" placeholder="ملاحظة (اختياري)"></textarea>
           <button onclick="submitPayroll('${s.id}', '${(s.full_name || '').replace(/'/g, '')}')" id="pf-btn-${s.id}" class="w-full h-10 bg-primary text-on-primary rounded-lg text-[13px] font-semibold">حفظ ودفع</button>
@@ -316,7 +316,7 @@ function renderPayments() {
         <p class="text-[13px] font-semibold">${gmEscapeHtml(staffNameById[p.staff_id] || '—')}</p>
         <p class="text-[11px] text-on-surface-variant">${periodLabel(p.pay_period)}</p>
       </div>
-      <span class="font-data-mono font-semibold text-[13px]">${fmt(p.net_amount)} ${currencyLabel}</span>
+      <span class="font-data-mono font-semibold text-[13px]">${gmFormatDualCurrency(p.net_amount, gmStore)}</span>
     </div>
   `).join('');
 }
