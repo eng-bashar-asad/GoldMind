@@ -636,7 +636,7 @@ function showTraderDetail(traderId) {
       ? ` ${weightLine ? '+' : ''}${isStockMovement ? `مصنعية (${fmtMoney(m.fab_fee_per_gram)}/غ)` : (isOpeningBalance ? 'نقدي' : (diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية'))} ${fmtMoney(m.fab_fee_amount)}`
       : '';
     return `
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-move-${m.id}">
         <div class="flex items-center justify-between mb-1">
           <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(m)}</span>
           <span class="text-[11px] text-on-surface-variant">${date}</span>
@@ -644,9 +644,118 @@ function showTraderDetail(traderId) {
         <p class="text-[12px] font-data-mono">${weightLine}${feeLine}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
         ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
-        ${isOpeningBalance ? `<button onclick="deleteOpeningBalanceMovement('${m.id}')" class="mt-2 text-[11px] text-error font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف لإعادة الإدخال</button>` : ''}
+        ${isOpeningBalance ? `
+        <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+          <button onclick="toggleEditOpeningBalance('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          <button onclick="deleteOpeningBalanceMovement('${m.id}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
+        </div>
+        <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-ob-form-${m.id}">
+          <div class="flex rounded-lg border border-outline-variant overflow-hidden">
+            <button type="button" id="edit-ob-dir-receivable-${m.id}" onclick="setEditObDirection('${m.id}','receivable')" class="flex-1 h-9 text-[11px] font-semibold">التاجر مديون للمحل</button>
+            <button type="button" id="edit-ob-dir-payable-${m.id}" onclick="setEditObDirection('${m.id}','payable')" class="flex-1 h-9 text-[11px] font-semibold">المحل مديون للتاجر</button>
+          </div>
+          <div class="flex rounded-lg border border-outline-variant overflow-hidden">
+            <button type="button" id="edit-ob-type-cash-${m.id}" onclick="setEditObType('${m.id}','cash')" class="flex-1 h-9 text-[11px] font-semibold">نقدي</button>
+            <button type="button" id="edit-ob-type-gold-${m.id}" onclick="setEditObType('${m.id}','gold')" class="flex-1 h-9 text-[11px] font-semibold">معادن (ذهب)</button>
+          </div>
+          <input id="edit-ob-cash-${m.id}" type="number" step="0.01" dir="ltr" placeholder="المبلغ (AED)" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.fab_fee_amount || ''}"/>
+          <div id="edit-ob-gold-wrap-${m.id}" class="hidden grid grid-cols-2 gap-2">
+            <input id="edit-ob-weight-${m.id}" type="number" step="0.001" dir="ltr" placeholder="الوزن (غ)" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.weight_grams || ''}"/>
+            <select id="edit-ob-karat-${m.id}" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px]">
+              <option value="24">24</option><option value="22">22</option><option value="21">21</option><option value="18">18</option>
+            </select>
+          </div>
+          <textarea id="edit-ob-notes-${m.id}" class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]">${gmEscapeHtml(m.notes || '')}</textarea>
+          <p class="text-error text-[11px] hidden" id="edit-ob-error-${m.id}"></p>
+          <div class="flex gap-2">
+            <button onclick="saveEditOpeningBalance('${m.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
+            <button onclick="toggleEditOpeningBalance('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+          </div>
+        </div>` : ''}
       </div>`;
   }).join('');
+}
+
+const obEditState = {}; // per-movement-id { direction, type }
+
+function toggleEditOpeningBalance(id) {
+  const form = document.getElementById('edit-ob-form-' + id);
+  const wasHidden = form.classList.contains('hidden');
+  form.classList.toggle('hidden');
+  form.classList.toggle('flex', wasHidden);
+  if (wasHidden) {
+    const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === id);
+    const dir = m.movement_type === 'debt_decrease' ? 'receivable' : 'payable';
+    const type = (m.weight_grams && Number(m.weight_grams) > 0) ? 'gold' : 'cash';
+    obEditState[id] = { direction: dir, type: type };
+    setEditObDirection(id, dir);
+    setEditObType(id, type);
+    if (m.karat) document.getElementById('edit-ob-karat-' + id).value = m.karat;
+  }
+}
+
+function setEditObDirection(id, dir) {
+  obEditState[id] = obEditState[id] || {};
+  obEditState[id].direction = dir;
+  document.getElementById('edit-ob-dir-receivable-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (dir === 'receivable' ? 'bg-primary text-white' : 'text-on-surface-variant');
+  document.getElementById('edit-ob-dir-payable-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (dir === 'payable' ? 'bg-primary text-white' : 'text-on-surface-variant');
+}
+
+function setEditObType(id, type) {
+  obEditState[id] = obEditState[id] || {};
+  obEditState[id].type = type;
+  document.getElementById('edit-ob-type-cash-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (type === 'cash' ? 'bg-primary text-white' : 'text-on-surface-variant');
+  document.getElementById('edit-ob-type-gold-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (type === 'gold' ? 'bg-primary text-white' : 'text-on-surface-variant');
+  document.getElementById('edit-ob-cash-' + id).classList.toggle('hidden', type !== 'cash');
+  document.getElementById('edit-ob-gold-wrap-' + id).classList.toggle('hidden', type !== 'gold');
+  document.getElementById('edit-ob-gold-wrap-' + id).classList.toggle('grid', type === 'gold');
+}
+
+async function saveEditOpeningBalance(id) {
+  const errEl = document.getElementById('edit-ob-error-' + id);
+  errEl.classList.add('hidden');
+  const state = obEditState[id] || { direction: 'receivable', type: 'cash' };
+
+  const update = {
+    movement_type: state.direction === 'receivable' ? 'debt_decrease' : 'debt_increase',
+    notes: document.getElementById('edit-ob-notes-' + id).value.trim() || 'رصيد سابق (قبل الاشتراك بالبرنامج)'
+  };
+
+  if (state.type === 'cash') {
+    const amount = parseFloat(document.getElementById('edit-ob-cash-' + id).value);
+    if (!amount || amount <= 0) {
+      errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    update.fab_fee_amount = amount;
+    update.weight_grams = null;
+    update.karat = null;
+    update.gold_24k_equivalent = 0;
+  } else {
+    const weight = parseFloat(document.getElementById('edit-ob-weight-' + id).value);
+    const karat = parseInt(document.getElementById('edit-ob-karat-' + id).value, 10);
+    if (!weight || weight <= 0) {
+      errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    update.weight_grams = weight;
+    update.karat = karat;
+    update.gold_24k_equivalent = +(weight * (karat / 24)).toFixed(3);
+    update.fab_fee_amount = 0;
+  }
+
+  const { error } = await goldmindClient.from('trader_movements').update(update).eq('id', id);
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
 }
 
 async function deleteOpeningBalanceMovement(movementId) {
