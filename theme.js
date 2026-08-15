@@ -296,6 +296,25 @@ const GOLDMIND_THEMES = {
       '--gm-outline-variant': '#ddd6c4'
     }
   },
+  'warm-ingot': {
+    label: 'المسبوكة الهادئة',
+    swatch: ['#9C8552', '#1C1A16', '#2A251E'],
+    displayFont: true,
+    vars: {
+      '--gm-bg': '#1C1A16',
+      '--gm-bg-elevated': '#1C1A16',
+      '--gm-surface-lowest': '#FBF8F1',
+      '--gm-surface-low': '#F1EADA',
+      '--gm-primary': '#1C1A16',
+      '--gm-on-primary': '#FBF8F1',
+      '--gm-accent': '#9C8552',
+      '--gm-on-accent': '#ffffff',
+      '--gm-secondary': '#7A6640',
+      '--gm-on-surface': '#211D17',
+      '--gm-on-surface-variant': '#6B6355',
+      '--gm-outline-variant': '#E3DCCB'
+    }
+  },
 };
 
 function goldmindApplyTheme(name) {
@@ -304,7 +323,29 @@ function goldmindApplyTheme(name) {
   Object.keys(theme.vars).forEach(function (key) {
     root.style.setProperty(key, theme.vars[key]);
   });
+  root.setAttribute('data-gm-display-font', theme.displayFont ? '1' : '0');
+  if (theme.displayFont) gmEnsureDisplayFont();
   localStorage.setItem('goldmind_theme', name);
+}
+
+// Some themes (currently only "warm-ingot") pair their palette with a
+// display serif for headlines/big numbers instead of the site-wide Inter.
+// Loaded lazily and only once, and scoped via the data-gm-display-font
+// attribute set above so it never affects other themes or a stale cache.
+let gmDisplayFontLoaded = false;
+function gmEnsureDisplayFont() {
+  if (gmDisplayFontLoaded) return;
+  gmDisplayFontLoaded = true;
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&display=swap';
+  document.head.appendChild(link);
+  const style = document.createElement('style');
+  style.textContent = '[data-gm-display-font="1"] .font-headline-md, ' +
+    '[data-gm-display-font="1"] .font-headline-lg, ' +
+    '[data-gm-display-font="1"] .font-headline-xl, ' +
+    '[data-gm-display-font="1"] .font-headline-xl-mobile { font-family: "Fraunces", serif; letter-spacing: -0.01em; }';
+  document.head.appendChild(style);
 }
 
 function goldmindLoadSavedTheme() {

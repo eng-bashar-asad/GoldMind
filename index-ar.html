@@ -172,9 +172,16 @@
 <span class="material-symbols-outlined text-[18px]">chevron_left</span>
 </a>
 <!-- Profile/Welcome -->
-<section class="mb-4">
+<section class="mb-4 flex items-center justify-between gap-3">
+<div>
 <h2 class="font-headline-md text-headline-md text-on-primary" id="storeNameEl">محل الفارس للذهب</h2>
 <p class="font-body-md text-body-md text-on-primary opacity-70" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
+</div>
+<!-- "Hallmark" badge — shown only for the warm-ingot theme, evokes a karat/purity stamp -->
+<div id="hallmarkBadge" class="hidden w-11 h-11 rounded-full border flex flex-col items-center justify-center shrink-0" style="border-color: var(--gm-accent); color: var(--gm-accent);">
+<span class="font-data-mono" style="font-size:9px; line-height:1.1;">٩١٦</span>
+<span class="font-data-mono" style="font-size:8px; line-height:1.1;">GM</span>
+</div>
 </section>
 <!-- Always-visible search bar (opens the same quick search panel) -->
 <button onclick="openQuickSearch()" class="w-full h-12 mb-5 px-4 flex items-center gap-2 bg-surface-container-lowest border border-outline-variant rounded-full text-on-surface-variant active:scale-[0.99] transition-transform">
@@ -755,6 +762,13 @@
         if (btn) btn.textContent = currencySymbolFor(active);
     }
     initCurrencyButton();
+
+    (function initHallmarkBadge() {
+        const badge = document.getElementById('hallmarkBadge');
+        if (badge && localStorage.getItem('goldmind_theme') === 'warm-ingot') {
+            badge.classList.remove('hidden');
+        }
+    })();
 
     function openNavDrawer() {
         document.getElementById('navDrawerOverlay').classList.remove('hidden');
