@@ -66,6 +66,7 @@
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="exchangeRate">سعر صرف الدولار مقابل عملة المحل (اتركه ١ إذا نفس العملة)</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="exchangeRate" placeholder="1" type="number" step="0.0001" value="1"/>
 </div>
+<p class="text-[11px] text-outline mt-2" id="exchangeRateHint"></p>
 <p class="text-[11px] text-outline mt-2">بيتم حساب سعر الغرام لعيار ٢٤ من الأونصة، وباقي العيارات (٢٢ / ٢١ / ١٨) تلقائياً حسب نسبة النقاء.</p>
 </div>
 
@@ -174,14 +175,47 @@ async function loadLastUpdated() {
     const parsed = JSON.parse(saved);
     document.getElementById('ouncePrice').value = parsed.ounce;
     document.getElementById('exchangeRate').value = parsed.rate;
+    recalcPreview();
+    return;
   }
+
+  // No manually-saved rate yet (first time on this device) — offer a
+  // sensible starting value instead of a bare "1", using the store's own
+  // currency settings (company-settings-ar.html). This is a starting
+  // suggestion only, always editable: the manual USD→base rate here moves
+  // with the live gold/FX market and is entered fresh each update, unlike
+  // secondary_currency_rate which the owner updates occasionally for
+  // display purposes elsewhere in the app — the two are deliberately kept
+  // as separate values, never auto-synced going forward.
+  const hintEl = document.getElementById('exchangeRateHint');
+  if (gmStore && gmStore.currency === 'USD') {
+    document.getElementById('exchangeRate').value = 1;
+    hintEl.textContent = 'عملة المحل هي الدولار، فسعر الصرف = ١.';
+  } else if (gmStore && gmStore.secondary_currency === 'USD' && gmStore.secondary_currency_rate) {
+    // secondary_currency_rate converts base→USD (base amount × rate = USD),
+    // so the ounce-price exchange rate here (USD→base) is its inverse.
+    const rate = Number(gmStore.secondary_currency_rate);
+    if (isFinite(rate) && rate > 0) {
+      document.getElementById('exchangeRate').value = +(1 / rate).toFixed(4);
+      hintEl.textContent = 'اقتراح مبدئي من سعر الصرف المسجّل بإعدادات المتجر (الدولار كعملة ثانوية) — عدّله إذا تغيّر سعر السوق.';
+    }
+  } else if (gmStore && gmStore.currency && gmStore.currency !== 'USD') {
+    hintEl.textContent = 'أدخل سعر صرف الدولار الحالي مقابل ' + gmStore.currency + '.';
+  }
+  recalcPreview();
 }
+
+let gmStore = null;
 
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
 
-  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const [{ data: staffRow }, { data: storeRow }] = await Promise.all([
+    goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+    goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+  ]);
+  gmStore = storeRow || null;
   const canManage = staffRow && staffRow.permissions && staffRow.permissions.manage_gold_price;
 
   document.getElementById('loading-state').classList.add('hidden');
