@@ -7,7 +7,88 @@
 // --gm-bg-elevated = light page background (used by all other pages' body)
 // --gm-surface-*   = white/near-white card surfaces, same across all pages
 
-// Shared HTML-escaping helper. Any value that came from user/DB input
+// ---------- Display timezone (per-device preference) ----------
+// The device's own clock/timezone was already correct all along — every
+// created_at is a real UTC instant from the server. This is purely about
+// which timezone the app converts that instant into when DISPLAYING it,
+// for staff who read the app from a different city than the shop. Stored
+// per-device (localStorage), never synced, defaults to the browser's own
+// timezone if the person never picked one.
+const GOLDMIND_TIMEZONES = [
+  { id: 'Africa/Cairo', label: 'GMT+2 — القاهرة' },
+  { id: 'Asia/Damascus', label: 'GMT+3 — دمشق' },
+  { id: 'Asia/Beirut', label: 'GMT+3 — بيروت' },
+  { id: 'Asia/Amman', label: 'GMT+3 — عمّان' },
+  { id: 'Asia/Baghdad', label: 'GMT+3 — بغداد' },
+  { id: 'Asia/Riyadh', label: 'GMT+3 — الرياض' },
+  { id: 'Asia/Kuwait', label: 'GMT+3 — الكويت' },
+  { id: 'Asia/Qatar', label: 'GMT+3 — الدوحة' },
+  { id: 'Asia/Bahrain', label: 'GMT+3 — المنامة' },
+  { id: 'Asia/Dubai', label: 'GMT+4 — دبي/أبوظبي' },
+  { id: 'Asia/Muscat', label: 'GMT+4 — مسقط' },
+  { id: 'Europe/Istanbul', label: 'GMT+3 — إسطنبول' },
+  { id: 'Africa/Casablanca', label: 'GMT+1 — الدار البيضاء' },
+  { id: 'Africa/Algiers', label: 'GMT+1 — الجزائر' },
+  { id: 'Africa/Tunis', label: 'GMT+1 — تونس' },
+  { id: 'Europe/London', label: 'GMT+0/+1 — لندن' },
+  { id: 'America/New_York', label: 'GMT-5/-4 — نيويورك' },
+];
+
+function gmGetDisplayTimeZone() {
+  return localStorage.getItem('goldmind_display_timezone') || Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+function gmSetDisplayTimeZone(tz) {
+  localStorage.setItem('goldmind_display_timezone', tz);
+}
+
+// Drop-in replacement for `new Date(x).toLocaleDateString(...)` /
+// `toLocaleTimeString(...)` that always converts into the chosen display
+// timezone instead of whatever timezone the device happens to be set to.
+function gmFormatDateTime(dateInput, opts) {
+  return new Date(dateInput).toLocaleString('ar-EG-u-nu-latn', { ...opts, timeZone: gmGetDisplayTimeZone() });
+}
+
+// Renders the small timezone-picker popover. Call gmOpenTimezonePicker()
+// from an icon button; expects a #gmTzModal container to exist on the
+// page (gmInjectTimezonePicker() creates one if missing).
+function gmInjectTimezonePicker() {
+  if (document.getElementById('gmTzModal')) return;
+  const wrap = document.createElement('div');
+  wrap.id = 'gmTzModal';
+  wrap.className = 'hidden fixed inset-0 z-[100] flex items-end lg:items-center justify-center bg-black/40';
+  wrap.innerHTML = `
+    <div class="bg-surface-container-lowest w-full lg:w-96 lg:rounded-2xl rounded-t-2xl p-5 max-h-[80vh] overflow-y-auto">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-bold text-[15px] text-on-surface">المنطقة الزمنية للعرض</h3>
+        <button onclick="gmCloseTimezonePicker()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high"><span class="material-symbols-outlined text-on-surface-variant">close</span></button>
+      </div>
+      <p class="text-[11px] text-on-surface-variant mb-3">هاد بيغيّر بس كيف تنعرض الأوقات إلك على هالجهاز — مش وقت الحفظ الفعلي بقاعدة البيانات.</p>
+      <div id="gmTzList" class="flex flex-col gap-1"></div>
+    </div>`;
+  document.body.appendChild(wrap);
+  const listEl = wrap.querySelector('#gmTzList');
+  const current = gmGetDisplayTimeZone();
+  listEl.innerHTML = GOLDMIND_TIMEZONES.map(tz => `
+    <button onclick="gmSetDisplayTimeZone('${tz.id}'); gmCloseTimezonePicker(); window.location.reload();"
+      class="text-right p-3 rounded-lg text-[13px] flex items-center justify-between ${tz.id === current ? 'bg-primary text-on-primary font-semibold' : 'text-on-surface hover:bg-surface-container-high'}">
+      <span>${tz.label}</span>
+      ${tz.id === current ? '<span class="material-symbols-outlined text-[16px]">check</span>' : ''}
+    </button>`).join('');
+}
+
+function gmOpenTimezonePicker() {
+  gmInjectTimezonePicker();
+  document.getElementById('gmTzModal').classList.remove('hidden');
+  document.getElementById('gmTzModal').classList.add('flex');
+}
+
+function gmCloseTimezonePicker() {
+  const el = document.getElementById('gmTzModal');
+  if (el) { el.classList.add('hidden'); el.classList.remove('flex'); }
+}
+
+
 // (customer/company/trader/staff names, notes, search results, etc.)
 // and gets injected into the page via innerHTML/template strings must
 // be passed through this first, or a maliciously-named record could

@@ -47,6 +47,9 @@
 </button>
 <h1 class="font-headline-md text-headline-md font-bold">الحركة اليومية</h1>
 </div>
+<button onclick="gmOpenTimezonePicker()" class="w-9 h-9 rounded-full border border-outline-variant flex items-center justify-center active:scale-90 transition-all" title="المنطقة الزمنية للعرض">
+<span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
+</button>
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-4xl mx-auto px-4 lg:px-8">
@@ -303,8 +306,8 @@ function renderAll() {
     listEl.innerHTML = entriesToShow.slice().reverse().map(e => {
       const isIn = e.direction === 'in';
       const time = showFullHistory
-        ? new Date(e.created_at).toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' })
-        : new Date(e.created_at).toLocaleTimeString('ar-EG-u-nu-latn', { hour: '2-digit', minute: '2-digit' });
+        ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' ' + gmFormatDateTime(e.created_at, { hour: '2-digit', minute: '2-digit' })
+        : gmFormatDateTime(e.created_at, { hour: '2-digit', minute: '2-digit' });
       return `
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="entry-${e.id}">
           <div class="flex items-center justify-between mb-1">
