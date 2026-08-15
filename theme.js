@@ -316,6 +316,24 @@ const GOLDMIND_THEMES = {
       '--gm-outline-variant': '#CBBF9E'
     }
   },
+  'onyx-gold': {
+    label: 'الذهبي الأونيكس',
+    swatch: ['#f2ca50', '#0F1113', '#1a1c1e'],
+    vars: {
+      '--gm-bg': '#0F1113',
+      '--gm-bg-elevated': '#0F1113',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#f5ecd0',
+      '--gm-primary': '#0F1113',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#f2ca50',
+      '--gm-on-accent': '#0F1113',
+      '--gm-secondary': '#a68a3a',
+      '--gm-on-surface': '#e2e2e5',
+      '--gm-on-surface-variant': '#d0c5af',
+      '--gm-outline-variant': '#4d4635'
+    }
+  },
 };
 
 function goldmindApplyTheme(name) {
