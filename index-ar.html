@@ -353,19 +353,31 @@
             return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        // Shrinks a stat number's font size, 1px at a time, down to a hard
-        // floor until it fully fits its box with no cut-off/ellipsis. A
-        // fixed step list (24→20→17→15→13→11→10) could still leave large
-        // balances (6+ digits plus the "AED" prefix) truncated with "...".
-        // A tight per-pixel loop down to an 8px floor guarantees the whole
-        // number is readable instead of ever showing "...".
+        // Shrinks a stat number's font size, 1px at a time, down to a
+        // readable floor (13px). If it still doesn't fit at that floor
+        // (e.g. a very large balance with the "AED" prefix), it wraps onto
+        // a second line instead of shrinking further or getting cut off
+        // with "...".
         function fitStatNumber(el) {
             if (!el) return;
             el.style.fontSize = '';
+            el.style.whiteSpace = '';
+            el.style.overflow = '';
+            el.style.textOverflow = '';
+            const READABLE_FLOOR = 13;
             const startSize = parseFloat(getComputedStyle(el).fontSize) || 24;
-            for (let size = startSize; size >= 8; size--) {
+            for (let size = startSize; size >= READABLE_FLOOR; size--) {
                 if (el.scrollWidth <= el.clientWidth) return;
                 el.style.fontSize = size + 'px';
+            }
+            // Still doesn't fit at the readable floor: allow wrapping to a
+            // second line instead of continuing to shrink or truncating.
+            if (el.scrollWidth > el.clientWidth) {
+                el.style.whiteSpace = 'normal';
+                el.style.overflow = 'visible';
+                el.style.textOverflow = 'clip';
+                el.style.wordBreak = 'break-word';
+                el.style.lineHeight = '1.15';
             }
         }
 
