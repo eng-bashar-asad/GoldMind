@@ -180,7 +180,7 @@
 <!-- Gold-price badge — shown only for the warm-ingot theme. Tapping it opens
      a small picker to switch which karat's price/gram it displays. -->
 <button id="hallmarkBadge" onclick="gmOpenKaratPicker()" class="hidden w-20 h-16 rounded-2xl border flex flex-col items-center justify-center gap-0.5 shrink-0 active:scale-95 transition-transform" style="border-color: var(--gm-accent); color: var(--gm-accent);">
-<span class="font-data-mono font-semibold" id="hallmarkKaratLabel" style="font-size:10px; line-height:1;">٢١ قيراط</span>
+<span class="font-data-mono font-semibold" id="hallmarkKaratLabel" style="font-size:10px; line-height:1;">عيار 21</span>
 <span class="font-data-mono font-bold" id="hallmarkPriceLabel" style="font-size:14px; line-height:1.15;">—</span>
 <span class="font-data-mono" id="hallmarkPriceUnit" style="font-size:8px; line-height:1; opacity:.75;">للغرام</span>
 </button>
@@ -781,8 +781,6 @@
         badge.classList.remove('hidden');
 
         const KARATS = [24, 22, 21, 18];
-        const arabicDigits = { '0':'٠','1':'١','2':'٢','3':'٣','4':'٤','5':'٥','6':'٦','7':'٧','8':'٨','9':'٩' };
-        const toArabicNum = (n) => String(n).replace(/[0-9]/g, d => arabicDigits[d]);
 
         let prices = {}; // { 24: 340.5, 22: ..., ... }
 
@@ -795,9 +793,9 @@
             const k = currentKarat();
             const priceEl = document.getElementById('hallmarkPriceLabel');
             const karatEl = document.getElementById('hallmarkKaratLabel');
-            karatEl.textContent = 'عيار ' + toArabicNum(k);
+            karatEl.textContent = 'عيار ' + k;
             const p = prices[k];
-            priceEl.textContent = (p != null) ? toArabicNum(Math.round(p * 100) / 100) : '—';
+            priceEl.textContent = (p != null) ? (Math.round(p * 100) / 100) : '—';
         }
 
         function renderPickerList() {
@@ -805,11 +803,11 @@
             const active = currentKarat();
             list.innerHTML = KARATS.map(k => {
                 const p = prices[k];
-                const priceText = (p != null) ? toArabicNum(Math.round(p * 100) / 100) + ' / غرام' : 'غير محدَّد';
+                const priceText = (p != null) ? (Math.round(p * 100) / 100) + ' / غرام' : 'غير محدَّد';
                 return `
                   <button onclick="window.__selectBadgeKarat(${k})"
                     class="text-right p-3 rounded-lg text-[13px] flex items-center justify-between ${k === active ? 'bg-primary text-on-primary font-semibold' : 'text-on-surface hover:bg-surface-container-high'}">
-                    <span>عيار ${toArabicNum(k)}</span>
+                    <span>عيار ${k}</span>
                     <span class="font-data-mono ${k === active ? '' : 'text-on-surface-variant'}">${priceText}</span>
                   </button>`;
             }).join('');
