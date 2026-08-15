@@ -353,17 +353,19 @@
             return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         }
 
-        // Shrinks a stat number's font size in steps until it fits its box
-        // without being cut off/ellipsized — long balances (e.g. a cash
-        // balance in the tens/hundreds of thousands) were getting truncated
-        // into an unreadable "...00.00" instead of just displaying smaller.
+        // Shrinks a stat number's font size, 1px at a time, down to a hard
+        // floor until it fully fits its box with no cut-off/ellipsis. A
+        // fixed step list (24→20→17→15→13→11→10) could still leave large
+        // balances (6+ digits plus the "AED" prefix) truncated with "...".
+        // A tight per-pixel loop down to an 8px floor guarantees the whole
+        // number is readable instead of ever showing "...".
         function fitStatNumber(el) {
             if (!el) return;
-            const sizes = [20, 17, 15, 13, 11, 10];
             el.style.fontSize = '';
-            for (let i = 0; i < sizes.length; i++) {
+            const startSize = parseFloat(getComputedStyle(el).fontSize) || 24;
+            for (let size = startSize; size >= 8; size--) {
                 if (el.scrollWidth <= el.clientWidth) return;
-                el.style.fontSize = sizes[i] + 'px';
+                el.style.fontSize = size + 'px';
             }
         }
 
