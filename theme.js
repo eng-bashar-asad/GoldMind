@@ -327,8 +327,8 @@ const GOLDMIND_THEMES = {
       '--gm-primary': '#0F1113',
       '--gm-on-primary': '#ffffff',
       '--gm-accent': '#f2ca50',
-      '--gm-on-accent': '#0F1113',
-      '--gm-secondary': '#a68a3a',
+      '--gm-on-accent': '#3c2f00',
+      '--gm-secondary': '#c6c6c9',
       '--gm-on-surface': '#e2e2e5',
       '--gm-on-surface-variant': '#d0c5af',
       '--gm-outline-variant': '#4d4635'
