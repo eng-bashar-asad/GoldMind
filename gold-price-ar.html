@@ -47,6 +47,9 @@
 </button>
 <h1 class="font-headline-md text-headline-md font-bold">سعر الذهب</h1>
 </div>
+<button onclick="gmOpenTimezonePicker()" class="w-9 h-9 rounded-full border border-outline-variant flex items-center justify-center active:scale-90 transition-all" title="المنطقة الزمنية للعرض">
+<span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
+</button>
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
@@ -161,7 +164,7 @@ async function loadLastUpdated() {
 
   if (data) {
     document.getElementById('lastUpdated').textContent =
-      'آخر تحديث: ' + new Date(data.updated_at).toLocaleString('ar-EG-u-nu-latn', { dateStyle: 'medium', timeStyle: 'short' });
+      'آخر تحديث: ' + gmFormatDateTime(data.updated_at, { dateStyle: 'medium', timeStyle: 'short' });
 
     const { data: allPrices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
     (allPrices || []).forEach(p => {

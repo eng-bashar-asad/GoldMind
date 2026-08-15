@@ -9,6 +9,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
+<script src="theme.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -279,8 +280,8 @@
 
         // ---- Meta ----
         document.getElementById('cert-number').textContent = piece.barcode || pieceId.slice(0, 12).toUpperCase();
-        const issueDate = invoice ? new Date(invoice.created_at) : new Date();
-        document.getElementById('cert-date').textContent = issueDate.toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric', month: 'long', year: 'numeric' });
+        const issueDate = invoice ? invoice.created_at : new Date();
+        document.getElementById('cert-date').textContent = gmFormatDateTime(issueDate, { day: 'numeric', month: 'long', year: 'numeric' });
         if (invoice && invoice.invoice_number) {
             document.getElementById('cert-invoice-line').textContent = 'فاتورة بيع: ' + invoice.invoice_number;
         }

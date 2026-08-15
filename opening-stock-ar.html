@@ -42,6 +42,9 @@
 </button>
 <h1 class="font-headline-md text-headline-md font-bold">بضاعة أول المدة</h1>
 </div>
+<button onclick="gmOpenTimezonePicker()" class="w-9 h-9 rounded-full border border-outline-variant flex items-center justify-center active:scale-90 transition-all" title="المنطقة الزمنية للعرض">
+<span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
+</button>
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-2xl mx-auto px-4 lg:px-8">
@@ -180,7 +183,7 @@ async function load() {
   emptyEl.classList.add('hidden');
 
   listEl.innerHTML = data.map(lot => {
-    const date = new Date(lot.created_at).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric', month: 'short', year: 'numeric' });
+    const date = gmFormatDateTime(lot.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
     return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
         <div class="flex items-center justify-between mb-1">
