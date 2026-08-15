@@ -83,6 +83,15 @@ const PAYMENT_LABELS = { cash: 'نقدي', bank: 'فيزا / بنك', credit: '�
 function fmt(n) {
   return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
+// Mirrors theme.js's gmFormatDualCurrency, kept local since this public
+// unauthenticated receipt page doesn't load theme.js.
+function fmtDual(amount, row) {
+  const base = fmt(amount) + ' ' + (row.currency || 'AED');
+  if (!row.secondary_currency || !row.secondary_currency_rate) return base;
+  const rate = Number(row.secondary_currency_rate);
+  if (!isFinite(rate) || rate <= 0) return base;
+  return base + ' (' + fmt(Number(amount) * rate) + ' ' + row.secondary_currency + ')';
+}
 function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
@@ -147,9 +156,8 @@ async function load() {
   const beforeTax = total / vatMultiplier;
   const tax = total - beforeTax;
 
-  const currency = row.currency || 'AED';
-  document.getElementById('sumVat').textContent = fmt(tax) + ' ' + currency;
-  document.getElementById('sumTotal').textContent = fmt(total) + ' ' + currency;
+  document.getElementById('sumVat').textContent = fmtDual(tax, row);
+  document.getElementById('sumTotal').textContent = fmtDual(total, row);
 
   document.getElementById('policyLink').href = 'invoice-receipt-policy-ar.html?store=' + encodeURIComponent(row.store_name || '');
 
