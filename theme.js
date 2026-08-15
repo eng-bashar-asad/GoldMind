@@ -298,13 +298,14 @@ const GOLDMIND_THEMES = {
   },
   'warm-ingot': {
     label: 'المسبوكة الهادئة',
-    swatch: ['#9C8552', '#1C1A16', '#2A251E'],
+    swatch: ['#9C8552', '#F3EEDF', '#EFE7D2'],
     displayFont: true,
+    lightCanvas: true,
     vars: {
-      '--gm-bg': '#1C1A16',
-      '--gm-bg-elevated': '#1C1A16',
-      '--gm-surface-lowest': '#FBF8F1',
-      '--gm-surface-low': '#F1EADA',
+      '--gm-bg': '#F3EEDF',
+      '--gm-bg-elevated': '#F3EEDF',
+      '--gm-surface-lowest': '#FFFFFF',
+      '--gm-surface-low': '#EFE7D2',
       '--gm-primary': '#1C1A16',
       '--gm-on-primary': '#FBF8F1',
       '--gm-accent': '#9C8552',
@@ -325,6 +326,7 @@ function goldmindApplyTheme(name) {
   });
   root.setAttribute('data-gm-display-font', theme.displayFont ? '1' : '0');
   if (theme.displayFont) gmEnsureDisplayFont();
+  root.classList.toggle('gm-light-canvas', !!theme.lightCanvas);
   localStorage.setItem('goldmind_theme', name);
 }
 
