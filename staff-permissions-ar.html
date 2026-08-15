@@ -110,7 +110,13 @@
 <label class="block text-[11px] text-on-surface-variant mb-1">رقم واتساب الموظف</label>
 <input id="direct-whatsapp" type="tel" dir="ltr" placeholder="971501234567 (بدون + أو أصفار البداية)" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
 </div>
-<p class="text-[11px] text-on-surface-variant mb-2">حدد صلاحيات الموظف:</p>
+<p class="text-[11px] text-on-surface-variant mb-2">نوع الموظف:</p>
+<div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
+<button type="button" id="direct-role-manager-btn" onclick="applyDirectRolePreset('manager')" class="flex-1 h-10 text-[12px] font-semibold">مدير</button>
+<button type="button" id="direct-role-employee-btn" onclick="applyDirectRolePreset('employee')" class="flex-1 h-10 text-[12px] font-semibold">موظف</button>
+<button type="button" id="direct-role-custom-btn" onclick="applyDirectRolePreset('custom')" class="flex-1 h-10 text-[12px] font-semibold">مخصص</button>
+</div>
+<p class="text-[11px] text-on-surface-variant mb-2">صلاحيات الموظف (يمكنك تعديلها يدوياً بعد اختيار النوع):</p>
 <div id="direct-permissions"></div>
 <button id="direct-add-btn" class="w-full h-12 gold-accent text-white rounded-lg font-semibold text-[13px] mt-3 active:scale-[0.98] transition-all" onclick="submitDirectAdd()">إضافة الموظف</button>
 <p class="text-error text-[12px] hidden mt-2" id="direct-add-error"></p>
@@ -387,6 +393,39 @@ function renderDirectPermissionChecklist() {
   renderPermissionChecklist('direct-permissions', 'direct');
 }
 
+// "مدير" gets everything except billing (manage_subscription stays owner-only
+// by default, though the owner can still flip it on manually if they want).
+// "موظف" gets a sensible day-to-day operational default with no
+// delete/edit-settings/staff-management/reports access.
+const MANAGER_PRESET_EXCLUDE = ['manage_subscription'];
+const EMPLOYEE_PRESET_KEYS = [
+  'view_inventory', 'add_piece',
+  'view_customers', 'add_customers',
+  'view_traders',
+  'view_invoices', 'create_invoice',
+  'contact_support',
+  'view_repairs', 'add_repair'
+];
+
+function applyDirectRolePreset(role) {
+  ['manager', 'employee', 'custom'].forEach(r => {
+    document.getElementById('direct-role-' + r + '-btn').className =
+      'flex-1 h-10 text-[12px] font-semibold ' + (r === role ? 'bg-primary text-white' : 'text-on-surface-variant');
+  });
+
+  if (role === 'custom') return; // leave checkboxes as the owner set them
+
+  const allKeys = PERMISSION_GROUPS.flatMap(g => g.keys.map(k => k[0]));
+  document.querySelectorAll('#direct-permissions input[data-direct-key]').forEach(input => {
+    const key = input.dataset.directKey;
+    if (role === 'manager') {
+      input.checked = !MANAGER_PRESET_EXCLUDE.includes(key);
+    } else if (role === 'employee') {
+      input.checked = EMPLOYEE_PRESET_KEYS.includes(key);
+    }
+  });
+}
+
 function toggleDirectAddForm() {
   const form = document.getElementById('direct-add-form');
   form.classList.toggle('hidden');
@@ -448,6 +487,7 @@ async function submitDirectAdd() {
   document.getElementById('direct-email').value = '';
   document.getElementById('direct-whatsapp').value = '';
   document.querySelectorAll('#direct-permissions input[data-direct-key]').forEach(i => i.checked = false);
+  applyDirectRolePreset('custom');
 
   loadStaff();
 }
