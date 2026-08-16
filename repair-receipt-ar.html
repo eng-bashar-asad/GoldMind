@@ -6,10 +6,12 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
     body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
     @media print {
+        .no-print { display: none !important; }
         body { background: #fff !important; margin: 0 !important; }
         #receipt { box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; }
         @page { margin: 10mm; }
@@ -27,7 +29,7 @@
 
 <!-- Letterhead -->
 <div class="p-6 text-center border-b-4 border-amber-600">
-<img id="storeLogo" class="hidden w-16 h-16 mx-auto mb-2 object-contain" />
+<img id="storeLogo" crossorigin="anonymous" class="hidden w-16 h-16 mx-auto mb-2 object-contain" />
 <h1 id="storeName" class="text-xl font-bold"></h1>
 <p id="storeAddress" class="text-[12px] text-gray-500 mt-1"></p>
 <p id="storePhone" class="text-[12px] text-gray-500" dir="ltr"></p>
@@ -58,6 +60,15 @@
 <p class="text-[10.5px] leading-5 text-amber-900">
 <strong>سياسة الصيانة:</strong> في حال التأخر عن استلام القطعة بعد إشعارها بالجاهزية بمدة تتجاوز أسبوعين، تكون الشركة غير مسؤولة عن ضياعها أو تلفها.
 </p>
+</div>
+
+<div class="no-print flex gap-2 mt-5">
+<button onclick="window.print()" class="flex-1 flex items-center justify-center gap-2 bg-white text-gray-800 border border-gray-300 py-3 rounded-lg text-sm font-semibold">
+طباعة
+</button>
+<button onclick="downloadRepairReceiptPdf()" id="download-pdf-btn" class="flex-1 flex items-center justify-center gap-2 bg-black text-white py-3 rounded-lg text-sm font-semibold">
+تحميل PDF
+</button>
 </div>
 </div>
 
@@ -141,5 +152,51 @@ function showNotFound() {
 }
 
 load();
+
+// ---- Download an official PDF copy for the customer (client-side html2pdf.js) ----
+async function downloadRepairReceiptPdf() {
+  const receipt = document.getElementById('receipt');
+  if (!receipt || receipt.classList.contains('hidden')) return;
+
+  const btn = document.getElementById('download-pdf-btn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.textContent = '...جارِ التجهيز';
+
+  const clone = receipt.cloneNode(true);
+  clone.classList.remove('hidden');
+  clone.style.margin = '0';
+  clone.style.width = '780px';
+  clone.style.maxWidth = '780px';
+  const cloneButtons = clone.querySelector('.no-print');
+  if (cloneButtons) cloneButtons.remove();
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.top = '0';
+  wrapper.style.left = '-99999px';
+  wrapper.style.background = '#ffffff';
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  const ticketNumber = (document.getElementById('ticketNumber')?.textContent || 'إيصال-صيانة').trim();
+
+  try {
+    await html2pdf().set({
+      margin: 10,
+      filename: `${ticketNumber}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(wrapper).save();
+  } catch (err) {
+    console.error('PDF generation failed', err);
+    alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
+  } finally {
+    document.body.removeChild(wrapper);
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
 </script>
 </body></html>
