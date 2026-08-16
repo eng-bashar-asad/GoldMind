@@ -152,62 +152,8 @@ const GOLDMIND_THEMES = {
       '--gm-outline-variant': '#c6c6cd'
     }
   },
-  'deep-teal': {
-    label: 'الفيروزي الداكن',
-    swatch: ['#C9A227', '#0d2b30', '#153a40'],
-    vars: {
-      '--gm-bg': '#0d2b30',
-      '--gm-bg-elevated': '#0d2b30',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#dcefed',
-      '--gm-primary': '#0d2b30',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#C9A227',
-      '--gm-on-accent': '#0d2b30',
-      '--gm-secondary': '#1c6b6b',
-      '--gm-on-surface': '#0d2b30',
-      '--gm-on-surface-variant': '#3c5457',
-      '--gm-outline-variant': '#c7d6d6'
-    }
-  },
-  'night-cyan': {
-    label: 'الليلي الفيروزي',
-    swatch: ['#00E0EF', '#0a1420', '#132030'],
-    vars: {
-      '--gm-bg': '#0a1420',
-      '--gm-bg-elevated': '#0a1420',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#daedf0',
-      '--gm-primary': '#0a1420',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#00E0EF',
-      '--gm-on-accent': '#0a1420',
-      '--gm-secondary': '#8A6D1B',
-      '--gm-on-surface': '#0a1420',
-      '--gm-on-surface-variant': '#40525e',
-      '--gm-outline-variant': '#c3ced4'
-    }
-  },
-  'light-gold': {
-    label: 'الفاتح الذهبي',
-    swatch: ['#C9A227', '#faf7f0', '#ffffff'],
-    vars: {
-      '--gm-bg': '#1c1710',
-      '--gm-bg-elevated': '#1c1710',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#f0e5cb',
-      '--gm-primary': '#191c1e',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#B4955A',
-      '--gm-on-accent': '#ffffff',
-      '--gm-secondary': '#8A6D1B',
-      '--gm-on-surface': '#191c1e',
-      '--gm-on-surface-variant': '#5a544a',
-      '--gm-outline-variant': '#e3dbc9'
-    }
-  },
   'rose-gold': {
-    label: 'الوردي الذهبي',
+    label: 'الوردي الملكي',
     swatch: ['#E8B4B8', '#2b1620', '#3d1f2c'],
     vars: {
       '--gm-bg': '#2b1620',
@@ -222,78 +168,6 @@ const GOLDMIND_THEMES = {
       '--gm-on-surface': '#2b1620',
       '--gm-on-surface-variant': '#5e4249',
       '--gm-outline-variant': '#e3cdd1'
-    }
-  },
-  'platinum-silver': {
-    label: 'الفضي البلاتيني',
-    swatch: ['#B9C2CB', '#14181c', '#1e242a'],
-    vars: {
-      '--gm-bg': '#14181c',
-      '--gm-bg-elevated': '#14181c',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#dfe3e7',
-      '--gm-primary': '#14181c',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#9FA8B0',
-      '--gm-on-accent': '#14181c',
-      '--gm-secondary': '#5b6670',
-      '--gm-on-surface': '#14181c',
-      '--gm-on-surface-variant': '#454e56',
-      '--gm-outline-variant': '#ccd1d6'
-    }
-  },
-  'emerald': {
-    label: 'الزمردي',
-    swatch: ['#0F9D58', '#0a1f14', '#123321'],
-    vars: {
-      '--gm-bg': '#0a1f14',
-      '--gm-bg-elevated': '#0a1f14',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#d6ecdc',
-      '--gm-primary': '#0a1f14',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#0F9D58',
-      '--gm-on-accent': '#ffffff',
-      '--gm-secondary': '#1c6b3e',
-      '--gm-on-surface': '#0a1f14',
-      '--gm-on-surface-variant': '#3c5445',
-      '--gm-outline-variant': '#c8dccf'
-    }
-  },
-  'royal-purple': {
-    label: 'الأرجواني الملكي',
-    swatch: ['#8B5CF6', '#1a1024', '#241533'],
-    vars: {
-      '--gm-bg': '#1a1024',
-      '--gm-bg-elevated': '#1a1024',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#e6ddf4',
-      '--gm-primary': '#1a1024',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#8B5CF6',
-      '--gm-on-accent': '#ffffff',
-      '--gm-secondary': '#6B46C1',
-      '--gm-on-surface': '#1a1024',
-      '--gm-on-surface-variant': '#4d4358',
-      '--gm-outline-variant': '#d9d0e8'
-    }
-  },
-  'aurum-night': {
-    label: 'الذهبي الليلي (Aurum)',
-    swatch: ['#f2ca50', '#081425', '#111c2d'],
-    vars: {
-      '--gm-bg': '#081425',
-      '--gm-bg-elevated': '#081425',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#f7edd3',
-      '--gm-primary': '#081425',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#f2ca50',
-      '--gm-on-accent': '#081425',
-      '--gm-secondary': '#404756',
-      '--gm-on-surface': '#0f1b2e',
-      '--gm-on-surface-variant': '#4a5568',
-      '--gm-outline-variant': '#ddd6c4'
     }
   },
   'warm-ingot': {
@@ -315,22 +189,45 @@ const GOLDMIND_THEMES = {
       '--gm-outline-variant': '#CBBF9E'
     }
   },
-  'onyx-gold': {
-    label: 'الذهبي الأونيكس',
-    swatch: ['#f2ca50', '#0F1113', '#1a1c1e'],
+  'golden-hour': {
+    label: 'غروب الذهب',
+    swatch: ['#D4AF37', '#FBF6EA', '#F4ECD6'],
+    lightCanvas: true,
+    shimmer: true,
     vars: {
-      '--gm-bg': '#0F1113',
-      '--gm-bg-elevated': '#0F1113',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#f5ecd0',
-      '--gm-primary': '#0F1113',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#f2ca50',
+      '--gm-bg': '#FBF6EA',
+      '--gm-bg-elevated': '#FBF6EA',
+      '--gm-surface-lowest': '#FFFFFF',
+      '--gm-surface-low': '#F4ECD6',
+      '--gm-primary': '#4A403A',
+      '--gm-on-primary': '#FBF8F1',
+      '--gm-accent': '#D4AF37',
       '--gm-on-accent': '#3c2f00',
-      '--gm-secondary': '#8A6D1B',
-      '--gm-on-surface': '#e2e2e5',
-      '--gm-on-surface-variant': '#d0c5af',
-      '--gm-outline-variant': '#4d4635'
+      '--gm-secondary': '#8A6A1F',
+      '--gm-on-surface': '#211D17',
+      '--gm-on-surface-variant': '#6B6355',
+      '--gm-outline-variant': '#CBBF9E',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #7a5a12 0%, #d4af37 28%, #fff2b8 50%, #d4af37 72%, #b8860b 100%)'
+    }
+  },
+  'midnight-galaxy': {
+    label: 'مجرة منتصف الليل',
+    swatch: ['#A490C2', '#1c1430', '#241a3d'],
+    shimmer: true,
+    vars: {
+      '--gm-bg': '#1c1430',
+      '--gm-bg-elevated': '#1c1430',
+      '--gm-surface-lowest': '#ffffff',
+      '--gm-surface-low': '#e6e2f5',
+      '--gm-primary': '#1c1430',
+      '--gm-on-primary': '#ffffff',
+      '--gm-accent': '#A490C2',
+      '--gm-on-accent': '#1c1430',
+      '--gm-secondary': '#4A4E8F',
+      '--gm-on-surface': '#f2f0fb',
+      '--gm-on-surface-variant': '#b6a9d9',
+      '--gm-outline-variant': '#4a3f66',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #241a3d 0%, #4a4e8f 30%, #d9d2f0 50%, #4a4e8f 70%, #241a3d 100%)'
     }
   },
 };
@@ -344,7 +241,28 @@ function goldmindApplyTheme(name) {
   root.setAttribute('data-gm-display-font', theme.displayFont ? '1' : '0');
   if (theme.displayFont) gmEnsureDisplayFont();
   root.classList.toggle('gm-light-canvas', !!theme.lightCanvas);
+  root.classList.toggle('gm-shimmer', !!theme.shimmer);
+  if (theme.shimmer) gmEnsureShimmerStyle();
   localStorage.setItem('goldmind_theme', name);
+}
+
+// "غروب الذهب" and "مجرة منتصف الليل" pair their palette with a subtle
+// animated sheen (a moving gradient sweep), matching the metallic/cosmic
+// feel previewed in the theme mockup. Any element can opt in with
+// class="gm-shimmer-surface" — it reads the theme's --gm-shimmer-grad
+// (set as part of that theme's vars) so the sweep colors always match the
+// active theme. Injected lazily/once so non-shimmer themes pay no cost.
+let gmShimmerStyleLoaded = false;
+function gmEnsureShimmerStyle() {
+  if (gmShimmerStyleLoaded) return;
+  gmShimmerStyleLoaded = true;
+  const style = document.createElement('style');
+  style.textContent =
+    '.gm-shimmer-surface{background:var(--gm-shimmer-grad, var(--gm-primary));' +
+    'background-size:220% 220%;animation:gmShimmerSweep 6s ease-in-out infinite;}' +
+    '@keyframes gmShimmerSweep{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}' +
+    '@media (prefers-reduced-motion: reduce){.gm-shimmer-surface{animation:none;}}';
+  document.head.appendChild(style);
 }
 
 // Some themes (currently only "warm-ingot") pair their palette with a
