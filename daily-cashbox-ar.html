@@ -118,12 +118,12 @@
 <h2 class="font-semibold text-[13px]" id="entries-heading">عمليات اليوم</h2>
 <button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold" id="fullHistoryToggle">عرض كل العمليات</button>
 </div>
-<div class="overflow-x-auto rounded-xl border border-outline-variant">
+<div class="overflow-x-auto rounded-xl border border-[#33363b]" style="background:#1a1c1e;">
 <table class="w-full text-[12px] border-collapse" id="cashbox-table">
 <thead>
 <tr>
-<th colspan="2" class="bg-success/10 text-success font-bold py-2 text-[13px] border-b border-outline-variant border-l-2 border-outline-variant">الداخل</th>
-<th colspan="2" class="bg-error/10 text-error font-bold py-2 text-[13px] border-b border-outline-variant">الصادر</th>
+<th colspan="2" class="bg-success/20 text-success font-bold py-2 text-[13px] border-b border-[#33363b] border-l-2 border-[#33363b]">الداخل</th>
+<th colspan="2" class="bg-error/20 text-error font-bold py-2 text-[13px] border-b border-[#33363b]">الصادر</th>
 </tr>
 </thead>
 <tbody id="cashbox-table-body"></tbody>
@@ -423,21 +423,32 @@ function renderAll() {
     const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     outEntries.push(...outMembers);
     inEntries.push(...inMembers);
+    // Pad the shorter side up to the same length before the next cluster
+    // starts. Without this, an unbalanced cluster (e.g. 2 out entries but
+    // only 1 in entry) shifts every cluster after it out of sync between
+    // the two columns — the whole point of clustering is that a group's
+    // block starts on the SAME row in both columns, not just "somewhere
+    // near" each other.
+    const diff = outMembers.length - inMembers.length;
+    if (diff > 0) inEntries.push(...Array(diff).fill(null));
+    else if (diff < 0) outEntries.push(...Array(-diff).fill(null));
   });
   const rowCount = Math.max(outEntries.length, inEntries.length);
 
   function cellHtml(e) {
     if (!e) return '<td></td><td></td>';
     const color = gmLinkColorFor(e.link_group);
-    const styleAttr = color ? ` style="background:${color}"` : '';
+    const styleAttr = color ? ` style="background:${color};color:#1a1c1e;"` : '';
+    const textClass = color ? '' : 'text-gray-100';
+    const metaClass = color ? 'opacity-70' : 'text-gray-500';
     const dateLabel = showFullHistory ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit' }) + ' ' : '';
     return `
-      <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>
+      <td class="px-2 py-2 border-b border-[#33363b] cursor-pointer ${textClass}" onclick="openEditModal('${e.id}')"${styleAttr}>
         <div class="font-semibold">${gmEscapeHtml(e.operation_type)}</div>
-        ${e.notes ? `<div class="text-[10px] text-on-surface-variant">${gmEscapeHtml(e.notes)}</div>` : ''}
-        <div class="text-[10px] text-on-surface-variant">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
+        ${e.notes ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(e.notes)}</div>` : ''}
+        <div class="text-[10px] ${metaClass}">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
       </td>
-      <td class="px-2 py-2 border-b border-outline-variant text-center font-bold font-data-mono cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>${fmt(e.amount)}<div class="text-[9px] font-normal">${e.currency}</div></td>`;
+      <td class="px-2 py-2 border-b border-[#33363b] text-center font-bold font-data-mono cursor-pointer ${textClass}" onclick="openEditModal('${e.id}')"${styleAttr}>${fmt(e.amount)}<div class="text-[9px] font-normal ${metaClass}">${e.currency}</div></td>`;
   }
 
   let rowsHtml = '';
