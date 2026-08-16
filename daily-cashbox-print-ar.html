@@ -48,10 +48,11 @@
 
 <div id="loading" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
-<div id="sheet" class="hidden max-w-2xl mx-auto my-6 bg-surface-container-lowest shadow rounded-lg overflow-hidden">
+<div id="sheet" class="hidden max-w-2xl mx-auto my-6 p-3 sm:p-5 bg-background">
+<div class="bg-surface-container-lowest shadow rounded-lg overflow-hidden">
 
 <!-- Letterhead -->
-<div class="p-6 text-center border-b-4 border-accent">
+<div class="p-6 text-center border-b-4 border-accent bg-surface-container-low">
 <img id="storeLogo" crossorigin="anonymous" class="hidden w-16 h-16 mx-auto mb-2 object-contain"/>
 <h1 id="storeName" class="text-xl font-bold text-on-surface"></h1>
 <p id="storeAddress" class="text-[12px] text-on-surface-variant mt-1"></p>
@@ -69,8 +70,8 @@
 <table class="w-full text-[13px]">
 <thead>
 <tr>
-<th colspan="2" class="bg-red-100 text-red-800 py-2.5 font-bold">الصادر</th>
 <th colspan="2" class="bg-green-100 text-green-800 py-2.5 font-bold">الداخل</th>
+<th colspan="2" class="bg-red-100 text-red-800 py-2.5 font-bold">الصادر</th>
 </tr>
 </thead>
 <tbody id="rowsBody"></tbody>
@@ -84,6 +85,7 @@
 </div>
 </div>
 
+</div>
 </div>
 
 <script>
@@ -175,10 +177,10 @@ async function load() {
     const inn = inEntries[i];
     const bg = rowColors[i] ? `background-color:${rowColors[i]};` : '';
     rowsHtml += `<tr style="${bg}">
-      <td class="py-2.5 px-3 border-t border-outline-variant">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-outline-variant">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-outline-variant">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
       <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-outline-variant">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
     </tr>`;
   }
   if (dayEntries.length === 0) {
