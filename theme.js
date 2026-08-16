@@ -149,7 +149,8 @@ const GOLDMIND_THEMES = {
       '--gm-secondary': '#745a25',
       '--gm-on-surface': '#191c1e',
       '--gm-on-surface-variant': '#45464d',
-      '--gm-outline-variant': '#c6c6cd'
+      '--gm-outline-variant': '#c6c6cd',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #745a25 0%, #FFD700 100%)'
     }
   },
   'rose-gold': {
@@ -167,7 +168,8 @@ const GOLDMIND_THEMES = {
       '--gm-secondary': '#9c5a63',
       '--gm-on-surface': '#2b1620',
       '--gm-on-surface-variant': '#5e4249',
-      '--gm-outline-variant': '#e3cdd1'
+      '--gm-outline-variant': '#e3cdd1',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #9c5a63 0%, #E8B4B8 100%)'
     }
   },
   'warm-ingot': {
@@ -186,7 +188,8 @@ const GOLDMIND_THEMES = {
       '--gm-secondary': '#7A6640',
       '--gm-on-surface': '#211D17',
       '--gm-on-surface-variant': '#6B6355',
-      '--gm-outline-variant': '#CBBF9E'
+      '--gm-outline-variant': '#CBBF9E',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #7A6640 0%, #9C8552 100%)'
     }
   },
   'golden-hour': {
@@ -207,7 +210,8 @@ const GOLDMIND_THEMES = {
       '--gm-on-surface': '#211D17',
       '--gm-on-surface-variant': '#6B6355',
       '--gm-outline-variant': '#CBBF9E',
-      '--gm-shimmer-grad': 'linear-gradient(120deg, #7a5a12 0%, #d4af37 28%, #fff2b8 50%, #d4af37 72%, #b8860b 100%)'
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #7a5a12 0%, #d4af37 28%, #fff2b8 50%, #d4af37 72%, #b8860b 100%)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #8A6A1F 0%, #D4AF37 60%, #fff2b8 100%)'
     }
   },
   'midnight-galaxy': {
@@ -224,10 +228,11 @@ const GOLDMIND_THEMES = {
       '--gm-accent': '#A490C2',
       '--gm-on-accent': '#1c1430',
       '--gm-secondary': '#4A4E8F',
-      '--gm-on-surface': '#f2f0fb',
-      '--gm-on-surface-variant': '#b6a9d9',
-      '--gm-outline-variant': '#4a3f66',
-      '--gm-shimmer-grad': 'linear-gradient(120deg, #241a3d 0%, #4a4e8f 30%, #d9d2f0 50%, #4a4e8f 70%, #241a3d 100%)'
+      '--gm-on-surface': '#1c1430',
+      '--gm-on-surface-variant': '#5b4f78',
+      '--gm-outline-variant': '#d6cfe8',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #241a3d 0%, #4a4e8f 30%, #d9d2f0 50%, #4a4e8f 70%, #241a3d 100%)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #4A4E8F 0%, #A490C2 100%)'
     }
   },
 };
@@ -264,6 +269,21 @@ function gmEnsureShimmerStyle() {
     '@media (prefers-reduced-motion: reduce){.gm-shimmer-surface{animation:none;}}';
   document.head.appendChild(style);
 }
+
+// Small "initials" circles (staff/customer/trader avatars) always use a
+// two-tone gradient matching the active theme's accent colors, in every
+// theme — not just the two shimmer themes. Injected once, globally, so any
+// page just needs class="gm-avatar-grad" instead of a flat bg color.
+let gmAvatarStyleLoaded = false;
+function gmEnsureAvatarStyle() {
+  if (gmAvatarStyleLoaded) return;
+  gmAvatarStyleLoaded = true;
+  const style = document.createElement('style');
+  style.textContent =
+    '.gm-avatar-grad{background:var(--gm-avatar-grad, var(--gm-accent));color:var(--gm-on-accent);}';
+  document.head.appendChild(style);
+}
+gmEnsureAvatarStyle();
 
 // Some themes (currently only "warm-ingot") pair their palette with a
 // display serif for headlines/big numbers instead of the site-wide Inter.
