@@ -20,7 +20,7 @@
           "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
           "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
           "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
-          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "accent": "var(--gm-accent)",
           "outline": "#76777d"
         },
         "fontFamily": { "body-md": ["Inter"], "headline-md": ["Inter"] },
@@ -32,7 +32,7 @@
     </script>
 <style>
     html { font-size: 87.5%; }
-    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 26px; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
@@ -41,7 +41,7 @@
 <div class="flex justify-between items-center px-4 w-full h-16">
 <div class="flex items-center gap-4">
 <button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
-<span class="material-symbols-outlined">arrow_forward</span>
+<span class="material-symbols-outlined" style="font-size:20px;">arrow_forward</span>
 </button>
 <h1 class="font-headline-md text-headline-md font-bold">اللوحة المتقدمة</h1>
 </div>
@@ -51,107 +51,116 @@
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
-<div id="page-content" class="hidden py-6 flex flex-col gap-3">
+<div id="page-content" class="hidden py-6 flex flex-col gap-4">
 
 <p class="text-[12px] text-outline leading-relaxed">
-تصميم بديل للاختصارات — كل صف اضغط عليه للانتقال مباشرة، أو اضغط على القائمة يمين الصف لتغيير الاختصار المعروض بهاد المكان. الترتيب يتحفظ على هاد الجهاز بس.
+تصميم بديل — كل أيقونة هون تصنيف بيجمع كم اختصار مرتبط ببعضه. اضغط أي تصنيف يفتحلك قائمة الخيارات يلي جواه.
 </p>
 
-<div id="slots-list" class="flex flex-col gap-2"></div>
-
-<button onclick="resetSlots()" class="w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl text-[13px] font-semibold mt-2">إعادة الترتيب الافتراضي</button>
+<div id="categories-grid" class="grid grid-cols-3 gap-3"></div>
 
 </div>
 </main>
 
+<!-- Themed bottom sheet — deliberately built from the app's own surface/
+     border/text CSS variables (not a native <select>), so its colors and
+     feel always match whatever theme the user picked instead of falling
+     back to the browser/OS's own dark picker style. -->
+<div class="hidden fixed inset-0 bg-black/40 z-[60] items-end justify-center" id="categorySheet" onclick="if(event.target===this) closeCategorySheet()">
+<div class="bg-surface-container-lowest w-full max-w-md rounded-t-2xl p-4 pb-6 max-h-[75vh] overflow-y-auto border-t border-outline-variant">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-bold text-[15px]" id="sheetTitle"></h3>
+<button onclick="closeCategorySheet()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant"><span class="material-symbols-outlined" style="font-size:20px;">close</span></button>
+</div>
+<div id="sheetItems" class="flex flex-col gap-1"></div>
+</div>
+</div>
+
 <script>
-// Every shortcut a slot can be assigned to. Mirrors the quick-actions grid
-// on index-ar.html (same hrefs/icons/permissions) plus a few extra
-// destinations from the hamburger menu, so the customizable list here has
-// real choice instead of being locked to exactly the original 15.
-const GM_SHORTCUT_CATALOG = [
-  { key: 'search-invoices', icon: 'manage_search', label: 'بحث الفواتير', href: 'invoices-list-ar.html', perm: null },
-  { key: 'new-sale', icon: 'add_shopping_cart', label: 'فاتورة جديدة', href: 'new-sale-ar.html', perm: 'create_invoice' },
-  { key: 'purchase-invoice', icon: 'local_shipping', label: 'فاتورة شراء', href: 'create-invoice-v2-ar.html', perm: 'create_invoice' },
-  { key: 'sales-return', icon: 'keyboard_return', label: 'مرتجع مبيعات', href: 'sales-return-ar.html', perm: 'create_invoice' },
-  { key: 'daily-cashbox', icon: 'account_balance_wallet', label: 'الصندوق اليومي', href: 'daily-cashbox-ar.html', perm: 'manage_daily_cashbox' },
-  { key: 'add-piece', icon: 'inventory_2', label: 'إضافة قطعة', href: 'inventory-add.html', perm: 'add_piece' },
-  { key: 'production', icon: 'precision_manufacturing', label: 'إنتاج القطع', href: 'stock-production-ar.html', perm: 'add_piece' },
-  { key: 'opening-stock', icon: 'warehouse', label: 'بضاعة أول المدة', href: 'opening-stock-ar.html', perm: 'owner_only_opening_stock' },
-  { key: 'inventory-list', icon: 'inventory_2', label: 'المخزن', href: 'inventory-list-ar.html', perm: 'view_inventory' },
-  { key: 'add-customer', icon: 'person_add', label: 'إضافة عميل', href: 'customer-add-ar.html', perm: 'add_customers' },
-  { key: 'customer-debts', icon: 'account_balance_wallet', label: 'كشف حساب', href: 'customer-debts-ar.html', perm: 'view_customers' },
-  { key: 'ledger', icon: 'groups', label: 'حسابات التجار', href: 'ledger-ar.html', perm: null },
-  { key: 'repairs', icon: 'build', label: 'الصيانة', href: 'repairs-ar.html', perm: 'view_repairs' },
-  { key: 'expense-entry', icon: 'receipt', label: 'مصروف جديد', href: 'expense-entry-ar.html', perm: null },
-  { key: 'main-cashbox', icon: 'account_balance', label: 'الصندوق الرئيسي', href: 'main-cashbox-ar.html', perm: 'manage_daily_cashbox' },
-  { key: 'reports', icon: 'bar_chart', label: 'التقارير والتحليلات', href: 'reports-ar.html', perm: 'view_profit_report' },
-  { key: 'gold-price', icon: 'payments', label: 'سعر الذهب', href: 'gold-price-ar.html', perm: null },
-  { key: 'diamond-add', icon: 'diamond', label: 'إضافة ألماسة', href: 'diamond-inventory-add.html', perm: 'add_piece', diamondOnly: true },
-  { key: 'diamond-list', icon: 'diamond', label: 'مخزون الألماس', href: 'diamond-inventory-list-ar.html', perm: 'view_inventory', diamondOnly: true },
+// Same underlying destinations as the main dashboard grid, but grouped
+// into categories here instead of listed one-by-one — one icon per
+// category, tap it to open a themed sheet with the items inside it.
+const GM_SHORTCUT_ITEMS = {
+  'search-invoices': { icon: 'manage_search', label: 'بحث الفواتير', href: 'invoices-list-ar.html', perm: null },
+  'new-sale': { icon: 'add_shopping_cart', label: 'فاتورة جديدة', href: 'new-sale-ar.html', perm: 'create_invoice' },
+  'purchase-invoice': { icon: 'local_shipping', label: 'فاتورة شراء', href: 'create-invoice-v2-ar.html', perm: 'create_invoice' },
+  'sales-return': { icon: 'keyboard_return', label: 'مرتجع مبيعات', href: 'sales-return-ar.html', perm: 'create_invoice' },
+  'daily-cashbox': { icon: 'account_balance_wallet', label: 'الصندوق اليومي', href: 'daily-cashbox-ar.html', perm: 'manage_daily_cashbox' },
+  'main-cashbox': { icon: 'account_balance', label: 'الصندوق الرئيسي', href: 'main-cashbox-ar.html', perm: 'manage_daily_cashbox' },
+  'expense-entry': { icon: 'receipt', label: 'مصروف جديد', href: 'expense-entry-ar.html', perm: null },
+  'add-piece': { icon: 'inventory_2', label: 'إضافة قطعة', href: 'inventory-add.html', perm: 'add_piece' },
+  'production': { icon: 'precision_manufacturing', label: 'إنتاج القطع', href: 'stock-production-ar.html', perm: 'add_piece' },
+  'opening-stock': { icon: 'warehouse', label: 'بضاعة أول المدة', href: 'opening-stock-ar.html', perm: 'owner_only_opening_stock' },
+  'inventory-list': { icon: 'inventory_2', label: 'المخزن', href: 'inventory-list-ar.html', perm: 'view_inventory' },
+  'diamond-add': { icon: 'diamond', label: 'إضافة ألماسة', href: 'diamond-inventory-add.html', perm: 'add_piece', diamondOnly: true },
+  'diamond-list': { icon: 'diamond', label: 'مخزون الألماس', href: 'diamond-inventory-list-ar.html', perm: 'view_inventory', diamondOnly: true },
+  'add-customer': { icon: 'person_add', label: 'إضافة عميل', href: 'customer-add-ar.html', perm: 'add_customers' },
+  'customer-debts': { icon: 'account_balance_wallet', label: 'كشف حساب', href: 'customer-debts-ar.html', perm: 'view_customers' },
+  'ledger': { icon: 'groups', label: 'حسابات التجار', href: 'ledger-ar.html', perm: null },
+  'repairs': { icon: 'build', label: 'الصيانة', href: 'repairs-ar.html', perm: 'view_repairs' },
+  'reports': { icon: 'bar_chart', label: 'التقارير والتحليلات', href: 'reports-ar.html', perm: 'view_profit_report' },
+  'gold-price': { icon: 'payments', label: 'سعر الذهب', href: 'gold-price-ar.html', perm: null },
+};
+
+const GM_SHORTCUT_CATEGORIES = [
+  { key: 'invoices', icon: 'receipt_long', label: 'الفواتير والمبيعات', items: ['new-sale', 'purchase-invoice', 'sales-return', 'search-invoices'] },
+  { key: 'cashbox', icon: 'account_balance_wallet', label: 'الصندوق والمالية', items: ['daily-cashbox', 'main-cashbox', 'expense-entry'] },
+  { key: 'inventory', icon: 'inventory_2', label: 'المخزون', items: ['add-piece', 'production', 'opening-stock', 'inventory-list'] },
+  { key: 'diamonds', icon: 'diamond', label: 'الألماس', items: ['diamond-add', 'diamond-list'], diamondOnly: true },
+  { key: 'customers', icon: 'groups', label: 'العملاء والتجار', items: ['add-customer', 'customer-debts', 'ledger'] },
+  { key: 'maintenance', icon: 'build', label: 'الصيانة', items: ['repairs'] },
+  { key: 'reports', icon: 'bar_chart', label: 'التقارير والأسعار', items: ['reports', 'gold-price'] },
 ];
 
-let allowedCatalog = []; // catalog entries the current staff member can actually see
-let slotAssignments = []; // array of catalog keys, one per slot
+let hasPermFn = () => true;
+let diamondsOn = false;
 
-function catalogItem(key) {
-  return GM_SHORTCUT_CATALOG.find(c => c.key === key) || allowedCatalog[0];
+function visibleItemsFor(category) {
+  return category.items
+    .map(k => ({ key: k, ...GM_SHORTCUT_ITEMS[k] }))
+    .filter(it => hasPermFn(it.perm) && (!it.diamondOnly || diamondsOn));
 }
 
-function defaultSlots() {
-  return allowedCatalog.map(c => c.key);
-}
+function renderCategories() {
+  const grid = document.getElementById('categories-grid');
+  const visibleCategories = GM_SHORTCUT_CATEGORIES
+    .filter(cat => !cat.diamondOnly || diamondsOn)
+    .map(cat => ({ cat, items: visibleItemsFor(cat) }))
+    .filter(x => x.items.length > 0);
 
-function loadSavedSlots() {
-  try {
-    const saved = JSON.parse(localStorage.getItem('goldmind_advanced_slots') || 'null');
-    if (Array.isArray(saved) && saved.length) {
-      // Drop any saved slot the user no longer has permission for (e.g. a
-      // permission was revoked, or diamonds got turned off since).
-      const filtered = saved.filter(k => allowedCatalog.some(c => c.key === k));
-      // Append any newly-permitted catalog items not already in the saved
-      // list, so new destinations aren't invisible after an update.
-      allowedCatalog.forEach(c => { if (!filtered.includes(c.key)) filtered.push(c.key); });
-      return filtered;
-    }
-  } catch (e) { /* fall through to defaults */ }
-  return defaultSlots();
-}
-
-function saveSlots() {
-  localStorage.setItem('goldmind_advanced_slots', JSON.stringify(slotAssignments));
-}
-
-function resetSlots() {
-  slotAssignments = defaultSlots();
-  saveSlots();
-  renderSlots();
-}
-
-function reassignSlot(index, newKey) {
-  slotAssignments[index] = newKey;
-  saveSlots();
-  renderSlots();
-}
-
-function renderSlots() {
-  const listEl = document.getElementById('slots-list');
-  listEl.innerHTML = slotAssignments.map((key, i) => {
-    const item = catalogItem(key);
-    const options = allowedCatalog.map(c =>
-      `<option value="${c.key}" ${c.key === key ? 'selected' : ''}>${gmEscapeHtml(c.label)}</option>`
-    ).join('');
+  grid.innerHTML = visibleCategories.map(({ cat, items }) => {
+    // A single-item category can just navigate directly — no need to
+    // open a sheet with one row in it.
+    const action = items.length === 1
+      ? `window.location.href='${items[0].href}'`
+      : `openCategorySheet('${cat.key}')`;
     return `
-      <div class="flex items-center justify-between bg-surface-container-lowest border border-outline-variant rounded-xl pl-2 gap-2">
-        <a href="${item.href}" class="flex items-center gap-3 flex-1 min-w-0 px-3 py-3">
-          <span class="material-symbols-outlined text-secondary shrink-0">${item.icon}</span>
-          <span class="font-semibold text-[14px] truncate">${gmEscapeHtml(item.label)}</span>
-        </a>
-        <select class="h-10 border border-outline-variant rounded-lg text-[12px] px-2 bg-transparent max-w-[110px]" onchange="reassignSlot(${i}, this.value)" title="تغيير الاختصار بهاد المكان">
-          ${options}
-        </select>
-      </div>`;
+      <button onclick="${action}" class="flex flex-col items-center justify-center gap-2 p-3 h-24 bg-surface-container-lowest border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform">
+        <span class="material-symbols-outlined text-secondary">${cat.icon}</span>
+        <span class="text-[11px] font-semibold leading-tight text-center">${gmEscapeHtml(cat.label)}</span>
+      </button>`;
   }).join('');
+}
+
+function openCategorySheet(key) {
+  const cat = GM_SHORTCUT_CATEGORIES.find(c => c.key === key);
+  if (!cat) return;
+  const items = visibleItemsFor(cat);
+  document.getElementById('sheetTitle').textContent = cat.label;
+  document.getElementById('sheetItems').innerHTML = items.map(it => `
+    <a href="${it.href}" class="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-surface-container-low active:bg-surface-container-low transition-colors">
+      <span class="material-symbols-outlined text-secondary" style="font-size:22px;">${it.icon}</span>
+      <span class="text-[14px] font-semibold">${gmEscapeHtml(it.label)}</span>
+    </a>`).join('');
+  const sheet = document.getElementById('categorySheet');
+  sheet.classList.remove('hidden');
+  sheet.classList.add('flex');
+}
+
+function closeCategorySheet() {
+  const sheet = document.getElementById('categorySheet');
+  sheet.classList.add('hidden');
+  sheet.classList.remove('flex');
 }
 
 async function load() {
@@ -160,19 +169,14 @@ async function load() {
 
   const { data: staffRow } = await goldmindClient.from('staff').select('permissions, role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
   const isOwner = staffRow && staffRow.role === 'owner';
-  const hasPerm = (perm) => !perm || isOwner || (staffRow && staffRow.permissions && staffRow.permissions[perm] === true);
+  hasPermFn = (perm) => !perm || isOwner || (staffRow && staffRow.permissions && staffRow.permissions[perm] === true);
 
   const { data: store } = await goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-  const diamondsOn = !!(store && store.diamonds_enabled);
-
-  allowedCatalog = GM_SHORTCUT_CATALOG.filter(c => hasPerm(c.perm) && (!c.diamondOnly || diamondsOn));
-  if (allowedCatalog.length === 0) allowedCatalog = [GM_SHORTCUT_CATALOG[0]];
-
-  slotAssignments = loadSavedSlots();
+  diamondsOn = !!(store && store.diamonds_enabled);
 
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
-  renderSlots();
+  renderCategories();
 }
 
 load();
