@@ -20,54 +20,83 @@
           "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
           "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
           "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
-          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "accent": "var(--gm-accent)",
-          "outline": "#76777d"
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "accent": "var(--gm-accent)"
         },
-        "fontFamily": { "body-md": ["Inter"], "headline-md": ["Inter"] },
+        "fontFamily": { "body-md": ["Inter"], "headline-md": ["Inter"], "headline-lg": ["Inter"] },
         "fontSize": {
           "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
-          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}]
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "headline-lg": ["30px", {"lineHeight": "38px", "fontWeight": "700"}]
         }
       } } }
     </script>
 <style>
     html { font-size: 87.5%; }
-    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 26px; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 24px; }
+
+    @keyframes gmCardIn {
+      from { opacity: 0; transform: translateY(14px) scale(.94); }
+      to { opacity: 1; transform: none; }
+    }
+    .gm-card-in { animation: gmCardIn .45s cubic-bezier(.16,1,.3,1) both; }
+
+    .gm-cat-card { transition: transform .18s ease, box-shadow .18s ease; }
+    .gm-cat-card:active { transform: scale(.94); }
+    .gm-cat-card:hover { box-shadow: 0 10px 24px -8px rgba(0,0,0,.18); transform: translateY(-2px); }
+    .gm-cat-icon-wrap { transition: transform .25s cubic-bezier(.34,1.56,.64,1); }
+    .gm-cat-card:active .gm-cat-icon-wrap { transform: scale(1.12) rotate(-4deg); }
+
+    #categorySheetBackdrop { opacity: 0; transition: opacity .22s ease; }
+    #categorySheetBackdrop.gm-open { opacity: 1; }
+    #categorySheetPanel { transform: translateY(100%); transition: transform .28s cubic-bezier(.16,1,.3,1); }
+    #categorySheetPanel.gm-open { transform: translateY(0); }
+
+    @keyframes gmSheetItemIn {
+      from { opacity: 0; transform: translateX(8px); }
+      to { opacity: 1; transform: none; }
+    }
+    .gm-sheet-item { animation: gmSheetItemIn .28s ease both; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
-<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
-<div class="flex justify-between items-center px-4 w-full h-16">
-<div class="flex items-center gap-4">
-<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
-<span class="material-symbols-outlined" style="font-size:20px;">arrow_forward</span>
+<!-- Same branded top bar as the main dashboard, not a plain settings-style
+     header — this page is meant to read as an alternate home screen, not
+     a sub-page. -->
+<header class="fixed top-0 right-0 w-full h-16 bg-surface-container-lowest border-b border-outline-variant z-50 flex justify-between items-center px-4">
+<div class="flex items-center gap-3">
+<button class="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high transition-colors rounded-full cursor-pointer active:opacity-80" onclick="window.location.href='index-ar.html'" title="رجوع للوحة الرئيسية">
+<span class="material-symbols-outlined text-primary" style="font-size:22px;">arrow_forward</span>
 </button>
-<h1 class="font-headline-md text-headline-md font-bold">اللوحة المتقدمة</h1>
-</div>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">GoldMind</h1>
 </div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-2xl mx-auto px-4">
+
+<main class="pt-20 pb-24 px-4 max-w-md lg:max-w-3xl mx-auto">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
-<div id="page-content" class="hidden py-6 flex flex-col gap-4">
+<div id="page-content" class="hidden">
 
-<p class="text-[12px] text-outline leading-relaxed">
-تصميم بديل — كل أيقونة هون تصنيف بيجمع كم اختصار مرتبط ببعضه. اضغط أي تصنيف يفتحلك قائمة الخيارات يلي جواه.
-</p>
+<!-- Hero block, same typographic weight as the real homepage's welcome
+     section (storeNameEl/welcomeEl), so this reads as a peer home screen
+     rather than a settings sub-page. -->
+<section class="mb-6">
+<h2 class="font-headline-lg text-headline-lg text-on-primary">اللوحة المتقدمة</h2>
+<p class="font-body-md text-body-md text-on-primary opacity-70 mt-1">تصنيفات مجمّعة بدل شبكة الأيقونات المعتادة — اضغط أي تصنيف يفتحلك خياراته.</p>
+</section>
 
 <div id="categories-grid" class="grid grid-cols-3 gap-3"></div>
 
 </div>
 </main>
 
-<!-- Themed bottom sheet — deliberately built from the app's own surface/
-     border/text CSS variables (not a native <select>), so its colors and
-     feel always match whatever theme the user picked instead of falling
-     back to the browser/OS's own dark picker style. -->
+<!-- Themed bottom sheet — built entirely from the app's own --gm- theme
+     variables (not a native <select>), animated in/out, so it always
+     matches whatever color theme is active. -->
 <div class="hidden fixed inset-0 bg-black/40 z-[60] items-end justify-center" id="categorySheet" onclick="if(event.target===this) closeCategorySheet()">
-<div class="bg-surface-container-lowest w-full max-w-md rounded-t-2xl p-4 pb-6 max-h-[75vh] overflow-y-auto border-t border-outline-variant">
+<div id="categorySheetBackdrop" class="absolute inset-0 bg-black/40 -z-10"></div>
+<div class="bg-surface-container-lowest w-full max-w-md rounded-t-2xl p-4 pb-6 max-h-[75vh] overflow-y-auto border-t border-outline-variant" id="categorySheetPanel">
 <div class="flex items-center justify-between mb-3">
 <h3 class="font-bold text-[15px]" id="sheetTitle"></h3>
 <button onclick="closeCategorySheet()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low text-on-surface-variant"><span class="material-symbols-outlined" style="font-size:20px;">close</span></button>
@@ -128,15 +157,17 @@ function renderCategories() {
     .map(cat => ({ cat, items: visibleItemsFor(cat) }))
     .filter(x => x.items.length > 0);
 
-  grid.innerHTML = visibleCategories.map(({ cat, items }) => {
+  grid.innerHTML = visibleCategories.map(({ cat, items }, i) => {
     // A single-item category can just navigate directly — no need to
     // open a sheet with one row in it.
     const action = items.length === 1
       ? `window.location.href='${items[0].href}'`
       : `openCategorySheet('${cat.key}')`;
     return `
-      <button onclick="${action}" class="flex flex-col items-center justify-center gap-2 p-3 h-24 bg-surface-container-lowest border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform">
-        <span class="material-symbols-outlined text-secondary">${cat.icon}</span>
+      <button onclick="${action}" style="animation-delay:${i * 55}ms" class="gm-card-in gm-cat-card flex flex-col items-center justify-center gap-2 p-3 h-28 bg-surface-container-lowest border border-outline-variant text-on-surface rounded-2xl">
+        <div class="gm-cat-icon-wrap w-11 h-11 rounded-full flex items-center justify-center bg-surface-container-low">
+          <span class="material-symbols-outlined" style="color: var(--gm-accent, var(--gm-primary));">${cat.icon}</span>
+        </div>
         <span class="text-[11px] font-semibold leading-tight text-center">${gmEscapeHtml(cat.label)}</span>
       </button>`;
   }).join('');
@@ -147,20 +178,31 @@ function openCategorySheet(key) {
   if (!cat) return;
   const items = visibleItemsFor(cat);
   document.getElementById('sheetTitle').textContent = cat.label;
-  document.getElementById('sheetItems').innerHTML = items.map(it => `
-    <a href="${it.href}" class="flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-surface-container-low active:bg-surface-container-low transition-colors">
+  document.getElementById('sheetItems').innerHTML = items.map((it, i) => `
+    <a href="${it.href}" style="animation-delay:${i * 40}ms" class="gm-sheet-item flex items-center gap-3 px-3 py-3 rounded-lg hover:bg-surface-container-low active:bg-surface-container-low transition-colors">
       <span class="material-symbols-outlined text-secondary" style="font-size:22px;">${it.icon}</span>
       <span class="text-[14px] font-semibold">${gmEscapeHtml(it.label)}</span>
     </a>`).join('');
+
   const sheet = document.getElementById('categorySheet');
   sheet.classList.remove('hidden');
   sheet.classList.add('flex');
+  // Force a reflow before adding the "open" classes so the transition
+  // (opacity/translateY) actually animates instead of jumping straight
+  // to the end state.
+  void sheet.offsetHeight;
+  document.getElementById('categorySheetBackdrop').classList.add('gm-open');
+  document.getElementById('categorySheetPanel').classList.add('gm-open');
 }
 
 function closeCategorySheet() {
-  const sheet = document.getElementById('categorySheet');
-  sheet.classList.add('hidden');
-  sheet.classList.remove('flex');
+  document.getElementById('categorySheetBackdrop').classList.remove('gm-open');
+  document.getElementById('categorySheetPanel').classList.remove('gm-open');
+  setTimeout(() => {
+    const sheet = document.getElementById('categorySheet');
+    sheet.classList.add('hidden');
+    sheet.classList.remove('flex');
+  }, 280);
 }
 
 async function load() {
