@@ -122,8 +122,8 @@
 <table class="w-full text-[12px] border-collapse" id="cashbox-table">
 <thead>
 <tr>
+<th colspan="2" class="bg-success/10 text-success font-bold py-2 text-[13px] border-b border-outline-variant border-l-2 border-outline-variant">الداخل</th>
 <th colspan="2" class="bg-error/10 text-error font-bold py-2 text-[13px] border-b border-outline-variant">الصادر</th>
-<th colspan="2" class="bg-success/10 text-success font-bold py-2 text-[13px] border-b border-outline-variant border-r-2 border-outline-variant">الداخل</th>
 </tr>
 </thead>
 <tbody id="cashbox-table-body"></tbody>
@@ -396,12 +396,34 @@ function renderAll() {
   document.getElementById('cashbox-table').classList.remove('hidden');
   emptyEl.classList.add('hidden');
 
-  // Two independent flowing columns (out / in), most recent first within
-  // each — same layout idea as the reference Excel sheet: الصادر and
-  // الداخل aren't paired row-by-row, they're just two separate lists
-  // sharing one table, with same-color cells marking related entries.
-  const outEntries = entriesToShow.filter(e => e.direction === 'out').slice().reverse();
-  const inEntries = entriesToShow.filter(e => e.direction === 'in').slice().reverse();
+  // Group entries into clusters by link_group (an entry with no
+  // link_group is its own singleton cluster), then order clusters by
+  // their most-recent activity and lay out each cluster's out/in members
+  // in the SAME cluster order for both columns. That's what actually
+  // pulls linked entries onto the same or adjacent rows — sorting each
+  // column independently by its own timestamps (the old approach) could
+  // put a linked pair many rows apart if they weren't logged back-to-back.
+  const scoped = entriesToShow;
+  const clustersByKey = new Map();
+  scoped.forEach(e => {
+    const key = e.link_group || ('__solo_' + e.id);
+    if (!clustersByKey.has(key)) clustersByKey.set(key, []);
+    clustersByKey.get(key).push(e);
+  });
+  const clusters = [...clustersByKey.values()].map(members => ({
+    members,
+    latest: Math.max(...members.map(e => new Date(e.created_at).getTime()))
+  }));
+  clusters.sort((a, b) => b.latest - a.latest); // most recently active cluster first
+
+  const outEntries = [];
+  const inEntries = [];
+  clusters.forEach(cluster => {
+    const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    outEntries.push(...outMembers);
+    inEntries.push(...inMembers);
+  });
   const rowCount = Math.max(outEntries.length, inEntries.length);
 
   function cellHtml(e) {
@@ -420,7 +442,7 @@ function renderAll() {
 
   let rowsHtml = '';
   for (let i = 0; i < rowCount; i++) {
-    rowsHtml += '<tr>' + cellHtml(outEntries[i]) + cellHtml(inEntries[i]) + '</tr>';
+    rowsHtml += '<tr>' + cellHtml(inEntries[i]) + cellHtml(outEntries[i]) + '</tr>';
   }
   bodyEl.innerHTML = rowsHtml;
 }
