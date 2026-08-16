@@ -60,6 +60,17 @@
 </p>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<h2 class="font-bold text-[14px] mb-3">الاسم الكامل</h2>
+<div class="relative mb-2">
+<input class="w-full h-12 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none" id="fullNameInput" placeholder="اسمك الكامل" type="text"/>
+</div>
+<p class="text-[11px] text-outline mb-3">هاد الاسم يلي بيظهر بسطر الترحيب أعلى الصفحة الرئيسية — منفصل عن اسم المستخدم فوق.</p>
+<button onclick="saveFullName()" id="fullNameSaveBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الاسم</button>
+<p class="text-error text-[12px] hidden mt-2" id="fullNameError"></p>
+<p class="text-success text-[12px] hidden mt-2" id="fullNameSuccess"></p>
+</div>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <h2 class="font-bold text-[14px] mb-3">اسم المستخدم</h2>
 <div class="relative mb-2">
 <input class="w-full h-12 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none" dir="ltr" id="usernameInput" placeholder="username" type="text"/>
@@ -108,14 +119,49 @@ async function load() {
   }
 
   if (typeof GOLDMIND_STAFF_ID !== 'undefined' && GOLDMIND_STAFF_ID) {
-    const { data: staffRow } = await goldmindClient.from('staff').select('whatsapp_phone').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const { data: staffRow } = await goldmindClient.from('staff').select('whatsapp_phone, full_name').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
     if (staffRow && staffRow.whatsapp_phone) {
       document.getElementById('whatsappInput').value = staffRow.whatsapp_phone;
+    }
+    if (staffRow && staffRow.full_name) {
+      document.getElementById('fullNameInput').value = staffRow.full_name;
     }
   }
 
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
+}
+
+async function saveFullName() {
+  const fullName = document.getElementById('fullNameInput').value.trim();
+  const errEl = document.getElementById('fullNameError');
+  const okEl = document.getElementById('fullNameSuccess');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+
+  if (!fullName) {
+    errEl.textContent = 'فضلاً اكتب اسمك';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('fullNameSaveBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const { error } = await goldmindClient.from('staff').update({ full_name: fullName }).eq('id', GOLDMIND_STAFF_ID);
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ الاسم';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  okEl.textContent = 'تم الحفظ بنجاح';
+  okEl.classList.remove('hidden');
 }
 
 async function saveWhatsapp() {
