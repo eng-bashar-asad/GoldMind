@@ -306,12 +306,16 @@ function renderCustomers() {
     card.dataset.customerId = c.id;
     card.innerHTML = `
         <div class="flex items-center justify-between">
-          <div>
-            <p class="font-bold text-[14px]"></p>
-            <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr"></p>
+          <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 rounded-full gm-avatar-grad flex items-center justify-center font-bold text-[13px] shrink-0"></div>
+            <div class="min-w-0">
+              <p class="font-bold text-[14px] truncate"></p>
+              <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr"></p>
+            </div>
           </div>
-          <span class="font-bold text-[14px] font-data-mono ${bal > 0 ? 'text-error' : 'text-success'}">${fmt(Math.abs(bal))}</span>
+          <span class="font-bold text-[14px] font-data-mono shrink-0 ${bal > 0 ? 'text-error' : 'text-success'}">${fmt(Math.abs(bal))}</span>
         </div>`;
+    card.querySelector('.gm-avatar-grad').textContent = gmInitials(c.name);
     card.querySelector('p.font-bold').textContent = c.name;
     card.querySelectorAll('p')[1].textContent = c.phone || '';
     container.appendChild(card);

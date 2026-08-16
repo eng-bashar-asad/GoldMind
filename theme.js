@@ -283,6 +283,12 @@ function gmEnsureAvatarStyle() {
     '.gm-avatar-grad{background:var(--gm-avatar-grad, var(--gm-accent));color:var(--gm-on-accent);}';
   document.head.appendChild(style);
 }
+
+// Shared first-letter initial for name-circle avatars, used consistently
+// across staff, customers, and traders instead of each page reimplementing it.
+function gmInitials(name) {
+  return (name || '؟').trim().charAt(0) || '؟';
+}
 // The "today at a glance" stat strip (cash box / today's invoices / today's
 // sales) gets a very subtle animated sheen in EVERY theme, not just the two
 // shimmer ones. It sweeps only between each theme's own surface-lowest and
