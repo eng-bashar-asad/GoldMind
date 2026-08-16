@@ -6,9 +6,21 @@
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
+<script src="theme.js?v=5"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = { theme: { extend: {
+    "colors": {
+      "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+      "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+      "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+      "surface-container-lowest": "var(--gm-surface-lowest)", "primary": "var(--gm-primary)",
+      "accent": "var(--gm-accent)"
+    }
+  } } }
+</script>
 <style>
     body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
@@ -19,41 +31,41 @@
     }
 </style>
 </head>
-<body class="bg-gray-100 text-gray-900">
+<body class="bg-background text-on-surface">
 
-<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 h-14">
-<button onclick="window.location.href='daily-cashbox-ar.html'" class="flex items-center gap-2 text-gray-700">
+<div class="no-print sticky top-0 bg-surface-container-lowest border-b border-outline-variant z-50 flex items-center justify-between px-4 h-14">
+<button onclick="window.location.href='daily-cashbox-ar.html'" class="flex items-center gap-2 text-on-surface-variant">
 <span class="material-symbols-outlined">arrow_forward</span>
 <span class="text-sm font-semibold">الحركة اليومية</span>
 </button>
-<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
+<button onclick="window.print()" class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">print</span> طباعة
 </button>
-<button onclick="downloadCashboxPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-white text-black border border-gray-300 px-4 py-2 rounded-lg text-sm font-semibold">
+<button onclick="downloadCashboxPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-surface-container-lowest text-on-surface border border-outline-variant px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">download</span> تحميل PDF
 </button>
 </div>
 
-<div id="loading" class="py-16 text-center text-gray-500 text-sm">جارِ التحميل...</div>
+<div id="loading" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
-<div id="sheet" class="hidden max-w-2xl mx-auto my-6 bg-white shadow rounded-lg overflow-hidden">
+<div id="sheet" class="hidden max-w-2xl mx-auto my-6 bg-surface-container-lowest shadow rounded-lg overflow-hidden">
 
 <!-- Letterhead -->
-<div class="p-6 text-center border-b-4 border-amber-600">
+<div class="p-6 text-center border-b-4 border-accent">
 <img id="storeLogo" crossorigin="anonymous" class="hidden w-16 h-16 mx-auto mb-2 object-contain"/>
-<h1 id="storeName" class="text-xl font-bold"></h1>
-<p id="storeAddress" class="text-[12px] text-gray-500 mt-1"></p>
-<p id="storePhone" class="text-[12px] text-gray-500" dir="ltr"></p>
+<h1 id="storeName" class="text-xl font-bold text-on-surface"></h1>
+<p id="storeAddress" class="text-[12px] text-on-surface-variant mt-1"></p>
+<p id="storePhone" class="text-[12px] text-on-surface-variant" dir="ltr"></p>
 </div>
 
 <div class="p-5">
 <div class="flex items-center justify-between mb-4">
-<h2 class="text-lg font-bold">كشف الحركة اليومية</h2>
-<span id="dateLabel" class="text-[12px] text-gray-500"></span>
+<h2 class="text-lg font-bold text-on-surface">كشف الحركة اليومية</h2>
+<span id="dateLabel" class="text-[12px] text-on-surface-variant" dir="ltr"></span>
 </div>
 
 <!-- Two symmetric columns: outgoing (right) / incoming (left) -->
-<div class="rounded-xl shadow-lg overflow-hidden border border-gray-200">
+<div class="rounded-xl shadow-lg overflow-hidden border border-outline-variant">
 <table class="w-full text-[13px]">
 <thead>
 <tr>
@@ -67,8 +79,8 @@
 
 <!-- Per-currency totals, mirroring the reference sheet's summary block -->
 <div class="mt-5">
-<h3 class="text-[13px] font-bold text-gray-700 mb-2">الرصيد الحالي بالدرج</h3>
-<table class="w-full text-[13px] rounded-xl shadow-lg overflow-hidden border border-gray-200" id="totalsTable"></table>
+<h3 class="text-[13px] font-bold text-on-surface-variant mb-2">الرصيد الحالي بالدرج</h3>
+<table class="w-full text-[13px] rounded-xl shadow-lg overflow-hidden border border-outline-variant" id="totalsTable"></table>
 </div>
 </div>
 
@@ -83,6 +95,17 @@ function getSelectedDate() {
   const d = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+// Same deterministic pastel-per-link_group palette used on the in-app
+// "الحركة اليومية" page, so a shared/printed copy of the day visually
+// matches what staff already see and color-recognize inside the app.
+const GM_LINK_PALETTE = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#FFEDD5', '#E0E7FF', '#CFFAFE', '#FEE2E2'];
+function gmLinkColorFor(group) {
+  if (!group) return null;
+  let hash = 0;
+  for (let i = 0; i < group.length; i++) hash = (hash * 31 + group.charCodeAt(i)) >>> 0;
+  return GM_LINK_PALETTE[hash % GM_LINK_PALETTE.length];
 }
 
 async function load() {
@@ -103,7 +126,7 @@ async function load() {
 
   const selectedDate = getSelectedDate();
   const dayEnd = new Date(selectedDate); dayEnd.setDate(dayEnd.getDate() + 1);
-  document.getElementById('dateLabel').textContent = selectedDate.toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  document.getElementById('dateLabel').textContent = selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const { data: allEntries, error } = await goldmindClient
     .from('daily_cash_log')
@@ -119,42 +142,62 @@ async function load() {
   const dayEntries = (allEntries || []).filter(e => new Date(e.created_at) >= selectedDate && new Date(e.created_at) < dayEnd);
   const priorEntries = (allEntries || []).filter(e => new Date(e.created_at) < selectedDate);
 
-  const outEntries = dayEntries.filter(e => e.direction === 'out');
-  const inEntries = dayEntries.filter(e => e.direction === 'in');
-  const rowCount = Math.max(outEntries.length, inEntries.length, 1);
+  // Cluster by link_group (same rule as the in-app page) so a linked out/in
+  // pair lands on the same row AND shares the same pastel highlight color.
+  const clustersByKey = new Map();
+  dayEntries.forEach(e => {
+    const key = e.link_group || ('__solo_' + e.id);
+    if (!clustersByKey.has(key)) clustersByKey.set(key, { group: e.link_group || null, members: [] });
+    clustersByKey.get(key).members.push(e);
+  });
+  const clusters = [...clustersByKey.values()];
+
+  const outEntries = [];
+  const inEntries = [];
+  const rowColors = [];
+  clusters.forEach(cluster => {
+    const outMembers = cluster.members.filter(e => e.direction === 'out');
+    const inMembers = cluster.members.filter(e => e.direction === 'in');
+    const rows = Math.max(outMembers.length, inMembers.length);
+    const color = gmLinkColorFor(cluster.group);
+    for (let i = 0; i < rows; i++) {
+      outEntries.push(outMembers[i]);
+      inEntries.push(inMembers[i]);
+      rowColors.push(color);
+    }
+  });
+  const rowCount = Math.max(outEntries.length, 1);
 
   const rowsBody = document.getElementById('rowsBody');
   let rowsHtml = '';
   for (let i = 0; i < rowCount; i++) {
     const o = outEntries[i];
     const inn = inEntries[i];
-    const stripe = i % 2 === 1;
-    const outBg = stripe ? 'bg-red-50' : 'bg-white';
-    const inBg = stripe ? 'bg-green-50' : 'bg-white';
-    rowsHtml += `<tr>
-      <td class="py-2.5 px-3 border-t border-gray-200 ${outBg}">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left ${outBg}" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200 ${inBg}">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left ${inBg}" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
+    const bg = rowColors[i] ? `background-color:${rowColors[i]};` : '';
+    rowsHtml += `<tr style="${bg}">
+      <td class="py-2.5 px-3 border-t border-outline-variant">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-outline-variant">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
     </tr>`;
   }
   if (dayEntries.length === 0) {
-    rowsHtml = '<tr><td colspan="4" class="py-6 text-center text-gray-400 border-t border-gray-200">لا توجد عمليات بهذا اليوم</td></tr>';
+    rowsHtml = '<tr><td colspan="4" class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا توجد عمليات بهذا اليوم</td></tr>';
   }
   rowsBody.innerHTML = rowsHtml;
 
   const currencies = [...new Set((allEntries || []).map(e => e.currency))];
   const totalsTable = document.getElementById('totalsTable');
   if (currencies.length === 0) {
-    totalsTable.innerHTML = '<tr><td class="py-3 px-2 text-center text-gray-400 border border-gray-300">لا يوجد رصيد مسجّل بعد</td></tr>';
+    totalsTable.innerHTML = '<tr><td class="py-3 px-2 text-center text-on-surface-variant border border-outline-variant">لا يوجد رصيد مسجّل بعد</td></tr>';
   } else {
     totalsTable.innerHTML = currencies.map(cur => {
       const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
       const dayNet = dayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
       const closing = opening + dayNet;
       return `<tr>
-        <td class="py-2 px-3 border border-gray-300 font-bold bg-gray-50">${cur}</td>
-        <td class="py-2 px-3 border border-gray-300 text-left" dir="ltr">${fmt(closing)}</td>
+        <td class="py-2 px-3 border border-outline-variant font-bold bg-surface-container-low">${cur}</td>
+        <td class="py-2 px-3 border border-outline-variant text-left" dir="ltr">${fmt(closing)}</td>
       </tr>`;
     }).join('');
   }
@@ -189,7 +232,7 @@ async function downloadCashboxPdf() {
       margin: 10,
       filename: `كشف-يومي-${dateLabel}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).from(sheet).save();
   } catch (err) {
