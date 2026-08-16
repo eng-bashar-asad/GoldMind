@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goldmind-shell-v4';
+const CACHE_NAME = 'goldmind-shell-v5';
 const SHELL_ASSETS = [
   './manifest.json',
   './icon-192.png',
@@ -29,6 +29,14 @@ self.addEventListener('activate', (event) => {
 // navigation (the previous blanket behavior) made every page feel slow.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  // Cross-origin requests (Supabase REST/data API, CDNs serving JSON, etc.)
+  // must NEVER be cached by this worker — only this app's own same-origin
+  // static files are safe to cache. Caching Supabase API responses was
+  // exactly what made balances/figures look "stuck" until a manual reload
+  // after adding an entry: the worker was serving a stale snapshot of the
+  // database instead of letting the real request through.
+  if (new URL(event.request.url).origin !== self.location.origin) return;
 
   const isDocument = event.request.mode === 'navigate' || event.request.destination === 'document';
 
