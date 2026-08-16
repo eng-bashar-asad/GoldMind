@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goldmind-shell-v3';
+const CACHE_NAME = 'goldmind-shell-v4';
 const SHELL_ASSETS = [
   './manifest.json',
   './icon-192.png',
@@ -21,25 +21,40 @@ self.addEventListener('activate', (event) => {
   self.clients.claim();
 });
 
-// Network-first: always try the network (so data/pages stay fresh), fall back
-// to cache only if the network is unreachable (basic offline resilience).
-//
-// { cache: 'no-store' } is critical here — without it, fetch() still lets
-// the BROWSER's own HTTP disk cache intercept the request before it ever
-// reaches the network (a page load looking like it went "network-first"
-// while actually being served a stale cached response, e.g. after every
-// GitHub Pages deploy until that cache entry happened to expire). This
-// forces every request straight to the network, bypassing that cache
-// layer entirely, so a push is reflected on the very next load.
+// Only HTML documents go network-first/no-store (deploys must show up
+// immediately). Static assets (JS/CSS/images/fonts) use stale-while-
+// revalidate: serve instantly from cache if we have it, then quietly
+// refresh the cache in the background — this is what actually keeps the
+// app fast, since re-fetching every single asset from the network on every
+// navigation (the previous blanket behavior) made every page feel slow.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+
+  const isDocument = event.request.mode === 'navigate' || event.request.destination === 'document';
+
+  if (isDocument) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+          return response;
+        })
+        .catch(() => caches.match(event.request))
+    );
+    return;
+  }
+
   event.respondWith(
-    fetch(event.request, { cache: 'no-store' })
-      .then((response) => {
-        const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
-        return response;
-      })
-      .catch(() => caches.match(event.request))
+    caches.match(event.request).then((cached) => {
+      const network = fetch(event.request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+          return response;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })
   );
 });
