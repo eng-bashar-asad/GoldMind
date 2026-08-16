@@ -283,7 +283,26 @@ function gmEnsureAvatarStyle() {
     '.gm-avatar-grad{background:var(--gm-avatar-grad, var(--gm-accent));color:var(--gm-on-accent);}';
   document.head.appendChild(style);
 }
+// The "today at a glance" stat strip (cash box / today's invoices / today's
+// sales) gets a very subtle animated sheen in EVERY theme, not just the two
+// shimmer ones. It sweeps only between each theme's own surface-lowest and
+// surface-low tones (both already designed as light, readable-with-dark-text
+// backgrounds), so it never risks contrast — unlike gm-shimmer-surface,
+// which needs a theme opted into strong accent colors on a dark backdrop.
+let gmStatShimmerStyleLoaded = false;
+function gmEnsureStatShimmerStyle() {
+  if (gmStatShimmerStyleLoaded) return;
+  gmStatShimmerStyleLoaded = true;
+  const style = document.createElement('style');
+  style.textContent =
+    '.gm-stat-shimmer{background:linear-gradient(120deg, var(--gm-surface-lowest) 0%, var(--gm-surface-low) 45%, var(--gm-surface-lowest) 100%) !important;' +
+    'background-size:220% 220%;animation:gmStatSweep 8s ease-in-out infinite;}' +
+    '@keyframes gmStatSweep{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}' +
+    '@media (prefers-reduced-motion: reduce){.gm-stat-shimmer{animation:none;}}';
+  document.head.appendChild(style);
+}
 gmEnsureAvatarStyle();
+gmEnsureStatShimmerStyle();
 
 // Some themes (currently only "warm-ingot") pair their palette with a
 // display serif for headlines/big numbers instead of the site-wide Inter.
