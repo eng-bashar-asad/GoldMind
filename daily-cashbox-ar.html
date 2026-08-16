@@ -118,12 +118,12 @@
 <h2 class="font-semibold text-[13px]" id="entries-heading">عمليات اليوم</h2>
 <button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold" id="fullHistoryToggle">عرض كل العمليات</button>
 </div>
-<div class="overflow-x-auto rounded-xl border border-[#33363b]" style="background:#1a1c1e;">
+<div class="overflow-x-auto rounded-xl border border-outline-variant shadow-lg" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
 <table class="w-full text-[12px] border-collapse" id="cashbox-table">
 <thead>
 <tr>
-<th colspan="2" class="bg-success/20 text-success font-bold py-2 text-[13px] border-b border-[#33363b] border-l-2 border-[#33363b]">الداخل</th>
-<th colspan="2" class="bg-error/20 text-error font-bold py-2 text-[13px] border-b border-[#33363b]">الصادر</th>
+<th colspan="2" class="bg-success/10 text-success font-bold py-2 text-[13px] border-b border-outline-variant border-l-2 border-outline-variant">الداخل</th>
+<th colspan="2" class="bg-error/10 text-error font-bold py-2 text-[13px] border-b border-outline-variant">الصادر</th>
 </tr>
 </thead>
 <tbody id="cashbox-table-body"></tbody>
@@ -439,16 +439,15 @@ function renderAll() {
     if (!e) return '<td></td><td></td>';
     const color = gmLinkColorFor(e.link_group);
     const styleAttr = color ? ` style="background:${color};color:#1a1c1e;"` : '';
-    const textClass = color ? '' : 'text-gray-100';
-    const metaClass = color ? 'opacity-70' : 'text-gray-500';
+    const metaClass = color ? 'opacity-70' : 'text-on-surface-variant';
     const dateLabel = showFullHistory ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit' }) + ' ' : '';
     return `
-      <td class="px-2 py-2 border-b border-[#33363b] cursor-pointer ${textClass}" onclick="openEditModal('${e.id}')"${styleAttr}>
+      <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>
         <div class="font-semibold">${gmEscapeHtml(e.operation_type)}</div>
         ${e.notes ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(e.notes)}</div>` : ''}
         <div class="text-[10px] ${metaClass}">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
       </td>
-      <td class="px-2 py-2 border-b border-[#33363b] text-center font-bold font-data-mono cursor-pointer ${textClass}" onclick="openEditModal('${e.id}')"${styleAttr}>${fmt(e.amount)}<div class="text-[9px] font-normal ${metaClass}">${e.currency}</div></td>`;
+      <td class="px-2 py-2 border-b border-outline-variant text-center font-bold font-data-mono cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>${fmt(e.amount)}<div class="text-[9px] font-normal ${metaClass}">${e.currency}</div></td>`;
   }
 
   let rowsHtml = '';
