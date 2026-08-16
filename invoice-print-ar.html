@@ -20,6 +20,7 @@
 <script src="pint-ae.js"></script>
 <script src="theme.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -52,6 +53,10 @@
 <button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">print</span>
                 طباعة
+            </button>
+<button onclick="downloadInvoicePdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-white text-black border border-gray-300 px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">download</span>
+                تحميل PDF
             </button>
 <button class="hidden items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-lg text-sm font-semibold" id="whatsapp-invoice-btn" onclick="sendInvoiceWhatsApp()">
 <span class="material-symbols-outlined">share</span>
@@ -547,6 +552,68 @@
     }
 
     loadInvoice();
+
+    // ---- Download an official PDF copy (html2pdf.js — html2canvas + jsPDF,
+    // fully client-side, no backend needed). Renders the same #invoice-sheet
+    // markup used for browser printing so the PDF always matches the live
+    // invoice design, plus the policy back-page. ----
+    async function downloadInvoicePdf() {
+        const sheet = document.getElementById('invoice-sheet');
+        if (!sheet || sheet.classList.contains('hidden')) return;
+
+        const btn = document.getElementById('download-pdf-btn');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span><span>...جارِ التجهيز</span>';
+
+        // Clone into an isolated, fixed-width wrapper off-screen so the PDF
+        // renders like a physical page instead of the narrow mobile layout.
+        const clone = sheet.cloneNode(true);
+        clone.classList.remove('hidden');
+        clone.style.boxShadow = 'none';
+        clone.style.margin = '0';
+        clone.style.width = '780px';
+        clone.style.maxWidth = '780px';
+
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'fixed';
+        wrapper.style.top = '0';
+        wrapper.style.left = '-99999px';
+        wrapper.style.background = '#ffffff';
+        wrapper.appendChild(clone);
+
+        const policy = document.getElementById('policy-page-wrap');
+        if (policy) {
+            const policyClone = policy.cloneNode(true);
+            policyClone.classList.remove('hidden');
+            policyClone.style.display = 'block';
+            policyClone.style.pageBreakBefore = 'always';
+            policyClone.style.width = '780px';
+            wrapper.appendChild(policyClone);
+        }
+
+        document.body.appendChild(wrapper);
+
+        const invNumber = (document.getElementById('inv-number')?.textContent || 'فاتورة').trim();
+
+        try {
+            await html2pdf().set({
+                margin: 10,
+                filename: `${invNumber}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+                pagebreak: { mode: ['css', 'legacy'] }
+            }).from(wrapper).save();
+        } catch (err) {
+            console.error('PDF generation failed', err);
+            alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
+        } finally {
+            document.body.removeChild(wrapper);
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
 
     async function generateEinvoiceXml() {
         const d = window.__einvoiceData;
