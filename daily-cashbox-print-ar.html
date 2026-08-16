@@ -41,7 +41,7 @@
 <button onclick="window.print()" class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">print</span> طباعة
 </button>
-<button onclick="downloadCashboxPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-surface-container-lowest text-on-surface border border-outline-variant px-4 py-2 rounded-lg text-sm font-semibold">
+<button onclick="downloadCashboxPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-surface-container-lowest text-on-surface border border-gray-200 px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">download</span> تحميل PDF
 </button>
 </div>
@@ -49,7 +49,7 @@
 <div id="loading" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
 <div id="sheet" class="hidden max-w-2xl mx-auto my-6 p-3 sm:p-5 bg-background">
-<div class="rounded-lg border-2 border-outline-variant">
+<div class="rounded-lg border-[3px] border-accent">
 <div class="bg-surface-container-lowest rounded-lg overflow-hidden">
 
 <!-- Letterhead -->
@@ -67,7 +67,7 @@
 </div>
 
 <!-- Two symmetric columns: incoming (right) / outgoing (left) -->
-<div class="rounded-xl border-2 border-outline-variant overflow-hidden">
+<div class="rounded-xl border-[3px] border-accent overflow-hidden">
 <table class="w-full text-[13px]">
 <thead>
 <tr>
@@ -82,7 +82,7 @@
 <!-- Per-currency totals, mirroring the reference sheet's summary block -->
 <div class="mt-5">
 <h3 class="text-[13px] font-bold text-on-surface-variant mb-2">الرصيد الحالي بالدرج</h3>
-<table class="w-full text-[13px] rounded-xl overflow-hidden border-2 border-outline-variant" id="totalsTable"></table>
+<table class="w-full text-[13px] rounded-xl overflow-hidden border-[3px] border-accent" id="totalsTable"></table>
 </div>
 </div>
 
@@ -178,29 +178,29 @@ async function load() {
     const inn = inEntries[i];
     const bg = rowColors[i] ? `background-color:${rowColors[i]};` : '';
     rowsHtml += `<tr style="${bg}">
-      <td class="py-2.5 px-3 border-t border-outline-variant">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-outline-variant">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
+      <td class="py-2.5 px-3 border-t border-gray-200">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-gray-200">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
     </tr>`;
   }
   if (dayEntries.length === 0) {
-    rowsHtml = '<tr><td colspan="4" class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا توجد عمليات بهذا اليوم</td></tr>';
+    rowsHtml = '<tr><td colspan="4" class="py-6 text-center text-on-surface-variant border-t border-gray-200">لا توجد عمليات بهذا اليوم</td></tr>';
   }
   rowsBody.innerHTML = rowsHtml;
 
   const currencies = [...new Set((allEntries || []).map(e => e.currency))];
   const totalsTable = document.getElementById('totalsTable');
   if (currencies.length === 0) {
-    totalsTable.innerHTML = '<tr><td class="py-3 px-2 text-center text-on-surface-variant border border-outline-variant">لا يوجد رصيد مسجّل بعد</td></tr>';
+    totalsTable.innerHTML = '<tr><td class="py-3 px-2 text-center text-on-surface-variant border border-gray-200">لا يوجد رصيد مسجّل بعد</td></tr>';
   } else {
     totalsTable.innerHTML = currencies.map(cur => {
       const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
       const dayNet = dayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
       const closing = opening + dayNet;
       return `<tr>
-        <td class="py-2 px-3 border border-outline-variant font-bold bg-surface-container-low">${cur}</td>
-        <td class="py-2 px-3 border border-outline-variant text-left" dir="ltr">${fmt(closing)}</td>
+        <td class="py-2 px-3 border border-gray-200 font-bold bg-surface-container-low">${cur}</td>
+        <td class="py-2 px-3 border border-gray-200 text-left" dir="ltr">${fmt(closing)}</td>
       </tr>`;
     }).join('');
   }
