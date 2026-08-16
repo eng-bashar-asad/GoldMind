@@ -583,29 +583,6 @@ async function buildDailyReport() {
 
   const { data: store } = await goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
 
-  // WhatsApp has no real table markup, but wrapping fixed-width padded
-  // rows in a ``` code block renders them in a monospace font, so the
-  // description/amount columns line up visually like a table.
-  const rows = todayEntries.map(e => {
-    const isIn = e.direction === 'in';
-    const signedAmount = (isIn ? '+' : '-') + fmt(e.amount) + ' ' + e.currency;
-    return { label: e.operation_type + (e.notes ? ' (' + e.notes + ')' : ''), amount: signedAmount };
-  });
-
-  let tableBlock;
-  if (rows.length === 0) {
-    tableBlock = 'لا توجد عمليات اليوم';
-  } else {
-    const labelWidth = Math.min(28, Math.max(...rows.map(r => r.label.length)));
-    const amountWidth = Math.max(...rows.map(r => r.amount.length));
-    const tableLines = rows.map(r => {
-      const label = r.label.length > labelWidth ? r.label.slice(0, labelWidth - 1) + '…' : r.label.padEnd(labelWidth, ' ');
-      const amount = r.amount.padStart(amountWidth, ' ');
-      return label + '  ' + amount;
-    });
-    tableBlock = '```\n' + tableLines.join('\n') + '\n```';
-  }
-
   const currencies = [...new Set(allEntries.map(e => e.currency))];
   const balanceLines = currencies.map(cur => {
     const total = allEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
@@ -614,17 +591,15 @@ async function buildDailyReport() {
 
   const dateStr = localDateStr(selectedDate);
   const printLink = window.location.origin + window.location.pathname.replace('daily-cashbox-ar.html', 'daily-cashbox-print-ar.html') + '?date=' + dateStr;
-  const fileLine = `\n📎 الكشف القابل للطباعة:\n${printLink}`;
 
   const reportText =
     `*جدول الحركة اليومية*\n` +
     `Day ${dateLabel}\n` +
     `${store ? store.name : ''}\n` +
     `——————————\n` +
-    `${tableBlock}\n` +
-    `——————————\n` +
     `💰 الرصيد الحالي بالدرج:\n${balanceLines}\n` +
-    fileLine;
+    `——————————\n` +
+    `📎 الكشف التفصيلي القابل للطباعة:\n${printLink}`;
 
   document.getElementById('reportPanelIntro').textContent = 'الجدول جاهز — اختر مين تبعتله:';
 
