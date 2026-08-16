@@ -166,6 +166,11 @@ async function load() {
 load();
 
 // ---- Download an official PDF copy (client-side html2pdf.js) ----
+// Captures the real, visible #sheet element directly — no off-screen clone.
+// (An earlier version cloned the sheet into a detached wrapper positioned
+// far off-screen; that pattern is known to render blank in some mobile
+// browsers, especially in RTL documents. Capturing the live, attached,
+// on-screen element is far more reliable.)
 async function downloadCashboxPdf() {
   const sheet = document.getElementById('sheet');
   if (!sheet || sheet.classList.contains('hidden')) return;
@@ -175,23 +180,7 @@ async function downloadCashboxPdf() {
   btn.disabled = true;
   btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
 
-  const clone = sheet.cloneNode(true);
-  clone.classList.remove('hidden');
-  clone.style.boxShadow = 'none';
-  clone.style.border = 'none';
-  clone.style.margin = '0';
-  clone.style.maxWidth = 'none';
-  clone.style.width = '780px';
-
-  const wrapper = document.createElement('div');
-  wrapper.style.position = 'fixed';
-  wrapper.style.top = '0';
-  wrapper.style.left = '-99999px';
-  wrapper.style.background = '#ffffff';
-  wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
   if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
-  await new Promise(r => setTimeout(r, 50));
 
   const dateLabel = (document.getElementById('dateLabel')?.textContent || 'daily-cashbox').trim();
 
@@ -202,12 +191,11 @@ async function downloadCashboxPdf() {
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-    }).from(wrapper).save();
+    }).from(sheet).save();
   } catch (err) {
     console.error('PDF generation failed', err);
     alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
   } finally {
-    document.body.removeChild(wrapper);
     btn.disabled = false;
     btn.innerHTML = originalHtml;
   }
