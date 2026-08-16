@@ -304,8 +304,8 @@ function gmEnsureStatShimmerStyle() {
     '.gm-stat-shimmer{position:relative;overflow:hidden;}' +
     '.gm-stat-shimmer::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;' +
     'background:linear-gradient(100deg, transparent 0%, rgba(255,215,110,0.55) 45%, rgba(255,255,255,0.75) 55%, transparent 100%);' +
-    'transform:skewX(-20deg);animation:gmStatSweep 3.2s ease-in-out infinite;pointer-events:none;}' +
-    '@keyframes gmStatSweep{0%{left:-60%;}35%,100%{left:130%;}}' +
+    'transform:skewX(-20deg);animation:gmStatSweep 4.6s ease-in-out infinite;pointer-events:none;}' +
+    '@keyframes gmStatSweep{0%{left:-60%;}45%,100%{left:130%;}}' +
     '@media (prefers-reduced-motion: reduce){.gm-stat-shimmer::after{animation:none;display:none;}}';
   document.head.appendChild(style);
 }
