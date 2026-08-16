@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>لوحة التحكم GoldMind - محل الفارس للذهب</title>
+<title>لوحة التحكم GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -174,7 +174,15 @@
 <!-- Profile/Welcome -->
 <section class="mb-4 flex items-center justify-between gap-3">
 <div>
-<h2 class="font-headline-md text-headline-md text-on-primary" id="storeNameEl">محل الفارس للذهب</h2>
+<h2 class="font-headline-md text-headline-md text-on-primary" id="storeNameEl"></h2>
+<script>
+  // Show the store name from last time instantly (no flash of empty/wrong
+  // text) while the real value loads from the database below.
+  (function () {
+    const cached = localStorage.getItem('goldmind_store_name');
+    if (cached) document.getElementById('storeNameEl').textContent = cached;
+  })();
+</script>
 <p class="font-body-md text-body-md text-on-primary opacity-70" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
 </div>
 <!-- Gold-price badge — shown only for the warm-ingot theme. Tapping it opens
@@ -406,7 +414,11 @@
             // Store name
             const { data: store } = await goldmindClient
                 .from('stores').select('name, diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-            if (store) { document.getElementById('storeNameEl').textContent = store.name; fitStatNumber(document.getElementById('storeNameEl')); }
+            if (store) {
+                document.getElementById('storeNameEl').textContent = store.name;
+                fitStatNumber(document.getElementById('storeNameEl'));
+                localStorage.setItem('goldmind_store_name', store.name);
+            }
 
             // Staff name / role for the welcome line
             const { data: staffRow } = await goldmindClient
