@@ -10,6 +10,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="theme.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -81,6 +82,9 @@
 </button>
 <button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">print</span> طباعة
+</button>
+<button onclick="downloadCertPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-white text-black border border-gray-300 px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">download</span> تحميل PDF
 </button>
 </div>
 
@@ -338,6 +342,50 @@
     }
 
     loadCertificate();
+
+    // ---- Download an official PDF copy (client-side html2pdf.js, same
+    // #cert-sheet markup used for printing so the PDF matches exactly) ----
+    async function downloadCertPdf() {
+        const sheet = document.getElementById('cert-sheet');
+        if (!sheet || sheet.classList.contains('hidden')) return;
+
+        const btn = document.getElementById('download-pdf-btn');
+        const originalHtml = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
+
+        const clone = sheet.cloneNode(true);
+        clone.classList.remove('hidden');
+        clone.style.margin = '0';
+        clone.style.width = '780px';
+        clone.style.maxWidth = '780px';
+
+        const wrapper = document.createElement('div');
+        wrapper.style.position = 'fixed';
+        wrapper.style.top = '0';
+        wrapper.style.left = '-99999px';
+        wrapper.appendChild(clone);
+        document.body.appendChild(wrapper);
+
+        const certNumber = (document.getElementById('cert-number')?.textContent || 'شهادة').trim();
+
+        try {
+            await html2pdf().set({
+                margin: 8,
+                filename: `${certNumber}.pdf`,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            }).from(wrapper).save();
+        } catch (err) {
+            console.error('PDF generation failed', err);
+            alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
+        } finally {
+            document.body.removeChild(wrapper);
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
 </script>
 <script>
 if ('serviceWorker' in navigator) {
