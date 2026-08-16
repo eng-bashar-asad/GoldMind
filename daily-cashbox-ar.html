@@ -94,9 +94,10 @@
 </select>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="notesInput" placeholder="ملاحظة / وصف إضافي (اختياري)"></textarea>
 <div class="mb-3">
-<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">رمز الربط (اختياري) — استخدم نفس الرمز لعمليتين مرتبطتين ببعض، وبتاخذوا نفس لون الخلفية بالجدول</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="linkGroupInput" placeholder="مثال: زبونة حنان" list="linkGroupsList"/>
-<datalist id="linkGroupsList"></datalist>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اربط بعملية موجودة (اختياري) — بتاخذوا نفس لون الخلفية بالجدول</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="linkTargetSelect">
+<option value="">بدون ربط</option>
+</select>
 </div>
 <button onclick="submitEntry()" id="submitBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ العملية</button>
 <p class="text-error text-[12px] hidden mt-2" id="addFormError"></p>
@@ -153,7 +154,12 @@
 <option value="GBP">جنيه إسترليني (GBP)</option>
 </select>
 <textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-2" id="modalNotes" placeholder="ملاحظة"></textarea>
-<input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-3" id="modalLinkGroup" placeholder="رمز الربط (اختياري)" list="linkGroupsList"/>
+<div class="mb-3">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">اربط بعملية موجودة (اختياري)</label>
+<select class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="modalLinkTargetSelect">
+<option value="">بدون ربط</option>
+</select>
+</div>
 <p class="text-error text-[12px] hidden mb-2" id="modalError"></p>
 <div class="flex gap-2">
 <button onclick="saveModalEdit()" class="flex-1 h-10 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
@@ -226,6 +232,14 @@ function setDirection(dir) {
   document.getElementById('dirOutBtn').className = 'flex-1 h-11 rounded-lg text-sm font-semibold border ' + (dir === 'out' ? 'bg-error text-white border-error' : 'border-outline-variant');
 }
 
+function buildLinkOptionsHtml(excludeId) {
+  const pool = showFullHistory ? allEntries : todayEntries;
+  return pool.filter(e => e.id !== excludeId).map(e => {
+    const dirLabel = e.direction === 'in' ? 'داخل' : 'صادر';
+    return `<option value="${e.id}">${dirLabel} — ${gmEscapeHtml(e.operation_type)} — ${fmt(e.amount)} ${e.currency}</option>`;
+  }).join('');
+}
+
 function toggleAddForm() {
   document.getElementById('addForm').classList.toggle('hidden');
   if (canManageDates) {
@@ -233,6 +247,7 @@ function toggleAddForm() {
     document.getElementById('addFormDate').value = localDateStr(selectedDate);
     document.getElementById('addFormDate').max = localDateStr(new Date());
   }
+  document.getElementById('linkTargetSelect').innerHTML = '<option value="">بدون ربط</option>' + buildLinkOptionsHtml(null);
 }
 
 async function submitEntry() {
@@ -240,6 +255,7 @@ async function submitEntry() {
   const amount = parseFloat(document.getElementById('amountInput').value);
   const currency = document.getElementById('currencySelect').value;
   const notes = document.getElementById('notesInput').value.trim();
+  const linkTargetId = document.getElementById('linkTargetSelect').value;
   const errEl = document.getElementById('addFormError');
   errEl.classList.add('hidden');
 
@@ -257,7 +273,6 @@ async function submitEntry() {
     amount: amount,
     currency: currency,
     notes: notes || null,
-    link_group: document.getElementById('linkGroupInput').value.trim() || null,
     created_by: GOLDMIND_STAFF_ID
   };
 
@@ -273,7 +288,19 @@ async function submitEntry() {
     }
   }
 
-  const { error } = await goldmindClient.from('daily_cash_log').insert(insertPayload);
+  const { data: inserted, error } = await goldmindClient.from('daily_cash_log').insert(insertPayload).select().single();
+
+  // Picking an existing entry to "link with" reuses that entry's group tag
+  // if it already has one (joining a group), or mints a new one for the
+  // pair (deterministic from the target's id, so it's stable/inspectable).
+  if (!error && inserted && linkTargetId) {
+    const target = allEntries.find(e => e.id === linkTargetId);
+    const group = (target && target.link_group) || ('lnk_' + linkTargetId.slice(0, 8));
+    if (target && !target.link_group) {
+      await goldmindClient.from('daily_cash_log').update({ link_group: group }).eq('id', linkTargetId);
+    }
+    await goldmindClient.from('daily_cash_log').update({ link_group: group }).eq('id', inserted.id);
+  }
 
   btn.disabled = false;
   btn.textContent = 'حفظ العملية';
@@ -287,7 +314,7 @@ async function submitEntry() {
   document.getElementById('opTypeInput').value = '';
   document.getElementById('amountInput').value = '';
   document.getElementById('notesInput').value = '';
-  document.getElementById('linkGroupInput').value = '';
+  document.getElementById('linkTargetSelect').value = '';
   document.getElementById('addForm').classList.add('hidden');
   reportPanelLoaded = false;
   document.getElementById('reportPanel').classList.add('hidden');
@@ -351,12 +378,6 @@ function renderAll() {
         </div>`;
     }).join('');
   }
-
-  // Datalist of existing link-group tags, for both the add form and the
-  // edit modal, so the user can reuse an exact tag with one tap instead
-  // of retyping it (a typo would silently break the color match).
-  const allTags = [...new Set(allEntries.map(e => e.link_group).filter(Boolean))];
-  document.getElementById('linkGroupsList').innerHTML = allTags.map(t => `<option value="${gmEscapeHtml(t)}"></option>`).join('');
 
   const bodyEl = document.getElementById('cashbox-table-body');
   const emptyEl = document.getElementById('empty-state');
@@ -426,7 +447,15 @@ function openEditModal(id) {
   document.getElementById('modalAmount').value = e.amount;
   document.getElementById('modalCurrency').value = e.currency;
   document.getElementById('modalNotes').value = e.notes || '';
-  document.getElementById('modalLinkGroup').value = e.link_group || '';
+
+  // Pre-select the current linked partner (if any) in the dropdown —
+  // find another entry in the same visible pool sharing this entry's
+  // link_group tag.
+  const pool = showFullHistory ? allEntries : todayEntries;
+  const partner = e.link_group ? pool.find(x => x.id !== id && x.link_group === e.link_group) : null;
+  document.getElementById('modalLinkTargetSelect').innerHTML = '<option value="">بدون ربط</option>' + buildLinkOptionsHtml(id);
+  document.getElementById('modalLinkTargetSelect').value = partner ? partner.id : '';
+
   document.getElementById('modalError').classList.add('hidden');
   const modal = document.getElementById('editModal');
   modal.classList.remove('hidden');
@@ -445,12 +474,23 @@ async function saveModalEdit() {
   const amount = parseFloat(document.getElementById('modalAmount').value);
   const currency = document.getElementById('modalCurrency').value;
   const notes = document.getElementById('modalNotes').value.trim();
-  const linkGroup = document.getElementById('modalLinkGroup').value.trim();
+  const linkTargetId = document.getElementById('modalLinkTargetSelect').value;
   const errEl = document.getElementById('modalError');
   errEl.classList.add('hidden');
 
   if (!opType) { errEl.textContent = 'فضلاً اكتب نوع العملية'; errEl.classList.remove('hidden'); return; }
   if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
+
+  // Same "join or mint a group" logic as adding a new linked entry, but
+  // also handles unlinking (empty selection → link_group cleared).
+  let newGroup = null;
+  if (linkTargetId) {
+    const target = allEntries.find(x => x.id === linkTargetId);
+    newGroup = (target && target.link_group) || ('lnk_' + linkTargetId.slice(0, 8));
+    if (target && !target.link_group) {
+      await goldmindClient.from('daily_cash_log').update({ link_group: newGroup }).eq('id', linkTargetId);
+    }
+  }
 
   const { error } = await goldmindClient.from('daily_cash_log').update({
     operation_type: opType,
@@ -458,7 +498,7 @@ async function saveModalEdit() {
     amount: amount,
     currency: currency,
     notes: notes || null,
-    link_group: linkGroup || null
+    link_group: newGroup
   }).eq('id', modalEntryId);
 
   if (error) {
