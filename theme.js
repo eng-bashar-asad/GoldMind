@@ -290,21 +290,23 @@ function gmInitials(name) {
   return (name || '؟').trim().charAt(0) || '؟';
 }
 // The "today at a glance" stat strip (cash box / today's invoices / today's
-// sales) gets a very subtle animated sheen in EVERY theme, not just the two
-// shimmer ones. It sweeps only between each theme's own surface-lowest and
-// surface-low tones (both already designed as light, readable-with-dark-text
-// backgrounds), so it never risks contrast — unlike gm-shimmer-surface,
-// which needs a theme opted into strong accent colors on a dark backdrop.
+// sales) gets an animated light sweep in EVERY theme, not just the two
+// shimmer ones. Earlier version animated between two very-similar light
+// surface tones (near-invisible on a real screen); this is a proper
+// diagonal gold streak passing over the card periodically, like a loading
+// shimmer — same idea, but actually visible.
 let gmStatShimmerStyleLoaded = false;
 function gmEnsureStatShimmerStyle() {
   if (gmStatShimmerStyleLoaded) return;
   gmStatShimmerStyleLoaded = true;
   const style = document.createElement('style');
   style.textContent =
-    '.gm-stat-shimmer{background:linear-gradient(120deg, var(--gm-surface-lowest) 0%, var(--gm-surface-low) 45%, var(--gm-surface-lowest) 100%) !important;' +
-    'background-size:220% 220%;animation:gmStatSweep 8s ease-in-out infinite;}' +
-    '@keyframes gmStatSweep{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}' +
-    '@media (prefers-reduced-motion: reduce){.gm-stat-shimmer{animation:none;}}';
+    '.gm-stat-shimmer{position:relative;overflow:hidden;}' +
+    '.gm-stat-shimmer::after{content:"";position:absolute;top:0;bottom:0;left:-60%;width:45%;' +
+    'background:linear-gradient(100deg, transparent 0%, rgba(255,215,110,0.55) 45%, rgba(255,255,255,0.75) 55%, transparent 100%);' +
+    'transform:skewX(-20deg);animation:gmStatSweep 3.2s ease-in-out infinite;pointer-events:none;}' +
+    '@keyframes gmStatSweep{0%{left:-60%;}35%,100%{left:130%;}}' +
+    '@media (prefers-reduced-motion: reduce){.gm-stat-shimmer::after{animation:none;display:none;}}';
   document.head.appendChild(style);
 }
 gmEnsureAvatarStyle();
