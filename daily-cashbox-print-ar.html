@@ -6,6 +6,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -27,6 +28,9 @@
 </button>
 <button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">print</span> طباعة
+</button>
+<button onclick="downloadCashboxPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-white text-black border border-gray-300 px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">download</span> تحميل PDF
 </button>
 </div>
 
@@ -155,5 +159,51 @@ async function load() {
 }
 
 load();
+
+// ---- Download an official PDF copy (client-side html2pdf.js) ----
+async function downloadCashboxPdf() {
+  const sheet = document.getElementById('sheet');
+  if (!sheet || sheet.classList.contains('hidden')) return;
+
+  const btn = document.getElementById('download-pdf-btn');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
+
+  const clone = sheet.cloneNode(true);
+  clone.classList.remove('hidden');
+  clone.style.boxShadow = 'none';
+  clone.style.border = 'none';
+  clone.style.margin = '0';
+  clone.style.maxWidth = 'none';
+  clone.style.width = '780px';
+
+  const wrapper = document.createElement('div');
+  wrapper.style.position = 'fixed';
+  wrapper.style.top = '0';
+  wrapper.style.left = '-99999px';
+  wrapper.style.background = '#ffffff';
+  wrapper.appendChild(clone);
+  document.body.appendChild(wrapper);
+
+  const dateLabel = (document.getElementById('dateLabel')?.textContent || 'daily-cashbox').trim();
+
+  try {
+    await html2pdf().set({
+      margin: 10,
+      filename: `كشف-يومي-${dateLabel}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(wrapper).save();
+  } catch (err) {
+    console.error('PDF generation failed', err);
+    alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
+  } finally {
+    document.body.removeChild(wrapper);
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
 </script>
 </body></html>
