@@ -3,9 +3,6 @@ name: Build GoldMind APK
 on:
   push:
     branches: [main]
-    paths:
-      - 'app/**'
-      - '.github/workflows/build-apk.yml'
   workflow_dispatch: {}
 
 jobs:
@@ -13,9 +10,6 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
-    defaults:
-      run:
-        working-directory: app
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -35,9 +29,26 @@ jobs:
           node-version: '20'
 
       - name: Install npm dependencies
+        working-directory: app
         run: npm install
 
+      # Bundle the live site's own HTML/JS/assets straight into the app so
+      # it opens instantly from local storage instead of fetching every
+      # page over the network like a browser tab. This copies the same
+      # files GitHub Pages serves — nothing app-specific to maintain
+      # separately; every push to main ships in the very next APK build.
+      - name: Bundle site files into app/www
+        run: |
+          rm -rf app/www
+          mkdir -p app/www
+          find . -maxdepth 1 -type f \( -name "*.html" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.svg" -o -name "*.ico" -o -name "*.webmanifest" \) \
+            ! -path "./app/*" -exec cp {} app/www/ \;
+          if [ -f app/www/login-entry-ar.html ]; then
+            cp app/www/login-entry-ar.html app/www/index.html
+          fi
+
       - name: Sync Capacitor Android project
+        working-directory: app
         run: npx cap sync android
 
       - name: Build debug APK
@@ -46,7 +57,7 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
 
-      - name: Rename APK with version
+      - name: Collect APK
         working-directory: app/android
         run: |
           mkdir -p ../../apk-output

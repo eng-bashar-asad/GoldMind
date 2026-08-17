@@ -312,6 +312,17 @@ function gmEnsureStatShimmerStyle() {
 gmEnsureAvatarStyle();
 gmEnsureStatShimmerStyle();
 
+// Fixes a "need to tap twice" bug on embedded WebViews (e.g. the packaged
+// Android app): the first tap on a link/button with a hover style gets
+// consumed as a hover-state activation instead of an immediate click, so
+// navigation only happens on the second tap. touch-action: manipulation
+// tells the browser to skip that hover/double-tap-zoom detection entirely.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = 'a, button, [onclick], [role="button"] { touch-action: manipulation; }';
+  document.head.appendChild(style);
+})();
+
 // Some themes (currently only "warm-ingot") pair their palette with a
 // display serif for headlines/big numbers instead of the site-wide Inter.
 // Loaded lazily and only once, and scoped via the data-gm-display-font

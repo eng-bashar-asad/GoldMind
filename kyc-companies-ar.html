@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
-<script src="theme.js?v=5"></script>
+<script src="theme.js?v=6"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
         tailwind.config = { darkMode: "class", theme: { extend: {
@@ -96,9 +96,10 @@
             });
         }
 
-        companies = (customers || [])
-            .filter(c => docsByCustomer[c.id] && docsByCustomer[c.id].length > 0)
-            .map(c => ({ customer: c, docs: docsByCustomer[c.id] }));
+        // Show every company customer — not just ones with existing docs —
+        // so a document can be added for any of them from this page, not
+        // only during the original customer-creation form.
+        companies = (customers || []).map(c => ({ customer: c, docs: docsByCustomer[c.id] || [] }));
 
         document.getElementById('loading-state').classList.add('hidden');
         renderList();
@@ -130,11 +131,52 @@
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4">
                 <div class="font-bold text-[14px]">${gmEscapeHtml(row.customer.legal_name || row.customer.name)}</div>
                 <div class="text-[11px] text-on-surface-variant mb-2">${gmEscapeHtml(row.customer.name)}${row.customer.tax_number ? ' • TRN: ' + gmEscapeHtml(row.customer.tax_number) : ''}</div>
-                <div class="flex flex-col gap-1.5 pt-2 border-t border-outline-variant">${docsHtml.join('')}</div>
+                <div class="flex flex-col gap-1.5 ${docsHtml.length ? 'pt-2 border-t border-outline-variant mb-2' : ''}">${docsHtml.join('') || '<p class="text-[11px] text-on-surface-variant">لا يوجد مستندات مرفوعة بعد.</p>'}</div>
+                <label class="flex items-center justify-center gap-1.5 text-[12px] font-semibold text-primary border border-dashed border-outline-variant rounded-lg py-2 cursor-pointer active:opacity-70">
+                    <span class="material-symbols-outlined text-[16px]">upload_file</span>
+                    <span class="add-doc-label">إضافة مستند</span>
+                    <input type="file" accept="image/*,.pdf" class="hidden" onchange="addDocument('${row.customer.id}', this)"/>
+                </label>
             </div>`;
         }));
 
         document.getElementById('companies-list').innerHTML = cards.join('');
+    }
+
+    async function addDocument(customerId, inputEl) {
+        const file = inputEl.files && inputEl.files[0];
+        if (!file) return;
+        const labelEl = inputEl.closest('label').querySelector('.add-doc-label');
+        const originalLabel = labelEl.textContent;
+        labelEl.textContent = 'جارِ الرفع...';
+
+        const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+        const path = GOLDMIND_STORE_ID + '/customer-' + customerId + '/kyc-' + Date.now() + '.' + ext;
+
+        const { error: uploadError } = await goldmindClient.storage
+            .from('company-kyc-documents').upload(path, file, { upsert: false });
+        if (uploadError) {
+            alert('تعذّر رفع الملف: ' + uploadError.message);
+            labelEl.textContent = originalLabel;
+            return;
+        }
+
+        const { error: rowError } = await goldmindClient.from('company_kyc_documents').insert({
+            store_id: GOLDMIND_STORE_ID,
+            owner_type: 'customer',
+            owner_id: customerId,
+            document_category: 'kyc',
+            file_url: path,
+            file_name: file.name,
+            uploaded_by: GOLDMIND_STAFF_ID
+        });
+        if (rowError) {
+            alert('تعذّر حفظ بيانات الملف: ' + rowError.message);
+            labelEl.textContent = originalLabel;
+            return;
+        }
+
+        await load();
     }
 
     load();
