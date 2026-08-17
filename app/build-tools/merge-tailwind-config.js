@@ -50,8 +50,16 @@ for (const file of files) {
 const config = {
   darkMode: 'class',
   content: [path.join(repoDir, '*.html')],
-  theme: { extend: { colors: mergedColors, fontFamily: mergedFonts } }
+  theme: { extend: { colors: mergedColors, fontFamily: mergedFonts } },
+  plugins: ['require("@tailwindcss/forms")', 'require("@tailwindcss/container-queries")']
 };
 
-fs.writeFileSync(outPath, 'module.exports = ' + JSON.stringify(config, null, 2) + ';\n');
+let configSrc = 'module.exports = ' + JSON.stringify(config, null, 2) + ';\n';
+// JSON.stringify quotes the plugin require() calls as strings — unquote them
+// so they execute as real requires instead of being inert string literals.
+configSrc = configSrc
+  .replace('"require(\\"@tailwindcss/forms\\")"', 'require("@tailwindcss/forms")')
+  .replace('"require(\\"@tailwindcss/container-queries\\")"', 'require("@tailwindcss/container-queries")');
+
+fs.writeFileSync(outPath, configSrc);
 console.log(`Merged tailwind config from ${parsed}/${files.length} pages -> ${outPath}`);

@@ -312,6 +312,15 @@ function gmEnsureStatShimmerStyle() {
 gmEnsureAvatarStyle();
 gmEnsureStatShimmerStyle();
 
+// Site-wide font: Times New Roman everywhere except icon glyphs (which are
+// rendered via a dedicated icon font — overriding it would turn every icon
+// into garbled text instead of a symbol).
+(function () {
+  const style = document.createElement('style');
+  style.textContent = '*:not(.material-symbols-outlined) { font-family: "Times New Roman", Times, serif !important; }';
+  document.head.appendChild(style);
+})();
+
 // Fixes a "need to tap twice" bug on embedded WebViews (e.g. the packaged
 // Android app): the first tap on a link/button with a hover style gets
 // consumed as a hover-state activation instead of an immediate click, so
