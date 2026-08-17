@@ -8,7 +8,10 @@
 const fs = require('fs');
 const path = require('path');
 
-const wwwDir = path.resolve(__dirname, '../www');
+const dirArg = process.argv.find(a => a.startsWith('--dir='));
+const wwwDir = dirArg
+  ? path.resolve(process.cwd(), dirArg.slice('--dir='.length))
+  : path.resolve(__dirname, '../www');
 const files = fs.readdirSync(wwwDir).filter(f => f.endsWith('.html'));
 
 let changed = 0;
