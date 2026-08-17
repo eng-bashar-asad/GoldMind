@@ -1,0 +1,63 @@
+name: Build GoldMind APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'app/**'
+      - '.github/workflows/build-apk.yml'
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    defaults:
+      run:
+        working-directory: app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install npm dependencies
+        run: npm install
+
+      - name: Sync Capacitor Android project
+        run: npx cap sync android
+
+      - name: Build debug APK
+        working-directory: app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+
+      - name: Rename APK with version
+        working-directory: app/android
+        run: |
+          mkdir -p ../../apk-output
+          cp app/build/outputs/apk/debug/app-debug.apk ../../apk-output/GoldMind.apk
+
+      - name: Publish/refresh download release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: app-latest
+          name: "GoldMind APK (latest)"
+          body: "Automatically built from commit ${{ github.sha }}. Download GoldMind.apk below and open it on your phone to install (allow 'install unknown apps' for your browser if asked)."
+          files: apk-output/GoldMind.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
