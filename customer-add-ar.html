@@ -86,6 +86,7 @@
     body {
       min-height: max(884px, 100dvh);
     }
+    .gm-section-title { font-size: 12px; font-weight: 700; color: var(--gm-on-surface-variant); letter-spacing: .04em; margin-top: 4px; }
   </style>
   </head>
 <body class="bg-background text-on-background font-body-md selection:bg-secondary-container selection:text-on-secondary-container">
@@ -116,7 +117,7 @@
 <input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" id="customer-name" placeholder="اكتب اسم العميل" type="text"/>
 </div>
 
-<!-- Company-only fields -->
+<!-- ============== COMPANY-ONLY FIELDS ============== -->
 <div id="company-fields" class="hidden flex-col gap-6">
 
 <div class="relative">
@@ -125,8 +126,18 @@
 </div>
 
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-tax-number">الرقم الضريبي (اختياري)</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-tax-number">الرقم الضريبي (TRN) (اختياري)</label>
 <input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="company-tax-number" placeholder="اختياري" type="text"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-trade-license">رقم الرخصة/السجل التجاري</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="company-trade-license" placeholder="رقم الرخصة التجارية" type="text"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-activity">نشاط الشركة</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" id="company-activity" placeholder="مثال: تجارة ذهب ومجوهرات بالجملة" type="text"/>
 </div>
 
 <div class="relative">
@@ -147,15 +158,50 @@
 </div>
 </div>
 
+<p class="gm-section-title">المستفيد الحقيقي (UBO)</p>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-ubo-name">اسم المستفيد الحقيقي</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" id="company-ubo-name" placeholder="الاسم الكامل" type="text"/>
+</div>
+
+<div class="flex gap-3">
+<div class="relative flex-1">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-ubo-id">رقم هوية المستفيد</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="company-ubo-id" type="text"/>
+</div>
+<div class="relative w-28">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-ubo-percent">نسبة الملكية %</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="company-ubo-percent" type="number" min="0" max="100"/>
+</div>
+</div>
+
+<p class="gm-section-title">المفوّض بالتوقيع</p>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-signatory-name">اسم المفوّض بالتوقيع</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" id="company-signatory-name" placeholder="الاسم الكامل" type="text"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="company-signatory-id">رقم هوية المفوّض</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="company-signatory-id" type="text"/>
+</div>
+
 <div>
-<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">مستندات KYC (صور أو PDF)</label>
-<input class="w-full text-sm border border-dashed border-outline-variant rounded-lg px-3 py-3" id="kyc-files" multiple="" type="file" accept="image/*,.pdf"/>
-<p class="text-[11px] text-outline mt-1 px-1">مستندات إثبات هوية الشركة (سجل تجاري، رخصة...) — بتنرفع بعد ما تحفظ الشركة.</p>
+<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">صورة الرخصة التجارية / السجل التجاري</label>
+<input class="w-full text-sm border border-dashed border-outline-variant rounded-lg px-3 py-3" id="company-license-file" type="file" accept="image/*,.pdf"/>
+</div>
+
+<div>
+<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">صورة هوية المفوّض بالتوقيع</label>
+<input class="w-full text-sm border border-dashed border-outline-variant rounded-lg px-3 py-3" id="company-signatory-id-file" type="file" accept="image/*,.pdf"/>
+<p class="text-[11px] text-outline mt-1 px-1">بتنحفظ بملف الشركة داخل حساب المتجر فقط — ما بتظهر إطلاقاً على الفواتير.</p>
 </div>
 
 </div>
 
-<!-- Phone Input (individual) -->
+<!-- ============== INDIVIDUAL-ONLY FIELDS ============== -->
 <div id="individual-phone-wrap">
 <label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">رقم الهاتف</label>
 <div class="flex gap-2">
@@ -164,11 +210,66 @@
 </div>
 </div>
 
-<!-- ID document upload (individual only) -->
-<div id="individual-id-doc-wrap">
-<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">صورة الهوية أو جواز السفر (اختياري)</label>
-<input class="w-full text-sm border border-dashed border-outline-variant rounded-lg px-3 py-3" id="id-doc-files" multiple="" type="file" accept="image/*,.pdf"/>
+<div id="individual-legal-fields" class="flex flex-col gap-6">
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-nationality">الجنسية</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" id="ind-nationality" type="text"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-dob">تاريخ الميلاد</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="ind-dob" type="date"/>
+</div>
+
+<div class="flex gap-3">
+<div class="relative flex-1">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-id-type">نوع المستند</label>
+<select class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-3 focus:ring-1 focus:ring-primary outline-none text-right text-on-background" id="ind-id-type">
+<option value="emirates_id">هوية إماراتية</option>
+<option value="passport">جواز سفر</option>
+<option value="residency">إقامة</option>
+<option value="other">أخرى</option>
+</select>
+</div>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-id-number">رقم المستند</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="ind-id-number" type="text"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-id-expiry">تاريخ انتهاء المستند</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="ind-id-expiry" type="date"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-address">العنوان</label>
+<textarea class="w-full h-20 bg-transparent border border-outline-variant rounded-lg px-4 py-3 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background resize-none" id="ind-address"></textarea>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-occupation">المهنة</label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" id="ind-occupation" type="text"/>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-source-funds">مصدر الأموال <span class="font-normal text-outline">(للمعاملات كبيرة القيمة)</span></label>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" id="ind-source-funds" placeholder="مثال: راتب، تجارة، ادخار" type="text"/>
+</div>
+
+<div>
+<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">صورة الهوية — الوجه</label>
+<input class="w-full text-sm border border-dashed border-outline-variant rounded-lg px-3 py-3" id="id-doc-front-file" type="file" accept="image/*,.pdf"/>
+</div>
+
+<div>
+<label class="block text-[11px] font-semibold text-outline tracking-wider mb-1 px-1">صورة الهوية — الظهر (أو صفحة بيانات الجواز)</label>
+<input class="w-full text-sm border border-dashed border-outline-variant rounded-lg px-3 py-3" id="id-doc-back-file" type="file" accept="image/*,.pdf"/>
 <p class="text-[11px] text-outline mt-1 px-1">بتنحفظ بملف العميل داخل حساب الشركة فقط — ما بتظهر إطلاقاً على الفواتير المطبوعة أو المرسلة للعميل.</p>
+</div>
+
 </div>
 
 <!-- Extra Phone Numbers -->
@@ -177,6 +278,12 @@
 <div class="flex flex-col gap-2" id="extra-phones-list"></div>
 <button type="button" id="add-extra-phone-btn" class="mt-2 w-full h-11 border border-dashed border-outline-variant rounded-lg text-sm font-semibold text-primary active:scale-[0.98] transition-all">+ إضافة رقم هاتف آخر</button>
 </div>
+
+<!-- KYC declaration -->
+<label class="flex items-start gap-2.5 text-[12px] text-on-surface-variant leading-relaxed border border-outline-variant rounded-lg p-3">
+<input class="mt-0.5" id="kyc-declaration" type="checkbox"/>
+<span>أقر بأن البيانات والمستندات المُدخلة صحيحة ومطابقة لهوية العميل/الشركة، وتم جمعها بموافقته لأغراض التوثيق (KYC).</span>
+</label>
 
 <!-- Status Message -->
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
@@ -255,10 +362,13 @@
         document.getElementById('company-fields').classList.toggle('hidden', !company);
         document.getElementById('company-fields').classList.toggle('flex', company);
         document.getElementById('individual-phone-wrap').classList.toggle('hidden', company);
-        document.getElementById('individual-id-doc-wrap').classList.toggle('hidden', company);
+        document.getElementById('individual-legal-fields').classList.toggle('hidden', company);
         document.getElementById('customer-name-label').textContent = company ? 'اسم العميل (مختصر/شائع)' : 'اسم العميل';
     }
-    setCustomerType(false);
+
+    // Allow deep-linking with ?type=company from the KYC company page.
+    const __urlParams = new URLSearchParams(window.location.search);
+    setCustomerType(__urlParams.get('type') === 'company');
 
     function showMessage(text, isError) {
         messageBox.textContent = text;
@@ -266,31 +376,28 @@
         messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
     }
 
-    async function uploadKycFiles(customerId, inputId, category) {
+    async function uploadKycFile(customerId, inputId, category) {
         const filesInput = document.getElementById(inputId);
-        const files = filesInput.files;
-        if (!files || files.length === 0) return { ok: true };
+        const file = filesInput.files && filesInput.files[0];
+        if (!file) return { ok: true };
 
-        for (let i = 0; i < files.length; i++) {
-            const file = files[i];
-            const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
-            const path = GOLDMIND_STORE_ID + '/customer-' + customerId + '/' + category + '-' + Date.now() + '-' + i + '.' + ext;
+        const ext = (file.name.split('.').pop() || 'bin').toLowerCase();
+        const path = GOLDMIND_STORE_ID + '/customer-' + customerId + '/' + category + '-' + Date.now() + '.' + ext;
 
-            const { error: uploadError } = await goldmindClient.storage
-                .from('company-kyc-documents').upload(path, file, { upsert: false });
-            if (uploadError) return { ok: false, message: uploadError.message };
+        const { error: uploadError } = await goldmindClient.storage
+            .from('company-kyc-documents').upload(path, file, { upsert: false });
+        if (uploadError) return { ok: false, message: uploadError.message };
 
-            const { error: rowError } = await goldmindClient.from('company_kyc_documents').insert({
-                store_id: GOLDMIND_STORE_ID,
-                owner_type: 'customer',
-                owner_id: customerId,
-                document_category: category,
-                file_url: path,
-                file_name: file.name,
-                uploaded_by: GOLDMIND_STAFF_ID
-            });
-            if (rowError) return { ok: false, message: rowError.message };
-        }
+        const { error: rowError } = await goldmindClient.from('company_kyc_documents').insert({
+            store_id: GOLDMIND_STORE_ID,
+            owner_type: 'customer',
+            owner_id: customerId,
+            document_category: category,
+            file_url: path,
+            file_name: file.name,
+            uploaded_by: GOLDMIND_STAFF_ID
+        });
+        if (rowError) return { ok: false, message: rowError.message };
         return { ok: true };
     }
 
@@ -302,10 +409,28 @@
         const phone = document.getElementById('customer-phone').value.trim();
         const legalName = document.getElementById('company-legal-name').value.trim();
         const taxNumber = document.getElementById('company-tax-number').value.trim();
+        const tradeLicense = document.getElementById('company-trade-license').value.trim();
+        const businessActivity = document.getElementById('company-activity').value.trim();
         const address = document.getElementById('company-address').value.trim();
         const email = document.getElementById('company-email').value.trim();
         const companyPhone = document.getElementById('company-phone').value.trim();
         const phoneCode = document.getElementById('company-phone-code').value;
+        const uboName = document.getElementById('company-ubo-name').value.trim();
+        const uboId = document.getElementById('company-ubo-id').value.trim();
+        const uboPercent = document.getElementById('company-ubo-percent').value;
+        const signatoryName = document.getElementById('company-signatory-name').value.trim();
+        const signatoryId = document.getElementById('company-signatory-id').value.trim();
+
+        const nationality = document.getElementById('ind-nationality').value.trim();
+        const dob = document.getElementById('ind-dob').value || null;
+        const idType = document.getElementById('ind-id-type').value;
+        const idNumber = document.getElementById('ind-id-number').value.trim();
+        const idExpiry = document.getElementById('ind-id-expiry').value || null;
+        const indAddress = document.getElementById('ind-address').value.trim();
+        const occupation = document.getElementById('ind-occupation').value.trim();
+        const sourceOfFunds = document.getElementById('ind-source-funds').value.trim();
+
+        const declarationAccepted = document.getElementById('kyc-declaration').checked;
 
         if (!name) {
             showMessage('الرجاء إدخال اسم العميل.', true);
@@ -317,6 +442,10 @@
         }
         if (isCompany && !legalName) {
             showMessage('الرجاء إدخال اسم الشركة القانوني.', true);
+            return;
+        }
+        if (!declarationAccepted) {
+            showMessage('الرجاء تأكيد إقرار صحة البيانات (KYC) قبل الحفظ.', true);
             return;
         }
 
@@ -348,7 +477,9 @@
         const insertPayload = {
             store_id: GOLDMIND_STORE_ID,
             name: name,
-            is_company: isCompany
+            is_company: isCompany,
+            kyc_declaration_accepted: true,
+            kyc_completed_at: new Date().toISOString()
         };
         if (isCompany) {
             insertPayload.phone = companyPhone || null;
@@ -357,9 +488,24 @@
             insertPayload.tax_number = taxNumber || null;
             insertPayload.address = address || null;
             insertPayload.email = email || null;
+            insertPayload.trade_license_number = tradeLicense || null;
+            insertPayload.business_activity = businessActivity || null;
+            insertPayload.ubo_name = uboName || null;
+            insertPayload.ubo_id_number = uboId || null;
+            insertPayload.ubo_ownership_percent = uboPercent ? Number(uboPercent) : null;
+            insertPayload.authorized_signatory_name = signatoryName || null;
+            insertPayload.authorized_signatory_id_number = signatoryId || null;
         } else {
             insertPayload.phone = phone || null;
             insertPayload.phone_country_code = phone ? individualPhoneCodeSelect.value : null;
+            insertPayload.nationality = nationality || null;
+            insertPayload.date_of_birth = dob;
+            insertPayload.id_type = idType || null;
+            insertPayload.id_number = idNumber || null;
+            insertPayload.id_expiry_date = idExpiry;
+            insertPayload.address = indAddress || null;
+            insertPayload.occupation = occupation || null;
+            insertPayload.source_of_funds = sourceOfFunds || null;
         }
 
         const { data: inserted, error } = await goldmindClient.from('customers').insert(insertPayload).select('id').single();
@@ -373,15 +519,15 @@
 
         let kycMessage = '';
         if (isCompany) {
-            const kycResult = await uploadKycFiles(inserted.id, 'kyc-files', 'kyc');
-            if (!kycResult.ok) {
-                kycMessage = ' (تنبيه: تعذّر رفع بعض مستندات KYC: ' + kycResult.message + ')';
-            }
+            const licenseResult = await uploadKycFile(inserted.id, 'company-license-file', 'trade_license');
+            if (!licenseResult.ok) kycMessage += ' (تنبيه: تعذّر رفع الرخصة التجارية: ' + licenseResult.message + ')';
+            const signatoryResult = await uploadKycFile(inserted.id, 'company-signatory-id-file', 'signatory_id');
+            if (!signatoryResult.ok) kycMessage += ' (تنبيه: تعذّر رفع هوية المفوّض: ' + signatoryResult.message + ')';
         } else {
-            const idDocResult = await uploadKycFiles(inserted.id, 'id-doc-files', 'id_document');
-            if (!idDocResult.ok) {
-                kycMessage = ' (تنبيه: تعذّر رفع صورة الهوية: ' + idDocResult.message + ')';
-            }
+            const frontResult = await uploadKycFile(inserted.id, 'id-doc-front-file', 'id_document_front');
+            if (!frontResult.ok) kycMessage += ' (تنبيه: تعذّر رفع وجه الهوية: ' + frontResult.message + ')';
+            const backResult = await uploadKycFile(inserted.id, 'id-doc-back-file', 'id_document_back');
+            if (!backResult.ok) kycMessage += ' (تنبيه: تعذّر رفع ظهر الهوية: ' + backResult.message + ')';
         }
 
         const extraPhoneValues = getExtraPhoneValues();
@@ -407,11 +553,29 @@
         individualPhoneCodeSelect.value = GOLDMIND_DEFAULT_PHONE_CODE;
         document.getElementById('company-legal-name').value = '';
         document.getElementById('company-tax-number').value = '';
+        document.getElementById('company-trade-license').value = '';
+        document.getElementById('company-activity').value = '';
         document.getElementById('company-address').value = '';
         document.getElementById('company-email').value = '';
         document.getElementById('company-phone').value = '';
-        document.getElementById('kyc-files').value = '';
-        document.getElementById('id-doc-files').value = '';
+        document.getElementById('company-ubo-name').value = '';
+        document.getElementById('company-ubo-id').value = '';
+        document.getElementById('company-ubo-percent').value = '';
+        document.getElementById('company-signatory-name').value = '';
+        document.getElementById('company-signatory-id').value = '';
+        document.getElementById('company-license-file').value = '';
+        document.getElementById('company-signatory-id-file').value = '';
+        document.getElementById('ind-nationality').value = '';
+        document.getElementById('ind-dob').value = '';
+        document.getElementById('ind-id-type').value = 'emirates_id';
+        document.getElementById('ind-id-number').value = '';
+        document.getElementById('ind-id-expiry').value = '';
+        document.getElementById('ind-address').value = '';
+        document.getElementById('ind-occupation').value = '';
+        document.getElementById('ind-source-funds').value = '';
+        document.getElementById('id-doc-front-file').value = '';
+        document.getElementById('id-doc-back-file').value = '';
+        document.getElementById('kyc-declaration').checked = false;
         document.getElementById('customer-name').focus();
     });
 </script>
