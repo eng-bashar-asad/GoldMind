@@ -312,12 +312,20 @@ function gmEnsureStatShimmerStyle() {
 gmEnsureAvatarStyle();
 gmEnsureStatShimmerStyle();
 
-// Site-wide font: Times New Roman everywhere except icon glyphs (which are
-// rendered via a dedicated icon font — overriding it would turn every icon
-// into garbled text instead of a symbol).
+// Site-wide font: Times New Roman for Latin text, Amiri Quran for Arabic
+// (Times New Roman has no Arabic glyphs, so Arabic characters automatically
+// fall through to Amiri Quran — this is why both are listed together
+// instead of picking one). Icon glyphs are excluded since they're
+// rendered via a dedicated icon font — overriding it would turn every
+// icon into garbled text instead of a symbol.
 (function () {
+  const link = document.createElement('link');
+  link.rel = 'stylesheet';
+  link.href = 'https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap';
+  document.head.appendChild(link);
+
   const style = document.createElement('style');
-  style.textContent = '*:not(.material-symbols-outlined) { font-family: "Times New Roman", Times, serif !important; }';
+  style.textContent = '*:not(.material-symbols-outlined) { font-family: "Times New Roman", "Amiri Quran", Times, serif !important; }';
   document.head.appendChild(style);
 })();
 
