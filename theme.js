@@ -312,22 +312,12 @@ function gmEnsureStatShimmerStyle() {
 gmEnsureAvatarStyle();
 gmEnsureStatShimmerStyle();
 
-// Site-wide font: Times New Roman for Latin text, Amiri Quran for Arabic
-// (Times New Roman has no Arabic glyphs, so Arabic characters automatically
-// fall through to Amiri Quran — this is why both are listed together
-// instead of picking one). Icon glyphs are excluded since they're
-// rendered via a dedicated icon font — overriding it would turn every
-// icon into garbled text instead of a symbol.
-(function () {
-  const link = document.createElement('link');
-  link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Amiri+Quran&display=swap';
-  document.head.appendChild(link);
-
-  const style = document.createElement('style');
-  style.textContent = '*:not(.material-symbols-outlined) { font-family: "Times New Roman", "Amiri Quran", Times, serif !important; }';
-  document.head.appendChild(style);
-})();
+// (Removed: a hardcoded Times New Roman + Amiri Quran site-wide font
+// override used to live here. Reverted per feedback back to the app's
+// original default font (Inter for Latin, the browser's normal Arabic
+// sans-serif fallback) — the font-picker below (GOLDMIND_FONTS /
+// theme-picker-ar.html) remains available for anyone who wants to
+// choose a different font themselves.)
 
 // Fixes a "need to tap twice" bug on embedded WebViews (e.g. the packaged
 // Android app): the first tap on a link/button with a hover style gets
