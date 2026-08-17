@@ -194,7 +194,7 @@
         const e = document.getElementById(id);
         if (e) e.style.visibility = 'visible';
       });
-    }, 4000);
+    }, 15000);
   })();
 </script>
 <p class="font-body-md text-body-md text-on-primary opacity-70" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
@@ -422,6 +422,7 @@
         let movementsViewDate = new Date(); // day currently shown in "حركات اليوم"
 
         (async function loadDashboard() {
+          try {
             const session = await requireGoldMindSession('login-entry-ar.html');
             if (!session) return;
             await goldMindSubscriptionGuard();
@@ -596,6 +597,13 @@
             }
 
             await loadMovementsForDay();
+          } catch (err) {
+            console.error('loadDashboard failed:', err);
+            ['storeNameEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl'].forEach(function (id) {
+              const e = document.getElementById(id);
+              if (e) e.style.visibility = 'visible';
+            });
+          }
         })();
 
         function formatMovementsDayLabel(date) {
