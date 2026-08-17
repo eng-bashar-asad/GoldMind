@@ -174,7 +174,7 @@
 <!-- Profile/Welcome -->
 <section class="mb-4 flex items-center justify-between gap-3">
 <div>
-<h2 class="font-headline-md text-on-primary font-bold" style="font-size:26px; line-height:32px;" id="storeNameEl"></h2>
+<h2 class="font-headline-md text-on-primary font-bold" style="font-size:26px; line-height:32px; visibility:hidden;" id="storeNameEl"></h2>
 <script>
   // Show the store name from last time instantly (no flash of empty/wrong
   // text) while the real value loads from the database below.
@@ -185,6 +185,16 @@
       el.textContent = cached;
       if (typeof fitStatNumber === 'function') fitStatNumber(el);
     }
+    // Safety net: if the dashboard data fetch below ever fails/errors
+    // before reaching its own fitStatNumber() calls, don't leave these
+    // elements permanently invisible — reveal them as-is after a short
+    // grace period.
+    setTimeout(function () {
+      ['storeNameEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl'].forEach(function (id) {
+        const e = document.getElementById(id);
+        if (e) e.style.visibility = 'visible';
+      });
+    }, 4000);
   })();
 </script>
 <p class="font-body-md text-body-md text-on-primary opacity-70" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
@@ -216,16 +226,16 @@
 <section class="mb-5 lg:mb-8">
 <div class="bg-surface-container-lowest gm-stat-shimmer border border-outline-variant rounded-xl lg:rounded-2xl luxury-shadow p-4 lg:p-7 grid grid-cols-3 divide-x divide-x-reverse divide-outline-variant">
 <div class="text-center px-1">
-<div class="font-headline-md font-bold text-secondary truncate" style="font-size:30px; line-height:36px;" id="dailyCashboxBalanceEl">0.00</div>
+<div class="font-headline-md font-bold text-secondary truncate" style="font-size:30px; line-height:36px; visibility:hidden;" id="dailyCashboxBalanceEl">0.00</div>
 <span class="text-[15px] text-on-surface-variant">كاش الصندوق</span>
 <div class="hidden text-[9px] text-on-surface-variant font-data-mono mt-0.5 truncate" id="dailyCashboxOtherCurrenciesEl"></div>
 </div>
 <div class="text-center px-1">
-<div class="font-headline-md font-bold text-primary truncate" style="font-size:30px; line-height:36px;" id="todayInvoiceCountEl">0</div>
+<div class="font-headline-md font-bold text-primary truncate" style="font-size:30px; line-height:36px; visibility:hidden;" id="todayInvoiceCountEl">0</div>
 <span class="text-[15px] text-on-surface-variant">فواتير اليوم</span>
 </div>
 <div class="text-center px-1">
-<div class="font-headline-md font-bold text-primary truncate" style="font-size:30px; line-height:36px;" id="todaySalesEl">0.00</div>
+<div class="font-headline-md font-bold text-primary truncate" style="font-size:30px; line-height:36px; visibility:hidden;" id="todaySalesEl">0.00</div>
 <span class="text-[15px] text-on-surface-variant">مبيعات اليوم</span>
 </div>
 </div>
@@ -379,9 +389,10 @@
             const READABLE_FLOOR = 13;
             const startSize = parseFloat(getComputedStyle(el).fontSize) || 24;
             for (let size = startSize; size >= READABLE_FLOOR; size--) {
-                if (el.scrollWidth <= el.clientWidth) return;
+                if (el.scrollWidth <= el.clientWidth) { el.style.visibility = 'visible'; return; }
                 el.style.fontSize = size + 'px';
             }
+            el.style.visibility = 'visible';
             // Still doesn't fit at the readable floor: allow wrapping to a
             // second line instead of continuing to shrink or truncating.
             if (el.scrollWidth > el.clientWidth) {
