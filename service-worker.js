@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goldmind-shell-v5';
+const CACHE_NAME = 'goldmind-shell-v6';
 const SHELL_ASSETS = [
   './manifest.json',
   './icon-192.png',

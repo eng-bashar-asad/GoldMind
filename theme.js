@@ -683,3 +683,36 @@ goldmindLoadSavedFont();
   `;
   document.head.appendChild(style);
 })();
+
+// Seventh shape: installed as a standalone PWA (manifest display:standalone),
+// the app draws under the device's status bar, gesture nav bar, and rounded
+// screen corners with no OS chrome to keep content clear of them. Every
+// inner page's sticky top-0 header and any fixed bottom bar/nav sat flush
+// against the true screen edge, so icons/buttons placed near those edges
+// could get visually clipped by the status bar, gesture bar, or a curved
+// screen edge depending on the device. Ensure the viewport opts in to
+// drawing under those system areas (viewport-fit=cover) then pad the
+// header/bottom-bar/FAB elements with the actual safe-area-inset values
+// (0 on devices/browsers that don't need it, so this is a no-op there).
+(function () {
+  const vp = document.querySelector('meta[name="viewport"]');
+  if (vp && !/viewport-fit/.test(vp.content)) {
+    vp.content = vp.content.replace(/\s*$/, '') + ', viewport-fit=cover';
+  }
+  const style = document.createElement('style');
+  style.textContent = `
+    header.sticky.top-0, header.fixed.top-0 {
+      padding-top: env(safe-area-inset-top, 0px);
+    }
+    nav.sticky.bottom-0, nav.fixed.bottom-0,
+    div.sticky.bottom-0, div.fixed.bottom-0 {
+      padding-bottom: env(safe-area-inset-bottom, 0px);
+    }
+    header.sticky.top-0 > div:first-child,
+    header.fixed.top-0 > div:first-child {
+      padding-left: max(1rem, env(safe-area-inset-left, 0px));
+      padding-right: max(1rem, env(safe-area-inset-right, 0px));
+    }
+  `;
+  document.head.appendChild(style);
+})();
