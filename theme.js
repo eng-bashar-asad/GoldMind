@@ -716,3 +716,20 @@ goldmindLoadSavedFont();
   `;
   document.head.appendChild(style);
 })();
+
+// Eighth shape: several pages (index-ar.html's dashboard among them) use a
+// custom Tailwind "margin-mobile" spacing token (px-margin-mobile) fixed at
+// 16px for their header/main/bottom-nav side padding. On some real devices
+// that still reads as "touching the edge" (rounded screen corners eat into
+// a flat 16px, and it never grows to clear the safe-area inset). Override
+// it site-wide to a slightly larger, safe-area-aware value.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    .px-margin-mobile {
+      padding-left: max(20px, env(safe-area-inset-left, 0px)) !important;
+      padding-right: max(20px, env(safe-area-inset-right, 0px)) !important;
+    }
+  `;
+  document.head.appendChild(style);
+})();
