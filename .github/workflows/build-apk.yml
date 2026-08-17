@@ -47,6 +47,19 @@ jobs:
             cp app/www/login-entry-ar.html app/www/index.html
           fi
 
+      # The live site loads Tailwind's Play CDN, which recompiles CSS from
+      # scratch in-browser on every single page load — real, measurable
+      # overhead on a phone. For the packaged app we precompile one static
+      # stylesheet covering every page instead, and strip the runtime CDN
+      # script out of the bundled copies (the live GitHub Pages site is
+      # untouched and keeps using the CDN as before).
+      - name: Precompile static Tailwind CSS for the app
+        working-directory: app
+        run: |
+          node build-tools/merge-tailwind-config.js
+          npx tailwindcss -i build-tools/input.css -o www/tailwind-built.css --config build-tools/tailwind.config.js --minify
+          node build-tools/strip-tailwind-cdn.js
+
       - name: Sync Capacitor Android project
         working-directory: app
         run: npx cap sync android
