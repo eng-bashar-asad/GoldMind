@@ -1,3 +1,11 @@
+// Ensure every page has a history.state entry. Without this, some mobile
+// browsers/WebViews (especially installed standalone PWAs) treat a page
+// with no history state as having nothing to go back to, and interpret an
+// edge-swipe-back gesture as "exit the app" instead of "go back one page".
+if (!history.state) {
+  history.replaceState({ gmPage: location.pathname }, '');
+}
+
 // GoldMind shared theming system.
 // Each theme sets CSS custom properties on :root. Pages whose Tailwind
 // config colors reference these variables (e.g. "primary": "var(--gm-primary)")
