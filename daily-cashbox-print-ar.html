@@ -68,7 +68,10 @@
 
 <!-- Two symmetric columns: incoming (right) / outgoing (left) -->
 <div class="rounded-xl border-[3px] border-accent overflow-hidden">
-<table class="w-full text-[13px]">
+<table class="w-full text-[13px]" style="table-layout:fixed;">
+<colgroup>
+<col style="width:28%"/><col style="width:22%"/><col style="width:28%"/><col style="width:22%"/>
+</colgroup>
 <thead>
 <tr>
 <th colspan="2" class="bg-green-100 text-green-800 py-2.5 font-bold">الداخل</th>
@@ -178,10 +181,10 @@ async function load() {
     const inn = inEntries[i];
     const bg = rowColors[i] ? `background-color:${rowColors[i]};` : '';
     rowsHtml += `<tr style="${bg}">
-      <td class="py-2.5 px-3 border-t border-gray-200">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
+      <td class="py-2.5 px-3 border-t border-gray-200" style="word-break:break-word;overflow-wrap:break-word;">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left" style="word-break:break-word;overflow-wrap:break-word;" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-gray-200" style="word-break:break-word;overflow-wrap:break-word;">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left" style="word-break:break-word;overflow-wrap:break-word;" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
     </tr>`;
   }
   if (dayEntries.length === 0) {
@@ -220,6 +223,23 @@ load();
 async function downloadCashboxPdf() {
   const sheet = document.getElementById('sheet');
   if (!sheet || sheet.classList.contains('hidden')) return;
+
+  // Inside the packaged Android app (Capacitor WebView), html2pdf's
+  // blob-based file download has nothing to catch it — no browser chrome,
+  // no download manager hooked up — so the button visibly does nothing
+  // even though the PDF data was generated correctly in memory. The
+  // system print dialog's own "Save as PDF" destination is a reliable,
+  // dependency-free way to get the same result on a real device, so use
+  // that instead whenever running inside the native app.
+  const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  if (isNativeApp) {
+    if (!sessionStorage.getItem('gm_pdf_print_hint_shown')) {
+      sessionStorage.setItem('gm_pdf_print_hint_shown', '1');
+      alert('لحفظ الملف كـ PDF: اختر "حفظ كـ PDF" من قائمة الطابعات بنافذة الطباعة التالية.');
+    }
+    window.print();
+    return;
+  }
 
   const btn = document.getElementById('download-pdf-btn');
   const originalHtml = btn.innerHTML;
