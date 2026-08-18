@@ -357,17 +357,25 @@ function renderAll() {
   const priorEntries = allEntries.filter(e => new Date(e.created_at) < selectedDate);
 
   // Running balance per currency: opening (everything before the selected day) + that day = closing
-  const currencies = [...new Set(allEntries.map(e => e.currency))];
+  const allCurrencies = [...new Set(allEntries.map(e => e.currency))];
   const balancesEl = document.getElementById('balances-by-currency');
 
-  if (currencies.length === 0) {
+  // Compute balances for every currency, then drop any currency that is
+  // fully empty (no opening balance, no activity today, no current
+  // balance) — once a currency's drawer is empty it disappears from view
+  // instead of sitting there forever as a permanent 0.00 row.
+  const currencyBalances = allCurrencies.map(cur => {
+    const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+    const todayNet = todayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+    const closing = opening + todayNet;
+    return { cur, opening, todayNet, closing };
+  }).filter(b => Math.abs(b.opening) > 0.0001 || Math.abs(b.todayNet) > 0.0001 || Math.abs(b.closing) > 0.0001);
+
+  if (currencyBalances.length === 0) {
     balancesEl.innerHTML = '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-center text-on-surface-variant text-sm">لا يوجد رصيد مسجّل بعد.</div>';
-  } else {
-    balancesEl.innerHTML = currencies.map(cur => {
-      const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
-      const todayNet = todayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
-      const closing = opening + todayNet;
-      return `
+  } else if (currencyBalances.length === 1) {
+    // Single currency: keep the spacious card, plenty of room either way.
+    balancesEl.innerHTML = currencyBalances.map(({ cur, opening, todayNet, closing }) => `
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
           <div class="text-[11px] font-bold text-secondary mb-2">${cur}</div>
           <div class="grid grid-cols-3 gap-2 text-center">
@@ -375,8 +383,22 @@ function renderAll() {
             <div><p class="text-[10px] text-on-surface-variant">صافي اليوم</p><p class="font-bold text-[14px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</p></div>
             <div><p class="text-[10px] text-on-surface-variant">الرصيد الحالي</p><p class="font-bold text-[15px] font-data-mono">${fmt(closing)}</p></div>
           </div>
-        </div>`;
-    }).join('');
+        </div>`).join('');
+  } else {
+    // More than one active currency: one shared card, each currency as a
+    // compact single-line row (small currency chip + 3 tight columns)
+    // instead of a full-height card per currency — keeps the page short
+    // no matter how many currencies are active at once.
+    const rows = currencyBalances.map(({ cur, opening, todayNet, closing }) => `
+        <div class="flex items-center gap-2 py-2 px-1 border-b border-outline-variant last:border-b-0">
+          <div class="text-[10px] font-bold text-secondary w-12 shrink-0">${cur}</div>
+          <div class="grid grid-cols-3 gap-1 flex-1 text-center">
+            <div class="flex flex-col leading-tight"><span class="text-[9px] text-on-surface-variant">افتتاحي</span><span class="font-bold text-[12px] font-data-mono">${fmt(opening)}</span></div>
+            <div class="flex flex-col leading-tight"><span class="text-[9px] text-on-surface-variant">صافي اليوم</span><span class="font-bold text-[12px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</span></div>
+            <div class="flex flex-col leading-tight"><span class="text-[9px] text-on-surface-variant">الحالي</span><span class="font-bold text-[13px] font-data-mono">${fmt(closing)}</span></div>
+          </div>
+        </div>`).join('');
+    balancesEl.innerHTML = `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl px-2">${rows}</div>`;
   }
 
   const bodyEl = document.getElementById('cashbox-table-body');
