@@ -181,7 +181,7 @@
 </a>
 </nav>
 
-<div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-[13px] px-4 py-2 rounded-full opacity-0 pointer-events-none transition-opacity z-[60]"></div>
+<div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-[13px] px-4 py-2 rounded-full opacity-0 pointer-events-none transition-opacity z-[70]"></div>
 
 <!-- Staff detail modal: opens when tapping a staff member's name. Shows
      everything about them in one place — name, phones, and login email —
@@ -203,6 +203,7 @@
 <input id="detailWhatsapp" type="tel" dir="ltr" placeholder="رقم واتساب (اختياري)" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2 bg-background text-on-background"/>
 
 <p id="detailBasicsError" class="text-error text-[12px] hidden mb-2"></p>
+<p id="detailBasicsSuccess" class="text-[12px] hidden mb-2" style="color:#2e7d32;">✓ تم الحفظ</p>
 <button onclick="saveStaffDetailBasics()" class="w-full h-10 bg-primary text-on-primary rounded-lg text-[12px] font-semibold mb-4">حفظ الاسم والأرقام</button>
 
 <div class="border-t border-outline-variant pt-3">
@@ -394,6 +395,9 @@ async function saveStaffDetailBasics() {
   }
 
   showToast('تم حفظ بيانات الموظف');
+  const successEl = document.getElementById('detailBasicsSuccess');
+  successEl.classList.remove('hidden');
+  setTimeout(() => successEl.classList.add('hidden'), 2500);
   loadStaff();
 }
 
