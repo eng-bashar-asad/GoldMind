@@ -38,7 +38,7 @@
 <span class="material-symbols-outlined">arrow_forward</span>
 <span class="text-sm font-semibold">الحركة اليومية</span>
 </button>
-<button onclick="window.print()" class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg text-sm font-semibold">
+<button onclick="window.print()" id="print-btn" class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">print</span> طباعة
 </button>
 <button onclick="downloadCashboxPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-surface-container-lowest text-on-surface border border-gray-200 px-4 py-2 rounded-lg text-sm font-semibold">
@@ -213,10 +213,81 @@ async function load() {
   document.getElementById('sheet').classList.remove('hidden');
 }
 
+function gmIsNativeApp() {
+  return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+}
+
+// Renders the on-screen #sheet element to a PDF and returns it as a plain
+// base64 string (no "data:application/pdf;base64," prefix) — the format
+// Capacitor's Filesystem plugin expects for writeFile().
+async function generateCashboxPdfBase64() {
+  const sheet = document.getElementById('sheet');
+  if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+  const dataUriString = await html2pdf().set({
+    margin: 10,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(sheet).outputPdf('datauristring');
+  return dataUriString.substring(dataUriString.indexOf(',') + 1);
+}
+
+// Inside the packaged Android app, neither window.print() nor a browser-
+// style blob download has anywhere to land — this WebView has no native
+// print integration and no download manager hooked up. Generating a real
+// PDF file and handing it to Android's own share sheet (via the
+// Filesystem + Share Capacitor plugins) is the reliable path on a real
+// device: the user picks WhatsApp, Files, Drive, etc. and the actual PDF
+// is attached — not a link that then asks them to log in.
+async function shareCashboxPdfNative(btn) {
+  const originalHtml = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
+  }
+  try {
+    const base64 = await generateCashboxPdfBase64();
+    const dateLabel = (document.getElementById('dateLabel')?.textContent || 'daily-cashbox').trim();
+    const filename = `goldmind-daily-cashbox-${dateLabel.replace(/\//g, '-')}.pdf`;
+
+    const { Filesystem, Share } = window.Capacitor.Plugins;
+    await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+    const { uri } = await Filesystem.getUri({ path: filename, directory: 'CACHE' });
+
+    await Share.share({
+      title: 'كشف الحركة اليومية',
+      text: 'كشف الحركة اليومية — ' + dateLabel,
+      url: uri,
+      dialogTitle: 'مشاركة الكشف'
+    });
+  } catch (err) {
+    console.error('PDF share failed', err);
+    alert('تعذّر تجهيز/مشاركة ملف PDF، حاول مرة أخرى');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+  }
+}
+
 load();
 
-if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
-  document.getElementById('nativePdfHint').classList.remove('hidden');
+if (gmIsNativeApp()) {
+  document.getElementById('print-btn').classList.add('hidden');
+  const hintEl = document.getElementById('nativePdfHint');
+  hintEl.textContent = 'اضغط "تحميل PDF" لحفظ الملف أو مشاركته عبر واتساب مباشرة.';
+  hintEl.classList.remove('hidden');
+
+  // Coming here from the "إرسال جدول اليوم عبر واتساب" button on the
+  // daily cashbox page (?autoshare=1) — open the native share sheet the
+  // moment the sheet has finished rendering, no extra tap needed.
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('autoshare') === '1') {
+    const waitForSheet = setInterval(() => {
+      if (!document.getElementById('sheet').classList.contains('hidden')) {
+        clearInterval(waitForSheet);
+        shareCashboxPdfNative(null);
+      }
+    }, 200);
+  }
 }
 
 // ---- Download an official PDF copy (client-side html2pdf.js) ----
@@ -229,20 +300,13 @@ async function downloadCashboxPdf() {
   const sheet = document.getElementById('sheet');
   if (!sheet || sheet.classList.contains('hidden')) return;
 
-  // Inside the packaged Android app (Capacitor WebView), html2pdf's
-  // blob-based file download has nothing to catch it — no browser chrome,
-  // no download manager hooked up — so the button visibly does nothing
-  // even though the PDF data was generated correctly in memory. The
-  // system print dialog's own "Save as PDF" destination is a reliable,
-  // dependency-free way to get the same result on a real device, so use
-  // that instead whenever running inside the native app.
-  const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
-  if (isNativeApp) {
-    window.print();
+  const btn = document.getElementById('download-pdf-btn');
+
+  if (gmIsNativeApp()) {
+    await shareCashboxPdfNative(btn);
     return;
   }
 
-  const btn = document.getElementById('download-pdf-btn');
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
