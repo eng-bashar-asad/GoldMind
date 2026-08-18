@@ -6,6 +6,60 @@ if (!history.state) {
   history.replaceState({ gmPage: location.pathname }, '');
 }
 
+// ---------- In-app update check (packaged Android APK only) ----------
+// The website (GitHub Pages / "add to home screen") always serves the
+// latest code on its own — the service worker fetches every page
+// network-first. The sideloaded APK is different: it's a snapshot frozen
+// at build time inside app/www, so it never updates itself no matter how
+// many times the underlying site changes. This checks the APK's own
+// baked-in commit (app/www/build-info.json, stamped by the GitHub Actions
+// build) against the latest commit on GitHub and — only when they differ,
+// and only inside the actual installed app, never on the website — shows
+// a small dismissible banner linking to the newest APK download.
+(function gmCheckAppUpdate() {
+  const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  if (!isNativeApp) return;
+
+  const DISMISS_KEY = 'goldmind_update_dismissed_sha';
+  const APK_URL = 'https://github.com/eng-bashar-asad/GoldMind/releases/download/app-latest/GoldMind.apk';
+
+  fetch('build-info.json', { cache: 'no-store' })
+    .then(r => r.ok ? r.json() : null)
+    .then(buildInfo => {
+      if (!buildInfo || !buildInfo.sha) return;
+      return fetch('https://api.github.com/repos/eng-bashar-asad/GoldMind/commits/main', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(latest => {
+          if (!latest || !latest.sha) return;
+          if (latest.sha === buildInfo.sha) return; // already up to date
+          if (localStorage.getItem(DISMISS_KEY) === latest.sha) return; // user already dismissed this exact version
+          gmShowUpdateBanner(APK_URL, latest.sha);
+        });
+    })
+    .catch(() => {}); // silent — a failed version check should never block using the app
+})();
+
+function gmShowUpdateBanner(apkUrl, latestSha) {
+  if (document.getElementById('gm-update-banner')) return;
+  const bar = document.createElement('div');
+  bar.id = 'gm-update-banner';
+  bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#B4955A;color:#fff;' +
+    'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;' +
+    'font-family:Inter,sans-serif;font-size:12.5px;font-weight:600;direction:rtl;box-shadow:0 2px 8px rgba(0,0,0,.15);';
+  bar.innerHTML =
+    '<span>يتوفر تحديث جديد للتطبيق</span>' +
+    '<span style="display:flex;gap:6px;align-items:center;">' +
+      '<a href="' + apkUrl + '" style="background:#fff;color:#7a6222;border-radius:999px;padding:5px 12px;text-decoration:none;font-weight:700;">تنزيل</a>' +
+      '<button type="button" style="background:transparent;border:none;color:#fff;font-size:16px;line-height:1;cursor:pointer;padding:2px 4px;">×</button>' +
+    '</span>';
+  bar.querySelector('button').onclick = function () {
+    localStorage.setItem('goldmind_update_dismissed_sha', latestSha);
+    bar.remove();
+  };
+  document.body.prepend(bar);
+  document.body.style.paddingTop = (document.body.style.paddingTop ? 'calc(' + document.body.style.paddingTop + ' + 38px)' : '38px');
+}
+
 // GoldMind shared theming system.
 // Each theme sets CSS custom properties on :root. Pages whose Tailwind
 // config colors reference these variables (e.g. "primary": "var(--gm-primary)")
