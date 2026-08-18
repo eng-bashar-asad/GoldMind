@@ -54,7 +54,8 @@ jobs:
       # from a sideloaded APK never auto-updates on its own the way the
       # website (GitHub Pages / PWA) does.
       - name: Stamp build version into the app
-        run: echo "{\"sha\": \"${{ github.sha }}\", \"built_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > app/www/build-info.json
+        run: |
+          printf '{"sha": "%s", "built_at": "%s"}' "${{ github.sha }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > app/www/build-info.json
 
       # The live site loads Tailwind's Play CDN, which recompiles CSS from
       # scratch in-browser on every single page load — real, measurable
