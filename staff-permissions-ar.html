@@ -183,6 +183,43 @@
 
 <div id="toast" class="fixed bottom-20 left-1/2 -translate-x-1/2 bg-primary text-on-primary text-[13px] px-4 py-2 rounded-full opacity-0 pointer-events-none transition-opacity z-[60]"></div>
 
+<!-- Staff detail modal: opens when tapping a staff member's name. Shows
+     everything about them in one place — name, phones, and login email —
+     instead of scattering edits across small inline fields on the card. -->
+<div class="hidden fixed inset-0 bg-black/50 z-[60] items-end lg:items-center justify-center" id="staffDetailModal">
+<div class="bg-surface-container-lowest w-full lg:w-96 lg:rounded-2xl rounded-t-2xl p-4 max-h-[85vh] overflow-y-auto">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-bold text-[15px]">بيانات الموظف</h3>
+<button onclick="closeStaffDetail()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined">close</span></button>
+</div>
+
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الاسم الكامل</label>
+<input id="detailFullName" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2 bg-background text-on-background"/>
+
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">رقم التواصل</label>
+<input id="detailContactPhone" type="tel" dir="ltr" placeholder="رقم هاتف عادي (اختياري)" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2 bg-background text-on-background"/>
+
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">رقم واتساب</label>
+<input id="detailWhatsapp" type="tel" dir="ltr" placeholder="رقم واتساب (اختياري)" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2 bg-background text-on-background"/>
+
+<p id="detailBasicsError" class="text-error text-[12px] hidden mb-2"></p>
+<button onclick="saveStaffDetailBasics()" class="w-full h-10 bg-primary text-on-primary rounded-lg text-[12px] font-semibold mb-4">حفظ الاسم والأرقام</button>
+
+<div class="border-t border-outline-variant pt-3">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">إيميل الدخول</label>
+<input id="detailEmail" type="email" dir="ltr" placeholder="جارِ التحميل..." class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-1 bg-background text-on-background"/>
+<p class="text-[10.5px] text-on-surface-variant mb-2">
+<span class="material-symbols-outlined align-middle" style="font-size:13px;">warning</span>
+تغيير الإيميل يغيّر بيانات دخول الموظف فوراً — الإيميل القديم لن يعود يعمل لتسجيل الدخول.
+</p>
+<p id="detailEmailError" class="text-error text-[12px] hidden mb-2"></p>
+<button onclick="saveStaffDetailEmail()" class="w-full h-10 border border-primary text-primary rounded-lg text-[12px] font-semibold">حفظ الإيميل الجديد</button>
+</div>
+
+</div>
+</div>
+
+
 <script>
 const PERMISSION_GROUPS = [
   { label: 'المخزون', icon: 'inventory_2', keys: [
@@ -214,6 +251,7 @@ const PERMISSION_GROUPS = [
 
 let currentStaffId = null;
 let canManage = false;
+let allStaffData = [];
 
 function showToast(msg, isError) {
   const t = document.getElementById('toast');
@@ -261,7 +299,9 @@ function renderStaffCard(staff) {
     <div class="flex items-center gap-3 mb-1">
       <div class="w-11 h-11 rounded-full ${avatarClass} flex items-center justify-center font-bold shrink-0">${gmEscapeHtml(initials(staff.full_name))}</div>
       <div class="min-w-0">
-        <p class="font-label-md text-label-md font-semibold text-on-surface truncate">${gmEscapeHtml(staff.full_name) || 'بدون اسم'}</p>
+        <button type="button" onclick="openStaffDetail('${staff.id}')" class="text-right block w-full">
+          <p class="font-label-md text-label-md font-semibold text-on-surface truncate underline decoration-dotted decoration-outline">${gmEscapeHtml(staff.full_name) || 'بدون اسم'}</p>
+        </button>
         <p class="text-[11px] text-on-surface-variant">${isOwner ? 'مالك المتجر — كل الصلاحيات' : 'موظف'}</p>
       </div>
       ${(!isOwner && staff.id !== currentStaffId) ? `<button type="button" onclick="deleteStaff('${staff.id}', '${gmEscapeHtml(staff.full_name || 'هذا الموظف').replace(/'/g, "\\'")}')" class="text-error shrink-0" title="حذف الموظف">
@@ -278,6 +318,115 @@ function renderStaffCard(staff) {
     </div>
     <div class="pt-1">${groupsHtml}</div>
   </div>`;
+}
+
+// ---------- Staff detail modal (name, phones, login email) ----------
+let detailStaffId = null;
+
+function openStaffDetail(staffId) {
+  const staff = allStaffData.find(s => s.id === staffId);
+  if (!staff) return;
+  detailStaffId = staffId;
+
+  document.getElementById('detailFullName').value = staff.full_name || '';
+  document.getElementById('detailContactPhone').value = staff.contact_phone || '';
+  document.getElementById('detailWhatsapp').value = staff.whatsapp_phone || '';
+  document.getElementById('detailBasicsError').classList.add('hidden');
+  document.getElementById('detailEmailError').classList.add('hidden');
+
+  const emailInput = document.getElementById('detailEmail');
+  emailInput.value = '';
+  emailInput.placeholder = 'جارِ التحميل...';
+  emailInput.disabled = true;
+
+  document.getElementById('staffDetailModal').classList.remove('hidden');
+  document.getElementById('staffDetailModal').classList.add('flex');
+
+  loadStaffEmail(staffId);
+}
+
+function closeStaffDetail() {
+  document.getElementById('staffDetailModal').classList.add('hidden');
+  document.getElementById('staffDetailModal').classList.remove('flex');
+  detailStaffId = null;
+}
+
+async function loadStaffEmail(staffId) {
+  const emailInput = document.getElementById('detailEmail');
+  const { data, error } = await goldmindClient.functions.invoke('staff-email-admin', {
+    body: { action: 'get', store_id: GOLDMIND_STORE_ID, staff_id: staffId }
+  });
+  if (detailStaffId !== staffId) return; // modal was closed/switched while this was in flight
+
+  if (error || !data || data.error) {
+    emailInput.placeholder = 'تعذّر تحميل الإيميل';
+    emailInput.disabled = false;
+    return;
+  }
+  emailInput.value = data.email || '';
+  emailInput.disabled = false;
+}
+
+async function saveStaffDetailBasics() {
+  if (!detailStaffId) return;
+  const errEl = document.getElementById('detailBasicsError');
+  errEl.classList.add('hidden');
+
+  const fullName = document.getElementById('detailFullName').value.trim();
+  const contactPhone = document.getElementById('detailContactPhone').value.trim().replace(/[^0-9+]/g, '');
+  const whatsapp = document.getElementById('detailWhatsapp').value.trim().replace(/[^0-9+]/g, '');
+
+  if (!fullName) {
+    errEl.textContent = 'الاسم الكامل مطلوب';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const { error } = await goldmindClient
+    .from('staff')
+    .update({ full_name: fullName, contact_phone: contactPhone || null, whatsapp_phone: whatsapp || null })
+    .eq('id', detailStaffId);
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  showToast('تم حفظ بيانات الموظف');
+  loadStaff();
+}
+
+async function saveStaffDetailEmail() {
+  if (!detailStaffId) return;
+  const errEl = document.getElementById('detailEmailError');
+  errEl.classList.add('hidden');
+
+  const newEmail = document.getElementById('detailEmail').value.trim();
+  if (!newEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newEmail)) {
+    errEl.textContent = 'صيغة الإيميل غير صحيحة';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const staff = allStaffData.find(s => s.id === detailStaffId);
+  const confirmed = confirm(
+    `سيتم تغيير إيميل دخول "${staff ? staff.full_name : 'الموظف'}" إلى:\n${newEmail}\n\n` +
+    `الإيميل القديم لن يعود يعمل لتسجيل الدخول بعد هذا التغيير. متابعة؟`
+  );
+  if (!confirmed) return;
+
+  const { data, error } = await goldmindClient.functions.invoke('staff-email-admin', {
+    body: { action: 'update', store_id: GOLDMIND_STORE_ID, staff_id: detailStaffId, new_email: newEmail }
+  });
+
+  if (error || !data || data.error) {
+    errEl.textContent = 'تعذّر تحديث الإيميل: ' + (data?.error || error?.message || '');
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  showToast('تم تحديث الإيميل بنجاح');
 }
 
 function toggleGroup(btn) {
@@ -593,7 +742,7 @@ async function loadStaff() {
   }
 
   const { data: staffRows, error } = await goldmindClient
-    .from('staff').select('id, full_name, role, permissions, whatsapp_phone')
+    .from('staff').select('id, full_name, role, permissions, whatsapp_phone, contact_phone')
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('role', { ascending: false });
 
@@ -603,6 +752,8 @@ async function loadStaff() {
     showToast('تعذر تحميل الموظفين: ' + error.message, true);
     return;
   }
+
+  allStaffData = staffRows;
 
   document.getElementById('stat-total').textContent = staffRows.length;
   document.getElementById('stat-owners').textContent = staffRows.filter(s => s.role === 'owner').length;
