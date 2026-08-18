@@ -591,6 +591,16 @@ function openPrintView() {
 
 let reportPanelLoaded = false;
 function toggleReportPanel() {
+  const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  if (isNativeApp) {
+    // wa.me links can only ever carry text, never attach a real file — so
+    // inside the app, go straight to the print page which generates the
+    // actual PDF and hands it to Android's native share sheet.
+    const dateStr = localDateStr(selectedDate);
+    window.location.href = 'daily-cashbox-print-ar.html?date=' + dateStr + '&autoshare=1';
+    return;
+  }
+
   const panel = document.getElementById('reportPanel');
   panel.classList.toggle('hidden');
   if (!panel.classList.contains('hidden') && !reportPanelLoaded) {
