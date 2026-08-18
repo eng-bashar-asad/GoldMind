@@ -427,18 +427,24 @@
             if (!session) return;
             await goldMindSubscriptionGuard();
 
-            // Store name
-            const { data: store } = await goldmindClient
-                .from('stores').select('name, diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+            // Store + staff rows only depend on the session above, not on
+            // each other — fetch both at once instead of one after the
+            // other. This (and the batch below) is what actually fixes the
+            // "numbers take forever to appear" issue: it was never the
+            // theme itself, it was ~9 database round trips running strictly
+            // one-at-a-time on every dashboard load.
+            const [{ data: store }, { data: staffRow }] = await Promise.all([
+                goldmindClient
+                    .from('stores').select('name, diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+                goldmindClient
+                    .from('staff').select('full_name, role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle()
+            ]);
+
             if (store) {
                 document.getElementById('storeNameEl').textContent = store.name;
                 fitStatNumber(document.getElementById('storeNameEl'));
                 localStorage.setItem('goldmind_store_name', store.name);
             }
-
-            // Staff name / role for the welcome line
-            const { data: staffRow } = await goldmindClient
-                .from('staff').select('full_name, role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle();
             if (staffRow) {
                 const roleLabel = staffRow.role === 'owner' ? 'مالك الحساب' : 'موظف';
                 document.getElementById('welcomeEl').textContent = staffRow.full_name + ' • ' + roleLabel;
@@ -479,38 +485,65 @@
                 nav.classList.add('flex');
             }
 
-            // Fiscal year closing reminder — owner only, checks for an unclosed past year
-            if (isOwner) {
-                const { data: storeCreated } = await goldmindClient.from('stores').select('created_at').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-                const startYear = storeCreated ? new Date(storeCreated.created_at).getFullYear() : new Date().getFullYear();
-                const currentYear = new Date().getFullYear();
-                if (currentYear > startYear) {
+            const baseCurrency = (store && store.currency) || 'AED';
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            // Everything below is independent of everything else in this
+            // block — none of these queries need another one's result —
+            // so they all fire together instead of waiting in line.
+            const [
+                fiscalResult,
+                { data: cashboxEntries },
+                { data: todayInvoices },
+                { count: unpaidCount },
+                { data: lowLots }
+            ] = await Promise.all([
+                // Fiscal year closing reminder — owner only, checks for an unclosed past year
+                (async () => {
+                    if (!isOwner) return null;
+                    const { data: storeCreated } = await goldmindClient.from('stores').select('created_at').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+                    const startYear = storeCreated ? new Date(storeCreated.created_at).getFullYear() : new Date().getFullYear();
+                    const currentYear = new Date().getFullYear();
+                    if (currentYear <= startYear) return null;
                     const { data: closures } = await goldmindClient.from('fiscal_year_closures').select('fiscal_year').eq('store_id', GOLDMIND_STORE_ID);
                     const closedYears = new Set((closures || []).map(c => c.fiscal_year));
                     const unclosedYears = [];
                     for (let y = startYear; y < currentYear; y++) if (!closedYears.has(y)) unclosedYears.push(y);
-                    if (unclosedYears.length > 0) {
-                        document.getElementById('fiscalYearBannerText').textContent =
-                            unclosedYears.length === 1
-                                ? 'سنة ' + unclosedYears[0] + ' المالية لسا مو مقفولة — اضغط لإغلاقها'
-                                : unclosedYears.length + ' سنوات مالية لسا مو مقفولة — اضغط للمراجعة';
-                        const banner = document.getElementById('fiscalYearBanner');
-                        banner.classList.remove('hidden');
-                        banner.classList.add('flex');
-                    }
-                }
+                    return unclosedYears;
+                })(),
+                // Daily cashbox balance (all-time running total from the manual
+                // drawer journal) — base currency only in the headline number,
+                // same logic as daily-cashbox-ar.html's "الرصيد الحالي" card.
+                goldmindClient
+                    .from('daily_cash_log').select('direction, amount, currency')
+                    .eq('store_id', GOLDMIND_STORE_ID),
+                // Today's sales + invoice count (real invoice type is 'sale', not
+                // 'sell' — fixing a real bug that made this card always read 0.00)
+                goldmindClient
+                    .from('invoices').select('total_amount')
+                    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
+                    .gte('created_at', todayStart.toISOString()),
+                // Real alerts — replaces the old dead "التنبيهات" button
+                goldmindClient
+                    .from('invoices').select('id', { count: 'exact', head: true })
+                    .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'unpaid'),
+                goldmindClient
+                    .from('gold_stock_lots').select('id')
+                    .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).lt('weight_grams_remaining', 5),
+                loadMovementsForDay()
+            ]);
+
+            if (fiscalResult && fiscalResult.length > 0) {
+                document.getElementById('fiscalYearBannerText').textContent =
+                    fiscalResult.length === 1
+                        ? 'سنة ' + fiscalResult[0] + ' المالية لسا مو مقفولة — اضغط لإغلاقها'
+                        : fiscalResult.length + ' سنوات مالية لسا مو مقفولة — اضغط للمراجعة';
+                const banner = document.getElementById('fiscalYearBanner');
+                banner.classList.remove('hidden');
+                banner.classList.add('flex');
             }
 
-            // Daily cashbox balance (all-time running total from the manual
-            // drawer journal) — base currency only in the headline number,
-            // same logic as daily-cashbox-ar.html's "الرصيد الحالي" card.
-            // Other currencies (if the owner ever logged any) are NOT
-            // silently dropped — they're listed in a small line underneath
-            // so nothing goes unnoticed.
-            const baseCurrency = (store && store.currency) || 'AED';
-            const { data: cashboxEntries } = await goldmindClient
-                .from('daily_cash_log').select('direction, amount, currency')
-                .eq('store_id', GOLDMIND_STORE_ID);
             const cashboxTotalsByCurrency = {};
             (cashboxEntries || []).forEach(e => {
                 const cur = e.currency || baseCurrency;
@@ -531,14 +564,6 @@
                 otherCurrenciesEl.classList.remove('hidden');
             }
 
-            // Today's sales + invoice count (real invoice type is 'sale', not
-            // 'sell' — fixing a real bug that made this card always read 0.00)
-            const todayStart = new Date();
-            todayStart.setHours(0, 0, 0, 0);
-            const { data: todayInvoices } = await goldmindClient
-                .from('invoices').select('total_amount')
-                .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
-                .gte('created_at', todayStart.toISOString());
             const todaySales = (todayInvoices || []).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
             document.getElementById('todaySalesEl').textContent = gmFormatDualCurrency(todaySales, store);
             document.getElementById('todayInvoiceCountEl').textContent = (todayInvoices || []).length;
@@ -570,17 +595,10 @@
                 });
             }
 
-            // Real alerts — replaces the old dead "التنبيهات" button
             const alerts = [];
-            const { count: unpaidCount } = await goldmindClient
-                .from('invoices').select('id', { count: 'exact', head: true })
-                .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'unpaid');
             if (unpaidCount > 0) {
                 alerts.push({ href: 'invoices-list-ar.html', icon: 'receipt_long', text: unpaidCount + ' فاتورة غير مدفوعة' });
             }
-            const { data: lowLots } = await goldmindClient
-                .from('gold_stock_lots').select('id')
-                .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).lt('weight_grams_remaining', 5);
             if (lowLots && lowLots.length > 0) {
                 alerts.push({ href: 'stock-production-ar.html', icon: 'inventory_2', text: lowLots.length + ' دفعة رصيد بالجملة أوشكت على النفاد' });
             }
@@ -595,8 +613,6 @@
                         <span class="material-symbols-outlined text-[18px]">chevron_left</span>
                     </a>`).join('');
             }
-
-            await loadMovementsForDay();
           } catch (err) {
             console.error('loadDashboard failed:', err);
             ['storeNameEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl'].forEach(function (id) {
