@@ -133,6 +133,12 @@
 <div class="fixed inset-0 bg-black/40 z-[100] hidden items-center justify-center p-4" id="addStoreModal">
 <div class="bg-surface-container-lowest rounded-xl p-5 w-full max-w-md">
 <h3 class="font-bold text-lg mb-1">إضافة شركة جديدة</h3>
+<div class="flex bg-surface-container-high rounded-lg p-1 mb-4">
+<button onclick="setAddStoreMode('email')" id="addStoreTabEmail" class="flex-1 h-9 rounded-md text-[12.5px] font-semibold">دعوة بالإيميل</button>
+<button onclick="setAddStoreMode('direct')" id="addStoreTabDirect" class="flex-1 h-9 rounded-md text-[12.5px] font-semibold">إنشاء مباشر (يوزر وباسورد)</button>
+</div>
+
+<div id="addStoreEmailPane">
 <p class="text-[12px] text-on-surface-variant mb-4">تُنشأ الشركة فوراً، ويُرسل دعوة مالك لهذا البريد — يصبح مالكاً تلقائياً عند أول تسجيل دخول له.</p>
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم الشركة</label>
 <input id="newStoreName" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" placeholder="مثال: مجوهرات النور"/>
@@ -144,7 +150,36 @@
 <button onclick="submitAddStore()" id="addStoreSubmitBtn" class="flex-1 h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">إنشاء</button>
 </div>
 </div>
+
+<div id="addStoreDirectPane" class="hidden">
+<p class="text-[12px] text-on-surface-variant mb-4">تُنشأ الشركة والمالك فوراً بدون أي إيميل حقيقي — بيوزرنيم وباسورد جاهزين تسلّمهم للعميل مباشرة (واتساب، أو شفهياً).</p>
+<div id="directFormFields">
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم الشركة</label>
+<input id="directStoreName" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" placeholder="مثال: مجوهرات النور"/>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم المالك الكامل</label>
+<input id="directOwnerName" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" placeholder="مثال: أحمد الخياط"/>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم المستخدم (username)</label>
+<input id="directUsername" dir="ltr" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-1" placeholder="مثال: nour-jewelry (حروف/أرقام إنجليزي فقط)"/>
+<p class="text-[10.5px] text-on-surface-variant mb-3">3-30 حرف/رقم إنجليزي، بدون مسافات (يسمح بـ . و _)</p>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">كلمة السر (اختياري — اتركه فارغاً ليتم توليدها تلقائياً)</label>
+<input id="directPassword" dir="ltr" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-1" placeholder="اتركه فارغاً للتوليد التلقائي"/>
+<p class="text-error text-[12px] hidden mb-2 mt-2" id="addStoreDirectError"></p>
+<div class="flex gap-2 mt-4">
+<button onclick="closeAddStoreModal()" class="flex-1 h-11 border border-outline-variant rounded-lg text-sm font-semibold">إلغاء</button>
+<button onclick="submitAddStoreDirect()" id="addStoreDirectSubmitBtn" class="flex-1 h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">إنشاء</button>
 </div>
+</div>
+<div id="directSuccessBox" class="hidden">
+<div class="bg-success-container text-success rounded-lg p-4 mb-4 text-[13px]">
+<p class="font-semibold mb-2">تم إنشاء الشركة والحساب بنجاح ✓</p>
+<p class="mb-1">اسم المستخدم: <span dir="ltr" class="font-bold font-mono" id="directResultUsername"></span></p>
+<p>كلمة السر: <span dir="ltr" class="font-bold font-mono" id="directResultPassword"></span></p>
+</div>
+<p class="text-[11.5px] text-on-surface-variant mb-4">سلّم هذه البيانات للعميل — يدخل من صفحة الدخول باستخدام تبويب "دخول سريع" باسم المستخدم وكلمة السر هذه.</p>
+<button onclick="closeAddStoreModal()" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">تم</button>
+</div>
+</div>
+</div></div>
 
 <!-- Company details modal -->
 <div class="fixed inset-0 bg-black/40 z-[100] hidden items-center justify-center p-4" id="storeDetailModal">
@@ -279,15 +314,78 @@ function openAddStoreModal() {
   document.getElementById('newStoreName').value = '';
   document.getElementById('newStoreOwnerEmail').value = '';
   document.getElementById('addStoreError').classList.add('hidden');
+  document.getElementById('directStoreName').value = '';
+  document.getElementById('directOwnerName').value = '';
+  document.getElementById('directUsername').value = '';
+  document.getElementById('directPassword').value = '';
+  document.getElementById('addStoreDirectError').classList.add('hidden');
+  document.getElementById('directFormFields').classList.remove('hidden');
+  document.getElementById('directSuccessBox').classList.add('hidden');
+  setAddStoreMode('email');
   const modal = document.getElementById('addStoreModal');
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+}
+
+function setAddStoreMode(mode) {
+  const isEmail = mode === 'email';
+  document.getElementById('addStoreEmailPane').classList.toggle('hidden', !isEmail);
+  document.getElementById('addStoreDirectPane').classList.toggle('hidden', isEmail);
+  document.getElementById('addStoreTabEmail').classList.toggle('bg-surface-container-lowest', isEmail);
+  document.getElementById('addStoreTabEmail').classList.toggle('shadow-sm', isEmail);
+  document.getElementById('addStoreTabDirect').classList.toggle('bg-surface-container-lowest', !isEmail);
+  document.getElementById('addStoreTabDirect').classList.toggle('shadow-sm', !isEmail);
 }
 
 function closeAddStoreModal() {
   const modal = document.getElementById('addStoreModal');
   modal.classList.add('hidden');
   modal.classList.remove('flex');
+}
+
+async function submitAddStoreDirect() {
+  const company_name = document.getElementById('directStoreName').value.trim();
+  const owner_full_name = document.getElementById('directOwnerName').value.trim();
+  const username = document.getElementById('directUsername').value.trim();
+  const password = document.getElementById('directPassword').value.trim();
+  const errEl = document.getElementById('addStoreDirectError');
+  errEl.classList.add('hidden');
+
+  if (!company_name) { errEl.textContent = 'فضلاً أدخل اسم الشركة'; errEl.classList.remove('hidden'); return; }
+  if (!owner_full_name) { errEl.textContent = 'فضلاً أدخل اسم المالك'; errEl.classList.remove('hidden'); return; }
+  if (!/^[a-zA-Z0-9_.]{3,30}$/.test(username)) {
+    errEl.textContent = 'اسم المستخدم يجب أن يكون 3-30 حرف/رقم إنجليزي بدون مسافات'; errEl.classList.remove('hidden'); return;
+  }
+
+  const btn = document.getElementById('addStoreDirectSubmitBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الإنشاء...';
+
+  const { data, error } = await goldmindClient.functions.invoke('create-store-direct', {
+    body: { company_name, owner_full_name, username, password: password || undefined }
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'إنشاء';
+
+  if (error || (data && data.error)) {
+    let detail = (data && data.error) || error.message;
+    if (error && error.context && typeof error.context.json === 'function') {
+      try {
+        const body = await error.context.json();
+        if (body && body.error) detail = body.error;
+      } catch (_) { /* response wasn't JSON */ }
+    }
+    errEl.textContent = 'تعذّر الإنشاء: ' + detail;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('directResultUsername').textContent = data.username;
+  document.getElementById('directResultPassword').textContent = data.password;
+  document.getElementById('directFormFields').classList.add('hidden');
+  document.getElementById('directSuccessBox').classList.remove('hidden');
+  loadStores();
 }
 
 async function submitAddStore() {
