@@ -47,6 +47,15 @@ jobs:
             cp app/www/login-entry-ar.html app/www/index.html
           fi
 
+      # Stamp this build with the commit it was built from. The app itself
+      # (running from theme.js, see the in-app update check there) reads
+      # this file and compares it against the latest commit on GitHub to
+      # know whether a newer APK is available — since installing this app
+      # from a sideloaded APK never auto-updates on its own the way the
+      # website (GitHub Pages / PWA) does.
+      - name: Stamp build version into the app
+        run: echo "{\"sha\": \"${{ github.sha }}\", \"built_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}" > app/www/build-info.json
+
       # The live site loads Tailwind's Play CDN, which recompiles CSS from
       # scratch in-browser on every single page load — real, measurable
       # overhead on a phone. For the packaged app we precompile one static
