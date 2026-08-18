@@ -5,6 +5,19 @@ on:
     branches: [main]
   workflow_dispatch: {}
 
+# Multiple pushes landing close together (e.g. several files updated in a
+# row) used to trigger several of these builds running fully in parallel.
+# With no ordering guarantee, a slower build for an OLDER commit could
+# finish after a faster build for a NEWER commit and overwrite the
+# "app-latest" release with a stale APK — which is exactly what made the
+# in-app update banner (theme.js) loop: the freshly-downloaded APK's own
+# baked-in commit was actually behind main's real HEAD. This ensures only
+# one build for this branch runs at a time, and a new push cancels
+# whatever older build is still in flight instead of racing it.
+concurrency:
+  group: build-apk-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: ubuntu-latest
