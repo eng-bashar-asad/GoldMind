@@ -45,6 +45,7 @@
 <span class="material-symbols-outlined">download</span> تحميل PDF
 </button>
 </div>
+<p id="nativePdfHint" class="no-print hidden text-[11px] text-on-surface-variant text-center py-2 px-4 bg-surface-container-low">لحفظ الملف كـ PDF: اختر "حفظ كـ PDF" من قائمة الطابعات بنافذة الطباعة.</p>
 
 <div id="loading" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
@@ -214,6 +215,10 @@ async function load() {
 
 load();
 
+if (window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform()) {
+  document.getElementById('nativePdfHint').classList.remove('hidden');
+}
+
 // ---- Download an official PDF copy (client-side html2pdf.js) ----
 // Captures the real, visible #sheet element directly — no off-screen clone.
 // (An earlier version cloned the sheet into a detached wrapper positioned
@@ -233,10 +238,6 @@ async function downloadCashboxPdf() {
   // that instead whenever running inside the native app.
   const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
   if (isNativeApp) {
-    if (!sessionStorage.getItem('gm_pdf_print_hint_shown')) {
-      sessionStorage.setItem('gm_pdf_print_hint_shown', '1');
-      alert('لحفظ الملف كـ PDF: اختر "حفظ كـ PDF" من قائمة الطابعات بنافذة الطباعة التالية.');
-    }
     window.print();
     return;
   }
