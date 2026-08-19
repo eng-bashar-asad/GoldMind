@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الجرد بـ RFID | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=13"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "error-container": "#ffdad6", "on-error-container": "#93000a"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { min-height: max(884px, 100dvh); }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="font-bold" style="direction:ltr;font-size:28px;">&#8594;</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">الجرد بـ RFID</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">لا تملك صلاحية إجراء الجرد.</div>
+<div id="disabled-state" class="hidden py-16 text-center text-on-surface-variant text-sm px-6">
+ميزة RFID غير مفعّلة لهذا المحل. يمكن تفعيلها من إعدادات المحل.
+</div>
+
+<!-- Start screen -->
+<div id="start-wrap" class="hidden py-6 flex flex-col gap-5">
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4">
+<p class="text-[13px] text-on-surface-variant leading-relaxed">
+تبدأ جلسة جرد جديدة، تمسح كل القطع المتوفرة برقاقة RFID واحدة تلو الأخرى (يعمل الماسح كلوحة مفاتيح — وجّه المؤشر لحقل المسح وامسح)، ثم تنهي الجلسة لعرض تقرير الفرق: قطع ناقصة وقطع غير متوقعة.
+</p>
+</div>
+<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 flex items-center justify-between">
+<span class="text-[13px] font-semibold text-on-surface-variant">القطع المتوفرة بالمخزون حالياً</span>
+<span id="expected-count" class="text-lg font-bold">—</span>
+</div>
+<button id="start-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all">بدء جلسة جرد جديدة</button>
+
+<div id="past-sessions-wrap" class="mt-4">
+<h3 class="text-[12px] font-bold text-on-surface-variant mb-2">جلسات سابقة</h3>
+<div id="past-sessions-list" class="flex flex-col gap-2"></div>
+</div>
+</div>
+
+<!-- Live scan screen -->
+<div id="scan-wrap" class="hidden py-6 flex flex-col gap-4">
+<div class="grid grid-cols-4 gap-2">
+<div class="bg-surface-container-low rounded-lg p-2 text-center">
+<div id="stat-expected" class="text-lg font-bold">0</div>
+<div class="text-[10px] text-on-surface-variant">متوقعة</div>
+</div>
+<div class="bg-surface-container-low rounded-lg p-2 text-center">
+<div id="stat-scanned" class="text-lg font-bold text-primary">0</div>
+<div class="text-[10px] text-on-surface-variant">مُمسوحة</div>
+</div>
+<div class="bg-green-50 rounded-lg p-2 text-center">
+<div id="stat-matched" class="text-lg font-bold text-green-700">0</div>
+<div class="text-[10px] text-green-700">مطابقة</div>
+</div>
+<div class="bg-red-50 rounded-lg p-2 text-center">
+<div id="stat-unexpected" class="text-lg font-bold text-red-700">0</div>
+<div class="text-[10px] text-red-700">غير متوقعة</div>
+</div>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="scan-input">حقل المسح — وجّه القارئ هون وامسح</label>
+<input autocomplete="off" autofocus class="w-full h-16 border-2 border-primary rounded-lg px-4 focus:ring-2 focus:ring-primary outline-none text-center font-data-mono text-lg tracking-widest" dir="ltr" id="scan-input" placeholder="بانتظار المسح..." type="text"/>
+</div>
+
+<div id="last-scan-box" class="hidden text-center text-sm font-semibold py-3 rounded-lg"></div>
+
+<div class="flex flex-col gap-1 max-h-64 overflow-y-auto" id="scan-log"></div>
+
+<button id="finish-btn" class="w-full h-14 border-2 border-primary text-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2">إنهاء الجلسة وعرض التقرير</button>
+</div>
+
+<!-- Report screen -->
+<div id="report-wrap" class="hidden py-6 flex flex-col gap-5">
+<div class="grid grid-cols-3 gap-2">
+<div class="bg-surface-container-low rounded-lg p-3 text-center">
+<div id="report-expected" class="text-xl font-bold">0</div>
+<div class="text-[10px] text-on-surface-variant">متوقعة</div>
+</div>
+<div class="bg-green-50 rounded-lg p-3 text-center">
+<div id="report-matched" class="text-xl font-bold text-green-700">0</div>
+<div class="text-[10px] text-green-700">مطابقة</div>
+</div>
+<div class="bg-red-50 rounded-lg p-3 text-center">
+<div id="report-missing" class="text-xl font-bold text-red-700">0</div>
+<div class="text-[10px] text-red-700">ناقصة</div>
+</div>
+</div>
+
+<div id="missing-section">
+<h3 class="text-[12px] font-bold text-error mb-2">قطع ناقصة (لم تُمسح)</h3>
+<div id="missing-list" class="flex flex-col gap-1"></div>
+</div>
+
+<div id="unexpected-section">
+<h3 class="text-[12px] font-bold text-red-700 mb-2 mt-2">مسوحات غير متوقعة</h3>
+<div id="unexpected-list" class="flex flex-col gap-1"></div>
+</div>
+
+<button id="new-session-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2">جلسة جرد جديدة</button>
+</div>
+
+</main>
+
+<script>
+let canRun = false;
+let expectedPieces = []; // [{id, barcode, rfid_epc, description}]
+let expectedByEpc = {};
+let currentCountId = null;
+let scannedEpcs = new Set();
+let stats = { expected: 0, scanned: 0, matched: 0, unexpected: 0 };
+
+function showEl(id) { document.getElementById(id).classList.remove('hidden'); }
+function hideEl(id) { document.getElementById(id).classList.add('hidden'); }
+
+async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: store } = await goldmindClient.from('stores').select('rfid_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  if (!store || !store.rfid_enabled) {
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('disabled-state').classList.remove('hidden');
+    return;
+  }
+
+  const { data: me } = await goldmindClient
+    .from('staff').select('role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).single();
+  canRun = me && (me.role === 'owner' || (me.permissions && me.permissions.run_inventory_count === true));
+
+  document.getElementById('loading-state').classList.add('hidden');
+
+  if (!canRun) {
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+
+  await loadExpectedPieces();
+  await loadPastSessions();
+  document.getElementById('start-wrap').classList.remove('hidden');
+}
+
+async function loadExpectedPieces() {
+  const { data } = await goldmindClient
+    .from('pieces')
+    .select('id, barcode, rfid_epc, description_ar, description_en, karat, weight_grams')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .eq('status', 'available')
+    .not('rfid_epc', 'is', null);
+
+  expectedPieces = data || [];
+  expectedByEpc = {};
+  expectedPieces.forEach(p => { expectedByEpc[p.rfid_epc] = p; });
+  document.getElementById('expected-count').textContent = expectedPieces.length;
+}
+
+async function loadPastSessions() {
+  const { data } = await goldmindClient
+    .from('inventory_counts')
+    .select('id, status, started_at, completed_at, expected_piece_count, matched_count, missing_count, unexpected_count')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('started_at', { ascending: false })
+    .limit(5);
+
+  const list = document.getElementById('past-sessions-list');
+  list.innerHTML = '';
+  (data || []).forEach(s => {
+    const row = document.createElement('div');
+    row.className = 'bg-surface-container-low rounded-lg p-3 flex items-center justify-between text-[12px]';
+    const dateStr = new Date(s.started_at).toLocaleDateString('ar-AE', { day: 'numeric', month: 'short', year: 'numeric' });
+    const statusLabel = s.status === 'completed' ? 'مكتملة' : 'غير مكتملة';
+    row.innerHTML = `<span class="font-semibold">${dateStr}</span>
+      <span class="text-on-surface-variant">${statusLabel}</span>
+      <span>${s.matched_count || 0}/${s.expected_piece_count || 0} مطابقة</span>`;
+    list.appendChild(row);
+  });
+}
+
+document.getElementById('start-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('start-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ البدء...';
+
+  const { data: countRow, error } = await goldmindClient.from('inventory_counts').insert({
+    store_id: GOLDMIND_STORE_ID,
+    status: 'in_progress',
+    started_by: GOLDMIND_STAFF_ID,
+    expected_piece_count: expectedPieces.length,
+    scanned_piece_count: 0,
+    matched_count: 0,
+    missing_count: 0,
+    unexpected_count: 0
+  }).select().single();
+
+  btn.disabled = false;
+  btn.textContent = 'بدء جلسة جرد جديدة';
+
+  if (error || !countRow) {
+    alert('تعذّر بدء جلسة الجرد: ' + (error ? error.message : ''));
+    return;
+  }
+
+  currentCountId = countRow.id;
+  scannedEpcs = new Set();
+  stats = { expected: expectedPieces.length, scanned: 0, matched: 0, unexpected: 0 };
+  updateStatsUI();
+
+  document.getElementById('start-wrap').classList.add('hidden');
+  document.getElementById('scan-wrap').classList.remove('hidden');
+  document.getElementById('scan-input').focus();
+});
+
+function updateStatsUI() {
+  document.getElementById('stat-expected').textContent = stats.expected;
+  document.getElementById('stat-scanned').textContent = stats.scanned;
+  document.getElementById('stat-matched').textContent = stats.matched;
+  document.getElementById('stat-unexpected').textContent = stats.unexpected;
+}
+
+function addLogRow(text, kind) {
+  const log = document.getElementById('scan-log');
+  const row = document.createElement('div');
+  const colorClass = kind === 'matched' ? 'bg-green-50 text-green-700' :
+                      kind === 'duplicate' ? 'bg-amber-50 text-amber-700' :
+                      'bg-red-50 text-red-700';
+  row.className = 'text-[12px] font-semibold px-3 py-2 rounded-lg ' + colorClass;
+  row.textContent = text;
+  log.insertBefore(row, log.firstChild);
+}
+
+function showLastScan(text, kind) {
+  const box = document.getElementById('last-scan-box');
+  box.classList.remove('hidden', 'bg-green-100', 'text-green-700', 'bg-amber-100', 'text-amber-700', 'bg-red-100', 'text-red-700');
+  const map = { matched: ['bg-green-100', 'text-green-700'], duplicate: ['bg-amber-100', 'text-amber-700'], unexpected: ['bg-red-100', 'text-red-700'] };
+  const cls = map[kind] || map.unexpected;
+  box.classList.add(cls[0], cls[1]);
+  box.textContent = text;
+}
+
+const scanInput = document.getElementById('scan-input');
+scanInput.addEventListener('keydown', async (e) => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const epc = scanInput.value.trim();
+  scanInput.value = '';
+  if (!epc || !currentCountId) return;
+  await handleScan(epc);
+});
+
+// Most keyboard-wedge scanners fire Enter after the payload, but some
+// (especially Bluetooth HID readers) don't — fall back to a short idle
+// timer so a scan still registers even without a terminating key.
+let scanIdleTimer = null;
+scanInput.addEventListener('input', () => {
+  if (scanIdleTimer) clearTimeout(scanIdleTimer);
+  scanIdleTimer = setTimeout(async () => {
+    const epc = scanInput.value.trim();
+    if (!epc || !currentCountId) return;
+    scanInput.value = '';
+    await handleScan(epc);
+  }, 400);
+});
+
+async function handleScan(epc) {
+  scanInput.focus();
+
+  if (scannedEpcs.has(epc)) {
+    showLastScan('تم مسح هذه القطعة مسبقاً بهذه الجلسة.', 'duplicate');
+    addLogRow('مكرر: ' + epc, 'duplicate');
+    return;
+  }
+  scannedEpcs.add(epc);
+
+  const piece = expectedByEpc[epc];
+  const matchStatus = piece ? 'matched' : 'unexpected';
+
+  stats.scanned++;
+  if (piece) stats.matched++; else stats.unexpected++;
+  updateStatsUI();
+
+  const label = piece ? (piece.barcode || piece.description_ar || epc) : epc;
+  if (piece) {
+    showLastScan('✓ مطابقة: ' + label, 'matched');
+    addLogRow('✓ ' + label, 'matched');
+    if (piece.rfid_last_seen_at !== undefined) {
+      goldmindClient.from('pieces').update({ rfid_last_seen_at: new Date().toISOString() }).eq('id', piece.id).then(() => {});
+    }
+  } else {
+    showLastScan('⚠ رقاقة غير متوقعة: ' + epc, 'unexpected');
+    addLogRow('⚠ غير متوقعة: ' + epc, 'unexpected');
+  }
+
+  await goldmindClient.from('inventory_count_scans').insert({
+    store_id: GOLDMIND_STORE_ID,
+    count_id: currentCountId,
+    rfid_epc: epc,
+    piece_id: piece ? piece.id : null,
+    match_status: matchStatus,
+    scanned_by: GOLDMIND_STAFF_ID
+  });
+}
+
+document.getElementById('finish-btn').addEventListener('click', async () => {
+  if (!currentCountId) return;
+  if (!confirm('هل تريد إنهاء جلسة الجرد وعرض تقرير الفرق؟')) return;
+
+  const btn = document.getElementById('finish-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الإنهاء...';
+
+  const missingPieces = expectedPieces.filter(p => !scannedEpcs.has(p.rfid_epc));
+  const missingCount = missingPieces.length;
+
+  await goldmindClient.from('inventory_counts').update({
+    status: 'completed',
+    completed_at: new Date().toISOString(),
+    scanned_piece_count: stats.scanned,
+    matched_count: stats.matched,
+    missing_count: missingCount,
+    unexpected_count: stats.unexpected
+  }).eq('id', currentCountId);
+
+  btn.disabled = false;
+  btn.textContent = 'إنهاء الجلسة وعرض التقرير';
+
+  document.getElementById('report-expected').textContent = stats.expected;
+  document.getElementById('report-matched').textContent = stats.matched;
+  document.getElementById('report-missing').textContent = missingCount;
+
+  const missingList = document.getElementById('missing-list');
+  missingList.innerHTML = '';
+  if (missingPieces.length === 0) {
+    missingList.innerHTML = '<div class="text-[12px] text-on-surface-variant py-2 text-center">لا توجد قطع ناقصة — كل شي مطابق 🎉</div>';
+  }
+  missingPieces.forEach(p => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between bg-red-50 rounded-lg px-3 py-2 text-[12px]';
+    row.innerHTML = `<span class="font-semibold text-red-700">${p.barcode || p.description_ar || p.id.slice(0,8)}</span>
+      <span class="text-on-surface-variant">${p.weight_grams || 0}g عيار ${p.karat || ''}</span>`;
+    missingList.appendChild(row);
+  });
+
+  const unexpectedEpcs = Array.from(scannedEpcs).filter(epc => !expectedByEpc[epc]);
+  const unexpectedList = document.getElementById('unexpected-list');
+  unexpectedList.innerHTML = '';
+  if (unexpectedEpcs.length === 0) {
+    unexpectedList.innerHTML = '<div class="text-[12px] text-on-surface-variant py-2 text-center">لا توجد مسوحات غير متوقعة</div>';
+  }
+  unexpectedEpcs.forEach(epc => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between bg-red-50 rounded-lg px-3 py-2 text-[12px] font-data-mono';
+    row.textContent = epc;
+    unexpectedList.appendChild(row);
+  });
+
+  document.getElementById('scan-wrap').classList.add('hidden');
+  document.getElementById('report-wrap').classList.remove('hidden');
+});
+
+document.getElementById('new-session-btn').addEventListener('click', async () => {
+  currentCountId = null;
+  scannedEpcs = new Set();
+  document.getElementById('scan-log').innerHTML = '';
+  document.getElementById('last-scan-box').classList.add('hidden');
+  document.getElementById('report-wrap').classList.add('hidden');
+  await loadExpectedPieces();
+  await loadPastSessions();
+  document.getElementById('start-wrap').classList.remove('hidden');
+});
+
+init();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
