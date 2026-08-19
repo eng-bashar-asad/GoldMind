@@ -43,7 +43,7 @@
 <div class="flex justify-between items-center px-4 w-full h-16">
 <div class="flex items-center gap-4">
 <button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
-<span class="font-bold" style="direction:ltr;">&#8594;</span>
+<span class="font-bold" style="direction:ltr;font-size:28px;">&#8594;</span>
 </button>
 <h1 class="font-headline-md text-headline-md font-bold">الحركة اليومية</h1>
 </div>
@@ -377,7 +377,7 @@ function renderAll() {
     // Single currency: keep the spacious card, plenty of room either way.
     balancesEl.innerHTML = currencyBalances.map(({ cur, opening, todayNet, closing }) => `
         <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-          <div class="text-[11px] font-bold text-secondary mb-2">${cur}</div>
+          <div class="text-[11px] font-bold ${cur === 'AED' ? 'text-secondary' : 'text-success'} mb-2">${cur}</div>
           <div class="grid grid-cols-3 gap-2 text-center">
             <div><p class="text-[10px] text-on-surface-variant">افتتاحي اليوم</p><p class="font-bold text-[14px] font-data-mono">${fmt(opening)}</p></div>
             <div><p class="text-[10px] text-on-surface-variant">صافي اليوم</p><p class="font-bold text-[14px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</p></div>
@@ -391,7 +391,7 @@ function renderAll() {
     // no matter how many currencies are active at once.
     const rows = currencyBalances.map(({ cur, opening, todayNet, closing }) => `
         <div class="flex items-center gap-2 py-2 px-1 border-b border-outline-variant last:border-b-0">
-          <div class="text-[10px] font-bold text-secondary w-12 shrink-0">${cur}</div>
+          <div class="text-[10px] font-bold ${cur === 'AED' ? 'text-secondary' : 'text-success'} w-12 shrink-0">${cur}</div>
           <div class="grid grid-cols-3 gap-1 flex-1 text-center">
             <div class="flex flex-col leading-tight"><span class="text-[9px] text-on-surface-variant">افتتاحي</span><span class="font-bold text-[12px] font-data-mono">${fmt(opening)}</span></div>
             <div class="flex flex-col leading-tight"><span class="text-[9px] text-on-surface-variant">صافي اليوم</span><span class="font-bold text-[12px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</span></div>
