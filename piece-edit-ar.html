@@ -141,6 +141,10 @@
 
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
+<button id="print-label-btn" onclick="openLabelPrint()" type="button" class="w-full h-14 border border-secondary text-secondary rounded-lg font-bold active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">print</span> طباعة ملصق القطعة
+</button>
+
 <button id="save-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all">حفظ التعديلات</button>
 <button id="delete-btn" class="hidden w-full h-14 border-2 border-error text-error rounded-lg font-bold active:scale-[0.98] transition-all">حذف القطعة</button>
 
@@ -281,6 +285,11 @@ function showMessage(text, isError) {
   box.textContent = text;
   box.classList.remove('hidden', 'bg-error-container', 'text-on-error-container', 'bg-green-100', 'text-green-700');
   box.classList.add(isError ? 'bg-error-container' : 'bg-green-100', isError ? 'text-on-error-container' : 'text-green-700');
+}
+
+function openLabelPrint() {
+  if (!pieceId) return;
+  window.location.href = 'piece-label-print-ar.html?id=' + encodeURIComponent(pieceId);
 }
 
 async function load() {
