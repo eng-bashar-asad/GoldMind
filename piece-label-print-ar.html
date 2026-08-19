@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>ملصق قطعة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="supabase-config.js"></script>
+<script src="zebra-rfid.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; }
+        #label { box-shadow: none !important; border: 1px dashed #999 !important; margin: 0 auto !important; }
+    }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+
+<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 h-14">
+<button onclick="window.location.href='inventory-list-ar.html'" class="flex items-center gap-2 text-gray-700">
+<span class="font-bold" style="direction:ltr;font-size:28px;">&#8594;</span>
+<span class="text-sm font-semibold">المخزن</span>
+</button>
+<div class="flex items-center gap-2">
+<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">print</span> طباعة
+</button>
+<button id="rfid-btn" class="hidden flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">wifi_tethering</span> طباعة + برمجة RFID
+</button>
+</div>
+</div>
+
+<div id="rfid-status" class="no-print hidden max-w-xs mx-auto mt-3 text-center text-xs font-semibold px-3 py-2 rounded-lg"></div>
+
+<div id="loading" class="py-16 text-center text-gray-500 text-sm">جارِ التحميل...</div>
+<div id="error-box" class="hidden py-10 px-6 text-center text-red-700 bg-red-100 max-w-sm mx-auto mt-6 rounded-lg"></div>
+
+<div id="label" class="hidden max-w-xs mx-auto my-8 bg-white shadow rounded-lg border border-gray-200 p-4 text-center">
+<div id="storeName" class="text-sm font-bold mb-1"></div>
+<div id="description" class="text-xs text-gray-600 mb-2 truncate"></div>
+<div id="specs" class="text-[11px] text-gray-500 mb-3"></div>
+<svg id="barcodeSvg" class="w-full"></svg>
+<div id="rfidBadge" class="hidden mt-2 text-[10px] font-semibold text-amber-700 flex items-center justify-center gap-1">
+<span class="material-symbols-outlined" style="font-size:13px;">sensors</span>
+<span>محمّلة RFID</span>
+</div>
+</div>
+
+<script>
+    function getParam(name) {
+        return new URLSearchParams(window.location.search).get(name);
+    }
+
+    let currentPiece = null;
+    let currentStore = null;
+
+    async function loadLabel() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const pieceId = getParam('id');
+        const loading = document.getElementById('loading');
+        const errorBox = document.getElementById('error-box');
+        const label = document.getElementById('label');
+
+        if (!pieceId) {
+            loading.classList.add('hidden');
+            errorBox.textContent = 'لم يتم تحديد القطعة.';
+            errorBox.classList.remove('hidden');
+            return;
+        }
+
+        const [{ data: piece, error: pieceError }, { data: store }] = await Promise.all([
+            goldmindClient.from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('stores').select('name, rfid_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+        ]);
+
+        loading.classList.add('hidden');
+
+        if (pieceError || !piece) {
+            errorBox.textContent = 'تعذر إيجاد هذه القطعة.';
+            errorBox.classList.remove('hidden');
+            return;
+        }
+
+        currentPiece = piece;
+        currentStore = store;
+
+        document.getElementById('storeName').textContent = (store && store.name) ? store.name : 'GoldMind';
+        document.getElementById('description').textContent = piece.description_ar || piece.description_en || (piece.piece_type || '');
+
+        const specParts = [(piece.weight_grams || 0) + ' غ', 'عيار ' + (piece.karat || '')];
+        document.getElementById('specs').textContent = specParts.join(' · ');
+
+        const barcodeValue = piece.barcode || pieceId.slice(0, 12).toUpperCase();
+        try {
+            JsBarcode('#barcodeSvg', barcodeValue, {
+                format: 'CODE128', width: 2, height: 46, displayValue: true,
+                fontSize: 13, margin: 4, font: 'IBM Plex Sans'
+            });
+        } catch (e) {
+            document.getElementById('barcodeSvg').outerHTML = '<div class="text-xs text-red-600">تعذّر توليد الباركود</div>';
+        }
+
+        if (piece.rfid_epc) {
+            document.getElementById('rfidBadge').classList.remove('hidden');
+        }
+
+        if (store && store.rfid_enabled) {
+            document.getElementById('rfid-btn').classList.remove('hidden');
+            document.getElementById('rfid-btn').classList.add('flex');
+        }
+
+        label.classList.remove('hidden');
+    }
+
+    function showRfidStatus(text, isError) {
+        const box = document.getElementById('rfid-status');
+        box.textContent = text;
+        box.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+        box.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
+    }
+
+    document.getElementById('rfid-btn').addEventListener('click', async function () {
+        if (!currentPiece) return;
+        const btn = this;
+
+        if (!GMZebra.isAvailable()) {
+            showRfidStatus('Zebra Browser Print غير متاح على هذا الجهاز — يجب تثبيت تطبيق Zebra Browser Print أولاً.', true);
+            return;
+        }
+
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> جارِ الطباعة...';
+
+        try {
+            const barcodeValue = currentPiece.barcode || currentPiece.id.slice(0, 12).toUpperCase();
+            const epcSource = GMZebra.buildEpcSource(barcodeValue, GOLDMIND_STORE_ID.slice(0, 8));
+            const epcHex = GMZebra.asciiToHex(epcSource);
+
+            await GMZebra.printAndEncodeRfid({
+                storeName: (currentStore && currentStore.name) || 'GoldMind',
+                line1: currentPiece.description_ar || currentPiece.piece_type || '',
+                line2: (currentPiece.weight_grams || 0) + 'g  ' + (currentPiece.karat || '') + 'K',
+                barcode: barcodeValue,
+                epcHex: epcHex
+            });
+
+            const { error: updateError } = await goldmindClient.from('pieces').update({
+                rfid_epc: epcHex,
+                rfid_encoded_at: new Date().toISOString()
+            }).eq('id', currentPiece.id);
+
+            if (updateError) {
+                showRfidStatus('طُبعت الملصقة لكن تعذّر تحديث سجل القطعة: ' + updateError.message, true);
+            } else {
+                showRfidStatus('تم طباعة الملصقة وبرمجة الرقاقة بنجاح.', false);
+                document.getElementById('rfidBadge').classList.remove('hidden');
+            }
+        } catch (err) {
+            showRfidStatus(err.message || 'فشل غير متوقع أثناء الطباعة.', true);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    });
+
+    loadLabel();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
