@@ -436,13 +436,13 @@ function renderAll() {
     members,
     latest: Math.max(...members.map(e => new Date(e.created_at).getTime()))
   }));
-  clusters.sort((a, b) => b.latest - a.latest); // most recently active cluster first
+  clusters.sort((a, b) => a.latest - b.latest); // oldest cluster first, newest at the bottom
 
   const outEntries = [];
   const inEntries = [];
   clusters.forEach(cluster => {
-    const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
-    const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     outEntries.push(...outMembers);
     inEntries.push(...inMembers);
     // Pad the shorter side up to the same length before the next cluster
