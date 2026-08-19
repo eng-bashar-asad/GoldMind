@@ -276,13 +276,6 @@
 </div>
 <span class="material-symbols-outlined text-outline">chevron_left</span>
 </a>
-<a href="admin-panel-ar.html" class="hidden w-full p-4 flex justify-between items-center text-right active:bg-surface-container-low transition-colors" id="adminPanelLink">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-secondary">admin_panel_settings</span>
-<span class="font-label-md text-label-md text-on-surface">لوحة تحكم المنصة</span>
-</div>
-<span class="material-symbols-outlined text-outline">chevron_left</span>
-</a>
 <button class="w-full p-4 flex justify-between items-center text-right active:bg-surface-container-low transition-colors" id="signOutBtn">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-error">logout</span>
@@ -335,12 +328,10 @@ function fitStoreName(el) {
     }
 }
 
-(async function checkAdmin() {
-    const { data: { session } } = await goldmindClient.auth.getSession();
-    if (!session) return;
-    const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
-    if (isAdmin) document.getElementById('adminPanelLink').classList.remove('hidden');
-})();
+// Platform-admin access is intentionally NOT surfaced anywhere inside a
+// store's own screens (this settings page included) — reaching the admin
+// panel now only happens through the dedicated admin-login-ar.html flow,
+// regardless of which store the same email is currently signed into.
 
 (async function checkCashboxAccess() {
     const session = await requireGoldMindSession('login-entry-ar.html');
