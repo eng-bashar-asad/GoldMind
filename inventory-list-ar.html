@@ -126,8 +126,8 @@
 <header class="bg-surface-container-lowest text-primary docked full-width top-0 border-b border-outline-variant z-50 sticky">
 <div class="flex justify-between items-center px-margin-mobile w-full h-16">
 <div class="flex items-center gap-4">
-<button onclick="window.location.href='index-ar.html'" class="cursor-pointer active:opacity-80 p-2 hover:bg-surface-container-high transition-colors rounded-full flex items-center justify-center">
-<span class="font-bold" style="direction:ltr;font-size:28px;">&#8594;</span>
+<button onclick="window.location.href='index-ar.html'" class="cursor-pointer active:scale-95 transition-all w-10 h-10 rounded-xl flex items-center justify-center" style="background: color-mix(in srgb, var(--gm-secondary) 16%, transparent);">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 22px; color: var(--gm-secondary);">arrow_forward</span>
 </button>
 <h1 class="font-headline-md text-headline-md font-bold text-primary">المخزن</h1>
 </div>
@@ -264,31 +264,40 @@
         const countLabel = document.getElementById('piece-count');
         const weightLabel = document.getElementById('total-weight');
 
-        const { data, error } = await goldmindClient
-            .from('pieces')
-            .select('*')
-            .eq('store_id', GOLDMIND_STORE_ID)
-            .order('created_at', { ascending: false });
+        try {
+            const { data, error } = await goldmindClient
+                .from('pieces')
+                .select('*')
+                .eq('store_id', GOLDMIND_STORE_ID)
+                .order('created_at', { ascending: false });
 
-        loading.classList.add('hidden');
+            loading.classList.add('hidden');
 
-        if (error) {
-            errorBox.textContent = 'حدث خطأ أثناء تحميل المخزون: ' + error.message;
+            if (error) {
+                errorBox.textContent = 'حدث خطأ أثناء تحميل المخزون: ' + error.message;
+                errorBox.classList.remove('hidden');
+                return;
+            }
+
+            if (!data || data.length === 0) {
+                empty.classList.remove('hidden');
+                countLabel.textContent = '0 قطعة';
+                return;
+            }
+
+            const totalWeight = data.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
+            countLabel.textContent = data.length + ' قطعة';
+            weightLabel.textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
+
+            list.innerHTML = data.map(pieceCardHtml).join('');
+        } catch (err) {
+            // A thrown exception (network drop, CORS, etc.) used to leave the
+            // spinner running forever since nothing ever hid #loading-state.
+            // Any failure now always resolves to a visible error instead.
+            loading.classList.add('hidden');
+            errorBox.textContent = 'تعذّر الاتصال بالخادم لتحميل المخزون. تحقق من الاتصال بالإنترنت وأعد المحاولة.';
             errorBox.classList.remove('hidden');
-            return;
         }
-
-        if (!data || data.length === 0) {
-            empty.classList.remove('hidden');
-            countLabel.textContent = '0 قطعة';
-            return;
-        }
-
-        const totalWeight = data.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
-        countLabel.textContent = data.length + ' قطعة';
-        weightLabel.textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-
-        list.innerHTML = data.map(pieceCardHtml).join('');
     }
 
     loadPieces();
