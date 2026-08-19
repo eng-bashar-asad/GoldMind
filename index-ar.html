@@ -259,6 +259,7 @@
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_customers" href="customer-debts-ar.html"><span class="material-symbols-outlined text-xl mb-1">account_balance_wallet</span><span class="text-[14px] font-bold leading-tight text-center">كشف حساب</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" href="ledger-ar.html"><span class="material-symbols-outlined text-xl mb-1">groups</span><span class="text-[14px] font-bold leading-tight text-center">حسابات التجار</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_repairs" href="repairs-ar.html"><span class="material-symbols-outlined text-xl mb-1">build</span><span class="text-[14px] font-bold leading-tight text-center">الصيانة</span></a>
+<a class="quick-action-icon rfid-feature hidden flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="run_inventory_count" href="inventory-count-ar.html"><span class="material-symbols-outlined text-xl mb-1">sensors</span><span class="text-[14px] font-bold leading-tight text-center">الجرد RFID</span></a>
 </div></section>
 <!-- Desktop layout: primary actions hero + grouped sections (hidden on mobile) -->
 <section class="hidden lg:block mb-10">
@@ -300,6 +301,7 @@
 <a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="owner_only_opening_stock" href="opening-stock-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">warehouse</span><span class="text-[13px] font-medium">بضاعة أول المدة</span></a>
 <a class="quick-action-icon diamond-feature hidden items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="add_piece" href="diamond-inventory-add.html"><span class="material-symbols-outlined text-secondary text-[20px]">diamond</span><span class="text-[13px] font-medium">إضافة ألماسة</span></a>
 <a class="quick-action-icon diamond-feature hidden items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="view_inventory" href="diamond-inventory-list-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">diamond</span><span class="text-[13px] font-medium">مخزون الألماس</span></a>
+<a class="quick-action-icon rfid-feature hidden items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="run_inventory_count" href="inventory-count-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">sensors</span><span class="text-[13px] font-medium">الجرد بـ RFID</span></a>
 </div>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-2xl luxury-shadow p-5">
@@ -435,7 +437,7 @@
             // one-at-a-time on every dashboard load.
             const [{ data: store }, { data: staffRow }] = await Promise.all([
                 goldmindClient
-                    .from('stores').select('name, diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
                 goldmindClient
                     .from('staff').select('full_name, role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle()
             ]);
@@ -475,6 +477,22 @@
             } else {
                 for (let i = GOLDMIND_SEARCH_INDEX.length - 1; i >= 0; i--) {
                     if (GOLDMIND_SEARCH_INDEX[i].href.indexOf('diamond') !== -1) GOLDMIND_SEARCH_INDEX.splice(i, 1);
+                }
+            }
+
+            // Same pattern for the RFID inventory-count feature: hidden by
+            // default in the HTML, only revealed for stores that turned it
+            // on in company settings, and only if this staff member also
+            // holds the run_inventory_count permission (data-permission
+            // above already handles that removal pass).
+            if (store && store.rfid_enabled) {
+                document.querySelectorAll('.rfid-feature').forEach(function (el) {
+                    el.classList.remove('hidden');
+                    el.classList.add('flex');
+                });
+            } else {
+                for (let i = GOLDMIND_SEARCH_INDEX.length - 1; i >= 0; i--) {
+                    if (GOLDMIND_SEARCH_INDEX[i].href.indexOf('inventory-count') !== -1) GOLDMIND_SEARCH_INDEX.splice(i, 1);
                 }
             }
 
@@ -767,6 +785,7 @@
         { label: 'المخزن', href: 'inventory-list-ar.html', icon: 'inventory_2', keywords: 'مخزون قطع inventory stock' },
         { label: 'إضافة ألماسة', href: 'diamond-inventory-add.html', icon: 'diamond', keywords: 'ألماس الماسة اضافة diamond add' },
         { label: 'مخزون الألماس', href: 'diamond-inventory-list-ar.html', icon: 'diamond', keywords: 'ألماس مخزون diamond inventory stock' },
+        { label: 'الجرد بـ RFID', href: 'inventory-count-ar.html', icon: 'sensors', keywords: 'جرد rfid رقاقة مسح inventory count scan rfid tag' },
         { label: 'مصروف جديد', href: 'expense-entry-ar.html', icon: 'receipt', keywords: 'مصروف expense' },
         { label: 'إضافة عميل', href: 'customer-add-ar.html', icon: 'person_add', keywords: 'عميل زبون customer add' },
         { label: 'ديون العملاء / كشف حساب', href: 'customer-debts-ar.html', icon: 'account_balance_wallet', keywords: 'عميل دين كشف حساب customer debt' },
