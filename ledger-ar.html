@@ -396,6 +396,7 @@
 <script>
 let traders = [];
 let movementsByTrader = {};
+let linkedCashMovementByTraderMoveId = {};
 let currentTraderId = null;
 let diamondsEnabled = false;
 
@@ -435,10 +436,11 @@ async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
 
-  const [{ data: traderRows, error: tErr }, { data: moveRows, error: mErr }, { data: storeRow }] = await Promise.all([
+  const [{ data: traderRows, error: tErr }, { data: moveRows, error: mErr }, { data: storeRow }, { data: linkedCashRows }] = await Promise.all([
     goldmindClient.from('traders').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
     goldmindClient.from('trader_movements').select('*, invoice:invoice_id(invoice_number)').eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }),
-    goldmindClient.from('stores').select('diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+    goldmindClient.from('stores').select('diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('cash_movements').select('id, trader_movement_id').eq('store_id', GOLDMIND_STORE_ID).not('trader_movement_id', 'is', null)
   ]);
 
   gmStore = storeRow || null;
@@ -465,8 +467,11 @@ async function load() {
   }
 
   traders = traderRows || [];
+  linkedCashMovementByTraderMoveId = {};
+  (linkedCashRows || []).forEach(c => { linkedCashMovementByTraderMoveId[c.trader_movement_id] = c.id; });
   movementsByTrader = {};
   (moveRows || []).forEach(m => {
+    m.linked_cash_movement_id = linkedCashMovementByTraderMoveId[m.id] || null;
     if (!movementsByTrader[m.trader_id]) movementsByTrader[m.trader_id] = [];
     movementsByTrader[m.trader_id].push(m);
   });
@@ -773,6 +778,8 @@ function showTraderDetail(traderId) {
     const date = gmFormatDateTime(m.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
     const isStockMovement = m.source === 'stock_given' || m.source === 'stock_received';
     const isOpeningBalance = m.source === 'opening_balance';
+    const isManualSettlement = !isStockMovement && !isOpeningBalance && m.movement_type === 'debt_decrease' && !(m.invoice && m.invoice.invoice_number);
+    const settlementIsCash = isManualSettlement && Number(m.fab_fee_amount || 0) > 0;
     const weightLine = isStockMovement
       ? `${m.weight_grams}غ قائم${m.accounting_weight_grams ? ` / ${m.accounting_weight_grams}غ محاسبي` : ''} عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)`
       : (m.weight_grams ? `${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : '');
@@ -842,6 +849,35 @@ function showTraderDetail(traderId) {
             <button onclick="toggleEditStockMovement('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
           </div>
         </div>` : ''}
+        ${isManualSettlement ? `
+        <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+          <button onclick="toggleEditSettlement('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          <button onclick="deleteSettlementMovement('${m.id}', ${settlementIsCash})" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
+        </div>
+        <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-settle-form-${m.id}">
+          <div class="flex rounded-lg border border-outline-variant overflow-hidden">
+            <button type="button" id="edit-settle-type-gold-${m.id}" onclick="setEditSettlementType('${m.id}','gold')" class="flex-1 h-9 text-[11px] font-semibold">تسوية ذهب</button>
+            <button type="button" id="edit-settle-type-cash-${m.id}" onclick="setEditSettlementType('${m.id}','cash')" class="flex-1 h-9 text-[11px] font-semibold">تسوية نقدية</button>
+          </div>
+          <div id="edit-settle-gold-wrap-${m.id}" class="hidden grid grid-cols-2 gap-2">
+            <input id="edit-settle-weight-${m.id}" type="number" step="0.001" dir="ltr" placeholder="الوزن (غ)" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.weight_grams || ''}"/>
+            <select id="edit-settle-karat-${m.id}" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px]">
+              <option value="18" ${m.karat == 18 ? 'selected' : ''}>18</option>
+              <option value="21" ${m.karat == 21 ? 'selected' : ''}>21</option>
+              <option value="22" ${m.karat == 22 ? 'selected' : ''}>22</option>
+              <option value="24" ${m.karat == 24 ? 'selected' : ''}>24</option>
+            </select>
+          </div>
+          <input id="edit-settle-cash-${m.id}" type="number" step="0.01" dir="ltr" placeholder="المبلغ (AED)" class="hidden w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.fab_fee_amount || ''}"/>
+          ${settlementIsCash ? `<p class="text-[10px] text-outline">تحديث المبلغ هون رح يعدّل حركة الصندوق اليومي المرتبطة تلقائياً${m.linked_cash_movement_id ? '' : ' (هذه التسوية أُنشئت قبل ربط السجلّين، فراجع الصندوق يدوياً بعد الحفظ)'}.</p>` : ''}
+          <textarea id="edit-settle-notes-${m.id}" class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]">${gmEscapeHtml(m.notes || '')}</textarea>
+          <p class="text-error text-[11px] hidden" id="edit-settle-error-${m.id}"></p>
+          <div class="flex gap-2">
+            <button onclick="saveEditSettlement('${m.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
+            <button onclick="toggleEditSettlement('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+          </div>
+        </div>` : ''}
+
       </div>`;
   }).join('');
 }
@@ -999,6 +1035,116 @@ async function deleteStockMovement(movementId) {
   if (error) {
     alert('تعذّر الحذف: ' + error.message);
     return;
+  }
+
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+}
+
+const settleEditState = {}; // per-movement-id { type }
+
+function toggleEditSettlement(id) {
+  const form = document.getElementById('edit-settle-form-' + id);
+  const wasHidden = form.classList.contains('hidden');
+  form.classList.toggle('hidden');
+  form.classList.toggle('flex', wasHidden);
+  if (wasHidden) {
+    const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === id);
+    const type = (m.weight_grams && Number(m.weight_grams) > 0) ? 'gold' : 'cash';
+    setEditSettlementType(id, type);
+  }
+}
+
+function setEditSettlementType(id, type) {
+  settleEditState[id] = type;
+  document.getElementById('edit-settle-type-gold-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (type === 'gold' ? 'bg-primary text-white' : 'text-on-surface-variant');
+  document.getElementById('edit-settle-type-cash-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (type === 'cash' ? 'bg-primary text-white' : 'text-on-surface-variant');
+  document.getElementById('edit-settle-gold-wrap-' + id).classList.toggle('hidden', type !== 'gold');
+  document.getElementById('edit-settle-gold-wrap-' + id).classList.toggle('grid', type === 'gold');
+  document.getElementById('edit-settle-cash-' + id).classList.toggle('hidden', type !== 'cash');
+}
+
+async function saveEditSettlement(id) {
+  const errEl = document.getElementById('edit-settle-error-' + id);
+  errEl.classList.add('hidden');
+  const type = settleEditState[id] || 'gold';
+  const notes = document.getElementById('edit-settle-notes-' + id).value.trim();
+  const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === id);
+
+  const update = { notes: notes || null };
+
+  if (type === 'gold') {
+    const weight = parseFloat(document.getElementById('edit-settle-weight-' + id).value);
+    const karat = parseInt(document.getElementById('edit-settle-karat-' + id).value, 10);
+    if (!weight || weight <= 0) {
+      errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    update.weight_grams = weight;
+    update.karat = karat;
+    update.gold_24k_equivalent = +(weight * (karat / 24)).toFixed(3);
+    update.fab_fee_amount = 0;
+  } else {
+    const amount = parseFloat(document.getElementById('edit-settle-cash-' + id).value);
+    if (!amount || amount <= 0) {
+      errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    update.weight_grams = 0;
+    update.karat = null;
+    update.gold_24k_equivalent = 0;
+    update.fab_fee_amount = amount;
+  }
+
+  const { error } = await goldmindClient.from('trader_movements').update(update).eq('id', id);
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  // Keep the linked cash-register entry in sync if this settlement was cash
+  // (either before or after the edit) and has a linked cash_movements row.
+  const linkedId = m && m.linked_cash_movement_id;
+  if (linkedId) {
+    if (type === 'cash') {
+      await goldmindClient.from('cash_movements').update({
+        amount: update.fab_fee_amount,
+        description: 'تسوية مصنعية نقدية - ' + (notes || (traders.find(t => t.id === currentTraderId) || {}).name || 'تاجر')
+      }).eq('id', linkedId);
+    } else {
+      // Switched from a cash settlement to a gold settlement -> the cash
+      // that left the register no longer has a matching debt reduction,
+      // so remove the now-orphaned register entry instead of leaving it.
+      await goldmindClient.from('cash_movements').delete().eq('id', linkedId);
+    }
+  }
+
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+}
+
+async function deleteSettlementMovement(movementId, wasCash) {
+  const warnMsg = wasCash
+    ? 'هل تريد حذف هذه التسوية؟ إذا كانت مرتبطة بحركة صندوق، رح تُحذف معها. هذا الإجراء نهائي.'
+    : 'هل تريد حذف هذه التسوية؟ هذا الإجراء نهائي.';
+  if (!confirm(warnMsg)) return;
+
+  const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === movementId);
+  const linkedId = m && m.linked_cash_movement_id;
+
+  const { error } = await goldmindClient.from('trader_movements').delete().eq('id', movementId);
+  if (error) {
+    alert('تعذّر الحذف: ' + error.message);
+    return;
+  }
+
+  if (linkedId) {
+    await goldmindClient.from('cash_movements').delete().eq('id', linkedId);
   }
 
   const traderIdToReopen = currentTraderId;
@@ -1354,11 +1500,13 @@ async function submitSettlement() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.from('trader_movements').insert(movement);
+  const { data: insertedMovement, error } = await goldmindClient.from('trader_movements').insert(movement).select().single();
 
   if (!error && settleMode === 'cash') {
     // Real cash leaving the register right now -> reflect it in the daily
-    // cash box, same as customer debt settlements already do.
+    // cash box, same as customer debt settlements already do. Linking via
+    // trader_movement_id lets a later edit/delete of this settlement keep
+    // the cash box entry in sync instead of going stale.
     const trader = traders.find(t => t.id === currentTraderId);
     await goldmindClient.from('cash_movements').insert({
       store_id: GOLDMIND_STORE_ID,
@@ -1366,7 +1514,8 @@ async function submitSettlement() {
       direction: 'out',
       amount: movement.fab_fee_amount,
       description: 'تسوية مصنعية نقدية - ' + (trader ? trader.name : 'تاجر'),
-      created_by: GOLDMIND_STAFF_ID
+      created_by: GOLDMIND_STAFF_ID,
+      trader_movement_id: insertedMovement ? insertedMovement.id : null
     });
   }
 
