@@ -816,6 +816,32 @@ function showTraderDetail(traderId) {
             <button onclick="toggleEditOpeningBalance('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
           </div>
         </div>` : ''}
+        ${isStockMovement ? `
+        <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+          <button onclick="toggleEditStockMovement('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          <button onclick="deleteStockMovement('${m.id}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
+        </div>
+        <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-sm-form-${m.id}">
+          <div class="grid grid-cols-2 gap-2">
+            <input id="edit-sm-weight-${m.id}" type="number" step="0.01" dir="ltr" placeholder="الوزن القائم (غ)" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.weight_grams || ''}"/>
+            <select id="edit-sm-karat-${m.id}" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px]">
+              <option value="18" ${m.karat == 18 ? 'selected' : ''}>18</option>
+              <option value="21" ${m.karat == 21 ? 'selected' : ''}>21</option>
+              <option value="22" ${m.karat == 22 ? 'selected' : ''}>22</option>
+              <option value="24" ${m.karat == 24 ? 'selected' : ''}>24</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <input id="edit-sm-accounting-${m.id}" type="number" step="0.01" dir="ltr" placeholder="الوزن المحاسبي (غ)" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.accounting_weight_grams || ''}"/>
+            <input id="edit-sm-fabpergram-${m.id}" type="number" step="0.01" dir="ltr" placeholder="مصنعية للغرام" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.fab_fee_per_gram || ''}"/>
+          </div>
+          <textarea id="edit-sm-notes-${m.id}" class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]">${gmEscapeHtml(m.notes || '')}</textarea>
+          <p class="text-error text-[11px] hidden" id="edit-sm-error-${m.id}"></p>
+          <div class="flex gap-2">
+            <button onclick="saveEditStockMovement('${m.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
+            <button onclick="toggleEditStockMovement('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+          </div>
+        </div>` : ''}
       </div>`;
   }).join('');
 }
@@ -904,6 +930,70 @@ async function saveEditOpeningBalance(id) {
 
 async function deleteOpeningBalanceMovement(movementId) {
   if (!confirm('هل تريد حذف الرصيد السابق؟ يمكنك إدخاله من جديد بالقيمة الصحيحة بعد الحذف.')) return;
+
+  const { error } = await goldmindClient.from('trader_movements').delete().eq('id', movementId);
+  if (error) {
+    alert('تعذّر الحذف: ' + error.message);
+    return;
+  }
+
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+}
+
+function toggleEditStockMovement(id) {
+  const form = document.getElementById('edit-sm-form-' + id);
+  const wasHidden = form.classList.contains('hidden');
+  form.classList.toggle('hidden');
+  form.classList.toggle('flex', wasHidden);
+}
+
+async function saveEditStockMovement(id) {
+  const errEl = document.getElementById('edit-sm-error-' + id);
+  errEl.classList.add('hidden');
+
+  const weight = parseFloat(document.getElementById('edit-sm-weight-' + id).value);
+  const karat = parseInt(document.getElementById('edit-sm-karat-' + id).value, 10);
+  const accounting = parseFloat(document.getElementById('edit-sm-accounting-' + id).value);
+  const fabPerGram = parseFloat(document.getElementById('edit-sm-fabpergram-' + id).value) || 0;
+  const notes = document.getElementById('edit-sm-notes-' + id).value.trim();
+
+  if (!weight || weight <= 0) {
+    errEl.textContent = 'فضلاً أدخل وزناً قائماً صحيحاً';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (!accounting || accounting <= 0) {
+    errEl.textContent = 'فضلاً أدخل وزناً محاسبياً صحيحاً';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const update = {
+    weight_grams: weight,
+    karat: karat,
+    gold_24k_equivalent: +(weight * (karat / 24)).toFixed(3),
+    accounting_weight_grams: accounting,
+    fab_fee_per_gram: fabPerGram,
+    fab_fee_amount: +(accounting * fabPerGram).toFixed(2),
+    notes: notes || null
+  };
+
+  const { error } = await goldmindClient.from('trader_movements').update(update).eq('id', id);
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+}
+
+async function deleteStockMovement(movementId) {
+  if (!confirm('هل تريد حذف هذه الحركة؟ هذا الإجراء نهائي.')) return;
 
   const { error } = await goldmindClient.from('trader_movements').delete().eq('id', movementId);
   if (error) {
