@@ -8,11 +8,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>الجرد بـ RFID | GoldMind</title>
+<title>الجرد | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="theme.js?v=13"></script>
+<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -45,7 +46,7 @@
 <button onclick="window.location.href='index-ar.html'" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
 </button>
-<h1 class="font-headline-md text-headline-md font-bold">الجرد بـ RFID</h1>
+<h1 class="font-headline-md text-headline-md font-bold">الجرد</h1>
 </div>
 </div>
 </header>
@@ -61,14 +62,31 @@
 <div id="start-wrap" class="hidden py-6 flex flex-col gap-5">
 <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4">
 <p class="text-[13px] text-on-surface-variant leading-relaxed">
-تبدأ جلسة جرد جديدة، تمسح كل القطع المتوفرة برقاقة RFID واحدة تلو الأخرى (يعمل الماسح كلوحة مفاتيح — وجّه المؤشر لحقل المسح وامسح)، ثم تنهي الجلسة لعرض تقرير الفرق: قطع ناقصة وقطع غير متوقعة.
+تبدأ جلسة جرد جديدة، تمسح كل القطع المتوفرة واحدة تلو الأخرى، ثم تنهي الجلسة لعرض تقرير الفرق: قطع ناقصة وقطع غير متوقعة.
 </p>
 </div>
+
+<div>
+<h3 class="text-[12px] font-bold text-on-surface-variant mb-2">طريقة الجرد</h3>
+<div class="grid grid-cols-2 gap-3">
+<button type="button" id="method-rfid-btn" onclick="setCountMethod('rfid')" class="p-4 border-2 rounded-xl flex flex-col items-center gap-2">
+<span class="material-symbols-outlined text-2xl">sensors</span>
+<span class="text-[12px] font-bold">قارئ RFID</span>
+<span class="text-[10px] text-on-surface-variant text-center">يحتاج قارئ RFID متصل بالجهاز</span>
+</button>
+<button type="button" id="method-camera-btn" onclick="setCountMethod('camera')" class="p-4 border-2 rounded-xl flex flex-col items-center gap-2">
+<span class="material-symbols-outlined text-2xl">photo_camera</span>
+<span class="text-[12px] font-bold">كاميرا الموبايل</span>
+<span class="text-[10px] text-on-surface-variant text-center">تمسح باركود القطعة مباشرة</span>
+</button>
+</div>
+</div>
+
 <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 flex items-center justify-between">
 <span class="text-[13px] font-semibold text-on-surface-variant">القطع المتوفرة بالمخزون حالياً</span>
 <span id="expected-count" class="text-lg font-bold">—</span>
 </div>
-<button id="start-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all">بدء جلسة جرد جديدة</button>
+<button id="start-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all" disabled>اختر طريقة الجرد أولاً</button>
 
 <div id="past-sessions-wrap" class="mt-4">
 <h3 class="text-[12px] font-bold text-on-surface-variant mb-2">جلسات سابقة</h3>
@@ -97,9 +115,15 @@
 </div>
 </div>
 
-<div class="relative">
+<div id="rfid-input-wrap" class="hidden relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="scan-input">حقل المسح — وجّه القارئ هون وامسح</label>
 <input autocomplete="off" autofocus class="w-full h-16 border-2 border-primary rounded-lg px-4 focus:ring-2 focus:ring-primary outline-none text-center font-data-mono text-lg tracking-widest" dir="ltr" id="scan-input" placeholder="بانتظار المسح..." type="text"/>
+</div>
+
+<div id="camera-wrap" class="hidden flex-col gap-2">
+<div id="camera-reader" class="w-full rounded-xl overflow-hidden border-2 border-primary"></div>
+<p class="text-[11px] text-center text-on-surface-variant">وجّه الكاميرا نحو باركود القطعة</p>
+<div id="camera-error" class="hidden text-[12px] text-error bg-error-container rounded-lg p-3 text-center"></div>
 </div>
 
 <div id="last-scan-box" class="hidden text-center text-sm font-semibold py-3 rounded-lg"></div>
@@ -143,11 +167,17 @@
 
 <script>
 let canRun = false;
-let expectedPieces = []; // [{id, barcode, rfid_epc, description}]
-let expectedByEpc = {};
+let expectedPieces = []; // [{id, barcode, rfid_epc, description, ...}] all available pieces
 let currentCountId = null;
-let scannedEpcs = new Set();
+let countMethod = null; // 'rfid' | 'camera'
+let matchField = null;  // 'rfid_epc' | 'barcode'
+let expectedPool = [];  // subset of expectedPieces relevant to the chosen method
+let expectedByField = {};
+let scannedValues = new Set();
 let stats = { expected: 0, scanned: 0, matched: 0, unexpected: 0 };
+let html5QrCode = null;
+let lastCameraValue = null;
+let lastCameraTime = 0;
 
 function showEl(id) { document.getElementById(id).classList.remove('hidden'); }
 function hideEl(id) { document.getElementById(id).classList.add('hidden'); }
@@ -180,23 +210,53 @@ async function init() {
 }
 
 async function loadExpectedPieces() {
+  // Fetch every available piece regardless of RFID tagging — the camera
+  // method needs the full set (matched by barcode, which virtually every
+  // piece already has), while the RFID method only cares about the subset
+  // that's actually been tagged (rfid_epc set).
   const { data } = await goldmindClient
     .from('pieces')
     .select('id, barcode, rfid_epc, description_ar, description_en, karat, weight_grams')
     .eq('store_id', GOLDMIND_STORE_ID)
-    .eq('status', 'available')
-    .not('rfid_epc', 'is', null);
+    .eq('status', 'available');
 
   expectedPieces = data || [];
-  expectedByEpc = {};
-  expectedPieces.forEach(p => { expectedByEpc[p.rfid_epc] = p; });
-  document.getElementById('expected-count').textContent = expectedPieces.length;
+  if (countMethod) updateExpectedCountUI();
+}
+
+function poolForMethod(method) {
+  if (method === 'rfid') return expectedPieces.filter(p => p.rfid_epc);
+  if (method === 'camera') return expectedPieces.filter(p => p.barcode);
+  return [];
+}
+
+function updateExpectedCountUI() {
+  const pool = poolForMethod(countMethod);
+  document.getElementById('expected-count').textContent = pool.length;
+}
+
+function setCountMethod(method) {
+  countMethod = method;
+  matchField = method === 'rfid' ? 'rfid_epc' : 'barcode';
+
+  const rfidBtn = document.getElementById('method-rfid-btn');
+  const camBtn = document.getElementById('method-camera-btn');
+  const selected = 'p-4 border-2 border-primary bg-primary/5 rounded-xl flex flex-col items-center gap-2';
+  const unselected = 'p-4 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-2';
+  rfidBtn.className = method === 'rfid' ? selected : unselected;
+  camBtn.className = method === 'camera' ? selected : unselected;
+
+  updateExpectedCountUI();
+
+  const startBtn = document.getElementById('start-btn');
+  startBtn.disabled = false;
+  startBtn.textContent = 'بدء جلسة جرد جديدة';
 }
 
 async function loadPastSessions() {
   const { data } = await goldmindClient
     .from('inventory_counts')
-    .select('id, status, started_at, completed_at, expected_piece_count, matched_count, missing_count, unexpected_count')
+    .select('id, status, started_at, completed_at, expected_piece_count, matched_count, missing_count, unexpected_count, method')
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('started_at', { ascending: false })
     .limit(5);
@@ -208,7 +268,8 @@ async function loadPastSessions() {
     row.className = 'bg-surface-container-low rounded-lg p-3 flex items-center justify-between text-[12px]';
     const dateStr = new Date(s.started_at).toLocaleDateString('ar-AE', { day: 'numeric', month: 'short', year: 'numeric' });
     const statusLabel = s.status === 'completed' ? 'مكتملة' : 'غير مكتملة';
-    row.innerHTML = `<span class="font-semibold">${dateStr}</span>
+    const methodLabel = s.method === 'camera' ? '📷' : (s.method === 'rfid' ? '📡' : '');
+    row.innerHTML = `<span class="font-semibold">${methodLabel} ${dateStr}</span>
       <span class="text-on-surface-variant">${statusLabel}</span>
       <span>${s.matched_count || 0}/${s.expected_piece_count || 0} مطابقة</span>`;
     list.appendChild(row);
@@ -216,15 +277,21 @@ async function loadPastSessions() {
 }
 
 document.getElementById('start-btn').addEventListener('click', async () => {
+  if (!countMethod) return;
   const btn = document.getElementById('start-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ البدء...';
+
+  expectedPool = poolForMethod(countMethod);
+  expectedByField = {};
+  expectedPool.forEach(p => { expectedByField[p[matchField]] = p; });
 
   const { data: countRow, error } = await goldmindClient.from('inventory_counts').insert({
     store_id: GOLDMIND_STORE_ID,
     status: 'in_progress',
     started_by: GOLDMIND_STAFF_ID,
-    expected_piece_count: expectedPieces.length,
+    method: countMethod,
+    expected_piece_count: expectedPool.length,
     scanned_piece_count: 0,
     matched_count: 0,
     missing_count: 0,
@@ -240,13 +307,23 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   }
 
   currentCountId = countRow.id;
-  scannedEpcs = new Set();
-  stats = { expected: expectedPieces.length, scanned: 0, matched: 0, unexpected: 0 };
+  scannedValues = new Set();
+  stats = { expected: expectedPool.length, scanned: 0, matched: 0, unexpected: 0 };
   updateStatsUI();
 
   document.getElementById('start-wrap').classList.add('hidden');
   document.getElementById('scan-wrap').classList.remove('hidden');
-  document.getElementById('scan-input').focus();
+
+  if (countMethod === 'rfid') {
+    document.getElementById('rfid-input-wrap').classList.remove('hidden');
+    document.getElementById('camera-wrap').classList.add('hidden');
+    document.getElementById('scan-input').focus();
+  } else {
+    document.getElementById('camera-wrap').classList.remove('hidden');
+    document.getElementById('camera-wrap').classList.add('flex');
+    document.getElementById('rfid-input-wrap').classList.add('hidden');
+    startCameraScanner();
+  }
 });
 
 function updateStatsUI() {
@@ -280,10 +357,10 @@ const scanInput = document.getElementById('scan-input');
 scanInput.addEventListener('keydown', async (e) => {
   if (e.key !== 'Enter') return;
   e.preventDefault();
-  const epc = scanInput.value.trim();
+  const val = scanInput.value.trim();
   scanInput.value = '';
-  if (!epc || !currentCountId) return;
-  await handleScan(epc);
+  if (!val || !currentCountId) return;
+  await handleScan(val);
 });
 
 // Most keyboard-wedge scanners fire Enter after the payload, but some
@@ -293,46 +370,91 @@ let scanIdleTimer = null;
 scanInput.addEventListener('input', () => {
   if (scanIdleTimer) clearTimeout(scanIdleTimer);
   scanIdleTimer = setTimeout(async () => {
-    const epc = scanInput.value.trim();
-    if (!epc || !currentCountId) return;
+    const val = scanInput.value.trim();
+    if (!val || !currentCountId) return;
     scanInput.value = '';
-    await handleScan(epc);
+    await handleScan(val);
   }, 400);
 });
 
-async function handleScan(epc) {
-  scanInput.focus();
+function showCameraError(text) {
+  const box = document.getElementById('camera-error');
+  box.textContent = text;
+  box.classList.remove('hidden');
+}
 
-  if (scannedEpcs.has(epc)) {
+function startCameraScanner() {
+  document.getElementById('camera-error').classList.add('hidden');
+  html5QrCode = new Html5Qrcode('camera-reader');
+  const config = {
+    fps: 10,
+    qrbox: { width: 260, height: 140 },
+    formatsToSupport: [
+      Html5QrcodeSupportedFormats.CODE_128,
+      Html5QrcodeSupportedFormats.CODE_39,
+      Html5QrcodeSupportedFormats.EAN_13,
+      Html5QrcodeSupportedFormats.QR_CODE
+    ]
+  };
+  html5QrCode.start({ facingMode: 'environment' }, config, onCameraScanSuccess, () => {})
+    .catch(err => {
+      showCameraError('تعذّر تشغيل الكاميرا — تأكد من منح إذن الوصول للكاميرا. (' + err + ')');
+    });
+}
+
+function stopCameraScanner() {
+  if (!html5QrCode) return;
+  const instance = html5QrCode;
+  html5QrCode = null;
+  instance.stop().then(() => instance.clear()).catch(() => {});
+}
+
+function onCameraScanSuccess(decodedText) {
+  // The camera keeps feeding the SAME barcode dozens of times per second
+  // while it's in frame, unlike a discrete handheld-scanner trigger pull.
+  // Silently ignore repeats of the same code within a short cooldown
+  // window instead of spamming handleScan (and the "duplicate" log) once
+  // per video frame.
+  const now = Date.now();
+  if (decodedText === lastCameraValue && (now - lastCameraTime) < 2000) return;
+  lastCameraValue = decodedText;
+  lastCameraTime = now;
+  handleScan(decodedText.trim());
+}
+
+async function handleScan(value) {
+  if (countMethod === 'rfid') scanInput.focus();
+
+  if (scannedValues.has(value)) {
     showLastScan('تم مسح هذه القطعة مسبقاً بهذه الجلسة.', 'duplicate');
-    addLogRow('مكرر: ' + epc, 'duplicate');
+    addLogRow('مكرر: ' + value, 'duplicate');
     return;
   }
-  scannedEpcs.add(epc);
+  scannedValues.add(value);
 
-  const piece = expectedByEpc[epc];
+  const piece = expectedByField[value];
   const matchStatus = piece ? 'matched' : 'unexpected';
 
   stats.scanned++;
   if (piece) stats.matched++; else stats.unexpected++;
   updateStatsUI();
 
-  const label = piece ? (piece.barcode || piece.description_ar || epc) : epc;
+  const label = piece ? (piece.barcode || piece.description_ar || value) : value;
   if (piece) {
     showLastScan('✓ مطابقة: ' + label, 'matched');
     addLogRow('✓ ' + label, 'matched');
-    if (piece.rfid_last_seen_at !== undefined) {
+    if (countMethod === 'rfid' && piece.rfid_last_seen_at !== undefined) {
       goldmindClient.from('pieces').update({ rfid_last_seen_at: new Date().toISOString() }).eq('id', piece.id).then(() => {});
     }
   } else {
-    showLastScan('⚠ رقاقة غير متوقعة: ' + epc, 'unexpected');
-    addLogRow('⚠ غير متوقعة: ' + epc, 'unexpected');
+    showLastScan('⚠ غير متوقعة: ' + value, 'unexpected');
+    addLogRow('⚠ غير متوقعة: ' + value, 'unexpected');
   }
 
   await goldmindClient.from('inventory_count_scans').insert({
     store_id: GOLDMIND_STORE_ID,
     count_id: currentCountId,
-    rfid_epc: epc,
+    rfid_epc: value, // reused for the scanned identifier regardless of method (RFID EPC or camera-read barcode)
     piece_id: piece ? piece.id : null,
     match_status: matchStatus,
     scanned_by: GOLDMIND_STAFF_ID
@@ -347,7 +469,9 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'جارِ الإنهاء...';
 
-  const missingPieces = expectedPieces.filter(p => !scannedEpcs.has(p.rfid_epc));
+  stopCameraScanner();
+
+  const missingPieces = expectedPool.filter(p => !scannedValues.has(p[matchField]));
   const missingCount = missingPieces.length;
 
   await goldmindClient.from('inventory_counts').update({
@@ -379,16 +503,16 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
     missingList.appendChild(row);
   });
 
-  const unexpectedEpcs = Array.from(scannedEpcs).filter(epc => !expectedByEpc[epc]);
+  const unexpectedValues = Array.from(scannedValues).filter(v => !expectedByField[v]);
   const unexpectedList = document.getElementById('unexpected-list');
   unexpectedList.innerHTML = '';
-  if (unexpectedEpcs.length === 0) {
+  if (unexpectedValues.length === 0) {
     unexpectedList.innerHTML = '<div class="text-[12px] text-on-surface-variant py-2 text-center">لا توجد مسوحات غير متوقعة</div>';
   }
-  unexpectedEpcs.forEach(epc => {
+  unexpectedValues.forEach(v => {
     const row = document.createElement('div');
     row.className = 'flex items-center justify-between bg-red-50 rounded-lg px-3 py-2 text-[12px] font-data-mono';
-    row.textContent = epc;
+    row.textContent = v;
     unexpectedList.appendChild(row);
   });
 
@@ -398,10 +522,18 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
 
 document.getElementById('new-session-btn').addEventListener('click', async () => {
   currentCountId = null;
-  scannedEpcs = new Set();
+  countMethod = null;
+  matchField = null;
+  scannedValues = new Set();
   document.getElementById('scan-log').innerHTML = '';
   document.getElementById('last-scan-box').classList.add('hidden');
   document.getElementById('report-wrap').classList.add('hidden');
+  document.getElementById('method-rfid-btn').className = 'p-4 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-2';
+  document.getElementById('method-camera-btn').className = 'p-4 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-2';
+  document.getElementById('expected-count').textContent = '—';
+  const startBtn = document.getElementById('start-btn');
+  startBtn.disabled = true;
+  startBtn.textContent = 'اختر طريقة الجرد أولاً';
   await loadExpectedPieces();
   await loadPastSessions();
   document.getElementById('start-wrap').classList.remove('hidden');
