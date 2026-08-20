@@ -173,24 +173,38 @@
 </a>
 <!-- Profile/Welcome -->
 <section class="mb-4 flex items-center justify-between gap-3">
-<div>
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-12 h-12 rounded-full gm-avatar-grad flex items-center justify-center font-bold text-lg shrink-0 overflow-hidden" id="storeAvatarEl" style="visibility:hidden;"></div>
+<div class="min-w-0">
 <h2 class="font-headline-md text-on-primary font-bold" style="font-size:26px; line-height:32px; visibility:hidden;" id="storeNameEl"></h2>
 <script>
-  // Show the store name from last time instantly (no flash of empty/wrong
-  // text) while the real value loads from the database below.
+  // Show the store name/logo from last time instantly (no flash of
+  // empty/wrong content) while the real values load from the database
+  // below.
   (function () {
     const cached = localStorage.getItem('goldmind_store_name');
+    const cachedLogo = localStorage.getItem('goldmind_store_logo');
     if (cached) {
       const el = document.getElementById('storeNameEl');
       el.textContent = cached;
       if (typeof fitStatNumber === 'function') fitStatNumber(el);
+    }
+    const avatarEl = document.getElementById('storeAvatarEl');
+    if (cachedLogo) {
+      avatarEl.innerHTML = '<img src="' + cachedLogo + '" alt="" class="w-full h-full object-cover"/>';
+      avatarEl.style.visibility = 'visible';
+    } else if (cached) {
+      // No logo cached yet but we do have a cached name -> safe to show
+      // the initial letter immediately instead of waiting.
+      avatarEl.textContent = cached.trim().charAt(0) || '؟';
+      avatarEl.style.visibility = 'visible';
     }
     // Safety net: if the dashboard data fetch below ever fails/errors
     // before reaching its own fitStatNumber() calls, don't leave these
     // elements permanently invisible — reveal them as-is after a short
     // grace period.
     setTimeout(function () {
-      ['storeNameEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl'].forEach(function (id) {
+      ['storeNameEl', 'storeAvatarEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl'].forEach(function (id) {
         const e = document.getElementById(id);
         if (e) e.style.visibility = 'visible';
       });
@@ -198,6 +212,7 @@
   })();
 </script>
 <p class="font-body-md text-body-md text-on-primary opacity-70" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
+</div>
 </div>
 <!-- Gold-price badge — shown only for the warm-ingot theme. Tapping it opens
      a small picker to switch which karat's price/gram it displays. -->
@@ -437,7 +452,7 @@
             // one-at-a-time on every dashboard load.
             const [{ data: store }, { data: staffRow }] = await Promise.all([
                 goldmindClient
-                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate, logo_url').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
                 goldmindClient
                     .from('staff').select('full_name, role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle()
             ]);
@@ -446,6 +461,16 @@
                 document.getElementById('storeNameEl').textContent = store.name;
                 fitStatNumber(document.getElementById('storeNameEl'));
                 localStorage.setItem('goldmind_store_name', store.name);
+
+                const avatarEl = document.getElementById('storeAvatarEl');
+                if (store.logo_url) {
+                    avatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full object-cover"/>';
+                    localStorage.setItem('goldmind_store_logo', store.logo_url);
+                } else {
+                    avatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
+                    localStorage.removeItem('goldmind_store_logo');
+                }
+                avatarEl.style.visibility = 'visible';
             }
             if (staffRow) {
                 const roleLabel = staffRow.role === 'owner' ? 'مالك الحساب' : 'موظف';
