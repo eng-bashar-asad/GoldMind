@@ -86,7 +86,7 @@
 </div>
 
 <div class="flex flex-col gap-2">
-<label class="flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-xl cursor-pointer">
+<label onclick="event.preventDefault(); toggleScopeBox('gold')" class="flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-xl cursor-pointer">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-secondary">inventory_2</span>
 <div>
@@ -94,10 +94,10 @@
 <div id="gold-count-label" class="text-[10px] text-on-surface-variant">—</div>
 </div>
 </div>
-<input type="checkbox" id="scope-gold" checked class="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary"/>
+<div id="scope-gold-box" class="w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all"></div>
 </label>
 
-<label id="diamond-scope-row" class="hidden flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-xl cursor-pointer">
+<label id="diamond-scope-row" onclick="event.preventDefault(); toggleScopeBox('diamond')" class="hidden flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-xl cursor-pointer">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-secondary">diamond</span>
 <div>
@@ -105,7 +105,7 @@
 <div id="diamond-count-label" class="text-[10px] text-on-surface-variant">—</div>
 </div>
 </div>
-<input type="checkbox" id="scope-diamond" class="w-5 h-5 rounded border-outline-variant text-primary focus:ring-primary"/>
+<div id="scope-diamond-box" class="w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all"></div>
 </label>
 
 <div class="p-4 bg-surface-container-low border border-outline-variant rounded-xl opacity-60">
@@ -325,6 +325,20 @@ let storeInfo = { rfid_enabled: false, diamonds_enabled: false };
 let goldPieces = [];
 let diamondPieces = [];
 let scope = { gold: true, diamond: false };
+let scopeChecked = { gold: true, diamond: false };
+
+function renderScopeBox(key) {
+  const box = document.getElementById('scope-' + key + '-box');
+  const isChecked = scopeChecked[key];
+  box.className = 'w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all ' +
+    (isChecked ? 'bg-primary border-primary' : 'bg-white border-outline-variant');
+  box.innerHTML = isChecked ? '<span class="material-symbols-outlined text-white" style="font-size:18px; font-variation-settings: \'wght\' 700;">check</span>' : '';
+}
+
+function toggleScopeBox(key) {
+  scopeChecked[key] = !scopeChecked[key];
+  renderScopeBox(key);
+}
 let selectedCategory = '';
 let expectedPool = []; // [{id, source:'gold'|'diamond', barcode, rfid_epc, description, karat, weight_grams}]
 let expectedByField = {};
@@ -385,6 +399,8 @@ async function init() {
     document.getElementById('diamond-scope-row').classList.remove('hidden');
     document.getElementById('diamond-scope-row').classList.add('flex');
   }
+  renderScopeBox('gold');
+  renderScopeBox('diamond');
 
   await loadAllPieces();
   await checkInProgressSession();
@@ -523,8 +539,8 @@ function detectAndShowConflicts() {
 }
 
 document.getElementById('scope-continue-btn').addEventListener('click', () => {
-  scope.gold = document.getElementById('scope-gold').checked;
-  scope.diamond = document.getElementById('scope-diamond').checked;
+  scope.gold = scopeChecked.gold;
+  scope.diamond = scopeChecked.diamond;
   selectedCategory = document.getElementById('category-filter').value || '';
 
   if (!scope.gold && !scope.diamond) {
@@ -1044,8 +1060,10 @@ function startNewSession() {
   const startBtn = document.getElementById('start-btn');
   startBtn.disabled = true;
   startBtn.textContent = 'اختر طريقة الجرد أولاً';
-  document.getElementById('scope-gold').checked = true;
-  document.getElementById('scope-diamond').checked = false;
+  scopeChecked.gold = true;
+  scopeChecked.diamond = false;
+  renderScopeBox('gold');
+  renderScopeBox('diamond');
   loadAllPieces().then(() => {
     document.getElementById('start-wrap').classList.add('hidden');
     document.getElementById('scope-wrap').classList.remove('hidden');
