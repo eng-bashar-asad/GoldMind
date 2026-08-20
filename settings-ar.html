@@ -154,7 +154,22 @@
 <section class="mb-6">
 <h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">ملف المتجر</h3>
 <a href="company-settings-ar.html" class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-5 flex items-center gap-4 active:bg-surface-container-low transition-colors">
-<div class="w-16 h-16 rounded-full gm-avatar-grad flex items-center justify-center font-bold text-xl shrink-0 overflow-hidden" id="storeAvatar">ف</div>
+<div class="w-16 h-16 rounded-full gm-avatar-grad flex items-center justify-center font-bold text-xl shrink-0 overflow-hidden" id="storeAvatar"></div>
+<script>
+  // Paint instantly from last time's cached logo/name (same technique
+  // already used on the dashboard) instead of showing a hardcoded wrong
+  // letter for a moment before the real value loads below.
+  (function () {
+    const cachedLogo = localStorage.getItem('goldmind_store_logo');
+    const cachedName = localStorage.getItem('goldmind_store_name');
+    const el = document.getElementById('storeAvatar');
+    if (cachedLogo) {
+      el.innerHTML = '<img src="' + cachedLogo + '" alt="" class="w-full h-full object-cover"/>';
+    } else if (cachedName) {
+      el.textContent = cachedName.trim().charAt(0) || '؟';
+    }
+  })();
+</script>
 <div class="min-w-0">
 <p class="font-headline-md text-headline-md text-on-surface truncate" id="storeNameLabel">جارِ التحميل...</p>
 <p class="font-body-md text-body-md text-on-surface-variant" id="storeRoleLabel">بوابة المسؤول</p>
@@ -356,11 +371,14 @@ function fitStoreName(el) {
 
     document.getElementById('storeNameLabel').textContent = store.name || '—';
     fitStoreName(document.getElementById('storeNameLabel'));
+    localStorage.setItem('goldmind_store_name', store.name || '');
     const avatarEl = document.getElementById('storeAvatar');
     if (store.logo_url) {
         avatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full rounded-full object-cover"/>';
+        localStorage.setItem('goldmind_store_logo', store.logo_url);
     } else {
         avatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
+        localStorage.removeItem('goldmind_store_logo');
     }
     document.getElementById('footerLabel').textContent = 'GoldMind v1.0 • ' + (store.name || '');
 
