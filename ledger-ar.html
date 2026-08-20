@@ -378,6 +378,11 @@
 </div>
 </div>
 <div class="hidden mb-3" id="settle-cash-fields">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">اتجاه الدفعة</label>
+<div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
+<button type="button" id="settle-cash-dir-out" onclick="setSettleCashDirection('out')" class="flex-1 h-10 text-[12px] font-semibold">دفعنا للتاجر (يخرج من الصندوق)</button>
+<button type="button" id="settle-cash-dir-in" onclick="setSettleCashDirection('in')" class="flex-1 h-10 text-[12px] font-semibold">استلمنا من التاجر (يدخل للصندوق)</button>
+</div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="settle-cash-amount-label">المبلغ المدفوع (د.إ)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-cash-amount" step="0.01" type="number"/>
 </div>
@@ -778,7 +783,8 @@ function showTraderDetail(traderId) {
     const date = gmFormatDateTime(m.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
     const isStockMovement = m.source === 'stock_given' || m.source === 'stock_received';
     const isOpeningBalance = m.source === 'opening_balance';
-    const isManualSettlement = !isStockMovement && !isOpeningBalance && m.movement_type === 'debt_decrease' && !(m.invoice && m.invoice.invoice_number);
+    const isManualSettlement = !isStockMovement && !isOpeningBalance && !(m.invoice && m.invoice.invoice_number) &&
+      (m.movement_type === 'debt_decrease' || (m.movement_type === 'debt_increase' && Number(m.fab_fee_amount || 0) > 0 && Number(m.weight_grams || 0) === 0));
     const settlementIsCash = isManualSettlement && Number(m.fab_fee_amount || 0) > 0;
     const weightLine = isStockMovement
       ? `${m.weight_grams}غ قائم${m.accounting_weight_grams ? ` / ${m.accounting_weight_grams}غ محاسبي` : ''} عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)`
@@ -868,8 +874,14 @@ function showTraderDetail(traderId) {
               <option value="24" ${m.karat == 24 ? 'selected' : ''}>24</option>
             </select>
           </div>
-          <input id="edit-settle-cash-${m.id}" type="number" step="0.01" dir="ltr" placeholder="المبلغ (AED)" class="hidden w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.fab_fee_amount || ''}"/>
-          ${settlementIsCash ? `<p class="text-[10px] text-outline">تحديث المبلغ هون رح يعدّل حركة الصندوق اليومي المرتبطة تلقائياً${m.linked_cash_movement_id ? '' : ' (هذه التسوية أُنشئت قبل ربط السجلّين، فراجع الصندوق يدوياً بعد الحفظ)'}.</p>` : ''}
+          <div id="edit-settle-cash-wrap-${m.id}" class="hidden flex-col gap-2">
+            <div class="flex rounded-lg border border-outline-variant overflow-hidden">
+              <button type="button" id="edit-settle-dir-out-${m.id}" onclick="setEditSettlementDirection('${m.id}','out')" class="flex-1 h-9 text-[11px] font-semibold">دفعنا للتاجر</button>
+              <button type="button" id="edit-settle-dir-in-${m.id}" onclick="setEditSettlementDirection('${m.id}','in')" class="flex-1 h-9 text-[11px] font-semibold">استلمنا من التاجر</button>
+            </div>
+            <input id="edit-settle-cash-${m.id}" type="number" step="0.01" dir="ltr" placeholder="المبلغ (AED)" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.fab_fee_amount || ''}"/>
+          </div>
+          ${settlementIsCash ? `<p class="text-[10px] text-outline">تحديث المبلغ أو الاتجاه هون رح يعدّل حركة الصندوق اليومي المرتبطة تلقائياً${m.linked_cash_movement_id ? '' : ' (هذه التسوية أُنشئت قبل ربط السجلّين، فراجع الصندوق يدوياً بعد الحفظ)'}.</p>` : ''}
           <textarea id="edit-settle-notes-${m.id}" class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]">${gmEscapeHtml(m.notes || '')}</textarea>
           <p class="text-error text-[11px] hidden" id="edit-settle-error-${m.id}"></p>
           <div class="flex gap-2">
@@ -1044,6 +1056,8 @@ async function deleteStockMovement(movementId) {
 
 const settleEditState = {}; // per-movement-id { type }
 
+const settleEditDirState = {}; // per-movement-id { direction: 'out'|'in' }
+
 function toggleEditSettlement(id) {
   const form = document.getElementById('edit-settle-form-' + id);
   const wasHidden = form.classList.contains('hidden');
@@ -1052,8 +1066,20 @@ function toggleEditSettlement(id) {
   if (wasHidden) {
     const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === id);
     const type = (m.weight_grams && Number(m.weight_grams) > 0) ? 'gold' : 'cash';
+    settleEditDirState[id] = m.movement_type === 'debt_increase' ? 'in' : 'out';
     setEditSettlementType(id, type);
+    setEditSettlementDirection(id, settleEditDirState[id]);
   }
+}
+
+function setEditSettlementDirection(id, dir) {
+  settleEditDirState[id] = dir;
+  const outBtn = document.getElementById('edit-settle-dir-out-' + id);
+  const inBtn = document.getElementById('edit-settle-dir-in-' + id);
+  const active = 'flex-1 h-9 text-[11px] font-semibold bg-primary text-white';
+  const inactive = 'flex-1 h-9 text-[11px] font-semibold text-on-surface-variant';
+  outBtn.className = dir === 'out' ? active : inactive;
+  inBtn.className = dir === 'in' ? active : inactive;
 }
 
 function setEditSettlementType(id, type) {
@@ -1062,13 +1088,15 @@ function setEditSettlementType(id, type) {
   document.getElementById('edit-settle-type-cash-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (type === 'cash' ? 'bg-primary text-white' : 'text-on-surface-variant');
   document.getElementById('edit-settle-gold-wrap-' + id).classList.toggle('hidden', type !== 'gold');
   document.getElementById('edit-settle-gold-wrap-' + id).classList.toggle('grid', type === 'gold');
-  document.getElementById('edit-settle-cash-' + id).classList.toggle('hidden', type !== 'cash');
+  document.getElementById('edit-settle-cash-wrap-' + id).classList.toggle('hidden', type !== 'cash');
+  document.getElementById('edit-settle-cash-wrap-' + id).classList.toggle('flex', type === 'cash');
 }
 
 async function saveEditSettlement(id) {
   const errEl = document.getElementById('edit-settle-error-' + id);
   errEl.classList.add('hidden');
   const type = settleEditState[id] || 'gold';
+  const direction = settleEditDirState[id] || 'out';
   const notes = document.getElementById('edit-settle-notes-' + id).value.trim();
   const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === id);
 
@@ -1086,6 +1114,7 @@ async function saveEditSettlement(id) {
     update.karat = karat;
     update.gold_24k_equivalent = +(weight * (karat / 24)).toFixed(3);
     update.fab_fee_amount = 0;
+    update.movement_type = 'debt_decrease'; // gold settlement always shop->trader for now
   } else {
     const amount = parseFloat(document.getElementById('edit-settle-cash-' + id).value);
     if (!amount || amount <= 0) {
@@ -1097,6 +1126,7 @@ async function saveEditSettlement(id) {
     update.karat = null;
     update.gold_24k_equivalent = 0;
     update.fab_fee_amount = amount;
+    update.movement_type = direction === 'out' ? 'debt_decrease' : 'debt_increase';
   }
 
   const { error } = await goldmindClient.from('trader_movements').update(update).eq('id', id);
@@ -1109,16 +1139,18 @@ async function saveEditSettlement(id) {
   // Keep the linked cash-register entry in sync if this settlement was cash
   // (either before or after the edit) and has a linked cash_movements row.
   const linkedId = m && m.linked_cash_movement_id;
+  const traderName = (traders.find(t => t.id === currentTraderId) || {}).name || 'تاجر';
   if (linkedId) {
     if (type === 'cash') {
       await goldmindClient.from('cash_movements').update({
         amount: update.fab_fee_amount,
-        description: 'تسوية مصنعية نقدية - ' + (notes || (traders.find(t => t.id === currentTraderId) || {}).name || 'تاجر')
+        direction: direction,
+        description: (direction === 'out' ? 'تسوية مصنعية نقدية - ' : 'استلام دفعة نقدية من التاجر - ') + traderName
       }).eq('id', linkedId);
     } else {
       // Switched from a cash settlement to a gold settlement -> the cash
-      // that left the register no longer has a matching debt reduction,
-      // so remove the now-orphaned register entry instead of leaving it.
+      // that moved no longer has a matching debt reduction, so remove the
+      // now-orphaned register entry instead of leaving it.
       await goldmindClient.from('cash_movements').delete().eq('id', linkedId);
     }
   }
@@ -1445,12 +1477,25 @@ async function submitGiveStock() {
 }
 
 let settleMode = 'gold';
+let settleCashDirection = 'out';
 function setSettleMode(mode) {
   settleMode = mode;
   document.getElementById('settleTabGold').classList.toggle('active', mode === 'gold');
   document.getElementById('settleTabCash').classList.toggle('active', mode === 'cash');
   document.getElementById('settle-gold-fields').classList.toggle('hidden', mode !== 'gold');
   document.getElementById('settle-cash-fields').classList.toggle('hidden', mode !== 'cash');
+  if (mode === 'cash') setSettleCashDirection(settleCashDirection);
+}
+
+function setSettleCashDirection(dir) {
+  settleCashDirection = dir;
+  const outBtn = document.getElementById('settle-cash-dir-out');
+  const inBtn = document.getElementById('settle-cash-dir-in');
+  const active = 'flex-1 h-10 text-[12px] font-semibold bg-primary text-white';
+  const inactive = 'flex-1 h-10 text-[12px] font-semibold text-on-surface-variant';
+  outBtn.className = dir === 'out' ? active : inactive;
+  inBtn.className = dir === 'in' ? active : inactive;
+  document.getElementById('settle-cash-amount-label').textContent = dir === 'out' ? 'المبلغ المدفوع (د.إ)' : 'المبلغ المُستلم (د.إ)';
 }
 
 async function submitSettlement() {
@@ -1484,15 +1529,24 @@ async function submitSettlement() {
       errEl.classList.remove('hidden');
       return;
     }
+    // Sign convention (same as everywhere else on this page): debt_decrease
+    // pushes the balance toward "trader owes the shop" (we received/are
+    // owed), debt_increase pushes it toward "shop owes the trader" (we
+    // paid/owe). Cash physically leaving the register when we pay, or
+    // entering it when the trader pays us, is a separate axis from that —
+    // hence the explicit direction toggle above instead of assuming one
+    // fixed flow like the form used to.
     movement = {
       store_id: GOLDMIND_STORE_ID,
       trader_id: currentTraderId,
-      movement_type: 'debt_decrease',
+      movement_type: settleCashDirection === 'out' ? 'debt_decrease' : 'debt_increase',
       weight_grams: 0,
       karat: null,
       gold_24k_equivalent: 0,
       fab_fee_amount: amount,
-      notes: notes || (diamondsEnabled ? 'تسوية نقدية (مصنعية/ألماس)' : 'تسوية مصنعية نقدية')
+      notes: notes || (settleCashDirection === 'out'
+        ? (diamondsEnabled ? 'تسوية نقدية (مصنعية/ألماس)' : 'تسوية مصنعية نقدية')
+        : 'استلام دفعة نقدية من التاجر')
     };
   }
 
@@ -1503,17 +1557,20 @@ async function submitSettlement() {
   const { data: insertedMovement, error } = await goldmindClient.from('trader_movements').insert(movement).select().single();
 
   if (!error && settleMode === 'cash') {
-    // Real cash leaving the register right now -> reflect it in the daily
-    // cash box, same as customer debt settlements already do. Linking via
-    // trader_movement_id lets a later edit/delete of this settlement keep
-    // the cash box entry in sync instead of going stale.
+    // Real cash moving in/out of the register right now -> reflect it in
+    // the daily cash box, same as customer debt settlements already do.
+    // Linking via trader_movement_id lets a later edit/delete of this
+    // settlement keep the cash box entry in sync instead of going stale.
     const trader = traders.find(t => t.id === currentTraderId);
+    const traderName = trader ? trader.name : 'تاجر';
     await goldmindClient.from('cash_movements').insert({
       store_id: GOLDMIND_STORE_ID,
       box: 'main',
-      direction: 'out',
+      direction: settleCashDirection,
       amount: movement.fab_fee_amount,
-      description: 'تسوية مصنعية نقدية - ' + (trader ? trader.name : 'تاجر'),
+      description: settleCashDirection === 'out'
+        ? ('تسوية مصنعية نقدية - ' + traderName)
+        : ('استلام دفعة نقدية من التاجر - ' + traderName),
       created_by: GOLDMIND_STAFF_ID,
       trader_movement_id: insertedMovement ? insertedMovement.id : null
     });
