@@ -142,6 +142,17 @@ async function saveGoldPrices() {
 
   const { error } = await goldmindClient.from('gold_prices').upsert(rows, { onConflict: 'store_id,karat' });
 
+  if (!error) {
+    // Persist to the store row too — this is what makes the value follow
+    // the account across devices/browsers instead of living only in this
+    // one browser's localStorage (which is what used to get wiped and
+    // force retyping it on every visit).
+    await goldmindClient.from('stores').update({
+      last_gold_ounce_price: ounce,
+      last_gold_ounce_rate: rate
+    }).eq('id', GOLDMIND_STORE_ID);
+  }
+
   btn.disabled = false;
   btn.textContent = 'حفظ الأسعار';
 
@@ -151,7 +162,6 @@ async function saveGoldPrices() {
     return;
   }
 
-  localStorage.setItem('goldmind_last_ounce_' + GOLDMIND_STORE_ID, JSON.stringify({ ounce, rate, at: new Date().toISOString() }));
   okEl.textContent = 'تم حفظ الأسعار بنجاح';
   okEl.classList.remove('hidden');
   loadLastUpdated();
@@ -173,6 +183,15 @@ async function loadLastUpdated() {
     });
   }
 
+  if (gmStore && gmStore.last_gold_ounce_price != null) {
+    document.getElementById('ouncePrice').value = gmStore.last_gold_ounce_price;
+    document.getElementById('exchangeRate').value = gmStore.last_gold_ounce_rate != null ? gmStore.last_gold_ounce_rate : 1;
+    recalcPreview();
+    return;
+  }
+
+  // Fallback for a value saved before this was moved to the database —
+  // once saved again it'll go through stores.last_gold_ounce_price above.
   const saved = localStorage.getItem('goldmind_last_ounce_' + GOLDMIND_STORE_ID);
   if (saved) {
     const parsed = JSON.parse(saved);
@@ -216,7 +235,7 @@ async function load() {
 
   const [{ data: staffRow }, { data: storeRow }] = await Promise.all([
     goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
-    goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+    goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate, last_gold_ounce_price, last_gold_ounce_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
   ]);
   gmStore = storeRow || null;
   const canManage = staffRow && staffRow.permissions && staffRow.permissions.manage_gold_price;
