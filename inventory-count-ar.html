@@ -14,6 +14,7 @@
 <script src="supabase-config.js"></script>
 <script src="theme.js?v=13"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -55,10 +56,33 @@
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">لا تملك صلاحية إجراء الجرد.</div>
 
+<!-- Resume banner (shown above scope-wrap if an in_progress session exists) -->
+<div id="resume-banner" class="hidden py-4 flex flex-col gap-3">
+<div class="bg-amber-50 border border-amber-300 rounded-xl p-4">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-amber-700">history</span>
+<span class="text-[13px] font-bold text-amber-800">في جلسة جرد غير مكتملة</span>
+</div>
+<p id="resume-details" class="text-[12px] text-amber-800"></p>
+</div>
+<div class="flex gap-2">
+<button onclick="resumeSession()" class="flex-1 h-12 bg-primary text-on-primary rounded-lg font-bold text-[13px]">استئناف الجلسة</button>
+<button onclick="discardInProgressAndStartNew()" class="flex-1 h-12 border border-error text-error rounded-lg font-bold text-[13px]">إلغاؤها والبدء من جديد</button>
+</div>
+</div>
+
 <!-- Step 1: warehouse/scope selection -->
 <div id="scope-wrap" class="hidden py-6 flex flex-col gap-5">
 <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4">
 <p class="text-[13px] text-on-surface-variant leading-relaxed">اختر المستودعات يلي بدك تجردها بهاي الجلسة.</p>
+</div>
+
+<div id="conflict-warning" class="hidden bg-red-50 border border-red-300 rounded-xl p-4">
+<div class="flex items-center gap-2 mb-1">
+<span class="material-symbols-outlined text-red-700">warning</span>
+<span class="text-[13px] font-bold text-red-700">تنبيه تضارب بيانات</span>
+</div>
+<p id="conflict-warning-text" class="text-[12px] text-red-700 leading-relaxed"></p>
 </div>
 
 <div class="flex flex-col gap-2">
@@ -95,6 +119,13 @@
 </div>
 </div>
 
+<div id="category-filter-wrap" class="hidden relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="category-filter">تصفية إضافية (اختياري) — صنف ١</label>
+<select id="category-filter" class="w-full h-12 border border-outline-variant rounded-lg px-3 bg-white text-[13px]">
+<option value="">كل الأصناف</option>
+</select>
+</div>
+
 <p id="scope-error" class="hidden text-error text-[12px] text-center">اختر مستودع واحد على الأقل للمتابعة</p>
 <button id="scope-continue-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all">متابعة</button>
 </div>
@@ -126,7 +157,7 @@
 <button id="start-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all" disabled>اختر طريقة الجرد أولاً</button>
 
 <div id="past-sessions-wrap" class="mt-4">
-<h3 class="text-[12px] font-bold text-on-surface-variant mb-2">جلسات سابقة</h3>
+<h3 class="text-[12px] font-bold text-on-surface-variant mb-2">جلسات سابقة (اضغط لعرض التفاصيل والتعديل)</h3>
 <div id="past-sessions-list" class="flex flex-col gap-2"></div>
 </div>
 </div>
@@ -226,12 +257,34 @@
 <span id="report-surplus-count" class="text-xl font-bold text-amber-700">0</span>
 </button>
 
+<div class="flex gap-2">
+<button onclick="exportCsv(missingListCache, surplusListCache, currentSessionMeta)" class="flex-1 h-11 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">table_view</span> Excel (CSV)</button>
+<button onclick="exportPdf('report-print-sheet','report-download-btn')" id="report-download-btn" class="flex-1 h-11 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> PDF</button>
+</div>
+
 <button id="post-count-btn" onclick="postCount()" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2 flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">task_alt</span> ترحيل الجرد
 </button>
-<p class="text-[10px] text-outline text-center -mt-3">الترحيل يقفل الجلسة كسجل نهائي معتمد. ما بيغيّر حالة أي قطعة تلقائياً — القطع الناقصة تحتاج قرارك بمراجعتها يدوياً.</p>
+<p class="text-[10px] text-outline text-center -mt-3">الترحيل يقفل الجلسة كسجل نهائي معتمد. ما بيغيّر حالة أي قطعة تلقائياً — القطع الناقصة تحتاج قرارك بمراجعتها يدوياً. المدير يقدر يلغي الترحيل ويعدّل لاحقاً من "جلسات سابقة".</p>
 
 <button id="new-session-btn" class="w-full h-12 border border-outline-variant rounded-lg font-semibold text-[13px]">جلسة جرد جديدة</button>
+
+<!-- Printable summary, kept in normal document flow (just hidden) so
+     html2pdf/html2canvas can capture real, attached, on-screen content —
+     toggled visible only for the instant of capture. -->
+<div id="report-print-sheet" class="hidden bg-white p-6 text-black" dir="rtl">
+<h2 class="text-lg font-bold mb-1">تقرير جرد المخزون — GoldMind</h2>
+<p id="print-meta" class="text-xs text-gray-600 mb-4"></p>
+<div class="grid grid-cols-3 gap-2 mb-4 text-center text-xs">
+<div class="border rounded p-2"><div id="print-expected" class="text-lg font-bold">0</div>متوقعة</div>
+<div class="border rounded p-2"><div id="print-matched" class="text-lg font-bold">0</div>مطابقة</div>
+<div class="border rounded p-2"><div id="print-scanned" class="text-lg font-bold">0</div>إجمالي المسح</div>
+</div>
+<h3 class="font-bold text-sm mb-1">قطع ناقصة</h3>
+<table class="w-full text-xs mb-4 border-collapse" id="print-missing-table"></table>
+<h3 class="font-bold text-sm mb-1">قطع زيادة</h3>
+<table class="w-full text-xs border-collapse" id="print-surplus-table"></table>
+</div>
 </div>
 
 <!-- Sub-screen: missing / surplus list -->
@@ -243,30 +296,71 @@
 <div id="subscreen-list" class="flex flex-col gap-2"></div>
 </div>
 
+<!-- Session detail / edit screen (past sessions) -->
+<div id="session-detail-wrap" class="hidden py-6 flex flex-col gap-4">
+<button onclick="closeSessionDetail()" class="self-start flex items-center gap-1 text-[13px] font-semibold text-primary">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span> رجوع للجرد
+</button>
+<div id="session-detail-meta" class="bg-surface-container-low border border-outline-variant rounded-xl p-4 text-[12px]"></div>
+
+<div id="session-owner-actions" class="hidden flex gap-2"></div>
+<p id="session-edit-hint" class="hidden text-[11px] text-outline"></p>
+
+<div class="grid grid-cols-3 gap-2">
+<div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-matched" class="text-lg font-bold text-green-700">0</div><div class="text-[10px]">مطابقة</div></div>
+<div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-missing" class="text-lg font-bold text-red-700">0</div><div class="text-[10px]">ناقصة</div></div>
+<div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-surplus" class="text-lg font-bold text-amber-700">0</div><div class="text-[10px]">زيادة</div></div>
+</div>
+
+<h3 class="text-[12px] font-bold text-on-surface-variant mt-2">كل المسوحات المسجّلة بهذه الجلسة</h3>
+<div id="session-scans-list" class="flex flex-col gap-1 max-h-96 overflow-y-auto"></div>
+</div>
+
 </main>
 
 <script>
 let canRun = false;
+let isOwner = false;
 let storeInfo = { rfid_enabled: false, diamonds_enabled: false };
 let goldPieces = [];
 let diamondPieces = [];
 let scope = { gold: true, diamond: false };
+let selectedCategory = '';
 let expectedPool = []; // [{id, source:'gold'|'diamond', barcode, rfid_epc, description, karat, weight_grams}]
 let expectedByField = {};
 let currentCountId = null;
 let countMethod = null;
 let matchField = null;
 let scannedValues = new Set();
-let scanRecords = []; // {value, piece, matchStatus, method}
 let stats = { expected: 0, scanned: 0, matched: 0, unexpected: 0 };
 let html5QrCode = null;
 let lastCameraValue = null;
 let lastCameraTime = 0;
 let missingListCache = [];
 let surplusListCache = [];
+let currentSessionMeta = {};
+let inProgressSession = null;
 
 function showEl(id) { document.getElementById(id).classList.remove('hidden'); }
 function hideEl(id) { document.getElementById(id).classList.add('hidden'); }
+
+// ---- Feedback: sound + vibration ----
+function playBeep(kind) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = kind === 'matched' ? 880 : (kind === 'unexpected' ? 260 : 440);
+    gain.gain.setValueAtTime(0.15, ctx.currentTime);
+    osc.start();
+    osc.stop(ctx.currentTime + 0.12);
+    osc.onended = () => ctx.close();
+  } catch (e) { /* audio not available — silently skip */ }
+}
+function vibrateDevice(pattern) {
+  if (navigator.vibrate) { try { navigator.vibrate(pattern); } catch (e) {} }
+}
 
 async function init() {
   const session = await requireGoldMindSession('login-entry-ar.html');
@@ -278,6 +372,7 @@ async function init() {
   const { data: me } = await goldmindClient
     .from('staff').select('role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).single();
   canRun = me && (me.role === 'owner' || (me.permissions && me.permissions.run_inventory_count === true));
+  isOwner = me && me.role === 'owner';
 
   document.getElementById('loading-state').classList.add('hidden');
 
@@ -292,12 +387,91 @@ async function init() {
   }
 
   await loadAllPieces();
+  await checkInProgressSession();
+
+  if (inProgressSession) {
+    document.getElementById('resume-details').textContent =
+      'بدأت بتاريخ ' + new Date(inProgressSession.started_at).toLocaleString('ar-AE') +
+      ' — ' + (inProgressSession.method === 'camera' ? 'كاميرا' : 'RFID') + ' — ' +
+      (inProgressSession.scope || []).join(' + ');
+    document.getElementById('resume-banner').classList.remove('hidden');
+  } else {
+    document.getElementById('scope-wrap').classList.remove('hidden');
+  }
+}
+
+async function checkInProgressSession() {
+  const { data } = await goldmindClient
+    .from('inventory_counts')
+    .select('id, method, scope, started_at, expected_piece_count')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .eq('status', 'in_progress')
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  inProgressSession = data || null;
+}
+
+async function resumeSession() {
+  document.getElementById('resume-banner').classList.add('hidden');
+  const countId = inProgressSession.id;
+  countMethod = inProgressSession.method;
+  matchField = countMethod === 'rfid' ? 'rfid_epc' : 'barcode';
+  scope.gold = (inProgressSession.scope || []).includes('gold');
+  scope.diamond = (inProgressSession.scope || []).includes('diamond');
+
+  const { data: expectedRows } = await goldmindClient
+    .from('inventory_count_expected').select('*').eq('count_id', countId);
+  expectedPool = (expectedRows || []).map(r => ({
+    id: r.piece_id, source: r.piece_source, barcode: r.barcode,
+    rfid_epc: matchField === 'rfid_epc' ? r.match_value : null,
+    description_ar: r.description_ar, karat: r.karat, weight_grams: r.weight_grams
+  }));
+  expectedByField = {};
+  (expectedRows || []).forEach(r => { expectedByField[r.match_value] = expectedPool.find(p => p.id === r.piece_id && p.source === r.piece_source); });
+
+  const { data: scanRows } = await goldmindClient
+    .from('inventory_count_scans').select('*').eq('count_id', countId).order('scanned_at', { ascending: true });
+
+  currentCountId = countId;
+  scannedValues = new Set();
+  stats = { expected: expectedPool.length, scanned: 0, matched: 0, unexpected: 0 };
+  document.getElementById('scan-log').innerHTML = '';
+  (scanRows || []).forEach(r => {
+    scannedValues.add(r.rfid_epc);
+    stats.scanned++;
+    if (r.match_status === 'matched') stats.matched++; else stats.unexpected++;
+    const label = r.match_status === 'matched' ? ('✓ ' + r.rfid_epc) : ('⚠ زيادة: ' + r.rfid_epc);
+    addLogRow(label, r.match_status === 'matched' ? 'matched' : 'unexpected');
+  });
+  updateStatsUI();
+  renderChecklist();
+
+  document.getElementById('scope-wrap').classList.add('hidden');
+  document.getElementById('start-wrap').classList.add('hidden');
+  document.getElementById('scan-wrap').classList.remove('hidden');
+
+  if (countMethod === 'rfid') {
+    document.getElementById('rfid-input-wrap').classList.remove('hidden');
+    document.getElementById('scan-input').focus();
+  } else {
+    document.getElementById('camera-wrap').classList.remove('hidden');
+    document.getElementById('camera-wrap').classList.add('flex');
+    startCameraScanner();
+  }
+}
+
+async function discardInProgressAndStartNew() {
+  if (!confirm('هل تريد إلغاء الجلسة غير المكتملة نهائياً؟ كل المسوحات المسجّلة فيها رح تُحذف.')) return;
+  await goldmindClient.from('inventory_counts').update({ status: 'cancelled' }).eq('id', inProgressSession.id);
+  inProgressSession = null;
+  document.getElementById('resume-banner').classList.add('hidden');
   document.getElementById('scope-wrap').classList.remove('hidden');
 }
 
 async function loadAllPieces() {
   const goldQ = goldmindClient.from('pieces')
-    .select('id, barcode, rfid_epc, description_ar, description_en, karat, weight_grams')
+    .select('id, barcode, rfid_epc, description_ar, description_en, karat, weight_grams, category1')
     .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'available');
   const queries = [goldQ];
   if (storeInfo.diamonds_enabled) {
@@ -307,17 +481,51 @@ async function loadAllPieces() {
   }
   const results = await Promise.all(queries);
   goldPieces = (results[0].data || []).map(p => ({ ...p, source: 'gold' }));
-  diamondPieces = storeInfo.diamonds_enabled ? (results[1].data || []).map(p => ({ ...p, source: 'diamond', rfid_epc: null })) : [];
+  diamondPieces = storeInfo.diamonds_enabled ? (results[1].data || []).map(p => ({ ...p, source: 'diamond', rfid_epc: null, category1: null })) : [];
 
   document.getElementById('gold-count-label').textContent = goldPieces.length + ' قطعة متوفرة';
   if (storeInfo.diamonds_enabled) {
     document.getElementById('diamond-count-label').textContent = diamondPieces.length + ' قطعة متوفرة';
   }
+
+  populateCategoryFilter();
+  detectAndShowConflicts();
+}
+
+function populateCategoryFilter() {
+  const cats = [...new Set(goldPieces.map(p => p.category1).filter(Boolean))];
+  const select = document.getElementById('category-filter');
+  const wrap = document.getElementById('category-filter-wrap');
+  if (cats.length === 0) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  select.innerHTML = '<option value="">كل الأصناف</option>' + cats.map(c => `<option value="${gmEscapeHtml(c)}">${gmEscapeHtml(c)}</option>`).join('');
+}
+
+function detectAndShowConflicts() {
+  const seen = {};
+  const conflicts = new Set();
+  goldPieces.concat(diamondPieces).forEach(p => {
+    ['barcode', 'rfid_epc'].forEach(f => {
+      const v = p[f];
+      if (!v) return;
+      const key = f + ':' + v;
+      if (seen[key] && seen[key] !== p.id) conflicts.add(v);
+      seen[key] = p.id;
+    });
+  });
+  const box = document.getElementById('conflict-warning');
+  if (conflicts.size === 0) { box.classList.add('hidden'); return; }
+  document.getElementById('conflict-warning-text').textContent =
+    'في ' + conflicts.size + ' رمز (باركود/RFID) مسجّل بأكتر من قطعة بنفس الوقت: ' +
+    Array.from(conflicts).slice(0, 5).join('، ') + (conflicts.size > 5 ? '...' : '') +
+    ' — هاد بيسبب نتائج جرد غير دقيقة، يفضّل تصحيح بيانات القطع قبل المتابعة.';
+  box.classList.remove('hidden');
 }
 
 document.getElementById('scope-continue-btn').addEventListener('click', () => {
   scope.gold = document.getElementById('scope-gold').checked;
   scope.diamond = document.getElementById('scope-diamond').checked;
+  selectedCategory = document.getElementById('category-filter').value || '';
 
   if (!scope.gold && !scope.diamond) {
     document.getElementById('scope-error').classList.remove('hidden');
@@ -325,10 +533,6 @@ document.getElementById('scope-continue-btn').addEventListener('click', () => {
   }
   document.getElementById('scope-error').classList.add('hidden');
 
-  // RFID only ever applies to the gold table (diamonds have no rfid_epc
-  // column) — hide it entirely once diamonds are in scope, to avoid a
-  // session where diamond pieces could NEVER be matched and would always
-  // show up as falsely "missing".
   const rfidBtn = document.getElementById('method-rfid-btn');
   if (scope.diamond || !storeInfo.rfid_enabled) {
     rfidBtn.classList.add('hidden');
@@ -347,13 +551,14 @@ function currentScopePool() {
   let pool = [];
   if (scope.gold) pool = pool.concat(goldPieces);
   if (scope.diamond) pool = pool.concat(diamondPieces);
+  if (selectedCategory) pool = pool.filter(p => p.category1 === selectedCategory);
   return pool;
 }
 
 function poolForMethod(method) {
   const scopePool = currentScopePool();
   if (method === 'rfid') return scopePool.filter(p => p.rfid_epc);
-  return scopePool.filter(p => p.barcode); // camera or manual-only sessions still match by barcode
+  return scopePool.filter(p => p.barcode);
 }
 
 function setCountMethod(method) {
@@ -380,22 +585,29 @@ async function loadPastSessions() {
     .from('inventory_counts')
     .select('id, status, started_at, completed_at, expected_piece_count, matched_count, missing_count, unexpected_count, method, scope')
     .eq('store_id', GOLDMIND_STORE_ID)
+    .neq('status', 'in_progress')
+    .neq('status', 'cancelled')
     .order('started_at', { ascending: false })
-    .limit(5);
+    .limit(8);
 
   const list = document.getElementById('past-sessions-list');
   list.innerHTML = '';
   (data || []).forEach(s => {
-    const row = document.createElement('div');
-    row.className = 'bg-surface-container-low rounded-lg p-3 flex items-center justify-between text-[12px]';
+    const row = document.createElement('button');
+    row.className = 'w-full bg-surface-container-low rounded-lg p-3 flex items-center justify-between text-[12px] text-right';
     const dateStr = new Date(s.started_at).toLocaleDateString('ar-AE', { day: 'numeric', month: 'short', year: 'numeric' });
     const methodLabel = s.method === 'camera' ? '📷' : (s.method === 'rfid' ? '📡' : '');
-    const statusLabel = s.status === 'posted' ? 'مُرحّلة' : (s.status === 'completed' ? 'مكتملة' : 'غير مكتملة');
+    const statusLabel = s.status === 'posted' ? 'مُرحّلة' : 'مكتملة';
     row.innerHTML = `<span class="font-semibold">${methodLabel} ${dateStr}</span>
       <span class="text-on-surface-variant">${statusLabel}</span>
-      <span>${s.matched_count || 0}/${s.expected_piece_count || 0} مطابقة</span>`;
+      <span>${s.matched_count || 0}/${s.expected_piece_count || 0} مطابقة</span>
+      <span class="material-symbols-outlined text-[16px] text-outline">chevron_left</span>`;
+    row.onclick = () => openSessionDetail(s.id);
     list.appendChild(row);
   });
+  if ((data || []).length === 0) {
+    list.innerHTML = '<div class="text-[12px] text-on-surface-variant text-center py-2">لا توجد جلسات سابقة بعد</div>';
+  }
 }
 
 document.getElementById('start-btn').addEventListener('click', async () => {
@@ -425,17 +637,37 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     unexpected_count: 0
   }).select().single();
 
-  btn.disabled = false;
-  btn.textContent = 'بدء جلسة جرد جديدة';
-
   if (error || !countRow) {
+    btn.disabled = false;
+    btn.textContent = 'بدء جلسة جرد جديدة';
     alert('تعذّر بدء جلسة الجرد: ' + (error ? error.message : ''));
     return;
   }
 
   currentCountId = countRow.id;
+
+  // Snapshot the expected pool now — this is what makes editing/undoing a
+  // scan on a past session reliable later, instead of re-deriving "what
+  // was expected" from live inventory that may have changed since.
+  if (expectedPool.length > 0) {
+    const snapshotRows = expectedPool.map(p => ({
+      store_id: GOLDMIND_STORE_ID,
+      count_id: currentCountId,
+      piece_id: p.id,
+      piece_source: p.source,
+      match_value: p[matchField],
+      barcode: p.barcode || null,
+      description_ar: p.description_ar || null,
+      karat: p.karat || null,
+      weight_grams: p.weight_grams || null
+    }));
+    await goldmindClient.from('inventory_count_expected').insert(snapshotRows);
+  }
+
+  btn.disabled = false;
+  btn.textContent = 'بدء جلسة جرد جديدة';
+
   scannedValues = new Set();
-  scanRecords = [];
   stats = { expected: expectedPool.length, scanned: 0, matched: 0, unexpected: 0 };
   updateStatsUI();
   renderChecklist();
@@ -539,11 +771,6 @@ function stopCameraScanner() {
 }
 
 function onCameraScanSuccess(decodedText) {
-  // The camera keeps feeding the SAME barcode dozens of times per second
-  // while it's in frame, unlike a discrete handheld-scanner trigger pull.
-  // Silently ignore repeats of the same code within a short cooldown
-  // window instead of spamming handleScan (and the "duplicate" log) once
-  // per video frame.
   const now = Date.now();
   if (decodedText === lastCameraValue && (now - lastCameraTime) < 2000) return;
   lastCameraValue = decodedText;
@@ -561,10 +788,6 @@ function handleManualSubmit() {
 document.getElementById('manual-input').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); handleManualSubmit(); }
 });
-// Live-filter the checklist as the person types, so typing a piece number
-// locates it in the table even before pressing "تأكيد" — this is the
-// "find where a piece is" behavior, separate from actually marking it
-// scanned.
 document.getElementById('manual-input').addEventListener('input', () => {
   if (!document.getElementById('checklist-wrap').classList.contains('hidden')) {
     renderChecklist(document.getElementById('manual-input').value.trim());
@@ -577,6 +800,8 @@ async function handleScan(value, method) {
   if (scannedValues.has(value)) {
     showLastScan('تم مسح هذه القطعة مسبقاً بهذه الجلسة — لا يمكن تكرارها.', 'duplicate');
     addLogRow('مكرر (مرفوض): ' + value, 'duplicate');
+    playBeep('duplicate');
+    vibrateDevice(30);
     return;
   }
   scannedValues.add(value);
@@ -587,18 +812,21 @@ async function handleScan(value, method) {
   stats.scanned++;
   if (piece) stats.matched++; else stats.unexpected++;
   updateStatsUI();
-  scanRecords.push({ value, piece, matchStatus, method });
 
   const label = piece ? (piece.barcode || piece.description_ar || value) : value;
   if (piece) {
     showLastScan('✓ مطابقة: ' + label, 'matched');
     addLogRow('✓ ' + label, 'matched');
+    playBeep('matched');
+    vibrateDevice(50);
     if (method !== 'manual' && piece.source === 'gold' && piece.rfid_last_seen_at !== undefined) {
       goldmindClient.from('pieces').update({ rfid_last_seen_at: new Date().toISOString() }).eq('id', piece.id).then(() => {});
     }
   } else {
     showLastScan('⚠ زيادة (غير متوقعة): ' + value, 'unexpected');
     addLogRow('⚠ زيادة: ' + value, 'unexpected');
+    playBeep('unexpected');
+    vibrateDevice([80, 60, 80]);
   }
 
   renderChecklist(document.getElementById('manual-input').value.trim());
@@ -606,7 +834,7 @@ async function handleScan(value, method) {
   await goldmindClient.from('inventory_count_scans').insert({
     store_id: GOLDMIND_STORE_ID,
     count_id: currentCountId,
-    rfid_epc: value, // reused as "the scanned identifier" regardless of method
+    rfid_epc: value,
     piece_id: piece ? piece.id : null,
     piece_source: piece ? piece.source : null,
     match_status: matchStatus,
@@ -630,7 +858,7 @@ function renderChecklist(filterText) {
   const filter = (filterText || '').toLowerCase();
   const rows = expectedPool
     .filter(p => !filter || (p.barcode || '').toLowerCase().includes(filter) || (p.description_ar || '').toLowerCase().includes(filter))
-    .slice(0, 200); // keep the DOM light on large inventories; narrow with the search box
+    .slice(0, 200);
 
   wrap.innerHTML = rows.map(p => {
     const isScanned = scannedValues.has(p[matchField]);
@@ -671,6 +899,8 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
 
   btn.disabled = false;
   btn.textContent = 'إنهاء الجلسة وعرض التقرير';
+
+  currentSessionMeta = { date: new Date().toLocaleString('ar-AE'), method: countMethod };
 
   document.getElementById('report-expected').textContent = stats.expected;
   document.getElementById('report-matched').textContent = stats.matched;
@@ -716,9 +946,63 @@ function closeSubScreen() {
   document.getElementById('header-title').textContent = 'الجرد';
 }
 
+// ---- Export ----
+function exportCsv(missing, surplus, meta) {
+  let csv = '\uFEFFنوع,الباركود,الوصف,الوزن,العيار\n';
+  missing.forEach(p => {
+    csv += `ناقصة,"${(p.barcode || '').replace(/"/g,'')}","${(p.description_ar || '').replace(/"/g,'')}",${p.weight_grams || ''},${p.karat || ''}\n`;
+  });
+  surplus.forEach(v => {
+    csv += `زيادة,"${v.replace(/"/g,'')}",,,\n`;
+  });
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'تقرير-جرد-' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+async function exportPdf(sheetId, btnId) {
+  const sheet = document.getElementById(sheetId);
+  const btn = document.getElementById(btnId);
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span>';
+
+  document.getElementById('print-meta').textContent = new Date().toLocaleString('ar-AE') + ' — طريقة: ' + (countMethod === 'camera' ? 'كاميرا' : 'RFID/يدوي');
+  document.getElementById('print-expected').textContent = document.getElementById('report-expected').textContent;
+  document.getElementById('print-matched').textContent = document.getElementById('report-matched').textContent;
+  document.getElementById('print-scanned').textContent = document.getElementById('report-scanned').textContent;
+  document.getElementById('print-missing-table').innerHTML = missingListCache.map(p =>
+    `<tr><td class="border px-2 py-1">${gmEscapeHtml(p.barcode || '')}</td><td class="border px-2 py-1">${gmEscapeHtml(p.description_ar || '')}</td></tr>`).join('') || '<tr><td class="border px-2 py-1">لا يوجد</td></tr>';
+  document.getElementById('print-surplus-table').innerHTML = surplusListCache.map(v =>
+    `<tr><td class="border px-2 py-1">${gmEscapeHtml(v)}</td></tr>`).join('') || '<tr><td class="border px-2 py-1">لا يوجد</td></tr>';
+
+  sheet.classList.remove('hidden');
+  if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+
+  try {
+    await html2pdf().set({
+      margin: 10,
+      filename: 'تقرير-جرد-' + new Date().toISOString().slice(0,10) + '.pdf',
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(sheet).save();
+  } catch (err) {
+    alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
+  } finally {
+    sheet.classList.add('hidden');
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
+
 async function postCount() {
   if (!currentCountId) return;
-  const msg = 'رح تُقفل جلسة الجرد كسجل نهائي معتمد (' + missingListCache.length + ' ناقصة، ' + surplusListCache.length + ' زيادة). ما رح تقدر تعدّل عليها بعدين. متأكد؟';
+  const msg = 'رح تُقفل جلسة الجرد كسجل نهائي معتمد (' + missingListCache.length + ' ناقصة، ' + surplusListCache.length + ' زيادة). المدير يقدر يلغي الترحيل لاحقاً ويعدّل. متأكد؟';
   if (!confirm(msg)) return;
 
   const btn = document.getElementById('post-count-btn');
@@ -747,7 +1031,6 @@ function startNewSession() {
   countMethod = null;
   matchField = null;
   scannedValues = new Set();
-  scanRecords = [];
   document.getElementById('scan-log').innerHTML = '';
   document.getElementById('checklist-wrap').innerHTML = '';
   document.getElementById('checklist-wrap').classList.add('hidden');
@@ -769,6 +1052,138 @@ function startNewSession() {
   });
 }
 document.getElementById('new-session-btn').addEventListener('click', startNewSession);
+
+// ---- Past session detail / edit (owner can unpost + delete a mis-scan) ----
+let sessionDetailId = null;
+let sessionDetailStatus = null;
+let sessionDetailScanRows = [];
+let sessionDetailExpectedRows = [];
+
+async function openSessionDetail(countId) {
+  sessionDetailId = countId;
+  document.getElementById('start-wrap').classList.add('hidden');
+  document.getElementById('session-detail-wrap').classList.remove('hidden');
+  document.getElementById('header-title').textContent = 'تفاصيل الجلسة';
+
+  const [{ data: countRow }, { data: expectedRows }, { data: scanRows }] = await Promise.all([
+    goldmindClient.from('inventory_counts').select('*').eq('id', countId).single(),
+    goldmindClient.from('inventory_count_expected').select('*').eq('count_id', countId),
+    goldmindClient.from('inventory_count_scans').select('*').eq('count_id', countId).order('scanned_at', { ascending: false })
+  ]);
+
+  sessionDetailStatus = countRow.status;
+  sessionDetailExpectedRows = expectedRows || [];
+  sessionDetailScanRows = scanRows || [];
+
+  const dateStr = new Date(countRow.started_at).toLocaleString('ar-AE');
+  const statusLabel = countRow.status === 'posted' ? 'مُرحّلة ✅' : 'مكتملة';
+  document.getElementById('session-detail-meta').innerHTML =
+    `<div class="font-bold mb-1">${dateStr}</div>
+     <div class="text-on-surface-variant">الطريقة: ${countRow.method === 'camera' ? 'كاميرا' : 'RFID'} — النطاق: ${(countRow.scope || []).join(' + ')}</div>
+     <div class="mt-1">الحالة: <span class="font-bold">${statusLabel}</span></div>`;
+
+  const ownerActions = document.getElementById('session-owner-actions');
+  const editHint = document.getElementById('session-edit-hint');
+  ownerActions.innerHTML = '';
+  if (isOwner && countRow.status === 'posted') {
+    ownerActions.classList.remove('hidden');
+    ownerActions.classList.add('flex');
+    const unpostBtn = document.createElement('button');
+    unpostBtn.className = 'flex-1 h-11 border border-error text-error rounded-lg text-[12px] font-bold';
+    unpostBtn.textContent = 'إلغاء الترحيل والتعديل';
+    unpostBtn.onclick = () => unpostSession(countId);
+    ownerActions.appendChild(unpostBtn);
+    editHint.classList.add('hidden');
+  } else if (isOwner && countRow.status === 'completed') {
+    ownerActions.classList.add('hidden');
+    editHint.textContent = 'الجلسة غير مُرحّلة بعد — تقدر تحذف أي مسحة خاطئة مباشرة (أيقونة السلة)، وترحّلها لاحقاً من هنا.';
+    editHint.classList.remove('hidden');
+  } else {
+    ownerActions.classList.add('hidden');
+    editHint.textContent = 'الجلسة مُرحّلة — التعديل يحتاج صلاحية مدير لإلغاء الترحيل أولاً.';
+    editHint.classList.remove('hidden');
+  }
+
+  renderSessionDetailCounts();
+  renderSessionScansList();
+}
+
+function renderSessionDetailCounts() {
+  const scannedMap = {};
+  sessionDetailScanRows.forEach(r => { scannedMap[r.rfid_epc] = r; });
+  const missing = sessionDetailExpectedRows.filter(e => !scannedMap[e.match_value]);
+  const matched = sessionDetailScanRows.filter(r => r.match_status === 'matched').length;
+  const surplus = sessionDetailScanRows.filter(r => r.match_status === 'unexpected').length;
+  document.getElementById('sd-matched').textContent = matched;
+  document.getElementById('sd-missing').textContent = missing.length;
+  document.getElementById('sd-surplus').textContent = surplus;
+}
+
+function renderSessionScansList() {
+  const canEdit = isOwner ? true : (sessionDetailStatus !== 'posted');
+  const list = document.getElementById('session-scans-list');
+  if (sessionDetailScanRows.length === 0) {
+    list.innerHTML = '<div class="text-[12px] text-on-surface-variant text-center py-3">لا توجد مسوحات</div>';
+    return;
+  }
+  list.innerHTML = sessionDetailScanRows.map(r => {
+    const isMatched = r.match_status === 'matched';
+    const colorClass = isMatched ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700';
+    const methodIcon = r.scan_method === 'camera' ? '📷' : (r.scan_method === 'manual' ? '⌨️' : '📡');
+    const trash = (sessionDetailStatus !== 'posted')
+      ? `<button onclick="deleteScanRow('${r.id}')" class="text-error"><span class="material-symbols-outlined text-[18px]">delete</span></button>`
+      : '';
+    return `<div class="flex items-center justify-between px-3 py-2 rounded-lg ${colorClass} text-[12px]">
+      <span class="font-data-mono">${methodIcon} ${gmEscapeHtml(r.rfid_epc)}</span>
+      <div class="flex items-center gap-2">
+        <span class="font-semibold">${isMatched ? 'مطابقة' : 'زيادة'}</span>
+        ${trash}
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function deleteScanRow(scanRowId) {
+  if (!confirm('هل تريد حذف هذه المسحة من الجلسة؟ رح يتحدّث تقرير الفرق تلقائياً.')) return;
+  await goldmindClient.from('inventory_count_scans').delete().eq('id', scanRowId);
+  sessionDetailScanRows = sessionDetailScanRows.filter(r => r.id !== scanRowId);
+  await recomputeSessionCounts(sessionDetailId);
+  renderSessionDetailCounts();
+  renderSessionScansList();
+}
+
+async function recomputeSessionCounts(countId) {
+  const scannedMap = {};
+  sessionDetailScanRows.forEach(r => { scannedMap[r.rfid_epc] = r; });
+  const missingCount = sessionDetailExpectedRows.filter(e => !scannedMap[e.match_value]).length;
+  const matchedCount = sessionDetailScanRows.filter(r => r.match_status === 'matched').length;
+  const unexpectedCount = sessionDetailScanRows.filter(r => r.match_status === 'unexpected').length;
+  await goldmindClient.from('inventory_counts').update({
+    matched_count: matchedCount,
+    missing_count: missingCount,
+    unexpected_count: unexpectedCount,
+    scanned_piece_count: sessionDetailScanRows.length
+  }).eq('id', countId);
+}
+
+async function unpostSession(countId) {
+  if (!isOwner) return;
+  if (!confirm('هل تريد إلغاء ترحيل هذه الجلسة والسماح بتعديلها؟')) return;
+  await goldmindClient.from('inventory_counts').update({ status: 'completed', posted_at: null, posted_by: null }).eq('id', countId);
+  await goldmindClient.from('audit_log').insert({
+    store_id: GOLDMIND_STORE_ID,
+    action_type: 'inventory_count_unposted',
+    description: 'إلغاء ترحيل جرد بواسطة المدير للتعديل'
+  });
+  openSessionDetail(countId);
+}
+
+function closeSessionDetail() {
+  document.getElementById('session-detail-wrap').classList.add('hidden');
+  document.getElementById('start-wrap').classList.remove('hidden');
+  document.getElementById('header-title').textContent = 'الجرد';
+  loadPastSessions();
+}
 
 init();
 </script>
