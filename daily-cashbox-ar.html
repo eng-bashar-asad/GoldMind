@@ -443,17 +443,15 @@ function renderAll() {
   clusters.forEach(cluster => {
     const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
     const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    // No padding between clusters: the table must stay fully filled on
+    // both sides at all times, so an unbalanced cluster (e.g. 2 out
+    // entries but only 1 in entry) no longer opens a blank cell — the next
+    // cluster's entries simply flow up to fill the gap. Each cell still
+    // carries its OWN entry's link color (see cellHtml below), so a linked
+    // pair stays visually tied together by color even if it lands a row
+    // or two apart from its partner.
     outEntries.push(...outMembers);
     inEntries.push(...inMembers);
-    // Pad the shorter side up to the same length before the next cluster
-    // starts. Without this, an unbalanced cluster (e.g. 2 out entries but
-    // only 1 in entry) shifts every cluster after it out of sync between
-    // the two columns — the whole point of clustering is that a group's
-    // block starts on the SAME row in both columns, not just "somewhere
-    // near" each other.
-    const diff = outMembers.length - inMembers.length;
-    if (diff > 0) inEntries.push(...Array(diff).fill(null));
-    else if (diff < 0) outEntries.push(...Array(-diff).fill(null));
   });
   const rowCount = Math.max(outEntries.length, inEntries.length);
 

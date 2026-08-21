@@ -17,7 +17,7 @@
       "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
       "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
       "surface-container-lowest": "var(--gm-surface-lowest)", "primary": "var(--gm-primary)",
-      "accent": "var(--gm-accent)"
+      "accent": "var(--gm-accent)", "success": "#1e7d32", "error": "#ba1a1a"
     }
   } } }
 </script>
@@ -28,6 +28,7 @@
         .no-print { display: none !important; }
         body { background: #fff !important; }
         #sheet { box-shadow: none !important; border: none !important; margin: 0 !important; max-width: none !important; }
+        #sheet .gm-print-shadow { box-shadow: none !important; }
     }
 </style>
 </head>
@@ -50,7 +51,7 @@
 <div id="loading" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
 <div id="sheet" class="hidden max-w-2xl mx-auto my-6 p-3 sm:p-5 bg-background">
-<div class="rounded-lg border-[3px] border-accent">
+<div class="rounded-lg border-[3px] border-accent gm-print-shadow" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
 <div class="bg-surface-container-lowest rounded-lg overflow-hidden">
 
 <!-- Letterhead -->
@@ -75,8 +76,8 @@
 </colgroup>
 <thead>
 <tr>
-<th colspan="2" class="bg-green-100 text-green-800 py-2.5 font-bold">الداخل</th>
-<th colspan="2" class="bg-red-100 text-red-800 py-2.5 font-bold">الصادر</th>
+<th colspan="2" class="bg-success/10 text-success py-2.5 font-bold">الداخل</th>
+<th colspan="2" class="bg-error/10 text-error py-2.5 font-bold">الصادر</th>
 </tr>
 </thead>
 <tbody id="rowsBody"></tbody>
@@ -86,7 +87,9 @@
 <!-- Per-currency totals, mirroring the reference sheet's summary block -->
 <div class="mt-5">
 <h3 class="text-[13px] font-bold text-on-surface-variant mb-2">الرصيد الحالي بالدرج</h3>
-<table class="w-full text-[13px] rounded-xl overflow-hidden border-[3px] border-accent" id="totalsTable"></table>
+<div class="rounded-xl overflow-hidden border-[3px] border-accent gm-print-shadow" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
+<table class="w-full text-[13px]" id="totalsTable"></table>
+</div>
 </div>
 </div>
 
@@ -161,50 +164,50 @@ async function load() {
 
   const outEntries = [];
   const inEntries = [];
-  const rowColors = [];
   clusters.forEach(cluster => {
-    const outMembers = cluster.members.filter(e => e.direction === 'out');
-    const inMembers = cluster.members.filter(e => e.direction === 'in');
-    const rows = Math.max(outMembers.length, inMembers.length);
-    const color = gmLinkColorFor(cluster.group);
-    for (let i = 0; i < rows; i++) {
-      outEntries.push(outMembers[i]);
-      inEntries.push(inMembers[i]);
-      rowColors.push(color);
-    }
+    const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    // Same always-filled approach as the in-app page: no padding between
+    // clusters, so an unbalanced cluster never opens a blank row in the
+    // middle of the sheet. Each cell keeps its OWN entry's link color
+    // (below) rather than one color per row, since two entries sharing a
+    // row are no longer guaranteed to be the same linked pair.
+    outEntries.push(...outMembers);
+    inEntries.push(...inMembers);
   });
-  const rowCount = Math.max(outEntries.length, 1);
+  const rowCount = Math.max(outEntries.length, inEntries.length, 1);
 
   const rowsBody = document.getElementById('rowsBody');
   let rowsHtml = '';
   for (let i = 0; i < rowCount; i++) {
     const o = outEntries[i];
     const inn = inEntries[i];
-    const bg = rowColors[i] ? `background-color:${rowColors[i]};` : '';
-    rowsHtml += `<tr style="${bg}">
-      <td class="py-2.5 px-3 border-t border-gray-200" style="word-break:break-word;overflow-wrap:break-word;">${inn ? inn.operation_type + (inn.notes ? ' — ' + inn.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left" style="word-break:break-word;overflow-wrap:break-word;" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200" style="word-break:break-word;overflow-wrap:break-word;">${o ? o.operation_type + (o.notes ? ' — ' + o.notes : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-gray-200 font-bold text-left" style="word-break:break-word;overflow-wrap:break-word;" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
+    const inBg = inn && gmLinkColorFor(inn.link_group) ? `background-color:${gmLinkColorFor(inn.link_group)};` : '';
+    const outBg = o && gmLinkColorFor(o.link_group) ? `background-color:${gmLinkColorFor(o.link_group)};` : '';
+    rowsHtml += `<tr>
+      <td class="py-2.5 px-3 border-t border-outline-variant" style="word-break:break-word;overflow-wrap:break-word;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (inn.notes ? ' — ' + gmEscapeHtml(inn.notes) : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="word-break:break-word;overflow-wrap:break-word;${inBg}" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-outline-variant" style="word-break:break-word;overflow-wrap:break-word;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (o.notes ? ' — ' + gmEscapeHtml(o.notes) : '') : ''}</td>
+      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="word-break:break-word;overflow-wrap:break-word;${outBg}" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
     </tr>`;
   }
   if (dayEntries.length === 0) {
-    rowsHtml = '<tr><td colspan="4" class="py-6 text-center text-on-surface-variant border-t border-gray-200">لا توجد عمليات بهذا اليوم</td></tr>';
+    rowsHtml = '<tr><td colspan="4" class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا توجد عمليات بهذا اليوم</td></tr>';
   }
   rowsBody.innerHTML = rowsHtml;
 
   const currencies = [...new Set((allEntries || []).map(e => e.currency))];
   const totalsTable = document.getElementById('totalsTable');
   if (currencies.length === 0) {
-    totalsTable.innerHTML = '<tr><td class="py-3 px-2 text-center text-on-surface-variant border border-gray-200">لا يوجد رصيد مسجّل بعد</td></tr>';
+    totalsTable.innerHTML = '<tr><td class="py-3 px-2 text-center text-on-surface-variant border border-outline-variant">لا يوجد رصيد مسجّل بعد</td></tr>';
   } else {
     totalsTable.innerHTML = currencies.map(cur => {
       const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
       const dayNet = dayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
       const closing = opening + dayNet;
       return `<tr>
-        <td class="py-2 px-3 border border-gray-200 font-bold bg-surface-container-low">${cur}</td>
-        <td class="py-2 px-3 border border-gray-200 text-left" dir="ltr">${fmt(closing)}</td>
+        <td class="py-2 px-3 border border-outline-variant font-bold bg-surface-container-low">${cur}</td>
+        <td class="py-2 px-3 border border-outline-variant text-left" dir="ltr">${fmt(closing)}</td>
       </tr>`;
     }).join('');
   }
