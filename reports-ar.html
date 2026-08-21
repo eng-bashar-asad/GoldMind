@@ -201,8 +201,8 @@ async function searchByInvoiceNumber() {
     .limit(10);
 
   resultEl.classList.remove('hidden');
-  if (error) { resultEl.innerHTML = `<p class="text-error text-sm">تعذّر البحث: ${error.message}</p>`; return; }
-  if (!data || data.length === 0) { resultEl.innerHTML = `<p class="text-on-surface-variant text-sm">لا توجد فاتورة برقم "${q}"</p>`; return; }
+  if (error) { resultEl.innerHTML = `<p class="text-error text-sm">تعذّر البحث: ${gmEscapeHtml(error.message)}</p>`; return; }
+  if (!data || data.length === 0) { resultEl.innerHTML = `<p class="text-on-surface-variant text-sm">لا توجد فاتورة برقم "${gmEscapeHtml(q)}"</p>`; return; }
 
   const TYPE_LABELS = { sale: 'بيع', buyTrader: 'شراء من تاجر', buyRetail: 'شراء من فرد', traderPay: 'سند دفع تاجر' };
   resultEl.innerHTML = data.map(i => `
