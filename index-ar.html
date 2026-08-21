@@ -138,12 +138,564 @@
       min-height: max(884px, 100dvh);
     }
   </style>
+<style>
+  /* ============================================================
+     Desktop app shell (≥1024px / Tailwind `lg`). Entirely separate
+     visual system from the mobile experience above — scoped under
+     .dsk-app so none of this touches mobile styling. Only ever
+     visible via the `hidden lg:flex` utility classes on .dsk-app
+     itself, so no extra breakpoint logic is needed in here.
+     ============================================================ */
+  .dsk-app{
+    --dsk-bg:#EDE6D2;
+    --dsk-surface:#FFFFFF;
+    --dsk-surface-sunken:#F6F1E2;
+    --dsk-ink:#1C1A16;
+    --dsk-ink-soft:#767059;
+    --dsk-ink-faint:#9B9478;
+    --dsk-line:#DED0A4;
+    --dsk-line-soft:#E7DCB6;
+    --dsk-gold:#9C8552;
+    --dsk-gold-deep:#7A6640;
+    --dsk-gold-ink:#FBF8F1;
+    --dsk-good:#3F6B47;
+    --dsk-warn:#8A5A2A;
+    --dsk-bad:#8A3B32;
+    --dsk-radius:10px;
+    min-height:100vh;width:100%;
+    background:var(--dsk-bg);color:var(--dsk-ink);
+    font-family:'Times New Roman','Amiri',Times,serif;
+    direction:rtl;font-variant-numeric:tabular-nums;font-size:13.5px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .dsk-app a{color:inherit;text-decoration:none;}
+  .dsk-app *{box-sizing:border-box;}
+
+  /* Sidebar first in DOM order so it lands on the right under RTL flex. */
+  .dsk-sidebar{
+    width:212px;flex:none;
+    background:var(--dsk-ink);color:var(--dsk-gold-ink);
+    display:flex;flex-direction:column;
+    position:sticky;top:0;height:100vh;
+  }
+  .dsk-brand{display:flex;align-items:center;gap:9px;padding:16px 16px 14px;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dsk-brand-mark{
+    width:34px;height:34px;border-radius:50%;flex:none;position:relative;overflow:hidden;background:#0E0D0A;
+    box-shadow:0 0 0 2px rgba(255,214,140,.35), 0 3px 8px rgba(0,0,0,.4);
+    transition:transform .22s ease, box-shadow .22s ease;
+  }
+  .dsk-brand-mark img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;}
+  .dsk-brand-mark::after{
+    content:'';position:absolute;inset:0;border-radius:50%;
+    background:linear-gradient(135deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 66%, rgba(255,255,255,.16) 100%);
+    pointer-events:none;
+  }
+  .dsk-brand:hover .dsk-brand-mark{transform:scale(1.07) rotate(2deg);box-shadow:0 0 0 2px rgba(255,214,140,.65), 0 4px 12px rgba(0,0,0,.45);}
+  .dsk-brand-name{font-size:14.5px;font-weight:700;}
+
+  .dsk-nav-scroll{flex:1;overflow-y:auto;padding:10px 10px 0;}
+  .dsk-nav-group-label{font-size:10px;color:#8f8873;letter-spacing:.05em;padding:12px 8px 4px;}
+  .dsk-nav-group:first-child .dsk-nav-group-label{padding-top:2px;}
+  .dsk-nav{display:flex;flex-direction:column;gap:1px;}
+  .dsk-nav-link{
+    display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;
+    font-size:12px;color:#CFC7AC;border-inline-end:2px solid transparent;cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .dsk-ic{width:14px;text-align:center;font-size:14px !important;opacity:.8;flex:none;transition:transform .18s ease;}
+  .dsk-nav-link:hover{background:rgba(255,255,255,.05);color:var(--dsk-gold-ink);}
+  .dsk-nav-link:hover .dsk-ic{transform:scale(1.18);}
+  .dsk-nav-link.active{background:rgba(156,133,82,.2);color:var(--dsk-gold-ink);border-inline-end-color:var(--dsk-gold);font-weight:600;}
+  .dsk-nav-link.active .dsk-ic{transform:scale(1.05);}
+
+  .dsk-sidebar-footer{
+    display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.08);
+    transition:background .15s ease;cursor:pointer;
+  }
+  .dsk-sidebar-footer:hover{background:rgba(255,255,255,.03);}
+  .dsk-avatar{
+    width:26px;height:26px;border-radius:50%;flex:none;
+    background:linear-gradient(145deg,#C9AD70,var(--dsk-gold-deep) 55%,#4E4022);
+    display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--dsk-gold-ink);font-size:11px;
+    box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 -1px 2px rgba(0,0,0,.3) inset, 0 2px 4px rgba(0,0,0,.2), 0 5px 10px rgba(0,0,0,.16);
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .dsk-sidebar-footer:hover .dsk-avatar{transform:scale(1.06);}
+  .dsk-sf-text{min-width:0;}
+  .dsk-sf-name{font-size:11.5px;font-weight:600;color:var(--dsk-gold-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dsk-sf-role{font-size:9.5px;color:#9d9578;}
+
+  /* Main column */
+  .dsk-main{flex:1;min-width:0;display:flex;flex-direction:column;}
+
+  .dsk-topbar{display:flex;flex-direction:column;border-bottom:1px solid var(--dsk-line-soft);background:var(--dsk-surface);}
+  .dsk-store-banner{
+    position:relative;overflow:hidden;display:flex;align-items:center;gap:11px;padding:10px 20px;
+    background:linear-gradient(120deg,#221D12 0%,#4A3F26 28%,#8A7343 50%,#4A3F26 72%,#221D12 100%);
+    background-size:220% 100%;animation:dskBrandShimmer 9s ease-in-out infinite;
+  }
+  .dsk-store-banner-shine{
+    position:absolute;inset:0;background:linear-gradient(115deg,transparent 42%,rgba(255,255,255,.32) 50%,transparent 58%);
+    background-size:280% 100%;animation:dskBrandShine 7.5s ease-in-out infinite;pointer-events:none;
+  }
+  @keyframes dskBrandShimmer{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}
+  @keyframes dskBrandShine{0%{background-position:220% 0;}60%,100%{background-position:-60% 0;}}
+  .dsk-store-logo{
+    width:31px;height:31px;border-radius:50%;flex:none;position:relative;z-index:1;overflow:hidden;
+    background:radial-gradient(circle at 32% 26%,#FFF8E6,#E7CE96 45%,#8A7343 100%);
+    display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#3B2F16;
+    box-shadow:0 0 0 2px rgba(255,255,255,.25),0 3px 8px rgba(0,0,0,.45);
+  }
+  .dsk-store-logo img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  .dsk-store-name{
+    font-size:17px;font-weight:700;color:var(--dsk-gold-ink);letter-spacing:.01em;
+    position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.4);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .dsk-topbar-utility{display:flex;align-items:center;gap:10px;padding:8px 20px;}
+  .dsk-page-title{font-size:14px;font-weight:700;white-space:nowrap;}
+  .dsk-search{
+    flex:1;max-width:420px;display:flex;align-items:center;gap:7px;
+    background:var(--dsk-surface-sunken);border:1px solid var(--dsk-line-soft);border-radius:8px;padding:7px 12px;
+    color:var(--dsk-ink-soft);font-size:12px;cursor:pointer;text-align:right;font-family:inherit;
+    transition:border-color .15s ease;
+  }
+  .dsk-search:hover{border-color:var(--dsk-gold);}
+  .dsk-topbar-spacer{flex:1;}
+  .dsk-gold-tick{
+    display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dsk-ink-soft);
+    background:var(--dsk-surface-sunken);border:1px solid var(--dsk-line-soft);border-radius:8px;padding:6px 12px;
+    white-space:nowrap;cursor:pointer;font-family:inherit;
+  }
+  .dsk-gt-live{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dsk-ink-faint);}
+  .dsk-gt-live-dot{width:6px;height:6px;border-radius:50%;background:var(--dsk-good);position:relative;flex:none;}
+  .dsk-gt-live-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--dsk-good);animation:dskLiveping 2.2s ease-out infinite;}
+  @keyframes dskLiveping{0%{opacity:.75;transform:scale(1);}100%{opacity:0;transform:scale(1.9);}}
+  .dsk-gt-sep{color:var(--dsk-line);}
+  .dsk-gt-karat{font-weight:600;color:var(--dsk-ink-soft);}
+  .dsk-gold-tick b{color:var(--dsk-gold-deep);font-weight:700;display:inline-flex;align-items:baseline;gap:3px;}
+  .dsk-gt-unit{font-size:9.5px;font-weight:600;color:var(--dsk-ink-faint);}
+  .dsk-icon-btn{
+    height:30px;min-width:30px;padding:0 8px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;color:var(--dsk-ink-soft);font-size:13px;font-weight:700;
+    background:var(--dsk-surface-sunken);cursor:pointer;font-family:inherit;
+    box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 2px 4px rgba(28,26,22,.08), 0 5px 9px rgba(28,26,22,.06);
+    transition:background .15s ease, transform .15s ease, box-shadow .15s ease;
+  }
+  .dsk-icon-btn:hover{background:var(--dsk-surface);transform:translateY(-2px);box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 3px 6px rgba(28,26,22,.12), 0 8px 14px rgba(28,26,22,.10);}
+  .dsk-account-trigger{display:flex;align-items:center;gap:3px;padding:2px 6px 2px 2px;border-radius:20px;cursor:pointer;transition:background .15s ease;}
+  .dsk-account-trigger:hover{background:var(--dsk-surface-sunken);}
+  .dsk-account-trigger:hover .dsk-avatar{transform:scale(1.07);box-shadow:0 0 0 2px var(--dsk-gold);}
+  .dsk-account-caret{font-size:9px;color:var(--dsk-ink-faint);}
+
+  .dsk-content{padding:16px 20px 28px;flex:1;}
+
+  /* Stat strip — floating 3D cards */
+  .dsk-stat-strip{display:flex;gap:13px;margin-bottom:16px;animation:dskRiseIn .45s ease both;}
+  .dsk-stat{
+    flex:1;padding:13px 15px;background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:var(--dsk-radius);
+    box-shadow:0 2px 5px rgba(28,26,22,.06), 0 10px 18px rgba(28,26,22,.055);
+    display:flex;flex-direction:column;gap:5px;
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  .dsk-stat:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(28,26,22,.10), 0 16px 26px rgba(28,26,22,.09);}
+  .dsk-stat-head{display:flex;align-items:center;gap:8px;}
+  .dsk-stat-ic{
+    width:27px !important;height:27px;border-radius:8px;flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:14px !important;
+    background:var(--dsk-tint,var(--dsk-surface-sunken));color:var(--dsk-ink,var(--dsk-gold-deep));
+    box-shadow:0 1px 0 rgba(255,255,255,.75) inset, 0 -1px 1px rgba(0,0,0,.06) inset, 0 2px 3px rgba(28,26,22,.14), 0 6px 10px rgba(28,26,22,.10);
+    transition:transform .18s ease;
+  }
+  .dsk-stat:hover .dsk-stat-ic{transform:scale(1.14) rotate(-3deg);}
+  .dsk-stat-label{font-size:10.5px;color:var(--dsk-ink-soft);font-weight:600;}
+  .dsk-stat-value{font-size:19px;font-weight:700;line-height:1.1;}
+  .dsk-stat-trend{font-size:10px;margin-top:1px;}
+  .dsk-stat-trend.flat{color:var(--dsk-ink-faint);}
+  .dsk-stat-trend.warn{color:var(--dsk-warn);}
+  .dsk-stat-trend.up{color:var(--dsk-good);}
+
+  /* Quick actions toolbar + customize */
+  .dsk-toolbar-row{display:flex;align-items:center;justify-content:space-between;margin:0 2px 8px;}
+  .dsk-toolbar-label{font-size:11px;color:var(--dsk-ink-soft);font-weight:600;}
+  .dsk-customize-btn{
+    font-size:10.5px;color:var(--dsk-gold-deep);font-weight:600;display:flex;align-items:center;gap:5px;
+    padding:4px 10px;border-radius:999px;border:1px solid var(--dsk-line-soft);background:var(--dsk-surface);
+    cursor:pointer;font-family:inherit;
+  }
+  .dsk-customize-btn:hover{border-color:var(--dsk-gold);}
+  .dsk-action-strip{display:flex;gap:8px;margin-bottom:16px;animation:dskRiseIn .45s ease .05s both;}
+  .dsk-action{
+    flex:1;background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:var(--dsk-radius);
+    padding:9px 10px;display:flex;align-items:center;gap:8px;cursor:pointer;
+    transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  }
+  .dsk-action:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(28,26,22,.10);border-color:var(--dsk-gold);}
+  .dsk-action-ic{
+    width:24px !important;height:24px;border-radius:7px;flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:14px !important;
+    background:var(--dsk-act-tint,var(--dsk-surface-sunken));color:var(--dsk-act-ink,var(--dsk-gold-deep));
+    box-shadow:0 1px 0 rgba(255,255,255,.75) inset, 0 -1px 1px rgba(0,0,0,.06) inset, 0 2px 3px rgba(28,26,22,.15), 0 5px 9px rgba(28,26,22,.11);
+    transition:transform .18s ease;
+  }
+  .dsk-action:hover .dsk-action-ic{transform:scale(1.12) rotate(-4deg);}
+  .dsk-action-label{font-size:11.5px;font-weight:600;}
+  .dsk-action.primary{background:var(--dsk-ink);border-color:var(--dsk-ink);}
+  .dsk-action.primary .dsk-action-label{color:var(--dsk-gold-ink);}
+  .dsk-action.primary .dsk-action-ic{
+    background:rgba(255,255,255,.12);color:var(--dsk-gold);
+    box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 -1px 1px rgba(0,0,0,.3) inset, 0 2px 4px rgba(0,0,0,.35), 0 6px 12px rgba(0,0,0,.3);
+  }
+  .dsk-customize-panel{display:none;background:var(--dsk-surface);border:1px dashed var(--dsk-gold);border-radius:var(--dsk-radius);padding:12px 14px;margin:-6px 0 16px;}
+  .dsk-customize-panel.open{display:block;}
+  .dsk-customize-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;}
+  .dsk-customize-title{font-size:12px;font-weight:700;white-space:nowrap;}
+  .dsk-customize-note{font-size:10px;color:var(--dsk-ink-faint);}
+  .dsk-customize-grid{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;}
+  .dsk-chip{
+    display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--dsk-line-soft);
+    font-size:11.5px;color:var(--dsk-ink-soft);cursor:pointer;background:var(--dsk-surface-sunken);user-select:none;
+  }
+  .dsk-chip.checked{background:var(--dsk-ink);color:var(--dsk-gold-ink);border-color:var(--dsk-ink);}
+  .dsk-customize-actions{display:flex;align-items:center;justify-content:space-between;}
+  .dsk-customize-count{font-size:10px;color:var(--dsk-ink-faint);}
+  .dsk-customize-buttons{display:flex;gap:8px;}
+  .dsk-btn-save{background:var(--dsk-ink);color:var(--dsk-gold-ink);border:none;border-radius:7px;padding:6px 16px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .dsk-btn-cancel{background:transparent;color:var(--dsk-ink-soft);border:1px solid var(--dsk-line-soft);border-radius:7px;padding:6px 14px;font-size:11.5px;cursor:pointer;font-family:inherit;}
+
+  /* Workspace: activity feed + rail */
+  .dsk-workspace{display:flex;gap:14px;align-items:flex-start;animation:dskRiseIn .45s ease .1s both;}
+  .dsk-col-main{flex:1.7;min-width:0;}
+  .dsk-col-rail{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px;}
+  .dsk-panel{background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:var(--dsk-radius);overflow:hidden;}
+  .dsk-panel-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--dsk-line-soft);}
+  .dsk-panel-title{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .dsk-panel-title .dsk-ic{color:var(--dsk-gold-deep);font-size:14px !important;}
+  .dsk-panel:hover .dsk-panel-title .dsk-ic{transform:scale(1.12);}
+  .dsk-panel-link{font-size:11px;color:var(--dsk-gold-deep);font-weight:600;cursor:pointer;}
+  .dsk-panel-link:hover{text-decoration:underline;}
+  .dsk-empty{padding:24px 14px;text-align:center;color:var(--dsk-ink-faint);font-size:12px;}
+
+  .dsk-alert-row{display:flex;align-items:flex-start;gap:8px;padding:9px 14px;border-bottom:1px solid var(--dsk-line-soft);cursor:pointer;transition:background .15s ease;}
+  .dsk-alert-row:last-child{border-bottom:none;}
+  .dsk-alert-row:hover{background:var(--dsk-surface-sunken);}
+  .dsk-alert-dot{width:6px;height:6px;border-radius:50%;flex:none;margin-top:4px;}
+  .dsk-alert-dot.warn{background:var(--dsk-warn);}
+  .dsk-alert-dot.bad{background:var(--dsk-bad);}
+  .dsk-alert-text{font-size:11.5px;line-height:1.4;flex:1;}
+
+  .dsk-rail-links{display:flex;flex-direction:column;}
+  .dsk-rail-links a{display:flex;align-items:center;padding:8px 14px;font-size:11.5px;color:var(--dsk-ink-soft);border-bottom:1px solid var(--dsk-line-soft);transition:background .15s ease, padding-inline-start .15s ease;cursor:pointer;}
+  .dsk-rail-links a:last-child{border-bottom:none;}
+  .dsk-rail-links a:hover{color:var(--dsk-ink);background:var(--dsk-surface-sunken);padding-inline-start:12px;}
+
+  /* Reused mobile "recent movements" row markup mirrored in here keeps its
+     own Tailwind classes and renders fine since Tailwind is global. */
+  #dskRecentMovementsEl > div{border-bottom:1px solid var(--dsk-line-soft);}
+  #dskRecentMovementsEl > div:last-child{border-bottom:none;}
+
+  @keyframes dskRiseIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  @media (prefers-reduced-motion: reduce){
+    .dsk-app *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;}
+  }
+</style>
+
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
+<!-- ============================================================
+     Desktop app shell (≥1024px / Tailwind `lg`). Independent DOM from
+     the mobile experience above (different element ids throughout,
+     prefixed dsk*), shown only via `hidden lg:flex`. Real data is
+     mirrored into these elements by the existing loadDashboard() /
+     loadMovementsForDay() functions further down this file — see the
+     "dsk mirror" comments inside them. Nothing here talks to Supabase
+     on its own.
+     ============================================================ -->
+<div class="dsk-app hidden lg:flex">
+  <aside class="dsk-sidebar">
+    <div class="dsk-brand">
+      <div class="dsk-brand-mark"><img src="icon-192.png" alt="GoldMind"></div>
+      <div class="dsk-brand-name">GoldMind</div>
+    </div>
+    <nav class="dsk-nav-scroll">
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">عام</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link active" href="index-ar.html"><span class="material-symbols-outlined dsk-ic">dashboard</span>لوحة التحكم</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">الفواتير</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="invoices-list-ar.html"><span class="material-symbols-outlined dsk-ic">receipt_long</span>مبيعات</a>
+          <a class="dsk-nav-link" href="sales-return-ar.html"><span class="material-symbols-outlined dsk-ic">keyboard_return</span>مردودات مبيعات</a>
+          <a class="dsk-nav-link" href="repairs-ar.html"><span class="material-symbols-outlined dsk-ic">build</span>الصيانة</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">التجار والإنتاج</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="ledger-ar.html"><span class="material-symbols-outlined dsk-ic">groups</span>حسابات التجار</a>
+          <a class="dsk-nav-link" href="inventory-add.html"><span class="material-symbols-outlined dsk-ic">inventory_2</span>إدخال بضاعة</a>
+          <a class="dsk-nav-link" href="stock-production-ar.html"><span class="material-symbols-outlined dsk-ic">precision_manufacturing</span>إنتاج قطع</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">المخزون</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="inventory-list-ar.html"><span class="material-symbols-outlined dsk-ic">inventory</span>المخزون</a>
+          <a class="dsk-nav-link" href="inventory-count-ar.html"><span class="material-symbols-outlined dsk-ic">checklist</span>الجرد</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">العملاء</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="customer-add-ar.html"><span class="material-symbols-outlined dsk-ic">person_add</span>إضافة عميل</a>
+          <a class="dsk-nav-link" href="customer-debts-ar.html"><span class="material-symbols-outlined dsk-ic">account_balance_wallet</span>ديون العملاء</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">الإدارة</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="reports-ar.html"><span class="material-symbols-outlined dsk-ic">bar_chart</span>التقارير</a>
+          <a class="dsk-nav-link" href="staff-permissions-ar.html"><span class="material-symbols-outlined dsk-ic">badge</span>الموظفون والصلاحيات</a>
+          <a class="dsk-nav-link" href="settings-ar.html"><span class="material-symbols-outlined dsk-ic">settings</span>الإعدادات</a>
+          <a class="dsk-nav-link" href="theme-picker-ar.html"><span class="material-symbols-outlined dsk-ic">palette</span>مظهر التطبيق</a>
+          <a class="dsk-nav-link" href="subscription-ar.html"><span class="material-symbols-outlined dsk-ic">workspace_premium</span>الاشتراك والفوترة</a>
+        </div>
+      </div>
+    </nav>
+    <a class="dsk-sidebar-footer" href="account-security-ar.html" title="حسابي">
+      <div class="dsk-avatar" id="dskAccountAvatarEl">؟</div>
+      <div class="dsk-sf-text">
+        <div class="dsk-sf-name" id="dskAccountNameEl">...</div>
+        <div class="dsk-sf-role" id="dskAccountRoleEl"></div>
+      </div>
+    </a>
+  </aside>
+
+  <div class="dsk-main">
+    <div class="dsk-topbar">
+      <div class="dsk-store-banner">
+        <div class="dsk-store-banner-shine"></div>
+        <div class="dsk-store-logo" id="dskStoreAvatarEl" style="visibility:hidden;"></div>
+        <div class="dsk-store-name" id="dskStoreNameEl" style="visibility:hidden;"></div>
+      </div>
+      <div class="dsk-topbar-utility">
+        <div class="dsk-page-title">لوحة التحكم</div>
+        <button type="button" class="dsk-search" onclick="openQuickSearch()">
+          <span class="material-symbols-outlined dsk-ic">search</span>بحث عن فاتورة، عميل، أو شاشة...
+        </button>
+        <div class="dsk-topbar-spacer"></div>
+        <button type="button" id="dskGoldTick" class="dsk-gold-tick hidden" onclick="gmOpenKaratPicker()" title="سعر الذهب اللحظي — يتحدّث تلقائيًا">
+          <span class="dsk-gt-live"><span class="dsk-gt-live-dot"></span>سعر الذهب</span>
+          <span class="dsk-gt-sep">·</span>
+          <span class="dsk-gt-karat" id="dskHallmarkKaratLabel">عيار 21</span>
+          <b><span id="dskHallmarkPriceLabel">—</span><span class="dsk-gt-unit">د.إ / غرام</span></b>
+        </button>
+        <button type="button" class="dsk-icon-btn" onclick="toggleCurrency()" title="تبديل العملة" id="dskCurrencyBtn">د.إ</button>
+        <div class="dsk-account-trigger" onclick="location.href='account-security-ar.html'" title="حسابي">
+          <div class="dsk-avatar" id="dskTopAvatarEl">؟</div>
+          <span class="dsk-account-caret">⌄</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsk-content">
+      <div class="dsk-stat-strip">
+        <div class="dsk-stat" style="--dsk-tint:#EFE7D2;--dsk-ink:#7A6640;">
+          <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">account_balance_wallet</span><span class="dsk-stat-label">كاش الصندوق</span></div>
+          <div class="dsk-stat-value" id="dskDailyCashboxBalanceEl" style="visibility:hidden;">0.00</div>
+          <div class="dsk-stat-trend flat hidden" id="dskDailyCashboxOtherCurrenciesEl"></div>
+        </div>
+        <div class="dsk-stat" style="--dsk-tint:#E1EADB;--dsk-ink:#3F6B47;">
+          <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">receipt_long</span><span class="dsk-stat-label">فواتير اليوم</span></div>
+          <div class="dsk-stat-value" id="dskTodayInvoiceCountEl" style="visibility:hidden;">0</div>
+        </div>
+        <div class="dsk-stat" style="--dsk-tint:#F1E9D6;--dsk-ink:#9C8552;">
+          <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">payments</span><span class="dsk-stat-label">مبيعات اليوم</span></div>
+          <div class="dsk-stat-value" id="dskTodaySalesEl" style="visibility:hidden;">0.00</div>
+        </div>
+        <div class="dsk-stat" style="--dsk-tint:#F2E2C9;--dsk-ink:#8A5A2A;">
+          <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">notifications</span><span class="dsk-stat-label">تنبيهات مفتوحة</span></div>
+          <div class="dsk-stat-value" id="dskAlertsCountEl">0</div>
+          <div class="dsk-stat-trend flat" id="dskAlertsSummaryEl">— لا تنبيهات حاليًا</div>
+        </div>
+      </div>
+
+      <div class="dsk-toolbar-row">
+        <div class="dsk-toolbar-label">الوصول السريع</div>
+        <button type="button" class="dsk-customize-btn" id="dskCustomizeBtn"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
+      </div>
+      <div class="dsk-action-strip" id="dskActionStrip"></div>
+
+      <div class="dsk-customize-panel" id="dskCustomizePanel">
+        <div class="dsk-customize-head">
+          <div class="dsk-customize-title">اختر اختصاراتك</div>
+          <div class="dsk-customize-note">يُحفظ لحسابك أنت فقط — لا يتغيّر عند باقي الموظفين</div>
+        </div>
+        <div class="dsk-customize-grid" id="dskCustomizeGrid"></div>
+        <div class="dsk-customize-actions">
+          <div class="dsk-customize-count" id="dskCustomizeCount"></div>
+          <div class="dsk-customize-buttons">
+            <button type="button" class="dsk-btn-cancel" id="dskCustomizeCancel">إلغاء</button>
+            <button type="button" class="dsk-btn-save" id="dskCustomizeSave">حفظ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dsk-workspace">
+        <div class="dsk-col-main">
+          <div class="dsk-panel">
+            <div class="dsk-panel-head">
+              <div class="dsk-panel-title"><span class="material-symbols-outlined dsk-ic">receipt_long</span>حركات اليوم</div>
+              <a class="dsk-panel-link" href="ledger-ar.html">عرض الكل ←</a>
+            </div>
+            <div id="dskRecentMovementsEl">
+              <div class="dsk-empty">جارِ التحميل...</div>
+            </div>
+          </div>
+        </div>
+        <div class="dsk-col-rail">
+          <div class="dsk-panel">
+            <div class="dsk-panel-head">
+              <div class="dsk-panel-title"><span class="material-symbols-outlined dsk-ic">warning</span>يحتاج انتباهك</div>
+            </div>
+            <div id="dskAlertsListEl">
+              <div class="dsk-empty">لا توجد تنبيهات حاليًا</div>
+            </div>
+          </div>
+          <div class="dsk-panel">
+            <div class="dsk-panel-head">
+              <div class="dsk-panel-title"><span class="material-symbols-outlined dsk-ic">apps</span>الأقسام</div>
+            </div>
+            <div class="dsk-rail-links">
+              <a href="inventory-list-ar.html">المخزون</a>
+              <a href="ledger-ar.html">حسابات التجار</a>
+              <a href="repairs-ar.html">الصيانة</a>
+              <a href="staff-permissions-ar.html">الموظفون والصلاحيات</a>
+              <a href="subscription-ar.html">الاشتراك والفوترة</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Desktop "الوصول السريع" — customizable per staff member. Catalog items
+// reuse the exact same hrefs/permission keys as the mobile quick-actions
+// grid above, so this stays consistent with the app's real permission
+// system rather than inventing a parallel one.
+(function () {
+  var CATALOG = [
+    { id: 'newSale', icon: 'add_shopping_cart', label: 'فاتورة جديدة', href: 'new-sale-ar.html', permission: 'create_invoice', primary: true },
+    { id: 'stockIn', icon: 'inventory_2', label: 'إدخال بضاعة', href: 'inventory-add.html', permission: 'add_piece', tint: '#F1E9D6', ink: '#9C8552' },
+    { id: 'salesReturn', icon: 'keyboard_return', label: 'مرتجع مبيعات', href: 'sales-return-ar.html', permission: 'create_invoice', tint: '#F3DEDA', ink: '#8A3B32' },
+    { id: 'cashbox', icon: 'account_balance_wallet', label: 'الصندوق اليومي', href: 'daily-cashbox-ar.html', permission: 'manage_daily_cashbox', tint: '#EFE7D2', ink: '#7A6640' },
+    { id: 'addCustomer', icon: 'person_add', label: 'إضافة عميل', href: 'customer-add-ar.html', permission: 'add_customers', tint: '#E1EADB', ink: '#3F6B47' },
+    { id: 'repairs', icon: 'build', label: 'الصيانة', href: 'repairs-ar.html', permission: 'view_repairs', tint: '#F2E2C9', ink: '#8A5A2A' },
+    { id: 'production', icon: 'precision_manufacturing', label: 'إنتاج قطعة', href: 'stock-production-ar.html', permission: 'add_piece', tint: '#DCE8EA', ink: '#3B6B7A' },
+    { id: 'purchaseInvoice', icon: 'local_shipping', label: 'فاتورة شراء', href: 'create-invoice-v2-ar.html', permission: 'create_invoice', tint: '#DCE8EA', ink: '#3B6B7A' },
+    { id: 'merchantLedger', icon: 'groups', label: 'حسابات التجار', href: 'ledger-ar.html', permission: null, tint: '#F1E9D6', ink: '#9C8552' },
+    { id: 'inventoryCount', icon: 'checklist', label: 'الجرد', href: 'inventory-count-ar.html', permission: 'run_inventory_count', tint: '#DCE8EA', ink: '#3B6B7A' }
+  ];
+  var DEFAULTS = ['newSale', 'stockIn', 'salesReturn', 'cashbox', 'addCustomer', 'repairs'];
+  var MAX_ACTIONS = 8;
+
+  var stripEl = document.getElementById('dskActionStrip');
+  var panelEl = document.getElementById('dskCustomizePanel');
+  var gridEl = document.getElementById('dskCustomizeGrid');
+  var countEl = document.getElementById('dskCustomizeCount');
+  var customizeBtn = document.getElementById('dskCustomizeBtn');
+  var saveBtn = document.getElementById('dskCustomizeSave');
+  var cancelBtn = document.getElementById('dskCustomizeCancel');
+  if (!stripEl) return; // desktop block not present on this page
+
+  function byId(id) { return CATALOG.filter(function (c) { return c.id === id; })[0]; }
+  function allowed(item) { return !item.permission || !window.GOLDMIND_HAS_PERM || window.GOLDMIND_HAS_PERM(item.permission); }
+  function allowedIds(ids) { return ids.filter(function (id) { var a = byId(id); return a && allowed(a); }); }
+
+  var selection = DEFAULTS.slice();
+  var draft = selection.slice();
+
+  function renderStrip() {
+    stripEl.innerHTML = selection.map(function (id) {
+      var a = byId(id);
+      if (!a) return '';
+      var permAttr = a.permission ? ' data-permission="' + a.permission + '"' : '';
+      var cls = 'dsk-action quick-action-icon' + (a.primary ? ' primary' : '');
+      var style = a.primary ? '' : ' style="--dsk-act-tint:' + a.tint + ';--dsk-act-ink:' + a.ink + ';"';
+      return '<a class="' + cls + '" href="' + a.href + '"' + permAttr + style + '>'
+        + '<span class="material-symbols-outlined dsk-action-ic">' + a.icon + '</span>'
+        + '<span class="dsk-action-label">' + a.label + '</span></a>';
+    }).join('');
+  }
+
+  function renderGrid() {
+    var choices = CATALOG.filter(allowed);
+    gridEl.innerHTML = choices.map(function (a) {
+      var checked = draft.indexOf(a.id) > -1;
+      return '<div class="dsk-chip' + (checked ? ' checked' : '') + '" data-id="' + a.id + '">'
+        + '<span class="material-symbols-outlined" style="font-size:13px;">' + a.icon + '</span>'
+        + '<span>' + a.label + '</span></div>';
+    }).join('');
+    countEl.textContent = draft.length + ' / ' + MAX_ACTIONS + ' مختارة';
+    var chips = gridEl.querySelectorAll('.dsk-chip');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        var idx = draft.indexOf(id);
+        if (idx > -1) { draft.splice(idx, 1); }
+        else { if (draft.length >= MAX_ACTIONS) return; draft.push(id); }
+        renderGrid();
+      });
+    }
+  }
+
+  customizeBtn.addEventListener('click', function () {
+    draft = selection.slice();
+    renderGrid();
+    panelEl.classList.add('open');
+  });
+  cancelBtn.addEventListener('click', function () { panelEl.classList.remove('open'); });
+  saveBtn.addEventListener('click', function () {
+    if (draft.length === 0) return;
+    selection = draft.slice();
+    try { localStorage.setItem('goldmind_quick_actions_' + (window.GOLDMIND_STAFF_ID || 'default'), JSON.stringify(selection)); } catch (e) {}
+    renderStrip();
+    panelEl.classList.remove('open');
+  });
+
+  renderStrip(); // optimistic default pass so the strip isn't empty while the session/permissions are still loading
+
+  // Called from loadDashboard() once staffRow + hasPerm are ready, so the
+  // real saved-per-staff selection (correctly permission-filtered) takes
+  // over from the optimistic default pass above.
+  window.__dskInitQuickActions = function () {
+    var picked = null;
+    try {
+      var raw = localStorage.getItem('goldmind_quick_actions_' + (window.GOLDMIND_STAFF_ID || 'default'));
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed) && parsed.length) {
+        var valid = allowedIds(parsed);
+        if (valid.length) picked = valid;
+      }
+    } catch (e) { picked = null; }
+    selection = picked || allowedIds(DEFAULTS);
+    if (!selection.length) selection = DEFAULTS.slice();
+    draft = selection.slice();
+    renderStrip();
+  };
+})();
+</script>
+
 <!-- TopAppBar -->
-<header class="fixed top-0 right-0 w-full h-16 bg-surface-container-lowest border-b border-outline-variant z-50 flex justify-between items-center px-margin-mobile">
+<header class="lg:hidden fixed top-0 right-0 w-full h-16 bg-surface-container-lowest border-b border-outline-variant z-50 flex justify-between items-center px-margin-mobile">
 <div class="flex items-center gap-3">
 <button class="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high transition-colors rounded-full cursor-pointer active:opacity-80" onclick="openNavDrawer()">
 <span class="material-symbols-outlined text-primary">menu</span>
@@ -164,7 +716,7 @@
 </div>
 </div>
 </header>
-<main class="pt-20 pb-24 px-margin-mobile max-w-md lg:max-w-6xl mx-auto lg:px-8">
+<main class="lg:hidden pt-20 pb-24 px-margin-mobile max-w-md lg:max-w-6xl mx-auto lg:px-8">
 <!-- Fiscal year closing reminder (owner only, shown when a past year isn't closed) -->
 <a id="fiscalYearBanner" href="fiscal-year-close-ar.html" class="hidden mb-4 flex items-center gap-3 bg-red-50 border border-error/40 text-error rounded-xl p-3">
 <span class="material-symbols-outlined">event_busy</span>
@@ -184,27 +736,33 @@
   (function () {
     const cached = localStorage.getItem('goldmind_store_name');
     const cachedLogo = localStorage.getItem('goldmind_store_logo');
+    const dskNameEl0 = document.getElementById('dskStoreNameEl');
     if (cached) {
       const el = document.getElementById('storeNameEl');
       el.textContent = cached;
       if (typeof fitStatNumber === 'function') fitStatNumber(el);
+      if (dskNameEl0) { dskNameEl0.textContent = cached; if (typeof fitStatNumber === 'function') fitStatNumber(dskNameEl0); }
     }
     const avatarEl = document.getElementById('storeAvatarEl');
+    const dskAvatarEl0 = document.getElementById('dskStoreAvatarEl');
     if (cachedLogo) {
       avatarEl.innerHTML = '<img src="' + cachedLogo + '" alt="" class="w-full h-full object-cover"/>';
       avatarEl.style.visibility = 'visible';
+      if (dskAvatarEl0) { dskAvatarEl0.innerHTML = '<img src="' + cachedLogo + '" alt="" class="w-full h-full object-cover"/>'; dskAvatarEl0.style.visibility = 'visible'; }
     } else if (cached) {
       // No logo cached yet but we do have a cached name -> safe to show
       // the initial letter immediately instead of waiting.
       avatarEl.textContent = cached.trim().charAt(0) || '؟';
       avatarEl.style.visibility = 'visible';
+      if (dskAvatarEl0) { dskAvatarEl0.textContent = cached.trim().charAt(0) || '؟'; dskAvatarEl0.style.visibility = 'visible'; }
     }
     // Safety net: if the dashboard data fetch below ever fails/errors
     // before reaching its own fitStatNumber() calls, don't leave these
     // elements permanently invisible — reveal them as-is after a short
     // grace period.
     setTimeout(function () {
-      ['storeNameEl', 'storeAvatarEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl'].forEach(function (id) {
+      ['storeNameEl', 'storeAvatarEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl',
+       'dskStoreNameEl', 'dskStoreAvatarEl', 'dskDailyCashboxBalanceEl', 'dskTodayInvoiceCountEl', 'dskTodaySalesEl'].forEach(function (id) {
         const e = document.getElementById(id);
         if (e) e.style.visibility = 'visible';
       });
@@ -350,7 +908,7 @@
 <div class="h-8"></div>
 </main>
 <!-- BottomNavBar -->
-<nav class="fixed bottom-0 right-0 w-full h-16 bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-around items-center px-margin-mobile shadow-sm">
+<nav class="lg:hidden fixed bottom-0 right-0 w-full h-16 bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-around items-center px-margin-mobile shadow-sm">
 <!-- Dashboard (Active) -->
 <a class="flex flex-col items-center justify-center text-primary font-bold cursor-pointer transition-all active:scale-90" href="index-ar.html">
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
@@ -463,22 +1021,43 @@
                 localStorage.setItem('goldmind_store_name', store.name);
 
                 const avatarEl = document.getElementById('storeAvatarEl');
+                const dskNameEl = document.getElementById('dskStoreNameEl');
+                const dskAvatarEl = document.getElementById('dskStoreAvatarEl');
+                if (dskNameEl) { dskNameEl.textContent = store.name; fitStatNumber(dskNameEl); }
                 if (store.logo_url) {
                     avatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full object-cover"/>';
                     localStorage.setItem('goldmind_store_logo', store.logo_url);
+                    if (dskAvatarEl) dskAvatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full object-cover"/>';
                 } else {
                     avatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
                     localStorage.removeItem('goldmind_store_logo');
+                    if (dskAvatarEl) dskAvatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
                 }
                 avatarEl.style.visibility = 'visible';
+                if (dskAvatarEl) dskAvatarEl.style.visibility = 'visible';
+                if (dskNameEl) dskNameEl.style.visibility = 'visible';
             }
             if (staffRow) {
                 const roleLabel = staffRow.role === 'owner' ? 'مالك الحساب' : 'موظف';
                 document.getElementById('welcomeEl').textContent = staffRow.full_name + ' • ' + roleLabel;
+                const initial = (staffRow.full_name || '؟').trim().charAt(0) || '؟';
+                ['dskAccountAvatarEl', 'dskTopAvatarEl'].forEach(function (id) {
+                    const e = document.getElementById(id);
+                    if (e) e.textContent = initial;
+                });
+                const dskNameLabelEl = document.getElementById('dskAccountNameEl');
+                const dskRoleLabelEl = document.getElementById('dskAccountRoleEl');
+                if (dskNameLabelEl) dskNameLabelEl.textContent = staffRow.full_name;
+                if (dskRoleLabelEl) dskRoleLabelEl.textContent = roleLabel;
             }
 
             const isOwner = staffRow && staffRow.role === 'owner';
             const hasPerm = (perm) => isOwner || (staffRow && staffRow.permissions && staffRow.permissions[perm] === true);
+            // Exposed so the desktop quick-actions module (a separate
+            // script, loaded earlier) can permission-filter its catalog
+            // using the exact same rules as everything else on this page.
+            window.GOLDMIND_HAS_PERM = hasPerm;
+            if (typeof window.__dskInitQuickActions === 'function') window.__dskInitQuickActions();
 
             // Hide (not just dim) quick-action icons the current staff member
             // doesn't have permission for, so the grid actually shrinks and
@@ -587,16 +1166,20 @@
             const dailyCashboxBalance = cashboxTotalsByCurrency[baseCurrency] || 0;
             document.getElementById('dailyCashboxBalanceEl').textContent = gmFormatDualCurrency(dailyCashboxBalance, store);
             fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
+            const dskCashboxEl = document.getElementById('dskDailyCashboxBalanceEl');
+            if (dskCashboxEl) { dskCashboxEl.textContent = gmFormatDualCurrency(dailyCashboxBalance, store); dskCashboxEl.style.visibility = 'visible'; fitStatNumber(dskCashboxEl); }
 
             const otherCurrencyLine = Object.keys(cashboxTotalsByCurrency)
                 .filter(cur => cur !== baseCurrency)
                 .map(cur => gmFormatNumber(cashboxTotalsByCurrency[cur]) + ' ' + cur)
                 .join(' · ');
             const otherCurrenciesEl = document.getElementById('dailyCashboxOtherCurrenciesEl');
+            const dskOtherCurrenciesEl = document.getElementById('dskDailyCashboxOtherCurrenciesEl');
             if (otherCurrencyLine) {
                 otherCurrenciesEl.textContent = otherCurrencyLine;
                 otherCurrenciesEl.classList.remove('hidden');
                 fitStatNumber(otherCurrenciesEl);
+                if (dskOtherCurrenciesEl) { dskOtherCurrenciesEl.textContent = otherCurrencyLine; dskOtherCurrenciesEl.classList.remove('hidden'); fitStatNumber(dskOtherCurrenciesEl); }
             }
 
             const todaySales = (todayInvoices || []).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
@@ -604,6 +1187,10 @@
             document.getElementById('todayInvoiceCountEl').textContent = (todayInvoices || []).length;
             fitStatNumber(document.getElementById('todaySalesEl'));
             fitStatNumber(document.getElementById('todayInvoiceCountEl'));
+            const dskSalesEl = document.getElementById('dskTodaySalesEl');
+            const dskInvCountEl = document.getElementById('dskTodayInvoiceCountEl');
+            if (dskSalesEl) { dskSalesEl.textContent = gmFormatDualCurrency(todaySales, store); dskSalesEl.style.visibility = 'visible'; fitStatNumber(dskSalesEl); }
+            if (dskInvCountEl) { dskInvCountEl.textContent = (todayInvoices || []).length; dskInvCountEl.style.visibility = 'visible'; fitStatNumber(dskInvCountEl); }
 
             // Themes with a lazily-loaded display font (e.g. "المسبوكة
             // الهادئة") can finish loading the font AFTER the fits above
@@ -618,6 +1205,8 @@
                     fitStatNumber(document.getElementById('todaySalesEl'));
                     fitStatNumber(document.getElementById('todayInvoiceCountEl'));
                     if (!otherCurrenciesEl.classList.contains('hidden')) fitStatNumber(otherCurrenciesEl);
+                    ['dskDailyCashboxBalanceEl', 'dskTodaySalesEl', 'dskTodayInvoiceCountEl'].forEach(function (id) { const e = document.getElementById(id); if (e) fitStatNumber(e); });
+                    if (dskOtherCurrenciesEl && !dskOtherCurrenciesEl.classList.contains('hidden')) fitStatNumber(dskOtherCurrenciesEl);
                 });
             }
             // Same idea, but for a font the user picked from the new
@@ -629,6 +1218,8 @@
                     fitStatNumber(document.getElementById('todaySalesEl'));
                     fitStatNumber(document.getElementById('todayInvoiceCountEl'));
                     if (!otherCurrenciesEl.classList.contains('hidden')) fitStatNumber(otherCurrenciesEl);
+                    ['dskDailyCashboxBalanceEl', 'dskTodaySalesEl', 'dskTodayInvoiceCountEl'].forEach(function (id) { const e = document.getElementById(id); if (e) fitStatNumber(e); });
+                    if (dskOtherCurrenciesEl && !dskOtherCurrenciesEl.classList.contains('hidden')) fitStatNumber(dskOtherCurrenciesEl);
                 });
             }
 
@@ -649,6 +1240,24 @@
                         <span class="flex-1 text-[13px] font-semibold">${a.text}</span>
                         <span class="material-symbols-outlined text-[18px]">chevron_left</span>
                     </a>`).join('');
+            }
+            const dskAlertsCountEl = document.getElementById('dskAlertsCountEl');
+            const dskAlertsSummaryEl = document.getElementById('dskAlertsSummaryEl');
+            const dskAlertsListEl = document.getElementById('dskAlertsListEl');
+            if (dskAlertsCountEl) dskAlertsCountEl.textContent = alerts.length;
+            if (dskAlertsSummaryEl) {
+                dskAlertsSummaryEl.textContent = alerts.length > 0 ? alerts.map(a => a.text).join(' · ') : '— لا تنبيهات حاليًا';
+                dskAlertsSummaryEl.className = 'dsk-stat-trend ' + (alerts.length > 0 ? 'warn' : 'flat');
+            }
+            if (dskAlertsListEl) {
+                dskAlertsListEl.innerHTML = alerts.length > 0
+                    ? alerts.map(a => `
+                        <a class="dsk-alert-row" href="${a.href}">
+                            <span class="dsk-alert-dot warn"></span>
+                            <span class="dsk-alert-text">${a.text}</span>
+                            <span class="material-symbols-outlined dsk-ic" style="font-size:15px !important;">chevron_left</span>
+                        </a>`).join('')
+                    : '<div class="dsk-empty">لا توجد تنبيهات حاليًا</div>';
             }
           } catch (err) {
             console.error('loadDashboard failed:', err);
@@ -726,6 +1335,8 @@
                         </div>`;
                 }).join('');
             }
+            const dskRecentEl = document.getElementById('dskRecentMovementsEl');
+            if (dskRecentEl) dskRecentEl.innerHTML = container.innerHTML;
         }
     </script>
 
@@ -864,6 +1475,7 @@
 <script>
     function toggleCurrency() {
         const btn = document.getElementById('currency-toggle-btn');
+        const dskBtn = document.getElementById('dskCurrencyBtn');
         const order = window.__goldmindCurrencyOrder || ['AED', 'USD', 'EUR'];
         let current = localStorage.getItem('goldmind_currency_code') || order[0];
         let idx = order.indexOf(current);
@@ -871,6 +1483,7 @@
         const next = order[idx];
         localStorage.setItem('goldmind_currency_code', next);
         btn.textContent = currencySymbolFor(next);
+        if (dskBtn) dskBtn.textContent = currencySymbolFor(next);
     }
 
     const currencySymbols = {
@@ -900,6 +1513,8 @@
         const saved = localStorage.getItem('goldmind_currency_code');
         const active = (saved && order.includes(saved)) ? saved : storeCurrency;
         if (btn) btn.textContent = currencySymbolFor(active);
+        const dskBtn = document.getElementById('dskCurrencyBtn');
+        if (dskBtn) dskBtn.textContent = currencySymbolFor(active);
     }
     initCurrencyButton();
 
