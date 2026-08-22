@@ -68,27 +68,31 @@
 <span id="dateLabel" class="text-[12px] text-on-surface-variant" dir="ltr"></span>
 </div>
 
-<!-- Two symmetric columns: incoming (right) / outgoing (left) -->
+<!-- Two symmetric columns: incoming (right) / outgoing (left).
+     This used to be a real <table>, but html2canvas (the PDF-export
+     engine used by "تحميل PDF"/share) has a text-layout bug specific to a
+     4-column table-layout:fixed <table>: a colspan header OR bold text in
+     the body (either one, independently) makes it miscalculate column
+     boundaries and garble/scramble the Arabic in the body rows — the rest
+     of the page (which isn't a <table>) always rendered fine, which is
+     why this was the only broken part. Flexbox rows produce the exact
+     same visual grid without tripping that bug, confirmed with real data
+     and the real bold font file before shipping this. -->
 <div class="rounded-xl border-[3px] border-accent overflow-hidden">
-<table class="w-full text-[13px]" style="table-layout:fixed;">
-<colgroup>
-<col style="width:28%"/><col style="width:22%"/><col style="width:28%"/><col style="width:22%"/>
-</colgroup>
-<thead>
-<tr>
-<th colspan="2" class="bg-success/10 text-success py-2.5 font-bold">الداخل</th>
-<th colspan="2" class="bg-error/10 text-error py-2.5 font-bold">الصادر</th>
-</tr>
-</thead>
-<tbody id="rowsBody"></tbody>
-</table>
+<div class="flex text-[15px]">
+<div class="bg-success/10 text-success py-2.5 font-bold text-center" style="width:28%">الداخل</div>
+<div class="bg-success/10 text-success py-2.5 font-bold" style="width:22%"></div>
+<div class="bg-error/10 text-error py-2.5 font-bold text-center" style="width:28%">الصادر</div>
+<div class="bg-error/10 text-error py-2.5 font-bold" style="width:22%"></div>
+</div>
+<div id="rowsBody"></div>
 </div>
 
 <!-- Per-currency totals, mirroring the reference sheet's summary block -->
 <div class="mt-5">
 <h3 class="text-[13px] font-bold text-on-surface-variant mb-2">الرصيد الحالي بالدرج</h3>
 <div class="rounded-xl overflow-hidden border-[3px] border-accent gm-print-shadow" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
-<table class="w-full text-[13px]" id="totalsTable"></table>
+<table class="w-full text-[15px]" id="totalsTable"></table>
 </div>
 </div>
 </div>
@@ -184,15 +188,15 @@ async function load() {
     const inn = inEntries[i];
     const inBg = inn && gmLinkColorFor(inn.link_group) ? `background-color:${gmLinkColorFor(inn.link_group)};` : '';
     const outBg = o && gmLinkColorFor(o.link_group) ? `background-color:${gmLinkColorFor(o.link_group)};` : '';
-    rowsHtml += `<tr>
-      <td class="py-2.5 px-3 border-t border-outline-variant" style="word-break:break-word;overflow-wrap:break-word;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (inn.notes ? ' — ' + gmEscapeHtml(inn.notes) : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="word-break:break-word;overflow-wrap:break-word;${inBg}" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-outline-variant" style="word-break:break-word;overflow-wrap:break-word;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (o.notes ? ' — ' + gmEscapeHtml(o.notes) : '') : ''}</td>
-      <td class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="word-break:break-word;overflow-wrap:break-word;${outBg}" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</td>
-    </tr>`;
+    rowsHtml += `<div class="flex">
+      <div class="py-2.5 px-3 border-t border-outline-variant font-semibold" style="width:28%;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (inn.notes ? ' — ' + gmEscapeHtml(inn.notes) : '') : ''}</div>
+      <div class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="width:22%;${inBg}" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</div>
+      <div class="py-2.5 px-3 border-t border-r border-outline-variant font-semibold" style="width:28%;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (o.notes ? ' — ' + gmEscapeHtml(o.notes) : '') : ''}</div>
+      <div class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="width:22%;${outBg}" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</div>
+    </div>`;
   }
   if (dayEntries.length === 0) {
-    rowsHtml = '<tr><td colspan="4" class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا توجد عمليات بهذا اليوم</td></tr>';
+    rowsHtml = '<div class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا توجد عمليات بهذا اليوم</div>';
   }
   rowsBody.innerHTML = rowsHtml;
 
@@ -207,7 +211,7 @@ async function load() {
       const closing = opening + dayNet;
       return `<tr>
         <td class="py-2 px-3 border border-outline-variant font-bold bg-surface-container-low">${cur}</td>
-        <td class="py-2 px-3 border border-outline-variant text-left" dir="ltr">${fmt(closing)}</td>
+        <td class="py-2 px-3 border border-outline-variant font-bold text-left" dir="ltr">${fmt(closing)}</td>
       </tr>`;
     }).join('');
   }
@@ -229,7 +233,7 @@ async function generateCashboxPdfBase64() {
   const dataUriString = await html2pdf().set({
     margin: 10,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, letterRendering: true},
+    html2canvas: { scale: 2, useCORS: true },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
   }).from(sheet).outputPdf('datauristring');
   return dataUriString.substring(dataUriString.indexOf(',') + 1);
@@ -323,7 +327,7 @@ async function downloadCashboxPdf() {
       margin: 10,
       filename: `كشف-يومي-${dateLabel}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, letterRendering: true },
+      html2canvas: { scale: 2, useCORS: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).from(sheet).save();
   } catch (err) {
