@@ -125,8 +125,53 @@
         .luxury-shadow {
             box-shadow: 0px 4px 20px rgba(15, 23, 42, 0.05);
         }
+        /* Matte gold hero tile (الصندوق اليومي) -- a muted brushed-metal
+           gradient (not a flat/bright gold) plus a soft diagonal sheen via
+           ::after, so it reads as "premium metal catching light" rather
+           than a glossy plastic highlight. */
         .gold-accent {
-            background-color: #B4955A;
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(150deg, #8a6d3f 0%, #c2a05a 38%, #a3823f 68%, #7a5f34 100%);
+            box-shadow: 0 6px 16px -4px rgba(122, 95, 52, 0.5), inset 0 1px 0 rgba(255,255,255,0.16);
+        }
+        .gold-accent::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.24) 50%, transparent 62%);
+            pointer-events: none;
+        }
+        /* Modern quick-action tile system -- an icon "badge" (tinted rounded
+           chip) sitting above the label, softer corners and a touch of
+           elevation instead of a flat border-only look. */
+        .qa-tile {
+            position: relative;
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .qa-icon-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            margin-bottom: 6px;
+        }
+        .gold-accent .qa-icon-badge {
+            background: rgba(255,255,255,0.2);
+        }
+        /* Row-2 tiles: a tint close to the gold accent, with a visibly
+           stronger border + shadow than the plain-white tiles above them. */
+        .qa-gold-tint {
+            background: #FBF4E4;
+            border: 1.5px solid #DCC287;
+            color: #6b4f21;
+            box-shadow: 0 5px 14px -4px rgba(180, 149, 90, 0.4);
+        }
+        .qa-gold-tint .qa-icon-badge {
+            background: rgba(180, 149, 90, 0.22);
         }
         /* Hide scrollbar for clean mobile look */
         ::-webkit-scrollbar {
@@ -817,13 +862,22 @@
 <div class="hidden flex-col gap-2 mb-5" id="alertsWrap"></div>
 <!-- Summary Cards (Bento Style for Mobile) -->
 <section class="mb-6 lg:hidden"><h3 class="font-label-md text-label-md text-on-primary opacity-70 mb-4 uppercase tracking-wider">الاختصارات السريعة</h3><div class="grid grid-cols-4 gap-3">
-<a class="quick-action-icon col-span-4 flex flex-row items-center justify-center gap-2 p-2.5 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" href="invoices-list-ar.html"><span class="material-symbols-outlined text-[20px]">manage_search</span><span class="text-[12px] font-semibold">بحث الفواتير</span></a>
-<a class="quick-action-icon gm-shimmer-surface flex flex-col items-center justify-center p-3 rounded-xl active:scale-95 transition-transform duration-200" style="background:var(--gm-primary); color:var(--gm-on-primary);" data-permission="create_invoice" href="new-sale-ar.html"><span class="material-symbols-outlined text-xl mb-1">add_shopping_cart</span><span class="text-[14px] font-bold leading-tight text-center">فاتورة جديدة</span></a>
-<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="create_invoice" href="create-invoice-v2-ar.html"><span class="material-symbols-outlined text-xl mb-1">local_shipping</span><span class="text-[14px] font-bold leading-tight text-center">فاتورة شراء</span></a>
-<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border-2 rounded-xl active:scale-95 transition-transform duration-200" style="border-color:#7f1d1d; color:#7f1d1d;" data-permission="create_invoice" href="sales-return-ar.html"><span class="material-symbols-outlined text-xl mb-1">keyboard_return</span><span class="text-[14px] font-bold leading-tight text-center">مرتجع مبيعات</span></a>
-<a class="quick-action-icon flex flex-col items-center justify-center p-3 gold-accent text-white rounded-xl active:scale-95 transition-transform duration-200 ring-2 ring-secondary ring-offset-1" data-permission="manage_daily_cashbox" href="daily-cashbox-ar.html" id="dailyCashboxIcon"><span class="material-symbols-outlined text-xl mb-1">account_balance_wallet</span><span class="text-[14px] font-bold leading-tight text-center">الصندوق اليومي</span></a>
-<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="inventory-add.html"><span class="material-symbols-outlined text-xl mb-1">inventory_2</span><span class="text-[14px] font-bold leading-tight text-center">إضافة قطعة</span></a>
-<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="stock-production-ar.html"><span class="material-symbols-outlined text-xl mb-1">precision_manufacturing</span><span class="text-[14px] font-bold leading-tight text-center">إنتاج القطع</span></a>
+<a class="quick-action-icon qa-tile col-span-4 flex flex-row items-center justify-center gap-2 p-3 bg-white border border-outline-variant text-on-surface rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" href="invoices-list-ar.html"><span class="material-symbols-outlined text-[20px]">manage_search</span><span class="text-[13px] font-semibold">بحث الفواتير</span></a>
+<a class="quick-action-icon qa-tile gm-shimmer-surface flex flex-col items-center justify-center p-3 rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" style="background:var(--gm-primary); color:var(--gm-on-primary);" data-permission="create_invoice" href="new-sale-ar.html"><span class="qa-icon-badge" style="background:rgba(255,255,255,0.16);"><span class="material-symbols-outlined text-xl">add_shopping_cart</span></span><span class="text-[15px] font-bold leading-tight text-center">فاتورة جديدة</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" data-permission="create_invoice" href="create-invoice-v2-ar.html"><span class="qa-icon-badge" style="background:rgba(116,90,37,0.1);"><span class="material-symbols-outlined text-xl">local_shipping</span></span><span class="text-[15px] font-bold leading-tight text-center">فاتورة شراء</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 bg-white border-2 rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" style="border-color:#7f1d1d; color:#7f1d1d;" data-permission="create_invoice" href="sales-return-ar.html"><span class="qa-icon-badge" style="background:rgba(127,29,29,0.08);"><span class="material-symbols-outlined text-xl">keyboard_return</span></span><span class="text-[15px] font-bold leading-tight text-center">مرتجع مبيعات</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 gold-accent text-white rounded-2xl active:scale-95 transition-transform duration-200 ring-2 ring-secondary ring-offset-1" data-permission="manage_daily_cashbox" href="daily-cashbox-ar.html" id="dailyCashboxIcon"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">account_balance_wallet</span></span><span class="text-[15px] font-bold leading-tight text-center">الصندوق اليومي</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" data-permission="add_piece" href="inventory-add.html"><span class="qa-icon-badge" style="background:rgba(116,90,37,0.1);"><span class="material-symbols-outlined text-xl">inventory_2</span></span><span class="text-[15px] font-bold leading-tight text-center">إضافة قطعة</span></a>
+<!-- Second quick-access row -- ledger/inventory-count promoted up front,
+     alongside statements and stock-on-hand, so the day-to-day accounting
+     shortcuts aren't buried below the less-frequent stock-entry actions.
+     Same destinations as their original tiles further down this grid
+     (kept there too, so nothing else on the page has to change). -->
+<a class="quick-action-icon qa-tile qa-gold-tint flex flex-col items-center justify-center p-3 rounded-2xl active:scale-95 transition-transform duration-200" href="ledger-ar.html"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">groups</span></span><span class="text-[15px] font-bold leading-tight text-center">حسابات التجار</span></a>
+<a class="quick-action-icon qa-tile qa-gold-tint flex flex-col items-center justify-center p-3 rounded-2xl active:scale-95 transition-transform duration-200" data-permission="run_inventory_count" href="inventory-count-ar.html"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">checklist</span></span><span class="text-[15px] font-bold leading-tight text-center">الجرد</span></a>
+<a class="quick-action-icon qa-tile qa-gold-tint flex flex-col items-center justify-center p-3 rounded-2xl active:scale-95 transition-transform duration-200" data-permission="view_customers" href="customer-debts-ar.html"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">account_balance_wallet</span></span><span class="text-[15px] font-bold leading-tight text-center">كشف حساب</span></a>
+<a class="quick-action-icon qa-tile qa-gold-tint flex flex-col items-center justify-center p-3 rounded-2xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="inventory-list-ar.html"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">inventory_2</span></span><span class="text-[15px] font-bold leading-tight text-center">المخزن</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" data-permission="add_piece" href="stock-production-ar.html"><span class="qa-icon-badge" style="background:rgba(116,90,37,0.1);"><span class="material-symbols-outlined text-xl">precision_manufacturing</span></span><span class="text-[15px] font-bold leading-tight text-center">إنتاج القطع</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="owner_only_opening_stock" href="opening-stock-ar.html"><span class="material-symbols-outlined text-xl mb-1">warehouse</span><span class="text-[14px] font-bold leading-tight text-center">بضاعة أول المدة</span></a>
 <a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="inventory-list-ar.html"><span class="material-symbols-outlined text-xl mb-1">inventory_2</span><span class="text-[14px] font-bold leading-tight text-center">المخزن</span></a>
 <a class="quick-action-icon diamond-feature hidden flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="diamond-inventory-add.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[14px] font-bold leading-tight text-center">إضافة ألماسة</span></a>
@@ -1355,6 +1409,7 @@
 
 <p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">السجلات</p>
 <a href="invoices-list-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">list_alt</span><span class="font-label-md text-label-md">كل الفواتير</span></a>
+<a href="invoices-archive-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory</span><span class="font-label-md text-label-md">الأرشيف الشامل (مبيعات/مشتريات زبائن وتجار)</span></a>
 <a href="sales-return-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">keyboard_return</span><span class="font-label-md text-label-md">مرتجع مبيعات</span></a>
 
 <p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">المالية</p>
@@ -1407,6 +1462,7 @@
         { label: 'بيع جديد / فاتورة', href: 'new-sale-ar.html', icon: 'add_shopping_cart', keywords: 'بيع فاتورة جديدة sale invoice' },
         { label: 'فاتورة شراء', href: 'create-invoice-v2-ar.html', icon: 'local_shipping', keywords: 'شراء تاجر فرد purchase buy' },
         { label: 'كل الفواتير (بحث وفلترة)', href: 'invoices-list-ar.html', icon: 'manage_search', keywords: 'فواتير بحث فلتر invoices search' },
+        { label: 'الأرشيف الشامل (مبيعات/مشتريات زبائن وتجار)', href: 'invoices-archive-ar.html', icon: 'inventory', keywords: 'ارشيف مبيعات مشتريات تجار زبائن archive sales purchases traders' },
         { label: 'مرتجع مبيعات', href: 'sales-return-ar.html', icon: 'keyboard_return', keywords: 'ارجاع مرتجع return' },
         { label: 'مستندات KYC — الشركات', href: 'kyc-companies-ar.html', icon: 'domain_verification', keywords: 'kyc شركات توثيق مستندات companies' },
         { label: 'مستندات الهوية — الأفراد', href: 'kyc-individuals-ar.html', icon: 'badge', keywords: 'هوية جواز سفر افراد id passport individuals' },
