@@ -1,0 +1,1664 @@
+<!DOCTYPE html>
+
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>لوحة التحكم GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<script src="theme.js?v=13"></script>
+<script id="tailwind-config">
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            "colors": {
+                    "on-surface-variant": "var(--gm-on-surface-variant)",
+                    "on-secondary-container": "#795f29",
+                    "secondary": "var(--gm-secondary)",
+                    "surface-dim": "#d8dadc",
+                    "on-tertiary": "#ffffff",
+                    "surface-bright": "#f7f9fb",
+                    "error": "#ba1a1a",
+                    "on-secondary": "#ffffff",
+                    "primary-fixed-dim": "#bec6e0",
+                    "on-primary-fixed-variant": "#3f465c",
+                    "on-tertiary-container": "#75859d",
+                    "tertiary": "#000000",
+                    "primary-fixed": "#dae2fd",
+                    "primary-container": "#131b2e",
+                    "surface-tint": "#565e74",
+                    "on-surface": "var(--gm-on-surface)",
+                    "surface-container": "#eceef0",
+                    "on-primary-container": "#7c839b",
+                    "surface-container-highest": "#e0e3e5",
+                    "on-error-container": "#93000a",
+                    "inverse-on-surface": "#eff1f3",
+                    "surface-container-low": "var(--gm-surface-low)",
+                    "on-secondary-fixed-variant": "#5a430f",
+                    "on-primary": "var(--gm-on-primary)",
+                    "background": "var(--gm-bg)",
+                    "secondary-fixed-dim": "#e4c283",
+                    "outline-variant": "var(--gm-outline-variant)",
+                    "surface-container-lowest": "var(--gm-surface-lowest)",
+                    "surface": "var(--gm-bg)",
+                    "error-container": "#ffdad6",
+                    "tertiary-fixed": "#d3e4fe",
+                    "on-primary-fixed": "#131b2e",
+                    "secondary-fixed": "#ffdea4",
+                    "on-secondary-fixed": "#261900",
+                    "tertiary-fixed-dim": "#b7c8e1",
+                    "primary": "var(--gm-primary)",
+                    "on-background": "var(--gm-on-primary)",
+                    "on-error": "#ffffff",
+                    "surface-variant": "#e0e3e5",
+                    "tertiary-container": "#0b1c30",
+                    "inverse-primary": "#bec6e0",
+                    "outline": "#76777d",
+                    "on-tertiary-fixed-variant": "#38485d",
+                    "surface-container-high": "#e6e8ea",
+                    "inverse-surface": "#2d3133",
+                    "secondary-container": "#ffdb99",
+                    "on-tertiary-fixed": "#0b1c30"
+            },
+            "borderRadius": {
+                    "DEFAULT": "0.125rem",
+                    "lg": "0.25rem",
+                    "xl": "0.5rem",
+                    "full": "0.75rem"
+            },
+            "spacing": {
+                    "margin-desktop": "40px",
+                    "gutter": "24px",
+                    "unit": "4px",
+                    "margin-mobile": "16px",
+                    "container-max": "1440px"
+            },
+            "fontFamily": {
+                    "body-md": ["Inter"],
+                    "data-mono": ["IBM Plex Sans"],
+                    "headline-md": ["Inter"],
+                    "headline-xl-mobile": ["Inter"],
+                    "label-md": ["Inter"],
+                    "headline-lg": ["Inter"],
+                    "body-lg": ["Inter"],
+                    "headline-xl": ["Inter"]
+            },
+            "fontSize": {
+                    "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+                    "data-mono": ["15px", {"lineHeight": "20px", "fontWeight": "400"}],
+                    "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+                    "headline-xl-mobile": ["30px", {"lineHeight": "38px", "fontWeight": "700"}],
+                    "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}],
+                    "headline-lg": ["32px", {"lineHeight": "40px", "fontWeight": "600"}],
+                    "body-lg": ["18px", {"lineHeight": "28px", "fontWeight": "400"}],
+                    "headline-xl": ["40px", {"lineHeight": "48px", "letterSpacing": "-0.02em", "fontWeight": "700"}]
+            }
+          },
+        },
+      }
+    </script>
+<style>
+        :root {
+            --gm-bg: #0f172a; --gm-bg-elevated: #f7f9fb; --gm-surface-lowest: #ffffff; --gm-surface-low: #f2f4f6;
+            --gm-primary: #000000; --gm-on-primary: #ffffff; --gm-accent: #FFD700; --gm-on-accent: #0f172a;
+            --gm-secondary: #745a25; --gm-on-surface: #191c1e; --gm-on-surface-variant: #45464d; --gm-outline-variant: #c6c6cd;
+        }
+        html { font-size: 87.5%; }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .material-symbols-outlined {
+            font-variation-settings: 'FILL' 0, 'wght' 400, 'GRAD' 0, 'opsz' 24;
+            font-size: 18px;
+        }
+        .luxury-shadow {
+            box-shadow: 0px 4px 20px rgba(15, 23, 42, 0.05);
+        }
+        /* Matte gold hero tile (الصندوق اليومي) -- a muted brushed-metal
+           gradient (not a flat/bright gold) plus a soft diagonal sheen via
+           ::after, so it reads as "premium metal catching light" rather
+           than a glossy plastic highlight. */
+        .gold-accent {
+            position: relative;
+            overflow: hidden;
+            background:
+                linear-gradient(150deg, #8a6d3f 0%, #c2a05a 38%, #a3823f 68%, #7a5f34 100%);
+            box-shadow: 0 6px 16px -4px rgba(122, 95, 52, 0.5), inset 0 1px 0 rgba(255,255,255,0.16);
+        }
+        .gold-accent::after {
+            content: "";
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(115deg, transparent 38%, rgba(255,255,255,0.24) 50%, transparent 62%);
+            pointer-events: none;
+        }
+        /* Modern quick-action tile system -- an icon "badge" (tinted rounded
+           chip) sitting above the label, softer corners and a touch of
+           elevation instead of a flat border-only look. */
+        .qa-tile {
+            position: relative;
+            transition: transform 0.15s ease, box-shadow 0.2s ease;
+        }
+        .qa-icon-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            width: 38px;
+            height: 38px;
+            border-radius: 11px;
+            margin-bottom: 6px;
+        }
+        .gold-accent .qa-icon-badge {
+            background: rgba(255,255,255,0.2);
+        }
+        /* Row-2 tiles: a tint close to the gold accent, with a visibly
+           stronger border + shadow than the plain-white tiles above them. */
+        .qa-gold-tint {
+            background: #FBF4E4;
+            border: 1.5px solid #DCC287;
+            color: #6b4f21;
+            box-shadow: 0 5px 14px -4px rgba(180, 149, 90, 0.4);
+        }
+        .qa-gold-tint .qa-icon-badge {
+            background: rgba(180, 149, 90, 0.22);
+        }
+        /* Hide scrollbar for clean mobile look */
+        ::-webkit-scrollbar {
+            display: none;
+        }
+    </style>
+<style>
+    body {
+      min-height: max(884px, 100dvh);
+    }
+  </style>
+<style>
+  /* ============================================================
+     Desktop app shell (≥1024px / Tailwind `lg`). Entirely separate
+     visual system from the mobile experience above — scoped under
+     .dsk-app so none of this touches mobile styling. Only ever
+     visible via the `hidden lg:flex` utility classes on .dsk-app
+     itself, so no extra breakpoint logic is needed in here.
+     ============================================================ */
+  .dsk-app{
+    --dsk-bg:#EDE6D2;
+    --dsk-surface:#FFFFFF;
+    --dsk-surface-sunken:#F6F1E2;
+    --dsk-ink:#1C1A16;
+    --dsk-ink-soft:#767059;
+    --dsk-ink-faint:#9B9478;
+    --dsk-line:#DED0A4;
+    --dsk-line-soft:#E7DCB6;
+    --dsk-gold:#9C8552;
+    --dsk-gold-deep:#7A6640;
+    --dsk-gold-ink:#FBF8F1;
+    --dsk-good:#3F6B47;
+    --dsk-warn:#8A5A2A;
+    --dsk-bad:#8A3B32;
+    --dsk-radius:10px;
+    min-height:100vh;width:100%;
+    background:var(--dsk-bg);color:var(--dsk-ink);
+    font-family:'Times New Roman','Amiri',Times,serif;
+    direction:rtl;font-variant-numeric:tabular-nums;font-size:13.5px;
+    -webkit-font-smoothing:antialiased;
+  }
+  .dsk-app a{color:inherit;text-decoration:none;}
+  .dsk-app *{box-sizing:border-box;}
+
+  /* Sidebar first in DOM order so it lands on the right under RTL flex. */
+  .dsk-sidebar{
+    width:212px;flex:none;
+    background:var(--dsk-ink);color:var(--dsk-gold-ink);
+    display:flex;flex-direction:column;
+    position:sticky;top:0;height:100vh;
+  }
+  .dsk-brand{display:flex;align-items:center;gap:9px;padding:16px 16px 14px;border-bottom:1px solid rgba(255,255,255,.08);}
+  .dsk-brand-mark{
+    width:34px;height:34px;border-radius:50%;flex:none;position:relative;overflow:hidden;background:#0E0D0A;
+    box-shadow:0 0 0 2px rgba(255,214,140,.35), 0 3px 8px rgba(0,0,0,.4);
+    transition:transform .22s ease, box-shadow .22s ease;
+  }
+  .dsk-brand-mark img{width:100%;height:100%;object-fit:cover;display:block;border-radius:50%;}
+  .dsk-brand-mark::after{
+    content:'';position:absolute;inset:0;border-radius:50%;
+    background:linear-gradient(135deg, rgba(255,255,255,.55) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 66%, rgba(255,255,255,.16) 100%);
+    pointer-events:none;
+  }
+  .dsk-brand:hover .dsk-brand-mark{transform:scale(1.07) rotate(2deg);box-shadow:0 0 0 2px rgba(255,214,140,.65), 0 4px 12px rgba(0,0,0,.45);}
+  .dsk-brand-name{font-size:14.5px;font-weight:700;}
+
+  .dsk-nav-scroll{flex:1;overflow-y:auto;padding:10px 10px 0;}
+  .dsk-nav-group-label{font-size:10px;color:#8f8873;letter-spacing:.05em;padding:12px 8px 4px;}
+  .dsk-nav-group:first-child .dsk-nav-group-label{padding-top:2px;}
+  .dsk-nav{display:flex;flex-direction:column;gap:1px;}
+  .dsk-nav-link{
+    display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;
+    font-size:12px;color:#CFC7AC;border-inline-end:2px solid transparent;cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+  }
+  .dsk-ic{width:14px;text-align:center;font-size:14px !important;opacity:.8;flex:none;transition:transform .18s ease;}
+  .dsk-nav-link:hover{background:rgba(255,255,255,.05);color:var(--dsk-gold-ink);}
+  .dsk-nav-link:hover .dsk-ic{transform:scale(1.18);}
+  .dsk-nav-link.active{background:rgba(156,133,82,.2);color:var(--dsk-gold-ink);border-inline-end-color:var(--dsk-gold);font-weight:600;}
+  .dsk-nav-link.active .dsk-ic{transform:scale(1.05);}
+
+  .dsk-sidebar-footer{
+    display:flex;align-items:center;gap:8px;padding:10px 12px;border-top:1px solid rgba(255,255,255,.08);
+    transition:background .15s ease;cursor:pointer;
+  }
+  .dsk-sidebar-footer:hover{background:rgba(255,255,255,.03);}
+  .dsk-avatar{
+    width:26px;height:26px;border-radius:50%;flex:none;
+    background:linear-gradient(145deg,#C9AD70,var(--dsk-gold-deep) 55%,#4E4022);
+    display:flex;align-items:center;justify-content:center;font-weight:700;color:var(--dsk-gold-ink);font-size:11px;
+    box-shadow:0 1px 0 rgba(255,255,255,.35) inset, 0 -1px 2px rgba(0,0,0,.3) inset, 0 2px 4px rgba(0,0,0,.2), 0 5px 10px rgba(0,0,0,.16);
+    transition:transform .18s ease, box-shadow .18s ease;
+  }
+  .dsk-sidebar-footer:hover .dsk-avatar{transform:scale(1.06);}
+  .dsk-sf-text{min-width:0;}
+  .dsk-sf-name{font-size:11.5px;font-weight:600;color:var(--dsk-gold-ink);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .dsk-sf-role{font-size:9.5px;color:#9d9578;}
+
+  /* Main column */
+  .dsk-main{flex:1;min-width:0;display:flex;flex-direction:column;}
+
+  .dsk-topbar{display:flex;flex-direction:column;border-bottom:1px solid var(--dsk-line-soft);background:var(--dsk-surface);}
+  .dsk-store-banner{
+    position:relative;overflow:hidden;display:flex;align-items:center;gap:11px;padding:10px 20px;
+    background:linear-gradient(120deg,#221D12 0%,#4A3F26 28%,#8A7343 50%,#4A3F26 72%,#221D12 100%);
+    background-size:220% 100%;animation:dskBrandShimmer 9s ease-in-out infinite;
+  }
+  .dsk-store-banner-shine{
+    position:absolute;inset:0;background:linear-gradient(115deg,transparent 42%,rgba(255,255,255,.32) 50%,transparent 58%);
+    background-size:280% 100%;animation:dskBrandShine 7.5s ease-in-out infinite;pointer-events:none;
+  }
+  @keyframes dskBrandShimmer{0%,100%{background-position:0% 50%;}50%{background-position:100% 50%;}}
+  @keyframes dskBrandShine{0%{background-position:220% 0;}60%,100%{background-position:-60% 0;}}
+  .dsk-store-logo{
+    width:31px;height:31px;border-radius:50%;flex:none;position:relative;z-index:1;overflow:hidden;
+    background:radial-gradient(circle at 32% 26%,#FFF8E6,#E7CE96 45%,#8A7343 100%);
+    display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:#3B2F16;
+    box-shadow:0 0 0 2px rgba(255,255,255,.25),0 3px 8px rgba(0,0,0,.45);
+  }
+  .dsk-store-logo img{width:100%;height:100%;object-fit:cover;border-radius:50%;}
+  .dsk-store-name{
+    font-size:17px;font-weight:700;color:var(--dsk-gold-ink);letter-spacing:.01em;
+    position:relative;z-index:1;text-shadow:0 1px 3px rgba(0,0,0,.4);
+    white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  }
+  .dsk-topbar-utility{display:flex;align-items:center;gap:10px;padding:8px 20px;}
+  .dsk-page-title{font-size:14px;font-weight:700;white-space:nowrap;}
+  .dsk-search{
+    flex:1;max-width:420px;display:flex;align-items:center;gap:7px;
+    background:var(--dsk-surface-sunken);border:1px solid var(--dsk-line-soft);border-radius:8px;padding:7px 12px;
+    color:var(--dsk-ink-soft);font-size:12px;cursor:pointer;text-align:right;font-family:inherit;
+    transition:border-color .15s ease;
+  }
+  .dsk-search:hover{border-color:var(--dsk-gold);}
+  .dsk-topbar-spacer{flex:1;}
+  .dsk-gold-tick{
+    display:flex;align-items:center;gap:7px;font-size:11px;color:var(--dsk-ink-soft);
+    background:var(--dsk-surface-sunken);border:1px solid var(--dsk-line-soft);border-radius:8px;padding:6px 12px;
+    white-space:nowrap;cursor:pointer;font-family:inherit;
+  }
+  .dsk-gt-live{display:flex;align-items:center;gap:5px;font-size:10px;color:var(--dsk-ink-faint);}
+  .dsk-gt-live-dot{width:6px;height:6px;border-radius:50%;background:var(--dsk-good);position:relative;flex:none;}
+  .dsk-gt-live-dot::after{content:'';position:absolute;inset:-3px;border-radius:50%;border:1px solid var(--dsk-good);animation:dskLiveping 2.2s ease-out infinite;}
+  @keyframes dskLiveping{0%{opacity:.75;transform:scale(1);}100%{opacity:0;transform:scale(1.9);}}
+  .dsk-gt-sep{color:var(--dsk-line);}
+  .dsk-gt-karat{font-weight:600;color:var(--dsk-ink-soft);}
+  .dsk-gold-tick b{color:var(--dsk-gold-deep);font-weight:700;display:inline-flex;align-items:baseline;gap:3px;}
+  .dsk-gt-unit{font-size:9.5px;font-weight:600;color:var(--dsk-ink-faint);}
+  .dsk-icon-btn{
+    height:30px;min-width:30px;padding:0 8px;border-radius:8px;
+    display:flex;align-items:center;justify-content:center;color:var(--dsk-ink-soft);font-size:13px;font-weight:700;
+    background:var(--dsk-surface-sunken);cursor:pointer;font-family:inherit;
+    box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 2px 4px rgba(28,26,22,.08), 0 5px 9px rgba(28,26,22,.06);
+    transition:background .15s ease, transform .15s ease, box-shadow .15s ease;
+  }
+  .dsk-icon-btn:hover{background:var(--dsk-surface);transform:translateY(-2px);box-shadow:0 1px 0 rgba(255,255,255,.7) inset, 0 3px 6px rgba(28,26,22,.12), 0 8px 14px rgba(28,26,22,.10);}
+  .dsk-account-trigger{display:flex;align-items:center;gap:3px;padding:2px 6px 2px 2px;border-radius:20px;cursor:pointer;transition:background .15s ease;}
+  .dsk-account-trigger:hover{background:var(--dsk-surface-sunken);}
+  .dsk-account-trigger:hover .dsk-avatar{transform:scale(1.07);box-shadow:0 0 0 2px var(--dsk-gold);}
+  .dsk-account-caret{font-size:9px;color:var(--dsk-ink-faint);}
+
+  .dsk-content{padding:16px 20px 28px;flex:1;}
+
+  /* Stat strip — floating 3D cards */
+  .dsk-stat-strip{display:flex;gap:13px;margin-bottom:16px;animation:dskRiseIn .45s ease both;}
+  .dsk-stat{
+    flex:1;padding:13px 15px;background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:var(--dsk-radius);
+    box-shadow:0 2px 5px rgba(28,26,22,.06), 0 10px 18px rgba(28,26,22,.055);
+    display:flex;flex-direction:column;gap:5px;
+    transition:transform .16s ease, box-shadow .16s ease;
+  }
+  .dsk-stat:hover{transform:translateY(-3px);box-shadow:0 4px 10px rgba(28,26,22,.10), 0 16px 26px rgba(28,26,22,.09);}
+  .dsk-stat-head{display:flex;align-items:center;gap:8px;}
+  .dsk-stat-ic{
+    width:27px !important;height:27px;border-radius:8px;flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:14px !important;
+    background:var(--dsk-tint,var(--dsk-surface-sunken));color:var(--dsk-ink,var(--dsk-gold-deep));
+    box-shadow:0 1px 0 rgba(255,255,255,.75) inset, 0 -1px 1px rgba(0,0,0,.06) inset, 0 2px 3px rgba(28,26,22,.14), 0 6px 10px rgba(28,26,22,.10);
+    transition:transform .18s ease;
+  }
+  .dsk-stat:hover .dsk-stat-ic{transform:scale(1.14) rotate(-3deg);}
+  .dsk-stat-label{font-size:10.5px;color:var(--dsk-ink-soft);font-weight:600;}
+  .dsk-stat-value{font-size:19px;font-weight:700;line-height:1.1;}
+  .dsk-stat-trend{font-size:10px;margin-top:1px;}
+  .dsk-stat-trend.flat{color:var(--dsk-ink-faint);}
+  .dsk-stat-trend.warn{color:var(--dsk-warn);}
+  .dsk-stat-trend.up{color:var(--dsk-good);}
+
+  /* Quick actions toolbar + customize */
+  .dsk-toolbar-row{display:flex;align-items:center;justify-content:space-between;margin:0 2px 8px;}
+  .dsk-toolbar-label{font-size:11px;color:var(--dsk-ink-soft);font-weight:600;}
+  .dsk-customize-btn{
+    font-size:10.5px;color:var(--dsk-gold-deep);font-weight:600;display:flex;align-items:center;gap:5px;
+    padding:4px 10px;border-radius:999px;border:1px solid var(--dsk-line-soft);background:var(--dsk-surface);
+    cursor:pointer;font-family:inherit;
+  }
+  .dsk-customize-btn:hover{border-color:var(--dsk-gold);}
+  .dsk-action-strip{display:flex;gap:8px;margin-bottom:16px;animation:dskRiseIn .45s ease .05s both;}
+  .dsk-action{
+    flex:1;background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:var(--dsk-radius);
+    padding:9px 10px;display:flex;align-items:center;gap:8px;cursor:pointer;
+    transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
+  }
+  .dsk-action:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(28,26,22,.10);border-color:var(--dsk-gold);}
+  .dsk-action-ic{
+    width:24px !important;height:24px;border-radius:7px;flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:14px !important;
+    background:var(--dsk-act-tint,var(--dsk-surface-sunken));color:var(--dsk-act-ink,var(--dsk-gold-deep));
+    box-shadow:0 1px 0 rgba(255,255,255,.75) inset, 0 -1px 1px rgba(0,0,0,.06) inset, 0 2px 3px rgba(28,26,22,.15), 0 5px 9px rgba(28,26,22,.11);
+    transition:transform .18s ease;
+  }
+  .dsk-action:hover .dsk-action-ic{transform:scale(1.12) rotate(-4deg);}
+  .dsk-action-label{font-size:11.5px;font-weight:600;}
+  .dsk-action.primary{background:var(--dsk-ink);border-color:var(--dsk-ink);}
+  .dsk-action.primary .dsk-action-label{color:var(--dsk-gold-ink);}
+  .dsk-action.primary .dsk-action-ic{
+    background:rgba(255,255,255,.12);color:var(--dsk-gold);
+    box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 -1px 1px rgba(0,0,0,.3) inset, 0 2px 4px rgba(0,0,0,.35), 0 6px 12px rgba(0,0,0,.3);
+  }
+  .dsk-customize-panel{display:none;background:var(--dsk-surface);border:1px dashed var(--dsk-gold);border-radius:var(--dsk-radius);padding:12px 14px;margin:-6px 0 16px;}
+  .dsk-customize-panel.open{display:block;}
+  .dsk-customize-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;}
+  .dsk-customize-title{font-size:12px;font-weight:700;white-space:nowrap;}
+  .dsk-customize-note{font-size:10px;color:var(--dsk-ink-faint);}
+  .dsk-customize-grid{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px;}
+  .dsk-chip{
+    display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;border:1px solid var(--dsk-line-soft);
+    font-size:11.5px;color:var(--dsk-ink-soft);cursor:pointer;background:var(--dsk-surface-sunken);user-select:none;
+  }
+  .dsk-chip.checked{background:var(--dsk-ink);color:var(--dsk-gold-ink);border-color:var(--dsk-ink);}
+  .dsk-customize-actions{display:flex;align-items:center;justify-content:space-between;}
+  .dsk-customize-count{font-size:10px;color:var(--dsk-ink-faint);}
+  .dsk-customize-buttons{display:flex;gap:8px;}
+  .dsk-btn-save{background:var(--dsk-ink);color:var(--dsk-gold-ink);border:none;border-radius:7px;padding:6px 16px;font-size:11.5px;font-weight:600;cursor:pointer;font-family:inherit;}
+  .dsk-btn-cancel{background:transparent;color:var(--dsk-ink-soft);border:1px solid var(--dsk-line-soft);border-radius:7px;padding:6px 14px;font-size:11.5px;cursor:pointer;font-family:inherit;}
+
+  /* Workspace: activity feed + rail */
+  .dsk-workspace{display:flex;gap:14px;align-items:flex-start;animation:dskRiseIn .45s ease .1s both;}
+  .dsk-col-main{flex:1.7;min-width:0;}
+  .dsk-col-rail{flex:1;min-width:0;display:flex;flex-direction:column;gap:14px;}
+  .dsk-panel{background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:var(--dsk-radius);overflow:hidden;}
+  .dsk-panel-head{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-bottom:1px solid var(--dsk-line-soft);}
+  .dsk-panel-title{font-size:12.5px;font-weight:700;display:flex;align-items:center;gap:6px;}
+  .dsk-panel-title .dsk-ic{color:var(--dsk-gold-deep);font-size:14px !important;}
+  .dsk-panel:hover .dsk-panel-title .dsk-ic{transform:scale(1.12);}
+  .dsk-panel-link{font-size:11px;color:var(--dsk-gold-deep);font-weight:600;cursor:pointer;}
+  .dsk-panel-link:hover{text-decoration:underline;}
+  .dsk-empty{padding:24px 14px;text-align:center;color:var(--dsk-ink-faint);font-size:12px;}
+
+  .dsk-alert-row{display:flex;align-items:flex-start;gap:8px;padding:9px 14px;border-bottom:1px solid var(--dsk-line-soft);cursor:pointer;transition:background .15s ease;}
+  .dsk-alert-row:last-child{border-bottom:none;}
+  .dsk-alert-row:hover{background:var(--dsk-surface-sunken);}
+  .dsk-alert-dot{width:6px;height:6px;border-radius:50%;flex:none;margin-top:4px;}
+  .dsk-alert-dot.warn{background:var(--dsk-warn);}
+  .dsk-alert-dot.bad{background:var(--dsk-bad);}
+  .dsk-alert-text{font-size:11.5px;line-height:1.4;flex:1;}
+
+  .dsk-rail-links{display:flex;flex-direction:column;}
+  .dsk-rail-links a{display:flex;align-items:center;padding:8px 14px;font-size:11.5px;color:var(--dsk-ink-soft);border-bottom:1px solid var(--dsk-line-soft);transition:background .15s ease, padding-inline-start .15s ease;cursor:pointer;}
+  .dsk-rail-links a:last-child{border-bottom:none;}
+  .dsk-rail-links a:hover{color:var(--dsk-ink);background:var(--dsk-surface-sunken);padding-inline-start:12px;}
+
+  /* Reused mobile "recent movements" row markup mirrored in here keeps its
+     own Tailwind classes and renders fine since Tailwind is global. */
+  #dskRecentMovementsEl > div{border-bottom:1px solid var(--dsk-line-soft);}
+  #dskRecentMovementsEl > div:last-child{border-bottom:none;}
+
+  @keyframes dskRiseIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
+
+  @media (prefers-reduced-motion: reduce){
+    .dsk-app *{animation-duration:.001ms !important;animation-iteration-count:1 !important;transition-duration:.001ms !important;}
+  }
+</style>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+</head>
+<body class="bg-background text-on-background selection:bg-secondary-container">
+<!-- ============================================================
+     Desktop app shell (≥1024px / Tailwind `lg`). Independent DOM from
+     the mobile experience above (different element ids throughout,
+     prefixed dsk*), shown only via `hidden lg:flex`. Real data is
+     mirrored into these elements by the existing loadDashboard() /
+     loadMovementsForDay() functions further down this file — see the
+     "dsk mirror" comments inside them. Nothing here talks to Supabase
+     on its own.
+     ============================================================ -->
+<div class="dsk-app hidden lg:flex">
+  <aside class="dsk-sidebar">
+    <div class="dsk-brand">
+      <div class="dsk-brand-mark"><img src="icon-192.png" alt="GoldMind"></div>
+      <div class="dsk-brand-name">GoldMind</div>
+    </div>
+    <nav class="dsk-nav-scroll">
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">عام</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link active" href="index-ar.html"><span class="material-symbols-outlined dsk-ic">dashboard</span>لوحة التحكم</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">الفواتير</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="invoices-list-ar.html"><span class="material-symbols-outlined dsk-ic">receipt_long</span>مبيعات</a>
+          <a class="dsk-nav-link" href="sales-return-ar.html"><span class="material-symbols-outlined dsk-ic">keyboard_return</span>مردودات مبيعات</a>
+          <a class="dsk-nav-link" href="repairs-ar.html"><span class="material-symbols-outlined dsk-ic">build</span>الصيانة</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">التجار والإنتاج</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="ledger-ar.html"><span class="material-symbols-outlined dsk-ic">groups</span>حسابات التجار</a>
+          <a class="dsk-nav-link" href="inventory-add.html"><span class="material-symbols-outlined dsk-ic">inventory_2</span>إدخال بضاعة</a>
+          <a class="dsk-nav-link" href="stock-production-ar.html"><span class="material-symbols-outlined dsk-ic">precision_manufacturing</span>إنتاج قطع</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">المخزون</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="inventory-list-ar.html"><span class="material-symbols-outlined dsk-ic">inventory</span>المخزون</a>
+          <a class="dsk-nav-link" href="inventory-count-ar.html"><span class="material-symbols-outlined dsk-ic">checklist</span>الجرد</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">العملاء</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="customer-add-ar.html"><span class="material-symbols-outlined dsk-ic">person_add</span>إضافة عميل</a>
+          <a class="dsk-nav-link" href="customer-debts-ar.html"><span class="material-symbols-outlined dsk-ic">account_balance_wallet</span>ديون العملاء</a>
+        </div>
+      </div>
+      <div class="dsk-nav-group">
+        <div class="dsk-nav-group-label">الإدارة</div>
+        <div class="dsk-nav">
+          <a class="dsk-nav-link" href="reports-ar.html"><span class="material-symbols-outlined dsk-ic">bar_chart</span>التقارير</a>
+          <a class="dsk-nav-link" href="staff-permissions-ar.html"><span class="material-symbols-outlined dsk-ic">badge</span>الموظفون والصلاحيات</a>
+          <a class="dsk-nav-link" href="settings-ar.html"><span class="material-symbols-outlined dsk-ic">settings</span>الإعدادات</a>
+          <a class="dsk-nav-link" href="theme-picker-ar.html"><span class="material-symbols-outlined dsk-ic">palette</span>مظهر التطبيق</a>
+          <a class="dsk-nav-link" href="subscription-ar.html"><span class="material-symbols-outlined dsk-ic">workspace_premium</span>الاشتراك والفوترة</a>
+        </div>
+      </div>
+    </nav>
+    <a class="dsk-sidebar-footer" href="account-security-ar.html" title="حسابي">
+      <div class="dsk-avatar" id="dskAccountAvatarEl">؟</div>
+      <div class="dsk-sf-text">
+        <div class="dsk-sf-name" id="dskAccountNameEl">...</div>
+        <div class="dsk-sf-role" id="dskAccountRoleEl"></div>
+      </div>
+    </a>
+  </aside>
+
+  <div class="dsk-main">
+    <div class="dsk-topbar">
+      <div class="dsk-store-banner">
+        <div class="dsk-store-banner-shine"></div>
+        <div class="dsk-store-logo" id="dskStoreAvatarEl" style="visibility:hidden;"></div>
+        <div class="dsk-store-name" id="dskStoreNameEl" style="visibility:hidden;"></div>
+      </div>
+      <div class="dsk-topbar-utility">
+        <div class="dsk-page-title">لوحة التحكم</div>
+        <button type="button" class="dsk-search" onclick="openQuickSearch()">
+          <span class="material-symbols-outlined dsk-ic">search</span>بحث عن فاتورة، عميل، أو شاشة...
+        </button>
+        <div class="dsk-topbar-spacer"></div>
+        <button type="button" id="dskGoldTick" class="dsk-gold-tick hidden" onclick="gmOpenKaratPicker()" title="سعر الذهب اللحظي — يتحدّث تلقائيًا">
+          <span class="dsk-gt-live"><span class="dsk-gt-live-dot"></span>سعر الذهب</span>
+          <span class="dsk-gt-sep">·</span>
+          <span class="dsk-gt-karat" id="dskHallmarkKaratLabel">عيار 21</span>
+          <b><span id="dskHallmarkPriceLabel">—</span><span class="dsk-gt-unit">د.إ / غرام</span></b>
+        </button>
+        <button type="button" class="dsk-icon-btn" onclick="toggleCurrency()" title="تبديل العملة" id="dskCurrencyBtn">د.إ</button>
+        <div class="dsk-account-trigger" onclick="location.href='account-security-ar.html'" title="حسابي">
+          <div class="dsk-avatar" id="dskTopAvatarEl">؟</div>
+          <span class="dsk-account-caret">⌄</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="dsk-content">
+      <div class="dsk-stat-strip">
+        <div class="dsk-stat" style="--dsk-tint:#EFE7D2;--dsk-ink:#7A6640;">
+          <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">account_balance_wallet</span><span class="dsk-stat-label">كاش الصندوق</span></div>
+          <div class="dsk-stat-value" id="dskDailyCashboxBalanceEl" style="visibility:hidden;">0.00</div>
+          <div class="dsk-stat-trend flat hidden" id="dskDailyCashboxOtherCurrenciesEl"></div>
+        </div>
+        <div class="dsk-stat" style="--dsk-tint:#E1EADB;--dsk-ink:#3F6B47;">
+          <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">receipt_long</span><span class="dsk-stat-label">فواتير اليوم</span></div>
+          <div class="dsk-stat-value" id="dskTodayInvoiceCountEl" style="visibility:hidden;">0</div>
+        </div>
+        <div class="dsk-stat" style="--dsk-tint:#F1E9D6;--dsk-ink:#9C8552;">
+          <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">payments</span><span class="dsk-stat-label">مبيعات اليوم</span></div>
+          <div class="dsk-stat-value" id="dskTodaySalesEl" style="visibility:hidden;">0.00</div>
+        </div>
+        <div class="dsk-stat" style="--dsk-tint:#F2E2C9;--dsk-ink:#8A5A2A;">
+          <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">notifications</span><span class="dsk-stat-label">تنبيهات مفتوحة</span></div>
+          <div class="dsk-stat-value" id="dskAlertsCountEl">0</div>
+          <div class="dsk-stat-trend flat" id="dskAlertsSummaryEl">— لا تنبيهات حاليًا</div>
+        </div>
+      </div>
+
+      <div class="dsk-toolbar-row">
+        <div class="dsk-toolbar-label">الوصول السريع</div>
+        <button type="button" class="dsk-customize-btn" id="dskCustomizeBtn"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
+      </div>
+      <div class="dsk-action-strip" id="dskActionStrip"></div>
+
+      <div class="dsk-customize-panel" id="dskCustomizePanel">
+        <div class="dsk-customize-head">
+          <div class="dsk-customize-title">اختر اختصاراتك</div>
+          <div class="dsk-customize-note">يُحفظ لحسابك أنت فقط — لا يتغيّر عند باقي الموظفين</div>
+        </div>
+        <div class="dsk-customize-grid" id="dskCustomizeGrid"></div>
+        <div class="dsk-customize-actions">
+          <div class="dsk-customize-count" id="dskCustomizeCount"></div>
+          <div class="dsk-customize-buttons">
+            <button type="button" class="dsk-btn-cancel" id="dskCustomizeCancel">إلغاء</button>
+            <button type="button" class="dsk-btn-save" id="dskCustomizeSave">حفظ</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="dsk-workspace">
+        <div class="dsk-col-main">
+          <div class="dsk-panel">
+            <div class="dsk-panel-head">
+              <div class="dsk-panel-title"><span class="material-symbols-outlined dsk-ic">receipt_long</span>حركات اليوم</div>
+              <a class="dsk-panel-link" href="ledger-ar.html">عرض الكل ←</a>
+            </div>
+            <div id="dskRecentMovementsEl">
+              <div class="dsk-empty">جارِ التحميل...</div>
+            </div>
+          </div>
+        </div>
+        <div class="dsk-col-rail">
+          <div class="dsk-panel">
+            <div class="dsk-panel-head">
+              <div class="dsk-panel-title"><span class="material-symbols-outlined dsk-ic">warning</span>يحتاج انتباهك</div>
+            </div>
+            <div id="dskAlertsListEl">
+              <div class="dsk-empty">لا توجد تنبيهات حاليًا</div>
+            </div>
+          </div>
+          <div class="dsk-panel">
+            <div class="dsk-panel-head">
+              <div class="dsk-panel-title"><span class="material-symbols-outlined dsk-ic">apps</span>الأقسام</div>
+            </div>
+            <div class="dsk-rail-links">
+              <a href="inventory-list-ar.html">المخزون</a>
+              <a href="ledger-ar.html">حسابات التجار</a>
+              <a href="repairs-ar.html">الصيانة</a>
+              <a href="staff-permissions-ar.html">الموظفون والصلاحيات</a>
+              <a href="subscription-ar.html">الاشتراك والفوترة</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// Desktop "الوصول السريع" — customizable per staff member. Catalog items
+// reuse the exact same hrefs/permission keys as the mobile quick-actions
+// grid above, so this stays consistent with the app's real permission
+// system rather than inventing a parallel one.
+(function () {
+  var CATALOG = [
+    { id: 'newSale', icon: 'add_shopping_cart', label: 'فاتورة جديدة', href: 'new-sale-ar.html', permission: 'create_invoice', primary: true },
+    { id: 'stockIn', icon: 'inventory_2', label: 'إدخال بضاعة', href: 'inventory-add.html', permission: 'add_piece', tint: '#F1E9D6', ink: '#9C8552' },
+    { id: 'salesReturn', icon: 'keyboard_return', label: 'مرتجع مبيعات', href: 'sales-return-ar.html', permission: 'create_invoice', tint: '#F3DEDA', ink: '#8A3B32' },
+    { id: 'cashbox', icon: 'account_balance_wallet', label: 'الصندوق اليومي', href: 'daily-cashbox-ar.html', permission: 'manage_daily_cashbox', tint: '#EFE7D2', ink: '#7A6640' },
+    { id: 'addCustomer', icon: 'person_add', label: 'إضافة عميل', href: 'customer-add-ar.html', permission: 'add_customers', tint: '#E1EADB', ink: '#3F6B47' },
+    { id: 'repairs', icon: 'build', label: 'الصيانة', href: 'repairs-ar.html', permission: 'view_repairs', tint: '#F2E2C9', ink: '#8A5A2A' },
+    { id: 'production', icon: 'precision_manufacturing', label: 'إنتاج قطعة', href: 'stock-production-ar.html', permission: 'add_piece', tint: '#DCE8EA', ink: '#3B6B7A' },
+    { id: 'purchaseInvoice', icon: 'local_shipping', label: 'فاتورة شراء', href: 'create-invoice-v2-ar.html', permission: 'create_invoice', tint: '#DCE8EA', ink: '#3B6B7A' },
+    { id: 'merchantLedger', icon: 'groups', label: 'حسابات التجار', href: 'ledger-ar.html', permission: null, tint: '#F1E9D6', ink: '#9C8552' },
+    { id: 'inventoryCount', icon: 'checklist', label: 'الجرد', href: 'inventory-count-ar.html', permission: 'run_inventory_count', tint: '#DCE8EA', ink: '#3B6B7A' }
+  ];
+  var DEFAULTS = ['newSale', 'stockIn', 'salesReturn', 'cashbox', 'addCustomer', 'repairs'];
+  var MAX_ACTIONS = 8;
+
+  var stripEl = document.getElementById('dskActionStrip');
+  var panelEl = document.getElementById('dskCustomizePanel');
+  var gridEl = document.getElementById('dskCustomizeGrid');
+  var countEl = document.getElementById('dskCustomizeCount');
+  var customizeBtn = document.getElementById('dskCustomizeBtn');
+  var saveBtn = document.getElementById('dskCustomizeSave');
+  var cancelBtn = document.getElementById('dskCustomizeCancel');
+  if (!stripEl) return; // desktop block not present on this page
+
+  function byId(id) { return CATALOG.filter(function (c) { return c.id === id; })[0]; }
+  function allowed(item) { return !item.permission || !window.GOLDMIND_HAS_PERM || window.GOLDMIND_HAS_PERM(item.permission); }
+  function allowedIds(ids) { return ids.filter(function (id) { var a = byId(id); return a && allowed(a); }); }
+
+  var selection = DEFAULTS.slice();
+  var draft = selection.slice();
+
+  function renderStrip() {
+    stripEl.innerHTML = selection.map(function (id) {
+      var a = byId(id);
+      if (!a) return '';
+      var permAttr = a.permission ? ' data-permission="' + a.permission + '"' : '';
+      var cls = 'dsk-action quick-action-icon' + (a.primary ? ' primary' : '');
+      var style = a.primary ? '' : ' style="--dsk-act-tint:' + a.tint + ';--dsk-act-ink:' + a.ink + ';"';
+      return '<a class="' + cls + '" href="' + a.href + '"' + permAttr + style + '>'
+        + '<span class="material-symbols-outlined dsk-action-ic">' + a.icon + '</span>'
+        + '<span class="dsk-action-label">' + a.label + '</span></a>';
+    }).join('');
+  }
+
+  function renderGrid() {
+    var choices = CATALOG.filter(allowed);
+    gridEl.innerHTML = choices.map(function (a) {
+      var checked = draft.indexOf(a.id) > -1;
+      return '<div class="dsk-chip' + (checked ? ' checked' : '') + '" data-id="' + a.id + '">'
+        + '<span class="material-symbols-outlined" style="font-size:13px;">' + a.icon + '</span>'
+        + '<span>' + a.label + '</span></div>';
+    }).join('');
+    countEl.textContent = draft.length + ' / ' + MAX_ACTIONS + ' مختارة';
+    var chips = gridEl.querySelectorAll('.dsk-chip');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        var idx = draft.indexOf(id);
+        if (idx > -1) { draft.splice(idx, 1); }
+        else { if (draft.length >= MAX_ACTIONS) return; draft.push(id); }
+        renderGrid();
+      });
+    }
+  }
+
+  customizeBtn.addEventListener('click', function () {
+    draft = selection.slice();
+    renderGrid();
+    panelEl.classList.add('open');
+  });
+  cancelBtn.addEventListener('click', function () { panelEl.classList.remove('open'); });
+  saveBtn.addEventListener('click', function () {
+    if (draft.length === 0) return;
+    selection = draft.slice();
+    try { localStorage.setItem('goldmind_quick_actions_' + (window.GOLDMIND_STAFF_ID || 'default'), JSON.stringify(selection)); } catch (e) {}
+    renderStrip();
+    panelEl.classList.remove('open');
+  });
+
+  renderStrip(); // optimistic default pass so the strip isn't empty while the session/permissions are still loading
+
+  // Called from loadDashboard() once staffRow + hasPerm are ready, so the
+  // real saved-per-staff selection (correctly permission-filtered) takes
+  // over from the optimistic default pass above.
+  window.__dskInitQuickActions = function () {
+    var picked = null;
+    try {
+      var raw = localStorage.getItem('goldmind_quick_actions_' + (window.GOLDMIND_STAFF_ID || 'default'));
+      var parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed) && parsed.length) {
+        var valid = allowedIds(parsed);
+        if (valid.length) picked = valid;
+      }
+    } catch (e) { picked = null; }
+    selection = picked || allowedIds(DEFAULTS);
+    if (!selection.length) selection = DEFAULTS.slice();
+    draft = selection.slice();
+    renderStrip();
+  };
+})();
+</script>
+
+<!-- TopAppBar -->
+<header class="lg:hidden fixed top-0 right-0 w-full h-16 bg-surface-container-lowest border-b border-outline-variant z-50 flex justify-between items-center px-margin-mobile">
+<div class="flex items-center gap-3">
+<button class="w-10 h-10 flex items-center justify-center hover:bg-surface-container-high transition-colors rounded-full cursor-pointer active:opacity-80" onclick="openNavDrawer()">
+<span class="material-symbols-outlined text-primary">menu</span>
+</button>
+<h1 class="font-headline-md font-bold text-primary" style="font-size:36px; line-height:42px;">GoldMind</h1>
+</div>
+<div class="flex items-center gap-2">
+<div class="flex items-center gap-2">
+<button id="quick-search-btn" onclick="openQuickSearch()" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center active:scale-90 transition-all" title="بحث سريع">
+<span class="material-symbols-outlined text-primary text-[20px]">search</span>
+</button>
+<button id="currency-toggle-btn" onclick="toggleCurrency()" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center text-[13px] font-bold text-primary active:scale-90 transition-all" title="تبديل العملة">
+                د.إ
+            </button>
+<button id="timezone-btn" onclick="gmOpenTimezonePicker()" class="w-9 h-9 rounded-full border border-outline-variant bg-surface-container-lowest flex items-center justify-center active:scale-90 transition-all" title="المنطقة الزمنية للعرض">
+<span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
+</button>
+</div>
+</div>
+</header>
+<main class="lg:hidden pt-20 pb-24 px-margin-mobile max-w-md lg:max-w-6xl mx-auto lg:px-8">
+<!-- Fiscal year closing reminder (owner only, shown when a past year isn't closed) -->
+<a id="fiscalYearBanner" href="fiscal-year-close-ar.html" class="hidden mb-4 flex items-center gap-3 bg-red-50 border border-error/40 text-error rounded-xl p-3">
+<span class="material-symbols-outlined">event_busy</span>
+<span class="flex-1 text-[13px] font-semibold" id="fiscalYearBannerText"></span>
+<span class="material-symbols-outlined text-[18px]">chevron_left</span>
+</a>
+<!-- Profile/Welcome -->
+<section class="mb-4 flex items-center justify-between gap-3">
+<div class="flex items-center gap-3 min-w-0">
+<div class="w-12 h-12 rounded-full gm-avatar-grad flex items-center justify-center font-bold text-lg shrink-0 overflow-hidden" id="storeAvatarEl" style="visibility:hidden;"></div>
+<div class="min-w-0">
+<h2 class="font-headline-md text-on-primary font-bold" style="font-size:26px; line-height:32px; visibility:hidden;" id="storeNameEl"></h2>
+<script>
+  // Show the store name/logo from last time instantly (no flash of
+  // empty/wrong content) while the real values load from the database
+  // below.
+  (function () {
+    const cached = localStorage.getItem('goldmind_store_name');
+    const cachedLogo = localStorage.getItem('goldmind_store_logo');
+    const dskNameEl0 = document.getElementById('dskStoreNameEl');
+    if (cached) {
+      const el = document.getElementById('storeNameEl');
+      el.textContent = cached;
+      if (typeof fitStatNumber === 'function') fitStatNumber(el);
+      if (dskNameEl0) { dskNameEl0.textContent = cached; if (typeof fitStatNumber === 'function') fitStatNumber(dskNameEl0); }
+    }
+    const avatarEl = document.getElementById('storeAvatarEl');
+    const dskAvatarEl0 = document.getElementById('dskStoreAvatarEl');
+    if (cachedLogo) {
+      avatarEl.innerHTML = '<img src="' + cachedLogo + '" alt="" class="w-full h-full object-cover"/>';
+      avatarEl.style.visibility = 'visible';
+      if (dskAvatarEl0) { dskAvatarEl0.innerHTML = '<img src="' + cachedLogo + '" alt="" class="w-full h-full object-cover"/>'; dskAvatarEl0.style.visibility = 'visible'; }
+    } else if (cached) {
+      // No logo cached yet but we do have a cached name -> safe to show
+      // the initial letter immediately instead of waiting.
+      avatarEl.textContent = cached.trim().charAt(0) || '؟';
+      avatarEl.style.visibility = 'visible';
+      if (dskAvatarEl0) { dskAvatarEl0.textContent = cached.trim().charAt(0) || '؟'; dskAvatarEl0.style.visibility = 'visible'; }
+    }
+    // Safety net: if the dashboard data fetch below ever fails/errors
+    // before reaching its own fitStatNumber() calls, don't leave these
+    // elements permanently invisible — reveal them as-is after a short
+    // grace period.
+    setTimeout(function () {
+      ['storeNameEl', 'storeAvatarEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl',
+       'dskStoreNameEl', 'dskStoreAvatarEl', 'dskDailyCashboxBalanceEl', 'dskTodayInvoiceCountEl', 'dskTodaySalesEl'].forEach(function (id) {
+        const e = document.getElementById(id);
+        if (e) e.style.visibility = 'visible';
+      });
+    }, 15000);
+  })();
+</script>
+<p class="font-body-md text-body-md text-on-primary opacity-70" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
+</div>
+</div>
+<!-- Gold-price badge — shown only for the warm-ingot theme. Tapping it opens
+     a small picker to switch which karat's price/gram it displays. -->
+<button id="hallmarkBadge" onclick="gmOpenKaratPicker()" class="hidden w-20 h-16 rounded-2xl border flex flex-col items-center justify-center gap-0.5 shrink-0 active:scale-95 transition-transform" style="border-color: var(--gm-accent); color: var(--gm-accent);">
+<span class="font-data-mono font-semibold" id="hallmarkKaratLabel" style="font-size:10px; line-height:1;">عيار 21</span>
+<span class="font-data-mono font-bold" id="hallmarkPriceLabel" style="font-size:14px; line-height:1.15;">—</span>
+<span class="font-data-mono" id="hallmarkPriceUnit" style="font-size:8px; line-height:1; opacity:.75;">للغرام</span>
+</button>
+</section>
+<!-- Karat picker popover for the gold-price badge -->
+<div id="karatPickerModal" class="hidden fixed inset-0 z-[100] flex items-end lg:items-center justify-center bg-black/40" onclick="if(event.target===this) gmCloseKaratPicker()">
+<div class="bg-surface-container-lowest w-full lg:w-80 lg:rounded-2xl rounded-t-2xl p-5 max-h-[70vh] overflow-y-auto">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-bold text-[15px] text-on-surface">اختر العيار للعرض</h3>
+<button onclick="gmCloseKaratPicker()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high"><span class="material-symbols-outlined text-on-surface-variant">close</span></button>
+</div>
+<div id="karatPickerList" class="flex flex-col gap-1"></div>
+</div>
+</div>
+<!-- Always-visible search bar (opens the same quick search panel) -->
+<button onclick="openQuickSearch()" class="w-full h-12 mb-5 px-4 flex items-center gap-2 bg-surface-container-lowest border border-outline-variant rounded-full text-on-surface-variant active:scale-[0.99] transition-transform">
+<span class="material-symbols-outlined text-[20px]">search</span>
+<span class="text-[13px]">بحث سريع عن فاتورة، عميل، أو أي شاشة...</span>
+</button>
+<!-- Today at a glance -->
+<section class="mb-5 lg:mb-8">
+<div class="bg-surface-container-lowest gm-stat-shimmer border border-outline-variant rounded-xl lg:rounded-2xl luxury-shadow p-4 lg:p-7 grid grid-cols-3 divide-x divide-x-reverse divide-outline-variant">
+<div class="px-1">
+<span class="block text-[13px] text-on-surface-variant text-right mb-1">كاش الصندوق</span>
+<div class="font-headline-md font-bold text-secondary truncate text-right" style="font-size:26px; line-height:32px; visibility:hidden;" id="dailyCashboxBalanceEl">0.00</div>
+<div class="hidden text-[15px] font-bold text-secondary font-data-mono mt-1 truncate text-right" id="dailyCashboxOtherCurrenciesEl"></div>
+</div>
+<div class="px-1">
+<span class="block text-[13px] text-on-surface-variant text-right mb-1">فواتير اليوم</span>
+<div class="font-headline-md font-bold text-primary truncate text-right" style="font-size:26px; line-height:32px; visibility:hidden;" id="todayInvoiceCountEl">0</div>
+</div>
+<div class="px-1">
+<span class="block text-[13px] text-on-surface-variant text-right mb-1">مبيعات اليوم</span>
+<div class="font-headline-md font-bold text-primary truncate text-right" style="font-size:26px; line-height:32px; visibility:hidden;" id="todaySalesEl">0.00</div>
+</div>
+</div>
+</section>
+<!-- Real alerts (replaces the old non-functional notifications button) -->
+<div class="hidden flex-col gap-2 mb-5" id="alertsWrap"></div>
+<!-- Summary Cards (Bento Style for Mobile) -->
+<section class="mb-6 lg:hidden"><h3 class="font-label-md text-label-md text-on-primary opacity-70 mb-4 uppercase tracking-wider">الاختصارات السريعة</h3><div class="grid grid-cols-4 gap-3">
+<a class="quick-action-icon qa-tile col-span-4 flex flex-row items-center justify-center gap-2 p-3 bg-white border border-outline-variant text-on-surface rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" href="invoices-list-ar.html"><span class="material-symbols-outlined text-[20px]">manage_search</span><span class="text-[13px] font-semibold">بحث الفواتير</span></a>
+<a class="quick-action-icon qa-tile gm-shimmer-surface flex flex-col items-center justify-center p-3 rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" style="background:var(--gm-primary); color:var(--gm-on-primary);" data-permission="create_invoice" href="new-sale-ar.html"><span class="qa-icon-badge" style="background:rgba(255,255,255,0.16);"><span class="material-symbols-outlined text-xl">add_shopping_cart</span></span><span class="text-[15px] font-bold leading-tight text-center">فاتورة جديدة</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" data-permission="create_invoice" href="create-invoice-v2-ar.html"><span class="qa-icon-badge" style="background:rgba(116,90,37,0.1);"><span class="material-symbols-outlined text-xl">local_shipping</span></span><span class="text-[15px] font-bold leading-tight text-center">فاتورة شراء</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 bg-white border-2 rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" style="border-color:#7f1d1d; color:#7f1d1d;" data-permission="create_invoice" href="sales-return-ar.html"><span class="qa-icon-badge" style="background:rgba(127,29,29,0.08);"><span class="material-symbols-outlined text-xl">keyboard_return</span></span><span class="text-[15px] font-bold leading-tight text-center">مرتجع مبيعات</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 gold-accent text-white rounded-2xl active:scale-95 transition-transform duration-200 ring-2 ring-secondary ring-offset-1" data-permission="manage_daily_cashbox" href="daily-cashbox-ar.html" id="dailyCashboxIcon"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">account_balance_wallet</span></span><span class="text-[15px] font-bold leading-tight text-center">الصندوق اليومي</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" data-permission="add_piece" href="inventory-add.html"><span class="qa-icon-badge" style="background:rgba(116,90,37,0.1);"><span class="material-symbols-outlined text-xl">inventory_2</span></span><span class="text-[15px] font-bold leading-tight text-center">إضافة قطعة</span></a>
+<!-- Second quick-access row -- ledger/inventory-count promoted up front,
+     alongside statements and stock-on-hand, so the day-to-day accounting
+     shortcuts aren't buried below the less-frequent stock-entry actions.
+     Same destinations as their original tiles further down this grid
+     (kept there too, so nothing else on the page has to change). -->
+<a class="quick-action-icon qa-tile qa-gold-tint flex flex-col items-center justify-center p-3 rounded-2xl active:scale-95 transition-transform duration-200" href="ledger-ar.html"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">groups</span></span><span class="text-[15px] font-bold leading-tight text-center">حسابات التجار</span></a>
+<a class="quick-action-icon qa-tile qa-gold-tint flex flex-col items-center justify-center p-3 rounded-2xl active:scale-95 transition-transform duration-200" data-permission="run_inventory_count" href="inventory-count-ar.html"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">checklist</span></span><span class="text-[15px] font-bold leading-tight text-center">الجرد</span></a>
+<a class="quick-action-icon qa-tile qa-gold-tint flex flex-col items-center justify-center p-3 rounded-2xl active:scale-95 transition-transform duration-200" data-permission="view_customers" href="customer-debts-ar.html"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">account_balance_wallet</span></span><span class="text-[15px] font-bold leading-tight text-center">كشف حساب</span></a>
+<a class="quick-action-icon qa-tile qa-gold-tint flex flex-col items-center justify-center p-3 rounded-2xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="inventory-list-ar.html"><span class="qa-icon-badge"><span class="material-symbols-outlined text-xl">inventory_2</span></span><span class="text-[15px] font-bold leading-tight text-center">المخزن</span></a>
+<a class="quick-action-icon qa-tile flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-2xl shadow-sm active:scale-95 transition-transform duration-200" data-permission="add_piece" href="stock-production-ar.html"><span class="qa-icon-badge" style="background:rgba(116,90,37,0.1);"><span class="material-symbols-outlined text-xl">precision_manufacturing</span></span><span class="text-[15px] font-bold leading-tight text-center">إنتاج القطع</span></a>
+<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="owner_only_opening_stock" href="opening-stock-ar.html"><span class="material-symbols-outlined text-xl mb-1">warehouse</span><span class="text-[14px] font-bold leading-tight text-center">بضاعة أول المدة</span></a>
+<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="inventory-list-ar.html"><span class="material-symbols-outlined text-xl mb-1">inventory_2</span><span class="text-[14px] font-bold leading-tight text-center">المخزن</span></a>
+<a class="quick-action-icon diamond-feature hidden flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_piece" href="diamond-inventory-add.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[14px] font-bold leading-tight text-center">إضافة ألماسة</span></a>
+<a class="quick-action-icon diamond-feature hidden flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_inventory" href="diamond-inventory-list-ar.html"><span class="material-symbols-outlined text-xl mb-1">diamond</span><span class="text-[14px] font-bold leading-tight text-center">مخزون الألماس</span></a>
+<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-surface-container-low border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="add_customers" href="customer-add-ar.html"><span class="material-symbols-outlined text-xl mb-1">person_add</span><span class="text-[14px] font-bold leading-tight text-center">إضافة عميل</span></a>
+<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_customers" href="customer-debts-ar.html"><span class="material-symbols-outlined text-xl mb-1">account_balance_wallet</span><span class="text-[14px] font-bold leading-tight text-center">كشف حساب</span></a>
+<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" href="ledger-ar.html"><span class="material-symbols-outlined text-xl mb-1">groups</span><span class="text-[14px] font-bold leading-tight text-center">حسابات التجار</span></a>
+<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-outline-variant text-on-surface rounded-xl active:scale-95 transition-transform duration-200" data-permission="view_repairs" href="repairs-ar.html"><span class="material-symbols-outlined text-xl mb-1">build</span><span class="text-[14px] font-bold leading-tight text-center">الصيانة</span></a>
+<a class="quick-action-icon flex flex-col items-center justify-center p-3 bg-white border border-secondary text-secondary rounded-xl active:scale-95 transition-transform duration-200" data-permission="run_inventory_count" href="inventory-count-ar.html"><span class="material-symbols-outlined text-xl mb-1">checklist</span><span class="text-[14px] font-bold leading-tight text-center">الجرد</span></a>
+</div></section>
+<!-- Desktop layout: primary actions hero + grouped sections (hidden on mobile) -->
+<section class="hidden lg:block mb-10">
+<h3 class="font-label-md text-label-md text-on-primary opacity-70 mb-4 uppercase tracking-wider">الوصول السريع</h3>
+<div class="grid grid-cols-4 gap-4">
+<a class="quick-action-icon group flex flex-col items-start justify-between p-5 h-32 gold-accent text-white rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200 ring-1 ring-secondary/40" data-permission="manage_daily_cashbox" href="daily-cashbox-ar.html" id="dailyCashboxIconDesktop">
+<span class="material-symbols-outlined text-3xl">account_balance_wallet</span>
+<span class="text-[15px] font-bold">الصندوق اليومي</span>
+</a>
+<a class="quick-action-icon gm-shimmer-surface group flex flex-col items-start justify-between p-5 h-32 rounded-2xl shadow-md hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200" style="background:var(--gm-primary); color:var(--gm-on-primary);" data-permission="create_invoice" href="new-sale-ar.html">
+<span class="material-symbols-outlined text-3xl">add_shopping_cart</span>
+<span class="text-[15px] font-bold">فاتورة جديدة</span>
+</a>
+<a class="quick-action-icon group flex flex-col items-start justify-between p-5 h-32 bg-surface-container-lowest border border-secondary/50 text-secondary rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200" data-permission="add_piece" href="inventory-add.html">
+<span class="material-symbols-outlined text-3xl">inventory_2</span>
+<span class="text-[15px] font-bold">إدخال بضاعة</span>
+</a>
+<a class="quick-action-icon group flex flex-col items-start justify-between p-5 h-32 bg-surface-container-lowest border-2 rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200" style="border-color:#7f1d1d; color:#7f1d1d;" data-permission="create_invoice" href="sales-return-ar.html">
+<span class="material-symbols-outlined text-3xl">keyboard_return</span>
+<span class="text-[15px] font-bold">إخراج / إرجاع بضاعة</span>
+</a>
+</div>
+</section>
+
+<section class="hidden lg:grid grid-cols-3 gap-6 mb-10">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-2xl luxury-shadow p-5">
+<h4 class="font-label-md text-label-md font-bold text-on-surface mb-4 uppercase tracking-wider flex items-center gap-2"><span class="material-symbols-outlined text-secondary text-[18px]">receipt_long</span>الفواتير والمبيعات</h4>
+<div class="flex flex-col gap-1">
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" href="invoices-list-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">manage_search</span><span class="text-[13px] font-medium">بحث الفواتير</span></a>
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="create_invoice" href="create-invoice-v2-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">local_shipping</span><span class="text-[13px] font-medium">فاتورة شراء</span></a>
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="view_repairs" href="repairs-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">build</span><span class="text-[13px] font-medium">الصيانة</span></a>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-2xl luxury-shadow p-5">
+<h4 class="font-label-md text-label-md font-bold text-on-surface mb-4 uppercase tracking-wider flex items-center gap-2"><span class="material-symbols-outlined text-secondary text-[18px]">inventory_2</span>المخزون</h4>
+<div class="flex flex-col gap-1">
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="view_inventory" href="inventory-list-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">inventory_2</span><span class="text-[13px] font-medium">المخزن</span></a>
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="add_piece" href="stock-production-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">precision_manufacturing</span><span class="text-[13px] font-medium">إنتاج القطع</span></a>
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="owner_only_opening_stock" href="opening-stock-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">warehouse</span><span class="text-[13px] font-medium">بضاعة أول المدة</span></a>
+<a class="quick-action-icon diamond-feature hidden items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="add_piece" href="diamond-inventory-add.html"><span class="material-symbols-outlined text-secondary text-[20px]">diamond</span><span class="text-[13px] font-medium">إضافة ألماسة</span></a>
+<a class="quick-action-icon diamond-feature hidden items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="view_inventory" href="diamond-inventory-list-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">diamond</span><span class="text-[13px] font-medium">مخزون الألماس</span></a>
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="run_inventory_count" href="inventory-count-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">checklist</span><span class="text-[13px] font-medium">الجرد</span></a>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-2xl luxury-shadow p-5">
+<h4 class="font-label-md text-label-md font-bold text-on-surface mb-4 uppercase tracking-wider flex items-center gap-2"><span class="material-symbols-outlined text-secondary text-[18px]">groups</span>العملاء والإدارة</h4>
+<div class="flex flex-col gap-1">
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="add_customers" href="customer-add-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">person_add</span><span class="text-[13px] font-medium">إضافة عميل</span></a>
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" data-permission="view_customers" href="customer-debts-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">account_balance_wallet</span><span class="text-[13px] font-medium">كشف حساب</span></a>
+<a class="quick-action-icon flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-surface-container-high transition-colors text-on-surface" href="ledger-ar.html"><span class="material-symbols-outlined text-secondary text-[20px]">groups</span><span class="text-[13px] font-medium">حسابات التجار</span></a>
+</div>
+</div>
+</section>
+<!-- Quick Actions -->
+<!-- Recent Movements Log -->
+<section class="mb-4">
+<div class="flex justify-between items-center mb-4">
+<h3 class="font-label-md text-label-md font-bold text-on-surface uppercase tracking-wider">حركات اليوم</h3>
+<div class="flex items-center gap-2">
+<div class="hidden items-center gap-1" id="movementsDayNav">
+<button onclick="shiftMovementsDay(-1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px] text-on-surface">chevron_right</span></button>
+<span class="text-[11px] text-on-surface font-semibold font-data-mono" id="movementsDayLabel"></span>
+<button onclick="shiftMovementsDay(1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px] text-on-surface">chevron_left</span></button>
+</div>
+<a class="text-secondary text-xs font-semibold" href="ledger-ar.html">عرض الكل</a>
+</div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant overflow-hidden" id="recentMovementsEl">
+<div class="p-6 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+</div>
+</section>
+<!-- Decorative Spacer for BottomNav -->
+<div class="h-8"></div>
+</main>
+<!-- BottomNavBar -->
+<nav class="lg:hidden fixed bottom-0 right-0 w-full h-16 bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-around items-center px-margin-mobile shadow-sm">
+<!-- Dashboard (Active) -->
+<a class="flex flex-col items-center justify-center text-primary font-bold cursor-pointer transition-all active:scale-90" href="index-ar.html">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">dashboard</span>
+<span class="font-label-md text-[10px] mt-1">لوحة التحكم</span>
+</a>
+<!-- Inventory -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant cursor-pointer transition-all hover:text-primary active:scale-90" href="inventory-list-ar.html">
+<span class="material-symbols-outlined">inventory_2</span>
+<span class="font-label-md text-[10px] mt-1">المخزن</span>
+</a>
+<!-- Invoices -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant cursor-pointer transition-all hover:text-primary active:scale-90" href="invoices-list-ar.html">
+<span class="material-symbols-outlined">receipt_long</span>
+<span class="font-label-md text-[10px] mt-1">الفواتير</span>
+</a>
+<!-- Ledgers -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant cursor-pointer transition-all hover:text-primary active:scale-90" href="ledger-ar.html">
+<span class="material-symbols-outlined">account_balance_wallet</span>
+<span class="font-label-md text-[10px] mt-1">السجلات</span>
+</a>
+<!-- Settings -->
+<a class="flex flex-col items-center justify-center text-on-surface-variant cursor-pointer transition-all hover:text-primary active:scale-90" href="settings-ar.html">
+<span class="material-symbols-outlined">settings</span>
+<span class="font-label-md text-[10px] mt-1">الإعدادات</span>
+</a>
+</nav>
+<script>
+        // Simple micro-interaction for balance tapping
+        const balanceCard = document.querySelector('.luxury-shadow');
+        balanceCard.addEventListener('click', () => {
+            balanceCard.classList.add('scale-95');
+            setTimeout(() => {
+                balanceCard.classList.remove('scale-95');
+            }, 150);
+        });
+
+        // --- Real data from Supabase ---
+        function fmt(n) {
+            return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        // Shrinks a stat number's font size, 1px at a time, down to a
+        // readable floor (13px). If it still doesn't fit at that floor
+        // (e.g. a very large balance with the "AED" prefix), it wraps onto
+        // a second line instead of shrinking further or getting cut off
+        // with "...".
+        function fitStatNumber(el) {
+            if (!el) return;
+            el.style.fontSize = '';
+            el.style.whiteSpace = '';
+            el.style.overflow = '';
+            el.style.textOverflow = '';
+            const READABLE_FLOOR = 13;
+            const startSize = parseFloat(getComputedStyle(el).fontSize) || 24;
+            for (let size = startSize; size >= READABLE_FLOOR; size--) {
+                if (el.scrollWidth <= el.clientWidth) { el.style.visibility = 'visible'; return; }
+                el.style.fontSize = size + 'px';
+            }
+            el.style.visibility = 'visible';
+            // Still doesn't fit at the readable floor: allow wrapping to a
+            // second line instead of continuing to shrink or truncating.
+            if (el.scrollWidth > el.clientWidth) {
+                el.style.whiteSpace = 'normal';
+                el.style.overflow = 'visible';
+                el.style.textOverflow = 'clip';
+                el.style.wordBreak = 'break-word';
+                el.style.lineHeight = '1.15';
+            }
+        }
+
+        function showQuickActionToast(message) {
+            let toast = document.getElementById('quickActionToast');
+            if (!toast) {
+                toast = document.createElement('div');
+                toast.id = 'quickActionToast';
+                toast.className = 'fixed bottom-24 left-1/2 -translate-x-1/2 bg-on-surface text-white text-[13px] px-4 py-2 rounded-full shadow-lg z-[100] transition-opacity duration-300';
+                document.body.appendChild(toast);
+            }
+            toast.textContent = message;
+            toast.style.opacity = '1';
+            clearTimeout(window.__quickActionToastTimer);
+            window.__quickActionToastTimer = setTimeout(() => { toast.style.opacity = '0'; }, 2200);
+        }
+
+        let canManageFinance = false; // owner or view_profit_report — gates movements day-navigation
+        let movementsViewDate = new Date(); // day currently shown in "حركات اليوم"
+
+        (async function loadDashboard() {
+          try {
+            const session = await requireGoldMindSession('login-entry-ar.html');
+            if (!session) return;
+            await goldMindSubscriptionGuard();
+
+            // Store + staff rows only depend on the session above, not on
+            // each other — fetch both at once instead of one after the
+            // other. This (and the batch below) is what actually fixes the
+            // "numbers take forever to appear" issue: it was never the
+            // theme itself, it was ~9 database round trips running strictly
+            // one-at-a-time on every dashboard load.
+            const [{ data: store }, { data: staffRow }] = await Promise.all([
+                goldmindClient
+                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate, logo_url').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+                goldmindClient
+                    .from('staff').select('full_name, role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle()
+            ]);
+
+            if (store) {
+                document.getElementById('storeNameEl').textContent = store.name;
+                fitStatNumber(document.getElementById('storeNameEl'));
+                localStorage.setItem('goldmind_store_name', store.name);
+
+                const avatarEl = document.getElementById('storeAvatarEl');
+                const dskNameEl = document.getElementById('dskStoreNameEl');
+                const dskAvatarEl = document.getElementById('dskStoreAvatarEl');
+                if (dskNameEl) { dskNameEl.textContent = store.name; fitStatNumber(dskNameEl); }
+                if (store.logo_url) {
+                    avatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full object-cover"/>';
+                    localStorage.setItem('goldmind_store_logo', store.logo_url);
+                    if (dskAvatarEl) dskAvatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full object-cover"/>';
+                } else {
+                    avatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
+                    localStorage.removeItem('goldmind_store_logo');
+                    if (dskAvatarEl) dskAvatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
+                }
+                avatarEl.style.visibility = 'visible';
+                if (dskAvatarEl) dskAvatarEl.style.visibility = 'visible';
+                if (dskNameEl) dskNameEl.style.visibility = 'visible';
+            }
+            if (staffRow) {
+                const roleLabel = staffRow.role === 'owner' ? 'مالك الحساب' : 'موظف';
+                document.getElementById('welcomeEl').textContent = staffRow.full_name + ' • ' + roleLabel;
+                const initial = (staffRow.full_name || '؟').trim().charAt(0) || '؟';
+                ['dskAccountAvatarEl', 'dskTopAvatarEl'].forEach(function (id) {
+                    const e = document.getElementById(id);
+                    if (e) e.textContent = initial;
+                });
+                const dskNameLabelEl = document.getElementById('dskAccountNameEl');
+                const dskRoleLabelEl = document.getElementById('dskAccountRoleEl');
+                if (dskNameLabelEl) dskNameLabelEl.textContent = staffRow.full_name;
+                if (dskRoleLabelEl) dskRoleLabelEl.textContent = roleLabel;
+            }
+
+            const isOwner = staffRow && staffRow.role === 'owner';
+            const hasPerm = (perm) => isOwner || (staffRow && staffRow.permissions && staffRow.permissions[perm] === true);
+            // Exposed so the desktop quick-actions module (a separate
+            // script, loaded earlier) can permission-filter its catalog
+            // using the exact same rules as everything else on this page.
+            window.GOLDMIND_HAS_PERM = hasPerm;
+            if (typeof window.__dskInitQuickActions === 'function') window.__dskInitQuickActions();
+
+            // Hide (not just dim) quick-action icons the current staff member
+            // doesn't have permission for, so the grid actually shrinks and
+            // reflows instead of leaving empty-feeling greyed-out slots.
+            // (owners always see everything; the daily cash box has no
+            // data-permission since it's intentionally open to all staff)
+            document.querySelectorAll('.quick-action-icon[data-permission]').forEach(function (el) {
+                if (!hasPerm(el.dataset.permission)) el.remove();
+            });
+
+            // Diamond quick-actions only show for stores that turned the
+            // diamonds feature on in company settings (independent of permissions above).
+            // They start hidden in the HTML (not shown-then-removed) so a
+            // gold-only store never sees a flash of the icon on refresh
+            // while this fetch is still in flight.
+            if (store && store.diamonds_enabled) {
+                document.querySelectorAll('.diamond-feature').forEach(function (el) {
+                    el.classList.remove('hidden');
+                    el.classList.add('flex');
+                });
+            } else {
+                for (let i = GOLDMIND_SEARCH_INDEX.length - 1; i >= 0; i--) {
+                    if (GOLDMIND_SEARCH_INDEX[i].href.indexOf('diamond') !== -1) GOLDMIND_SEARCH_INDEX.splice(i, 1);
+                }
+            }
+
+            // Inventory count is a permission-gated feature available to
+            // every store by default now (it also offers camera/manual
+            // scanning, not just RFID), so unlike the diamond feature it
+            // needs no rfid_enabled toggle check here — the generic
+            // data-permission pass below already removes it for staff
+            // without run_inventory_count.
+
+            canManageFinance = hasPerm('view_profit_report');
+            if (canManageFinance) {
+                const nav = document.getElementById('movementsDayNav');
+                nav.classList.remove('hidden');
+                nav.classList.add('flex');
+            }
+
+            const baseCurrency = (store && store.currency) || 'AED';
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+
+            // Everything below is independent of everything else in this
+            // block — none of these queries need another one's result —
+            // so they all fire together instead of waiting in line.
+            const [
+                fiscalResult,
+                { data: cashboxEntries },
+                { data: todayInvoices },
+                { count: unpaidCount },
+                { data: lowLots }
+            ] = await Promise.all([
+                // Fiscal year closing reminder — owner only, checks for an unclosed past year
+                (async () => {
+                    if (!isOwner) return null;
+                    const { data: storeCreated } = await goldmindClient.from('stores').select('created_at').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+                    const startYear = storeCreated ? new Date(storeCreated.created_at).getFullYear() : new Date().getFullYear();
+                    const currentYear = new Date().getFullYear();
+                    if (currentYear <= startYear) return null;
+                    const { data: closures } = await goldmindClient.from('fiscal_year_closures').select('fiscal_year').eq('store_id', GOLDMIND_STORE_ID);
+                    const closedYears = new Set((closures || []).map(c => c.fiscal_year));
+                    const unclosedYears = [];
+                    for (let y = startYear; y < currentYear; y++) if (!closedYears.has(y)) unclosedYears.push(y);
+                    return unclosedYears;
+                })(),
+                // Daily cashbox balance (all-time running total from the manual
+                // drawer journal) — base currency only in the headline number,
+                // same logic as daily-cashbox-ar.html's "الرصيد الحالي" card.
+                goldmindClient
+                    .from('daily_cash_log').select('direction, amount, currency')
+                    .eq('store_id', GOLDMIND_STORE_ID),
+                // Today's sales + invoice count (real invoice type is 'sale', not
+                // 'sell' — fixing a real bug that made this card always read 0.00)
+                goldmindClient
+                    .from('invoices').select('total_amount')
+                    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
+                    .gte('created_at', todayStart.toISOString()),
+                // Real alerts — replaces the old dead "التنبيهات" button
+                goldmindClient
+                    .from('invoices').select('id', { count: 'exact', head: true })
+                    .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'unpaid'),
+                goldmindClient
+                    .from('gold_stock_lots').select('id')
+                    .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).lt('weight_grams_remaining', 5),
+                loadMovementsForDay()
+            ]);
+
+            if (fiscalResult && fiscalResult.length > 0) {
+                document.getElementById('fiscalYearBannerText').textContent =
+                    fiscalResult.length === 1
+                        ? 'سنة ' + fiscalResult[0] + ' المالية لسا مو مقفولة — اضغط لإغلاقها'
+                        : fiscalResult.length + ' سنوات مالية لسا مو مقفولة — اضغط للمراجعة';
+                const banner = document.getElementById('fiscalYearBanner');
+                banner.classList.remove('hidden');
+                banner.classList.add('flex');
+            }
+
+            const cashboxTotalsByCurrency = {};
+            (cashboxEntries || []).forEach(e => {
+                const cur = e.currency || baseCurrency;
+                const delta = (e.direction === 'in' ? 1 : -1) * Number(e.amount);
+                cashboxTotalsByCurrency[cur] = (cashboxTotalsByCurrency[cur] || 0) + delta;
+            });
+            const dailyCashboxBalance = cashboxTotalsByCurrency[baseCurrency] || 0;
+            document.getElementById('dailyCashboxBalanceEl').textContent = gmFormatDualCurrency(dailyCashboxBalance, store);
+            fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
+            const dskCashboxEl = document.getElementById('dskDailyCashboxBalanceEl');
+            if (dskCashboxEl) { dskCashboxEl.textContent = gmFormatDualCurrency(dailyCashboxBalance, store); dskCashboxEl.style.visibility = 'visible'; fitStatNumber(dskCashboxEl); }
+
+            const otherCurrencyLine = Object.keys(cashboxTotalsByCurrency)
+                .filter(cur => cur !== baseCurrency)
+                .map(cur => gmFormatNumber(cashboxTotalsByCurrency[cur]) + ' ' + cur)
+                .join(' · ');
+            const otherCurrenciesEl = document.getElementById('dailyCashboxOtherCurrenciesEl');
+            const dskOtherCurrenciesEl = document.getElementById('dskDailyCashboxOtherCurrenciesEl');
+            if (otherCurrencyLine) {
+                otherCurrenciesEl.textContent = otherCurrencyLine;
+                otherCurrenciesEl.classList.remove('hidden');
+                fitStatNumber(otherCurrenciesEl);
+                if (dskOtherCurrenciesEl) { dskOtherCurrenciesEl.textContent = otherCurrencyLine; dskOtherCurrenciesEl.classList.remove('hidden'); fitStatNumber(dskOtherCurrenciesEl); }
+            }
+
+            const todaySales = (todayInvoices || []).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
+            document.getElementById('todaySalesEl').textContent = gmFormatDualCurrency(todaySales, store);
+            document.getElementById('todayInvoiceCountEl').textContent = (todayInvoices || []).length;
+            fitStatNumber(document.getElementById('todaySalesEl'));
+            fitStatNumber(document.getElementById('todayInvoiceCountEl'));
+            const dskSalesEl = document.getElementById('dskTodaySalesEl');
+            const dskInvCountEl = document.getElementById('dskTodayInvoiceCountEl');
+            if (dskSalesEl) { dskSalesEl.textContent = gmFormatDualCurrency(todaySales, store); dskSalesEl.style.visibility = 'visible'; fitStatNumber(dskSalesEl); }
+            if (dskInvCountEl) { dskInvCountEl.textContent = (todayInvoices || []).length; dskInvCountEl.style.visibility = 'visible'; fitStatNumber(dskInvCountEl); }
+
+            // Themes with a lazily-loaded display font (e.g. "المسبوكة
+            // الهادئة") can finish loading the font AFTER the fits above
+            // already ran on the fallback font's (narrower) metrics — the
+            // real font then renders wider and overflows again. Re-run the
+            // fits once the real display font (if this theme uses one) has
+            // actually finished loading its glyph data — a reliable event
+            // from theme.js, not a guessed timeout.
+            if (typeof gmOnDisplayFontReady === 'function') {
+                gmOnDisplayFontReady(() => {
+                    fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
+                    fitStatNumber(document.getElementById('todaySalesEl'));
+                    fitStatNumber(document.getElementById('todayInvoiceCountEl'));
+                    if (!otherCurrenciesEl.classList.contains('hidden')) fitStatNumber(otherCurrenciesEl);
+                    ['dskDailyCashboxBalanceEl', 'dskTodaySalesEl', 'dskTodayInvoiceCountEl'].forEach(function (id) { const e = document.getElementById(id); if (e) fitStatNumber(e); });
+                    if (dskOtherCurrenciesEl && !dskOtherCurrenciesEl.classList.contains('hidden')) fitStatNumber(dskOtherCurrenciesEl);
+                });
+            }
+            // Same idea, but for a font the user picked from the new
+            // app-wide font picker (settings → مظهر التطبيق) instead of
+            // a theme's built-in display font.
+            if (typeof gmOnFontReady === 'function') {
+                gmOnFontReady(() => {
+                    fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
+                    fitStatNumber(document.getElementById('todaySalesEl'));
+                    fitStatNumber(document.getElementById('todayInvoiceCountEl'));
+                    if (!otherCurrenciesEl.classList.contains('hidden')) fitStatNumber(otherCurrenciesEl);
+                    ['dskDailyCashboxBalanceEl', 'dskTodaySalesEl', 'dskTodayInvoiceCountEl'].forEach(function (id) { const e = document.getElementById(id); if (e) fitStatNumber(e); });
+                    if (dskOtherCurrenciesEl && !dskOtherCurrenciesEl.classList.contains('hidden')) fitStatNumber(dskOtherCurrenciesEl);
+                });
+            }
+
+            const alerts = [];
+            if (unpaidCount > 0) {
+                alerts.push({ href: 'invoices-list-ar.html', icon: 'receipt_long', text: unpaidCount + ' فاتورة غير مدفوعة' });
+            }
+            if (lowLots && lowLots.length > 0) {
+                alerts.push({ href: 'stock-production-ar.html', icon: 'inventory_2', text: lowLots.length + ' دفعة رصيد بالجملة أوشكت على النفاد' });
+            }
+            if (alerts.length > 0) {
+                const wrap = document.getElementById('alertsWrap');
+                wrap.classList.remove('hidden');
+                wrap.classList.add('flex');
+                wrap.innerHTML = alerts.map(a => `
+                    <a href="${a.href}" class="flex items-center gap-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl p-3">
+                        <span class="material-symbols-outlined">${a.icon}</span>
+                        <span class="flex-1 text-[13px] font-semibold">${a.text}</span>
+                        <span class="material-symbols-outlined text-[18px]">chevron_left</span>
+                    </a>`).join('');
+            }
+            const dskAlertsCountEl = document.getElementById('dskAlertsCountEl');
+            const dskAlertsSummaryEl = document.getElementById('dskAlertsSummaryEl');
+            const dskAlertsListEl = document.getElementById('dskAlertsListEl');
+            if (dskAlertsCountEl) dskAlertsCountEl.textContent = alerts.length;
+            if (dskAlertsSummaryEl) {
+                dskAlertsSummaryEl.textContent = alerts.length > 0 ? alerts.map(a => a.text).join(' · ') : '— لا تنبيهات حاليًا';
+                dskAlertsSummaryEl.className = 'dsk-stat-trend ' + (alerts.length > 0 ? 'warn' : 'flat');
+            }
+            if (dskAlertsListEl) {
+                dskAlertsListEl.innerHTML = alerts.length > 0
+                    ? alerts.map(a => `
+                        <a class="dsk-alert-row" href="${a.href}">
+                            <span class="dsk-alert-dot warn"></span>
+                            <span class="dsk-alert-text">${a.text}</span>
+                            <span class="material-symbols-outlined dsk-ic" style="font-size:15px !important;">chevron_left</span>
+                        </a>`).join('')
+                    : '<div class="dsk-empty">لا توجد تنبيهات حاليًا</div>';
+            }
+          } catch (err) {
+            console.error('loadDashboard failed:', err);
+            ['storeNameEl', 'dailyCashboxBalanceEl', 'todayInvoiceCountEl', 'todaySalesEl'].forEach(function (id) {
+              const e = document.getElementById(id);
+              if (e) e.style.visibility = 'visible';
+            });
+          }
+        })();
+
+        function formatMovementsDayLabel(date) {
+            const today = new Date(); today.setHours(0,0,0,0);
+            const d = new Date(date); d.setHours(0,0,0,0);
+            if (d.getTime() === today.getTime()) return 'اليوم';
+            return d.toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'short' });
+        }
+
+        async function shiftMovementsDay(deltaDays) {
+            if (!canManageFinance) return;
+            movementsViewDate.setDate(movementsViewDate.getDate() + deltaDays);
+            // Never navigate into the future
+            const today = new Date(); today.setHours(0,0,0,0);
+            const target = new Date(movementsViewDate); target.setHours(0,0,0,0);
+            if (target.getTime() > today.getTime()) movementsViewDate = new Date();
+            await loadMovementsForDay();
+        }
+
+        async function loadMovementsForDay() {
+            document.getElementById('movementsDayLabel').textContent = formatMovementsDayLabel(movementsViewDate);
+
+            const dayStart = new Date(movementsViewDate); dayStart.setHours(0, 0, 0, 0);
+            const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
+
+            const [{ data: recent }, { data: store }] = await Promise.all([
+                goldmindClient
+                    .from('cash_movements')
+                    .select('direction, amount, currency, description, created_at, invoice_id')
+                    .eq('store_id', GOLDMIND_STORE_ID)
+                    .gte('created_at', dayStart.toISOString())
+                    .lt('created_at', dayEnd.toISOString())
+                    .order('created_at', { ascending: false }),
+                goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            ]);
+            const baseCurrency = (store && store.currency) || 'AED';
+
+            const container = document.getElementById('recentMovementsEl');
+            if (!recent || recent.length === 0) {
+                container.innerHTML = '<div class="p-6 text-center text-on-surface-variant text-sm">لا توجد حركات بهذا اليوم.</div>';
+            } else {
+                container.innerHTML = recent.map(m => {
+                    const isIn = m.direction === 'in';
+                    const dateStr = new Date(m.created_at).toLocaleString('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+                    const clickable = !!m.invoice_id;
+                    const cur = m.currency || baseCurrency;
+                    const amountLabel = cur === baseCurrency
+                        ? gmFormatDualCurrency(m.amount, store)
+                        : fmt(m.amount) + ' ' + cur;
+                    return `
+                        <div class="p-4 flex justify-between items-center hover:bg-surface-container-low transition-colors ${clickable ? 'cursor-pointer active:opacity-70' : ''}" ${clickable ? `onclick="window.location.href='invoice-print-ar.html?id=${m.invoice_id}'"` : ''}>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full ${isIn ? 'bg-green-50' : 'bg-red-50'} flex items-center justify-center">
+                                    <span class="material-symbols-outlined ${isIn ? 'text-green-600' : 'text-red-600'} text-[20px]">${isIn ? 'arrow_downward' : 'arrow_upward'}</span>
+                                </div>
+                                <div>
+                                    <p class="font-label-md text-label-md font-semibold text-primary">${gmEscapeHtml(m.description || (isIn ? 'إيداع' : 'مصروف'))}</p>
+                                    <p class="text-[11px] text-on-surface-variant">${dateStr}</p>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2">
+                                <div class="text-left">
+                                    <p class="font-data-mono text-data-mono font-bold ${isIn ? 'text-green-600' : 'text-red-600'}">${isIn ? '+' : '-'}${amountLabel}</p>
+                                </div>
+                                ${clickable ? '<span class="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_left</span>' : ''}
+                            </div>
+                        </div>`;
+                }).join('');
+            }
+            const dskRecentEl = document.getElementById('dskRecentMovementsEl');
+            if (dskRecentEl) dskRecentEl.innerHTML = container.innerHTML;
+        }
+    </script>
+
+<!-- Site Navigation Drawer -->
+<div class="fixed inset-0 bg-black/40 z-[200] hidden" id="navDrawerOverlay" onclick="closeNavDrawer()"></div>
+<div class="fixed top-0 right-0 h-full w-72 max-w-[80vw] bg-surface-container-lowest z-[201] shadow-2xl translate-x-full transition-transform duration-300 flex flex-col" dir="rtl" id="navDrawer">
+<div class="flex items-center justify-between px-5 h-16 border-b border-outline-variant">
+<span class="font-headline-md text-headline-md font-bold text-primary">GoldMind</span>
+<button class="material-symbols-outlined text-on-surface-variant" onclick="closeNavDrawer()">close</button>
+</div>
+<nav class="flex-1 overflow-y-auto py-2">
+<p class="px-5 pt-2 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">الرئيسية</p>
+<a href="index-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">dashboard</span><span class="font-label-md text-label-md">لوحة التحكم</span></a>
+<a href="inventory-add.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory_2</span><span class="font-label-md text-label-md">إضافة قطعة للمخزون</span></a>
+<a href="new-sale-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt_long</span><span class="font-label-md text-label-md">بيع جديد / فاتورة</span></a>
+
+<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">السجلات</p>
+<a href="invoices-list-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">list_alt</span><span class="font-label-md text-label-md">كل الفواتير</span></a>
+<a href="invoices-archive-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory</span><span class="font-label-md text-label-md">الأرشيف الشامل (مبيعات/مشتريات زبائن وتجار)</span></a>
+<a href="sales-return-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">keyboard_return</span><span class="font-label-md text-label-md">مرتجع مبيعات</span></a>
+
+<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">المالية</p>
+<a href="expense-entry-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt</span><span class="font-label-md text-label-md">مصروف جديد</span></a>
+<a href="daily-cashbox-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">point_of_sale</span><span class="font-label-md text-label-md">الصندوق اليومي</span></a>
+<a href="main-cashbox-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">account_balance</span><span class="font-label-md text-label-md">الصندوق الرئيسي</span></a>
+<a href="ledger-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">account_balance_wallet</span><span class="font-label-md text-label-md">سجل حركات التاجر</span></a>
+<a href="customer-debts-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">groups</span><span class="font-label-md text-label-md">ديون العملاء</span></a>
+<a href="customer-debts-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">payments</span><span class="font-label-md text-label-md">سجل مديونيات العملاء</span></a>
+
+<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">التوثيق (KYC)</p>
+<a href="kyc-companies-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">domain_verification</span><span class="font-label-md text-label-md">مستندات KYC — الشركات</span></a>
+<a href="kyc-individuals-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">badge</span><span class="font-label-md text-label-md">مستندات الهوية — الأفراد</span></a>
+
+<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">الإدارة والتقارير</p>
+<a href="reports-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">bar_chart</span><span class="font-label-md text-label-md">التقارير والتحليلات</span></a>
+<a href="audit-log-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">history</span><span class="font-label-md text-label-md">سجل النشاط</span></a>
+<a href="staff-permissions-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">badge</span><span class="font-label-md text-label-md">الموظفون والصلاحيات</span></a>
+<a href="payroll-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">payments</span><span class="font-label-md text-label-md">الرواتب والموارد البشرية</span></a>
+<a href="repairs-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">build</span><span class="font-label-md text-label-md">الصيانة والتصليح</span></a>
+<a href="gold-price-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">payments</span><span class="font-label-md text-label-md">سعر الذهب</span></a>
+<a href="profit-report-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">trending_up</span><span class="font-label-md text-label-md">تقرير الأرباح</span></a>
+
+<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">الإعدادات</p>
+<a href="settings-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">settings</span><span class="font-label-md text-label-md">الإعدادات</span></a>
+<a href="theme-picker-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">palette</span><span class="font-label-md text-label-md">مظهر التطبيق</span></a>
+<a href="fiscal-year-close-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">event_repeat</span><span class="font-label-md text-label-md">إغلاق السنة المالية</span></a>
+<a href="account-security-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">lock</span><span class="font-label-md text-label-md">الأمان وكلمة المرور</span></a>
+<a href="dashboard-advanced-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">grid_view</span><span class="font-label-md text-label-md">اللوحة المتقدمة (تصميم بديل)</span></a>
+<a href="support-contact-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">support_agent</span><span class="font-label-md text-label-md">تواصل مع الدعم</span></a>
+</nav>
+<div class="border-t border-outline-variant">
+<button onclick="goldMindSignOut()" class="w-full flex items-center gap-3 px-5 py-4 text-error hover:bg-error-container/30 transition-colors"><span class="material-symbols-outlined">logout</span><span class="font-label-md text-label-md font-semibold">تسجيل الخروج</span></button>
+</div>
+</div>
+
+<!-- Quick Search (command palette) -->
+<div class="fixed inset-0 bg-black/40 z-[300] hidden" id="quickSearchOverlay" onclick="closeQuickSearch()"></div>
+<div class="fixed inset-x-0 top-0 z-[301] translate-y-[-100%] transition-transform duration-200 bg-surface-container-lowest rounded-b-2xl shadow-2xl" dir="rtl" id="quickSearchPanel">
+<div class="p-4 flex items-center gap-2 border-b border-outline-variant">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+<input id="quickSearchInput" oninput="renderQuickSearchResults()" placeholder="اكتب اسم الشاشة يلي بدك ياها... (مثال: عميل، فاتورة، صندوق)" class="flex-1 h-10 bg-transparent border-none outline-none focus:ring-0 text-[14px] text-on-surface"/>
+<button onclick="closeQuickSearch()" class="material-symbols-outlined text-on-surface-variant">close</button>
+</div>
+<div id="quickSearchResults" class="max-h-[70vh] overflow-y-auto py-2"></div>
+</div>
+<script>
+    const GOLDMIND_SEARCH_INDEX = [
+        { label: 'لوحة التحكم', href: 'index-ar.html', icon: 'dashboard', keywords: 'الرئيسية home dashboard' },
+        { label: 'بيع جديد / فاتورة', href: 'new-sale-ar.html', icon: 'add_shopping_cart', keywords: 'بيع فاتورة جديدة sale invoice' },
+        { label: 'فاتورة شراء', href: 'create-invoice-v2-ar.html', icon: 'local_shipping', keywords: 'شراء تاجر فرد purchase buy' },
+        { label: 'كل الفواتير (بحث وفلترة)', href: 'invoices-list-ar.html', icon: 'manage_search', keywords: 'فواتير بحث فلتر invoices search' },
+        { label: 'الأرشيف الشامل (مبيعات/مشتريات زبائن وتجار)', href: 'invoices-archive-ar.html', icon: 'inventory', keywords: 'ارشيف مبيعات مشتريات تجار زبائن archive sales purchases traders' },
+        { label: 'مرتجع مبيعات', href: 'sales-return-ar.html', icon: 'keyboard_return', keywords: 'ارجاع مرتجع return' },
+        { label: 'مستندات KYC — الشركات', href: 'kyc-companies-ar.html', icon: 'domain_verification', keywords: 'kyc شركات توثيق مستندات companies' },
+        { label: 'مستندات الهوية — الأفراد', href: 'kyc-individuals-ar.html', icon: 'badge', keywords: 'هوية جواز سفر افراد id passport individuals' },
+        { label: 'إضافة قطعة للمخزون', href: 'inventory-add.html', icon: 'inventory_2', keywords: 'قطعة مخزون اضافة add piece inventory' },
+        { label: 'إنتاج القطع من رصيد الجملة', href: 'stock-production-ar.html', icon: 'precision_manufacturing', keywords: 'انتاج رصيد جملة لوت production stock lot' },
+        { label: 'المخزن', href: 'inventory-list-ar.html', icon: 'inventory_2', keywords: 'مخزون قطع inventory stock' },
+        { label: 'إضافة ألماسة', href: 'diamond-inventory-add.html', icon: 'diamond', keywords: 'ألماس الماسة اضافة diamond add' },
+        { label: 'مخزون الألماس', href: 'diamond-inventory-list-ar.html', icon: 'diamond', keywords: 'ألماس مخزون diamond inventory stock' },
+        { label: 'الجرد', href: 'inventory-count-ar.html', icon: 'checklist', keywords: 'جرد rfid رقاقة مسح باركود كاميرا inventory count scan rfid tag barcode camera' },
+        { label: 'مصروف جديد', href: 'expense-entry-ar.html', icon: 'receipt', keywords: 'مصروف expense' },
+        { label: 'إضافة عميل', href: 'customer-add-ar.html', icon: 'person_add', keywords: 'عميل زبون customer add' },
+        { label: 'ديون العملاء / كشف حساب', href: 'customer-debts-ar.html', icon: 'account_balance_wallet', keywords: 'عميل دين كشف حساب customer debt' },
+        { label: 'سجل حركات التاجر / إضافة تاجر', href: 'ledger-ar.html', icon: 'groups', keywords: 'تاجر دين ledger trader add' },
+        { label: 'الصندوق اليومي', href: 'daily-cashbox-ar.html', icon: 'point_of_sale', keywords: 'صندوق يومي كاش cashbox daily' },
+        { label: 'الصندوق الرئيسي', href: 'main-cashbox-ar.html', icon: 'account_balance', keywords: 'صندوق رئيسي كاش main cashbox' },
+        { label: 'الصيانة والتصليح', href: 'repairs-ar.html', icon: 'build', keywords: 'صيانة تصليح repair' },
+        { label: 'سعر الذهب', href: 'gold-price-ar.html', icon: 'payments', keywords: 'سعر ذهب عيار gold price' },
+        { label: 'التقارير والتحليلات', href: 'reports-ar.html', icon: 'bar_chart', keywords: 'تقرير ضريبة vat report tax' },
+        { label: 'تقرير الأرباح', href: 'profit-report-ar.html', icon: 'trending_up', keywords: 'ربح أرباح profit' },
+        { label: 'سجل النشاط', href: 'audit-log-ar.html', icon: 'history', keywords: 'سجل نشاط audit log' },
+        { label: 'الموظفون والصلاحيات', href: 'staff-permissions-ar.html', icon: 'badge', keywords: 'موظف صلاحية دعوة staff permission invite' },
+        { label: 'الرواتب والموارد البشرية', href: 'payroll-ar.html', icon: 'payments', keywords: 'راتب رواتب موظفين موارد بشرية payroll salary hr' },
+        { label: 'إغلاق السنة المالية', href: 'fiscal-year-close-ar.html', icon: 'event_repeat', keywords: 'سنة مالية اغلاق fiscal year close' },
+        { label: 'إعدادات المحل', href: 'settings-ar.html', icon: 'settings', keywords: 'اعدادات settings' },
+        { label: 'مظهر التطبيق', href: 'theme-picker-ar.html', icon: 'palette', keywords: 'ثيم لون مظهر theme color' },
+        { label: 'الأمان وكلمة المرور', href: 'account-security-ar.html', icon: 'lock', keywords: 'أمان كلمة مرور password security' },
+        { label: 'الاشتراك', href: 'subscription-ar.html', icon: 'workspace_premium', keywords: 'اشتراك خطة subscription plan' },
+        { label: 'تواصل مع الدعم', href: 'support-contact-ar.html', icon: 'support_agent', keywords: 'دعم مساعدة support help' }
+    ];
+
+    function openQuickSearch() {
+        document.getElementById('quickSearchOverlay').classList.remove('hidden');
+        const panel = document.getElementById('quickSearchPanel');
+        panel.classList.remove('translate-y-[-100%]');
+        const input = document.getElementById('quickSearchInput');
+        input.value = '';
+        renderQuickSearchResults();
+        setTimeout(function () { input.focus(); }, 50);
+    }
+
+    function closeQuickSearch() {
+        document.getElementById('quickSearchOverlay').classList.add('hidden');
+        document.getElementById('quickSearchPanel').classList.add('translate-y-[-100%]');
+    }
+
+    function renderQuickSearchResults() {
+        const q = (document.getElementById('quickSearchInput').value || '').trim().toLowerCase();
+        const results = q
+            ? GOLDMIND_SEARCH_INDEX.filter(function (item) {
+                return item.label.toLowerCase().includes(q) || item.keywords.toLowerCase().includes(q);
+            })
+            : GOLDMIND_SEARCH_INDEX;
+
+        const container = document.getElementById('quickSearchResults');
+        if (results.length === 0) {
+            container.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">ما في نتائج مطابقة.</p>';
+            return;
+        }
+        container.innerHTML = results.map(function (item) {
+            return '<a href="' + item.href + '" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors">' +
+                '<span class="material-symbols-outlined text-secondary">' + item.icon + '</span>' +
+                '<span class="font-label-md text-label-md">' + item.label + '</span></a>';
+        }).join('');
+    }
+</script>
+<script>
+    function toggleCurrency() {
+        const btn = document.getElementById('currency-toggle-btn');
+        const dskBtn = document.getElementById('dskCurrencyBtn');
+        const order = window.__goldmindCurrencyOrder || ['AED', 'USD', 'EUR'];
+        let current = localStorage.getItem('goldmind_currency_code') || order[0];
+        let idx = order.indexOf(current);
+        idx = (idx + 1) % order.length;
+        const next = order[idx];
+        localStorage.setItem('goldmind_currency_code', next);
+        btn.textContent = currencySymbolFor(next);
+        if (dskBtn) dskBtn.textContent = currencySymbolFor(next);
+    }
+
+    const currencySymbols = {
+        'AED': 'د.إ', 'SAR': 'ر.س', 'KWD': 'د.ك', 'QAR': 'ر.ق', 'BHD': 'د.ب',
+        'OMR': 'ر.ع', 'EGP': 'ج.م', 'JOD': 'د.أ', 'LBP': 'ل.ل', 'IQD': 'د.ع',
+        'SYP': 'ل.س', 'USD': '$', 'EUR': '€'
+    };
+    function currencySymbolFor(code) {
+        return currencySymbols[code] || code;
+    }
+
+    async function initCurrencyButton() {
+        const session = await requireGoldMindSession();
+        if (!session) return;
+        const btn = document.getElementById('currency-toggle-btn');
+        const { data: store } = await goldmindClient
+            .from('stores')
+            .select('currency')
+            .eq('id', GOLDMIND_STORE_ID)
+            .single();
+
+        const storeCurrency = (store && store.currency) ? store.currency.toUpperCase() : 'AED';
+        const order = [storeCurrency];
+        ['USD', 'EUR'].forEach(c => { if (!order.includes(c)) order.push(c); });
+        window.__goldmindCurrencyOrder = order;
+
+        const saved = localStorage.getItem('goldmind_currency_code');
+        const active = (saved && order.includes(saved)) ? saved : storeCurrency;
+        if (btn) btn.textContent = currencySymbolFor(active);
+        const dskBtn = document.getElementById('dskCurrencyBtn');
+        if (dskBtn) dskBtn.textContent = currencySymbolFor(active);
+    }
+    initCurrencyButton();
+
+    (function initHallmarkBadge() {
+        const badge = document.getElementById('hallmarkBadge');
+        if (!badge || localStorage.getItem('goldmind_theme') !== 'warm-ingot') return;
+        badge.classList.remove('hidden');
+
+        const KARATS = [24, 22, 21, 18];
+
+        let prices = {}; // { 24: 340.5, 22: ..., ... }
+
+        function currentKarat() {
+            const saved = Number(localStorage.getItem('goldmind_badge_karat'));
+            return KARATS.includes(saved) ? saved : 21;
+        }
+
+        function renderBadge() {
+            const k = currentKarat();
+            const priceEl = document.getElementById('hallmarkPriceLabel');
+            const karatEl = document.getElementById('hallmarkKaratLabel');
+            karatEl.textContent = 'عيار ' + k;
+            const p = prices[k];
+            priceEl.textContent = (p != null) ? (Math.round(p * 100) / 100) : '—';
+        }
+
+        function renderPickerList() {
+            const list = document.getElementById('karatPickerList');
+            const active = currentKarat();
+            list.innerHTML = KARATS.map(k => {
+                const p = prices[k];
+                const priceText = (p != null) ? (Math.round(p * 100) / 100) + ' / غرام' : 'غير محدَّد';
+                return `
+                  <button onclick="window.__selectBadgeKarat(${k})"
+                    class="text-right p-3 rounded-lg text-[13px] flex items-center justify-between ${k === active ? 'bg-primary text-on-primary font-semibold' : 'text-on-surface hover:bg-surface-container-high'}">
+                    <span>عيار ${k}</span>
+                    <span class="font-data-mono ${k === active ? '' : 'text-on-surface-variant'}">${priceText}</span>
+                  </button>`;
+            }).join('');
+        }
+
+        window.__selectBadgeKarat = function (k) {
+            localStorage.setItem('goldmind_badge_karat', String(k));
+            renderBadge();
+            renderPickerList();
+            gmCloseKaratPicker();
+        };
+
+        window.gmOpenKaratPicker = function () {
+            renderPickerList();
+            const modal = document.getElementById('karatPickerModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        };
+        window.gmCloseKaratPicker = function () {
+            const modal = document.getElementById('karatPickerModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        };
+
+        (async function loadPrices() {
+            const session = await requireGoldMindSession();
+            if (!session) return;
+            const { data } = await goldmindClient
+                .from('gold_prices').select('karat, price_per_gram')
+                .eq('store_id', GOLDMIND_STORE_ID);
+            (data || []).forEach(row => { prices[row.karat] = Number(row.price_per_gram); });
+            renderBadge();
+        })();
+    })();
+
+    function openNavDrawer() {
+        document.getElementById('navDrawerOverlay').classList.remove('hidden');
+        const d = document.getElementById('navDrawer');
+        d.classList.remove('translate-x-full');
+    }
+    function closeNavDrawer() {
+        document.getElementById('navDrawerOverlay').classList.add('hidden');
+        const d = document.getElementById('navDrawer');
+        d.classList.add('translate-x-full');
+    }
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
