@@ -36,9 +36,13 @@
 </div>
 
 <div class="p-5">
-<div class="flex items-center justify-between mb-4">
+<div class="flex items-center justify-between mb-1">
 <h2 class="text-lg font-bold">إيصال استلام قطعة للصيانة</h2>
 <span id="statusBadge" class="text-[11px] font-bold px-3 py-1 rounded-full"></span>
+</div>
+<div class="mb-4">
+<div class="font-bold text-[12px] tracking-wide" id="doc-type-ar"></div>
+<div class="text-[9px] text-gray-500 tracking-widest uppercase" id="doc-type-en"></div>
 </div>
 
 <div id="ticketPhotoWrap" class="hidden mb-4">
@@ -55,6 +59,27 @@
 <tr><td class="py-2 text-gray-500">استلمها الموظف</td><td class="py-2 font-semibold text-left" id="receivedBy"></td></tr>
 </tbody>
 </table>
+
+<div id="costBlock" class="hidden border-t-2 border-gray-800 pt-3 mb-4 space-y-1 text-[12px]">
+<div id="costEstRow" class="hidden flex justify-between text-gray-500">
+<span>التكلفة التقديرية</span>
+<span id="costEst"></span>
+</div>
+<div id="costActualWrap" class="hidden">
+<div class="flex justify-between text-gray-600">
+<span>القيمة قبل الضريبة</span>
+<span id="costBeforeTax"></span>
+</div>
+<div class="flex justify-between text-gray-600">
+<span id="costVatLabel">ضريبة القيمة المضافة</span>
+<span id="costVat"></span>
+</div>
+<div class="flex justify-between font-bold text-base pt-1 border-t border-gray-200 mt-1">
+<span>الإجمالي المستحق</span>
+<span id="costTotal"></span>
+</div>
+</div>
+</div>
 
 <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
 <p class="text-[10.5px] leading-5 text-amber-900">
@@ -84,6 +109,9 @@ const STATUS_COLORS = { received: 'bg-gray-100 text-gray-600', in_progress: 'bg-
 function fmtDate(iso) {
   if (!iso) return '—';
   return new Date(iso).toLocaleDateString('ar-EG-u-nu-latn', { year: 'numeric', month: 'long', day: 'numeric' });
+}
+function fmt(n) {
+  return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' AED';
 }
 
 const PRINT_FRAME_CLASSES = {
@@ -130,6 +158,33 @@ async function load() {
   document.getElementById('receivedBy').textContent = row.received_by_name || '—';
   document.getElementById('statusBadge').textContent = STATUS_LABELS[row.status] || row.status;
   document.getElementById('statusBadge').className = 'text-[11px] font-bold px-3 py-1 rounded-full ' + (STATUS_COLORS[row.status] || '');
+
+  // Repair services are a taxable VAT supply just like goods (5%), so once a
+  // final cost is set the receipt must show the same Tax Invoice / Invoice
+  // labeling and VAT breakdown used on the sales invoice, and the amount
+  // charged is stored VAT-inclusive (same convention as invoices.total_amount).
+  document.getElementById('doc-type-ar').textContent = row.tax_number ? 'فاتورة ضريبية (صيانة)' : 'فاتورة (صيانة)';
+  document.getElementById('doc-type-en').textContent = row.tax_number ? 'Tax Invoice (Repair)' : 'Invoice (Repair)';
+
+  if (row.estimated_cost != null || row.actual_cost != null) {
+    document.getElementById('costBlock').classList.remove('hidden');
+  }
+  if (row.estimated_cost != null && row.actual_cost == null) {
+    document.getElementById('costEstRow').classList.remove('hidden');
+    document.getElementById('costEst').textContent = fmt(row.estimated_cost);
+  }
+  if (row.actual_cost != null) {
+    const vatRate = Number(row.vat_rate || 0);
+    const vatMultiplier = 1 + (vatRate / 100);
+    const total = Number(row.actual_cost);
+    const beforeTax = total / vatMultiplier;
+    const tax = total - beforeTax;
+    document.getElementById('costActualWrap').classList.remove('hidden');
+    document.getElementById('costVatLabel').textContent = row.tax_number ? 'ضريبة القيمة المضافة (٥٪)' : 'ضريبة القيمة المضافة';
+    document.getElementById('costBeforeTax').textContent = fmt(beforeTax);
+    document.getElementById('costVat').textContent = fmt(tax);
+    document.getElementById('costTotal').textContent = fmt(total);
+  }
 
   if (row.ready_at) {
     document.getElementById('readyAtRow').classList.remove('hidden');
@@ -188,7 +243,7 @@ async function downloadRepairReceiptPdf() {
       margin: 10,
       filename: `${ticketNumber}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', letterRendering: true },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).from(wrapper).save();
   } catch (err) {

@@ -95,6 +95,17 @@
 <img class="hidden mx-auto mb-2 h-14 object-contain" id="store-logo" crossorigin="anonymous"/>
 <div class="font-bold text-lg" id="store-name"></div>
 </div>
+
+<!-- Document type: "Tax Invoice" only when the store has a TRN on file
+     (an unregistered store must not label its invoices as tax invoices);
+     a return prints as a Credit Note instead, per FTA labeling rules, with
+     a reference line to the original invoice it corrects. -->
+<div class="text-center mb-3">
+<div class="font-bold text-[13px] tracking-wide" id="doc-type-ar"></div>
+<div class="text-[10px] text-gray-500 tracking-widest uppercase" id="doc-type-en"></div>
+<div class="hidden text-[11px] text-gray-600 mt-1" id="doc-related-invoice"></div>
+</div>
+
 <div class="border-b border-dashed border-gray-300 pb-3 mb-4 flex" dir="rtl">
 <div style="flex:1; text-align:right;" class="text-[10.5px] text-gray-600 leading-5" dir="rtl" id="store-info-ar"></div>
 <div style="flex:1; text-align:left; border-right: 1px solid #e5e7eb; padding-right: 10px; margin-right: 10px;" class="text-[10.5px] text-gray-600 leading-5" dir="ltr" id="store-info-en"></div>
@@ -138,6 +149,7 @@
 <thead>
 <tr class="border-b-2 border-gray-800 text-gray-600">
 <th class="py-2 text-right">الوصف</th>
+<th class="py-2 text-center">الكمية</th>
 <th class="py-2 text-center">العيار</th>
 <th class="py-2 text-center">الوزن</th>
 <th class="py-2 text-left">الإجمالي</th>
@@ -343,6 +355,51 @@
         }
         document.getElementById('store-name').textContent = store.name || '';
 
+        // ---- Document type label (Tax Invoice / plain Invoice / Tax Credit Note) ----
+        // Per FTA Article 60, a document correcting an earlier tax invoice
+        // MUST be prominently labeled "Tax Credit Note" (not "Sales Return"
+        // or any informal equivalent) when the store is VAT-registered — the
+        // FTA rejects credit-note treatment for a document missing that
+        // exact phrase, however complete its other fields are. An
+        // unregistered store isn't subject to VAT credit-note rules at all,
+        // so it gets the plain "Credit Note" label instead. Same TRN gating
+        // applies to the invoice label itself: "Tax Invoice" only when
+        // VAT-registered, plain "Invoice" otherwise.
+        if (invoice.type === 'return') {
+            document.getElementById('doc-type-ar').textContent = store.tax_number ? 'إشعار دائن ضريبي' : 'إشعار دائن';
+            document.getElementById('doc-type-en').textContent = store.tax_number ? 'Tax Credit Note' : 'Credit Note';
+            if (invoice.related_invoice_id) {
+                const { data: originalInvoice } = await goldmindClient
+                    .from('invoices').select('invoice_number, created_at').eq('id', invoice.related_invoice_id).maybeSingle();
+                if (originalInvoice) {
+                    const relEl = document.getElementById('doc-related-invoice');
+                    relEl.textContent = 'متعلق بالفاتورة رقم: ' + originalInvoice.invoice_number + ' بتاريخ ' + gmFormatDateTime(originalInvoice.created_at);
+                    relEl.classList.remove('hidden');
+                }
+            }
+        } else if (invoice.type === 'buyTrader' || invoice.type === 'buyRetail') {
+            // A purchase record is NOT a tax invoice issued by this store —
+            // the store is the BUYER here. For buyRetail the seller is a
+            // private individual (never VAT-registered), and for buyTrader
+            // the seller (the trader) is the one who must issue any tax
+            // invoice, unless a formal self-billing agreement exists. This
+            // is our own internal purchase voucher, not a customer-facing
+            // tax document.
+            document.getElementById('doc-type-ar').textContent = 'سند شراء (مستند داخلي)';
+            document.getElementById('doc-type-en').textContent = 'Purchase Voucher (Internal)';
+            const relEl = document.getElementById('doc-related-invoice');
+            relEl.textContent = invoice.type === 'buyRetail'
+                ? 'شراء من فرد — لا تُطبَّق ضريبة القيمة المضافة (الفرد غير مسجَّل ضريبياً).'
+                : 'شراء من تاجر — الفاتورة الضريبية الرسمية لهذه الصفقة يجب أن يصدرها التاجر البائع، وليس هذا المستند.';
+            relEl.classList.remove('hidden');
+        } else if (store.tax_number) {
+            document.getElementById('doc-type-ar').textContent = 'فاتورة ضريبية';
+            document.getElementById('doc-type-en').textContent = 'Tax Invoice';
+        } else {
+            document.getElementById('doc-type-ar').textContent = 'فاتورة';
+            document.getElementById('doc-type-en').textContent = 'Invoice';
+        }
+
         function buildStoreInfoRows(labels) {
             const rows = [];
             if (store.address) rows.push(`<div>${labels.address}: ${gmEscapeHtml(store.address)}</div>`);
@@ -442,6 +499,7 @@
         // ---- Items + VAT breakdown ----
         const vatRate = Number(store.vat_rate || 0);
         const vatMultiplier = 1 + (vatRate / 100);
+        const isPurchaseDoc = invoice.type === 'buyTrader' || invoice.type === 'buyRetail';
 
         let sumBeforeTax = 0;
         let sumTax = 0;
@@ -450,8 +508,19 @@
         const itemsBody = document.getElementById('items-body');
         itemsBody.innerHTML = (items || []).map(item => {
             const full = Number(item.line_total || 0);
-            const beforeTax = full / vatMultiplier;
-            const tax = full - beforeTax;
+            // A purchase voucher (buyTrader/buyRetail) must NOT apply the
+            // store's flat sale VAT rate to the gold value here: buyRetail
+            // sellers (individuals) never charge VAT at all, and for
+            // buyTrader the gold portion is meant to fall under the reverse-
+            // charge mechanism (handled by the store's accountant, not
+            // priced into this line) — only the fabrication fee is
+            // VAT-bearing, and that fee isn't part of line_total at all
+            // (tracked separately as a trader debt). So purchase lines are
+            // shown at face value with no per-line VAT split here; the
+            // authoritative vat_amount for the whole document comes from
+            // the invoice row itself, below.
+            const beforeTax = isPurchaseDoc ? full : (full / vatMultiplier);
+            const tax = isPurchaseDoc ? 0 : (full - beforeTax);
 
             sumBeforeTax += beforeTax;
             sumTax += tax;
@@ -460,12 +529,23 @@
             return `
                 <tr>
                     <td class="py-2">${gmEscapeHtml(item.description) || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${gmEscapeHtml(item.description_en)}</span>` : ''}</td>
+                    <td class="py-2 text-center">1</td>
                     <td class="py-2 text-center">${item.karat}K</td>
                     <td class="py-2 text-center">${item.weight_grams}</td>
                     <td class="py-2 text-left font-semibold">${fmt(full)}</td>
                 </tr>
             `;
         }).join('');
+
+        if (isPurchaseDoc) {
+            // Trust the invoice row's own vat_amount/total_amount, computed
+            // at save time in create-invoice-v2-ar.html (0 for buyRetail;
+            // VAT-on-fabrication-fee-only for buyTrader) — this also covers
+            // the fabrication fee amount, which never appears in line_total.
+            sumTax = Number(invoice.vat_amount || 0);
+            sumTotal = Number(invoice.total_amount || sumTotal);
+            sumBeforeTax = sumTotal - sumTax;
+        }
 
         document.getElementById('vat-rate-label').textContent = fmt(vatRate).replace(/\.00$/, '');
         document.getElementById('sum-before-tax').textContent = gmFormatDualCurrency(sumBeforeTax, store);
@@ -603,7 +683,7 @@
                 margin: 10,
                 filename: `${invNumber}.pdf`,
                 image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', letterRendering: true },
+                html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
                 jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
                 pagebreak: { mode: ['css', 'legacy'] }
             }).from(wrapper).save();

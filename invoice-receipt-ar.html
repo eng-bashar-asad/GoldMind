@@ -28,9 +28,14 @@
 </div>
 
 <div class="p-5">
-<div class="flex items-center justify-between mb-4">
+<div class="flex items-center justify-between mb-1">
 <h2 class="text-lg font-bold" id="typeLabel">فاتورة</h2>
 <span id="statusBadge" class="text-[11px] font-bold px-3 py-1 rounded-full"></span>
+</div>
+<div class="mb-4">
+<div class="font-bold text-[12px] tracking-wide" id="doc-type-ar"></div>
+<div class="text-[9px] text-gray-500 tracking-widest uppercase" id="doc-type-en"></div>
+<div class="hidden text-[11px] text-gray-600 mt-1" id="doc-note"></div>
 </div>
 
 <table class="w-full text-[13px] mb-4">
@@ -46,6 +51,7 @@
 <thead>
 <tr class="border-b-2 border-gray-800 text-gray-600">
 <th class="py-2 text-right">الوصف</th>
+<th class="py-2 text-center">الكمية</th>
 <th class="py-2 text-center">العيار</th>
 <th class="py-2 text-center">الوزن</th>
 <th class="py-2 text-left">الإجمالي</th>
@@ -55,6 +61,10 @@
 </table>
 
 <div class="border-t-2 border-gray-800 pt-3 space-y-1 text-[12px]">
+<div class="flex justify-between text-gray-600">
+<span>القيمة قبل الضريبة</span>
+<span id="sumBeforeTax"></span>
+</div>
 <div class="flex justify-between text-gray-600">
 <span>قيمة الضريبة</span>
 <span id="sumVat"></span>
@@ -147,20 +157,62 @@ async function load() {
   document.getElementById('itemsBody').innerHTML = items.map(item => `
     <tr>
       <td class="py-2">${escapeHtml(item.description) || '—'}</td>
+      <td class="py-2 text-center">${item.quantity || 1}</td>
       <td class="py-2 text-center">${item.karat}K</td>
       <td class="py-2 text-center">${item.weight_grams}</td>
       <td class="py-2 text-left font-semibold">${fmt(item.line_total)}</td>
     </tr>`).join('');
 
-  // vat_amount stored on the invoice row isn't reliable (recorded as 0 at
-  // sale time), so derive it from vat_rate the same way invoice-print-ar.html
-  // does: total_amount is tax-inclusive.
-  const vatRate = Number(row.vat_rate || 0);
-  const vatMultiplier = 1 + (vatRate / 100);
-  const total = Number(row.total_amount || 0);
-  const beforeTax = total / vatMultiplier;
-  const tax = total - beforeTax;
+  // Document-type label per FTA Article 59/60: "Tax Invoice"/"Tax Credit
+  // Note" only when the store is VAT-registered (has a TRN); plain
+  // "Invoice"/"Credit Note" otherwise. A purchase record (buyTrader/
+  // buyRetail) is this store's own internal voucher, not a tax invoice it
+  // issued — the store is the buyer, not the supplier, in that transaction.
+  const isReturn = row.invoice_type === 'return';
+  const isPurchase = row.invoice_type === 'buyTrader' || row.invoice_type === 'buyRetail';
+  if (isPurchase) {
+    document.getElementById('doc-type-ar').textContent = 'سند شراء (مستند داخلي)';
+    document.getElementById('doc-type-en').textContent = 'Purchase Voucher (Internal)';
+    const noteEl = document.getElementById('doc-note');
+    noteEl.textContent = row.invoice_type === 'buyRetail'
+      ? 'شراء من فرد — لا تُطبَّق ضريبة القيمة المضافة.'
+      : 'شراء من تاجر — الفاتورة الضريبية الرسمية يصدرها التاجر البائع.';
+    noteEl.classList.remove('hidden');
+  } else if (isReturn) {
+    document.getElementById('doc-type-ar').textContent = row.tax_number ? 'إشعار دائن ضريبي' : 'إشعار دائن';
+    document.getElementById('doc-type-en').textContent = row.tax_number ? 'Tax Credit Note' : 'Credit Note';
+  } else if (row.tax_number) {
+    document.getElementById('doc-type-ar').textContent = 'فاتورة ضريبية';
+    document.getElementById('doc-type-en').textContent = 'Tax Invoice';
+  } else {
+    document.getElementById('doc-type-ar').textContent = 'فاتورة';
+    document.getElementById('doc-type-en').textContent = 'Invoice';
+  }
 
+  let beforeTax, tax, total;
+  if (isPurchase) {
+    // A purchase voucher never applies the store's flat sale VAT rate to
+    // the gold value (buyRetail sellers can't charge VAT at all; buyTrader
+    // gold falls under the reverse-charge mechanism handled separately by
+    // the store's accountant). The authoritative figure is whatever
+    // create-invoice-v2-ar.html computed and stored at save time — 0 for
+    // buyRetail, VAT-on-fabrication-fee-only for buyTrader.
+    total = Number(row.total_amount || 0);
+    tax = Number(row.vat_amount || 0);
+    beforeTax = total - tax;
+  } else {
+    // vat_amount stored on sale/return rows wasn't reliable historically
+    // (recorded as 0 at sale time on older invoices), so derive it from
+    // vat_rate the same way invoice-print-ar.html does: total_amount is
+    // tax-inclusive.
+    const vatRate = Number(row.vat_rate || 0);
+    const vatMultiplier = 1 + (vatRate / 100);
+    total = Number(row.total_amount || 0);
+    beforeTax = total / vatMultiplier;
+    tax = total - beforeTax;
+  }
+
+  document.getElementById('sumBeforeTax').textContent = fmtDual(beforeTax, row);
   document.getElementById('sumVat').textContent = fmtDual(tax, row);
   document.getElementById('sumTotal').textContent = fmtDual(total, row);
 
@@ -213,7 +265,7 @@ async function downloadReceiptPdf() {
       margin: 10,
       filename: `${invNumber}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', letterRendering: true },
+      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).from(wrapper).save();
   } catch (err) {
