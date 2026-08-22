@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>كشف الحركة اليومية | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=13"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = { theme: { extend: {
+    "colors": {
+      "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+      "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+      "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+      "surface-container-lowest": "var(--gm-surface-lowest)", "primary": "var(--gm-primary)",
+      "accent": "var(--gm-accent)", "success": "#1e7d32", "error": "#ba1a1a"
+    }
+  } } }
+</script>
+<style>
+    body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; }
+        #sheet { box-shadow: none !important; border: none !important; margin: 0 !important; max-width: none !important; }
+        #sheet .gm-print-shadow { box-shadow: none !important; }
+    }
+</style>
+</head>
+<body class="bg-background text-on-surface">
+
+<div class="no-print sticky top-0 bg-surface-container-lowest border-b border-outline-variant z-50 flex items-center justify-between px-4 h-14">
+<button onclick="window.location.href='daily-cashbox-ar.html'" class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+<span class="text-sm font-semibold">الحركة اليومية</span>
+</button>
+<button onclick="window.print()" id="print-btn" class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">print</span> طباعة
+</button>
+<button onclick="downloadCashboxPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-surface-container-lowest text-on-surface border border-gray-200 px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">download</span> تحميل PDF
+</button>
+</div>
+<p id="nativePdfHint" class="no-print hidden text-[11px] text-on-surface-variant text-center py-2 px-4 bg-surface-container-low">لحفظ الملف كـ PDF: اختر "حفظ كـ PDF" من قائمة الطابعات بنافذة الطباعة.</p>
+
+<div id="loading" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<div id="sheet" class="hidden max-w-2xl mx-auto my-6 p-3 sm:p-5 bg-background">
+<div class="rounded-lg border-[3px] border-accent gm-print-shadow" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
+<div class="bg-surface-container-lowest rounded-lg overflow-hidden">
+
+<!-- Letterhead -->
+<div class="p-6 text-center border-b-4 border-accent bg-surface-container-low">
+<img id="storeLogo" crossorigin="anonymous" class="hidden w-16 h-16 mx-auto mb-2 object-contain"/>
+<h1 id="storeName" class="text-xl font-bold text-on-surface"></h1>
+<p id="storeAddress" class="text-[12px] text-on-surface-variant mt-1"></p>
+<p id="storePhone" class="text-[12px] text-on-surface-variant" dir="ltr"></p>
+</div>
+
+<div class="p-5">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-lg font-bold text-on-surface">كشف الحركة اليومية</h2>
+<span id="dateLabel" class="text-[12px] text-on-surface-variant" dir="ltr"></span>
+</div>
+
+<!-- Two symmetric columns: incoming (right) / outgoing (left).
+     This used to be a real <table>, but html2canvas (the PDF-export
+     engine used by "تحميل PDF"/share) has a text-layout bug specific to a
+     4-column table-layout:fixed <table>: a colspan header OR bold text in
+     the body (either one, independently) makes it miscalculate column
+     boundaries and garble/scramble the Arabic in the body rows — the rest
+     of the page (which isn't a <table>) always rendered fine, which is
+     why this was the only broken part. Flexbox rows produce the exact
+     same visual grid without tripping that bug, confirmed with real data
+     and the real bold font file before shipping this. -->
+<div class="rounded-xl border-[3px] border-accent overflow-hidden">
+<div class="flex text-[15px]">
+<div class="bg-success/10 text-success py-2.5 font-bold text-center" style="width:28%">الداخل</div>
+<div class="bg-success/10 text-success py-2.5 font-bold" style="width:22%"></div>
+<div class="bg-error/10 text-error py-2.5 font-bold text-center" style="width:28%">الصادر</div>
+<div class="bg-error/10 text-error py-2.5 font-bold" style="width:22%"></div>
+</div>
+<div id="rowsBody"></div>
+</div>
+
+<!-- Per-currency totals, mirroring the reference sheet's summary block -->
+<div class="mt-5">
+<h3 class="text-[13px] font-bold text-on-surface-variant mb-2">الرصيد الحالي بالدرج</h3>
+<div class="rounded-xl overflow-hidden border-[3px] border-accent gm-print-shadow" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
+<table class="w-full text-[15px]" id="totalsTable"></table>
+</div>
+</div>
+</div>
+
+</div>
+</div></div>
+
+<script>
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
+
+function getSelectedDate() {
+  const params = new URLSearchParams(window.location.search);
+  const dateStr = params.get('date');
+  const d = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Same deterministic pastel-per-link_group palette used on the in-app
+// "الحركة اليومية" page, so a shared/printed copy of the day visually
+// matches what staff already see and color-recognize inside the app.
+const GM_LINK_PALETTE = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#FFEDD5', '#E0E7FF', '#CFFAFE', '#FEE2E2'];
+function gmLinkColorFor(group) {
+  if (!group) return null;
+  let hash = 0;
+  for (let i = 0; i < group.length; i++) hash = (hash * 31 + group.charCodeAt(i)) >>> 0;
+  return GM_LINK_PALETTE[hash % GM_LINK_PALETTE.length];
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: store } = await goldmindClient.from('stores').select('name, address, phone, logo_url').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  if (store) {
+    document.getElementById('storeName').textContent = store.name || '';
+    if (store.address) document.getElementById('storeAddress').textContent = store.address;
+    if (store.phone) document.getElementById('storePhone').textContent = store.phone;
+    if (store.logo_url) {
+      const logo = document.getElementById('storeLogo');
+      logo.src = store.logo_url;
+      logo.classList.remove('hidden');
+    }
+  }
+
+  const selectedDate = getSelectedDate();
+  const dayEnd = new Date(selectedDate); dayEnd.setDate(dayEnd.getDate() + 1);
+  document.getElementById('dateLabel').textContent = selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const { data: allEntries, error } = await goldmindClient
+    .from('daily_cash_log')
+    .select('*')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    document.getElementById('loading').textContent = 'تعذّر التحميل: ' + error.message;
+    return;
+  }
+
+  const dayEntries = (allEntries || []).filter(e => new Date(e.created_at) >= selectedDate && new Date(e.created_at) < dayEnd);
+  const priorEntries = (allEntries || []).filter(e => new Date(e.created_at) < selectedDate);
+
+  // Cluster by link_group (same rule as the in-app page) so a linked out/in
+  // pair lands on the same row AND shares the same pastel highlight color.
+  const clustersByKey = new Map();
+  dayEntries.forEach(e => {
+    const key = e.link_group || ('__solo_' + e.id);
+    if (!clustersByKey.has(key)) clustersByKey.set(key, { group: e.link_group || null, members: [] });
+    clustersByKey.get(key).members.push(e);
+  });
+  const clusters = [...clustersByKey.values()];
+
+  const outEntries = [];
+  const inEntries = [];
+  clusters.forEach(cluster => {
+    const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    // Same always-filled approach as the in-app page: no padding between
+    // clusters, so an unbalanced cluster never opens a blank row in the
+    // middle of the sheet. Each cell keeps its OWN entry's link color
+    // (below) rather than one color per row, since two entries sharing a
+    // row are no longer guaranteed to be the same linked pair.
+    outEntries.push(...outMembers);
+    inEntries.push(...inMembers);
+  });
+  const rowCount = Math.max(outEntries.length, inEntries.length, 1);
+
+  const rowsBody = document.getElementById('rowsBody');
+  let rowsHtml = '';
+  for (let i = 0; i < rowCount; i++) {
+    const o = outEntries[i];
+    const inn = inEntries[i];
+    const inBg = inn && gmLinkColorFor(inn.link_group) ? `background-color:${gmLinkColorFor(inn.link_group)};` : '';
+    const outBg = o && gmLinkColorFor(o.link_group) ? `background-color:${gmLinkColorFor(o.link_group)};` : '';
+    rowsHtml += `<div class="flex">
+      <div class="py-2.5 px-3 border-t border-outline-variant font-semibold" style="width:28%;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (inn.notes ? ' — ' + gmEscapeHtml(inn.notes) : '') : ''}</div>
+      <div class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="width:22%;${inBg}" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</div>
+      <div class="py-2.5 px-3 border-t border-r border-outline-variant font-semibold" style="width:28%;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (o.notes ? ' — ' + gmEscapeHtml(o.notes) : '') : ''}</div>
+      <div class="py-2.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="width:22%;${outBg}" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</div>
+    </div>`;
+  }
+  if (dayEntries.length === 0) {
+    rowsHtml = '<div class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا توجد عمليات بهذا اليوم</div>';
+  }
+  rowsBody.innerHTML = rowsHtml;
+
+  const currencies = [...new Set((allEntries || []).map(e => e.currency))];
+  const totalsTable = document.getElementById('totalsTable');
+  if (currencies.length === 0) {
+    totalsTable.innerHTML = '<tr><td class="py-3 px-2 text-center text-on-surface-variant border border-outline-variant">لا يوجد رصيد مسجّل بعد</td></tr>';
+  } else {
+    totalsTable.innerHTML = currencies.map(cur => {
+      const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+      const dayNet = dayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
+      const closing = opening + dayNet;
+      return `<tr>
+        <td class="py-2 px-3 border border-outline-variant font-bold bg-surface-container-low">${cur}</td>
+        <td class="py-2 px-3 border border-outline-variant font-bold text-left" dir="ltr">${fmt(closing)}</td>
+      </tr>`;
+    }).join('');
+  }
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('sheet').classList.remove('hidden');
+}
+
+function gmIsNativeApp() {
+  return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+}
+
+// Renders the on-screen #sheet element to a PDF and returns it as a plain
+// base64 string (no "data:application/pdf;base64," prefix) — the format
+// Capacitor's Filesystem plugin expects for writeFile().
+async function generateCashboxPdfBase64() {
+  const sheet = document.getElementById('sheet');
+  if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+  const dataUriString = await html2pdf().set({
+    margin: 10,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(sheet).outputPdf('datauristring');
+  return dataUriString.substring(dataUriString.indexOf(',') + 1);
+}
+
+// Inside the packaged Android app, neither window.print() nor a browser-
+// style blob download has anywhere to land — this WebView has no native
+// print integration and no download manager hooked up. Generating a real
+// PDF file and handing it to Android's own share sheet (via the
+// Filesystem + Share Capacitor plugins) is the reliable path on a real
+// device: the user picks WhatsApp, Files, Drive, etc. and the actual PDF
+// is attached — not a link that then asks them to log in.
+async function shareCashboxPdfNative(btn) {
+  const originalHtml = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
+  }
+  try {
+    const base64 = await generateCashboxPdfBase64();
+    const dateLabel = (document.getElementById('dateLabel')?.textContent || 'daily-cashbox').trim();
+    const filename = `goldmind-daily-cashbox-${dateLabel.replace(/\//g, '-')}.pdf`;
+
+    const { Filesystem, Share } = window.Capacitor.Plugins;
+    await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+    const { uri } = await Filesystem.getUri({ path: filename, directory: 'CACHE' });
+
+    await Share.share({
+      title: 'كشف الحركة اليومية',
+      text: 'كشف الحركة اليومية — ' + dateLabel,
+      url: uri,
+      dialogTitle: 'مشاركة الكشف'
+    });
+  } catch (err) {
+    console.error('PDF share failed', err);
+    alert('تعذّر تجهيز/مشاركة ملف PDF، حاول مرة أخرى');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+  }
+}
+
+load();
+
+if (gmIsNativeApp()) {
+  document.getElementById('print-btn').classList.add('hidden');
+  const hintEl = document.getElementById('nativePdfHint');
+  hintEl.textContent = 'اضغط "تحميل PDF" لحفظ الملف أو مشاركته عبر واتساب مباشرة.';
+  hintEl.classList.remove('hidden');
+
+  // Coming here from the "إرسال جدول اليوم عبر واتساب" button on the
+  // daily cashbox page (?autoshare=1) — open the native share sheet the
+  // moment the sheet has finished rendering, no extra tap needed.
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('autoshare') === '1') {
+    const waitForSheet = setInterval(() => {
+      if (!document.getElementById('sheet').classList.contains('hidden')) {
+        clearInterval(waitForSheet);
+        shareCashboxPdfNative(null);
+      }
+    }, 200);
+  }
+}
+
+// ---- Download an official PDF copy (client-side html2pdf.js) ----
+// Captures the real, visible #sheet element directly — no off-screen clone.
+// (An earlier version cloned the sheet into a detached wrapper positioned
+// far off-screen; that pattern is known to render blank in some mobile
+// browsers, especially in RTL documents. Capturing the live, attached,
+// on-screen element is far more reliable.)
+async function downloadCashboxPdf() {
+  const sheet = document.getElementById('sheet');
+  if (!sheet || sheet.classList.contains('hidden')) return;
+
+  const btn = document.getElementById('download-pdf-btn');
+
+  if (gmIsNativeApp()) {
+    await shareCashboxPdfNative(btn);
+    return;
+  }
+
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
+
+  if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+
+  const dateLabel = (document.getElementById('dateLabel')?.textContent || 'daily-cashbox').trim();
+
+  try {
+    await html2pdf().set({
+      margin: 10,
+      filename: `كشف-يومي-${dateLabel}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(sheet).save();
+  } catch (err) {
+    console.error('PDF generation failed', err);
+    alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
+</script>
+</body></html>
