@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إدخال بضاعة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=13"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .entry-choice-card {
+        display: flex; align-items: flex-start; gap: 14px; padding: 20px;
+        border: 1px solid var(--gm-outline-variant); border-radius: 16px;
+        background: var(--gm-bg-elevated); cursor: pointer; text-align: right;
+        transition: transform .15s ease, box-shadow .15s ease, border-color .15s ease;
+    }
+    .entry-choice-card:hover { transform: translateY(-2px); box-shadow: 0 10px 22px rgba(28,26,22,.10); border-color: var(--gm-accent, #B4955A); }
+    .entry-choice-icon {
+        width: 52px; height: 52px; border-radius: 14px; flex: none;
+        display: flex; align-items: center; justify-content: center; font-size: 26px;
+    }
+</style>
+</head>
+<body>
+<header class="border-b border-gray-200 sticky top-0 z-50" style="background: var(--gm-surface-lowest);">
+<div class="flex justify-between items-center px-4 w-full h-16 max-w-md lg:max-w-2xl mx-auto">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-xl font-bold">إدخال بضاعة</h1>
+</div>
+</div>
+</header>
+
+<main class="max-w-md lg:max-w-2xl mx-auto px-4 py-8">
+<div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-sm text-red-600">ليس لديك صلاحية الوصول لهذه الشاشة.</div>
+
+<div id="page-content" class="hidden flex flex-col gap-4">
+<p class="text-[13px] mb-1" style="color: var(--gm-on-surface-variant);">شو نوع الإدخال يلي بدك ياه؟</p>
+
+<button type="button" class="entry-choice-card" onclick="window.location.href='create-invoice-v2-ar.html?mode=bulk'">
+<div class="entry-choice-icon" style="background:#F1E9D6;color:#9C8552;">
+<span class="material-symbols-outlined">local_shipping</span>
+</div>
+<div class="flex-1">
+<div class="font-bold text-[15px] mb-1">بضاعة من تاجر (رصيد بالجملة)</div>
+<div class="text-[12.5px] leading-relaxed" style="color: var(--gm-on-surface-variant);">
+استلام كمية ذهب/فضة كرصيد جملة (اللونات) بفاتورة شراء من تاجر — بيتسجّل كوزن إجمالي واحد، وبعدين تقدر تحوّله لقطع فردية جاهزة للبيع من صفحة "إنتاج القطع".
+</div>
+</div>
+</button>
+
+<button type="button" class="entry-choice-card" onclick="window.location.href='inventory-add.html'">
+<div class="entry-choice-icon" style="background:#E1EADB;color:#3F6B47;">
+<span class="material-symbols-outlined">inventory_2</span>
+</div>
+<div class="flex-1">
+<div class="font-bold text-[15px] mb-1">إدخال قطعة</div>
+<div class="text-[12.5px] leading-relaxed" style="color: var(--gm-on-surface-variant);">
+تسجيل قطعة واحدة جاهزة (وزن وعيار ونوع محددين) مباشرة بالمخزون — نفس الشاشة يلي كانت تفتح مباشرة قبل هيك.
+</div>
+</div>
+</button>
+</div>
+</main>
+
+<script>
+(async function init() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const { data: staff } = await goldmindClient
+        .from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const allowed = staff && (staff.role === 'owner' || (staff.permissions && staff.permissions.add_piece === true));
+
+    document.getElementById('loading-state').classList.add('hidden');
+
+    if (!allowed) {
+        document.getElementById('no-access').classList.remove('hidden');
+        return;
+    }
+    document.getElementById('page-content').classList.remove('hidden');
+})();
+</script>
+</body>
+</html>
