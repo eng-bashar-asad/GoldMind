@@ -785,3 +785,26 @@ goldmindLoadSavedFont();
   `;
   document.head.appendChild(style);
 })();
+
+// Context-aware "back" for header back buttons across the app (rolled out
+// site-wide — see conversation with بشار, Aug 23 2026). Previously most
+// header back buttons hard-jumped straight to index-ar.html no matter how
+// the user got to the page. If the user actually navigated in from another
+// GoldMind page during this tab's session, gmSmartBack() steps back ONE
+// page in browser history instead (lands wherever they actually came from —
+// a search result, a customer's ledger, etc.). If there's no same-app
+// history to return to (fresh tab, deep link, bookmark, opened from the
+// Android app shell), it falls back to the given href exactly like before.
+// Pages with their own bespoke internal back logic (e.g. ledger-ar.html's
+// list/detail goBack(), inventory-count-ar.html's multi-step headerBack())
+// keep their own function untouched — this only replaces the flat
+// "always go to index-ar.html" buttons.
+function gmSmartBack(fallbackHref) {
+  try {
+    if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) {
+      history.back();
+      return;
+    }
+  } catch (e) { /* fall through to hard navigation */ }
+  window.location.href = fallbackHref;
+}
