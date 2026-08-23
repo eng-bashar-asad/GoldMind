@@ -1595,10 +1595,23 @@
     }
     initCurrencyButton();
 
-    (function initHallmarkBadge() {
+    (function initKaratPicker() {
+        // NOTE: this used to early-return (and skip defining
+        // window.gmOpenKaratPicker/gmCloseKaratPicker entirely) unless the
+        // "warm-ingot" theme was active. That's fine for the mobile
+        // hallmark badge (which really is warm-ingot-only, cosmetically),
+        // but the DESKTOP gold-tick (#dskGoldTick) is visible regardless of
+        // theme and calls the same gmOpenKaratPicker() — so on any other
+        // theme (the default "royal-gold" included) that call hit an
+        // undefined function and silently did nothing. The picker
+        // logic itself now always runs; only the mobile badge's own
+        // visibility stays theme-gated below.
         const badge = document.getElementById('hallmarkBadge');
-        if (!badge || localStorage.getItem('goldmind_theme') !== 'warm-ingot') return;
-        badge.classList.remove('hidden');
+        const isWarmIngot = localStorage.getItem('goldmind_theme') === 'warm-ingot';
+        if (badge && isWarmIngot) badge.classList.remove('hidden');
+
+        const dskTick = document.getElementById('dskGoldTick');
+        if (dskTick) dskTick.classList.remove('hidden');
 
         const KARATS = [24, 22, 21, 18];
 
@@ -1611,11 +1624,16 @@
 
         function renderBadge() {
             const k = currentKarat();
+            const p = prices[k];
+            const priceText = (p != null) ? String(Math.round(p * 100) / 100) : '—';
             const priceEl = document.getElementById('hallmarkPriceLabel');
             const karatEl = document.getElementById('hallmarkKaratLabel');
-            karatEl.textContent = 'عيار ' + k;
-            const p = prices[k];
-            priceEl.textContent = (p != null) ? (Math.round(p * 100) / 100) : '—';
+            if (karatEl) karatEl.textContent = 'عيار ' + k;
+            if (priceEl) priceEl.textContent = priceText;
+            const dskPriceEl = document.getElementById('dskHallmarkPriceLabel');
+            const dskKaratEl = document.getElementById('dskHallmarkKaratLabel');
+            if (dskKaratEl) dskKaratEl.textContent = 'عيار ' + k;
+            if (dskPriceEl) dskPriceEl.textContent = priceText;
         }
 
         function renderPickerList() {
