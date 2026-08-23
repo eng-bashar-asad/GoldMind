@@ -254,13 +254,17 @@
 </div>
 </div>
 
-<div class="relative">
+<div class="relative" id="manual-price-field">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-price">سعر الشراء</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-price" placeholder="السعر" step="0.01" type="number"/>
 </div>
 <div class="relative" id="fab-fee-field">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-fabfee">أجرة المصنعية (دين منفصل على التاجر، اختياري)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-fabfee" placeholder="0.00" step="0.01" type="number"/>
+</div>
+<div class="relative" id="fab-fee-vat-field" hidden>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" id="fab-fee-vat-label" for="manual-fabfee-vat">ضريبة المصنعية</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono bg-surface-container-low" id="manual-fabfee-vat" placeholder="0.00" readonly type="text"/>
 </div>
 <button onclick="addManualToCart()" class="w-full h-12 bg-surface-container-high border border-outline-variant text-primary font-semibold rounded-lg active:scale-95 transition-all flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">add</span> إضافة للفاتورة
@@ -298,6 +302,17 @@
 <button onclick="document.getElementById('attachment-input').click()" class="w-full h-12 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-on-surface-variant" id="attachment-trigger" type="button">
 <span class="material-symbols-outlined">attach_file</span> <span id="attachment-label">اختر ملف</span>
 </button>
+</section>
+
+<!-- Bulk-lot photos (optional, buyTrader only) -->
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
+<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">صور البضاعة (اختياري)</h2>
+<p class="text-[11px] text-outline">عدة صور للبضاعة المستلمة — بتظهر بسند هالفاتورة بس، ومش مرتبطة بأي قطعة بالمخزون.</p>
+<input accept="image/*" class="hidden" id="bulk-photos-input" multiple type="file"/>
+<button onclick="document.getElementById('bulk-photos-input').click()" class="w-full h-12 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-on-surface-variant" type="button">
+<span class="material-symbols-outlined">add_photo_alternate</span> <span id="bulk-photos-label">اختر صور</span>
+</button>
+<div class="hidden flex flex-wrap gap-2" id="bulk-photos-preview"></div>
 </section>
 
 <!-- Totals & Payment -->
@@ -393,6 +408,13 @@
         document.getElementById('weight-karat-grid').hidden = mode === 'diamond';
         document.getElementById('diamond-fields').classList.toggle('hidden', mode !== 'diamond');
         document.getElementById('manual-weight-label').textContent = mode === 'bulk' ? 'الوزن الكلي (غ)' : 'الوزن (غ)';
+        // A bulk lot (رصيد بالجملة) can mix different piece types under one
+        // weighed batch, so a single description doesn't describe it, and
+        // there's usually no cash "سعر شراء" at entry time either -- the
+        // gold is exchanged/settled with the trader by weight (see
+        // trader_movements), not priced per invoice line.
+        document.getElementById('manual-desc-wrap').hidden = mode === 'bulk';
+        document.getElementById('manual-price-field').hidden = mode === 'bulk';
         document.getElementById('itemModeHint').textContent = mode === 'bulk'
             ? 'دفعة/لوت بوزن إجمالي واحد — تُباع لاحقاً بالوزن مباشرة من الرصيد، أو تُحوَّل لقطع مستقلة من صفحة "إنتاج القطع".'
             : (mode === 'diamond'
@@ -417,8 +439,32 @@
     // Fabrication-fee field only makes sense for a gold piece/lot bought from a trader —
     // hidden for diamond items (their cash debt is captured via the item's own price instead).
     function updateFabFeeVisibility() {
-        document.getElementById('fab-fee-field').classList.toggle('hidden', purchaseType !== 'buyTrader' || itemMode === 'diamond');
+        const show = purchaseType === 'buyTrader' && itemMode !== 'diamond';
+        document.getElementById('fab-fee-field').classList.toggle('hidden', !show);
+        document.getElementById('fab-fee-vat-field').hidden = !show;
     }
+
+    // ---------- VAT on the fabrication fee (live preview) ----------
+    // UAE VAT is charged on the making/service charge, not on the gold value
+    // itself (which typically falls under the reverse-charge mechanism for
+    // buyTrader). This mirrors the exact calc invoice-print-ar.html already
+    // expects from invoices.vat_amount for buyTrader documents.
+    let storeVatRate = 0;
+    (async function loadStoreVatRate() {
+        const { data } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+        storeVatRate = Number((data && data.vat_rate) || 0);
+        document.getElementById('fab-fee-vat-label').textContent = 'ضريبة المصنعية (' + storeVatRate + '%)';
+        updateFabFeeVatPreview();
+    })();
+
+    function currentFabFeeVat() {
+        const fabFee = parseFloat(document.getElementById('manual-fabfee').value) || 0;
+        return fabFee * (storeVatRate / 100);
+    }
+    function updateFabFeeVatPreview() {
+        document.getElementById('manual-fabfee-vat').value = currentFabFeeVat().toFixed(2);
+    }
+    document.getElementById('manual-fabfee').addEventListener('input', updateFabFeeVatPreview);
 
     // Show/hide the optional gold-portion sub-fields inside the diamond form
     document.getElementById('diamond-has-gold-toggle').addEventListener('change', (e) => {
@@ -525,13 +571,28 @@
         document.getElementById('attachment-label').textContent = file ? file.name : 'اختر ملف';
     });
 
+    // ---------- Bulk-lot photos (optional, multiple) ----------
+    let bulkPhotoFiles = [];
+    document.getElementById('bulk-photos-input').addEventListener('change', (e) => {
+        bulkPhotoFiles = Array.from(e.target.files || []);
+        document.getElementById('bulk-photos-label').textContent = bulkPhotoFiles.length
+            ? bulkPhotoFiles.length + ' صورة مختارة'
+            : 'اختر صور';
+        const preview = document.getElementById('bulk-photos-preview');
+        preview.classList.toggle('hidden', bulkPhotoFiles.length === 0);
+        preview.innerHTML = bulkPhotoFiles.map(f => `<img src="${URL.createObjectURL(f)}" class="w-16 h-16 object-cover rounded-lg border border-outline-variant"/>`).join('');
+    });
+
     // ---------- Manual item entry ----------
     function addManualToCart() {
         if (itemMode === 'diamond') { addDiamondToCart(); return; }
 
         const weight = parseFloat(document.getElementById('manual-weight').value);
         const karat = parseInt(document.getElementById('manual-karat').value, 10);
-        const price = parseFloat(document.getElementById('manual-price').value);
+        // "سعر الشراء" doesn't apply to a bulk lot (see setItemMode) -- gold
+        // received from a trader as رصيد بالجملة is settled by weight via
+        // trader_movements, not priced per invoice line. Defaults to 0.
+        const price = itemMode === 'bulk' ? (parseFloat(document.getElementById('manual-price').value) || 0) : parseFloat(document.getElementById('manual-price').value);
 
         const weightInput = document.getElementById('manual-weight');
         const priceInput = document.getElementById('manual-price');
@@ -540,8 +601,10 @@
 
         let valid = true;
         if (!weight || weight <= 0) { weightInput.classList.add('border-error'); valid = false; }
-        if (!price || price <= 0) { priceInput.classList.add('border-error'); valid = false; }
+        if (itemMode !== 'bulk' && (!price || price <= 0)) { priceInput.classList.add('border-error'); valid = false; }
         if (!valid) return;
+
+        const fabFee = parseFloat(document.getElementById('manual-fabfee').value) || 0;
 
         cart.push({
             cartId: ++cartCounter,
@@ -549,7 +612,8 @@
             karat: karat,
             weight: weight,
             price: price,
-            fabFee: parseFloat(document.getElementById('manual-fabfee').value) || 0,
+            fabFee: fabFee,
+            fabFeeVat: (purchaseType === 'buyTrader') ? fabFee * (storeVatRate / 100) : 0,
             fabPerGram: itemMode === 'bulk' ? (parseFloat(document.getElementById('bulk-fab-per-gram').value) || 0) : null,
             description: document.getElementById('manual-desc').value.trim() || (itemMode === 'bulk' ? 'رصيد بالجملة' : null)
         });
@@ -559,6 +623,7 @@
         document.getElementById('manual-price').value = '';
         document.getElementById('manual-fabfee').value = '';
         document.getElementById('bulk-fab-per-gram').value = '';
+        updateFabFeeVatPreview();
         renderCart();
     }
 
@@ -592,6 +657,7 @@
             weight: hasGold ? goldWeight : null,
             price: totalPrice,
             fabFee: 0,
+            fabFeeVat: 0,
             description: document.getElementById('manual-desc').value.trim() || 'قطعة ألماس',
             diamondCarat: carat,
             diamondPricePerCarat: pricePerCarat,
@@ -649,7 +715,7 @@
                 <td class="px-3 py-3"><div class="font-body-md">${gmEscapeHtml(item.description || '—')}${badge}</div></td>
                 <td class="px-2 py-3 text-center">${karatDisplay}</td>
                 <td class="px-2 py-3 text-left">${weightDisplay}</td>
-                <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}${item.fabFee ? `<br><span class="text-[10px] text-outline">+مصنعية ${item.fabFee.toFixed(2)}</span>` : ''}</td>
+                <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}${item.fabFee ? `<br><span class="text-[10px] text-outline">+مصنعية ${item.fabFee.toFixed(2)}${item.fabFeeVat ? ` (ضريبة ${item.fabFeeVat.toFixed(2)})` : ''}</span>` : ''}</td>
                 <td class="px-2 py-3 text-left">
                     <button onclick="removeFromCart(${item.cartId})" class="text-error">
                         <span class="material-symbols-outlined text-[18px]">close</span>
@@ -703,9 +769,14 @@
             return;
         }
 
-        const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-        const vatRate = Number((storeRow && storeRow.vat_rate) || 0);
-        const vatAmount = total - (total / (1 + vatRate / 100));
+        // fabrication_fees/vat_amount: sum of the per-item fab fee (and its
+        // VAT) tracked in the cart. This used to be a blanket back-calc off
+        // the whole total (fabrication_fees was even hardcoded to 0) which
+        // didn't match what invoice-print-ar.html already assumed it would
+        // receive -- "0 for buyRetail; VAT-on-fabrication-fee-only for
+        // buyTrader" -- so this now actually produces that.
+        const fabFeeTotal = cart.reduce((sum, item) => sum + (item.fabFee || 0), 0);
+        const vatAmount = purchaseType === 'buyTrader' ? cart.reduce((sum, item) => sum + (item.fabFeeVat || 0), 0) : 0;
 
         // Upload attachment first (if any) so we can attach its URL to the invoice
         let attachmentUrl = null;
@@ -724,6 +795,25 @@
             attachmentUrl = publicUrlData ? publicUrlData.publicUrl : null;
         }
 
+        // Upload the optional bulk-lot photos (0 or more) -- shown only on
+        // this invoice's own printed voucher, not attached to any piece.
+        let bulkPhotoUrls = [];
+        for (let i = 0; i < bulkPhotoFiles.length; i++) {
+            const photoFile = bulkPhotoFiles[i];
+            const ext = (photoFile.name.split('.').pop() || 'jpg').toLowerCase();
+            const path = GOLDMIND_STORE_ID + '/' + invoiceNumber + '-photo-' + (i + 1) + '.' + ext;
+            const { error: photoUploadError } = await goldmindClient.storage
+                .from('invoice-attachments').upload(path, photoFile, { upsert: false });
+            if (photoUploadError) {
+                saveBtn.disabled = false;
+                saveBtn.textContent = 'حفظ فاتورة الشراء';
+                showMessage('تعذّر رفع إحدى الصور: ' + photoUploadError.message, true);
+                return;
+            }
+            const { data: photoUrlData } = goldmindClient.storage.from('invoice-attachments').getPublicUrl(path);
+            if (photoUrlData) bulkPhotoUrls.push(photoUrlData.publicUrl);
+        }
+
         const { data: invoiceRow, error: invoiceError } = await goldmindClient
             .from('invoices')
             .insert({
@@ -733,12 +823,13 @@
                 trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
                 counterparty_name: purchaseType === 'buyRetail' ? (document.getElementById('retail-name').value.trim() || null) : null,
                 payment_method: selectedPaymentMethod === 'cash' ? 'cash' : 'credit',
-                fabrication_fees: 0,
+                fabrication_fees: fabFeeTotal,
                 vat_amount: vatAmount,
                 total_amount: total,
                 amount_paid: selectedPaymentMethod === 'cash' ? total : 0,
                 status: selectedPaymentMethod === 'cash' ? 'paid' : 'unpaid',
                 attachment_url: attachmentUrl,
+                bulk_photos: bulkPhotoUrls.length ? bulkPhotoUrls : null,
                 created_by: GOLDMIND_STAFF_ID
             })
             .select()
