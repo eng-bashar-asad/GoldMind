@@ -92,6 +92,10 @@
 <option value="EUR">يورو (EUR)</option>
 <option value="GBP">جنيه إسترليني (GBP)</option>
 </select>
+<div id="extraRowsContainer" class="flex flex-col gap-2 mb-2"></div>
+<button type="button" onclick="addExtraRow()" class="w-full h-9 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-secondary flex items-center justify-center gap-1 mb-3">
+<span class="material-symbols-outlined text-[16px]">add</span> عملة/اتجاه إضافي لنفس العملية
+</button>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="notesInput" placeholder="ملاحظة / وصف إضافي (اختياري)"></textarea>
 <div class="mb-3">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اربط بعملية موجودة (اختياري) — بتاخذوا نفس لون الخلفية بالجدول</label>
@@ -232,6 +236,46 @@ function setDirection(dir) {
   document.getElementById('dirOutBtn').className = 'flex-1 h-11 rounded-lg text-sm font-semibold border ' + (dir === 'out' ? 'bg-error text-white border-error' : 'border-outline-variant');
 }
 
+// Extra rows let one "عملية" (shared نوع العملية/ملاحظة) carry more than one
+// direction/amount/currency line — e.g. a customer paying part AED cash +
+// part USD, or a mixed settlement. All rows saved together are stamped with
+// ONE shared link_group automatically (see submitEntry), so they show up
+// color-linked in the table without any manual "اربط بعملية موجودة" step.
+let extraRowCount = 0;
+function addExtraRow() {
+  extraRowCount++;
+  const idx = extraRowCount;
+  const row = document.createElement('div');
+  row.className = 'flex gap-2 items-center';
+  row.id = 'extraRow' + idx;
+  row.dataset.dir = 'in';
+  row.innerHTML = `
+    <div class="flex gap-1 shrink-0">
+      <button type="button" onclick="setExtraDir(${idx},'in')" id="extraDirIn${idx}" class="h-9 px-2 rounded-lg text-[11px] font-semibold border bg-success text-white border-success">داخل</button>
+      <button type="button" onclick="setExtraDir(${idx},'out')" id="extraDirOut${idx}" class="h-9 px-2 rounded-lg text-[11px] font-semibold border border-outline-variant">خارج</button>
+    </div>
+    <input class="flex-1 min-w-0 h-9 border border-outline-variant rounded-lg px-2 text-sm font-data-mono" id="extraAmount${idx}" placeholder="المبلغ" type="number" step="0.01" dir="ltr"/>
+    <select class="h-9 border border-outline-variant rounded-lg px-1 text-[12px] shrink-0" id="extraCurrency${idx}">
+      <option value="AED">AED</option><option value="USD">USD</option><option value="SAR">SAR</option><option value="EGP">EGP</option><option value="EUR">EUR</option><option value="GBP">GBP</option>
+    </select>
+    <button type="button" onclick="removeExtraRow(${idx})" class="h-9 w-9 shrink-0 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-error">close</span></button>
+  `;
+  document.getElementById('extraRowsContainer').appendChild(row);
+}
+function setExtraDir(idx, dir) {
+  document.getElementById('extraRow' + idx).dataset.dir = dir;
+  document.getElementById('extraDirIn' + idx).className = 'h-9 px-2 rounded-lg text-[11px] font-semibold border ' + (dir === 'in' ? 'bg-success text-white border-success' : 'border-outline-variant');
+  document.getElementById('extraDirOut' + idx).className = 'h-9 px-2 rounded-lg text-[11px] font-semibold border ' + (dir === 'out' ? 'bg-error text-white border-error' : 'border-outline-variant');
+}
+function removeExtraRow(idx) {
+  const el = document.getElementById('extraRow' + idx);
+  if (el) el.remove();
+}
+function resetExtraRows() {
+  document.getElementById('extraRowsContainer').innerHTML = '';
+  extraRowCount = 0;
+}
+
 function buildLinkOptionsHtml(excludeId) {
   const pool = showFullHistory ? allEntries : todayEntries;
   return pool.filter(e => e.id !== excludeId).map(e => {
@@ -248,30 +292,42 @@ function toggleAddForm() {
     document.getElementById('addFormDate').max = localDateStr(new Date());
   }
   document.getElementById('linkTargetSelect').innerHTML = '<option value="">بدون ربط</option>' + buildLinkOptionsHtml(null);
+  resetExtraRows();
 }
 
 async function submitEntry() {
   const opType = document.getElementById('opTypeInput').value.trim();
-  const amount = parseFloat(document.getElementById('amountInput').value);
-  const currency = document.getElementById('currencySelect').value;
   const notes = document.getElementById('notesInput').value.trim();
   const linkTargetId = document.getElementById('linkTargetSelect').value;
   const errEl = document.getElementById('addFormError');
   errEl.classList.add('hidden');
 
   if (!opType) { errEl.textContent = 'فضلاً اكتب نوع العملية'; errEl.classList.remove('hidden'); return; }
-  if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
+
+  const mainAmount = parseFloat(document.getElementById('amountInput').value);
+  const mainCurrency = document.getElementById('currencySelect').value;
+  if (!mainAmount || mainAmount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
+
+  // Collect the main row + any extra rows (different direction/amount/
+  // currency under the same shared operation_type/notes — see addExtraRow).
+  const rows = [{ direction: currentDirection, amount: mainAmount, currency: mainCurrency }];
+  const extraRowEls = [...document.getElementById('extraRowsContainer').children];
+  for (const rowEl of extraRowEls) {
+    const idx = rowEl.id.replace('extraRow', '');
+    const amt = parseFloat(document.getElementById('extraAmount' + idx).value);
+    const cur = document.getElementById('extraCurrency' + idx).value;
+    const dir = rowEl.dataset.dir || 'in';
+    if (!amt || amt <= 0) { errEl.textContent = 'فيه سطر إضافي بدون مبلغ صحيح — عبّيه أو احذفه'; errEl.classList.remove('hidden'); return; }
+    rows.push({ direction: dir, amount: amt, currency: cur });
+  }
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const insertPayload = {
+  const basePayload = {
     store_id: GOLDMIND_STORE_ID,
     operation_type: opType,
-    direction: currentDirection,
-    amount: amount,
-    currency: currency,
     notes: notes || null,
     created_by: GOLDMIND_STAFF_ID
   };
@@ -284,22 +340,33 @@ async function submitEntry() {
       // Keep the current time-of-day so entries added "for" a past day still
       // sort sensibly among that day's other entries.
       chosen.setHours(now.getHours(), now.getMinutes(), now.getSeconds());
-      insertPayload.created_at = chosen.toISOString();
+      basePayload.created_at = chosen.toISOString();
     }
   }
 
-  const { data: inserted, error } = await goldmindClient.from('daily_cash_log').insert(insertPayload).select().single();
+  const insertPayloads = rows.map(r => ({ ...basePayload, direction: r.direction, amount: r.amount, currency: r.currency }));
+  const { data: insertedRows, error } = await goldmindClient.from('daily_cash_log').insert(insertPayloads).select();
 
-  // Picking an existing entry to "link with" reuses that entry's group tag
-  // if it already has one (joining a group), or mints a new one for the
-  // pair (deterministic from the target's id, so it's stable/inspectable).
-  if (!error && inserted && linkTargetId) {
-    const target = allEntries.find(e => e.id === linkTargetId);
-    const group = (target && target.link_group) || ('lnk_' + linkTargetId.slice(0, 8));
-    if (target && !target.link_group) {
-      await goldmindClient.from('daily_cash_log').update({ link_group: group }).eq('id', linkTargetId);
+  // Linking: if the user ALSO picked an existing entry to join, everything
+  // (main row + extra rows) joins that entry's group (or mints one from it,
+  // same as before). Otherwise, if this was a multi-row batch (2+ rows),
+  // mint a fresh group from the first inserted row so the whole batch is
+  // automatically color-linked — no manual per-pair linking needed.
+  if (!error && insertedRows && insertedRows.length > 0) {
+    let group = null;
+    if (linkTargetId) {
+      const target = allEntries.find(e => e.id === linkTargetId);
+      group = (target && target.link_group) || ('lnk_' + linkTargetId.slice(0, 8));
+      if (target && !target.link_group) {
+        await goldmindClient.from('daily_cash_log').update({ link_group: group }).eq('id', linkTargetId);
+      }
+    } else if (insertedRows.length > 1) {
+      group = 'lnk_' + insertedRows[0].id.slice(0, 8);
     }
-    await goldmindClient.from('daily_cash_log').update({ link_group: group }).eq('id', inserted.id);
+    if (group) {
+      const ids = insertedRows.map(r => r.id);
+      await goldmindClient.from('daily_cash_log').update({ link_group: group }).in('id', ids);
+    }
   }
 
   btn.disabled = false;
@@ -315,6 +382,7 @@ async function submitEntry() {
   document.getElementById('amountInput').value = '';
   document.getElementById('notesInput').value = '';
   document.getElementById('linkTargetSelect').value = '';
+  resetExtraRows();
   document.getElementById('addForm').classList.add('hidden');
   reportPanelLoaded = false;
   document.getElementById('reportPanel').classList.add('hidden');
@@ -337,12 +405,21 @@ async function loadAll() {
   renderAll();
 }
 
-// Deterministic pastel background per link_group tag — same text always
-// gets the same color (a simple string hash into a fixed palette), so the
-// user can "color-link" related in/out entries the same way they did by
-// hand in Excel, just by typing the same tag instead of manually coloring.
-const GM_LINK_PALETTE = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#FFEDD5', '#E0E7FF', '#CFFAFE', '#FEE2E2'];
-function gmLinkColorFor(group) {
+// Pastel background per link_group tag, so the user can "color-link"
+// related in/out entries the same way they did by hand in Excel.
+//
+// NOTE: this used to be a plain string-hash into an 8-color palette, which
+// meant two totally UNRELATED groups could hash to the same bucket and look
+// linked even though they had nothing to do with each other (e.g.
+// "lnk_427549e2" and "lnk_6f2c8764" both landed on index 4). Colors are now
+// assigned fresh on every render, in order of first appearance among the
+// entries actually on screen (see buildGroupColorMap in renderAll) — so any
+// two distinct groups visible together are guaranteed distinct colors as
+// long as there are no more than GM_LINK_PALETTE.length groups showing at
+// once, which covers normal daily use. This function is kept only as the
+// (extremely unlikely) overflow fallback for that case.
+const GM_LINK_PALETTE = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#FFEDD5', '#E0E7FF', '#CFFAFE', '#FEE2E2', '#F3E8FF', '#FFE4E6', '#ECFCCB', '#E0F2FE'];
+function gmLinkColorHashFallback(group) {
   if (!group) return null;
   let hash = 0;
   for (let i = 0; i < group.length; i++) hash = (hash * 31 + group.charCodeAt(i)) >>> 0;
@@ -455,9 +532,27 @@ function renderAll() {
   });
   const rowCount = Math.max(outEntries.length, inEntries.length);
 
+  // Assign each distinct link_group visible right now its own palette
+  // color, in the order clusters appear above (oldest first) — this is what
+  // actually guarantees two unrelated groups on screen together never share
+  // a color (see note on GM_LINK_PALETTE above).
+  const groupColorMap = new Map();
+  let nextColorIdx = 0;
+  clusters.forEach(cluster => {
+    const g = cluster.members[0] && cluster.members[0].link_group;
+    if (g && !groupColorMap.has(g)) {
+      if (nextColorIdx < GM_LINK_PALETTE.length) {
+        groupColorMap.set(g, GM_LINK_PALETTE[nextColorIdx]);
+        nextColorIdx++;
+      } else {
+        groupColorMap.set(g, gmLinkColorHashFallback(g)); // overflow: >12 groups on screen at once
+      }
+    }
+  });
+
   function cellHtml(e) {
     if (!e) return '<td></td><td></td>';
-    const color = gmLinkColorFor(e.link_group);
+    const color = e.link_group ? groupColorMap.get(e.link_group) : null;
     const styleAttr = color ? ` style="background:${color};color:#1a1c1e;"` : '';
     const metaClass = color ? 'opacity-70' : 'text-on-surface-variant';
     const dateLabel = showFullHistory ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit' }) + ' ' : '';
