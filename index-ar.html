@@ -369,28 +369,44 @@
     cursor:pointer;font-family:inherit;
   }
   .dsk-customize-btn:hover{border-color:var(--dsk-gold);}
-  .dsk-action-strip{display:flex;gap:8px;margin-bottom:16px;animation:dskRiseIn .45s ease .05s both;}
+  /* Grid of squarish vertical tiles (icon badge above label) instead of the
+     old thin horizontal chip row -- matches the premium look shipped on
+     mobile (see .qa-tile), applied here to the desktop dashboard only. */
+  .dsk-action-strip{display:grid;grid-template-columns:repeat(auto-fill, minmax(112px, 1fr));gap:10px;margin-bottom:16px;animation:dskRiseIn .45s ease .05s both;}
   .dsk-action{
-    flex:1;background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:var(--dsk-radius);
-    padding:9px 10px;display:flex;align-items:center;gap:8px;cursor:pointer;
+    background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:16px;
+    padding:16px 10px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px;cursor:pointer;text-align:center;
+    box-shadow:0 1px 2px rgba(28,26,22,.05);
     transition:transform .16s ease, box-shadow .16s ease, border-color .16s ease;
   }
-  .dsk-action:hover{transform:translateY(-2px);box-shadow:0 6px 14px rgba(28,26,22,.10);border-color:var(--dsk-gold);}
+  .dsk-action:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(28,26,22,.12);border-color:var(--dsk-gold);}
   .dsk-action-ic{
-    width:24px !important;height:24px;border-radius:7px;flex:none;
-    display:flex;align-items:center;justify-content:center;font-size:14px !important;
+    width:42px !important;height:42px;border-radius:13px;flex:none;
+    display:flex;align-items:center;justify-content:center;font-size:21px !important;
     background:var(--dsk-act-tint,var(--dsk-surface-sunken));color:var(--dsk-act-ink,var(--dsk-gold-deep));
     box-shadow:0 1px 0 rgba(255,255,255,.75) inset, 0 -1px 1px rgba(0,0,0,.06) inset, 0 2px 3px rgba(28,26,22,.15), 0 5px 9px rgba(28,26,22,.11);
     transition:transform .18s ease;
   }
-  .dsk-action:hover .dsk-action-ic{transform:scale(1.12) rotate(-4deg);}
-  .dsk-action-label{font-size:11.5px;font-weight:600;}
+  .dsk-action:hover .dsk-action-ic{transform:scale(1.1) rotate(-4deg);}
+  .dsk-action-label{font-size:12px;font-weight:700;}
   .dsk-action.primary{background:var(--dsk-ink);border-color:var(--dsk-ink);}
   .dsk-action.primary .dsk-action-label{color:var(--dsk-gold-ink);}
   .dsk-action.primary .dsk-action-ic{
     background:rgba(255,255,255,.12);color:var(--dsk-gold);
     box-shadow:0 1px 0 rgba(255,255,255,.18) inset, 0 -1px 1px rgba(0,0,0,.3) inset, 0 2px 4px rgba(0,0,0,.35), 0 6px 12px rgba(0,0,0,.3);
   }
+  /* Brushed-gold variant reserved for "الصندوق اليومي" -- same muted
+     metal gradient + diagonal sheen as the mobile gold-accent tile, so it
+     reads as visibly distinct from the other (flat/tinted) desktop tiles
+     at a glance instead of blending in as just another chip. */
+  .dsk-action.gold{
+    position:relative;overflow:hidden;border-color:transparent;
+    background:linear-gradient(150deg,#8a6d3f 0%,#c2a05a 38%,#a3823f 68%,#7a5f34 100%);
+    box-shadow:0 6px 16px -4px rgba(122,95,52,.5), inset 0 1px 0 rgba(255,255,255,.16);
+  }
+  .dsk-action.gold::after{content:"";position:absolute;inset:0;background:linear-gradient(115deg,transparent 38%,rgba(255,255,255,.24) 50%,transparent 62%);pointer-events:none;}
+  .dsk-action.gold .dsk-action-label{color:#fff;}
+  .dsk-action.gold .dsk-action-ic{background:rgba(255,255,255,.2);color:#fff;box-shadow:none;}
   .dsk-customize-panel{display:none;background:var(--dsk-surface);border:1px dashed var(--dsk-gold);border-radius:var(--dsk-radius);padding:12px 14px;margin:-6px 0 16px;}
   .dsk-customize-panel.open{display:block;}
   .dsk-customize-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-bottom:10px;}
@@ -641,7 +657,7 @@
     { id: 'newSale', icon: 'add_shopping_cart', label: 'فاتورة جديدة', href: 'new-sale-ar.html', permission: 'create_invoice', primary: true },
     { id: 'stockIn', icon: 'inventory_2', label: 'إدخال بضاعة', href: 'inventory-add.html', permission: 'add_piece', tint: '#F1E9D6', ink: '#9C8552' },
     { id: 'salesReturn', icon: 'keyboard_return', label: 'مرتجع مبيعات', href: 'sales-return-ar.html', permission: 'create_invoice', tint: '#F3DEDA', ink: '#8A3B32' },
-    { id: 'cashbox', icon: 'account_balance_wallet', label: 'الصندوق اليومي', href: 'daily-cashbox-ar.html', permission: 'manage_daily_cashbox', tint: '#EFE7D2', ink: '#7A6640' },
+    { id: 'cashbox', icon: 'account_balance_wallet', label: 'الصندوق اليومي', href: 'daily-cashbox-ar.html', permission: 'manage_daily_cashbox', gold: true },
     { id: 'addCustomer', icon: 'person_add', label: 'إضافة عميل', href: 'customer-add-ar.html', permission: 'add_customers', tint: '#E1EADB', ink: '#3F6B47' },
     { id: 'repairs', icon: 'build', label: 'الصيانة', href: 'repairs-ar.html', permission: 'view_repairs', tint: '#F2E2C9', ink: '#8A5A2A' },
     { id: 'production', icon: 'precision_manufacturing', label: 'إنتاج قطعة', href: 'stock-production-ar.html', permission: 'add_piece', tint: '#DCE8EA', ink: '#3B6B7A' },
@@ -649,7 +665,7 @@
     { id: 'merchantLedger', icon: 'groups', label: 'حسابات التجار', href: 'ledger-ar.html', permission: null, tint: '#F1E9D6', ink: '#9C8552' },
     { id: 'inventoryCount', icon: 'checklist', label: 'الجرد', href: 'inventory-count-ar.html', permission: 'run_inventory_count', tint: '#DCE8EA', ink: '#3B6B7A' }
   ];
-  var DEFAULTS = ['newSale', 'stockIn', 'salesReturn', 'cashbox', 'addCustomer', 'repairs'];
+  var DEFAULTS = ['newSale', 'stockIn', 'salesReturn', 'cashbox', 'addCustomer', 'repairs', 'production', 'inventoryCount'];
   var MAX_ACTIONS = 8;
 
   var stripEl = document.getElementById('dskActionStrip');
@@ -673,8 +689,8 @@
       var a = byId(id);
       if (!a) return '';
       var permAttr = a.permission ? ' data-permission="' + a.permission + '"' : '';
-      var cls = 'dsk-action quick-action-icon' + (a.primary ? ' primary' : '');
-      var style = a.primary ? '' : ' style="--dsk-act-tint:' + a.tint + ';--dsk-act-ink:' + a.ink + ';"';
+      var cls = 'dsk-action quick-action-icon' + (a.primary ? ' primary' : '') + (a.gold ? ' gold' : '');
+      var style = (a.primary || a.gold) ? '' : ' style="--dsk-act-tint:' + a.tint + ';--dsk-act-ink:' + a.ink + ';"';
       return '<a class="' + cls + '" href="' + a.href + '"' + permAttr + style + '>'
         + '<span class="material-symbols-outlined dsk-action-ic">' + a.icon + '</span>'
         + '<span class="dsk-action-label">' + a.label + '</span></a>';
