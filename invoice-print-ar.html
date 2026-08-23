@@ -144,6 +144,20 @@
 </div>
 </div>
 
+<!-- Piece photo — screen-only controls (whether/which photo to print) -->
+<div class="no-print hidden items-center gap-3 mb-3 p-3 bg-gray-50 rounded-lg" id="piece-photo-controls">
+<label class="flex items-center gap-2 text-[12px] font-semibold text-gray-700 shrink-0">
+<input type="checkbox" id="piece-photo-toggle"/> طباعة صورة القطعة
+</label>
+<select class="hidden flex-1 h-9 border border-gray-300 rounded-lg px-2 text-[12px]" id="piece-photo-select"></select>
+</div>
+
+<!-- The actual photo that appears in the printed document (and in the live
+     preview) once the employee opts in above. -->
+<div class="hidden justify-center mb-4" id="piece-photo-print-slot">
+<img class="rounded-lg border border-gray-200" style="max-width:160px;max-height:160px;object-fit:cover;" id="piece-photo-print-img"/>
+</div>
+
 <!-- Items table -->
 <table class="w-full text-[11px] mb-4">
 <thead>
@@ -340,6 +354,17 @@
                 ? goldmindClient.from('staff').select('full_name').eq('id', invoice.created_by).maybeSingle()
                 : Promise.resolve({ data: null })
         ]);
+
+        // Some items already carry a photo snapshot (item_photo_url, set at
+        // sale time in new-sale-ar.html); purchase-invoice items don't, so
+        // fall back to the live piece record in case a photo was added
+        // after the piece was purchased.
+        const missingPhotoPieceIds = (items || []).filter(it => !it.item_photo_url && it.piece_id).map(it => it.piece_id);
+        let piecePhotoById = {};
+        if (missingPhotoPieceIds.length) {
+            const { data: piecesWithPhotos } = await goldmindClient.from('pieces').select('id, photo_url').in('id', missingPhotoPieceIds);
+            (piecesWithPhotos || []).forEach(p => { if (p.photo_url) piecePhotoById[p.id] = p.photo_url; });
+        }
 
         // The counterparty is whichever side the invoice actually links to.
         const counterparty = customer || trader;
@@ -558,6 +583,38 @@
             sumTax = Number(invoice.vat_amount || 0);
             sumTotal = Number(invoice.total_amount || sumTotal);
             sumBeforeTax = sumTotal - sumTax;
+        }
+
+        // ---- Piece photo: optional, staff-controlled at print time ----
+        // Collect every item that has a photo (snapshot on the item, or a
+        // fallback lookup on the live piece). If there's more than one, the
+        // employee picks which single photo actually goes on the printed
+        // document — the layout only has room for one.
+        const photoCandidates = (items || [])
+            .map(it => ({ label: it.description || it.barcode || 'قطعة', url: it.item_photo_url || piecePhotoById[it.piece_id] || null }))
+            .filter(c => c.url);
+
+        if (photoCandidates.length > 0) {
+            const controls = document.getElementById('piece-photo-controls');
+            const toggle = document.getElementById('piece-photo-toggle');
+            const select = document.getElementById('piece-photo-select');
+            const slot = document.getElementById('piece-photo-print-slot');
+            const img = document.getElementById('piece-photo-print-img');
+
+            controls.classList.remove('hidden');
+            controls.classList.add('flex');
+            select.classList.toggle('hidden', photoCandidates.length < 2);
+            select.innerHTML = photoCandidates.map((c, i) => `<option value="${i}">${gmEscapeHtml(c.label)}</option>`).join('');
+
+            function updatePiecePhotoDisplay() {
+                const on = toggle.checked;
+                slot.classList.toggle('hidden', !on);
+                slot.classList.toggle('flex', on);
+                if (on) img.src = photoCandidates[Number(select.value) || 0].url;
+            }
+            toggle.addEventListener('change', updatePiecePhotoDisplay);
+            select.addEventListener('change', updatePiecePhotoDisplay);
+            updatePiecePhotoDisplay(); // starts unchecked -- opt-in, no surprise ink usage
         }
 
         document.getElementById('vat-rate-label').textContent = fmt(vatRate).replace(/\.00$/, '');
