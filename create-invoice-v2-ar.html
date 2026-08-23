@@ -376,6 +376,13 @@
     }
     checkDiamondsEnabled();
 
+    // Support ?mode=bulk to open directly in "رصيد بالجملة" mode -- used by
+    // the "بضاعة من تاجر" option on stock-entry-choice-ar.html.
+    (function applyUrlMode() {
+        const params = new URLSearchParams(location.search);
+        if (params.get('mode') === 'bulk') setItemMode('bulk');
+    })();
+
     // ---------- Item mode toggle (individual piece vs. bulk stock lot vs. diamond piece) ----------
     function setItemMode(mode) {
         itemMode = mode;
