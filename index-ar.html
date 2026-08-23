@@ -841,16 +841,6 @@
 <span class="font-data-mono" id="hallmarkPriceUnit" style="font-size:8px; line-height:1; opacity:.75;">للغرام</span>
 </button>
 </section>
-<!-- Karat picker popover for the gold-price badge -->
-<div id="karatPickerModal" class="hidden fixed inset-0 z-[100] flex items-end lg:items-center justify-center bg-black/40" onclick="if(event.target===this) gmCloseKaratPicker()">
-<div class="bg-surface-container-lowest w-full lg:w-80 lg:rounded-2xl rounded-t-2xl p-5 max-h-[70vh] overflow-y-auto">
-<div class="flex items-center justify-between mb-3">
-<h3 class="font-bold text-[15px] text-on-surface">اختر العيار للعرض</h3>
-<button onclick="gmCloseKaratPicker()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high"><span class="material-symbols-outlined text-on-surface-variant">close</span></button>
-</div>
-<div id="karatPickerList" class="flex flex-col gap-1"></div>
-</div>
-</div>
 <!-- Always-visible search bar (opens the same quick search panel) -->
 <button onclick="openQuickSearch()" class="w-full h-12 mb-5 px-4 flex items-center gap-2 bg-surface-container-lowest border border-outline-variant rounded-full text-on-surface-variant active:scale-[0.99] transition-transform">
 <span class="material-symbols-outlined text-[20px]">search</span>
@@ -977,6 +967,21 @@
 <!-- Decorative Spacer for BottomNav -->
 <div class="h-8"></div>
 </main>
+<!-- Karat picker popover for the gold-price badge/tick -- lives OUTSIDE the
+     lg:hidden mobile <main> on purpose: it's opened from both the mobile
+     hallmark badge AND the desktop gold-tick (#dskGoldTick), and nesting it
+     inside <main> made it invisible on desktop no matter what its own
+     hidden/flex classes said, since a display:none ancestor hides its
+     whole subtree regardless. -->
+<div id="karatPickerModal" class="hidden fixed inset-0 z-[100] flex items-end lg:items-center justify-center bg-black/40" onclick="if(event.target===this) gmCloseKaratPicker()">
+<div class="bg-surface-container-lowest w-full lg:w-80 lg:rounded-2xl rounded-t-2xl p-5 max-h-[70vh] overflow-y-auto">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-bold text-[15px] text-on-surface">اختر العيار للعرض</h3>
+<button onclick="gmCloseKaratPicker()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high"><span class="material-symbols-outlined text-on-surface-variant">close</span></button>
+</div>
+<div id="karatPickerList" class="flex flex-col gap-1"></div>
+</div>
+</div>
 <!-- BottomNavBar -->
 <nav class="lg:hidden fixed bottom-0 right-0 w-full h-16 bg-surface-container-lowest border-t border-outline-variant z-50 flex justify-around items-center px-margin-mobile shadow-sm">
 <!-- Dashboard (Active) -->
