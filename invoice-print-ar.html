@@ -180,6 +180,12 @@
 </div>
 </div>
 
+<!-- Bulk-lot photos (buyTrader only, optional) -->
+<div id="bulk-photos-section" class="hidden mb-6">
+<h3 class="text-[11px] font-bold text-gray-600 mb-2">صور البضاعة المستلمة</h3>
+<div id="bulk-photos-grid" class="flex flex-wrap gap-2"></div>
+</div>
+
 <!-- Customer signature -->
 <div class="mt-10 pt-3 flex justify-between items-end text-[11px] text-gray-500">
 <div class="flex-1">
@@ -500,6 +506,13 @@
         const vatRate = Number(store.vat_rate || 0);
         const vatMultiplier = 1 + (vatRate / 100);
         const isPurchaseDoc = invoice.type === 'buyTrader' || invoice.type === 'buyRetail';
+
+        // ---- Optional bulk-lot photos (buyTrader stock intake) ----
+        if (Array.isArray(invoice.bulk_photos) && invoice.bulk_photos.length) {
+            document.getElementById('bulk-photos-section').classList.remove('hidden');
+            document.getElementById('bulk-photos-grid').innerHTML = invoice.bulk_photos
+                .map(url => `<img src="${url}" class="w-20 h-20 object-cover rounded border border-gray-300"/>`).join('');
+        }
 
         let sumBeforeTax = 0;
         let sumTax = 0;
