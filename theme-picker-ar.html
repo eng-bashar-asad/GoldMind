@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
-<script src="theme.js?v=19"></script>
+<script src="theme.js?v=20"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <!-- Preview fonts loaded upfront on this settings page only, so every
      option in the font list below renders in its own real font right
@@ -46,11 +46,6 @@
 
 <p class="text-[11px] mt-6" style="color: var(--gm-on-surface-variant);">ملاحظة: الثيم حالياً مطبّق بشكل كامل على الصفحة الرئيسية، وبيتوسّع تدريجياً لباقي شاشات التطبيق.</p>
 
-<h2 class="font-bold text-[17px] mt-8 mb-2">خط الكتابة</h2>
-<p class="text-[12px] mb-5" style="color: var(--gm-on-surface-variant);">اختر خط الكتابة لكل التطبيق. الخطوط الإنجليزية (متل Times New Roman) بتنطبق بس على الأرقام والحروف الإنجليزية، والنص العربي بيضل بخطه الطبيعي.</p>
-
-<div id="fonts-grid" class="flex flex-col gap-3"></div>
-
 </main>
 <script>
 function renderThemes() {
@@ -81,29 +76,6 @@ function selectTheme(key) {
 
 renderThemes();
 
-function renderFonts() {
-  const current = localStorage.getItem('goldmind_font') || 'default';
-  const grid = document.getElementById('fonts-grid');
-  grid.innerHTML = Object.keys(GOLDMIND_FONTS).map(key => {
-    const f = GOLDMIND_FONTS[key];
-    const isActive = key === current;
-    const previewFamily = f.family || 'inherit';
-    return `
-      <div class="theme-card ${isActive ? 'active' : ''}" onclick="selectFont('${key}')" style="background: var(--gm-surface-lowest);">
-        <div class="flex items-center justify-between">
-          <span class="text-[16px]" style="font-family:${previewFamily}">${f.label}</span>
-          ${isActive ? '<span class="material-symbols-outlined" style="color: var(--gm-accent, #FFD700);">check_circle</span>' : ''}
-        </div>
-      </div>`;
-  }).join('');
-}
-
-function selectFont(key) {
-  goldmindApplyFont(key);
-  renderFonts();
-}
-
-renderFonts();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
