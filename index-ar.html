@@ -627,22 +627,19 @@
           <div class="dsk-panel" style="background:#131722;border-color:#1e222d;">
             <div class="dsk-panel-head" style="border-bottom-color:#1e222d;">
               <div class="dsk-panel-title" style="color:#d1d4dc;"><span class="material-symbols-outlined dsk-ic">show_chart</span>السوق اللحظي</div>
-              <select id="dskChartSymbolSelect" class="dsk-chart-symbol-select" title="اختر الأصل المعروض" style="background:#1e222d;color:#d1d4dc;border-color:#2a2e39;">
-                <option value="OANDA:XAUUSD">الذهب (XAU/USD)</option>
-                <option value="OANDA:XAGUSD">الفضة (XAG/USD)</option>
-                <option value="COINBASE:BTCUSD">بيتكوين (BTC/USD)</option>
-                <option value="COINBASE:ETHUSD">إيثيريوم (ETH/USD)</option>
-                <option value="FX:EURUSD">يورو/دولار (EUR/USD)</option>
-                <option value="OANDA:USDAED">دولار/درهم (USD/AED)</option>
-                <option value="TVC:DXY">مؤشر الدولار (DXY)</option>
-                <option value="FOREXCOM:SPXUSD">S&amp;P 500</option>
-              </select>
+              <button type="button" id="dskPriceCustomizeBtn" class="dsk-customize-btn" style="background:#1e222d;color:#d1d4dc;border-color:#2a2e39;"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
             </div>
-            <!-- Live chart widget (TradingView public embed — no API key/backend
-                 needed). "allow_symbol_change" also lets the staff click the
-                 symbol name INSIDE the chart itself and search literally any
-                 other symbol on the exchange, beyond the quick presets above. -->
-            <div id="dskChartContainer" style="height:600px;"></div>
+            <!-- Lightweight price tiles (TradingView "Single Ticker" widgets —
+                 price + change% only, no candle chart/drawing tools/history
+                 stream). Swapped in for the old full Advanced Chart widget,
+                 which was noticeably heavier (a whole charting engine per
+                 instance) and — since both the desktop AND mobile chart
+                 sections used to load simultaneously regardless of which was
+                 visible — effectively doubled that cost on every page load.
+                 This is the same tradeoff TradingView itself designed this
+                 widget for: "see the price and change % of your preferred
+                 symbol, nothing else." -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-2 p-3" id="dskPriceTiles"></div>
           </div>
         </div>
         <div class="dsk-col-rail">
@@ -669,47 +666,26 @@
           </div>
         </div>
       </div>
-      <script src="https://s3.tradingview.com/tv.js"></script>
-      <script>
-      (function () {
-        var container = document.getElementById('dskChartContainer');
-        var select = document.getElementById('dskChartSymbolSelect');
-        if (!container || !select) return;
-        var STORAGE_KEY = 'goldmind_dsk_chart_symbol';
 
-        function renderChart(symbol) {
-          container.innerHTML = '';
-          // eslint-disable-next-line no-undef
-          new TradingView.widget({
-            autosize: true,
-            symbol: symbol,
-            interval: '60',
-            timezone: 'Asia/Dubai',
-            theme: 'dark',
-            style: '1',
-            locale: 'ar',
-            toolbar_bg: '#131722',
-            enable_publishing: false,
-            allow_symbol_change: true,
-            hide_side_toolbar: false,
-            withdateranges: true,
-            container_id: 'dskChartContainer'
-          });
-        }
-
-        var saved = localStorage.getItem(STORAGE_KEY);
-        if (saved && [...select.options].some(function (o) { return o.value === saved; })) {
-          select.value = saved;
-        }
-
-        select.addEventListener('change', function () {
-          localStorage.setItem(STORAGE_KEY, select.value);
-          renderChart(select.value);
-        });
-
-        renderChart(select.value);
-      })();
-      </script>
+      <!-- Price-tile "تخصيص" panel (desktop) -->
+      <div class="hidden fixed inset-0 z-[90] items-center justify-center bg-black/40" id="dskPriceCustomizeOverlay">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-5 max-h-[75vh] overflow-y-auto">
+          <div class="flex items-center justify-between mb-1">
+            <div class="font-bold text-[15px]">اختر الأسعار المعروضة</div>
+            <button type="button" id="dskPriceCustomizeCloseX" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-gray-100"><span class="material-symbols-outlined">close</span></button>
+          </div>
+          <div class="text-[11px] text-gray-500 mb-4">يُحفظ لحسابك أنت فقط</div>
+          <div class="grid grid-cols-2 gap-2" id="dskPriceCustomizeGrid"></div>
+          <div class="flex items-center justify-between mt-4">
+            <div class="text-[11px] text-gray-500" id="dskPriceCustomizeCount"></div>
+            <div class="flex gap-2">
+              <button type="button" id="dskPriceCustomizeCancel" class="h-9 px-4 rounded-lg text-[12px] font-semibold border border-gray-300">إلغاء</button>
+              <button type="button" id="dskPriceCustomizeSave" class="h-9 px-4 rounded-lg text-[12px] font-semibold bg-primary text-on-primary">حفظ</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      <script>window.__GOLDMIND_PRICE_TILE_TARGETS = window.__GOLDMIND_PRICE_TILE_TARGETS || []; window.__GOLDMIND_PRICE_TILE_TARGETS.push({ grid: 'dskPriceTiles', btn: 'dskPriceCustomizeBtn', overlay: 'dskPriceCustomizeOverlay', custGrid: 'dskPriceCustomizeGrid', count: 'dskPriceCustomizeCount', save: 'dskPriceCustomizeSave', cancel: 'dskPriceCustomizeCancel', closeX: 'dskPriceCustomizeCloseX', storageKey: 'goldmind_price_tiles_' });</script>
     </div>
   </div>
 </div>
@@ -1091,6 +1067,137 @@
 })();
 </script>
 
+<!-- Shared lightweight price-tile engine (desktop + mobile both register a
+     target above via window.__GOLDMIND_PRICE_TILE_TARGETS). One shared
+     saved selection so a choice made on one device shows the same set
+     everywhere — customize is available on both, per بشار. -->
+<script>
+(function () {
+  var TICKER_CATALOG = [
+    { id: 'gold', symbol: 'OANDA:XAUUSD', label: 'الذهب' },
+    { id: 'silver', symbol: 'OANDA:XAGUSD', label: 'الفضة' },
+    { id: 'bitcoin', symbol: 'COINBASE:BTCUSD', label: 'بيتكوين' },
+    { id: 'ethereum', symbol: 'COINBASE:ETHUSD', label: 'إيثيريوم' },
+    { id: 'eurusd', symbol: 'FX:EURUSD', label: 'يورو/دولار' },
+    { id: 'usdaed', symbol: 'OANDA:USDAED', label: 'دولار/درهم' },
+    { id: 'dxy', symbol: 'TVC:DXY', label: 'مؤشر الدولار' },
+    { id: 'sp500', symbol: 'FOREXCOM:SPXUSD', label: 'S&amp;P 500' }
+  ];
+  var DEFAULTS = ['gold', 'silver', 'bitcoin', 'usdaed'];
+  var MAX_TILES = 8;
+
+  function byId(id) { return TICKER_CATALOG.filter(function (c) { return c.id === id; })[0]; }
+  function storageKeyFor(prefix) { return prefix + (window.GOLDMIND_STAFF_ID || 'default'); }
+
+  var selection = DEFAULTS.slice();
+  try {
+    var raw = localStorage.getItem(storageKeyFor('goldmind_price_tiles_'));
+    var parsed = raw ? JSON.parse(raw) : null;
+    if (Array.isArray(parsed) && parsed.length) selection = parsed.filter(function (id) { return !!byId(id); });
+    if (!selection.length) selection = DEFAULTS.slice();
+  } catch (e) { selection = DEFAULTS.slice(); }
+  var draft = selection.slice();
+
+  // Each tile is its own tiny TradingView "Single Ticker" widget (price +
+  // change % only — no candles, no drawing tools, no history stream). Real
+  // <script> elements must be created via the DOM (innerHTML-injected
+  // <script> tags never execute), and each widget reads its OWN script
+  // tag's JSON text content, per TradingView's standard embed convention.
+  function buildTile(item) {
+    var wrap = document.createElement('div');
+    wrap.className = 'rounded-lg overflow-hidden';
+    wrap.style.cssText = 'background:#1a1f2b;border:1px solid #2a2e39;min-height:64px;';
+    var widgetDiv = document.createElement('div');
+    widgetDiv.className = 'tradingview-widget-container';
+    var inner = document.createElement('div');
+    inner.className = 'tradingview-widget-container__widget';
+    widgetDiv.appendChild(inner);
+    var script = document.createElement('script');
+    script.type = 'text/javascript';
+    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js';
+    script.async = true;
+    script.text = JSON.stringify({
+      symbol: item.symbol,
+      width: '100%',
+      colorTheme: 'dark',
+      isTransparent: true,
+      locale: 'ar_AE'
+    });
+    widgetDiv.appendChild(script);
+    wrap.appendChild(widgetDiv);
+    return wrap;
+  }
+
+  function renderTiles(gridEl) {
+    if (!gridEl) return;
+    gridEl.innerHTML = '';
+    selection.forEach(function (id) {
+      var item = byId(id);
+      if (item) gridEl.appendChild(buildTile(item));
+    });
+  }
+
+  function renderAllStrips() {
+    (window.__GOLDMIND_PRICE_TILE_TARGETS || []).forEach(function (t) {
+      renderTiles(document.getElementById(t.grid));
+    });
+  }
+
+  function renderCustomizeGrid(t) {
+    var gridEl = document.getElementById(t.custGrid);
+    var countEl = document.getElementById(t.count);
+    if (!gridEl) return;
+    gridEl.innerHTML = TICKER_CATALOG.map(function (item) {
+      var checked = draft.indexOf(item.id) > -1;
+      return '<div class="flex items-center gap-2 p-2.5 rounded-lg border ' + (checked ? 'border-primary bg-primary/5' : 'border-gray-300') + '" data-id="' + item.id + '">'
+        + '<span class="text-[12.5px] font-semibold">' + item.label + '</span></div>';
+    }).join('');
+    if (countEl) countEl.textContent = draft.length + ' / ' + MAX_TILES + ' مختارة';
+    var chips = gridEl.querySelectorAll('[data-id]');
+    for (var i = 0; i < chips.length; i++) {
+      chips[i].addEventListener('click', function () {
+        var id = this.getAttribute('data-id');
+        var idx = draft.indexOf(id);
+        if (idx > -1) { draft.splice(idx, 1); }
+        else { if (draft.length >= MAX_TILES) return; draft.push(id); }
+        renderCustomizeGrid(t);
+      });
+    }
+  }
+
+  // Wire up every registered target (desktop panel + mobile panel).
+  (window.__GOLDMIND_PRICE_TILE_TARGETS || []).forEach(function (t) {
+    var btn = document.getElementById(t.btn);
+    var overlay = document.getElementById(t.overlay);
+    var saveBtn = document.getElementById(t.save);
+    var cancelBtn = document.getElementById(t.cancel);
+    var closeXBtn = document.getElementById(t.closeX);
+    if (!btn || !overlay) return;
+
+    function closeOverlay() { overlay.classList.add('hidden'); overlay.classList.remove('flex'); }
+
+    btn.addEventListener('click', function () {
+      draft = selection.slice();
+      renderCustomizeGrid(t);
+      overlay.classList.remove('hidden');
+      overlay.classList.add('flex');
+    });
+    if (cancelBtn) cancelBtn.addEventListener('click', closeOverlay);
+    if (closeXBtn) closeXBtn.addEventListener('click', closeOverlay);
+    overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+    if (saveBtn) saveBtn.addEventListener('click', function () {
+      if (draft.length === 0) return;
+      selection = draft.slice();
+      try { localStorage.setItem(storageKeyFor(t.storageKey), JSON.stringify(selection)); } catch (e) {}
+      renderAllStrips();
+      closeOverlay();
+    });
+  });
+
+  renderAllStrips();
+})();
+</script>
+
 <!-- Desktop layout: primary actions hero + grouped sections (hidden on mobile) -->
 <section class="hidden lg:block mb-10">
 <h3 class="font-label-md text-label-md text-on-primary opacity-70 mb-4 uppercase tracking-wider">الوصول السريع</h3>
@@ -1144,63 +1251,36 @@
 </div>
 </section>
 <!-- Quick Actions -->
-<!-- Live market chart (mirrors the desktop dashboard's chart — gold/silver/bitcoin/etc, symbol-selectable) -->
+<!-- Lightweight price tiles (mirrors the desktop version — same TICKER_CATALOG/customize system, distinct rectangular-tile look) -->
 <section class="mb-4">
 <div class="rounded-xl overflow-hidden" style="background:#131722;border:1px solid #1e222d;">
 <div class="flex items-center justify-between px-3 py-2.5" style="border-bottom:1px solid #1e222d;">
 <div class="flex items-center gap-1.5 text-[12.5px] font-bold" style="color:#d1d4dc;"><span class="material-symbols-outlined text-[18px]">show_chart</span>السوق اللحظي</div>
-<select id="mobChartSymbolSelect" class="text-[11px] font-semibold rounded-lg px-2 py-1" style="background:#1e222d;color:#d1d4dc;border:1px solid #2a2e39;" title="اختر الأصل المعروض">
-<option value="OANDA:XAUUSD">الذهب (XAU/USD)</option>
-<option value="OANDA:XAGUSD">الفضة (XAG/USD)</option>
-<option value="COINBASE:BTCUSD">بيتكوين (BTC/USD)</option>
-<option value="COINBASE:ETHUSD">إيثيريوم (ETH/USD)</option>
-<option value="FX:EURUSD">يورو/دولار (EUR/USD)</option>
-<option value="OANDA:USDAED">دولار/درهم (USD/AED)</option>
-<option value="TVC:DXY">مؤشر الدولار (DXY)</option>
-<option value="FOREXCOM:SPXUSD">S&amp;P 500</option>
-</select>
+<button type="button" id="mobPriceCustomizeBtn" class="flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-1" style="background:#1e222d;color:#d1d4dc;border:1px solid #2a2e39;"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
 </div>
-<div id="mobChartContainer" style="height:320px;"></div>
+<div class="grid grid-cols-2 gap-2 p-3" id="mobPriceTiles"></div>
 </div>
 </section>
-<script src="https://s3.tradingview.com/tv.js"></script>
-<script>
-(function () {
-  var container = document.getElementById('mobChartContainer');
-  var select = document.getElementById('mobChartSymbolSelect');
-  if (!container || !select) return;
-  var STORAGE_KEY = 'goldmind_dsk_chart_symbol'; // shared preference with the desktop dashboard chart
 
-  function renderChart(symbol) {
-    container.innerHTML = '';
-    // eslint-disable-next-line no-undef
-    new TradingView.widget({
-      autosize: true,
-      symbol: symbol,
-      interval: '60',
-      timezone: 'Asia/Dubai',
-      theme: 'dark',
-      style: '1',
-      locale: 'ar',
-      toolbar_bg: '#131722',
-      enable_publishing: false,
-      allow_symbol_change: true,
-      hide_side_toolbar: true,
-      container_id: 'mobChartContainer'
-    });
-  }
-
-  var saved = localStorage.getItem(STORAGE_KEY);
-  if (saved && [...select.options].some(function (o) { return o.value === saved; })) select.value = saved;
-
-  select.addEventListener('change', function () {
-    localStorage.setItem(STORAGE_KEY, select.value);
-    renderChart(select.value);
-  });
-
-  renderChart(select.value);
-})();
-</script>
+<!-- Price-tile "تخصيص" panel (mobile) -->
+<div class="hidden fixed inset-0 z-[90] items-end justify-center bg-black/40" id="mobPriceCustomizeOverlay">
+<div class="bg-surface-container-lowest w-full rounded-t-2xl p-5 max-h-[75vh] overflow-y-auto">
+<div class="flex items-center justify-between mb-1">
+<div class="font-bold text-[15px]">اختر الأسعار المعروضة</div>
+<button type="button" id="mobPriceCustomizeCloseX" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high"><span class="material-symbols-outlined">close</span></button>
+</div>
+<div class="text-[11px] text-on-surface-variant mb-4">يُحفظ لحسابك أنت فقط</div>
+<div class="grid grid-cols-2 gap-2" id="mobPriceCustomizeGrid"></div>
+<div class="flex items-center justify-between mt-4">
+<div class="text-[11px] text-on-surface-variant" id="mobPriceCustomizeCount"></div>
+<div class="flex gap-2">
+<button type="button" id="mobPriceCustomizeCancel" class="h-9 px-4 rounded-lg text-[12px] font-semibold border border-outline-variant">إلغاء</button>
+<button type="button" id="mobPriceCustomizeSave" class="h-9 px-4 rounded-lg text-[12px] font-semibold bg-primary text-on-primary">حفظ</button>
+</div>
+</div>
+</div>
+</div>
+<script>window.__GOLDMIND_PRICE_TILE_TARGETS = window.__GOLDMIND_PRICE_TILE_TARGETS || []; window.__GOLDMIND_PRICE_TILE_TARGETS.push({ grid: 'mobPriceTiles', btn: 'mobPriceCustomizeBtn', overlay: 'mobPriceCustomizeOverlay', custGrid: 'mobPriceCustomizeGrid', count: 'mobPriceCustomizeCount', save: 'mobPriceCustomizeSave', cancel: 'mobPriceCustomizeCancel', closeX: 'mobPriceCustomizeCloseX', storageKey: 'goldmind_price_tiles_' });</script>
 <!-- Recent Movements Log -->
 <section class="mb-4">
 <div class="flex justify-between items-center mb-4">
