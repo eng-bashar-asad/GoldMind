@@ -624,22 +624,17 @@
 
       <div class="dsk-workspace">
         <div class="dsk-col-main">
-          <div class="dsk-panel" style="background:#131722;border-color:#1e222d;">
-            <div class="dsk-panel-head" style="border-bottom-color:#1e222d;">
-              <div class="dsk-panel-title" style="color:#d1d4dc;"><span class="material-symbols-outlined dsk-ic">show_chart</span>السوق اللحظي</div>
-              <button type="button" id="dskPriceCustomizeBtn" class="dsk-customize-btn" style="background:#1e222d;color:#d1d4dc;border-color:#2a2e39;"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
+          <div class="dsk-panel">
+            <div class="dsk-panel-head">
+              <div class="dsk-panel-title"><span class="material-symbols-outlined dsk-ic">show_chart</span>السوق اللحظي</div>
+              <button type="button" id="dskPriceCustomizeBtn" class="dsk-customize-btn"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
             </div>
-            <!-- Lightweight price tiles (TradingView "Single Ticker" widgets —
-                 price + change% only, no candle chart/drawing tools/history
-                 stream). Swapped in for the old full Advanced Chart widget,
-                 which was noticeably heavier (a whole charting engine per
-                 instance) and — since both the desktop AND mobile chart
-                 sections used to load simultaneously regardless of which was
-                 visible — effectively doubled that cost on every page load.
-                 This is the same tradeoff TradingView itself designed this
-                 widget for: "see the price and change % of your preferred
-                 symbol, nothing else." -->
-            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2 p-3" id="dskPriceTiles"></div>
+            <!-- Lightweight price tiles: live REST/WebSocket data, styled
+                 entirely by us (see "بشار: التصميم كئيب وغامق" — switched
+                 from a dark trading-terminal look to the app's normal warm
+                 light card style, with real, visible drop shadows instead
+                 of shadows-on-black that barely showed. -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3" id="dskPriceTiles"></div>
           </div>
         </div>
         <div class="dsk-col-rail">
@@ -1121,17 +1116,17 @@ document.addEventListener('DOMContentLoaded', function () {
 
   function buildTile(item) {
     var wrap = document.createElement('div');
-    wrap.className = 'rounded-lg px-4 py-3 flex items-center justify-between';
-    wrap.style.cssText = 'background:#1a1f2b;border:1px solid #2a2e39;min-height:64px;';
+    wrap.className = 'rounded-xl px-4 py-3 flex items-center justify-between bg-white';
+    wrap.style.cssText = 'border:1px solid #ECE4D3;min-height:64px;box-shadow:0 2px 6px rgba(120,95,40,.10), 0 6px 16px rgba(120,95,40,.10);';
     wrap.innerHTML =
       '<div class="flex items-center gap-2">' +
-        '<span style="width:28px;height:28px;border-radius:50%;background:' + item.badgeColor + ';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex:none;">' + item.badge + '</span>' +
+        '<span style="width:30px;height:30px;border-radius:50%;background:' + item.badgeColor + ';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11.5px;font-weight:800;flex:none;box-shadow:0 2px 4px rgba(0,0,0,.18);">' + item.badge + '</span>' +
         '<div>' +
-          '<div style="color:#d1d4dc;font-size:12.5px;font-weight:700;">' + item.label + '</div>' +
-          '<div style="color:#787b86;font-size:10px;">' + item.symbol + '/USD</div>' +
+          '<div style="color:#2b241a;font-size:12.5px;font-weight:700;">' + item.label + '</div>' +
+          '<div style="color:#9c8f78;font-size:10px;">' + item.symbol + '/USD</div>' +
         '</div>' +
       '</div>' +
-      '<div id="pt-price-' + item.id + '" style="color:#d1d4dc;font-size:17px;font-weight:700;">…</div>';
+      '<div id="pt-price-' + item.id + '" style="color:#5c4a20;font-size:17px;font-weight:800;">…</div>';
     return wrap;
   }
 
@@ -1339,14 +1334,14 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 </section>
 <!-- Quick Actions -->
-<!-- Lightweight price tiles (mirrors the desktop version — same TICKER_CATALOG/customize system, distinct rectangular-tile look) -->
+<!-- Lightweight price tiles (mirrors the desktop version — same TICKER_CATALOG/customize system) -->
 <section class="mb-4">
-<div class="rounded-xl overflow-hidden" style="background:#131722;border:1px solid #1e222d;">
-<div class="flex items-center justify-between px-3 py-2.5" style="border-bottom:1px solid #1e222d;">
-<div class="flex items-center gap-1.5 text-[12.5px] font-bold" style="color:#d1d4dc;"><span class="material-symbols-outlined text-[18px]">show_chart</span>السوق اللحظي</div>
-<button type="button" id="mobPriceCustomizeBtn" class="flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-1" style="background:#1e222d;color:#d1d4dc;border:1px solid #2a2e39;"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
+<div class="rounded-xl overflow-hidden bg-surface-container-lowest border border-outline-variant shadow-sm">
+<div class="flex items-center justify-between px-3 py-2.5 border-b border-outline-variant">
+<div class="flex items-center gap-1.5 text-[12.5px] font-bold text-on-surface"><span class="material-symbols-outlined text-[18px] text-secondary">show_chart</span>السوق اللحظي</div>
+<button type="button" id="mobPriceCustomizeBtn" class="flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-1 border border-outline-variant text-secondary"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
 </div>
-<div class="grid grid-cols-1 gap-2 p-3" id="mobPriceTiles"></div>
+<div class="grid grid-cols-1 gap-3 p-3" id="mobPriceTiles"></div>
 </div>
 </section>
 
