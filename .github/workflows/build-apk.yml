@@ -1,8 +1,10 @@
 name: Build GoldMind APK
-# Manual trigger note: this comment-only edit forces one clean build run
-# after a burst of rapid pushes kept cancelling each other's in-progress
-# builds (cancel-in-progress fires on every new push, so back-to-back
-# pushes faster than one build's runtime can starve every build forever).
+# Manual trigger note (2026-08-24 11:50 UTC): the previous successful-build's
+# asset upload hit a transient GitHub API timeout right after deleting the
+# old GoldMind.apk asset ("We couldn't respond to your request in time"),
+# leaving the app-latest release with zero assets — the APK download link
+# 404'd even though the build itself succeeded. This comment-only edit
+# forces one clean rebuild to repopulate the asset.
 
 on:
   push:
