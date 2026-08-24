@@ -1070,8 +1070,19 @@
 <!-- Shared lightweight price-tile engine (desktop + mobile both register a
      target above via window.__GOLDMIND_PRICE_TILE_TARGETS). One shared
      saved selection so a choice made on one device shows the same set
-     everywhere — customize is available on both, per بشار. -->
+     everywhere — customize is available on both, per بشار.
+
+     NOTE: this used to run immediately (top-level, right here in document
+     order), but the mobile section's own registration script sits further
+     down the page and hadn't run yet at that point — so on load,
+     window.__GOLDMIND_PRICE_TILE_TARGETS only ever contained the desktop
+     entry. That's exactly why the mobile "تخصيص" button did nothing (never
+     got an event listener) and the mobile tile grid stayed an empty black
+     box (renderAllStrips() ran before it had anything to render into).
+     Deferred to DOMContentLoaded so it runs after every section on the
+     page — desktop AND mobile — has had a chance to register itself. -->
 <script>
+document.addEventListener('DOMContentLoaded', function () {
 (function () {
   var TICKER_CATALOG = [
     { id: 'gold', symbol: 'OANDA:XAUUSD', label: 'الذهب' },
@@ -1196,6 +1207,7 @@
 
   renderAllStrips();
 })();
+});
 </script>
 
 <!-- Desktop layout: primary actions hero + grouped sections (hidden on mobile) -->
