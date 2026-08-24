@@ -481,7 +481,14 @@ async function load() {
     movementsByTrader[m.trader_id].push(m);
   });
 
-  showTradersList();
+  // Deep-link support: invoices-archive-ar.html's "مبيعات تجار" rows link
+  // here as ?trader=<id> to jump straight to that trader's detail view.
+  const traderParam = new URLSearchParams(window.location.search).get('trader');
+  if (traderParam && traders.some(t => t.id === traderParam)) {
+    showTraderDetail(traderParam);
+  } else {
+    showTradersList();
+  }
 }
 
 // Positive = the trader owes the shop (we're owed). Negative = the shop
