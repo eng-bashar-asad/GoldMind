@@ -559,12 +559,10 @@ function goldmindApplyFont(key) {
 }
 
 function goldmindLoadSavedFont() {
-  // Defaults to Amiri site-wide (per بشار) unless a device has its own
-  // explicit choice saved from theme-picker-ar.html. Unlike the earlier
-  // Times New Roman attempt, Amiri actually ships Arabic glyphs, so this
-  // covers Arabic text too, not just Latin numbers/labels.
-  const saved = localStorage.getItem('goldmind_font') || 'amiri';
-  goldmindApplyFont(saved);
+  // The font-picker (theme-picker-ar.html) was removed per بشار's request —
+  // no more per-device choice/variety. This is now the one fixed combo,
+  // forced everywhere below regardless of this call.
+  goldmindApplyFont('default');
 }
 
 
@@ -890,6 +888,28 @@ function gmSmartBack(fallbackHref) {
       background-position: left 10px center !important;
       background-size: 16px !important;
       padding-left: 34px !important;
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
+// Twelfth shape: one fixed, non-optional site-wide font combo per بشار —
+// Times New Roman for Latin/numbers, Arial for Arabic — no more picker,
+// no more per-device variety. A single font-family list lets the browser's
+// normal per-character fallback do the work: Times New Roman has no Arabic
+// glyphs, so Arabic characters automatically fall through to Arial (which
+// does have real Arabic coverage), while Latin letters and digits render in
+// Times New Roman. This also fixes the داشبورد "كاش الصندوق" card showing
+// two different fonts for the AED and USD lines — both are covered by this
+// same blanket rule now.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    *, *::before, *::after {
+      font-family: 'Times New Roman', Arial, sans-serif !important;
+    }
+    .material-symbols-outlined {
+      font-family: 'Material Symbols Outlined' !important;
     }
   `;
   document.head.appendChild(style);
