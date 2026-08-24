@@ -849,8 +849,17 @@ function gmSmartBack(fallbackHref) {
   document.head.appendChild(style);
 
   const selector = '[onclick^="gmSmartBack"], [onclick^="goBack"], [onclick^="headerBack"], [onclick*="history.back"]';
-  document.querySelectorAll(selector).forEach(function (btn) {
-    btn.className = 'gm-back-btn-3d';
-    btn.innerHTML = '<span class="material-symbols-outlined">arrow_forward</span>';
-  });
+  function applyBackBtnStyle() {
+    document.querySelectorAll(selector).forEach(function (btn) {
+      btn.className = 'gm-back-btn-3d';
+      btn.innerHTML = '<span class="material-symbols-outlined">arrow_forward</span>';
+    });
+  }
+  // theme.js loads in <head>, before <body> (and the back button itself)
+  // exists in the DOM yet — running the query immediately found nothing.
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', applyBackBtnStyle);
+  } else {
+    applyBackBtnStyle();
+  }
 })();
