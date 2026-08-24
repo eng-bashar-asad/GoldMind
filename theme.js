@@ -868,3 +868,29 @@ function gmSmartBack(fallbackHref) {
   }
 })();
 
+
+// Eleventh shape: native <select> dropdown arrows across the app were
+// rendering right on top of the selected text instead of sitting cleanly
+// to the side (worse in RTL, where the browser's built-in arrow placement
+// is inconsistent). Replace the native arrow with a manually positioned
+// one, center the text, and reserve real padding so the two never overlap
+// again — applied site-wide so every dropdown in the app gets this at
+// once, not just the ones someone happens to notice.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    select {
+      -webkit-appearance: none !important;
+      -moz-appearance: none !important;
+      appearance: none !important;
+      text-align: center !important;
+      text-align-last: center !important;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23745a25' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E") !important;
+      background-repeat: no-repeat !important;
+      background-position: left 10px center !important;
+      background-size: 16px !important;
+      padding-left: 34px !important;
+    }
+  `;
+  document.head.appendChild(style);
+})();
