@@ -570,6 +570,16 @@
     </div>
 
     <div class="dsk-content">
+      <div class="hidden items-center justify-between gap-4 rounded-2xl px-5 py-3.5 mb-4" id="dskTrialBanner" style="background:linear-gradient(120deg,#1e333b,#132229);border:1px solid rgba(255,215,0,0.25);">
+        <div class="flex items-center gap-3">
+          <span class="material-symbols-outlined" style="color:#FFD700;font-size:24px;">redeem</span>
+          <div>
+            <div class="font-bold text-[13.5px]" style="color:#FFD700;">باقي <span id="dskTrialDaysLeft">—</span> يوم من تجربتك المجانية</div>
+            <div class="text-[11px]" style="color:rgba(255,215,0,0.55);">اشترك الآن حتى ما ينقطع استخدامك بعد انتهاء الفترة التجريبية</div>
+          </div>
+        </div>
+        <a href="subscription-ar.html" class="shrink-0 h-9 px-4 flex items-center rounded-lg text-[12.5px] font-bold" style="background:linear-gradient(135deg,#FFD700,#B4955A);color:#0f232a;">اشترك الآن</a>
+      </div>
       <div class="dsk-stat-strip">
         <div class="dsk-stat" style="--dsk-tint:#EFE7D2;--dsk-ink:#7A6640;">
           <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">account_balance_wallet</span><span class="dsk-stat-label">كاش الصندوق</span></div>
@@ -835,6 +845,14 @@
 </div>
 </header>
 <main class="lg:hidden pt-20 pb-24 px-margin-mobile max-w-md lg:max-w-6xl mx-auto lg:px-8">
+<!-- Free-trial countdown (shown while subscription status = trialing) -->
+<div id="trialBanner" class="hidden mb-4 items-center gap-3 rounded-xl p-3" style="background:linear-gradient(120deg,#1e333b,#132229);border:1px solid rgba(255,215,0,0.25);">
+<span class="material-symbols-outlined" style="color:#FFD700;">redeem</span>
+<div class="flex-1 min-w-0">
+<div class="font-bold text-[13px]" style="color:#FFD700;">باقي <span id="trialDaysLeft">—</span> يوم من تجربتك المجانية</div>
+</div>
+<a href="subscription-ar.html" class="shrink-0 h-8 px-3 flex items-center rounded-lg text-[11.5px] font-bold" style="background:linear-gradient(135deg,#FFD700,#B4955A);color:#0f232a;">اشترك الآن</a>
+</div>
 <!-- Fiscal year closing reminder (owner only, shown when a past year isn't closed) -->
 <a id="fiscalYearBanner" href="fiscal-year-close-ar.html" class="hidden mb-4 flex items-center gap-3 bg-red-50 border border-error/40 text-error rounded-xl p-3">
 <span class="material-symbols-outlined">event_busy</span>
@@ -1242,7 +1260,8 @@
                 { data: cashboxEntries },
                 { data: todayInvoices },
                 { count: unpaidCount },
-                { data: lowLots }
+                { data: lowLots },
+                { data: subRow }
             ] = await Promise.all([
                 // Fiscal year closing reminder — owner only, checks for an unclosed past year
                 (async () => {
@@ -1276,8 +1295,22 @@
                 goldmindClient
                     .from('gold_stock_lots').select('id')
                     .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).lt('weight_grams_remaining', 5),
-                loadMovementsForDay()
+                loadMovementsForDay(),
+                // Free-trial countdown banner (see landing-ar.html / register_new_company)
+                goldmindClient.from('subscriptions').select('status, trial_end').eq('store_id', GOLDMIND_STORE_ID).maybeSingle()
             ]);
+
+            if (subRow && subRow.status === 'trialing' && subRow.trial_end) {
+                const daysLeft = Math.max(0, Math.ceil((new Date(subRow.trial_end) - new Date()) / (1000 * 60 * 60 * 24)));
+                document.getElementById('trialDaysLeft').textContent = daysLeft;
+                const mobileBanner = document.getElementById('trialBanner');
+                mobileBanner.classList.remove('hidden');
+                mobileBanner.classList.add('flex');
+                const dskDaysEl = document.getElementById('dskTrialDaysLeft');
+                const dskBanner = document.getElementById('dskTrialBanner');
+                if (dskDaysEl) dskDaysEl.textContent = daysLeft;
+                if (dskBanner) { dskBanner.classList.remove('hidden'); dskBanner.classList.add('flex'); }
+            }
 
             if (fiscalResult && fiscalResult.length > 0) {
                 document.getElementById('fiscalYearBannerText').textContent =
