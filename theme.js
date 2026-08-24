@@ -559,7 +559,11 @@ function goldmindApplyFont(key) {
 }
 
 function goldmindLoadSavedFont() {
-  const saved = localStorage.getItem('goldmind_font') || 'default';
+  // Defaults to Amiri site-wide (per بشار) unless a device has its own
+  // explicit choice saved from theme-picker-ar.html. Unlike the earlier
+  // Times New Roman attempt, Amiri actually ships Arabic glyphs, so this
+  // covers Arabic text too, not just Latin numbers/labels.
+  const saved = localStorage.getItem('goldmind_font') || 'amiri';
   goldmindApplyFont(saved);
 }
 
@@ -864,24 +868,3 @@ function gmSmartBack(fallbackHref) {
   }
 })();
 
-// Tenth shape: force Times New Roman everywhere, across every theme, per
-// بشار's explicit request to unify the app's typography.
-//
-// IMPORTANT CAVEAT (so this doesn't look "broken" later): Times New Roman
-// has no Arabic glyphs at all. Since ~95% of this app's text is Arabic, the
-// browser will silently fall back to its own default Arabic system font for
-// every Arabic character no matter what we set font-family to — only Latin
-// letters and digits (invoice numbers, English labels, "AED"/"USD", etc.)
-// will actually render in Times New Roman. This is a font-technology limit,
-// not a bug in this rule. If a fully-Arabic-compatible unified look is ever
-// wanted instead, that requires picking a font that ships Arabic glyphs
-// (e.g. Amiri for a serif Arabic look) rather than Times New Roman itself.
-(function () {
-  const style = document.createElement('style');
-  style.textContent = `
-    *, *::before, *::after {
-      font-family: 'Times New Roman', Times, serif !important;
-    }
-  `;
-  document.head.appendChild(style);
-})();
