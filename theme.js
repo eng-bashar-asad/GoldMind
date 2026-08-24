@@ -824,12 +824,12 @@ function gmSmartBack(fallbackHref) {
     .gm-back-btn-3d {
       width: 40px !important; height: 40px !important; min-width: 40px; border-radius: 50% !important;
       flex: none; display: inline-flex !important; align-items: center; justify-content: center;
-      background: linear-gradient(150deg, #FFE168 0%, #FFD700 45%, #C9A227 100%) !important;
+      background: linear-gradient(150deg, #B4955A 0%, #8a6d3f 45%, #6d5530 100%) !important;
       box-shadow:
-        0 1px 0 rgba(255,255,255,.7) inset,
-        0 -2px 3px rgba(120,90,10,.35) inset,
-        0 3px 6px rgba(120,90,10,.35),
-        0 6px 14px rgba(120,90,10,.22);
+        0 1px 0 rgba(255,255,255,.35) inset,
+        0 -2px 3px rgba(60,45,15,.4) inset,
+        0 3px 6px rgba(60,45,15,.35),
+        0 6px 14px rgba(60,45,15,.25);
       border: none !important; cursor: pointer;
       transition: transform .12s ease, box-shadow .12s ease;
       padding: 0 !important;
@@ -837,12 +837,12 @@ function gmSmartBack(fallbackHref) {
     .gm-back-btn-3d:active {
       transform: translateY(1px) scale(.94);
       box-shadow:
-        0 1px 0 rgba(255,255,255,.5) inset,
-        0 -1px 2px rgba(120,90,10,.3) inset,
-        0 1px 2px rgba(120,90,10,.3);
+        0 1px 0 rgba(255,255,255,.25) inset,
+        0 -1px 2px rgba(60,45,15,.35) inset,
+        0 1px 2px rgba(60,45,15,.35);
     }
     .gm-back-btn-3d .material-symbols-outlined {
-      font-size: 22px !important; line-height: 1 !important; color: #4a3a10 !important;
+      font-size: 22px !important; line-height: 1 !important; color: #fdf6e8 !important;
       font-variation-settings: 'FILL' 1, 'wght' 700 !important;
     }
   `;
