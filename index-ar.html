@@ -1140,10 +1140,58 @@ document.addEventListener('DOMContentLoaded', function () {
       .then(function (r) { return r.ok ? r.json() : null; })
       .then(function (data) {
         if (!data || typeof data.price !== 'number') return;
-        var els = document.querySelectorAll('[id="pt-price-' + item.id + '"]');
-        els.forEach(function (el) { el.textContent = '$' + fmtPrice(data.price); });
+        setTilePrice(item.id, data.price);
       })
       .catch(function () { /* silent — a failed price refresh shouldn't disrupt the dashboard */ });
+  }
+
+  function setTilePrice(id, price) {
+    var els = document.querySelectorAll('[id="pt-price-' + id + '"]');
+    els.forEach(function (el) { el.textContent = '$' + fmtPrice(price); });
+  }
+
+  // ---- Live WebSocket layer (bitcoin/ethereum only) ----
+  // Binance's public market-data stream is free, needs no API key/signup,
+  // and pushes a price update roughly once a second — genuinely live,
+  // unlike the 30s REST poll used for gold/silver/etc (no equivalent free
+  // real-time feed exists for precious metals). Only opened when bitcoin
+  // and/or ethereum is actually selected, and closed otherwise.
+  var LIVE_SYMBOLS = { bitcoin: 'btcusdt', ethereum: 'ethusdt' };
+  var liveSocket = null;
+  var liveReconnectTimer = null;
+
+  function stopLiveSocket() {
+    if (liveReconnectTimer) { clearTimeout(liveReconnectTimer); liveReconnectTimer = null; }
+    if (liveSocket) { try { liveSocket.onclose = null; liveSocket.close(); } catch (e) {} liveSocket = null; }
+  }
+
+  function startLiveSocketIfNeeded() {
+    stopLiveSocket();
+    var activeStreams = Object.keys(LIVE_SYMBOLS)
+      .filter(function (id) { return selection.indexOf(id) > -1; })
+      .map(function (id) { return LIVE_SYMBOLS[id] + '@miniTicker'; });
+    if (!activeStreams.length) return;
+
+    try {
+      liveSocket = new WebSocket('wss://stream.binance.com:9443/stream?streams=' + activeStreams.join('/'));
+    } catch (e) { return; }
+
+    liveSocket.onmessage = function (ev) {
+      try {
+        var msg = JSON.parse(ev.data);
+        var d = msg && msg.data;
+        if (!d || !d.s || !d.c) return;
+        var sym = d.s.toLowerCase(); // e.g. "btcusdt"
+        var id = Object.keys(LIVE_SYMBOLS).filter(function (k) { return LIVE_SYMBOLS[k] === sym; })[0];
+        if (id) setTilePrice(id, parseFloat(d.c));
+      } catch (e) { /* ignore malformed frame */ }
+    };
+    // If the connection drops (network hiccup, backgrounded app, etc.),
+    // reconnect after a short delay rather than silently going stale.
+    liveSocket.onclose = function () {
+      liveReconnectTimer = setTimeout(startLiveSocketIfNeeded, 4000);
+    };
+    liveSocket.onerror = function () { try { liveSocket.close(); } catch (e) {} };
   }
 
   function renderTiles(gridEl) {
@@ -1156,6 +1204,10 @@ document.addEventListener('DOMContentLoaded', function () {
   }
 
   function refreshAllPrices() {
+    // Bitcoin/ethereum get their price from the live WebSocket above once
+    // it's connected — still do one REST fetch for them too so the tile
+    // shows a real number immediately instead of "…" while the socket
+    // handshake is still in flight.
     selection.forEach(function (id) {
       var item = byId(id);
       if (item) fetchAndFillPrice(item);
@@ -1166,6 +1218,7 @@ document.addEventListener('DOMContentLoaded', function () {
     if (refreshTimer) clearInterval(refreshTimer);
     refreshAllPrices();
     refreshTimer = setInterval(refreshAllPrices, REFRESH_MS);
+    startLiveSocketIfNeeded();
   }
 
   function renderAllStrips() {
