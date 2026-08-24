@@ -990,13 +990,12 @@
     { id: 'customerDebts', icon: 'account_balance_wallet', label: 'كشف حساب', href: 'customer-debts-ar.html', permission: 'view_customers', cls: 'qa-tile qa-gold-tint shadow-sm' },
     { id: 'inventory', icon: 'inventory_2', label: 'المخزن', href: 'inventory-list-ar.html', permission: 'view_inventory', cls: 'qa-tile qa-gold-tint shadow-sm' },
     { id: 'production', icon: 'precision_manufacturing', label: 'إنتاج القطع', href: 'stock-production-ar.html', permission: 'add_piece', cls: 'qa-tile bg-white border border-secondary text-secondary shadow-sm', badgeStyle: 'background:rgba(116,90,37,0.1);' },
-    { id: 'openingStock', icon: 'warehouse', label: 'بضاعة أول المدة', href: 'opening-stock-ar.html', permission: 'owner_only_opening_stock', cls: 'bg-white border border-secondary text-secondary shadow-sm', simple: true },
     { id: 'addCustomer', icon: 'person_add', label: 'إضافة عميل', href: 'customer-add-ar.html', permission: 'add_customers', cls: 'bg-surface-container-low border border-outline-variant text-on-surface shadow-sm', simple: true },
     { id: 'repairs', icon: 'build', label: 'الصيانة', href: 'repairs-ar.html', permission: 'view_repairs', cls: 'bg-white border border-outline-variant text-on-surface shadow-sm', simple: true },
     { id: 'diamondAdd', icon: 'diamond', label: 'إضافة ألماسة', href: 'diamond-inventory-add.html', permission: 'add_piece', cls: 'bg-white border border-secondary text-secondary shadow-sm', simple: true, diamondOnly: true },
     { id: 'diamondList', icon: 'diamond', label: 'مخزون الألماس', href: 'diamond-inventory-list-ar.html', permission: 'view_inventory', cls: 'bg-white border border-outline-variant text-on-surface shadow-sm', simple: true, diamondOnly: true }
   ];
-  var DEFAULTS = ['cashbox', 'newSale', 'purchaseInvoice', 'salesReturn', 'stockIn', 'merchantLedger', 'inventoryCount', 'customerDebts', 'inventory', 'production', 'openingStock', 'addCustomer'];
+  var DEFAULTS = ['cashbox', 'newSale', 'salesReturn', 'purchaseInvoice', 'stockIn', 'merchantLedger', 'inventoryCount', 'customerDebts', 'inventory', 'production', 'addCustomer'];
   var MAX_ACTIONS = 12;
 
   var stripEl = document.getElementById('mobActionStrip');
@@ -1066,7 +1065,7 @@
   saveBtn.addEventListener('click', function () {
     if (draft.length === 0) return;
     selection = draft.slice();
-    try { localStorage.setItem('goldmind_mobile_quick_actions_v3_' + (window.GOLDMIND_STAFF_ID || 'default'), JSON.stringify(selection)); } catch (e) {}
+    try { localStorage.setItem('goldmind_mobile_quick_actions_v4_' + (window.GOLDMIND_STAFF_ID || 'default'), JSON.stringify(selection)); } catch (e) {}
     renderStrip();
     closeOverlay();
   });
@@ -1077,7 +1076,7 @@
   window.__mobInitQuickActions = function () {
     var picked = null;
     try {
-      var raw = localStorage.getItem('goldmind_mobile_quick_actions_v3_' + (window.GOLDMIND_STAFF_ID || 'default'));
+      var raw = localStorage.getItem('goldmind_mobile_quick_actions_v4_' + (window.GOLDMIND_STAFF_ID || 'default'));
       var parsed = raw ? JSON.parse(raw) : null;
       if (Array.isArray(parsed) && parsed.length) {
         var valid = allowedIds(parsed);
@@ -1705,6 +1704,15 @@
 <a href="invoices-list-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">list_alt</span><span class="font-label-md text-label-md">كل الفواتير</span></a>
 <a href="invoices-archive-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory</span><span class="font-label-md text-label-md">الأرشيف الشامل (مبيعات/مشتريات زبائن وتجار)</span></a>
 <a href="sales-return-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">keyboard_return</span><span class="font-label-md text-label-md">مرتجع مبيعات</span></a>
+
+<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">المستودعات</p>
+<a href="inventory-list-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory_2</span><span class="font-label-md text-label-md">المخزن</span></a>
+<a href="inventory-add.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">add_box</span><span class="font-label-md text-label-md">إضافة قطعة للمخزون</span></a>
+<a href="stock-production-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">precision_manufacturing</span><span class="font-label-md text-label-md">إنتاج القطع من رصيد الجملة</span></a>
+<a href="opening-stock-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">warehouse</span><span class="font-label-md text-label-md">بضاعة أول المدة</span></a>
+<a href="inventory-count-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">checklist</span><span class="font-label-md text-label-md">الجرد</span></a>
+<a href="diamond-inventory-add.html" class="diamond-feature hidden items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">diamond</span><span class="font-label-md text-label-md">إضافة ألماسة</span></a>
+<a href="diamond-inventory-list-ar.html" class="diamond-feature hidden items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">diamond</span><span class="font-label-md text-label-md">مخزون الألماس</span></a>
 
 <p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">المالية</p>
 <a href="expense-entry-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt</span><span class="font-label-md text-label-md">مصروف جديد</span></a>
