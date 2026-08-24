@@ -1091,17 +1091,17 @@ document.addEventListener('DOMContentLoaded', function () {
   // exactly these assets. We render the number ourselves, so there's no
   // more fighting an iframe's internal styling.
   var TICKER_CATALOG = [
-    { id: 'gold', symbol: 'XAU', label: 'الذهب', emoji: '🥇' },
-    { id: 'silver', symbol: 'XAG', label: 'الفضة', emoji: '🥈' },
-    { id: 'platinum', symbol: 'XPT', label: 'البلاتين', emoji: '⚪' },
-    { id: 'palladium', symbol: 'XPD', label: 'البلاديوم', emoji: '⚡' },
-    { id: 'copper', symbol: 'HG', label: 'النحاس', emoji: '🔷' },
-    { id: 'bitcoin', symbol: 'BTC', label: 'بيتكوين', emoji: '₿' },
-    { id: 'ethereum', symbol: 'ETH', label: 'إيثيريوم', emoji: 'Ξ' }
+    { id: 'gold', symbol: 'XAU', label: 'الذهب', badge: 'Au', badgeColor: '#D4AF37' },
+    { id: 'silver', symbol: 'XAG', label: 'الفضة', badge: 'Ag', badgeColor: '#A8A9AD' },
+    { id: 'platinum', symbol: 'XPT', label: 'البلاتين', badge: 'Pt', badgeColor: '#B4C0C6' },
+    { id: 'palladium', symbol: 'XPD', label: 'البلاديوم', badge: 'Pd', badgeColor: '#8A9BA8' },
+    { id: 'copper', symbol: 'HG', label: 'النحاس', badge: 'Cu', badgeColor: '#B87333' },
+    { id: 'bitcoin', symbol: 'BTC', label: 'بيتكوين', badge: '₿', badgeColor: '#F7931A' },
+    { id: 'ethereum', symbol: 'ETH', label: 'إيثيريوم', badge: 'Ξ', badgeColor: '#627EEA' }
   ];
   var DEFAULTS = ['gold', 'silver', 'bitcoin', 'ethereum'];
   var MAX_TILES = 7;
-  var REFRESH_MS = 45000; // gold-api.com asks callers to cache ~30s; 45s is a courteous margin
+  var REFRESH_MS = 30000; // gold-api.com explicitly asks for ~30s caching — matching that exactly instead of padding it further
 
   function byId(id) { return TICKER_CATALOG.filter(function (c) { return c.id === id; })[0]; }
   function storageKeyFor(prefix) { return prefix + (window.GOLDMIND_STAFF_ID || 'default'); }
@@ -1125,7 +1125,7 @@ document.addEventListener('DOMContentLoaded', function () {
     wrap.style.cssText = 'background:#1a1f2b;border:1px solid #2a2e39;min-height:64px;';
     wrap.innerHTML =
       '<div class="flex items-center gap-2">' +
-        '<span style="font-size:20px;">' + item.emoji + '</span>' +
+        '<span style="width:28px;height:28px;border-radius:50%;background:' + item.badgeColor + ';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex:none;">' + item.badge + '</span>' +
         '<div>' +
           '<div style="color:#d1d4dc;font-size:12.5px;font-weight:700;">' + item.label + '</div>' +
           '<div style="color:#787b86;font-size:10px;">' + item.symbol + '/USD</div>' +
@@ -1181,7 +1181,7 @@ document.addEventListener('DOMContentLoaded', function () {
     gridEl.innerHTML = TICKER_CATALOG.map(function (item) {
       var checked = draft.indexOf(item.id) > -1;
       return '<div class="flex items-center gap-2 p-2.5 rounded-lg border ' + (checked ? 'border-primary bg-primary/5' : 'border-gray-300') + '" data-id="' + item.id + '">'
-        + '<span style="font-size:16px;">' + item.emoji + '</span>'
+        + '<span style="width:22px;height:22px;border-radius:50%;background:' + item.badgeColor + ';color:#fff;display:inline-flex;align-items:center;justify-content:center;font-size:9.5px;font-weight:800;flex:none;">' + item.badge + '</span>'
         + '<span class="text-[12.5px] font-semibold">' + item.label + '</span></div>';
     }).join('');
     if (countEl) countEl.textContent = draft.length + ' / ' + MAX_TILES + ' مختارة';
