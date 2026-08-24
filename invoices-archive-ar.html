@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الأرشيف الشامل | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .arch-card { background: var(--gm-surface-lowest); border: 1px solid var(--gm-outline-variant); border-radius: 14px; }
+    .arch-row { border-bottom: 1px solid var(--gm-outline-variant); }
+    .arch-row:last-child { border-bottom: none; }
+    .type-pill { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; display: inline-block; }
+</style>
+</head>
+<body>
+<header class="border-b sticky top-0 z-50" style="background: var(--gm-surface-lowest); border-color: var(--gm-outline-variant);">
+<div class="flex justify-between items-center px-4 w-full h-16 max-w-md lg:max-w-4xl mx-auto">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold">الأرشيف الشامل</h1>
+</div>
+</div>
+</header>
+
+<main class="max-w-md lg:max-w-4xl mx-auto px-4 py-5">
+<div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-sm text-red-600">ليس لديك صلاحية الوصول لهذه الشاشة.</div>
+
+<div id="page-content" class="hidden">
+
+<!-- Filters -->
+<div class="arch-card p-4 mb-4">
+<div class="grid grid-cols-2 gap-2 mb-2">
+<div>
+<label class="block text-[10.5px] font-semibold mb-1" style="color: var(--gm-on-surface-variant);">من تاريخ</label>
+<input type="date" id="filterFrom" class="w-full h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);"/>
+</div>
+<div>
+<label class="block text-[10.5px] font-semibold mb-1" style="color: var(--gm-on-surface-variant);">إلى تاريخ</label>
+<input type="date" id="filterTo" class="w-full h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-2 mb-2">
+<select id="filterType" class="w-full h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);">
+<option value="">كل الأنواع</option>
+<option value="sale">مبيعات زبائن</option>
+<option value="buyRetail">مشتريات زبائن (كسر)</option>
+<option value="stockGiven">مبيعات تجار</option>
+<option value="buyTrader">مشتريات تجار</option>
+</select>
+<select id="filterEmployee" class="w-full h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);">
+<option value="">كل الموظفين</option>
+</select>
+</div>
+<input type="text" id="filterSearch" placeholder="بحث حر (اسم، رقم فاتورة، ملاحظة...)" class="w-full h-10 border rounded-lg px-3 text-[12.5px]" style="border-color: var(--gm-outline-variant);"/>
+</div>
+
+<!-- Summary cards -->
+<div class="grid grid-cols-2 gap-2 mb-4" id="summaryCards"></div>
+
+<!-- Results -->
+<div class="arch-card overflow-hidden" id="resultsList"></div>
+
+</div>
+</main>
+
+<script>
+let ALL_ROWS = [];
+const TYPE_META = {
+    sale: { label: 'مبيعات زبائن', color: '#3F6B47', bg: '#E1EADB' },
+    buyRetail: { label: 'مشتريات زبائن (كسر)', color: '#9C8552', bg: '#F1E9D6' },
+    stockGiven: { label: 'مبيعات تجار', color: '#3B6B7A', bg: '#DCE8EA' },
+    buyTrader: { label: 'مشتريات تجار', color: '#8A3B32', bg: '#F3DEDA' }
+};
+
+function fmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtDate(d) { return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }); }
+
+async function loadArchive() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['view_reports'] === true));
+    if (!allowed) {
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('no-access').classList.remove('hidden');
+        return;
+    }
+
+    const [{ data: invoices }, { data: traderMoves }, { data: staffList }] = await Promise.all([
+        goldmindClient.from('invoices').select('id, invoice_number, type, total_amount, counterparty_name, customer_id, trader_id, created_by, created_at, status')
+            .eq('store_id', GOLDMIND_STORE_ID).neq('status', 'cancelled')
+            .in('type', ['sale', 'buyRetail', 'buyTrader']).order('created_at', { ascending: false }),
+        goldmindClient.from('trader_movements').select('id, trader_id, gold_24k_equivalent, fab_fee_amount, currency, notes, created_by, created_at')
+            .eq('store_id', GOLDMIND_STORE_ID).eq('source', 'stock_given').order('created_at', { ascending: false }),
+        goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID)
+    ]);
+
+    const staffById = {};
+    (staffList || []).forEach(s => { staffById[s.id] = s.full_name; });
+
+    // Need customer/trader names for display
+    const customerIds = [...new Set((invoices || []).filter(i => i.customer_id).map(i => i.customer_id))];
+    const traderIds = [...new Set([
+        ...(invoices || []).filter(i => i.trader_id).map(i => i.trader_id),
+        ...(traderMoves || []).map(m => m.trader_id)
+    ])];
+    const [{ data: customers }, { data: tradersData }] = await Promise.all([
+        customerIds.length ? goldmindClient.from('customers').select('id, name').in('id', customerIds) : Promise.resolve({ data: [] }),
+        traderIds.length ? goldmindClient.from('traders').select('id, name').in('id', traderIds) : Promise.resolve({ data: [] })
+    ]);
+    const customerById = {}; (customers || []).forEach(c => { customerById[c.id] = c.name; });
+    const traderById = {}; (tradersData || []).forEach(t => { traderById[t.id] = t.name; });
+
+    ALL_ROWS = [];
+    (invoices || []).forEach(inv => {
+        ALL_ROWS.push({
+            archiveType: inv.type,
+            date: inv.created_at,
+            amount: Number(inv.total_amount || 0),
+            currency: null,
+            partyName: inv.type === 'buyTrader' ? (traderById[inv.trader_id] || '—') : (customerById[inv.customer_id] || inv.counterparty_name || '—'),
+            refLabel: inv.invoice_number,
+            employeeId: inv.created_by,
+            invoiceId: inv.id,
+            traderId: inv.trader_id || null
+        });
+    });
+    (traderMoves || []).forEach(m => {
+        ALL_ROWS.push({
+            archiveType: 'stockGiven',
+            date: m.created_at,
+            amount: Number(m.gold_24k_equivalent || 0),
+            amountSuffix: 'غ (24K)',
+            currency: null,
+            partyName: traderById[m.trader_id] || '—',
+            refLabel: m.notes || 'إعطاء بضاعة',
+            employeeId: m.created_by,
+            invoiceId: null,
+            traderId: m.trader_id
+        });
+    });
+    ALL_ROWS.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+    document.getElementById('filterEmployee').innerHTML = '<option value="">كل الموظفين</option>' +
+        (staffList || []).map(s => `<option value="${s.id}">${gmEscapeHtml(s.full_name || 'موظف')}</option>`).join('');
+
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('page-content').classList.remove('hidden');
+
+    applyFilters();
+}
+
+function gmEscapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+function applyFilters() {
+    const from = document.getElementById('filterFrom').value;
+    const to = document.getElementById('filterTo').value;
+    const type = document.getElementById('filterType').value;
+    const employee = document.getElementById('filterEmployee').value;
+    const search = document.getElementById('filterSearch').value.trim().toLowerCase();
+
+    let rows = ALL_ROWS.slice();
+    if (from) rows = rows.filter(r => new Date(r.date) >= new Date(from + 'T00:00:00'));
+    if (to) rows = rows.filter(r => new Date(r.date) <= new Date(to + 'T23:59:59'));
+    if (type) rows = rows.filter(r => r.archiveType === type);
+    if (employee) rows = rows.filter(r => r.employeeId === employee);
+    if (search) rows = rows.filter(r =>
+        (r.partyName || '').toLowerCase().includes(search) ||
+        (r.refLabel || '').toLowerCase().includes(search)
+    );
+
+    renderSummary(rows);
+    renderList(rows);
+}
+
+function renderSummary(rows) {
+    const byType = {};
+    rows.forEach(r => {
+        if (!byType[r.archiveType]) byType[r.archiveType] = { count: 0, value: 0 };
+        byType[r.archiveType].count++;
+        byType[r.archiveType].value += r.amount;
+    });
+    const el = document.getElementById('summaryCards');
+    el.innerHTML = Object.keys(TYPE_META).map(key => {
+        const meta = TYPE_META[key];
+        const s = byType[key] || { count: 0, value: 0 };
+        return `
+            <div class="arch-card p-3">
+                <div class="type-pill mb-2" style="background:${meta.bg};color:${meta.color};">${meta.label}</div>
+                <div class="text-[18px] font-bold">${s.count}</div>
+                <div class="text-[11px]" style="color: var(--gm-on-surface-variant);">${fmt(s.value)}${key === 'stockGiven' ? ' غ' : ''}</div>
+            </div>`;
+    }).join('');
+}
+
+function renderList(rows) {
+    const el = document.getElementById('resultsList');
+    if (!rows.length) {
+        el.innerHTML = '<div class="p-8 text-center text-[12.5px]" style="color: var(--gm-on-surface-variant);">لا توجد نتائج مطابقة</div>';
+        return;
+    }
+    el.innerHTML = rows.map(r => {
+        const meta = TYPE_META[r.archiveType];
+        const amountText = r.amountSuffix ? fmt(r.amount) + ' ' + r.amountSuffix : fmt(r.amount);
+        const link = r.invoiceId
+            ? `invoice-print-ar.html?id=${r.invoiceId}`
+            : (r.traderId ? `ledger-ar.html?trader=${r.traderId}` : null);
+        const inner = `
+            <div class="flex items-center justify-between p-3">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2 mb-1">
+                        <span class="type-pill" style="background:${meta.bg};color:${meta.color};">${meta.label}</span>
+                        <span class="text-[10.5px]" style="color: var(--gm-on-surface-variant);">${fmtDate(r.date)}</span>
+                    </div>
+                    <div class="text-[13px] font-semibold truncate">${gmEscapeHtml(r.partyName)}</div>
+                    <div class="text-[11px] truncate" style="color: var(--gm-on-surface-variant);">${gmEscapeHtml(r.refLabel)}</div>
+                </div>
+                <div class="text-[13px] font-bold shrink-0 mr-2">${amountText}</div>
+            </div>`;
+        return link ? `<a href="${link}" class="arch-row block hover:bg-gray-50">${inner}</a>` : `<div class="arch-row">${inner}</div>`;
+    }).join('');
+}
+
+['filterFrom', 'filterTo', 'filterType', 'filterEmployee'].forEach(id => {
+    document.getElementById(id).addEventListener('change', applyFilters);
+});
+document.getElementById('filterSearch').addEventListener('input', applyFilters);
+
+loadArchive();
+</script>
+</body></html>
