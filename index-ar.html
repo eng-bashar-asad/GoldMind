@@ -1084,20 +1084,30 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 (function () {
+  // Switched from TradingView's embedded widgets (iframes — slow to load,
+  // and their fixed large font kept truncating the price in a narrow tile)
+  // to a direct REST call against gold-api.com: free, no API key, no rate
+  // limit, CORS-enabled for direct browser calls, and purpose-built for
+  // exactly these assets. We render the number ourselves, so there's no
+  // more fighting an iframe's internal styling.
   var TICKER_CATALOG = [
-    { id: 'gold', symbol: 'OANDA:XAUUSD', label: 'الذهب' },
-    { id: 'silver', symbol: 'OANDA:XAGUSD', label: 'الفضة' },
-    { id: 'bitcoin', symbol: 'COINBASE:BTCUSD', label: 'بيتكوين' },
-    { id: 'ethereum', symbol: 'COINBASE:ETHUSD', label: 'إيثيريوم' },
-    { id: 'eurusd', symbol: 'FX:EURUSD', label: 'يورو/دولار' },
-    { id: 'usdaed', symbol: 'OANDA:USDAED', label: 'دولار/درهم' },
-    { id: 'sp500', symbol: 'FOREXCOM:SPXUSD', label: 'S&amp;P 500' }
+    { id: 'gold', symbol: 'XAU', label: 'الذهب', emoji: '🥇' },
+    { id: 'silver', symbol: 'XAG', label: 'الفضة', emoji: '🥈' },
+    { id: 'platinum', symbol: 'XPT', label: 'البلاتين', emoji: '⚪' },
+    { id: 'palladium', symbol: 'XPD', label: 'البلاديوم', emoji: '⚡' },
+    { id: 'copper', symbol: 'HG', label: 'النحاس', emoji: '🔷' },
+    { id: 'bitcoin', symbol: 'BTC', label: 'بيتكوين', emoji: '₿' },
+    { id: 'ethereum', symbol: 'ETH', label: 'إيثيريوم', emoji: 'Ξ' }
   ];
-  var DEFAULTS = ['gold', 'silver', 'bitcoin', 'usdaed'];
-  var MAX_TILES = 8;
+  var DEFAULTS = ['gold', 'silver', 'bitcoin', 'ethereum'];
+  var MAX_TILES = 7;
+  var REFRESH_MS = 45000; // gold-api.com asks callers to cache ~30s; 45s is a courteous margin
 
   function byId(id) { return TICKER_CATALOG.filter(function (c) { return c.id === id; })[0]; }
   function storageKeyFor(prefix) { return prefix + (window.GOLDMIND_STAFF_ID || 'default'); }
+  function fmtPrice(n) {
+    return Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  }
 
   var selection = DEFAULTS.slice();
   try {
@@ -1107,35 +1117,33 @@ document.addEventListener('DOMContentLoaded', function () {
     if (!selection.length) selection = DEFAULTS.slice();
   } catch (e) { selection = DEFAULTS.slice(); }
   var draft = selection.slice();
+  var refreshTimer = null;
 
-  // Each tile is its own tiny TradingView "Single Ticker" widget (price +
-  // change % only — no candles, no drawing tools, no history stream). Real
-  // <script> elements must be created via the DOM (innerHTML-injected
-  // <script> tags never execute), and each widget reads its OWN script
-  // tag's JSON text content, per TradingView's standard embed convention.
   function buildTile(item) {
     var wrap = document.createElement('div');
-    wrap.className = 'rounded-lg';
-    wrap.style.cssText = 'background:#1a1f2b;border:1px solid #2a2e39;min-height:110px;overflow:visible;';
-    var widgetDiv = document.createElement('div');
-    widgetDiv.className = 'tradingview-widget-container';
-    var inner = document.createElement('div');
-    inner.className = 'tradingview-widget-container__widget';
-    widgetDiv.appendChild(inner);
-    var script = document.createElement('script');
-    script.type = 'text/javascript';
-    script.src = 'https://s3.tradingview.com/external-embedding/embed-widget-single-quote.js';
-    script.async = true;
-    script.text = JSON.stringify({
-      symbol: item.symbol,
-      width: '100%',
-      colorTheme: 'dark',
-      isTransparent: true,
-      locale: 'ar_AE'
-    });
-    widgetDiv.appendChild(script);
-    wrap.appendChild(widgetDiv);
+    wrap.className = 'rounded-lg px-4 py-3 flex items-center justify-between';
+    wrap.style.cssText = 'background:#1a1f2b;border:1px solid #2a2e39;min-height:64px;';
+    wrap.innerHTML =
+      '<div class="flex items-center gap-2">' +
+        '<span style="font-size:20px;">' + item.emoji + '</span>' +
+        '<div>' +
+          '<div style="color:#d1d4dc;font-size:12.5px;font-weight:700;">' + item.label + '</div>' +
+          '<div style="color:#787b86;font-size:10px;">' + item.symbol + '/USD</div>' +
+        '</div>' +
+      '</div>' +
+      '<div id="pt-price-' + item.id + '" style="color:#d1d4dc;font-size:17px;font-weight:700;">…</div>';
     return wrap;
+  }
+
+  function fetchAndFillPrice(item) {
+    fetch('https://api.gold-api.com/price/' + item.symbol)
+      .then(function (r) { return r.ok ? r.json() : null; })
+      .then(function (data) {
+        if (!data || typeof data.price !== 'number') return;
+        var els = document.querySelectorAll('[id="pt-price-' + item.id + '"]');
+        els.forEach(function (el) { el.textContent = '$' + fmtPrice(data.price); });
+      })
+      .catch(function () { /* silent — a failed price refresh shouldn't disrupt the dashboard */ });
   }
 
   function renderTiles(gridEl) {
@@ -1145,6 +1153,19 @@ document.addEventListener('DOMContentLoaded', function () {
       var item = byId(id);
       if (item) gridEl.appendChild(buildTile(item));
     });
+  }
+
+  function refreshAllPrices() {
+    selection.forEach(function (id) {
+      var item = byId(id);
+      if (item) fetchAndFillPrice(item);
+    });
+  }
+
+  function restartRefreshLoop() {
+    if (refreshTimer) clearInterval(refreshTimer);
+    refreshAllPrices();
+    refreshTimer = setInterval(refreshAllPrices, REFRESH_MS);
   }
 
   function renderAllStrips() {
@@ -1160,6 +1181,7 @@ document.addEventListener('DOMContentLoaded', function () {
     gridEl.innerHTML = TICKER_CATALOG.map(function (item) {
       var checked = draft.indexOf(item.id) > -1;
       return '<div class="flex items-center gap-2 p-2.5 rounded-lg border ' + (checked ? 'border-primary bg-primary/5' : 'border-gray-300') + '" data-id="' + item.id + '">'
+        + '<span style="font-size:16px;">' + item.emoji + '</span>'
         + '<span class="text-[12.5px] font-semibold">' + item.label + '</span></div>';
     }).join('');
     if (countEl) countEl.textContent = draft.length + ' / ' + MAX_TILES + ' مختارة';
@@ -1200,11 +1222,13 @@ document.addEventListener('DOMContentLoaded', function () {
       selection = draft.slice();
       try { localStorage.setItem(storageKeyFor(t.storageKey), JSON.stringify(selection)); } catch (e) {}
       renderAllStrips();
+      restartRefreshLoop();
       closeOverlay();
     });
   });
 
   renderAllStrips();
+  restartRefreshLoop();
 })();
 });
 </script>
