@@ -808,3 +808,49 @@ function gmSmartBack(fallbackHref) {
   } catch (e) { /* fall through to hard navigation */ }
   window.location.href = fallbackHref;
 }
+
+// Ninth shape: every header "back" button across the app used to be a bare
+// flat glyph (a plain unicode arrow or an unstyled Material Symbol) — easy
+// to miss and visually flat/"dry". Give every one of them a consistent,
+// clearly-tappable 3D raised gold badge instead, site-wide, without having
+// to touch each page's markup individually. This runs after each page's own
+// scripts wire up the button's onclick handler, so the click BEHAVIOR
+// (gmSmartBack's context-aware step-back, or a page's own bespoke goBack()/
+// headerBack()/history.back()) is completely untouched — only the button's
+// look is normalized.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    .gm-back-btn-3d {
+      width: 40px !important; height: 40px !important; min-width: 40px; border-radius: 50% !important;
+      flex: none; display: inline-flex !important; align-items: center; justify-content: center;
+      background: linear-gradient(150deg, #FFE168 0%, #FFD700 45%, #C9A227 100%) !important;
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.7) inset,
+        0 -2px 3px rgba(120,90,10,.35) inset,
+        0 3px 6px rgba(120,90,10,.35),
+        0 6px 14px rgba(120,90,10,.22);
+      border: none !important; cursor: pointer;
+      transition: transform .12s ease, box-shadow .12s ease;
+      padding: 0 !important;
+    }
+    .gm-back-btn-3d:active {
+      transform: translateY(1px) scale(.94);
+      box-shadow:
+        0 1px 0 rgba(255,255,255,.5) inset,
+        0 -1px 2px rgba(120,90,10,.3) inset,
+        0 1px 2px rgba(120,90,10,.3);
+    }
+    .gm-back-btn-3d .material-symbols-outlined {
+      font-size: 22px !important; line-height: 1 !important; color: #4a3a10 !important;
+      font-variation-settings: 'FILL' 1, 'wght' 700 !important;
+    }
+  `;
+  document.head.appendChild(style);
+
+  const selector = '[onclick^="gmSmartBack"], [onclick^="goBack"], [onclick^="headerBack"], [onclick*="history.back"]';
+  document.querySelectorAll(selector).forEach(function (btn) {
+    btn.className = 'gm-back-btn-3d';
+    btn.innerHTML = '<span class="material-symbols-outlined">arrow_forward</span>';
+  });
+})();
