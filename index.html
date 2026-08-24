@@ -1,10 +1,25 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl"><head>
 <meta charset="utf-8"/>
-<meta http-equiv="refresh" content="0; url=index-ar.html"/>
-<script>window.location.replace('index-ar.html');</script>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>جولد مايند</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
 </head>
-<body style="background:#0f172a;color:#FFD700;font-family:sans-serif;text-align:center;padding-top:3rem;">
-<p>يتم تحويلك... <a href="index-ar.html" style="color:#FFD700;">اضغط هنا إذا لم يتم تحويلك تلقائياً</a></p>
+<body style="background:#0f232a;color:#FFD700;font-family:sans-serif;text-align:center;padding-top:3rem;">
+<p>يتم تحويلك...</p>
+<script>
+// Existing users (with an active session) go straight to their dashboard,
+// like before. Anyone new/logged-out lands on the public marketing page
+// instead of being dropped straight into a login wall.
+(async function () {
+    try {
+        const { data: { session } } = await goldmindClient.auth.getSession();
+        window.location.replace(session ? 'index-ar.html' : 'landing-ar.html');
+    } catch (e) {
+        window.location.replace('landing-ar.html');
+    }
+})();
+</script>
+<noscript><meta http-equiv="refresh" content="0; url=landing-ar.html"/></noscript>
 </body></html>
