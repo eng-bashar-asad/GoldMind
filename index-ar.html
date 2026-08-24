@@ -1022,6 +1022,63 @@
 </div>
 </section>
 <!-- Quick Actions -->
+<!-- Live market chart (mirrors the desktop dashboard's chart — gold/silver/bitcoin/etc, symbol-selectable) -->
+<section class="mb-4">
+<div class="rounded-xl overflow-hidden" style="background:#131722;border:1px solid #1e222d;">
+<div class="flex items-center justify-between px-3 py-2.5" style="border-bottom:1px solid #1e222d;">
+<div class="flex items-center gap-1.5 text-[12.5px] font-bold" style="color:#d1d4dc;"><span class="material-symbols-outlined text-[18px]">show_chart</span>السوق اللحظي</div>
+<select id="mobChartSymbolSelect" class="text-[11px] font-semibold rounded-lg px-2 py-1" style="background:#1e222d;color:#d1d4dc;border:1px solid #2a2e39;" title="اختر الأصل المعروض">
+<option value="OANDA:XAUUSD">الذهب (XAU/USD)</option>
+<option value="OANDA:XAGUSD">الفضة (XAG/USD)</option>
+<option value="COINBASE:BTCUSD">بيتكوين (BTC/USD)</option>
+<option value="COINBASE:ETHUSD">إيثيريوم (ETH/USD)</option>
+<option value="FX:EURUSD">يورو/دولار (EUR/USD)</option>
+<option value="OANDA:USDAED">دولار/درهم (USD/AED)</option>
+<option value="TVC:DXY">مؤشر الدولار (DXY)</option>
+<option value="FOREXCOM:SPXUSD">S&amp;P 500</option>
+</select>
+</div>
+<div id="mobChartContainer" style="height:320px;"></div>
+</div>
+</section>
+<script src="https://s3.tradingview.com/tv.js"></script>
+<script>
+(function () {
+  var container = document.getElementById('mobChartContainer');
+  var select = document.getElementById('mobChartSymbolSelect');
+  if (!container || !select) return;
+  var STORAGE_KEY = 'goldmind_dsk_chart_symbol'; // shared preference with the desktop dashboard chart
+
+  function renderChart(symbol) {
+    container.innerHTML = '';
+    // eslint-disable-next-line no-undef
+    new TradingView.widget({
+      autosize: true,
+      symbol: symbol,
+      interval: '60',
+      timezone: 'Asia/Dubai',
+      theme: 'dark',
+      style: '1',
+      locale: 'ar',
+      toolbar_bg: '#131722',
+      enable_publishing: false,
+      allow_symbol_change: true,
+      hide_side_toolbar: true,
+      container_id: 'mobChartContainer'
+    });
+  }
+
+  var saved = localStorage.getItem(STORAGE_KEY);
+  if (saved && [...select.options].some(function (o) { return o.value === saved; })) select.value = saved;
+
+  select.addEventListener('change', function () {
+    localStorage.setItem(STORAGE_KEY, select.value);
+    renderChart(select.value);
+  });
+
+  renderChart(select.value);
+})();
+</script>
 <!-- Recent Movements Log -->
 <section class="mb-4">
 <div class="flex justify-between items-center mb-4">
