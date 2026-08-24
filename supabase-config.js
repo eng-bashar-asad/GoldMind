@@ -27,6 +27,26 @@ let GOLDMIND_STAFF_ID = null;
 
 const goldmindClient = supabase.createClient(GOLDMIND_SUPABASE_URL, GOLDMIND_SUPABASE_KEY);
 
+// Mobile app (Capacitor WebView) background/foreground fix: Supabase's
+// built-in auto-refresh relies on a JS timer scheduled ahead of the access
+// token's expiry, but mobile OSes throttle/suspend JS timers while the app
+// is backgrounded to save battery. That scheduled refresh can be missed
+// entirely, so the token is already expired by the time the person reopens
+// the app — and with nothing re-checking it on resume, every page's
+// requireGoldMindSession() then reads that as "no session" and bounces to
+// the login screen, even though the person never actually signed out. This
+// is the officially recommended fix for Supabase in WebView/React-Native-
+// style apps: explicitly re-verify/refresh right when the page becomes
+// visible again, instead of only relying on the background timer.
+document.addEventListener('visibilitychange', function () {
+    if (document.visibilityState === 'visible') {
+        goldmindClient.auth.startAutoRefresh();
+        goldmindClient.auth.refreshSession().catch(function () {});
+    } else {
+        goldmindClient.auth.stopAutoRefresh();
+    }
+});
+
 // ---- Idle timeout: auto sign-out after 2 hours with no activity ----
 const GOLDMIND_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
 const GOLDMIND_IDLE_KEY = 'goldmind_last_activity';
