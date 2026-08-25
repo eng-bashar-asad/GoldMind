@@ -141,6 +141,25 @@
 </div>
 
 <div class="border-t border-outline-variant pt-5 mt-1">
+<h3 class="font-label-md text-label-md text-secondary font-bold mb-1">مستويات أجرة المصنعية (اقتراح سعر بيع)</h3>
+<p class="text-[11px] text-on-surface-variant leading-5 mb-4">أجرة المصنعية للغرام حسب نوع البيع — بتستخدم لاقتراح سعر تلقائي بشاشة "فاتورة جديدة" (تقدر تعدّله دايماً وقت البيع). اتركها فاضية إذا ما بدك اقتراح تلقائي.</p>
+<div class="grid grid-cols-3 gap-2">
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="fab-rate-retail">مفرق</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="fab-rate-retail" step="0.01" type="number" placeholder="د.إ/غ"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="fab-rate-wholesale">جملة</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="fab-rate-wholesale" step="0.01" type="number" placeholder="د.إ/غ"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="fab-rate-wholesale2">جملة الجملة</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="fab-rate-wholesale2" step="0.01" type="number" placeholder="د.إ/غ"/>
+</div>
+</div>
+</div>
+
+<div class="border-t border-outline-variant pt-5 mt-1">
 <h3 class="font-label-md text-label-md text-secondary font-bold mb-1">ترقيم القطع (الباركود)</h3>
 <p class="text-[11px] text-on-surface-variant leading-5 mb-4">حدّد حرف/رمز ثابت أول باركود كل نوع قطعة، ورقم البداية (مفيد إذا كنت لسا بأول اشتراكك وعندك ترقيم قديم من نظام سابق). كل قطعة جديدة تتسجّل تلقائياً بهالتسلسل — ذهب برمز لحاله بمستودعه، وألماس برمز لحاله بمستودعه.</p>
 </div>
@@ -681,6 +700,9 @@
         document.getElementById('store-address').value = data.address || '';
         document.getElementById('store-phone').value = data.phone || '';
         document.getElementById('store-vat').value = data.vat_rate != null ? data.vat_rate : 5;
+        document.getElementById('fab-rate-retail').value = data.fab_rate_retail != null ? data.fab_rate_retail : '';
+        document.getElementById('fab-rate-wholesale').value = data.fab_rate_wholesale != null ? data.fab_rate_wholesale : '';
+        document.getElementById('fab-rate-wholesale2').value = data.fab_rate_wholesale2 != null ? data.fab_rate_wholesale2 : '';
         document.getElementById('store-email').value = data.email || '';
         document.getElementById('store-instagram').value = data.social_instagram || '';
         document.getElementById('store-tiktok').value = data.social_tiktok || '';
@@ -723,6 +745,9 @@
         const address = document.getElementById('store-address').value.trim();
         const phone = document.getElementById('store-phone').value.trim();
         const vat = parseFloat(document.getElementById('store-vat').value);
+        const fabRateRetail = parseFloat(document.getElementById('fab-rate-retail').value);
+        const fabRateWholesale = parseFloat(document.getElementById('fab-rate-wholesale').value);
+        const fabRateWholesale2 = parseFloat(document.getElementById('fab-rate-wholesale2').value);
         const email = document.getElementById('store-email').value.trim();
         const instagram = document.getElementById('store-instagram').value.trim();
         const tiktok = document.getElementById('store-tiktok').value.trim();
@@ -760,6 +785,9 @@
                 address: address || null,
                 phone: phone || null,
                 vat_rate: isNaN(vat) ? 5 : vat,
+                fab_rate_retail: isNaN(fabRateRetail) ? null : fabRateRetail,
+                fab_rate_wholesale: isNaN(fabRateWholesale) ? null : fabRateWholesale,
+                fab_rate_wholesale2: isNaN(fabRateWholesale2) ? null : fabRateWholesale2,
                 logo_url: logo || null,
                 email: email || null,
                 social_instagram: instagram || null,
