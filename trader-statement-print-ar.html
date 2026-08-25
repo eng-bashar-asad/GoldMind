@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>كشف حساب تاجر | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; background: #f4f0e6; color: #2b241a; min-height: max(884px, 100dvh); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .no-print { }
+    @media print { .no-print { display: none !important; } body { background: #fff; } .stmt-sheet { box-shadow: none !important; margin: 0 !important; } }
+    .stmt-sheet { background: #fff; border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,.08); }
+    .stmt-table th { font-size: 10.5px; color: #8a7f68; font-weight: 700; text-align: center; padding: 8px 6px; border-bottom: 2px solid #e5ddc8; }
+    .stmt-table td { font-size: 12px; text-align: center; padding: 8px 6px; border-bottom: 1px solid #f0ebdc; }
+    .summary-card { border-radius: 12px; padding: 14px 16px; }
+</style>
+</head>
+<body>
+<header class="no-print border-b sticky top-0 z-50 bg-white">
+<div class="flex justify-between items-center px-4 w-full h-16 max-w-3xl mx-auto">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('ledger-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold">كشف حساب تاجر</h1>
+</div>
+<button onclick="window.print()" class="h-10 px-4 rounded-lg text-[12.5px] font-bold bg-primary text-on-primary flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">print</span>طباعة</button>
+</div>
+</header>
+
+<main class="max-w-3xl mx-auto px-4 py-6">
+<div id="loading-state" class="py-16 text-center text-sm text-gray-500">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-sm text-red-600">ليس لديك صلاحية الوصول لهذه الشاشة.</div>
+
+<div id="page-content" class="hidden stmt-sheet p-6">
+<div class="flex items-center justify-between mb-1">
+<div>
+<div class="font-bold text-[18px]" id="stTraderName"></div>
+<div class="text-[11px] text-gray-500 font-data-mono" dir="ltr" id="stTraderPhone"></div>
+</div>
+<div class="text-left">
+<div class="font-bold text-[14px]" id="stStoreName"></div>
+<div class="text-[10.5px] text-gray-500" id="stPeriodLabel"></div>
+</div>
+</div>
+<div class="h-px bg-gray-200 my-4"></div>
+
+<!-- Summary: gold and cash kept strictly separate, per بشار's request -->
+<div class="grid grid-cols-2 gap-3 mb-6">
+<div class="summary-card" style="background:#F1E9D6;">
+<div class="text-[11px] font-bold text-[#7A6640] mb-1">صافي حركة الذهب (مكافئ عيار ٢٤)</div>
+<div class="text-[20px] font-bold font-data-mono" id="stGoldNet">0.00 غ</div>
+<div class="text-[10px] text-[#8a7f68] mt-1" id="stGoldHint"></div>
+</div>
+<div id="stCashCards" class="flex flex-col gap-2"></div>
+</div>
+
+<!-- Gold movements -->
+<div class="mb-6">
+<div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">workspace_premium</span>حركات الذهب</div>
+<table class="w-full stmt-table" style="border-collapse:collapse;">
+<thead><tr><th>التاريخ</th><th>النوع</th><th>الوزن</th><th>العيار</th><th>مكافئ ٢٤</th></tr></thead>
+<tbody id="stGoldRows"></tbody>
+</table>
+</div>
+
+<!-- Cash movements -->
+<div>
+<div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#3F6B47;">payments</span>حركات النقد</div>
+<table class="w-full stmt-table" style="border-collapse:collapse;">
+<thead><tr><th>التاريخ</th><th>الاتجاه</th><th>المبلغ</th><th>الوصف</th></tr></thead>
+<tbody id="stCashRows"></tbody>
+</table>
+</div>
+
+<div class="text-center text-[10px] text-gray-400 mt-8">GoldMind — كشف حساب تم إنشاؤه آلياً</div>
+</div>
+</main>
+
+<script>
+function gmEscapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function fmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtDate(d) { return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }); }
+
+const GOLD_TYPE_LABELS = {
+    'debt_increase|stock_received': 'استلام بضاعة',
+    'debt_decrease|stock_given': 'إعطاء بضاعة',
+    'debt_increase|opening_balance': 'رصيد سابق (دين علينا)',
+    'debt_decrease|opening_balance': 'رصيد سابق (دين له)',
+    'debt_increase|settlement': 'تسوية',
+    'debt_decrease|settlement': 'تسوية'
+};
+
+async function loadStatement() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const params = new URLSearchParams(window.location.search);
+    const traderId = params.get('trader');
+    const fromDate = params.get('from');
+    if (!traderId) { document.getElementById('loading-state').textContent = 'لا يوجد معرّف تاجر بالرابط'; return; }
+
+    const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['view_reports'] === true));
+    if (!allowed) {
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('no-access').classList.remove('hidden');
+        return;
+    }
+
+    const [{ data: trader }, { data: store }] = await Promise.all([
+        goldmindClient.from('traders').select('id, name, phone').eq('id', traderId).maybeSingle(),
+        goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+    ]);
+    if (!trader) { document.getElementById('loading-state').textContent = 'تعذّر إيجاد هذا التاجر'; return; }
+
+    let goldQuery = goldmindClient.from('trader_movements').select('*')
+        .eq('store_id', GOLDMIND_STORE_ID).eq('trader_id', traderId).order('created_at', { ascending: true });
+    if (fromDate) goldQuery = goldQuery.gte('created_at', fromDate + 'T00:00:00');
+    const { data: goldMoves } = await goldQuery;
+
+    const moveIds = (goldMoves || []).map(m => m.id);
+    let cashMoves = [];
+    if (moveIds.length) {
+        const { data: cashData } = await goldmindClient.from('cash_movements').select('*')
+            .in('trader_movement_id', moveIds).order('created_at', { ascending: true });
+        cashMoves = cashData || [];
+    }
+
+    // ---- Header ----
+    document.getElementById('stTraderName').textContent = trader.name;
+    document.getElementById('stTraderPhone').textContent = trader.phone || '';
+    document.getElementById('stStoreName').textContent = (store && store.name) || '';
+    document.getElementById('stPeriodLabel').textContent = fromDate
+        ? ('من ' + fmtDate(fromDate + 'T00:00:00') + ' إلى اليوم')
+        : 'كل الحركات منذ بداية الحساب';
+
+    // ---- Gold: same sign convention used everywhere else in ledger-ar.html ----
+    // debt_increase -> shop owes the trader more (subtracts from "trader owes shop" balance)
+    // debt_decrease -> trader owes the shop more / settles up (adds to that balance)
+    let goldNet = 0;
+    document.getElementById('stGoldRows').innerHTML = (goldMoves || []).map(m => {
+        const signed = m.movement_type === 'debt_increase' ? -Number(m.gold_24k_equivalent || 0) : Number(m.gold_24k_equivalent || 0);
+        goldNet += signed;
+        const label = GOLD_TYPE_LABELS[m.movement_type + '|' + m.source] || (m.movement_type === 'debt_increase' ? 'استلام ذهب' : 'تسوية/دفعة');
+        return `<tr>
+            <td>${fmtDate(m.created_at)}</td>
+            <td>${gmEscapeHtml(label)}</td>
+            <td class="font-data-mono">${m.weight_grams != null ? fmt(m.weight_grams) + ' غ' : '—'}</td>
+            <td>${m.karat || '—'}</td>
+            <td class="font-data-mono font-bold" style="color:${signed >= 0 ? '#3F6B47' : '#8A3B32'};">${signed >= 0 ? '+' : ''}${fmt(signed)}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
+    document.getElementById('stGoldNet').textContent = fmt(goldNet) + ' غ';
+    document.getElementById('stGoldNet').style.color = goldNet >= 0 ? '#3F6B47' : '#8A3B32';
+    document.getElementById('stGoldHint').textContent = goldNet >= 0 ? '(التاجر مديون للمحل)' : '(المحل مديون للتاجر)';
+
+    // ---- Cash: grouped per currency, since a trader can have mixed-currency settlements ----
+    const cashByCurrency = {};
+    document.getElementById('stCashRows').innerHTML = cashMoves.map(c => {
+        const cur = c.currency || 'AED';
+        const signed = c.direction === 'in' ? Number(c.amount || 0) : -Number(c.amount || 0);
+        cashByCurrency[cur] = (cashByCurrency[cur] || 0) + signed;
+        return `<tr>
+            <td>${fmtDate(c.created_at)}</td>
+            <td>${c.direction === 'in' ? 'قبض' : 'دفع'}</td>
+            <td class="font-data-mono font-bold" style="color:${c.direction === 'in' ? '#3F6B47' : '#8A3B32'};">${c.direction === 'in' ? '+' : '-'}${fmt(c.amount)} ${gmEscapeHtml(cur)}</td>
+            <td>${gmEscapeHtml(c.description || '—')}</td>
+        </tr>`;
+    }).join('') || '<tr><td colspan="4" class="text-gray-400 py-6">لا توجد حركات نقدية بهذه الفترة</td></tr>';
+
+    const cashCardsEl = document.getElementById('stCashCards');
+    const currencies = Object.keys(cashByCurrency);
+    if (!currencies.length) {
+        cashCardsEl.innerHTML = `<div class="summary-card flex-1" style="background:#E1EADB;">
+            <div class="text-[11px] font-bold text-[#3F6B47] mb-1">صافي حركة النقد</div>
+            <div class="text-[20px] font-bold font-data-mono">0.00</div>
+        </div>`;
+    } else {
+        cashCardsEl.innerHTML = currencies.map(cur => `
+            <div class="summary-card" style="background:#E1EADB;">
+                <div class="text-[11px] font-bold text-[#3F6B47] mb-1">صافي حركة النقد (${gmEscapeHtml(cur)})</div>
+                <div class="text-[20px] font-bold font-data-mono" style="color:${cashByCurrency[cur] >= 0 ? '#3F6B47' : '#8A3B32'};">${fmt(cashByCurrency[cur])}</div>
+            </div>`).join('');
+    }
+
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('page-content').classList.remove('hidden');
+}
+
+loadStatement();
+</script>
+</body></html>
