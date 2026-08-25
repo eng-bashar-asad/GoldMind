@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>كشف الضريبة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .tax-card { background: var(--gm-surface-lowest); border: 1px solid var(--gm-outline-variant); border-radius: 14px; }
+    .tax-row { border-bottom: 1px solid var(--gm-outline-variant); }
+    .tax-row:last-child { border-bottom: none; }
+    @media print {
+        header, #filters-block, #print-btn, #back-fab { display: none !important; }
+        body { background: #fff; }
+        .tax-card { border: 1px solid #ccc; break-inside: avoid; }
+    }
+</style>
+</head>
+<body>
+<header class="border-b sticky top-0 z-50" style="background: var(--gm-surface-lowest); border-color: var(--gm-outline-variant);">
+<div class="flex justify-between items-center px-4 w-full h-16 max-w-md lg:max-w-4xl mx-auto">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold">كشف الضريبة</h1>
+</div>
+<button id="print-btn" onclick="window.print()" class="p-2 hover:bg-gray-100 rounded-full flex items-center justify-center" title="طباعة">
+<span class="material-symbols-outlined">print</span>
+</button>
+</div>
+</header>
+
+<main class="max-w-md lg:max-w-4xl mx-auto px-4 py-5">
+<div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-sm text-red-600">ليس لديك صلاحية الوصول لهذه الشاشة.</div>
+
+<div id="page-content" class="hidden">
+
+<!-- Filters -->
+<div class="tax-card p-4 mb-4" id="filters-block">
+<div class="grid grid-cols-2 gap-2">
+<div>
+<label class="block text-[10.5px] font-semibold mb-1" style="color: var(--gm-on-surface-variant);">من تاريخ</label>
+<input type="date" id="filterFrom" class="w-full h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);"/>
+</div>
+<div>
+<label class="block text-[10.5px] font-semibold mb-1" style="color: var(--gm-on-surface-variant);">إلى تاريخ</label>
+<input type="date" id="filterTo" class="w-full h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);"/>
+</div>
+</div>
+</div>
+
+<!-- Summary cards -->
+<div class="grid grid-cols-2 gap-2 mb-2">
+<div class="tax-card p-3">
+<p class="text-[10.5px] mb-1" style="color: var(--gm-on-surface-variant);">ضريبة المبيعات المحصّلة</p>
+<h2 class="text-[19px] font-bold" id="sum-output-tax">0.00</h2>
+</div>
+<div class="tax-card p-3">
+<p class="text-[10.5px] mb-1" style="color: var(--gm-on-surface-variant);">ضريبة مشتريات التجار (على المصنعية)</p>
+<h2 class="text-[19px] font-bold" id="sum-input-tax">0.00</h2>
+</div>
+</div>
+<div class="tax-card p-3 mb-4">
+<p class="text-[10.5px] mb-1" style="color: var(--gm-on-surface-variant);">إجمالي المبيعات شامل الضريبة</p>
+<h2 class="text-[19px] font-bold" id="sum-total-sales">0.00</h2>
+</div>
+
+<!-- Sales tax table -->
+<h3 class="font-bold text-[14px] mb-2">فواتير المبيعات (ضريبة المخرجات)</h3>
+<div class="tax-card overflow-hidden mb-4" id="salesTaxList"></div>
+
+<!-- Trader purchase tax table -->
+<h3 class="font-bold text-[14px] mb-2">فواتير شراء التجار (ضريبة المدخلات على المصنعية)</h3>
+<div class="tax-card overflow-hidden mb-4" id="purchaseTaxList"></div>
+
+</div>
+</main>
+
+<script>
+let ALL_SALES = [];
+let ALL_PURCHASES = [];
+let VAT_RATE = 0;
+
+function fmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+function fmtDate(d) { return new Date(d).toLocaleDateString('ar-EG', { year: 'numeric', month: 'short', day: 'numeric' }); }
+function gmEscapeHtml(s) {
+    return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function loadTaxReport() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['view_reports'] === true));
+    if (!allowed) {
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('no-access').classList.remove('hidden');
+        return;
+    }
+
+    const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+    VAT_RATE = Number((storeRow && storeRow.vat_rate) || 0);
+    const vatMultiplier = 1 + (VAT_RATE / 100);
+
+    const [{ data: salesInvoices }, { data: purchaseInvoices }] = await Promise.all([
+        goldmindClient.from('invoices').select('id, invoice_number, total_amount, counterparty_name, customer_id, created_at')
+            .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled').order('created_at', { ascending: false }),
+        goldmindClient.from('invoices').select('id, invoice_number, total_amount, vat_amount, counterparty_name, trader_id, created_at')
+            .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'buyTrader').neq('status', 'cancelled').order('created_at', { ascending: false })
+    ]);
+
+    const customerIds = [...new Set((salesInvoices || []).filter(i => i.customer_id).map(i => i.customer_id))];
+    const traderIds = [...new Set((purchaseInvoices || []).filter(i => i.trader_id).map(i => i.trader_id))];
+    const [{ data: customers }, { data: traders }] = await Promise.all([
+        customerIds.length ? goldmindClient.from('customers').select('id, name').in('id', customerIds) : Promise.resolve({ data: [] }),
+        traderIds.length ? goldmindClient.from('traders').select('id, name').in('id', traderIds) : Promise.resolve({ data: [] })
+    ]);
+    const customerById = {}; (customers || []).forEach(c => { customerById[c.id] = c.name; });
+    const traderById = {}; (traders || []).forEach(t => { traderById[t.id] = t.name; });
+
+    ALL_SALES = (salesInvoices || []).map(i => {
+        const total = Number(i.total_amount || 0);
+        const beforeTax = vatMultiplier ? total / vatMultiplier : total;
+        return {
+            id: i.id, invoiceNumber: i.invoice_number, date: i.created_at,
+            partyName: customerById[i.customer_id] || i.counterparty_name || '—',
+            total, tax: total - beforeTax
+        };
+    });
+
+    ALL_PURCHASES = (purchaseInvoices || []).map(i => ({
+        id: i.id, invoiceNumber: i.invoice_number, date: i.created_at,
+        partyName: traderById[i.trader_id] || i.counterparty_name || '—',
+        total: Number(i.total_amount || 0), tax: Number(i.vat_amount || 0)
+    }));
+
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('page-content').classList.remove('hidden');
+
+    applyFilters();
+}
+
+function inRange(dateStr, from, to) {
+    if (from && new Date(dateStr) < new Date(from + 'T00:00:00')) return false;
+    if (to && new Date(dateStr) > new Date(to + 'T23:59:59')) return false;
+    return true;
+}
+
+function applyFilters() {
+    const from = document.getElementById('filterFrom').value;
+    const to = document.getElementById('filterTo').value;
+
+    const sales = ALL_SALES.filter(r => inRange(r.date, from, to));
+    const purchases = ALL_PURCHASES.filter(r => inRange(r.date, from, to));
+
+    const outputTax = sales.reduce((sum, r) => sum + r.tax, 0);
+    const inputTax = purchases.reduce((sum, r) => sum + r.tax, 0);
+    const totalSales = sales.reduce((sum, r) => sum + r.total, 0);
+
+    document.getElementById('sum-output-tax').textContent = fmt(outputTax);
+    document.getElementById('sum-input-tax').textContent = fmt(inputTax);
+    document.getElementById('sum-total-sales').textContent = fmt(totalSales);
+
+    renderTable('salesTaxList', sales);
+    renderTable('purchaseTaxList', purchases);
+}
+
+function renderTable(elId, rows) {
+    const el = document.getElementById(elId);
+    if (!rows.length) {
+        el.innerHTML = '<div class="p-6 text-center text-[12.5px]" style="color: var(--gm-on-surface-variant);">لا توجد فواتير بهذه الفترة</div>';
+        return;
+    }
+    el.innerHTML = rows.map(r => `
+        <a href="invoice-print-ar.html?id=${r.id}" class="tax-row flex items-center justify-between p-3 hover:bg-gray-50">
+            <div class="min-w-0">
+                <div class="text-[13px] font-semibold truncate">${gmEscapeHtml(r.partyName)}</div>
+                <div class="text-[11px] truncate" style="color: var(--gm-on-surface-variant);">${gmEscapeHtml(r.invoiceNumber)} · ${fmtDate(r.date)}</div>
+            </div>
+            <div class="text-left shrink-0 mr-2">
+                <div class="text-[13px] font-bold">${fmt(r.tax)}</div>
+                <div class="text-[10px]" style="color: var(--gm-on-surface-variant);">من إجمالي ${fmt(r.total)}</div>
+            </div>
+        </a>`).join('');
+}
+
+['filterFrom', 'filterTo'].forEach(id => {
+    document.getElementById(id).addEventListener('change', applyFilters);
+});
+
+loadTaxReport();
+</script>
+</body></html>
