@@ -78,12 +78,36 @@
 <span class="material-symbols-outlined">description</span>
                 XML إلكترونية
             </button>
+<button class="hidden items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-2 rounded-lg text-sm font-semibold" id="show-profit-btn" onclick="toggleProfitPanel()">
+<span class="material-symbols-outlined">payments</span>
+                عرض الربح
+            </button>
 </div>
 
 <div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
 <div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="cancelled-banner">
 <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm text-center font-semibold">هذه الفاتورة ملغاة ولا تُحتسب في أي تقرير</div>
+</div>
+<div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="profit-panel">
+<div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
+<div class="flex items-center justify-between mb-3">
+<h3 class="text-sm font-bold text-emerald-800">تفاصيل الربح (خاص — لا يظهر بفاتورة الزبون)</h3>
+<button onclick="toggleProfitPanel()" class="text-emerald-700"><span class="material-symbols-outlined text-[18px]">close</span></button>
+</div>
+<div class="overflow-x-auto">
+<table class="w-full text-right text-[12px]">
+<thead class="text-emerald-800"><tr>
+<th class="px-2 py-1">القطعة</th><th class="px-2 py-1">البيع</th><th class="px-2 py-1">تكلفة الذهب</th><th class="px-2 py-1">الأجرة</th><th class="px-2 py-1">الربح</th>
+</tr></thead>
+<tbody id="profit-tbody"></tbody>
+</table>
+</div>
+<div class="flex items-center justify-between mt-3 pt-3 border-t border-emerald-200">
+<span class="text-[13px] font-bold text-emerald-800">إجمالي ربح الفاتورة</span>
+<span class="text-[16px] font-bold text-emerald-800" id="profit-total"></span>
+</div>
+</div>
 </div>
 
 <div class="max-w-md lg:max-w-3xl mx-auto p-4" id="print-wrap">
@@ -343,7 +367,7 @@
         }
 
         const [{ data: items, error: itemsError }, { data: customer }, { data: trader }, { data: creator }] = await Promise.all([
-            goldmindClient.from('invoice_items').select('*').eq('invoice_id', invoiceId).order('id', { ascending: true }),
+            goldmindClient.from('invoice_items').select('*, piece:piece_id(cost_fabrication_per_gram), lot:gold_stock_lot_id(cost_fabrication_per_gram), diamond:diamond_piece_id(diamond_carat, diamond_price_per_carat, has_gold, gold_cost_fabrication_per_gram)').eq('invoice_id', invoiceId).order('id', { ascending: true }),
             invoice.customer_id
                 ? goldmindClient.from('customers').select('*').eq('id', invoice.customer_id).single()
                 : Promise.resolve({ data: null }),
@@ -665,6 +689,56 @@
             eBtn.classList.add('flex');
         }
 
+        // ---- Owner/manager-only profit reveal (screen-only, gated by the
+        // same view_profit_report permission used on profit-report-ar.html;
+        // never appears in print/PDF since the whole panel carries
+        // no-print). Only meaningful for sale/return documents — a purchase
+        // voucher has no "profit" of its own. ----
+        if ((invoice.type === 'sale' || invoice.type === 'return') && invoice.status !== 'cancelled') {
+            const { data: profitStaffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+            const canViewProfit = profitStaffRow && (profitStaffRow.role === 'owner' || (profitStaffRow.permissions && profitStaffRow.permissions.view_profit_report));
+            if (canViewProfit) {
+                const profitBtn = document.getElementById('show-profit-btn');
+                profitBtn.classList.remove('hidden');
+                profitBtn.classList.add('flex');
+
+                let livePriceMap = {};
+                const anyMissingSnapshot = (items || []).some(it => it.gold_price_per_gram == null);
+                if (anyMissingSnapshot) {
+                    const { data: prices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
+                    (prices || []).forEach(p => { livePriceMap[p.karat] = Number(p.price_per_gram); });
+                }
+
+                const sign = invoice.type === 'return' ? -1 : 1;
+                let totalProfit = 0;
+                const profitRows = (items || []).map(it => {
+                    const goldPrice = it.gold_price_per_gram != null ? Number(it.gold_price_per_gram) : (livePriceMap[it.karat] || 0);
+                    const weight = Number(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams) || 0;
+                    const revenue = sign * (Number(it.line_total) || 0);
+                    const goldValue = sign * (weight * goldPrice);
+                    const beforeTax = revenue / vatMultiplier;
+                    const vatPart = revenue - beforeTax;
+                    const fabCost = it.lot && it.fabrication_fee
+                        ? sign * Number(it.fabrication_fee)
+                        : sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || ((it.diamond && it.diamond.has_gold && it.diamond.gold_cost_fabrication_per_gram) || 0)));
+                    const diamondCost = it.diamond ? sign * (Number(it.diamond.diamond_carat || 0) * Number(it.diamond.diamond_price_per_carat || 0)) : 0;
+                    const profit = revenue - goldValue - vatPart - fabCost - diamondCost;
+                    totalProfit += profit;
+                    return { desc: it.description || it.barcode || 'قطعة', revenue, goldValue, fabCost: fabCost + diamondCost, profit };
+                });
+
+                document.getElementById('profit-tbody').innerHTML = profitRows.map(r => `
+                    <tr>
+                        <td class="px-2 py-1 truncate">${gmEscapeHtml(r.desc)}</td>
+                        <td class="px-2 py-1 font-data-mono">${r.revenue.toFixed(2)}</td>
+                        <td class="px-2 py-1 font-data-mono">${r.goldValue.toFixed(2)}</td>
+                        <td class="px-2 py-1 font-data-mono">${r.fabCost.toFixed(2)}</td>
+                        <td class="px-2 py-1 font-data-mono font-bold ${r.profit >= 0 ? 'text-emerald-700' : 'text-red-600'}">${r.profit.toFixed(2)}</td>
+                    </tr>`).join('');
+                document.getElementById('profit-total').textContent = totalProfit.toFixed(2);
+            }
+        }
+
         // ---- WhatsApp share (free wa.me text link, same convention used
         // by repairs/daily-cashbox — no paid Business API) ----
         if (invoice.status !== 'cancelled') {
@@ -844,6 +918,12 @@
             return;
         }
         window.location.reload();
+    }
+
+    function toggleProfitPanel() {
+        const panel = document.getElementById('profit-panel');
+        const isHidden = panel.classList.contains('hidden');
+        panel.classList.toggle('hidden', !isHidden);
     }
 </script>
 <script>
