@@ -1508,7 +1508,11 @@ function renderGiveStockCart(previewOnly) {
   const totals = giveStockCart.reduce((acc, it) => {
     acc.gross += it.grossWeight;
     acc.accounting += it.accountingWeight;
-    acc.gold24k += it.grossWeight * ((it.karat || 0) / 24);
+    // The trader's gold debt is billed on the accounting (billable) weight,
+    // matching accounting_weight_grams' role everywhere else in the app
+    // (profit-report-ar.html, invoice-print-ar.html's COGS) — gross/standing
+    // weight is only the physical reference, never the billing basis.
+    acc.gold24k += it.accountingWeight * ((it.karat || 0) / 24);
     acc.fee += it.accountingWeight * it.fabPerGram;
     return acc;
   }, { gross: 0, accounting: 0, gold24k: 0, fee: 0 });
@@ -1566,7 +1570,9 @@ async function submitGiveStock() {
     movement_type: 'debt_decrease',
     weight_grams: it.grossWeight,
     karat: it.karat,
-    gold_24k_equivalent: +(it.grossWeight * ((it.karat || 0) / 24)).toFixed(3),
+    // Billed on the accounting (billable) weight, not the physical gross
+    // weight — see comment in renderGiveStockCart above.
+    gold_24k_equivalent: +(it.accountingWeight * ((it.karat || 0) / 24)).toFixed(3),
     accounting_weight_grams: it.accountingWeight,
     fab_fee_per_gram: it.fabPerGram,
     fab_fee_amount: +(it.accountingWeight * it.fabPerGram).toFixed(2),
