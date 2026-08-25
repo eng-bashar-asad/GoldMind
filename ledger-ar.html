@@ -355,36 +355,24 @@ function goToStatementPrint() {
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="give-stock-form">
-<p class="text-[12px] text-on-surface-variant mb-3">تسليم بضاعة للتاجر (وزن قائم + وزن محاسبة + مصنعية على الغرام). هذه العملية تُخصَم من نفس رصيد التاجر الحالي — إذا تجاوزت الرصيد يصبح التاجر مديوناً للمحل.</p>
-<div class="grid grid-cols-2 gap-3 mb-3">
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن القائم (غ)</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gs-gross-weight" oninput="onGrossWeightInput(); recomputeGiveStockPreview()" step="0.01" type="number"/>
+<p class="text-[12px] text-on-surface-variant mb-3">امسح أو اكتب باركود كل قطعة عم تسلّمها للتاجر. القطعة بتتحدد تلقائياً "معطاة لتاجر" — ما بتظهر ناقصة بالجرد ولا ضمن وزن البضاعة المتوفرة بعدها.</p>
+<div class="flex gap-2 mb-3">
+<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gs-barcode-input" placeholder="امسح أو اكتب الباركود" type="text"/>
+<button onclick="searchGiveStockBarcode()" class="h-11 w-11 bg-primary text-on-primary rounded-lg flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">search</span>
+</button>
 </div>
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العيار</label>
-<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="gs-karat" onchange="recomputeGiveStockPreview()">
-<option value="18">18</option>
-<option selected value="21">21</option>
-<option value="22">22</option>
-<option value="24">24</option>
-</select>
-</div>
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن المحاسبي (غ)</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gs-accounting-weight" oninput="recomputeGiveStockPreview()" step="0.01" type="number"/>
-</div>
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="gs-fab-per-gram-label">مصنعية للغرام (د.إ)</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gs-fab-per-gram" oninput="recomputeGiveStockPreview()" step="0.01" type="number"/>
-</div>
-</div>
+<div id="gs-barcode-result" class="mb-3"></div>
+<div id="gs-cart-list" class="flex flex-col gap-2 mb-3"></div>
 <div class="bg-surface-container-low rounded-lg p-3 mb-3 text-[12px] flex flex-col gap-1" id="gs-preview">
+<div class="flex justify-between"><span class="text-on-surface-variant">عدد القطع</span><span class="font-data-mono font-semibold" id="gs-preview-count">0</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant">إجمالي الوزن القائم</span><span class="font-data-mono font-semibold" id="gs-preview-gross">0.00 غ</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant">إجمالي الوزن المحاسبي</span><span class="font-data-mono font-semibold" id="gs-preview-accounting">0.00 غ</span></div>
 <div class="flex justify-between"><span class="text-on-surface-variant">دين الذهب (مكافئ ٢٤)</span><span class="font-data-mono font-semibold" id="gs-preview-gold">0.00 غ</span></div>
-<div class="flex justify-between"><span class="text-on-surface-variant">إجمالي المصنعية</span><span class="font-data-mono font-semibold" id="gs-preview-fee">0.00 د.إ</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant" id="gs-preview-fee-label">إجمالي المصنعية</span><span class="font-data-mono font-semibold" id="gs-preview-fee">0.00</span></div>
 </div>
-<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="gs-notes" placeholder="ملاحظة (اختياري)"></textarea>
-<button onclick="submitGiveStock()" id="gs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ التسليم</button>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="gs-notes" placeholder="ملاحظة عامة على السند (اختياري)"></textarea>
+<button onclick="submitGiveStock()" id="gs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold disabled:opacity-50" disabled="">حفظ التسليم</button>
 <p class="text-error text-[12px] hidden mt-2" id="gs-error"></p>
 </div>
 
@@ -455,7 +443,7 @@ function fmtMoney(amount) {
 
 document.addEventListener('DOMContentLoaded', () => {
   const unit = currencyUnitLabel();
-  document.getElementById('gs-fab-per-gram-label').textContent = `مصنعية للغرام (${unit})`;
+  document.getElementById('gs-preview-fee-label').textContent = `إجمالي المصنعية (${unit})`;
   document.getElementById('settle-cash-amount-label').textContent = `المبلغ المدفوع (${unit})`;
 });
 
@@ -481,7 +469,7 @@ async function load() {
 
   gmStore = storeRow || null;
   const unit = currencyUnitLabel();
-  document.getElementById('gs-fab-per-gram-label').textContent = `مصنعية للغرام (${unit})`;
+  document.getElementById('gs-preview-fee-label').textContent = `إجمالي المصنعية (${unit})`;
   document.getElementById('settle-cash-amount-label').textContent = `المبلغ المدفوع (${unit})`;
 
   diamondsEnabled = !!(storeRow && storeRow.diamonds_enabled);
@@ -1234,7 +1222,9 @@ function toggleGiveStockForm() {
   document.getElementById('settle-form').classList.add('hidden');
   document.getElementById('receive-stock-form').classList.add('hidden');
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
+  const wasHidden = document.getElementById('give-stock-form').classList.contains('hidden');
   document.getElementById('give-stock-form').classList.toggle('hidden');
+  if (wasHidden) resetGiveStockCart();
 }
 
 function toggleReceiveStockForm() {
@@ -1344,22 +1334,12 @@ async function submitTraderOpeningBalance() {
   showTraderDetail(traderIdToReopen);
 }
 
-// Accounting weight defaults to the gross/standing weight and stays in sync
-// until the user edits it directly, so the common case (no stone/loss
-// difference) needs no extra typing.
-let gsAccountingWeightTouched = false;
-function onGrossWeightInput() {
-  if (gsAccountingWeightTouched) return;
-  document.getElementById('gs-accounting-weight').value = document.getElementById('gs-gross-weight').value;
-}
 let rsAccountingWeightTouched = false;
 function onReceiveGrossWeightInput() {
   if (rsAccountingWeightTouched) return;
   document.getElementById('rs-accounting-weight').value = document.getElementById('rs-gross-weight').value;
 }
 document.addEventListener('DOMContentLoaded', () => {
-  const accEl = document.getElementById('gs-accounting-weight');
-  if (accEl) accEl.addEventListener('input', () => { gsAccountingWeightTouched = true; });
   const rsAccEl = document.getElementById('rs-accounting-weight');
   if (rsAccEl) rsAccEl.addEventListener('input', () => { rsAccountingWeightTouched = true; });
 });
@@ -1439,75 +1419,182 @@ async function submitReceiveStock() {
   showTraderDetail(traderIdToReopen);
 }
 
-function recomputeGiveStockPreview() {
-  const gross = parseFloat(document.getElementById('gs-gross-weight').value) || 0;
-  const karat = parseInt(document.getElementById('gs-karat').value, 10) || 0;
-  const accounting = parseFloat(document.getElementById('gs-accounting-weight').value) || 0;
-  const perGram = parseFloat(document.getElementById('gs-fab-per-gram').value) || 0;
-  document.getElementById('gs-preview-gold').textContent = fmt(gross * (karat / 24)) + ' غ';
-  // perGram is typed in whichever currency is currently selected, so the
-  // preview total is shown in that same currency (not converted via fmtMoney,
-  // which expects an AED-based amount).
-  document.getElementById('gs-preview-fee').textContent = fmt(accounting * perGram) + ' ' + currencyUnitLabel();
+// ---------- Give stock to trader — barcode-driven multi-piece cart ----------
+// Each scanned piece stays fully editable (accounting weight, fab fee per
+// gram) but defaults from the piece's own inventory record, and the gross
+// weight/karat are the piece's real physical values (not free-typed). On
+// submit, one trader_movements row is written per piece (so the existing
+// per-row edit affordances on the ledger timeline keep working unchanged),
+// and each piece is flipped out of 'available' so it stops counting toward
+// inventory-count expected lists and reports-ar.html's available-stock
+// weight — without deleting the piece record itself.
+let giveStockCart = [];
+let giveStockCartCounter = 0;
+
+function resetGiveStockCart() {
+  giveStockCart = [];
+  document.getElementById('gs-barcode-input').value = '';
+  document.getElementById('gs-barcode-result').innerHTML = '';
+  document.getElementById('gs-notes').value = '';
+  document.getElementById('gs-error').classList.add('hidden');
+  renderGiveStockCart();
+}
+
+async function searchGiveStockBarcode() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const resultEl = document.getElementById('gs-barcode-result');
+  const input = document.getElementById('gs-barcode-input');
+  const code = input.value.trim();
+  if (!code) return;
+
+  if (giveStockCart.some(it => it.barcode === code)) {
+    resultEl.innerHTML = '<div class="text-error text-sm p-2">هذه القطعة مُضافة أصلاً بالأسفل.</div>';
+    return;
+  }
+
+  resultEl.innerHTML = '<div class="text-on-surface-variant text-sm p-2">جارِ البحث...</div>';
+
+  const { data, error } = await goldmindClient
+    .from('pieces').select('*')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('barcode', code).eq('status', 'available')
+    .maybeSingle();
+
+  if (error) {
+    resultEl.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${gmEscapeHtml(error.message)}</div>`;
+    return;
+  }
+  if (!data) {
+    resultEl.innerHTML = '<div class="text-error text-sm p-2">لا توجد قطعة متوفرة بهذا الباركود (ممكن تكون مباعة أو مُعطاة أصلاً).</div>';
+    return;
+  }
+
+  giveStockCart.push({
+    cartId: ++giveStockCartCounter,
+    pieceId: data.id,
+    barcode: data.barcode,
+    description: data.description_ar || data.description_en || '',
+    karat: data.karat,
+    grossWeight: Number(data.weight_grams) || 0,
+    accountingWeight: Number(data.accounting_weight_grams != null ? data.accounting_weight_grams : data.weight_grams) || 0,
+    fabPerGram: Number(data.cost_fabrication_per_gram) || 0
+  });
+
+  input.value = '';
+  resultEl.innerHTML = '';
+  input.focus();
+  renderGiveStockCart();
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const gsInput = document.getElementById('gs-barcode-input');
+  if (gsInput) gsInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); searchGiveStockBarcode(); } });
+});
+
+function removeGiveStockCartItem(cartId) {
+  giveStockCart = giveStockCart.filter(it => it.cartId !== cartId);
+  renderGiveStockCart();
+}
+
+function updateGiveStockCartItem(cartId, field, value) {
+  const item = giveStockCart.find(it => it.cartId === cartId);
+  if (!item) return;
+  item[field] = parseFloat(value) || 0;
+  renderGiveStockCart(true); // preserve focus: skip re-render of the inputs themselves
+}
+
+function renderGiveStockCart(previewOnly) {
+  const totals = giveStockCart.reduce((acc, it) => {
+    acc.gross += it.grossWeight;
+    acc.accounting += it.accountingWeight;
+    acc.gold24k += it.grossWeight * ((it.karat || 0) / 24);
+    acc.fee += it.accountingWeight * it.fabPerGram;
+    return acc;
+  }, { gross: 0, accounting: 0, gold24k: 0, fee: 0 });
+
+  document.getElementById('gs-preview-count').textContent = giveStockCart.length;
+  document.getElementById('gs-preview-gross').textContent = fmt(totals.gross) + ' غ';
+  document.getElementById('gs-preview-accounting').textContent = fmt(totals.accounting) + ' غ';
+  document.getElementById('gs-preview-gold').textContent = fmt(totals.gold24k) + ' غ';
+  document.getElementById('gs-preview-fee').textContent = fmt(totals.fee) + ' ' + currencyUnitLabel();
+  document.getElementById('gs-btn').disabled = giveStockCart.length === 0;
+
+  if (previewOnly) return; // don't rebuild the list while the user is mid-typing in one of its inputs
+
+  document.getElementById('gs-cart-list').innerHTML = giveStockCart.map(it => `
+    <div class="bg-white border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
+      <div class="flex items-center justify-between gap-2">
+        <div class="min-w-0">
+          <div class="font-data-mono font-bold text-sm">${it.grossWeight} غ &middot; عيار ${it.karat}</div>
+          <div class="text-outline text-[11px] font-data-mono truncate">${gmEscapeHtml(it.barcode)}${it.description ? ' — ' + gmEscapeHtml(it.description) : ''}</div>
+        </div>
+        <button onclick="removeGiveStockCartItem(${it.cartId})" class="text-error shrink-0"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">الوزن المحاسبي (غ)</label>
+          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.accountingWeight}" oninput="updateGiveStockCartItem(${it.cartId}, 'accountingWeight', this.value)"/>
+        </div>
+        <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">مصنعية للغرام</label>
+          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.fabPerGram}" oninput="updateGiveStockCartItem(${it.cartId}, 'fabPerGram', this.value)"/>
+        </div>
+      </div>
+    </div>`).join('');
 }
 
 async function submitGiveStock() {
   const errEl = document.getElementById('gs-error');
   errEl.classList.add('hidden');
 
-  const gross = parseFloat(document.getElementById('gs-gross-weight').value);
-  const karat = parseInt(document.getElementById('gs-karat').value, 10);
-  const accounting = parseFloat(document.getElementById('gs-accounting-weight').value);
-  // Amount is entered directly in the store's base currency, no conversion needed.
-  const perGramAed = parseFloat(document.getElementById('gs-fab-per-gram').value) || 0;
+  if (giveStockCart.length === 0) {
+    errEl.textContent = 'أضف قطعة واحدة على الأقل بالباركود';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
   const notes = document.getElementById('gs-notes').value.trim();
-
-  if (!gross || gross <= 0) {
-    errEl.textContent = 'فضلاً أدخل وزناً قائماً صحيحاً';
-    errEl.classList.remove('hidden');
-    return;
-  }
-  if (!accounting || accounting <= 0) {
-    errEl.textContent = 'فضلاً أدخل وزناً محاسبياً صحيحاً';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  const movement = {
-    store_id: GOLDMIND_STORE_ID,
-    trader_id: currentTraderId,
-    movement_type: 'debt_decrease',
-    weight_grams: gross,
-    karat: karat,
-    gold_24k_equivalent: +(gross * (karat / 24)).toFixed(3),
-    accounting_weight_grams: accounting,
-    fab_fee_per_gram: perGramAed,
-    fab_fee_amount: +(accounting * perGramAed).toFixed(2),
-    source: 'stock_given',
-    notes: notes || 'إعطاء بضاعة للتاجر'
-  };
-
   const btn = document.getElementById('gs-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.from('trader_movements').insert(movement);
+  const movements = giveStockCart.map(it => ({
+    store_id: GOLDMIND_STORE_ID,
+    trader_id: currentTraderId,
+    piece_id: it.pieceId,
+    movement_type: 'debt_decrease',
+    weight_grams: it.grossWeight,
+    karat: it.karat,
+    gold_24k_equivalent: +(it.grossWeight * ((it.karat || 0) / 24)).toFixed(3),
+    accounting_weight_grams: it.accountingWeight,
+    fab_fee_per_gram: it.fabPerGram,
+    fab_fee_amount: +(it.accountingWeight * it.fabPerGram).toFixed(2),
+    source: 'stock_given',
+    notes: (notes ? notes + ' — ' : '') + 'باركود ' + it.barcode + (it.description ? ' (' + it.description + ')' : '')
+  }));
 
-  btn.disabled = false;
-  btn.textContent = 'حفظ التسليم';
+  const { error: moveError } = await goldmindClient.from('trader_movements').insert(movements);
 
-  if (error) {
-    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+  if (moveError) {
+    btn.disabled = false;
+    btn.textContent = 'حفظ التسليم';
+    errEl.textContent = 'تعذّر الحفظ: ' + moveError.message;
     errEl.classList.remove('hidden');
     return;
   }
 
-  document.getElementById('gs-gross-weight').value = '';
-  document.getElementById('gs-accounting-weight').value = '';
-  document.getElementById('gs-fab-per-gram').value = '';
-  document.getElementById('gs-notes').value = '';
-  gsAccountingWeightTouched = false;
-  recomputeGiveStockPreview();
+  const pieceIds = giveStockCart.map(it => it.pieceId);
+  await goldmindClient.from('pieces').update({ status: 'given_to_trader' }).in('id', pieceIds);
+  await goldmindClient.from('piece_movements').insert(pieceIds.map(id => ({
+    store_id: GOLDMIND_STORE_ID, piece_id: id, event_type: 'given_to_trader',
+    note: 'إعطاء بضاعة للتاجر', created_by: GOLDMIND_STAFF_ID
+  })));
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ التسليم';
+
+  resetGiveStockCart();
   document.getElementById('give-stock-form').classList.add('hidden');
   const traderIdToReopen = currentTraderId;
   await load();
