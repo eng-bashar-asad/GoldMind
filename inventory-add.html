@@ -587,7 +587,7 @@
                 photoUrl = publicUrlData ? publicUrlData.publicUrl : null;
             }
 
-            const { error } = await goldmindClient.from('pieces').insert({
+            const { data: newPiece, error } = await goldmindClient.from('pieces').insert({
                 store_id: GOLDMIND_STORE_ID,
                 barcode: barcode,
                 photo_url: photoUrl,
@@ -603,7 +603,7 @@
                 color: selectedColor,
                 status: 'available',
                 created_by: GOLDMIND_STAFF_ID
-            });
+            }).select().single();
 
             saveBtn.disabled = false;
             saveBtn.textContent = 'حفظ القطعة بالمخزون';
@@ -611,6 +611,13 @@
             if (error) {
                 showMessage('خطأ: ' + error.message, true);
                 return;
+            }
+
+            if (newPiece) {
+                await goldmindClient.from('piece_movements').insert({
+                    store_id: GOLDMIND_STORE_ID, piece_id: newPiece.id, event_type: 'created',
+                    note: 'إدخال قطعة جديدة — وزن ' + weight + 'غ، عيار ' + karat, created_by: GOLDMIND_STAFF_ID
+                });
             }
 
             showMessage('تم حفظ القطعة بنجاح! الباركود: ' + barcode, false);
