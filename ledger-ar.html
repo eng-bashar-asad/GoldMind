@@ -222,7 +222,38 @@
 
 <!-- Trader detail -->
 <div id="trader-detail-view" class="hidden py-6 flex flex-col gap-4">
-<button onclick="showTradersList()" class="text-[12px] text-secondary font-semibold self-start">→ كل التجار</button>
+<div class="flex items-center justify-between">
+<button onclick="showTradersList()" class="text-[12px] text-secondary font-semibold">→ كل التجار</button>
+<button onclick="openStatementDatePrompt()" class="text-[12px] text-secondary font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">print</span>طباعة كشف حساب</button>
+</div>
+
+<!-- "من تاريخ" prompt before printing the statement -->
+<div class="hidden fixed inset-0 z-[95] items-center justify-center bg-black/40" id="statementDateOverlay">
+<div class="bg-surface-container-lowest w-full max-w-xs rounded-2xl p-5">
+<div class="font-bold text-[14px] mb-1">كشف حساب من تاريخ</div>
+<div class="text-[11px] text-on-surface-variant mb-3">اتركه فاضي لعرض كل الحركات منذ بداية الحساب</div>
+<input type="date" id="statementFromDate" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] mb-4"/>
+<div class="flex gap-2">
+<button onclick="closeStatementDatePrompt()" class="flex-1 h-10 rounded-lg text-[12.5px] font-semibold border border-outline-variant">إلغاء</button>
+<button onclick="goToStatementPrint()" class="flex-1 h-10 rounded-lg text-[12.5px] font-semibold bg-primary text-on-primary">طباعة</button>
+</div>
+</div>
+</div>
+<script>
+function openStatementDatePrompt() {
+  document.getElementById('statementDateOverlay').classList.remove('hidden');
+  document.getElementById('statementDateOverlay').classList.add('flex');
+}
+function closeStatementDatePrompt() {
+  document.getElementById('statementDateOverlay').classList.add('hidden');
+  document.getElementById('statementDateOverlay').classList.remove('flex');
+}
+function goToStatementPrint() {
+  var from = document.getElementById('statementFromDate').value;
+  var url = 'trader-statement-print-ar.html?trader=' + encodeURIComponent(currentTraderId) + (from ? '&from=' + from : '');
+  window.location.href = url;
+}
+</script>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <h2 class="font-bold text-[16px]" id="detail-trader-name"></h2>
