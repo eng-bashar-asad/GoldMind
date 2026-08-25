@@ -195,19 +195,9 @@
 </select>
 </div>
 </div>
-<div class="grid grid-cols-2 gap-3">
-<div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-tier">نوع البيع</label>
-<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-tier">
-<option value="retail">مفرق</option>
-<option value="wholesale">جملة</option>
-<option value="wholesale2">جملة الجملة</option>
-</select>
-</div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-price">السعر</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-price" placeholder="السعر" step="0.01" type="number"/>
-</div>
 </div>
 <div class="hidden text-[11.5px] text-secondary font-semibold -mt-1 flex items-center justify-between" id="manual-price-suggestion">
 <span id="manual-price-suggestion-text"></span>
@@ -406,22 +396,20 @@
         }
     })();
 
-    // ---------- Price-tier suggestion (مفرق/جملة/جملة الجملة) ----------
+    // ---------- Price suggestion ----------
     // Purely advisory: pre-computes weight × (today's gold price for that
-    // karat) + weight × (the selected tier's fabrication rate from company
-    // settings), shown as a one-click suggestion — never overwrites the
-    // manual price field on its own. Skips silently if the store hasn't
-    // configured that tier's rate yet.
-    let __fabRates = {};
+    // karat) + weight × (the store's configured fabrication rate per gram),
+    // shown as a one-click suggestion — never overwrites the manual price
+    // field on its own. Skips silently if the store hasn't configured a
+    // fabrication rate yet.
+    let __fabRate = null;
     let __goldPriceByKarat = {};
     (async function __loadPriceSuggestionData() {
         const [{ data: storeRates }, { data: goldPrices }] = await Promise.all([
-            goldmindClient.from('stores').select('fab_rate_retail, fab_rate_wholesale, fab_rate_wholesale2').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('stores').select('fab_rate_retail').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
             goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID)
         ]);
-        if (storeRates) {
-            __fabRates = { retail: storeRates.fab_rate_retail, wholesale: storeRates.fab_rate_wholesale, wholesale2: storeRates.fab_rate_wholesale2 };
-        }
+        if (storeRates) __fabRate = storeRates.fab_rate_retail;
         (goldPrices || []).forEach(p => { __goldPriceByKarat[p.karat] = Number(p.price_per_gram); });
         updateManualPriceSuggestion();
     })();
@@ -430,14 +418,12 @@
         const box = document.getElementById('manual-price-suggestion');
         const weight = parseFloat(document.getElementById('manual-weight').value);
         const karat = parseInt(document.getElementById('manual-karat').value, 10);
-        const tier = document.getElementById('manual-tier').value;
-        const fabRate = __fabRates[tier];
         const goldPrice = __goldPriceByKarat[karat];
-        if (!weight || weight <= 0 || fabRate == null || goldPrice == null) {
+        if (!weight || weight <= 0 || __fabRate == null || goldPrice == null) {
             box.classList.add('hidden');
             return;
         }
-        const suggested = weight * goldPrice + weight * fabRate;
+        const suggested = weight * goldPrice + weight * __fabRate;
         document.getElementById('manual-price-suggestion-text').textContent = 'سعر مقترح: ' + suggested.toFixed(2);
         box.dataset.suggestedValue = suggested.toFixed(2);
         box.classList.remove('hidden');
@@ -446,7 +432,7 @@
         const box = document.getElementById('manual-price-suggestion');
         if (box.dataset.suggestedValue) document.getElementById('manual-price').value = box.dataset.suggestedValue;
     }
-    ['manual-weight', 'manual-karat', 'manual-tier'].forEach(id => {
+    ['manual-weight', 'manual-karat'].forEach(id => {
         document.getElementById(id).addEventListener('input', updateManualPriceSuggestion);
         document.getElementById(id).addEventListener('change', updateManualPriceSuggestion);
     });
