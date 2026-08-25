@@ -161,6 +161,25 @@
 </div>
 </section>
 
+<!-- Ounce price (internal — profit calc only, never printed) -->
+<section class="hidden bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm p-4 space-y-2" id="ounce-price-section">
+<h2 class="font-label-md text-label-md text-emerald-800 uppercase tracking-wider flex items-center gap-1">
+<span class="material-symbols-outlined text-[16px]">visibility_off</span>
+                سعر الأونصة اليوم (خاص — لحساب الربح فقط)
+            </h2>
+<p class="text-[11px] text-emerald-700 leading-5">اختياري. لو عبّيته، البرنامج بيحسب ربح هالفاتورة على أساسه (حسب عيار ووزن محاسبة كل قطعة مباعة) بدل سعر الغرام المسجّل بصفحة "سعر الذهب". هالرقم داخلي بس — ما بيظهر أبداً بفاتورة الزبون ولا بالطباعة.</p>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-emerald-50 px-1 text-[10px] font-semibold text-emerald-700" for="sale-ounce-price">سعر الأونصة (دولار)</label>
+<input class="w-full h-12 border border-emerald-300 rounded-lg px-3 text-right font-data-mono bg-white" dir="ltr" id="sale-ounce-price" placeholder="2400.00" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-emerald-50 px-1 text-[10px] font-semibold text-emerald-700" for="sale-ounce-rate">سعر صرف الدولار</label>
+<input class="w-full h-12 border border-emerald-300 rounded-lg px-3 text-right font-data-mono bg-white" dir="ltr" id="sale-ounce-rate" placeholder="3.67" step="0.0001" type="number"/>
+</div>
+</div>
+</section>
+
 <!-- Barcode Search -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة قطعة بالباركود</h2>
@@ -393,6 +412,29 @@
         const { data: __store } = await goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
         if (__store && __store.diamonds_enabled) {
             document.getElementById('diamond-sale-section').classList.remove('hidden');
+        }
+    })();
+
+    // Show the internal ounce-price section only to owner/manager (same
+    // gate as the invoice-print-ar.html profit reveal) — a regular sales
+    // clerk shouldn't see or influence the store's cost basis. Pre-fills
+    // from the store's last saved ounce price/rate (gold-price-ar.html)
+    // purely as a starting suggestion; always editable, and saving here
+    // never touches stores.last_gold_ounce_price/gold_prices — it only
+    // affects this one invoice's profit-calc snapshot.
+    (async function __showOuncePriceSectionIfAllowed() {
+        await requireGoldMindSession('login-entry-ar.html');
+        const [{ data: __staffPerm2 }, { data: __storeRates }] = await Promise.all([
+            goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+            goldmindClient.from('stores').select('currency, last_gold_ounce_price, last_gold_ounce_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+        ]);
+        const __canSeeOunce = __staffPerm2 && (__staffPerm2.role === 'owner' || (__staffPerm2.permissions && __staffPerm2.permissions.view_profit_report === true));
+        if (!__canSeeOunce) return;
+        document.getElementById('ounce-price-section').classList.remove('hidden');
+        if (__storeRates && __storeRates.last_gold_ounce_rate != null) {
+            document.getElementById('sale-ounce-rate').value = __storeRates.last_gold_ounce_rate;
+        } else if (__storeRates && __storeRates.currency === 'USD') {
+            document.getElementById('sale-ounce-rate').value = 1;
         }
     })();
 
@@ -998,6 +1040,23 @@
             .from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
         const goldPriceMap = {};
         (goldPrices || []).forEach(p => { goldPriceMap[p.karat] = Number(p.price_per_gram); });
+
+        // If the (owner/manager-only) internal ounce-price field was filled
+        // in for this sale, it overrides the per-karat prices above for
+        // this invoice's profit snapshot only — gold-price-ar.html's saved
+        // per-gram rates and stores.last_gold_ounce_price are left
+        // untouched. This value is never sent to invoice-print-ar.html's
+        // customer-facing rendering, only stored in invoice_items.gold_price_per_gram
+        // (already screen-only/no-print, used solely by the profit panel).
+        const __ouncePriceInput = parseFloat(document.getElementById('sale-ounce-price') ? document.getElementById('sale-ounce-price').value : '');
+        const __ounceRateInput = parseFloat(document.getElementById('sale-ounce-rate') ? document.getElementById('sale-ounce-rate').value : '');
+        if (__ouncePriceInput && __ouncePriceInput > 0) {
+            const OUNCE_GRAMS = 31.1034768;
+            const KARAT_PURITY = { 24: 1, 22: 22 / 24, 21: 21 / 24, 18: 18 / 24 };
+            const rate = (__ounceRateInput && __ounceRateInput > 0) ? __ounceRateInput : 1;
+            const pricePerGram24 = (__ouncePriceInput / OUNCE_GRAMS) * rate;
+            [24, 22, 21, 18].forEach(k => { goldPriceMap[k] = pricePerGram24 * KARAT_PURITY[k]; });
+        }
 
         const { data: invoiceRow, error: invoiceError } = await goldmindClient
             .from('invoices')
