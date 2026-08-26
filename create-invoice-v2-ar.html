@@ -318,6 +318,14 @@
 <!-- Totals & Payment -->
 <section class="space-y-4 pb-8">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm space-y-2">
+<div class="hidden flex justify-between items-center text-[12px] text-on-surface-variant" id="fab-fee-total-row">
+<span>إجمالي أجرة المصنعية (دين على التاجر)</span>
+<span class="font-data-mono font-semibold" id="fab-fee-total">0.00</span>
+</div>
+<div class="hidden flex justify-between items-center text-[12px] text-on-surface-variant" id="fab-fee-vat-total-row">
+<span>إجمالي ضريبة المصنعية</span>
+<span class="font-data-mono font-semibold" id="fab-fee-vat-total">0.00</span>
+</div>
 <div class="pt-2 flex justify-between items-end">
 <span class="text-primary font-bold font-headline-md text-headline-md">الإجمالي</span>
 <span class="text-primary font-bold text-headline-md font-headline-md" id="grand-total">0.00 د.إ</span>
@@ -382,6 +390,7 @@
     let diamondsEnabled = false;
     const cart = []; // { cartId, karat, weight, price, description, mode, fabPerGram, ...diamond fields }
     let cartCounter = 0;
+    let fabFeeTouched = false; // declared here (not near currentFabFeeVat below) so the ?mode=bulk auto-open IIFE, which calls setItemMode() immediately, doesn't hit it before initialization
 
     // ---------- Diamonds feature toggle (per-store) ----------
     async function checkDiamondsEnabled() {
@@ -401,6 +410,7 @@
     // ---------- Item mode toggle (individual piece vs. bulk stock lot vs. diamond piece) ----------
     function setItemMode(mode) {
         itemMode = mode;
+        fabFeeTouched = false;
         document.getElementById('itemModePiece').classList.toggle('active', mode === 'piece');
         document.getElementById('itemModeBulk').classList.toggle('active', mode === 'bulk');
         document.getElementById('itemModeDiamond').classList.toggle('active', mode === 'diamond');
@@ -464,7 +474,24 @@
     function updateFabFeeVatPreview() {
         document.getElementById('manual-fabfee-vat').value = currentFabFeeVat().toFixed(2);
     }
-    document.getElementById('manual-fabfee').addEventListener('input', updateFabFeeVatPreview);
+
+    // "أجرة المصنعية" (the actual cash debt charged to the trader) auto-fills
+    // from weight × "مصنعية الغرام" for a bulk lot — the two fields used to be
+    // completely disconnected, so filling only the per-gram rate silently
+    // left the fee (and its VAT) at zero. Still fully editable/overridable:
+    // once the user types directly into أجرة المصنعية, autofill stops until
+    // the next new line (reset in setItemMode/addManualToCart).
+    function autoCalcBulkFabFee() {
+        if (itemMode !== 'bulk' || fabFeeTouched) return;
+        const weight = parseFloat(document.getElementById('manual-weight').value) || 0;
+        const perGram = parseFloat(document.getElementById('bulk-fab-per-gram').value) || 0;
+        const computed = weight * perGram;
+        document.getElementById('manual-fabfee').value = computed > 0 ? computed.toFixed(2) : '';
+        updateFabFeeVatPreview();
+    }
+    document.getElementById('manual-weight').addEventListener('input', autoCalcBulkFabFee);
+    document.getElementById('bulk-fab-per-gram').addEventListener('input', autoCalcBulkFabFee);
+    document.getElementById('manual-fabfee').addEventListener('input', () => { fabFeeTouched = true; updateFabFeeVatPreview(); });
 
     // Show/hide the optional gold-portion sub-fields inside the diamond form
     document.getElementById('diamond-has-gold-toggle').addEventListener('change', (e) => {
@@ -623,6 +650,7 @@
         document.getElementById('manual-price').value = '';
         document.getElementById('manual-fabfee').value = '';
         document.getElementById('bulk-fab-per-gram').value = '';
+        fabFeeTouched = false;
         updateFabFeeVatPreview();
         renderCart();
     }
@@ -696,11 +724,62 @@
         renderCart();
     }
 
+    // Editing a cart row is done by re-loading its values back into the
+    // entry form (and removing it from the cart) rather than a separate
+    // inline-edit UI -- this reuses the exact same validation/VAT-preview/
+    // auto-calc logic the form already has, instead of duplicating it.
+    // Pressing the mode's "add" button again re-inserts the (now edited) row.
+    function editCartItem(cartId) {
+        const idx = cart.findIndex(item => item.cartId === cartId);
+        if (idx === -1) return;
+        const item = cart[idx];
+        cart.splice(idx, 1);
+
+        setItemMode(item.mode);
+
+        if (item.mode === 'diamond') {
+            document.getElementById('diamond-carat').value = item.diamondCarat || '';
+            document.getElementById('diamond-price-per-carat').value = item.diamondPricePerCarat || '';
+            document.getElementById('manual-price').value = item.price || '';
+            document.getElementById('diamond-shape').value = item.shape || '';
+            document.getElementById('diamond-clarity').value = item.clarity || '';
+            document.getElementById('diamond-cut').value = item.cut || '';
+            document.getElementById('diamond-color').value = item.color || '';
+            document.getElementById('certificate-lab').value = item.certLab || '';
+            document.getElementById('certificate-number').value = item.certNumber || '';
+            document.getElementById('manual-desc').value = item.description || '';
+            const hasGoldToggle = document.getElementById('diamond-has-gold-toggle');
+            hasGoldToggle.checked = !!item.hasGold;
+            document.getElementById('diamond-gold-subfields').classList.toggle('hidden', !item.hasGold);
+            if (item.hasGold) {
+                document.getElementById('diamond-gold-weight').value = item.goldWeight || '';
+                document.getElementById('diamond-gold-karat').value = item.goldKarat || 21;
+                document.getElementById('diamond-gold-fab-cost').value = item.goldFabCost || '';
+            }
+        } else {
+            document.getElementById('manual-desc').value = item.description || '';
+            document.getElementById('manual-weight').value = item.weight || '';
+            document.getElementById('manual-karat').value = item.karat || 21;
+            document.getElementById('manual-price').value = item.price || '';
+            if (item.mode === 'bulk') document.getElementById('bulk-fab-per-gram').value = item.fabPerGram || '';
+            document.getElementById('manual-fabfee').value = item.fabFee || '';
+            fabFeeTouched = true; // we're restoring a saved value, not re-deriving it -- don't let the next weight/rate edit silently overwrite it
+            updateFabFeeVatPreview();
+        }
+
+        renderCart();
+        document.getElementById('itemModePiece').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+
     function renderCart() {
         const body = document.getElementById('cart-body');
         if (cart.length === 0) {
             body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
             document.getElementById('grand-total').textContent = '0.00 د.إ';
+            document.getElementById('fab-fee-total-row').classList.add('hidden');
+            document.getElementById('fab-fee-total-row').classList.remove('flex');
+            document.getElementById('fab-fee-vat-total-row').classList.add('hidden');
+            document.getElementById('fab-fee-vat-total-row').classList.remove('flex');
             return;
         }
         body.innerHTML = cart.map(item => {
@@ -717,14 +796,28 @@
                 <td class="px-2 py-3 text-left">${weightDisplay}</td>
                 <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}${item.fabFee ? `<br><span class="text-[10px] text-outline">+مصنعية ${item.fabFee.toFixed(2)}${item.fabFeeVat ? ` (ضريبة ${item.fabFeeVat.toFixed(2)})` : ''}</span>` : ''}</td>
                 <td class="px-2 py-3 text-left">
-                    <button onclick="removeFromCart(${item.cartId})" class="text-error">
-                        <span class="material-symbols-outlined text-[18px]">close</span>
-                    </button>
+                    <div class="flex items-center gap-2 justify-end">
+                        <button onclick="editCartItem(${item.cartId})" class="text-secondary">
+                            <span class="material-symbols-outlined text-[18px]">edit</span>
+                        </button>
+                        <button onclick="removeFromCart(${item.cartId})" class="text-error">
+                            <span class="material-symbols-outlined text-[18px]">close</span>
+                        </button>
+                    </div>
                 </td>
             </tr>
         `; }).join('');
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         document.getElementById('grand-total').textContent = total.toFixed(2) + ' د.إ';
+
+        const fabFeeTotal = cart.reduce((sum, item) => sum + (item.fabFee || 0), 0);
+        const fabFeeVatTotal = cart.reduce((sum, item) => sum + (item.fabFeeVat || 0), 0);
+        document.getElementById('fab-fee-total-row').classList.toggle('hidden', fabFeeTotal <= 0);
+        document.getElementById('fab-fee-total-row').classList.toggle('flex', fabFeeTotal > 0);
+        document.getElementById('fab-fee-total').textContent = fabFeeTotal.toFixed(2);
+        document.getElementById('fab-fee-vat-total-row').classList.toggle('hidden', fabFeeVatTotal <= 0);
+        document.getElementById('fab-fee-vat-total-row').classList.toggle('flex', fabFeeVatTotal > 0);
+        document.getElementById('fab-fee-vat-total').textContent = fabFeeVatTotal.toFixed(2);
     }
 
     // ---------- Save purchase invoice ----------
