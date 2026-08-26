@@ -129,7 +129,7 @@ async function loadData() {
 
   let invQuery = goldmindClient
     .from('invoices')
-    .select('id, invoice_number, type, status, total_amount, created_at, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name')
+    .select('id, invoice_number, type, status, total_amount, fabrication_fees, vat_amount, created_at, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name')
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('created_at', { ascending: false })
     .limit(300);
@@ -147,13 +147,34 @@ async function loadData() {
 
   const [{ data: invoices, error: invErr }, { data: repairs, error: repErr }] = await Promise.all([invQuery, repQuery]);
 
+  // Net weight per buyTrader invoice, fetched in one bulk query (not one
+  // query per row) so the list stays fast even with 300 invoices.
+  const traderInvoiceIds = (invoices || []).filter(i => i.type === 'buyTrader').map(i => i.id);
+  let weightByInvoice = {};
+  if (traderInvoiceIds.length) {
+    const { data: itemsForWeight } = await goldmindClient
+      .from('invoice_items').select('invoice_id, weight_grams, karat').in('invoice_id', traderInvoiceIds);
+    (itemsForWeight || []).forEach(it => {
+      const pureWeight = Number(it.weight_grams || 0) * (Number(it.karat || 0) / 24);
+      weightByInvoice[it.invoice_id] = (weightByInvoice[it.invoice_id] || 0) + pureWeight;
+    });
+  }
+
   const invRows = (invoices || []).map(i => ({
     id: i.id,
     kind: 'invoice',
     number: i.invoice_number,
     type: i.type,
     status: i.status,
-    amount: i.total_amount,
+    // buyTrader's total_amount is the cash-paid-now portion only (always 0
+    // on credit, since the gold itself is settled by weight via
+    // trader_movements/ledger-ar.html, not priced in cash) -- showing that
+    // here reads as a broken "0.00" with no context. The fab fee + its VAT
+    // is the actual debt this invoice created, so that's what's meaningful
+    // in a list glance.
+    amount: i.type === 'buyTrader' ? (Number(i.fabrication_fees || 0) + Number(i.vat_amount || 0)) : i.total_amount,
+    isTraderDebt: i.type === 'buyTrader',
+    netWeight: i.type === 'buyTrader' ? (weightByInvoice[i.id] || 0) : null,
     created_at: i.created_at,
     counterpartyName: (i.customer && i.customer.name) || (i.trader && i.trader.name) || i.counterparty_name || '',
     counterpartyPhone: (i.customer && i.customer.phone) || (i.trader && i.trader.phone) || '',
@@ -220,10 +241,13 @@ function applyFilters() {
             <span class="type-badge ${badgeColor}">${TYPE_LABELS[r.type] || r.type}</span>
           </div>
           <p class="text-[12px] text-on-surface-variant truncate">${r.counterpartyName || 'بدون اسم'} ${r.counterpartyPhone ? '· ' + r.counterpartyPhone : ''}</p>
-          <p class="text-[10px] text-outline">${dateStr}${statusLabel ? ' · ' + statusLabel : ''}</p>
+          <p class="text-[10px] text-outline">${dateStr}${statusLabel ? ' · ' + statusLabel : ''}${r.isTraderDebt ? ' · وزن صافي ' + fmt(r.netWeight) + ' غ' : ''}</p>
         </div>
         <div class="flex items-center gap-1 shrink-0">
-          <span class="font-data-mono font-bold text-[14px]">${fmt(r.amount)}</span>
+          <div class="flex flex-col items-end">
+            <span class="font-data-mono font-bold text-[14px]">${fmt(r.amount)}</span>
+            ${r.isTraderDebt ? '<span class="text-[9px] text-on-surface-variant">دين مصنعية</span>' : ''}
+          </div>
           <span class="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_left</span>
         </div>
       </a>`;
