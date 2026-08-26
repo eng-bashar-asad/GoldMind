@@ -1,0 +1,194 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>أرصدة الشركة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .gm-card { background: var(--gm-surface-lowest); border: 1px solid var(--gm-outline-variant); border-radius: 14px; }
+    .gm-row { border-bottom: 1px solid var(--gm-outline-variant); }
+    .gm-row:last-child { border-bottom: none; }
+    .text-success { color: #1e7d32; }
+    .text-error { color: #ba1a1a; }
+</style>
+</head>
+<body>
+<header class="border-b sticky top-0 z-50" style="background: var(--gm-surface-lowest); border-color: var(--gm-outline-variant);">
+<div class="flex justify-between items-center px-4 w-full h-16 max-w-md lg:max-w-3xl mx-auto">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold">أرصدة الشركة</h1>
+</div>
+<button onclick="window.location.href='traders-summary-print-ar.html'" class="p-2 hover:bg-gray-100 rounded-full flex items-center justify-center" title="طباعة PDF">
+<span class="material-symbols-outlined">picture_as_pdf</span>
+</button>
+</div>
+</header>
+
+<main class="max-w-md lg:max-w-3xl mx-auto px-4 py-5">
+<div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
+
+<div id="page-content" class="hidden space-y-6">
+
+<!-- Section 1: Traders balances (gold + cash), same numbers as ledger-ar.html -->
+<section>
+<h2 class="text-[14px] font-bold mb-2">أرصدة التجار (ذهب صافي + نقدي)</h2>
+<div class="gm-card overflow-hidden" id="tradersTable"></div>
+<div class="gm-card mt-2 p-3 flex justify-around text-center">
+<div>
+<p class="text-[10.5px]" style="color: var(--gm-on-surface-variant);">إجمالي ذهب التجار</p>
+<p class="font-bold text-[15px]" id="tradersGoldTotal"></p>
+</div>
+<div>
+<p class="text-[10.5px]" style="color: var(--gm-on-surface-variant);">إجمالي نقدي التجار</p>
+<p class="font-bold text-[15px]" id="tradersCashTotal"></p>
+</div>
+</div>
+</section>
+
+<!-- Section 2: Warehouse stock per karat (own inventory only — pieces + remaining bulk lots, excludes anything given to a trader) -->
+<section>
+<h2 class="text-[14px] font-bold mb-2">رصيد البضاعة الموجودة بالشركة</h2>
+<div class="gm-card overflow-hidden" id="warehouseTable"></div>
+</section>
+
+<!-- Section 3: Net gold position -->
+<section>
+<h2 class="text-[14px] font-bold mb-2">صافي ذهب الشركة</h2>
+<div class="gm-card overflow-hidden">
+<div class="gm-row flex items-center justify-between p-3">
+<span class="text-[12.5px]" style="color: var(--gm-on-surface-variant);">ذهب البضاعة بالمستودع (مكافئ ٢٤)</span>
+<span class="font-bold text-[13.5px]" id="netWarehouseGold" style="font-family: monospace;"></span>
+</div>
+<div class="gm-row flex items-center justify-between p-3">
+<span class="text-[12.5px]" style="color: var(--gm-on-surface-variant);">صافي الذهب مع تجار الجملة</span>
+<span class="font-bold text-[13.5px]" id="netTraderGold" style="font-family: monospace;"></span>
+</div>
+<div class="flex items-center justify-between p-3" style="background: var(--gm-surface-low);">
+<span class="text-[13px] font-bold">الصافي الإجمالي</span>
+<span class="font-bold text-[17px]" id="netTotalGold" style="font-family: monospace;"></span>
+</div>
+</div>
+<p class="text-[10.5px] mt-2" style="color: var(--gm-on-surface-variant);">قيمة موجبة (خضراء) بأرصدة التجار = التاجر مديون للشركة. قيمة سالبة (حمراء) = الشركة مديونة للتاجر.</p>
+</section>
+
+</div>
+</main>
+
+<script>
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 3 }); }
+let gmStore = null;
+function fmtMoney(amount) { return gmFormatDualCurrency(amount, gmStore); }
+
+async function load() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const [{ data: store }, { data: traders }, { data: moves }, { data: pieces }, { data: lots }] = await Promise.all([
+        goldmindClient.from('stores').select('currency, secondary_currency, last_gold_ounce_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+        goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name', { ascending: true }),
+        goldmindClient.from('trader_movements').select('trader_id, movement_type, gold_24k_equivalent, fab_fee_amount').eq('store_id', GOLDMIND_STORE_ID),
+        goldmindClient.from('pieces').select('karat, weight_grams').eq('store_id', GOLDMIND_STORE_ID).eq('status', 'available'),
+        goldmindClient.from('gold_stock_lots').select('karat, weight_grams_remaining').eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0)
+    ]);
+    gmStore = store || null;
+
+    // ---- Section 1: traders ----
+    const movesByTrader = {};
+    (moves || []).forEach(m => {
+        if (!movesByTrader[m.trader_id]) movesByTrader[m.trader_id] = [];
+        movesByTrader[m.trader_id].push(m);
+    });
+    function goldBalance(traderId) {
+        return (movesByTrader[traderId] || []).reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? -Number(m.gold_24k_equivalent || 0) : Number(m.gold_24k_equivalent || 0)), 0);
+    }
+    function cashBalance(traderId) {
+        return (movesByTrader[traderId] || []).reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0)), 0);
+    }
+    const traderRows = (traders || []).map(t => ({ name: t.name, gold: goldBalance(t.id), cash: cashBalance(t.id) }));
+    const totalTraderGold = traderRows.reduce((s, r) => s + r.gold, 0);
+    const totalTraderCash = traderRows.reduce((s, r) => s + r.cash, 0);
+
+    const tradersTableEl = document.getElementById('tradersTable');
+    tradersTableEl.innerHTML = traderRows.length === 0
+        ? '<div class="p-6 text-center text-[12.5px]" style="color: var(--gm-on-surface-variant);">لا يوجد تجار مسجّلون بعد</div>'
+        : traderRows.map(r => `
+            <div class="gm-row flex items-center justify-between p-3">
+                <span class="text-[13px] font-semibold truncate">${gmEscapeHtml(r.name)}</span>
+                <div class="flex gap-4 text-[12.5px] shrink-0" style="font-family: monospace;">
+                    <span class="${r.gold > 0 ? 'text-success' : (r.gold < 0 ? 'text-error' : '')}">${fmt(Math.abs(r.gold))} غ</span>
+                    <span class="${r.cash > 0 ? 'text-success' : (r.cash < 0 ? 'text-error' : '')}">${fmtMoney(Math.abs(r.cash))}</span>
+                </div>
+            </div>`).join('');
+
+    const goldTotalEl = document.getElementById('tradersGoldTotal');
+    goldTotalEl.textContent = fmt(Math.abs(totalTraderGold)) + ' غ';
+    goldTotalEl.className = 'font-bold text-[15px] ' + (totalTraderGold > 0 ? 'text-success' : (totalTraderGold < 0 ? 'text-error' : ''));
+    const cashTotalEl = document.getElementById('tradersCashTotal');
+    cashTotalEl.textContent = fmtMoney(Math.abs(totalTraderCash));
+    cashTotalEl.className = 'font-bold text-[15px] ' + (totalTraderCash > 0 ? 'text-success' : (totalTraderCash < 0 ? 'text-error' : ''));
+
+    // ---- Section 2: warehouse stock per karat ----
+    // Only pieces still physically on hand (status='available' -- anything
+    // given to a trader already flips out of this status, see
+    // inventory-list-ar.html) plus the un-sold remainder of any bulk gold
+    // lots (رصيد بالجملة) -- both are gold the company actually holds right
+    // now, independent of anything owed to/by a trader.
+    const byKarat = {};
+    (pieces || []).forEach(p => {
+        const k = p.karat || 0;
+        byKarat[k] = (byKarat[k] || 0) + Number(p.weight_grams || 0);
+    });
+    (lots || []).forEach(l => {
+        const k = l.karat || 0;
+        byKarat[k] = (byKarat[k] || 0) + Number(l.weight_grams_remaining || 0);
+    });
+    const karats = Object.keys(byKarat).map(Number).sort((a, b) => b - a);
+    const warehouseTableEl = document.getElementById('warehouseTable');
+    let warehouseGold24k = 0;
+    warehouseTableEl.innerHTML = karats.length === 0
+        ? '<div class="p-6 text-center text-[12.5px]" style="color: var(--gm-on-surface-variant);">لا توجد بضاعة بالمستودع حالياً</div>'
+        : karats.map(k => {
+            const weight = byKarat[k];
+            warehouseGold24k += weight * (k / 24);
+            return `
+            <div class="gm-row flex items-center justify-between p-3">
+                <span class="text-[13px] font-semibold">عيار ${k}</span>
+                <span class="font-bold text-[13px]" style="font-family: monospace;">${fmt(weight)} غ</span>
+            </div>`;
+        }).join('') + `
+            <div class="flex items-center justify-between p-3" style="background: var(--gm-surface-low);">
+                <span class="text-[12.5px] font-bold">الإجمالي (مكافئ عيار ٢٤)</span>
+                <span class="font-bold text-[13.5px]" style="font-family: monospace;">${fmt(warehouseGold24k)} غ</span>
+            </div>`;
+
+    // ---- Section 3: net gold position ----
+    document.getElementById('netWarehouseGold').textContent = fmt(warehouseGold24k) + ' غ';
+    const netTraderEl = document.getElementById('netTraderGold');
+    netTraderEl.textContent = (totalTraderGold >= 0 ? '+' : '−') + fmt(Math.abs(totalTraderGold)) + ' غ';
+    netTraderEl.className = 'font-bold text-[13.5px] ' + (totalTraderGold > 0 ? 'text-success' : (totalTraderGold < 0 ? 'text-error' : ''));
+    const netTotal = warehouseGold24k + totalTraderGold;
+    document.getElementById('netTotalGold').textContent = fmt(netTotal) + ' غ';
+
+    document.getElementById('loading-state').classList.add('hidden');
+    document.getElementById('page-content').classList.remove('hidden');
+}
+
+load();
+</script>
+</body></html>
