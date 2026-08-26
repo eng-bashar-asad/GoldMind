@@ -805,26 +805,60 @@ function showTraderDetail(traderId) {
 
   // Group consecutive rows sharing a non-null batch_id (a multi-line
   // receive-stock voucher, e.g. a wholesale invoice with several
-  // weight/rate lines) into one render entry, so they show as a single
-  // itemized card instead of scattering across the timeline. moves[] is
-  // already ordered by created_at desc, so same-batch rows (inserted
-  // together) are guaranteed adjacent.
+  // weight/rate lines) OR sharing the same invoice_id (a purchase invoice
+  // from create-invoice-v2-ar.html with several cart items, each of which
+  // writes its own trader_movements row) into one render entry, so they
+  // show as a single itemized card instead of one card per fab fee line.
+  // moves[] is already ordered by created_at desc, so rows from the same
+  // save action (batch or invoice) are guaranteed adjacent.
   const renderGroups = [];
   moves.forEach(m => {
     if (m.batch_id) {
       const last = renderGroups[renderGroups.length - 1];
-      if (last && last.isBatch && last.batchId === m.batch_id) {
+      if (last && last.kind === 'batch' && last.batchId === m.batch_id) {
         last.rows.push(m);
         return;
       }
-      renderGroups.push({ isBatch: true, batchId: m.batch_id, rows: [m] });
+      renderGroups.push({ kind: 'batch', batchId: m.batch_id, rows: [m] });
+    } else if (m.invoice_id) {
+      const last = renderGroups[renderGroups.length - 1];
+      if (last && last.kind === 'invoice' && last.invoiceId === m.invoice_id) {
+        last.rows.push(m);
+        return;
+      }
+      renderGroups.push({ kind: 'invoice', invoiceId: m.invoice_id, rows: [m] });
     } else {
-      renderGroups.push({ isBatch: false, m });
+      renderGroups.push({ kind: 'single', m });
     }
   });
 
   listEl.innerHTML = renderGroups.map(group => {
-    if (group.isBatch) {
+    if (group.kind === 'invoice') {
+      const rows = group.rows;
+      const first = rows[0];
+      const isIncrease = first.movement_type === 'debt_increase';
+      const date = gmFormatDateTime(first.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
+      const totalGold24k = rows.reduce((s, r) => s + Number(r.gold_24k_equivalent || 0), 0);
+      const totalFee = rows.reduce((s, r) => s + Number(r.fab_fee_amount || 0), 0);
+      const invoiceNumber = first.invoice && first.invoice.invoice_number;
+      return `
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-invgroup-${group.invoiceId}">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(first)} (${rows.length} ${rows.length === 1 ? 'صنف' : 'أصناف'})</span>
+          <span class="text-[11px] text-on-surface-variant">${date}</span>
+        </div>
+        <div class="flex flex-col gap-1 mb-2">
+          ${rows.map(r => `<div class="flex items-center justify-between text-[12px] font-data-mono border-b border-outline-variant/40 pb-1 pt-1"><span>${r.weight_grams ? r.weight_grams + 'غ عيار ' + r.karat : (r.notes ? gmEscapeHtml(r.notes) : '—')}</span><span>${fmt(r.gold_24k_equivalent)}غ (٢٤)${Number(r.fab_fee_amount || 0) > 0 ? ' + ' + fmtMoney(r.fab_fee_amount) : ''}</span></div>`).join('')}
+        </div>
+        <div class="flex items-center justify-between text-[13px] font-bold pt-1 border-t border-outline-variant">
+          <span>الإجمالي</span>
+          <span class="font-data-mono">${fmt(totalGold24k)}غ (٢٤) + ${fmtMoney(totalFee)}</span>
+        </div>
+        ${invoiceNumber ? `<a href="invoice-print-ar.html?id=${group.invoiceId}" class="text-[11px] text-secondary font-semibold underline mt-1 inline-block">عرض فاتورة الشراء: ${gmEscapeHtml(invoiceNumber)} ←</a>` : ''}
+      </div>`;
+    }
+
+    if (group.kind === 'batch') {
       const rows = group.rows;
       const first = rows[0];
       const isIncrease = first.movement_type === 'debt_increase';
