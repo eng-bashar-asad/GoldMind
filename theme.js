@@ -789,22 +789,45 @@ goldmindLoadSavedFont();
 })();
 
 // Context-aware "back" for header back buttons across the app (rolled out
-// site-wide — see conversation with بشار, Aug 23 2026). Previously most
-// header back buttons hard-jumped straight to index-ar.html no matter how
-// the user got to the page. If the user actually navigated in from another
-// GoldMind page during this tab's session, gmSmartBack() steps back ONE
-// page in browser history instead (lands wherever they actually came from —
-// a search result, a customer's ledger, etc.). If there's no same-app
-// history to return to (fresh tab, deep link, bookmark, opened from the
-// Android app shell), it falls back to the given href exactly like before.
-// Pages with their own bespoke internal back logic (e.g. ledger-ar.html's
-// list/detail goBack(), inventory-count-ar.html's multi-step headerBack())
-// keep their own function untouched — this only replaces the flat
-// "always go to index-ar.html" buttons.
+// site-wide — see conversation with بشار, Aug 23 2026; reworked Aug 26 2026
+// after the document.referrer/history.length approach turned out unreliable
+// inside the Android WebView the APK runs in -- document.referrer is often
+// empty there even for genuine in-app navigation (unlike a normal desktop
+// browser tab), so the button was silently falling through to the fallback
+// page instead of actually stepping back.
+//
+// Replaced with an explicit sessionStorage-based navigation stack instead,
+// which doesn't depend on the WebView's referrer/history quirks at all:
+// every GoldMind page pushes its own URL onto gm_nav_stack on load (unless
+// it just arrived via gmSmartBack itself, flagged by gm_nav_going_back, in
+// which case it's already sitting at the top and shouldn't be pushed again
+// -- that flag is what prevents the earlier A→B→back-to-A→forward-to-B-again
+// "ping-pong" bug). gmSmartBack() pops the current entry and navigates to
+// whatever is now on top. Falls back to the given href only when the stack
+// has nothing left (fresh tab, deep link, bookmark, or storage unavailable).
+(function () {
+  try {
+    var STACK_KEY = 'gm_nav_stack';
+    var stack = JSON.parse(sessionStorage.getItem(STACK_KEY) || '[]');
+    var here = location.pathname + location.search;
+    var wasBack = sessionStorage.getItem('gm_nav_going_back') === '1';
+    sessionStorage.removeItem('gm_nav_going_back');
+    if (!wasBack && stack[stack.length - 1] !== here) {
+      stack.push(here);
+    }
+    sessionStorage.setItem(STACK_KEY, JSON.stringify(stack.slice(-30)));
+  } catch (e) { /* sessionStorage unavailable (private mode etc.) -- gmSmartBack falls back to fallbackHref every time */ }
+})();
+
 function gmSmartBack(fallbackHref) {
   try {
-    if (history.length > 1 && document.referrer && new URL(document.referrer).origin === location.origin) {
-      history.back();
+    var stack = JSON.parse(sessionStorage.getItem('gm_nav_stack') || '[]');
+    if (stack.length > 1) {
+      stack.pop(); // drop the current page
+      var target = stack[stack.length - 1]; // new top = where we actually came from
+      sessionStorage.setItem('gm_nav_stack', JSON.stringify(stack));
+      sessionStorage.setItem('gm_nav_going_back', '1');
+      window.location.href = target;
       return;
     }
   } catch (e) { /* fall through to hard navigation */ }
