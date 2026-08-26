@@ -323,15 +323,19 @@
 <section class="space-y-4 pb-8">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm space-y-2">
 <div class="hidden flex justify-between items-center text-[12px] text-on-surface-variant" id="fab-fee-total-row">
-<span>إجمالي أجرة المصنعية (دين على التاجر)</span>
+<span>إجمالي أجرة المصنعية</span>
 <span class="font-data-mono font-semibold" id="fab-fee-total">0.00</span>
 </div>
 <div class="hidden flex justify-between items-center text-[12px] text-on-surface-variant" id="fab-fee-vat-total-row">
 <span>إجمالي ضريبة المصنعية</span>
 <span class="font-data-mono font-semibold" id="fab-fee-vat-total">0.00</span>
 </div>
+<div class="hidden flex justify-between items-center text-[13px] font-bold text-error pt-1 border-t border-outline-variant" id="trader-debt-total-row">
+<span>إجمالي الدين المُسجَّل على حساب التاجر</span>
+<span class="font-data-mono" id="trader-debt-total">0.00</span>
+</div>
 <div class="pt-2 flex justify-between items-end">
-<span class="text-primary font-bold font-headline-md text-headline-md">الإجمالي</span>
+<span class="text-primary font-bold font-headline-md text-headline-md">الإجمالي النقدي المدفوع الآن</span>
 <span class="text-primary font-bold text-headline-md font-headline-md" id="grand-total">0.00 د.إ</span>
 </div>
 </div>
@@ -448,6 +452,7 @@
         document.getElementById('payment-options').classList.toggle('hidden', type !== 'buyTrader');
         if (type !== 'buyTrader') selectPayment('cash');
         updateFabFeeVisibility();
+        renderCart();
     }
 
     // Fabrication-fee field only makes sense for a gold piece/lot bought from a trader —
@@ -524,6 +529,7 @@
         const inactive = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
         cashBtn.className = mode === 'cash' ? active : inactive;
         creditBtn.className = mode === 'credit' ? active : inactive;
+        renderCart();
     }
 
     // ---------- Trader search ----------
@@ -801,6 +807,8 @@
             document.getElementById('fab-fee-total-row').classList.remove('flex');
             document.getElementById('fab-fee-vat-total-row').classList.add('hidden');
             document.getElementById('fab-fee-vat-total-row').classList.remove('flex');
+            document.getElementById('trader-debt-total-row').classList.add('hidden');
+            document.getElementById('trader-debt-total-row').classList.remove('flex');
             return;
         }
         body.innerHTML = cart.map(item => {
@@ -839,6 +847,15 @@
         document.getElementById('fab-fee-vat-total-row').classList.toggle('hidden', fabFeeVatTotal <= 0);
         document.getElementById('fab-fee-vat-total-row').classList.toggle('flex', fabFeeVatTotal > 0);
         document.getElementById('fab-fee-vat-total').textContent = fabFeeVatTotal.toFixed(2);
+
+        // Only meaningful for buyTrader + credit (دين على حساب التاجر) --
+        // this is the exact number that lands in trader_movements.fab_fee_amount
+        // and shows on ledger-ar.html as the trader's cash debt.
+        const traderDebtTotal = fabFeeTotal + fabFeeVatTotal;
+        const showTraderDebt = purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit' && traderDebtTotal > 0;
+        document.getElementById('trader-debt-total-row').classList.toggle('hidden', !showTraderDebt);
+        document.getElementById('trader-debt-total-row').classList.toggle('flex', showTraderDebt);
+        document.getElementById('trader-debt-total').textContent = traderDebtTotal.toFixed(2) + ' د.إ';
     }
 
     // ---------- Save purchase invoice ----------
@@ -1158,7 +1175,9 @@
                     weight_grams: item.weight,
                     karat: item.karat,
                     gold_24k_equivalent: +(item.weight * (item.karat / 24)).toFixed(3),
-                    fab_fee_amount: item.fabFee || 0,
+                    // Includes the fab fee's VAT too -- this is what the trader
+                    // actually owes the shop in cash, not just the bare fee.
+                    fab_fee_amount: +((item.fabFee || 0) + (item.fabFeeVat || 0)).toFixed(2),
                     notes: item.description || ('فاتورة شراء ' + invoiceNumber)
                 };
             });
