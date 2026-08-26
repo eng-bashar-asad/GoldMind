@@ -321,36 +321,23 @@ function goToStatementPrint() {
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="receive-stock-form">
-<p class="text-[12px] text-on-surface-variant mb-3">استلام بضاعة من التاجر (وزن قائم + وزن محاسبة + مصنعية على الغرام). الذهب يُسجَّل ديناً على المحل تجاه التاجر، والمصنعية تُسجَّل ديناً نقدياً منفصلاً تماماً — لا يوجد سعر شراء نقدي هنا.</p>
-<div class="grid grid-cols-2 gap-3 mb-3">
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن القائم (غ)</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="rs-gross-weight" oninput="onReceiveGrossWeightInput(); recomputeReceiveStockPreview()" step="0.01" type="number"/>
+<p class="text-[12px] text-on-surface-variant mb-3">استلام بضاعة من التاجر — أضف سطر لكل وزن/مصنعية مختلفة بنفس فاتورة التاجر (متل فاتورة المشتريات الورقية). الذهب يُسجَّل ديناً على المحل تجاه التاجر، والمصنعية تُسجَّل ديناً نقدياً منفصلاً تماماً — لا يوجد سعر شراء نقدي هنا.</p>
+<div class="relative mb-3">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="rs-batch-ref">مرجع فاتورة التاجر (اختياري)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="rs-batch-ref" placeholder="مثلاً SAL NO: HO-260602"/>
 </div>
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العيار</label>
-<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="rs-karat" onchange="recomputeReceiveStockPreview()">
-<option value="18">18</option>
-<option selected value="21">21</option>
-<option value="22">22</option>
-<option value="24">24</option>
-</select>
-</div>
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن المحاسبي (غ)</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="rs-accounting-weight" oninput="recomputeReceiveStockPreview()" step="0.01" type="number"/>
-</div>
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="rs-fab-per-gram-label">مصنعية للغرام (د.إ)</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="rs-fab-per-gram" oninput="recomputeReceiveStockPreview()" step="0.01" type="number"/>
-</div>
-</div>
+<div id="rs-lines-list" class="flex flex-col gap-2 mb-3"></div>
+<button class="w-full h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary mb-3 flex items-center justify-center gap-1" onclick="addReceiveStockLine()">
+<span class="material-symbols-outlined text-[16px]">add</span> أضف سطر آخر
+</button>
 <div class="bg-surface-container-low rounded-lg p-3 mb-3 text-[12px] flex flex-col gap-1" id="rs-preview">
+<div class="flex justify-between"><span class="text-on-surface-variant">إجمالي الوزن القائم</span><span class="font-data-mono font-semibold" id="rs-preview-gross">0.00 غ</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant">إجمالي الوزن المحاسبي</span><span class="font-data-mono font-semibold" id="rs-preview-accounting">0.00 غ</span></div>
 <div class="flex justify-between"><span class="text-on-surface-variant">دين الذهب (مكافئ ٢٤)</span><span class="font-data-mono font-semibold" id="rs-preview-gold">0.00 غ</span></div>
-<div class="flex justify-between"><span class="text-on-surface-variant">إجمالي المصنعية</span><span class="font-data-mono font-semibold" id="rs-preview-fee">0.00 د.إ</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant" id="rs-preview-fee-label">إجمالي المصنعية</span><span class="font-data-mono font-semibold" id="rs-preview-fee">0.00</span></div>
 </div>
-<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="rs-notes" placeholder="ملاحظة (اختياري)"></textarea>
-<button onclick="submitReceiveStock()" id="rs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الاستلام</button>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="rs-notes" placeholder="ملاحظة عامة على السند (اختياري)"></textarea>
+<button onclick="submitReceiveStock()" id="rs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold disabled:opacity-50" disabled="">حفظ الاستلام</button>
 <p class="text-error text-[12px] hidden mt-2" id="rs-error"></p>
 </div>
 
@@ -804,7 +791,56 @@ function showTraderDetail(traderId) {
   }
   emptyEl.classList.add('hidden');
 
-  listEl.innerHTML = moves.map(m => {
+  // Group consecutive rows sharing a non-null batch_id (a multi-line
+  // receive-stock voucher, e.g. a wholesale invoice with several
+  // weight/rate lines) into one render entry, so they show as a single
+  // itemized card instead of scattering across the timeline. moves[] is
+  // already ordered by created_at desc, so same-batch rows (inserted
+  // together) are guaranteed adjacent.
+  const renderGroups = [];
+  moves.forEach(m => {
+    if (m.batch_id) {
+      const last = renderGroups[renderGroups.length - 1];
+      if (last && last.isBatch && last.batchId === m.batch_id) {
+        last.rows.push(m);
+        return;
+      }
+      renderGroups.push({ isBatch: true, batchId: m.batch_id, rows: [m] });
+    } else {
+      renderGroups.push({ isBatch: false, m });
+    }
+  });
+
+  listEl.innerHTML = renderGroups.map(group => {
+    if (group.isBatch) {
+      const rows = group.rows;
+      const first = rows[0];
+      const isIncrease = first.movement_type === 'debt_increase';
+      const date = gmFormatDateTime(first.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
+      const totalGold24k = rows.reduce((s, r) => s + Number(r.gold_24k_equivalent || 0), 0);
+      const totalFee = rows.reduce((s, r) => s + Number(r.fab_fee_amount || 0), 0);
+      return `
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-batch-${group.batchId}">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(first)} (${rows.length} أسطر)</span>
+          <span class="text-[11px] text-on-surface-variant">${date}</span>
+        </div>
+        ${first.batch_ref ? `<p class="text-[11px] text-on-surface-variant mb-2">مرجع: ${gmEscapeHtml(first.batch_ref)}</p>` : ''}
+        <div class="flex flex-col gap-1 mb-2">
+          ${rows.map(r => `<div class="flex items-center justify-between text-[12px] font-data-mono border-b border-outline-variant/40 pb-1 pt-1"><span>${r.weight_grams}غ قائم / ${r.accounting_weight_grams}غ محاسبي &middot; عيار ${r.karat}</span><span>${fmtMoney(r.fab_fee_per_gram)}/غ</span></div>`).join('')}
+        </div>
+        <div class="flex items-center justify-between text-[13px] font-bold pt-1 border-t border-outline-variant">
+          <span>الإجمالي</span>
+          <span class="font-data-mono">${fmt(totalGold24k)}غ (٢٤) + ${fmtMoney(totalFee)}</span>
+        </div>
+        ${first.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(first.notes)}</p>` : ''}
+        <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+          <button onclick="deleteStockMovementBatch('${group.batchId}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف السند بالكامل</button>
+        </div>
+      </div>`;
+    }
+
+    const m = group.m;
     const isIncrease = m.movement_type === 'debt_increase';
     const date = gmFormatDateTime(m.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
     const isStockMovement = m.source === 'stock_given' || m.source === 'stock_received';
@@ -1048,7 +1084,7 @@ async function saveEditStockMovement(id) {
     weight_grams: weight,
     karat: karat,
     // Billed on the accounting (billable) weight, not the physical gross
-    // weight — see comment in recomputeReceiveStockPreview above.
+    // weight — see comment in renderReceiveStockLines above.
     gold_24k_equivalent: +(accounting * (karat / 24)).toFixed(3),
     accounting_weight_grams: accounting,
     fab_fee_per_gram: fabPerGram,
@@ -1072,6 +1108,20 @@ async function deleteStockMovement(movementId) {
   if (!confirm('هل تريد حذف هذه الحركة؟ هذا الإجراء نهائي.')) return;
 
   const { error } = await goldmindClient.from('trader_movements').delete().eq('id', movementId);
+  if (error) {
+    alert('تعذّر الحذف: ' + error.message);
+    return;
+  }
+
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+}
+
+async function deleteStockMovementBatch(batchId) {
+  if (!confirm('هل تريد حذف هذا السند بالكامل (كل أسطره)؟ هذا الإجراء نهائي.')) return;
+
+  const { error } = await goldmindClient.from('trader_movements').delete().eq('batch_id', batchId);
   if (error) {
     alert('تعذّر الحذف: ' + error.message);
     return;
@@ -1233,7 +1283,9 @@ function toggleReceiveStockForm() {
   document.getElementById('settle-form').classList.add('hidden');
   document.getElementById('give-stock-form').classList.add('hidden');
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
+  const wasHidden = document.getElementById('receive-stock-form').classList.contains('hidden');
   document.getElementById('receive-stock-form').classList.toggle('hidden');
+  if (wasHidden) resetReceiveStockLines();
 }
 
 let tobDirection = 'receivable'; // 'receivable' = التاجر مديون للمحل (قبض), 'payable' = المحل مديون للتاجر (صرف)
@@ -1336,75 +1388,145 @@ async function submitTraderOpeningBalance() {
   showTraderDetail(traderIdToReopen);
 }
 
-let rsAccountingWeightTouched = false;
-function onReceiveGrossWeightInput() {
-  if (rsAccountingWeightTouched) return;
-  document.getElementById('rs-accounting-weight').value = document.getElementById('rs-gross-weight').value;
-}
-document.addEventListener('DOMContentLoaded', () => {
-  const rsAccEl = document.getElementById('rs-accounting-weight');
-  if (rsAccEl) rsAccEl.addEventListener('input', () => { rsAccountingWeightTouched = true; });
-});
+// ---------- Receive stock from trader — multi-line batch cart ----------
+// Mirrors a wholesale trader's own paper invoice, which often has several
+// lines at different fabrication rates in ONE invoice (see e.g. a fixed-rate
+// tax invoice with per-item making charges). All lines saved together share
+// a client-generated batch_id so the ledger timeline groups + totals them
+// as a single voucher card instead of scattering them across the timeline.
+let receiveStockLines = [];
+let receiveStockLineCounter = 0;
 
-function recomputeReceiveStockPreview() {
-  const gross = parseFloat(document.getElementById('rs-gross-weight').value) || 0;
-  const karat = parseInt(document.getElementById('rs-karat').value, 10) || 0;
-  const accounting = parseFloat(document.getElementById('rs-accounting-weight').value) || 0;
-  const perGram = parseFloat(document.getElementById('rs-fab-per-gram').value) || 0;
-  // Billed on the accounting (billable) weight, not the physical gross
-  // weight — matches accounting_weight_grams' role everywhere else in the
-  // app (profit-report-ar.html, invoice-print-ar.html's COGS, and the
-  // give-stock flow above).
-  document.getElementById('rs-preview-gold').textContent = fmt(accounting * (karat / 24)) + ' غ';
-  // perGram is typed in whichever currency is currently selected, so the
-  // preview total is shown in that same currency (not converted via fmtMoney,
-  // which expects an AED-based amount).
-  document.getElementById('rs-preview-fee').textContent = fmt(accounting * perGram) + ' ' + currencyUnitLabel();
+function resetReceiveStockLines() {
+  receiveStockLines = [];
+  document.getElementById('rs-batch-ref').value = '';
+  document.getElementById('rs-notes').value = '';
+  document.getElementById('rs-error').classList.add('hidden');
+  addReceiveStockLine();
+}
+
+function addReceiveStockLine() {
+  receiveStockLines.push({
+    lineId: ++receiveStockLineCounter,
+    karat: 21,
+    grossWeight: 0,
+    accountingWeight: 0,
+    fabPerGram: 0
+  });
+  renderReceiveStockLines();
+}
+
+function removeReceiveStockLine(lineId) {
+  receiveStockLines = receiveStockLines.filter(l => l.lineId !== lineId);
+  renderReceiveStockLines();
+}
+
+function updateReceiveStockLine(lineId, field, value) {
+  const line = receiveStockLines.find(l => l.lineId === lineId);
+  if (!line) return;
+  line[field] = field === 'karat' ? (parseInt(value, 10) || 0) : (parseFloat(value) || 0);
+  renderReceiveStockLines(field !== 'karat'); // karat is a <select>, safe to re-render; number inputs skip re-render to keep focus
+}
+
+function renderReceiveStockLines(previewOnly) {
+  const totals = receiveStockLines.reduce((acc, l) => {
+    acc.gross += l.grossWeight;
+    acc.accounting += l.accountingWeight;
+    // Billed on the accounting (billable) weight, not the physical gross
+    // weight — matches accounting_weight_grams' role everywhere else in the
+    // app (profit-report-ar.html, invoice-print-ar.html's COGS, and the
+    // give-stock flow above).
+    acc.gold24k += l.accountingWeight * ((l.karat || 0) / 24);
+    acc.fee += l.accountingWeight * l.fabPerGram;
+    return acc;
+  }, { gross: 0, accounting: 0, gold24k: 0, fee: 0 });
+
+  document.getElementById('rs-preview-gross').textContent = fmt(totals.gross) + ' غ';
+  document.getElementById('rs-preview-accounting').textContent = fmt(totals.accounting) + ' غ';
+  document.getElementById('rs-preview-gold').textContent = fmt(totals.gold24k) + ' غ';
+  document.getElementById('rs-preview-fee').textContent = fmt(totals.fee) + ' ' + currencyUnitLabel();
+  document.getElementById('rs-btn').disabled = receiveStockLines.length === 0 || totals.gross <= 0;
+
+  if (previewOnly) return; // don't rebuild the list while the user is mid-typing in one of its inputs
+
+  document.getElementById('rs-lines-list').innerHTML = receiveStockLines.map((l, idx) => `
+    <div class="bg-white border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
+      <div class="flex items-center justify-between">
+        <span class="text-[12px] font-semibold text-on-surface-variant">سطر ${idx + 1}</span>
+        ${receiveStockLines.length > 1 ? `<button onclick="removeReceiveStockLine(${l.lineId})" class="text-error"><span class="material-symbols-outlined text-[18px]">delete</span></button>` : ''}
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">العيار</label>
+          <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="updateReceiveStockLine(${l.lineId}, 'karat', this.value)">
+            <option value="18" ${l.karat == 18 ? 'selected' : ''}>18</option>
+            <option value="21" ${l.karat == 21 ? 'selected' : ''}>21</option>
+            <option value="22" ${l.karat == 22 ? 'selected' : ''}>22</option>
+            <option value="24" ${l.karat == 24 ? 'selected' : ''}>24</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">الوزن القائم (غ)</label>
+          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${l.grossWeight || ''}" oninput="updateReceiveStockLine(${l.lineId}, 'grossWeight', this.value)"/>
+        </div>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">الوزن المحاسبي (غ)</label>
+          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${l.accountingWeight || ''}" oninput="updateReceiveStockLine(${l.lineId}, 'accountingWeight', this.value)"/>
+        </div>
+        <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">مصنعية للغرام</label>
+          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${l.fabPerGram || ''}" oninput="updateReceiveStockLine(${l.lineId}, 'fabPerGram', this.value)"/>
+        </div>
+      </div>
+    </div>`).join('');
 }
 
 async function submitReceiveStock() {
   const errEl = document.getElementById('rs-error');
   errEl.classList.add('hidden');
 
-  const gross = parseFloat(document.getElementById('rs-gross-weight').value);
-  const karat = parseInt(document.getElementById('rs-karat').value, 10);
-  const accounting = parseFloat(document.getElementById('rs-accounting-weight').value);
-  // Amount is entered directly in the store's base currency, no conversion needed.
-  const perGramAed = parseFloat(document.getElementById('rs-fab-per-gram').value) || 0;
+  const validLines = receiveStockLines.filter(l => l.grossWeight > 0);
+  if (validLines.length === 0) {
+    errEl.textContent = 'أضف سطراً واحداً على الأقل بوزن قائم صحيح';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  const badAccounting = validLines.find(l => !(l.accountingWeight > 0));
+  if (badAccounting) {
+    errEl.textContent = 'فضلاً أدخل وزناً محاسبياً صحيحاً لكل سطر';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const batchRef = document.getElementById('rs-batch-ref').value.trim();
   const notes = document.getElementById('rs-notes').value.trim();
+  const batchId = (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random()));
 
-  if (!gross || gross <= 0) {
-    errEl.textContent = 'فضلاً أدخل وزناً قائماً صحيحاً';
-    errEl.classList.remove('hidden');
-    return;
-  }
-  if (!accounting || accounting <= 0) {
-    errEl.textContent = 'فضلاً أدخل وزناً محاسبياً صحيحاً';
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  const movement = {
+  const movements = validLines.map(l => ({
     store_id: GOLDMIND_STORE_ID,
     trader_id: currentTraderId,
     movement_type: 'debt_increase',
-    weight_grams: gross,
-    karat: karat,
+    weight_grams: l.grossWeight,
+    karat: l.karat,
     // Billed on the accounting (billable) weight, not the physical gross
-    // weight — see comment in recomputeReceiveStockPreview above.
-    gold_24k_equivalent: +(accounting * (karat / 24)).toFixed(3),
-    accounting_weight_grams: accounting,
-    fab_fee_per_gram: perGramAed,
-    fab_fee_amount: +(accounting * perGramAed).toFixed(2),
+    // weight — see comment in renderReceiveStockLines above.
+    gold_24k_equivalent: +(l.accountingWeight * ((l.karat || 0) / 24)).toFixed(3),
+    accounting_weight_grams: l.accountingWeight,
+    fab_fee_per_gram: l.fabPerGram,
+    fab_fee_amount: +(l.accountingWeight * l.fabPerGram).toFixed(2),
     source: 'stock_received',
+    batch_id: validLines.length > 1 ? batchId : null,
+    batch_ref: batchRef || null,
     notes: notes || 'استلام بضاعة من التاجر'
-  };
+  }));
 
   const btn = document.getElementById('rs-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.from('trader_movements').insert(movement);
+  const { error } = await goldmindClient.from('trader_movements').insert(movements);
 
   btn.disabled = false;
   btn.textContent = 'حفظ الاستلام';
@@ -1415,12 +1537,7 @@ async function submitReceiveStock() {
     return;
   }
 
-  document.getElementById('rs-gross-weight').value = '';
-  document.getElementById('rs-accounting-weight').value = '';
-  document.getElementById('rs-fab-per-gram').value = '';
-  document.getElementById('rs-notes').value = '';
-  rsAccountingWeightTouched = false;
-  recomputeReceiveStockPreview();
+  resetReceiveStockLines();
   document.getElementById('receive-stock-form').classList.add('hidden');
   const traderIdToReopen = currentTraderId;
   await load();
