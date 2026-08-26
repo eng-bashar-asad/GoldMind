@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>كشف أرصدة التجار | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.16"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+  tailwind.config = { theme: { extend: {
+    "colors": {
+      "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+      "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+      "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+      "surface-container-lowest": "var(--gm-surface-lowest)", "primary": "var(--gm-primary)",
+      "accent": "var(--gm-accent)", "success": "#1e7d32", "error": "#ba1a1a"
+    }
+  } } }
+</script>
+<style>
+    body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; }
+        #sheet { box-shadow: none !important; border: none !important; margin: 0 !important; max-width: none !important; }
+        #sheet .gm-print-shadow { box-shadow: none !important; }
+    }
+</style>
+</head>
+<body class="bg-background text-on-surface">
+
+<div class="no-print sticky top-0 bg-surface-container-lowest border-b border-outline-variant z-50 flex items-center justify-between px-4 h-14">
+<button onclick="gmSmartBack('ledger-ar.html')" class="flex items-center gap-2 text-on-surface-variant">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+<span class="text-sm font-semibold">سجل التجار</span>
+</button>
+<button onclick="window.print()" id="print-btn" class="flex items-center gap-2 bg-primary text-on-primary px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">print</span> طباعة
+</button>
+<button onclick="downloadTradersPdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-surface-container-lowest text-on-surface border border-gray-200 px-4 py-2 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined">download</span> تحميل PDF
+</button>
+</div>
+<p id="nativePdfHint" class="no-print hidden text-[11px] text-on-surface-variant text-center py-2 px-4 bg-surface-container-low">لحفظ الملف كـ PDF: اختر "حفظ كـ PDF" من قائمة الطابعات بنافذة الطباعة.</p>
+
+<div id="loading" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<div id="sheet" class="hidden max-w-2xl mx-auto my-6 p-3 sm:p-5 bg-background">
+<div class="rounded-lg border-[3px] border-accent gm-print-shadow" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
+<div class="bg-surface-container-lowest rounded-lg overflow-hidden">
+
+<!-- Letterhead -->
+<div class="p-6 text-center border-b-4 border-accent bg-surface-container-low">
+<img id="storeLogo" crossorigin="anonymous" class="hidden w-16 h-16 mx-auto mb-2 object-contain"/>
+<h1 id="storeName" class="text-xl font-bold text-on-surface"></h1>
+<p id="storeAddress" class="text-[12px] text-on-surface-variant mt-1"></p>
+<p id="storePhone" class="text-[12px] text-on-surface-variant" dir="ltr"></p>
+</div>
+
+<div class="p-5">
+<div class="flex items-center justify-between mb-4">
+<h2 class="text-lg font-bold text-on-surface">كشف أرصدة التجار</h2>
+<span id="dateLabel" class="text-[12px] text-on-surface-variant" dir="ltr"></span>
+</div>
+
+<!-- Combined totals -->
+<div class="rounded-xl border-[3px] border-accent p-4 mb-4 flex justify-around text-center">
+<div>
+<p class="text-[11px] text-on-surface-variant mb-1">إجمالي ذهب</p>
+<p class="font-bold text-[16px]" id="totalGoldLabel"></p>
+</div>
+<div>
+<p class="text-[11px] text-on-surface-variant mb-1">إجمالي نقدي</p>
+<p class="font-bold text-[16px]" id="totalCashLabel"></p>
+</div>
+</div>
+
+<!-- Traders table. Built as flex rows (not a real <table>) -- html2canvas
+     (the PDF-export engine) has a known text-layout bug with multi-column
+     table-layout:fixed <table>s that mixes bold text with a colspan
+     header and garbles Arabic body text; flexbox rows give the identical
+     visual grid without tripping it (same fix already shipped on
+     daily-cashbox-print-ar.html). -->
+<div class="rounded-xl border-[3px] border-accent overflow-hidden">
+<div class="flex text-[13px] bg-surface-container-low">
+<div class="py-2.5 px-2 font-bold" style="width:40%">التاجر</div>
+<div class="py-2.5 px-2 font-bold text-center" style="width:30%">ذهب (غ)</div>
+<div class="py-2.5 px-2 font-bold text-center" style="width:30%">نقدي</div>
+</div>
+<div id="rowsBody"></div>
+</div>
+
+<p class="text-[10px] text-on-surface-variant text-center mt-4">قيمة موجبة (أخضر) = التاجر مديون للمحل. قيمة سالبة (أحمر) = المحل مديون للتاجر.</p>
+
+</div>
+
+</div>
+</div></div>
+
+<script>
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 3 }); }
+let gmStoreForMoney = null;
+function fmtMoney(amount) { return gmFormatDualCurrency(amount, gmStoreForMoney); }
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+
+  const { data: store } = await goldmindClient.from('stores').select('name, address, phone, logo_url, currency, secondary_currency, last_gold_ounce_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  gmStoreForMoney = store || null;
+  if (store) {
+    document.getElementById('storeName').textContent = store.name || '';
+    if (store.address) document.getElementById('storeAddress').textContent = store.address;
+    if (store.phone) document.getElementById('storePhone').textContent = store.phone;
+    if (store.logo_url) {
+      const logo = document.getElementById('storeLogo');
+      logo.src = store.logo_url;
+      logo.classList.remove('hidden');
+    }
+  }
+
+  document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+  const [{ data: traders, error: tErr }, { data: moves, error: mErr }] = await Promise.all([
+    goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name', { ascending: true }),
+    goldmindClient.from('trader_movements').select('trader_id, movement_type, gold_24k_equivalent, fab_fee_amount').eq('store_id', GOLDMIND_STORE_ID)
+  ]);
+
+  if (tErr || mErr) {
+    document.getElementById('loading').textContent = 'تعذّر التحميل: ' + ((tErr || mErr).message);
+    return;
+  }
+
+  const movesByTrader = {};
+  (moves || []).forEach(m => {
+    if (!movesByTrader[m.trader_id]) movesByTrader[m.trader_id] = [];
+    movesByTrader[m.trader_id].push(m);
+  });
+
+  function goldBalance(traderId) {
+    return (movesByTrader[traderId] || []).reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? -Number(m.gold_24k_equivalent || 0) : Number(m.gold_24k_equivalent || 0)), 0);
+  }
+  function cashBalance(traderId) {
+    return (movesByTrader[traderId] || []).reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0)), 0);
+  }
+
+  const rows = (traders || []).map(t => ({ name: t.name, gold: goldBalance(t.id), cash: cashBalance(t.id) }));
+
+  const totalGold = rows.reduce((s, r) => s + r.gold, 0);
+  const totalCash = rows.reduce((s, r) => s + r.cash, 0);
+  const goldTotalEl = document.getElementById('totalGoldLabel');
+  const cashTotalEl = document.getElementById('totalCashLabel');
+  goldTotalEl.textContent = fmt(Math.abs(totalGold)) + ' غ';
+  goldTotalEl.className = 'font-bold text-[16px] ' + (totalGold > 0 ? 'text-success' : (totalGold < 0 ? 'text-error' : ''));
+  cashTotalEl.textContent = fmtMoney(Math.abs(totalCash));
+  cashTotalEl.className = 'font-bold text-[16px] ' + (totalCash > 0 ? 'text-success' : (totalCash < 0 ? 'text-error' : ''));
+
+  const rowsBody = document.getElementById('rowsBody');
+  if (rows.length === 0) {
+    rowsBody.innerHTML = '<div class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا يوجد تجار مسجّلون بعد</div>';
+  } else {
+    rowsBody.innerHTML = rows.map(r => `
+      <div class="flex text-[12px]">
+        <div class="py-2.5 px-2 border-t border-outline-variant font-semibold" style="width:40%">${gmEscapeHtml(r.name)}</div>
+        <div class="py-2.5 px-2 border-t border-r border-outline-variant text-center font-bold ${r.gold > 0 ? 'text-success' : (r.gold < 0 ? 'text-error' : '')}" style="width:30%" dir="ltr">${fmt(Math.abs(r.gold))}</div>
+        <div class="py-2.5 px-2 border-t border-r border-outline-variant text-center font-bold ${r.cash > 0 ? 'text-success' : (r.cash < 0 ? 'text-error' : '')}" style="width:30%" dir="ltr">${fmtMoney(Math.abs(r.cash))}</div>
+      </div>`).join('');
+  }
+
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('sheet').classList.remove('hidden');
+}
+
+function gmIsNativeApp() {
+  return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+}
+
+async function generateTradersPdfBase64() {
+  const sheet = document.getElementById('sheet');
+  if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+  const dataUriString = await html2pdf().set({
+    margin: 10,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  }).from(sheet).outputPdf('datauristring');
+  return dataUriString.substring(dataUriString.indexOf(',') + 1);
+}
+
+async function shareTradersPdfNative(btn) {
+  const originalHtml = btn ? btn.innerHTML : null;
+  if (btn) {
+    btn.disabled = true;
+    btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
+  }
+  try {
+    const base64 = await generateTradersPdfBase64();
+    const dateLabel = (document.getElementById('dateLabel')?.textContent || 'traders-summary').trim();
+    const filename = `goldmind-traders-summary-${dateLabel.replace(/\//g, '-')}.pdf`;
+
+    const { Filesystem, Share } = window.Capacitor.Plugins;
+    await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
+    const { uri } = await Filesystem.getUri({ path: filename, directory: 'CACHE' });
+
+    await Share.share({
+      title: 'كشف أرصدة التجار',
+      text: 'كشف أرصدة التجار — ' + dateLabel,
+      url: uri,
+      dialogTitle: 'مشاركة الكشف'
+    });
+  } catch (err) {
+    console.error('PDF share failed', err);
+    alert('تعذّر تجهيز/مشاركة ملف PDF، حاول مرة أخرى');
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = originalHtml; }
+  }
+}
+
+load();
+
+if (gmIsNativeApp()) {
+  document.getElementById('print-btn').classList.add('hidden');
+  const hintEl = document.getElementById('nativePdfHint');
+  hintEl.textContent = 'اضغط "تحميل PDF" لحفظ الملف أو مشاركته عبر واتساب مباشرة.';
+  hintEl.classList.remove('hidden');
+}
+
+async function downloadTradersPdf() {
+  const sheet = document.getElementById('sheet');
+  if (!sheet || sheet.classList.contains('hidden')) return;
+
+  const btn = document.getElementById('download-pdf-btn');
+
+  if (gmIsNativeApp()) {
+    await shareTradersPdfNative(btn);
+    return;
+  }
+
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> ...جارِ التجهيز';
+
+  if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
+
+  const dateLabel = (document.getElementById('dateLabel')?.textContent || 'traders-summary').trim();
+
+  try {
+    await html2pdf().set({
+      margin: 10,
+      filename: `كشف-أرصدة-التجار-${dateLabel}.pdf`,
+      image: { type: 'jpeg', quality: 0.98 },
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    }).from(sheet).save();
+  } catch (err) {
+    console.error('PDF generation failed', err);
+    alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
+}
+</script>
+</body></html>
