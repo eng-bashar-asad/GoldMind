@@ -160,8 +160,18 @@
 <!-- Error state -->
 <div id="error-state" class="hidden py-6 px-4 rounded-lg bg-red-100 text-red-700 font-label-md text-label-md text-center"></div>
 
-<!-- Pieces list -->
+<!-- Karat boxes (default view): pick a karat to see what's actually in stock -->
+<div id="karat-boxes" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3 pb-8"></div>
+
+<!-- Piece list for the selected karat -->
+<div id="piece-list-view" class="hidden">
+<button onclick="showKaratBoxes()" class="flex items-center gap-1 text-primary font-semibold text-[13px] mb-3">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+العودة لعرض العيارات
+</button>
+<h2 class="font-headline-md text-headline-md font-bold text-primary mb-3" id="piece-list-title"></h2>
 <div id="pieces-list" class="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4 pb-8"></div>
+</div>
 
 </main>
 
@@ -228,6 +238,7 @@
         const colorLabel = colorNames[piece.color] || piece.color;
         const badgeClass = statusStyle[piece.status] || 'bg-gray-100 text-gray-600';
         const statusLabel = statusNames[piece.status] || piece.status;
+        const typeLabel = [piece.piece_type, piece.category1, piece.category2].filter(Boolean).join(' &middot; ');
         const photo = piece.photo_url
             ? `<img src="${piece.photo_url}" onclick="openPhotoLightbox('${piece.photo_url}')" class="w-16 h-16 rounded-lg object-cover border border-outline-variant cursor-pointer active:scale-95 transition-transform" alt="صورة القطعة"/>`
             : `<div class="w-16 h-16 rounded-lg border border-dashed border-outline-variant bg-surface-container-low flex items-center justify-center">
@@ -242,6 +253,7 @@
                     <span class="font-data-mono text-data-mono font-bold">${piece.weight_grams} غ</span>
                     <span class="text-[11px] font-semibold px-2 py-0.5 rounded-full ${badgeClass}">${statusLabel}</span>
                 </div>
+                ${typeLabel ? `<div class="text-on-surface font-label-md text-label-md font-semibold mt-1 truncate">${typeLabel}</div>` : ''}
                 <div class="flex items-center gap-2 mt-1">
                     <div class="w-3 h-3 rounded-full shrink-0" style="background-color:${swatch}"></div>
                     <span class="text-on-surface-variant font-label-md text-label-md">${colorLabel} &middot; عيار ${piece.karat}</span>
@@ -254,6 +266,75 @@
         </div>`;
     }
 
+    let ALL_PIECES = [];
+
+    // Karat "box" cards -- distinct karat/color tints so they scan at a
+    // glance, matching the colorSwatch palette already used per-piece below.
+    const karatTint = {
+        24: { bg: '#FBF4E4', ink: '#9C8552', ring: '#E4C283' },
+        22: { bg: '#F1E9D6', ink: '#8A6D3F', ring: '#B4955A' },
+        21: { bg: '#F3EEE0', ink: '#795F29', ring: '#C9A96A' },
+        18: { bg: '#EDEBF5', ink: '#3F465C', ring: '#8A93B5' }
+    };
+    function tintFor(karat) {
+        return karatTint[karat] || { bg: '#EEF0F2', ink: '#565E74', ring: '#B7BCC9' };
+    }
+
+    function karatBoxHtml(karat, pieces) {
+        const t = tintFor(karat);
+        const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
+        return `
+        <button onclick="showKaratPieces(${karat})" class="text-right rounded-xl p-4 border active:scale-95 transition-transform" style="background:${t.bg};border-color:${t.ring};">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[13px] font-bold" style="color:${t.ink};">عيار ${karat}</span>
+                <span class="material-symbols-outlined text-[18px]" style="color:${t.ink};">chevron_left</span>
+            </div>
+            <div class="font-data-mono text-data-mono font-bold text-[19px]" style="color:${t.ink};">${totalWeight.toFixed(2)} غ</div>
+            <div class="text-[11px] mt-1" style="color:${t.ink};opacity:.8;">${pieces.length} قطعة</div>
+        </button>`;
+    }
+
+    function renderKaratBoxes() {
+        const boxesEl = document.getElementById('karat-boxes');
+        const byKarat = {};
+        ALL_PIECES.forEach(p => {
+            const k = p.karat || 0;
+            if (!byKarat[k]) byKarat[k] = [];
+            byKarat[k].push(p);
+        });
+        const karats = Object.keys(byKarat).map(Number).sort((a, b) => b - a);
+        boxesEl.innerHTML = karats.map(k => karatBoxHtml(k, byKarat[k])).join('');
+
+        const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
+        document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
+        document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
+
+        showKaratBoxes();
+    }
+
+    function showKaratBoxes() {
+        document.getElementById('karat-boxes').classList.remove('hidden');
+        document.getElementById('karat-boxes').classList.add('grid');
+        document.getElementById('piece-list-view').classList.add('hidden');
+        const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
+        document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
+        document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
+    }
+
+    function showKaratPieces(karat) {
+        const pieces = ALL_PIECES.filter(p => (p.karat || 0) === karat);
+        document.getElementById('karat-boxes').classList.add('hidden');
+        document.getElementById('karat-boxes').classList.remove('grid');
+        document.getElementById('piece-list-view').classList.remove('hidden');
+        document.getElementById('piece-list-title').textContent = 'عيار ' + karat;
+
+        const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
+        document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
+        document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
+
+        document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
+    }
+
     async function loadPieces() {
         const session = await requireGoldMindSession('login-entry-ar.html');
         if (!session) return;
@@ -261,15 +342,19 @@
         const loading = document.getElementById('loading-state');
         const empty = document.getElementById('empty-state');
         const errorBox = document.getElementById('error-state');
-        const list = document.getElementById('pieces-list');
         const countLabel = document.getElementById('piece-count');
-        const weightLabel = document.getElementById('total-weight');
 
         try {
+            // "المخزن" shows what's actually sitting in the warehouse right
+            // now -- pieces that have been sold or given to a trader have
+            // physically left, so they're excluded here (same status='available'
+            // convention already used by reports-ar.html's stock-weight total
+            // and inventory-count-ar.html's expected list).
             const { data, error } = await goldmindClient
                 .from('pieces')
                 .select('*')
                 .eq('store_id', GOLDMIND_STORE_ID)
+                .eq('status', 'available')
                 .order('created_at', { ascending: false });
 
             loading.classList.add('hidden');
@@ -286,11 +371,8 @@
                 return;
             }
 
-            const totalWeight = data.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
-            countLabel.textContent = data.length + ' قطعة';
-            weightLabel.textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-
-            list.innerHTML = data.map(pieceCardHtml).join('');
+            ALL_PIECES = data;
+            renderKaratBoxes();
         } catch (err) {
             // A thrown exception (network drop, CORS, etc.) used to leave the
             // spinner running forever since nothing ever hid #loading-state.
