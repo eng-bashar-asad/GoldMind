@@ -1603,7 +1603,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 fiscalResult,
                 { data: cashboxEntries },
                 { data: todayInvoices },
-                { count: unpaidCount },
                 { data: lowLots },
                 , // loadMovementsForDay() — result already handled inside that function itself, not needed here
                 { data: subRow }
@@ -1633,10 +1632,6 @@ document.addEventListener('DOMContentLoaded', function () {
                     .from('invoices').select('total_amount')
                     .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
                     .gte('created_at', todayStart.toISOString()),
-                // Real alerts — replaces the old dead "التنبيهات" button
-                goldmindClient
-                    .from('invoices').select('id', { count: 'exact', head: true })
-                    .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'unpaid'),
                 goldmindClient
                     .from('gold_stock_lots').select('id')
                     .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).lt('weight_grams_remaining', 5),
@@ -1734,9 +1729,6 @@ document.addEventListener('DOMContentLoaded', function () {
             }
 
             const alerts = [];
-            if (unpaidCount > 0) {
-                alerts.push({ href: 'invoices-list-ar.html', icon: 'receipt_long', text: unpaidCount + ' فاتورة غير مدفوعة' });
-            }
             if (lowLots && lowLots.length > 0) {
                 alerts.push({ href: 'stock-production-ar.html', icon: 'inventory_2', text: lowLots.length + ' دفعة رصيد بالجملة أوشكت على النفاد' });
             }
