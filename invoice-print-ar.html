@@ -182,8 +182,8 @@
 <img class="rounded-lg border border-gray-200" style="max-width:160px;max-height:160px;object-fit:cover;" id="piece-photo-print-img"/>
 </div>
 
-<!-- Items table -->
-<table class="w-full text-[11px] mb-4">
+<!-- Items table (sale / return / buyRetail — no per-item VAT breakdown) -->
+<table class="w-full text-[11px] mb-4" id="items-table-generic">
 <thead>
 <tr class="border-b-2 border-gray-800 text-gray-600">
 <th class="py-2 text-right">الوصف</th>
@@ -196,6 +196,28 @@
 <tbody id="items-body" class="divide-y divide-gray-100"></tbody>
 </table>
 
+<!-- Items table (buyTrader only) — closer to a wholesale trader's own
+     Gross/Purity/Pure-Weight/Making/VAT layout, since a purchase from a
+     trader is priced by weight + a per-gram making charge, not a flat
+     per-piece price. Gold value itself stays informational-only (no
+     "Metal Amount" column) — the gold side of a buyTrader purchase is
+     settled by weight via trader_movements/ledger-ar.html, never priced in
+     cash here, per the reverse-charge note below. -->
+<table class="hidden w-full text-[10.5px] mb-4" id="items-table-trader">
+<thead>
+<tr class="border-b-2 border-gray-800 text-gray-600">
+<th class="py-2 text-right">الوصف</th>
+<th class="py-2 text-center">الوزن القائم</th>
+<th class="py-2 text-center">النقاوة</th>
+<th class="py-2 text-center">الوزن الصافي</th>
+<th class="py-2 text-center">أجرة الصنعة</th>
+<th class="py-2 text-center">ض.%</th>
+<th class="py-2 text-left">قيمة الضريبة</th>
+</tr>
+</thead>
+<tbody id="items-body-trader" class="divide-y divide-gray-100"></tbody>
+</table>
+
 <!-- Totals: subtotal / VAT / grand total, stacked, aligned left -->
 <div class="flex items-start justify-between gap-3 mb-4">
 <div id="einvoice-qr-box" class="hidden flex-col items-center gap-1 shrink-0">
@@ -204,7 +226,7 @@
 </div>
 <div class="border-t-2 border-gray-800 pt-3 text-[12px] flex-1" style="width: 62%; margin-inline-start: auto;">
 <div class="flex justify-between text-gray-600">
-<span>الإجمالي قبل الضريبة</span>
+<span id="sum-before-tax-label">الإجمالي قبل الضريبة</span>
 <span id="sum-before-tax"></span>
 </div>
 <div class="flex justify-between text-gray-600 mt-1">
@@ -212,7 +234,7 @@
 <span id="sum-tax"></span>
 </div>
 <div class="flex justify-between font-bold text-base pt-1 border-t border-gray-200 mt-1">
-<span>الإجمالي الكامل</span>
+<span id="sum-total-label">الإجمالي الكامل</span>
 <span id="sum-total"></span>
 </div>
 </div>
@@ -224,11 +246,15 @@
 <div id="bulk-photos-grid" class="flex flex-wrap gap-2"></div>
 </div>
 
-<!-- Customer signature -->
-<div class="mt-10 pt-3 flex justify-between items-end text-[11px] text-gray-500">
+<!-- Signature(s) -->
+<div class="mt-10 pt-3 flex justify-between items-end gap-6 text-[11px] text-gray-500" id="signature-block">
 <div class="flex-1">
 <div class="border-b border-gray-400 h-8"></div>
-<div class="mt-1">توقيع العميل</div>
+<div class="mt-1" id="signature-label-1">توقيع العميل</div>
+</div>
+<div class="hidden flex-1" id="signature-block-2">
+<div class="border-b border-gray-400 h-8"></div>
+<div class="mt-1">توقيع مندوب التاجر</div>
 </div>
 </div>
 
@@ -445,7 +471,7 @@
             const relEl = document.getElementById('doc-related-invoice');
             relEl.textContent = invoice.type === 'buyRetail'
                 ? 'شراء من فرد — لا تُطبَّق ضريبة القيمة المضافة (الفرد غير مسجَّل ضريبياً).'
-                : 'شراء من تاجر — الفاتورة الضريبية الرسمية لهذه الصفقة يجب أن يصدرها التاجر البائع، وليس هذا المستند.';
+                : 'شراء من تاجر — قيمة المعدن (الذهب) بهذه الصفقة تخضع لآلية الاحتساب العكسي وتُسوَّى بالوزن عبر حساب التاجر (لا تُسعَّر نقداً هنا)، والضريبة أعلاه على أجرة الصنعة فقط. الفاتورة الضريبية الرسمية لكامل الصفقة يجب أن يصدرها التاجر البائع، وليس هذا المستند.';
             relEl.classList.remove('hidden');
         } else if (store.tax_number) {
             document.getElementById('doc-type-ar').textContent = 'فاتورة ضريبية';
@@ -556,6 +582,16 @@
         const vatMultiplier = 1 + (vatRate / 100);
         const isPurchaseDoc = invoice.type === 'buyTrader' || invoice.type === 'buyRetail';
 
+        // ---- Signature block: purchase docs need "who handed it over" vs
+        // "who received it", not the sale-invoice "customer signature" ----
+        if (isPurchaseDoc) {
+            document.getElementById('signature-label-1').textContent = 'توقيع المستلم (المحل)';
+            if (invoice.type === 'buyTrader') {
+                document.getElementById('signature-block-2').classList.remove('hidden');
+                document.getElementById('signature-block-2').classList.add('flex');
+            }
+        }
+
         // ---- Optional bulk-lot photos (buyTrader stock intake) ----
         if (Array.isArray(invoice.bulk_photos) && invoice.bulk_photos.length) {
             document.getElementById('bulk-photos-section').classList.remove('hidden');
@@ -567,6 +603,39 @@
         let sumTax = 0;
         let sumTotal = 0;
 
+        const isTraderPurchase = invoice.type === 'buyTrader';
+        document.getElementById('items-table-generic').classList.toggle('hidden', isTraderPurchase);
+        document.getElementById('items-table-trader').classList.toggle('hidden', !isTraderPurchase);
+
+        if (isTraderPurchase) {
+            // Purity = karat/24 (matches how a wholesale trader's own tax
+            // invoice states it, e.g. "0.750000" for 18K) — informational
+            // only, not used in any of our own calculations.
+            const itemsBodyTrader = document.getElementById('items-body-trader');
+            let totalFabBeforeVat = 0, totalFabVat = 0;
+            itemsBodyTrader.innerHTML = (items || []).map(item => {
+                const purity = Number(item.karat || 0) / 24;
+                const pureWeight = Number(item.weight_grams || 0) * purity;
+                const fabFee = Number(item.fabrication_fee || 0);
+                const fabVat = Number(item.fabrication_fee_vat || 0);
+                totalFabBeforeVat += fabFee;
+                totalFabVat += fabVat;
+                return `
+                    <tr>
+                        <td class="py-2">${gmEscapeHtml(item.description) || '—'}</td>
+                        <td class="py-2 text-center">${item.weight_grams}</td>
+                        <td class="py-2 text-center">${purity.toFixed(6)}</td>
+                        <td class="py-2 text-center">${fmt(pureWeight)}</td>
+                        <td class="py-2 text-center">${fmt(fabFee)}</td>
+                        <td class="py-2 text-center">${fmt(vatRate).replace(/\.00$/, '')}%</td>
+                        <td class="py-2 text-left font-semibold">${fmt(fabVat)}</td>
+                    </tr>
+                `;
+            }).join('');
+            sumBeforeTax = totalFabBeforeVat;
+            sumTax = totalFabVat;
+            sumTotal = totalFabBeforeVat + totalFabVat;
+        } else {
         const itemsBody = document.getElementById('items-body');
         itemsBody.innerHTML = (items || []).map(item => {
             const full = Number(item.line_total || 0);
@@ -608,6 +677,7 @@
             sumTotal = Number(invoice.total_amount || sumTotal);
             sumBeforeTax = sumTotal - sumTax;
         }
+        } // end of the non-buyTrader items rendering branch
 
         // ---- Piece photo: optional, staff-controlled at print time ----
         // Collect every item that has a photo (snapshot on the item, or a
@@ -645,6 +715,10 @@
         document.getElementById('sum-before-tax').textContent = gmFormatDualCurrency(sumBeforeTax, store);
         document.getElementById('sum-tax').textContent = gmFormatDualCurrency(sumTax, store);
         document.getElementById('sum-total').textContent = gmFormatDualCurrency(sumTotal, store);
+        if (isTraderPurchase) {
+            document.getElementById('sum-before-tax-label').textContent = 'إجمالي أجرة الصنعة قبل الضريبة';
+            document.getElementById('sum-total-label').textContent = 'إجمالي دين المصنعية على التاجر';
+        }
 
         // ---- E-invoice readiness QR (TLV/base64, the same encoding GCC tax
         // authorities use for the simplified-invoice QR) ----
