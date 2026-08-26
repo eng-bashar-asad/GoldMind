@@ -368,7 +368,13 @@ function goToStatementPrint() {
 <button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabGold" onclick="setSettleMode('gold')">تسوية ذهب</button>
 <button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabCash" onclick="setSettleMode('cash')">تسوية نقدية (مصنعية)</button>
 </div>
-<div id="settle-gold-fields" class="grid grid-cols-2 gap-3 mb-3">
+<div id="settle-gold-fields" class="mb-3">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">اتجاه التسوية</label>
+<div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
+<button type="button" id="settle-gold-dir-out" onclick="setSettleGoldDirection('out')" class="flex-1 h-10 text-[12px] font-semibold">صادر (نعطي التاجر ذهب)</button>
+<button type="button" id="settle-gold-dir-in" onclick="setSettleGoldDirection('in')" class="flex-1 h-10 text-[12px] font-semibold">وارد (نستلم ذهب من التاجر)</button>
+</div>
+<div class="grid grid-cols-2 gap-3">
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن المُسوّى (غ)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-weight" step="0.01" type="number"/>
@@ -381,6 +387,7 @@ function goToStatementPrint() {
 <option value="22">22</option>
 <option value="24">24</option>
 </select>
+</div>
 </div>
 </div>
 <div class="hidden mb-3" id="settle-cash-fields">
@@ -927,6 +934,10 @@ function showTraderDetail(traderId) {
             <button type="button" id="edit-settle-type-gold-${m.id}" onclick="setEditSettlementType('${m.id}','gold')" class="flex-1 h-9 text-[11px] font-semibold">تسوية ذهب</button>
             <button type="button" id="edit-settle-type-cash-${m.id}" onclick="setEditSettlementType('${m.id}','cash')" class="flex-1 h-9 text-[11px] font-semibold">تسوية نقدية</button>
           </div>
+          <div class="flex rounded-lg border border-outline-variant overflow-hidden">
+            <button type="button" id="edit-settle-dir-out-${m.id}" onclick="setEditSettlementDirection('${m.id}','out')" class="flex-1 h-9 text-[11px] font-semibold">صادر (منّا للتاجر)</button>
+            <button type="button" id="edit-settle-dir-in-${m.id}" onclick="setEditSettlementDirection('${m.id}','in')" class="flex-1 h-9 text-[11px] font-semibold">وارد (من التاجر إلنا)</button>
+          </div>
           <div id="edit-settle-gold-wrap-${m.id}" class="hidden grid grid-cols-2 gap-2">
             <input id="edit-settle-weight-${m.id}" type="number" step="0.001" dir="ltr" placeholder="الوزن (غ)" class="h-10 border border-outline-variant rounded-lg px-3 text-center text-[13px] font-data-mono" value="${m.weight_grams || ''}"/>
             <select id="edit-settle-karat-${m.id}" class="h-10 border border-outline-variant rounded-lg px-3 text-center text-[13px]">
@@ -937,10 +948,6 @@ function showTraderDetail(traderId) {
             </select>
           </div>
           <div id="edit-settle-cash-wrap-${m.id}" class="hidden flex-col gap-2">
-            <div class="flex rounded-lg border border-outline-variant overflow-hidden">
-              <button type="button" id="edit-settle-dir-out-${m.id}" onclick="setEditSettlementDirection('${m.id}','out')" class="flex-1 h-9 text-[11px] font-semibold">دفعنا للتاجر</button>
-              <button type="button" id="edit-settle-dir-in-${m.id}" onclick="setEditSettlementDirection('${m.id}','in')" class="flex-1 h-9 text-[11px] font-semibold">استلمنا من التاجر</button>
-            </div>
             <input id="edit-settle-cash-${m.id}" type="number" step="0.01" dir="ltr" placeholder="المبلغ (AED)" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" value="${m.fab_fee_amount || ''}"/>
           </div>
           ${settlementIsCash ? `<p class="text-[10px] text-outline">تحديث المبلغ أو الاتجاه هون رح يعدّل حركة الصندوق اليومي المرتبطة تلقائياً${m.linked_cash_movement_id ? '' : ' (هذه التسوية أُنشئت قبل ربط السجلّين، فراجع الصندوق يدوياً بعد الحفظ)'}.</p>` : ''}
@@ -1192,7 +1199,7 @@ async function saveEditSettlement(id) {
     update.karat = karat;
     update.gold_24k_equivalent = +(weight * (karat / 24)).toFixed(3);
     update.fab_fee_amount = 0;
-    update.movement_type = 'debt_decrease'; // gold settlement always shop->trader for now
+    update.movement_type = direction === 'out' ? 'debt_decrease' : 'debt_increase';
   } else {
     const amount = parseFloat(document.getElementById('edit-settle-cash-' + id).value);
     if (!amount || amount <= 0) {
@@ -1734,6 +1741,7 @@ async function submitGiveStock() {
 
 let settleMode = 'gold';
 let settleCashDirection = 'out';
+let settleGoldDirection = 'out';
 function setSettleMode(mode) {
   settleMode = mode;
   document.getElementById('settleTabGold').classList.toggle('active', mode === 'gold');
@@ -1741,6 +1749,7 @@ function setSettleMode(mode) {
   document.getElementById('settle-gold-fields').classList.toggle('hidden', mode !== 'gold');
   document.getElementById('settle-cash-fields').classList.toggle('hidden', mode !== 'cash');
   if (mode === 'cash') setSettleCashDirection(settleCashDirection);
+  if (mode === 'gold') setSettleGoldDirection(settleGoldDirection);
 }
 
 function setSettleCashDirection(dir) {
@@ -1752,6 +1761,22 @@ function setSettleCashDirection(dir) {
   outBtn.className = dir === 'out' ? active : inactive;
   inBtn.className = dir === 'in' ? active : inactive;
   document.getElementById('settle-cash-amount-label').textContent = dir === 'out' ? 'المبلغ المدفوع (د.إ)' : 'المبلغ المُستلم (د.إ)';
+}
+
+// Pure/net gold settlement (تسوية ذهب) needs the same two-way direction as
+// cash: it's just a straight gold weight exchanged with no fabrication fee
+// attached, as distinct from give-stock/receive-stock (which always carry a
+// fab fee/accounting-weight pair). "صادر" = shop hands over gold, pushing
+// the balance the same way give-stock does; "وارد" = the trader hands gold
+// back to the shop, pushing it the same way receive-stock does.
+function setSettleGoldDirection(dir) {
+  settleGoldDirection = dir;
+  const outBtn = document.getElementById('settle-gold-dir-out');
+  const inBtn = document.getElementById('settle-gold-dir-in');
+  const active = 'flex-1 h-10 text-[12px] font-semibold bg-primary text-white';
+  const inactive = 'flex-1 h-10 text-[12px] font-semibold text-on-surface-variant';
+  outBtn.className = dir === 'out' ? active : inactive;
+  inBtn.className = dir === 'in' ? active : inactive;
 }
 
 async function submitSettlement() {
@@ -1771,12 +1796,12 @@ async function submitSettlement() {
     movement = {
       store_id: GOLDMIND_STORE_ID,
       trader_id: currentTraderId,
-      movement_type: 'debt_decrease',
+      movement_type: settleGoldDirection === 'out' ? 'debt_decrease' : 'debt_increase',
       weight_grams: weight,
       karat: karat,
       gold_24k_equivalent: +(weight * (karat / 24)).toFixed(3),
       fab_fee_amount: 0,
-      notes: notes || 'تسوية ذهب يدوية'
+      notes: notes || (settleGoldDirection === 'out' ? 'تسوية ذهب يدوية (صادر)' : 'تسوية ذهب يدوية (وارد من التاجر)')
     };
   } else {
     const amount = parseFloat(document.getElementById('settle-cash-amount').value);
