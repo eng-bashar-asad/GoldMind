@@ -423,7 +423,7 @@ let currentTraderId = null;
 let diamondsEnabled = false;
 
 function fmt(n) {
-  return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+  return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 // Trader cash/fee amounts are always entered and stored directly in the
@@ -848,7 +848,7 @@ function showTraderDetail(traderId) {
           <span class="text-[11px] text-on-surface-variant">${date}</span>
         </div>
         <div class="flex flex-col gap-1 mb-2">
-          ${rows.map(r => `<div class="flex items-center justify-between text-[12px] font-data-mono border-b border-outline-variant/40 pb-1 pt-1"><span>${r.weight_grams ? r.weight_grams + 'غ عيار ' + r.karat : (r.notes ? gmEscapeHtml(r.notes) : '—')}</span><span>${fmt(r.gold_24k_equivalent)}غ (٢٤)${Number(r.fab_fee_amount || 0) > 0 ? ' + ' + fmtMoney(r.fab_fee_amount) : ''}</span></div>`).join('')}
+          ${rows.map(r => `<div class="flex items-center justify-between text-[12px] font-data-mono border-b border-outline-variant/40 pb-1 pt-1"><span>${r.weight_grams ? fmt(r.weight_grams) + 'غ عيار ' + r.karat : (r.notes ? gmEscapeHtml(r.notes) : '—')}</span><span>${fmt(r.gold_24k_equivalent)}غ (٢٤)${Number(r.fab_fee_amount || 0) > 0 ? ' + ' + fmtMoney(r.fab_fee_amount) : ''}</span></div>`).join('')}
         </div>
         <div class="flex items-center justify-between text-[13px] font-bold pt-1 border-t border-outline-variant">
           <span>الإجمالي</span>
@@ -873,7 +873,7 @@ function showTraderDetail(traderId) {
         </div>
         ${first.batch_ref ? `<p class="text-[11px] text-on-surface-variant mb-2">مرجع: ${gmEscapeHtml(first.batch_ref)}</p>` : ''}
         <div class="flex flex-col gap-1 mb-2">
-          ${rows.map(r => `<div class="flex items-center justify-between text-[12px] font-data-mono border-b border-outline-variant/40 pb-1 pt-1"><span>${r.weight_grams}غ قائم / ${r.accounting_weight_grams}غ محاسبي &middot; عيار ${r.karat}</span><span>${fmtMoney(r.fab_fee_per_gram)}/غ</span></div>`).join('')}
+          ${rows.map(r => `<div class="flex items-center justify-between text-[12px] font-data-mono border-b border-outline-variant/40 pb-1 pt-1"><span>${fmt(r.weight_grams)}غ قائم / ${fmt(r.accounting_weight_grams)}غ محاسبي &middot; عيار ${r.karat}</span><span>${fmtMoney(r.fab_fee_per_gram)}/غ</span></div>`).join('')}
         </div>
         <div class="flex items-center justify-between text-[13px] font-bold pt-1 border-t border-outline-variant">
           <span>الإجمالي</span>
@@ -895,8 +895,8 @@ function showTraderDetail(traderId) {
       (m.movement_type === 'debt_decrease' || (m.movement_type === 'debt_increase' && Number(m.fab_fee_amount || 0) > 0 && Number(m.weight_grams || 0) === 0));
     const settlementIsCash = isManualSettlement && Number(m.fab_fee_amount || 0) > 0;
     const weightLine = isStockMovement
-      ? `${m.weight_grams}غ قائم${m.accounting_weight_grams ? ` / ${m.accounting_weight_grams}غ محاسبي` : ''} عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)`
-      : (m.weight_grams ? `${m.weight_grams}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : '');
+      ? `${fmt(m.weight_grams)}غ قائم${m.accounting_weight_grams ? ` / ${fmt(m.accounting_weight_grams)}غ محاسبي` : ''} عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)`
+      : (m.weight_grams ? `${fmt(m.weight_grams)}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : '');
     const feeLine = (m.fab_fee_amount && Number(m.fab_fee_amount) > 0)
       ? ` ${weightLine ? '+' : ''}${isStockMovement ? `مصنعية (${fmtMoney(m.fab_fee_per_gram)}/غ)` : (isOpeningBalance ? 'نقدي' : (diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية'))} ${fmtMoney(m.fab_fee_amount)}`
       : '';
@@ -1701,7 +1701,7 @@ function renderGiveStockCart(previewOnly) {
     <div class="bg-white border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
-          <div class="font-data-mono font-bold text-sm">${it.grossWeight} غ &middot; عيار ${it.karat}</div>
+          <div class="font-data-mono font-bold text-sm">${fmt(it.grossWeight)} غ &middot; عيار ${it.karat}</div>
           <div class="text-outline text-[11px] font-data-mono truncate">${gmEscapeHtml(it.barcode)}${it.description ? ' — ' + gmEscapeHtml(it.description) : ''}</div>
         </div>
         <button onclick="removeGiveStockCartItem(${it.cartId})" class="text-error shrink-0"><span class="material-symbols-outlined text-[18px]">delete</span></button>
