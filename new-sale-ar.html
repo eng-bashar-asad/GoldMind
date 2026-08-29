@@ -484,6 +484,50 @@
     const cart = []; // { cartId, piece (or null), barcode, karat, weight, price }
     let cartCounter = 0;
 
+    // ---------- Draft memory (localStorage) ----------
+    // A scanning session can involve many pieces added one by one — an
+    // accidental tab close, phone lock, or app switch before hitting "حفظ
+    // الفاتورة" used to lose the whole cart with no way back. Scoped per
+    // store (GOLDMIND_STORE_ID) so this never leaks across different
+    // stores/tenants sharing the same device/browser.
+    const DRAFT_KEY = 'gm_sale_draft_' + GOLDMIND_STORE_ID;
+
+    function saveDraftToLocalStorage() {
+        try {
+            if (cart.length === 0 && !selectedCustomer) {
+                localStorage.removeItem(DRAFT_KEY);
+                return;
+            }
+            localStorage.setItem(DRAFT_KEY, JSON.stringify({
+                cart, cartCounter, selectedCustomer, selectedPaymentMethod,
+                savedAt: new Date().toISOString()
+            }));
+        } catch (e) { /* storage unavailable (private mode, quota) — silently skip, not critical */ }
+    }
+
+    function clearDraftFromLocalStorage() {
+        try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+    }
+
+    function restoreDraftIfAny() {
+        let draft;
+        try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { draft = null; }
+        if (!draft || !Array.isArray(draft.cart) || draft.cart.length === 0) return;
+
+        const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+        if (!confirm('في فاتورة غير محفوظة (' + draft.cart.length + ' قطعة) من ' + savedLabel + ' — بدك تسترجعها؟')) {
+            clearDraftFromLocalStorage();
+            return;
+        }
+
+        cart.push(...draft.cart);
+        cartCounter = draft.cartCounter || draft.cart.length;
+        selectedPaymentMethod = draft.selectedPaymentMethod || 'cash';
+        if (draft.selectedCustomer) pickCustomer(draft.selectedCustomer);
+        selectPayment(selectedPaymentMethod);
+        renderCart();
+    }
+
     // ---------- Sell from bulk stock (gold_stock_lots) ----------
     let stockLotsCache = []; // lots for the currently selected karat
     const reservedByLot = {}; // lotId -> weight already added to this cart, not yet saved
@@ -741,6 +785,7 @@
         mixedFields.classList.toggle('hidden', mode !== 'mixed');
         mixedFields.classList.toggle('flex', mode === 'mixed');
         if (mode === 'mixed') onMixedAmountInput();
+        saveDraftToLocalStorage();
     }
 
     function getMixedAmounts() {
@@ -816,6 +861,7 @@
         document.getElementById('customer-selected').classList.remove('hidden');
         document.getElementById('customer-selected').classList.add('flex');
         document.getElementById('customer-search-block').classList.add('hidden');
+        saveDraftToLocalStorage();
     }
 
     function clearCustomer() {
@@ -825,6 +871,7 @@
         document.getElementById('customer-search-block').classList.remove('hidden');
         customerSearchInput.value = '';
         customerResults.innerHTML = '';
+        saveDraftToLocalStorage();
     }
 
     // ---------- Barcode search ----------
@@ -955,6 +1002,7 @@
         if (cart.length === 0) {
             body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
             document.getElementById('grand-total').textContent = '0.00 د.إ';
+            saveDraftToLocalStorage();
             return;
         }
 
@@ -977,6 +1025,7 @@
 
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         document.getElementById('grand-total').textContent = total.toFixed(2) + ' د.إ';
+        saveDraftToLocalStorage();
     }
 
     // ---------- Save invoice ----------
@@ -1183,11 +1232,28 @@
             });
         }
 
+        clearDraftFromLocalStorage();
         showMessage('تم حفظ الفاتورة بنجاح!' + stockConsumeWarning, stockConsumeWarning !== '');
         setTimeout(() => {
             window.location.href = 'invoice-print-ar.html?id=' + invoiceRow.id;
         }, 800);
     });
+
+    // ---------- Keyboard shortcuts (desktop) ----------
+    // F2 → jump straight to the barcode field (fast rescanning without
+    // reaching for the mouse). F4 → save & print, same as clicking the
+    // button — skipped while a save is already in flight (button disabled).
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            e.preventDefault();
+            document.getElementById('barcode-search-input').focus();
+        } else if (e.key === 'F4') {
+            e.preventDefault();
+            if (!saveBtn.disabled) saveBtn.click();
+        }
+    });
+
+    restoreDraftIfAny();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
