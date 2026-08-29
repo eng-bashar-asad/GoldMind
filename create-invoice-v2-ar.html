@@ -506,6 +506,10 @@
         const show = purchaseType === 'buyTrader' && itemMode !== 'diamond';
         document.getElementById('fab-fee-field').classList.toggle('hidden', !show);
         document.getElementById('fab-fee-vat-field').hidden = !show;
+
+        const priceLabel = document.querySelector('label[for="manual-price"]');
+        const priceOptional = itemMode === 'bulk' || (purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit');
+        if (priceLabel) priceLabel.textContent = priceOptional ? 'سعر الشراء (اختياري — مسوّى بالوزن مع التاجر)' : 'سعر الشراء';
     }
 
     // ---------- VAT on the fabrication fee (live preview) ----------
@@ -574,6 +578,7 @@
         const inactive = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
         cashBtn.className = mode === 'cash' ? active : inactive;
         creditBtn.className = mode === 'credit' ? active : inactive;
+        updateFabFeeVisibility();
         renderCart();
     }
 
@@ -686,10 +691,16 @@
 
         const weight = parseFloat(document.getElementById('manual-weight').value);
         const karat = parseInt(document.getElementById('manual-karat').value, 10);
-        // "سعر الشراء" doesn't apply to a bulk lot (see setItemMode) -- gold
-        // received from a trader as رصيد بالجملة is settled by weight via
-        // trader_movements, not priced per invoice line. Defaults to 0.
-        const price = itemMode === 'bulk' ? (parseFloat(document.getElementById('manual-price').value) || 0) : parseFloat(document.getElementById('manual-price').value);
+        // "سعر الشراء" doesn't apply when the gold itself is settled by
+        // weight via trader_movements rather than priced in cash -- true for
+        // any bulk lot, AND for an individual piece bought from a trader on
+        // credit (see movementsPayload below, which posts a gold-weight debt
+        // for every cart item uniformly, not just bulk ones). It's still
+        // mandatory for buyRetail (an individual seller, no trader account
+        // to fall back on) or a cash buyTrader purchase (no debt posted at
+        // all, so price is the only record of what was paid).
+        const priceOptional = itemMode === 'bulk' || (purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit');
+        const price = priceOptional ? (parseFloat(document.getElementById('manual-price').value) || 0) : parseFloat(document.getElementById('manual-price').value);
 
         const weightInput = document.getElementById('manual-weight');
         const priceInput = document.getElementById('manual-price');
@@ -698,7 +709,7 @@
 
         let valid = true;
         if (!weight || weight <= 0) { weightInput.classList.add('border-error'); valid = false; }
-        if (itemMode !== 'bulk' && (!price || price <= 0)) { priceInput.classList.add('border-error'); valid = false; }
+        if (!priceOptional && (!price || price <= 0)) { priceInput.classList.add('border-error'); valid = false; }
         if (!valid) return;
 
         const fabFee = parseFloat(document.getElementById('manual-fabfee').value) || 0;
