@@ -112,6 +112,46 @@ let selectedItemIds = new Set();
 
 function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
+// ---------- Draft memory (localStorage) ----------
+// Lighter than the cart-based drafts elsewhere: re-searching by invoice
+// number is nearly free, so what's actually worth saving is which items
+// were already checked off before an accidental close.
+const RETURN_DRAFT_KEY = 'gm_return_draft_' + GOLDMIND_STORE_ID;
+
+function saveReturnDraft() {
+    try {
+        if (!originalInvoice || selectedItemIds.size === 0) { localStorage.removeItem(RETURN_DRAFT_KEY); return; }
+        localStorage.setItem(RETURN_DRAFT_KEY, JSON.stringify({
+            invoiceNumber: originalInvoice.invoice_number,
+            selectedItemIds: [...selectedItemIds],
+            savedAt: new Date().toISOString()
+        }));
+    } catch (e) { /* storage unavailable — not critical */ }
+}
+function clearReturnDraft() {
+    try { localStorage.removeItem(RETURN_DRAFT_KEY); } catch (e) { /* ignore */ }
+}
+
+async function restoreReturnDraftIfAny() {
+    let draft;
+    try { draft = JSON.parse(localStorage.getItem(RETURN_DRAFT_KEY) || 'null'); } catch (e) { draft = null; }
+    if (!draft || !draft.invoiceNumber || !draft.selectedItemIds || draft.selectedItemIds.length === 0) return;
+
+    const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+    if (!confirm('في مرتجع غير مكتمل لفاتورة ' + draft.invoiceNumber + ' من ' + savedLabel + ' — بدك تسترجعه؟')) {
+        clearReturnDraft();
+        return;
+    }
+
+    document.getElementById('searchInput').value = draft.invoiceNumber;
+    await searchInvoice();
+    draft.selectedItemIds.forEach(id => {
+        const cb = document.querySelector('input[data-item-id="' + id + '"]');
+        if (cb) { cb.checked = true; selectedItemIds.add(id); }
+    });
+    updateTotal();
+}
+
 async function searchInvoice() {
   const num = document.getElementById('searchInput').value.trim();
   const errEl = document.getElementById('search-error');
@@ -213,7 +253,7 @@ function renderItems() {
       : `${it.weight_grams}غ / عيار ${it.karat}`;
     return `
     <label class="flex items-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-xl p-3 cursor-pointer">
-      <input type="checkbox" class="w-5 h-5" onchange="toggleItem('${it.id}', this.checked)"/>
+      <input type="checkbox" class="w-5 h-5" data-item-id="${it.id}" onchange="toggleItem('${it.id}', this.checked)"/>
       <div class="flex-1">
         <p class="text-[13px] font-semibold">${gmEscapeHtml(it.description || it.barcode || '—')}</p>
         <p class="text-[11px] text-on-surface-variant font-data-mono">${subLine}</p>
@@ -226,6 +266,7 @@ function renderItems() {
 function toggleItem(itemId, checked) {
   if (checked) selectedItemIds.add(itemId); else selectedItemIds.delete(itemId);
   updateTotal();
+  saveReturnDraft();
 }
 
 function updateTotal() {
@@ -362,6 +403,7 @@ async function submitReturn() {
   btn.disabled = false;
   btn.textContent = 'تسجيل المرتجع';
 
+  clearReturnDraft();
   setTimeout(() => { window.location.href = 'invoice-print-ar.html?id=' + returnInvoice.id; }, 1200);
 }
 
@@ -381,6 +423,21 @@ async function load() {
 }
 
 load();
+
+// ---------- Keyboard shortcuts (desktop) ----------
+// F2 → focus the invoice-number search field. F4 → submit the return, same
+// as clicking the button — only once an invoice is actually loaded.
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'F2') {
+        e.preventDefault();
+        document.getElementById('searchInput').focus();
+    } else if (e.key === 'F4') {
+        e.preventDefault();
+        if (originalInvoice && !document.getElementById('invoice-block').classList.contains('hidden')) submitReturn();
+    }
+});
+
+restoreReturnDraftIfAny();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
