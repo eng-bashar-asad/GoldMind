@@ -328,7 +328,7 @@ function goToStatementPrint() {
 <p class="text-[12px] text-on-surface-variant mb-3">استلام بضاعة من التاجر — أضف سطر لكل وزن/مصنعية مختلفة بنفس فاتورة التاجر (متل فاتورة المشتريات الورقية). الذهب يُسجَّل ديناً على المحل تجاه التاجر، والمصنعية تُسجَّل ديناً نقدياً منفصلاً تماماً — لا يوجد سعر شراء نقدي هنا.</p>
 <div class="relative mb-3">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="rs-batch-ref">مرجع فاتورة التاجر (اختياري)</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="rs-batch-ref" placeholder="مثلاً SAL NO: HO-260602"/>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="rs-batch-ref" oninput="saveReceiveStockDraft()" placeholder="مثلاً SAL NO: HO-260602"/>
 </div>
 <div id="rs-lines-list" class="flex flex-col gap-2 mb-3"></div>
 <button class="w-full h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary mb-3 flex items-center justify-center gap-1" onclick="addReceiveStockLine()">
@@ -1322,7 +1322,7 @@ function toggleGiveStockForm() {
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
   const wasHidden = document.getElementById('give-stock-form').classList.contains('hidden');
   document.getElementById('give-stock-form').classList.toggle('hidden');
-  if (wasHidden) resetGiveStockCart();
+  if (wasHidden) openGiveStockForm();
 }
 
 function toggleReceiveStockForm() {
@@ -1331,7 +1331,7 @@ function toggleReceiveStockForm() {
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
   const wasHidden = document.getElementById('receive-stock-form').classList.contains('hidden');
   document.getElementById('receive-stock-form').classList.toggle('hidden');
-  if (wasHidden) resetReceiveStockLines();
+  if (wasHidden) openReceiveStockForm();
 }
 
 let tobDirection = 'receivable'; // 'receivable' = التاجر مديون للمحل (قبض), 'payable' = المحل مديون للتاجر (صرف)
@@ -1443,6 +1443,54 @@ async function submitTraderOpeningBalance() {
 let receiveStockLines = [];
 let receiveStockLineCounter = 0;
 
+// Draft is scoped per store AND per trader, same reasoning as give-stock.
+function receiveStockDraftKey() { return 'gm_receivestock_draft_' + GOLDMIND_STORE_ID + '_' + currentTraderId; }
+
+// A freshly-reset form still has one empty line (grossWeight 0) by design —
+// that's not "content" worth restoring, so this checks for an actual
+// filled-in line or a typed batch reference before treating it as a draft.
+function receiveStockHasContent() {
+  return receiveStockLines.some(l => l.grossWeight > 0) ||
+    (document.getElementById('rs-batch-ref') && document.getElementById('rs-batch-ref').value.trim());
+}
+
+function saveReceiveStockDraft() {
+  try {
+    if (!receiveStockHasContent()) { localStorage.removeItem(receiveStockDraftKey()); return; }
+    localStorage.setItem(receiveStockDraftKey(), JSON.stringify({
+      receiveStockLines, receiveStockLineCounter,
+      batchRef: document.getElementById('rs-batch-ref') ? document.getElementById('rs-batch-ref').value : '',
+      notes: document.getElementById('rs-notes') ? document.getElementById('rs-notes').value : '',
+      savedAt: new Date().toISOString()
+    }));
+  } catch (e) { /* storage unavailable — not critical */ }
+}
+function clearReceiveStockDraft() {
+  try { localStorage.removeItem(receiveStockDraftKey()); } catch (e) { /* ignore */ }
+}
+
+// Called when the form is opened (see toggleReceiveStockForm) instead of
+// resetReceiveStockLines() directly, so an in-progress multi-line entry
+// (accidentally closed mid-typing) can be offered back before wiping it.
+function openReceiveStockForm() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(receiveStockDraftKey()) || 'null'); } catch (e) { draft = null; }
+  if (draft && Array.isArray(draft.receiveStockLines) && draft.receiveStockLines.some(l => l.grossWeight > 0)) {
+    const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+    if (confirm('في سند استلام بضاعة غير محفوظ (' + draft.receiveStockLines.length + ' سطر) من ' + savedLabel + ' — بدك تسترجعه؟')) {
+      receiveStockLines = draft.receiveStockLines;
+      receiveStockLineCounter = draft.receiveStockLineCounter || draft.receiveStockLines.length;
+      document.getElementById('rs-batch-ref').value = draft.batchRef || '';
+      document.getElementById('rs-notes').value = draft.notes || '';
+      document.getElementById('rs-error').classList.add('hidden');
+      renderReceiveStockLines();
+      return;
+    }
+    clearReceiveStockDraft();
+  }
+  resetReceiveStockLines();
+}
+
 function resetReceiveStockLines() {
   receiveStockLines = [];
   document.getElementById('rs-batch-ref').value = '';
@@ -1492,6 +1540,7 @@ function renderReceiveStockLines(previewOnly) {
   document.getElementById('rs-preview-gold').textContent = fmt(totals.gold24k) + ' غ';
   document.getElementById('rs-preview-fee').textContent = fmt(totals.fee) + ' ' + currencyUnitLabel();
   document.getElementById('rs-btn').disabled = receiveStockLines.length === 0 || totals.gross <= 0;
+  saveReceiveStockDraft();
 
   if (previewOnly) return; // don't rebuild the list while the user is mid-typing in one of its inputs
 
@@ -1583,6 +1632,7 @@ async function submitReceiveStock() {
     return;
   }
 
+  clearReceiveStockDraft();
   resetReceiveStockLines();
   document.getElementById('receive-stock-form').classList.add('hidden');
   const traderIdToReopen = currentTraderId;
@@ -1601,6 +1651,43 @@ async function submitReceiveStock() {
 // weight — without deleting the piece record itself.
 let giveStockCart = [];
 let giveStockCartCounter = 0;
+
+// Draft is scoped per store AND per trader — giving stock to Trader A
+// should never accidentally offer to restore into Trader B's session.
+function giveStockDraftKey() { return 'gm_givestock_draft_' + GOLDMIND_STORE_ID + '_' + currentTraderId; }
+
+function saveGiveStockDraft() {
+  try {
+    if (giveStockCart.length === 0) { localStorage.removeItem(giveStockDraftKey()); return; }
+    localStorage.setItem(giveStockDraftKey(), JSON.stringify({ giveStockCart, giveStockCartCounter, savedAt: new Date().toISOString() }));
+  } catch (e) { /* storage unavailable — not critical */ }
+}
+function clearGiveStockDraft() {
+  try { localStorage.removeItem(giveStockDraftKey()); } catch (e) { /* ignore */ }
+}
+
+// Called when the form is opened (see toggleGiveStockForm) instead of
+// resetGiveStockCart() directly, so an in-progress sending session
+// (accidentally closed mid-scan) can be offered back before wiping it.
+function openGiveStockForm() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(giveStockDraftKey()) || 'null'); } catch (e) { draft = null; }
+  if (draft && Array.isArray(draft.giveStockCart) && draft.giveStockCart.length > 0) {
+    const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+    if (confirm('في سند إخراج بضاعة غير محفوظ (' + draft.giveStockCart.length + ' قطعة) من ' + savedLabel + ' — بدك تسترجعه؟')) {
+      giveStockCart = draft.giveStockCart;
+      giveStockCartCounter = draft.giveStockCartCounter || draft.giveStockCart.length;
+      document.getElementById('gs-barcode-input').value = '';
+      document.getElementById('gs-barcode-result').innerHTML = '';
+      document.getElementById('gs-notes').value = '';
+      document.getElementById('gs-error').classList.add('hidden');
+      renderGiveStockCart();
+      return;
+    }
+    clearGiveStockDraft();
+  }
+  resetGiveStockCart();
+}
 
 function resetGiveStockCart() {
   giveStockCart = [];
@@ -1694,6 +1781,7 @@ function renderGiveStockCart(previewOnly) {
   document.getElementById('gs-preview-gold').textContent = fmt(totals.gold24k) + ' غ';
   document.getElementById('gs-preview-fee').textContent = fmt(totals.fee) + ' ' + currencyUnitLabel();
   document.getElementById('gs-btn').disabled = giveStockCart.length === 0;
+  saveGiveStockDraft();
 
   if (previewOnly) return; // don't rebuild the list while the user is mid-typing in one of its inputs
 
@@ -1771,6 +1859,7 @@ async function submitGiveStock() {
   btn.disabled = false;
   btn.textContent = 'حفظ التسليم';
 
+  clearGiveStockDraft();
   resetGiveStockCart();
   document.getElementById('give-stock-form').classList.add('hidden');
   const traderIdToReopen = currentTraderId;
