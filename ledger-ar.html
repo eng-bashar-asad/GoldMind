@@ -338,7 +338,13 @@ function goToStatementPrint() {
 <div class="flex justify-between"><span class="text-on-surface-variant">إجمالي الوزن القائم</span><span class="font-data-mono font-semibold" id="rs-preview-gross">0.00 غ</span></div>
 <div class="flex justify-between"><span class="text-on-surface-variant">إجمالي الوزن المحاسبي</span><span class="font-data-mono font-semibold" id="rs-preview-accounting">0.00 غ</span></div>
 <div class="flex justify-between"><span class="text-on-surface-variant">دين الذهب (مكافئ ٢٤)</span><span class="font-data-mono font-semibold" id="rs-preview-gold">0.00 غ</span></div>
-<div class="flex justify-between"><span class="text-on-surface-variant" id="rs-preview-fee-label">إجمالي المصنعية</span><span class="font-data-mono font-semibold" id="rs-preview-fee">0.00</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant" id="rs-preview-fee-label">إجمالي المصنعية قبل الضريبة</span><span class="font-data-mono font-semibold" id="rs-preview-fee">0.00</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant">قيمة الضريبة</span><span class="font-data-mono font-semibold" id="rs-preview-vat">0.00</span></div>
+<div class="flex justify-between font-bold pt-1 border-t border-outline-variant"><span>إجمالي دين المصنعية (شامل الضريبة)</span><span class="font-data-mono" id="rs-preview-fee-total">0.00</span></div>
+</div>
+<div class="relative mb-3">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="rs-vat-rate">نسبة الضريبة على المصنعية (%)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="rs-vat-rate" oninput="renderReceiveStockLines()" step="0.01" type="number"/>
 </div>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="rs-notes" placeholder="ملاحظة عامة على السند (اختياري)"></textarea>
 <button onclick="submitReceiveStock()" id="rs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold disabled:opacity-50" disabled="">حفظ الاستلام</button>
@@ -360,7 +366,13 @@ function goToStatementPrint() {
 <div class="flex justify-between"><span class="text-on-surface-variant">إجمالي الوزن القائم</span><span class="font-data-mono font-semibold" id="gs-preview-gross">0.00 غ</span></div>
 <div class="flex justify-between"><span class="text-on-surface-variant">إجمالي الوزن المحاسبي</span><span class="font-data-mono font-semibold" id="gs-preview-accounting">0.00 غ</span></div>
 <div class="flex justify-between"><span class="text-on-surface-variant">دين الذهب (مكافئ ٢٤)</span><span class="font-data-mono font-semibold" id="gs-preview-gold">0.00 غ</span></div>
-<div class="flex justify-between"><span class="text-on-surface-variant" id="gs-preview-fee-label">إجمالي المصنعية</span><span class="font-data-mono font-semibold" id="gs-preview-fee">0.00</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant" id="gs-preview-fee-label">إجمالي المصنعية قبل الضريبة</span><span class="font-data-mono font-semibold" id="gs-preview-fee">0.00</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant">قيمة الضريبة</span><span class="font-data-mono font-semibold" id="gs-preview-vat">0.00</span></div>
+<div class="flex justify-between font-bold pt-1 border-t border-outline-variant"><span>إجمالي دين المصنعية (شامل الضريبة)</span><span class="font-data-mono" id="gs-preview-fee-total">0.00</span></div>
+</div>
+<div class="relative mb-3">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gs-vat-rate">نسبة الضريبة على المصنعية (%)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gs-vat-rate" oninput="renderGiveStockCart()" step="0.01" type="number"/>
 </div>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="gs-notes" placeholder="ملاحظة عامة على السند (اختياري)"></textarea>
 <button onclick="submitGiveStock()" id="gs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold disabled:opacity-50" disabled="">حفظ التسليم</button>
@@ -368,23 +380,16 @@ function goToStatementPrint() {
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form">
-<div class="flex bg-surface-container-low rounded-lg p-1 gap-1 mb-3">
-<button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabGold" onclick="setSettleMode('gold')">تسوية ذهب</button>
-<button class="settle-tab-btn flex-1 py-2 rounded-md text-[13px] font-semibold" id="settleTabCash" onclick="setSettleMode('cash')">تسوية نقدية (مصنعية)</button>
-</div>
-<div id="settle-gold-fields" class="mb-3">
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">اتجاه التسوية</label>
 <div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
-<button type="button" id="settle-gold-dir-out" onclick="setSettleGoldDirection('out')" class="flex-1 h-10 text-[12px] font-semibold">صادر (نعطي التاجر ذهب)</button>
-<button type="button" id="settle-gold-dir-in" onclick="setSettleGoldDirection('in')" class="flex-1 h-10 text-[12px] font-semibold">وارد (نستلم ذهب من التاجر)</button>
+<button type="button" id="settle-dir-out" onclick="setSettleDirection('out')" class="flex-1 h-10 text-[12px] font-semibold">صادر (منّا للتاجر)</button>
+<button type="button" id="settle-dir-in" onclick="setSettleDirection('in')" class="flex-1 h-10 text-[12px] font-semibold">وارد (من التاجر إلنا)</button>
 </div>
+<p class="text-[11px] text-on-surface-variant mb-3">تقدر تعبّي الجزء الذهبي والنقدي سوا — بينحفظو كسند تسوية واحد.</p>
+<div class="mb-3">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الجزء الذهبي (اختياري)</label>
 <div class="grid grid-cols-2 gap-3">
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الوزن المُسوّى (غ)</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-weight" step="0.01" type="number"/>
-</div>
-<div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العيار</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-weight" placeholder="الوزن (غ)" step="0.01" type="number"/>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="settle-karat">
 <option value="18">18</option>
 <option selected value="21">21</option>
@@ -393,14 +398,8 @@ function goToStatementPrint() {
 </select>
 </div>
 </div>
-</div>
-<div class="hidden mb-3" id="settle-cash-fields">
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">اتجاه الدفعة</label>
-<div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
-<button type="button" id="settle-cash-dir-out" onclick="setSettleCashDirection('out')" class="flex-1 h-10 text-[12px] font-semibold">دفعنا للتاجر (يخرج من الصندوق)</button>
-<button type="button" id="settle-cash-dir-in" onclick="setSettleCashDirection('in')" class="flex-1 h-10 text-[12px] font-semibold">استلمنا من التاجر (يدخل للصندوق)</button>
-</div>
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="settle-cash-amount-label">المبلغ المدفوع (د.إ)</label>
+<div class="mb-3">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="settle-cash-amount-label">الجزء النقدي (اختياري)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-cash-amount" step="0.01" type="number"/>
 </div>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="settle-notes" placeholder="ملاحظة (اختياري)"></textarea>
@@ -461,7 +460,7 @@ async function load() {
   const [{ data: traderRows, error: tErr }, { data: moveRows, error: mErr }, { data: storeRow }, { data: linkedCashRows }] = await Promise.all([
     goldmindClient.from('traders').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
     goldmindClient.from('trader_movements').select('*, invoice:invoice_id(invoice_number)').eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }),
-    goldmindClient.from('stores').select('diamonds_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('stores').select('diamonds_enabled, currency, secondary_currency, secondary_currency_rate, vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
     goldmindClient.from('cash_movements').select('id, trader_movement_id').eq('store_id', GOLDMIND_STORE_ID).not('trader_movement_id', 'is', null)
   ]);
 
@@ -477,7 +476,6 @@ async function load() {
   if (diamondsEnabled) {
     document.getElementById('cashDebtLabel').textContent = 'دين نقدي (مصنعية/ألماس)';
     document.getElementById('cashDebtHint').textContent = 'قيمة موجبة (خضراء) = التاجر مديون للمحل. قيمة سالبة (حمراء) = المحل مديون للتاجر. الذهب دائماً بمكافئ عيار ٢٤ الصافي؛ دين الذهب والدين النقدي (مصنعية أو ألماس) منفصلان تماماً.';
-    document.getElementById('settleTabCash').textContent = 'تسوية نقدية (مصنعية/ألماس)';
   }
 
   document.getElementById('loading-state').classList.add('hidden');
@@ -1313,7 +1311,7 @@ function toggleSettleForm() {
   document.getElementById('receive-stock-form').classList.add('hidden');
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
   document.getElementById('settle-form').classList.toggle('hidden');
-  setSettleMode('gold');
+  setSettleDirection('out');
 }
 
 function toggleGiveStockForm() {
@@ -1495,6 +1493,7 @@ function resetReceiveStockLines() {
   receiveStockLines = [];
   document.getElementById('rs-batch-ref').value = '';
   document.getElementById('rs-notes').value = '';
+  document.getElementById('rs-vat-rate').value = (gmStore && gmStore.vat_rate != null) ? gmStore.vat_rate : '';
   document.getElementById('rs-error').classList.add('hidden');
   addReceiveStockLine();
 }
@@ -1539,6 +1538,10 @@ function renderReceiveStockLines(previewOnly) {
   document.getElementById('rs-preview-accounting').textContent = fmt(totals.accounting) + ' غ';
   document.getElementById('rs-preview-gold').textContent = fmt(totals.gold24k) + ' غ';
   document.getElementById('rs-preview-fee').textContent = fmt(totals.fee) + ' ' + currencyUnitLabel();
+  const rsVatRate = parseFloat(document.getElementById('rs-vat-rate').value) || 0;
+  const rsVatAmount = totals.fee * (rsVatRate / 100);
+  document.getElementById('rs-preview-vat').textContent = fmt(rsVatAmount) + ' ' + currencyUnitLabel();
+  document.getElementById('rs-preview-fee-total').textContent = fmt(totals.fee + rsVatAmount) + ' ' + currencyUnitLabel();
   document.getElementById('rs-btn').disabled = receiveStockLines.length === 0 || totals.gross <= 0;
   saveReceiveStockDraft();
 
@@ -1598,24 +1601,31 @@ async function submitReceiveStock() {
   const batchRef = document.getElementById('rs-batch-ref').value.trim();
   const notes = document.getElementById('rs-notes').value.trim();
   const batchId = (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random()));
+  const rsVatRate = parseFloat(document.getElementById('rs-vat-rate').value) || 0;
 
-  const movements = validLines.map(l => ({
-    store_id: GOLDMIND_STORE_ID,
-    trader_id: currentTraderId,
-    movement_type: 'debt_increase',
-    weight_grams: l.grossWeight,
-    karat: l.karat,
-    // Billed on the accounting (billable) weight, not the physical gross
-    // weight — see comment in renderReceiveStockLines above.
-    gold_24k_equivalent: +(l.accountingWeight * ((l.karat || 0) / 24)).toFixed(3),
-    accounting_weight_grams: l.accountingWeight,
-    fab_fee_per_gram: l.fabPerGram,
-    fab_fee_amount: +(l.accountingWeight * l.fabPerGram).toFixed(2),
-    source: 'stock_received',
-    batch_id: validLines.length > 1 ? batchId : null,
-    batch_ref: batchRef || null,
-    notes: notes || 'استلام بضاعة من التاجر'
-  }));
+  const movements = validLines.map(l => {
+    const feeBeforeVat = l.accountingWeight * l.fabPerGram;
+    return {
+      store_id: GOLDMIND_STORE_ID,
+      trader_id: currentTraderId,
+      movement_type: 'debt_increase',
+      weight_grams: l.grossWeight,
+      karat: l.karat,
+      // Billed on the accounting (billable) weight, not the physical gross
+      // weight — see comment in renderReceiveStockLines above.
+      gold_24k_equivalent: +(l.accountingWeight * ((l.karat || 0) / 24)).toFixed(3),
+      accounting_weight_grams: l.accountingWeight,
+      fab_fee_per_gram: l.fabPerGram,
+      // Includes VAT on the fab fee too, at the rate the user set for this
+      // voucher — matches trader_movements.fab_fee_amount's role everywhere
+      // else (the cash debt actually owed), same as the purchase-invoice fix.
+      fab_fee_amount: +(feeBeforeVat * (1 + rsVatRate / 100)).toFixed(2),
+      source: 'stock_received',
+      batch_id: validLines.length > 1 ? batchId : null,
+      batch_ref: batchRef || null,
+      notes: notes || 'استلام بضاعة من التاجر'
+    };
+  });
 
   const btn = document.getElementById('rs-btn');
   btn.disabled = true;
@@ -1694,6 +1704,7 @@ function resetGiveStockCart() {
   document.getElementById('gs-barcode-input').value = '';
   document.getElementById('gs-barcode-result').innerHTML = '';
   document.getElementById('gs-notes').value = '';
+  document.getElementById('gs-vat-rate').value = (gmStore && gmStore.vat_rate != null) ? gmStore.vat_rate : '';
   document.getElementById('gs-error').classList.add('hidden');
   renderGiveStockCart();
 }
@@ -1780,6 +1791,10 @@ function renderGiveStockCart(previewOnly) {
   document.getElementById('gs-preview-accounting').textContent = fmt(totals.accounting) + ' غ';
   document.getElementById('gs-preview-gold').textContent = fmt(totals.gold24k) + ' غ';
   document.getElementById('gs-preview-fee').textContent = fmt(totals.fee) + ' ' + currencyUnitLabel();
+  const gsVatRate = parseFloat(document.getElementById('gs-vat-rate').value) || 0;
+  const gsVatAmount = totals.fee * (gsVatRate / 100);
+  document.getElementById('gs-preview-vat').textContent = fmt(gsVatAmount) + ' ' + currencyUnitLabel();
+  document.getElementById('gs-preview-fee-total').textContent = fmt(totals.fee + gsVatAmount) + ' ' + currencyUnitLabel();
   document.getElementById('gs-btn').disabled = giveStockCart.length === 0;
   saveGiveStockDraft();
 
@@ -1822,22 +1837,30 @@ async function submitGiveStock() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const movements = giveStockCart.map(it => ({
-    store_id: GOLDMIND_STORE_ID,
-    trader_id: currentTraderId,
-    piece_id: it.pieceId,
-    movement_type: 'debt_decrease',
-    weight_grams: it.grossWeight,
-    karat: it.karat,
-    // Billed on the accounting (billable) weight, not the physical gross
-    // weight — see comment in renderGiveStockCart above.
-    gold_24k_equivalent: +(it.accountingWeight * ((it.karat || 0) / 24)).toFixed(3),
-    accounting_weight_grams: it.accountingWeight,
-    fab_fee_per_gram: it.fabPerGram,
-    fab_fee_amount: +(it.accountingWeight * it.fabPerGram).toFixed(2),
-    source: 'stock_given',
-    notes: (notes ? notes + ' — ' : '') + 'باركود ' + it.barcode + (it.description ? ' (' + it.description + ')' : '')
-  }));
+  const gsVatRate = parseFloat(document.getElementById('gs-vat-rate').value) || 0;
+
+  const movements = giveStockCart.map(it => {
+    const feeBeforeVat = it.accountingWeight * it.fabPerGram;
+    return {
+      store_id: GOLDMIND_STORE_ID,
+      trader_id: currentTraderId,
+      piece_id: it.pieceId,
+      movement_type: 'debt_decrease',
+      weight_grams: it.grossWeight,
+      karat: it.karat,
+      // Billed on the accounting (billable) weight, not the physical gross
+      // weight — see comment in renderGiveStockCart above.
+      gold_24k_equivalent: +(it.accountingWeight * ((it.karat || 0) / 24)).toFixed(3),
+      accounting_weight_grams: it.accountingWeight,
+      fab_fee_per_gram: it.fabPerGram,
+      // Includes VAT on the fab fee too, at the rate the user set for this
+      // voucher — matches trader_movements.fab_fee_amount's role everywhere
+      // else (the cash debt actually owed), same as the purchase-invoice fix.
+      fab_fee_amount: +(feeBeforeVat * (1 + gsVatRate / 100)).toFixed(2),
+      source: 'stock_given',
+      notes: (notes ? notes + ' — ' : '') + 'باركود ' + it.barcode + (it.description ? ' (' + it.description + ')' : '')
+    };
+  });
 
   const { error: moveError } = await goldmindClient.from('trader_movements').insert(movements);
 
@@ -1867,44 +1890,22 @@ async function submitGiveStock() {
   showTraderDetail(traderIdToReopen);
 }
 
-let settleMode = 'gold';
-let settleCashDirection = 'out';
-let settleGoldDirection = 'out';
-function setSettleMode(mode) {
-  settleMode = mode;
-  document.getElementById('settleTabGold').classList.toggle('active', mode === 'gold');
-  document.getElementById('settleTabCash').classList.toggle('active', mode === 'cash');
-  document.getElementById('settle-gold-fields').classList.toggle('hidden', mode !== 'gold');
-  document.getElementById('settle-cash-fields').classList.toggle('hidden', mode !== 'cash');
-  if (mode === 'cash') setSettleCashDirection(settleCashDirection);
-  if (mode === 'gold') setSettleGoldDirection(settleGoldDirection);
-}
+// Unified settlement: a single voucher can carry a gold weight AND a cash
+// amount together (e.g. paying a trader partly in gold, partly in cash, in
+// one visit) — both fields stay filled regardless of what the person typed
+// into first, and both post into the SAME trader_movements row sharing one
+// direction, instead of forcing two separate save actions like before.
+let settleDirection = 'out';
 
-function setSettleCashDirection(dir) {
-  settleCashDirection = dir;
-  const outBtn = document.getElementById('settle-cash-dir-out');
-  const inBtn = document.getElementById('settle-cash-dir-in');
+function setSettleDirection(dir) {
+  settleDirection = dir;
+  const outBtn = document.getElementById('settle-dir-out');
+  const inBtn = document.getElementById('settle-dir-in');
   const active = 'flex-1 h-10 text-[12px] font-semibold bg-primary text-white';
   const inactive = 'flex-1 h-10 text-[12px] font-semibold text-on-surface-variant';
   outBtn.className = dir === 'out' ? active : inactive;
   inBtn.className = dir === 'in' ? active : inactive;
-  document.getElementById('settle-cash-amount-label').textContent = dir === 'out' ? 'المبلغ المدفوع (د.إ)' : 'المبلغ المُستلم (د.إ)';
-}
-
-// Pure/net gold settlement (تسوية ذهب) needs the same two-way direction as
-// cash: it's just a straight gold weight exchanged with no fabrication fee
-// attached, as distinct from give-stock/receive-stock (which always carry a
-// fab fee/accounting-weight pair). "صادر" = shop hands over gold, pushing
-// the balance the same way give-stock does; "وارد" = the trader hands gold
-// back to the shop, pushing it the same way receive-stock does.
-function setSettleGoldDirection(dir) {
-  settleGoldDirection = dir;
-  const outBtn = document.getElementById('settle-gold-dir-out');
-  const inBtn = document.getElementById('settle-gold-dir-in');
-  const active = 'flex-1 h-10 text-[12px] font-semibold bg-primary text-white';
-  const inactive = 'flex-1 h-10 text-[12px] font-semibold text-on-surface-variant';
-  outBtn.className = dir === 'out' ? active : inactive;
-  inBtn.className = dir === 'in' ? active : inactive;
+  document.getElementById('settle-cash-amount-label').textContent = dir === 'out' ? 'الجزء النقدي (اختياري) — المبلغ المدفوع' : 'الجزء النقدي (اختياري) — المبلغ المُستلم';
 }
 
 async function submitSettlement() {
@@ -1912,52 +1913,33 @@ async function submitSettlement() {
   const errEl = document.getElementById('settle-error');
   errEl.classList.add('hidden');
 
-  let movement;
-  if (settleMode === 'gold') {
-    const weight = parseFloat(document.getElementById('settle-weight').value);
-    const karat = parseInt(document.getElementById('settle-karat').value, 10);
-    if (!weight || weight <= 0) {
-      errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
-      errEl.classList.remove('hidden');
-      return;
-    }
-    movement = {
-      store_id: GOLDMIND_STORE_ID,
-      trader_id: currentTraderId,
-      movement_type: settleGoldDirection === 'out' ? 'debt_decrease' : 'debt_increase',
-      weight_grams: weight,
-      karat: karat,
-      gold_24k_equivalent: +(weight * (karat / 24)).toFixed(3),
-      fab_fee_amount: 0,
-      notes: notes || (settleGoldDirection === 'out' ? 'تسوية ذهب يدوية (صادر)' : 'تسوية ذهب يدوية (وارد من التاجر)')
-    };
-  } else {
-    const amount = parseFloat(document.getElementById('settle-cash-amount').value);
-    if (!amount || amount <= 0) {
-      errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً';
-      errEl.classList.remove('hidden');
-      return;
-    }
-    // Sign convention (same as everywhere else on this page): debt_decrease
-    // pushes the balance toward "trader owes the shop" (we received/are
-    // owed), debt_increase pushes it toward "shop owes the trader" (we
-    // paid/owe). Cash physically leaving the register when we pay, or
-    // entering it when the trader pays us, is a separate axis from that —
-    // hence the explicit direction toggle above instead of assuming one
-    // fixed flow like the form used to.
-    movement = {
-      store_id: GOLDMIND_STORE_ID,
-      trader_id: currentTraderId,
-      movement_type: settleCashDirection === 'out' ? 'debt_decrease' : 'debt_increase',
-      weight_grams: 0,
-      karat: null,
-      gold_24k_equivalent: 0,
-      fab_fee_amount: amount,
-      notes: notes || (settleCashDirection === 'out'
-        ? (diamondsEnabled ? 'تسوية نقدية (مصنعية/ألماس)' : 'تسوية مصنعية نقدية')
-        : 'استلام دفعة نقدية من التاجر')
-    };
+  const weight = parseFloat(document.getElementById('settle-weight').value) || 0;
+  const karat = parseInt(document.getElementById('settle-karat').value, 10) || 21;
+  const cashAmount = parseFloat(document.getElementById('settle-cash-amount').value) || 0;
+
+  if (weight <= 0 && cashAmount <= 0) {
+    errEl.textContent = 'فضلاً عبّي الجزء الذهبي أو النقدي (أو الاثنين سوا)';
+    errEl.classList.remove('hidden');
+    return;
   }
+
+  // Sign convention (same as everywhere else on this page): debt_decrease
+  // pushes the balance toward "trader owes the shop" (we gave/are owed),
+  // debt_increase pushes it toward "shop owes the trader" (we received/owe).
+  const defaultNotes = settleDirection === 'out'
+    ? (diamondsEnabled ? 'تسوية صادرة (ذهب/نقدي/مصنعية/ألماس)' : 'تسوية صادرة (ذهب و/أو نقدي)')
+    : 'تسوية واردة من التاجر (ذهب و/أو نقدي)';
+
+  const movement = {
+    store_id: GOLDMIND_STORE_ID,
+    trader_id: currentTraderId,
+    movement_type: settleDirection === 'out' ? 'debt_decrease' : 'debt_increase',
+    weight_grams: weight,
+    karat: weight > 0 ? karat : null,
+    gold_24k_equivalent: weight > 0 ? +(weight * (karat / 24)).toFixed(3) : 0,
+    fab_fee_amount: cashAmount,
+    notes: notes || defaultNotes
+  };
 
   const btn = document.getElementById('settle-btn');
   btn.disabled = true;
@@ -1965,7 +1947,7 @@ async function submitSettlement() {
 
   const { data: insertedMovement, error } = await goldmindClient.from('trader_movements').insert(movement).select().single();
 
-  if (!error && settleMode === 'cash') {
+  if (!error && cashAmount > 0) {
     // Real cash moving in/out of the register right now -> reflect it in
     // the daily cash box, same as customer debt settlements already do.
     // Linking via trader_movement_id lets a later edit/delete of this
@@ -1975,10 +1957,10 @@ async function submitSettlement() {
     await goldmindClient.from('cash_movements').insert({
       store_id: GOLDMIND_STORE_ID,
       box: 'main',
-      direction: settleCashDirection,
-      amount: movement.fab_fee_amount,
-      description: settleCashDirection === 'out'
-        ? ('تسوية مصنعية نقدية - ' + traderName)
+      direction: settleDirection,
+      amount: cashAmount,
+      description: settleDirection === 'out'
+        ? ('تسوية نقدية - ' + traderName)
         : ('استلام دفعة نقدية من التاجر - ' + traderName),
       created_by: GOLDMIND_STAFF_ID,
       trader_movement_id: insertedMovement ? insertedMovement.id : null
