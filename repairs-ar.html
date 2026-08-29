@@ -130,11 +130,63 @@ document.getElementById('photo-input').addEventListener('change', () => {
 function openAddForm() {
   document.getElementById('addOverlay').classList.remove('hidden');
   document.getElementById('addSheet').classList.remove('translate-y-full');
+  restoreRepairDraftIfAny();
 }
 function closeAddForm() {
   document.getElementById('addOverlay').classList.add('hidden');
   document.getElementById('addSheet').classList.add('translate-y-full');
 }
+
+// ---------- Draft memory (localStorage) ----------
+// A single-form intake ticket, not a multi-item cart, but the same accident
+// (tab closed, phone locked, app switched) can still lose everything typed.
+// The intake photo (a File object) can't survive localStorage, so it's
+// intentionally left out — restoring a draft just means re-attaching the
+// photo if one was picked.
+const REPAIR_DRAFT_KEY = 'gm_repair_draft_' + GOLDMIND_STORE_ID;
+
+function repairDraftFields() {
+  return {
+    customerName: document.getElementById('customerName').value,
+    customerPhone: document.getElementById('customerPhone').value,
+    pieceDesc: document.getElementById('pieceDesc').value,
+    problemDesc: document.getElementById('problemDesc').value,
+    estCost: document.getElementById('estCost').value,
+    expectedDate: document.getElementById('expectedDate').value
+  };
+}
+
+function saveRepairDraft() {
+  try {
+    const f = repairDraftFields();
+    const hasContent = Object.values(f).some(v => v && v.trim && v.trim());
+    if (!hasContent) { localStorage.removeItem(REPAIR_DRAFT_KEY); return; }
+    localStorage.setItem(REPAIR_DRAFT_KEY, JSON.stringify({ fields: f, savedAt: new Date().toISOString() }));
+  } catch (e) { /* storage unavailable — not critical */ }
+}
+function clearRepairDraft() {
+  try { localStorage.removeItem(REPAIR_DRAFT_KEY); } catch (e) { /* ignore */ }
+}
+
+function restoreRepairDraftIfAny() {
+  let draft;
+  try { draft = JSON.parse(localStorage.getItem(REPAIR_DRAFT_KEY) || 'null'); } catch (e) { draft = null; }
+  if (!draft || !draft.fields) return;
+  const hasContent = Object.values(draft.fields).some(v => v && v.trim && v.trim());
+  if (!hasContent) return;
+
+  const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+  if (!confirm('في تذكرة صيانة غير محفوظة من ' + savedLabel + ' — بدك تسترجعها؟ (الصورة لو كانت مرفقة لازم تعيد اختيارها)')) {
+    clearRepairDraft();
+    return;
+  }
+  Object.keys(draft.fields).forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = draft.fields[id];
+  });
+}
+
+document.getElementById('addForm').addEventListener('input', saveRepairDraft);
 
 const STATUS_LABELS = { received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة للاستلام', delivered: 'تم التسليم', cancelled: 'ملغاة' };
 const STATUS_COLORS = { received: 'bg-surface-container-low text-on-surface-variant', in_progress: 'bg-amber-100 text-amber-800', ready: 'bg-success-container text-success', delivered: 'bg-gray-200 text-gray-600', cancelled: 'bg-error-container text-on-error-container' };
@@ -230,6 +282,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   }
 
   closeAddForm();
+  clearRepairDraft();
   e.target.reset();
   selectedPhotoFile = null;
   document.getElementById('photo-preview').classList.add('hidden');
@@ -262,6 +315,22 @@ async function init() {
   document.getElementById('page-content').classList.remove('hidden');
   loadTickets();
 }
+
+// ---------- Keyboard shortcuts (desktop) ----------
+// F2 → focus the first field (this page has no barcode scanner). F4 →
+// submit the intake form. Both only act while the "استلام قطعة" sheet is
+// actually open, so they don't hijack the keys while just browsing the list.
+document.addEventListener('keydown', (e) => {
+  const formOpen = !document.getElementById('addOverlay').classList.contains('hidden');
+  if (!formOpen) return;
+  if (e.key === 'F2') {
+    e.preventDefault();
+    document.getElementById('customerName').focus();
+  } else if (e.key === 'F4') {
+    e.preventDefault();
+    if (!document.getElementById('submitBtn').disabled) document.getElementById('addForm').requestSubmit();
+  }
+});
 
 init();
 </script>
