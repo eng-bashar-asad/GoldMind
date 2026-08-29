@@ -400,6 +400,51 @@
     let cartCounter = 0;
     let fabFeeTouched = false; // declared here (not near currentFabFeeVat below) so the ?mode=bulk auto-open IIFE, which calls setItemMode() immediately, doesn't hit it before initialization
 
+    // ---------- Draft memory (localStorage) ----------
+    // Same idea as new-sale-ar.html's draft cart — a purchase invoice can
+    // build up several trader items/lots before saving; an accidental tab
+    // close shouldn't lose all of it. attachmentFile (a File object) can't
+    // survive localStorage, so it's intentionally left out of the draft —
+    // the person re-attaches it if needed after restoring.
+    const DRAFT_KEY = 'gm_purchase_draft_' + GOLDMIND_STORE_ID;
+
+    function saveDraftToLocalStorage() {
+        try {
+            if (cart.length === 0 && !selectedTrader) {
+                localStorage.removeItem(DRAFT_KEY);
+                return;
+            }
+            localStorage.setItem(DRAFT_KEY, JSON.stringify({
+                cart, cartCounter, purchaseType, selectedTrader, selectedPaymentMethod,
+                savedAt: new Date().toISOString()
+            }));
+        } catch (e) { /* storage unavailable (private mode, quota) — silently skip, not critical */ }
+    }
+
+    function clearDraftFromLocalStorage() {
+        try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+    }
+
+    function restoreDraftIfAny() {
+        let draft;
+        try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { draft = null; }
+        if (!draft || !Array.isArray(draft.cart) || draft.cart.length === 0) return;
+
+        const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+        if (!confirm('في فاتورة شراء غير محفوظة (' + draft.cart.length + ' صنف) من ' + savedLabel + ' — بدك تسترجعها؟')) {
+            clearDraftFromLocalStorage();
+            return;
+        }
+
+        cart.push(...draft.cart);
+        cartCounter = draft.cartCounter || draft.cart.length;
+        if (draft.purchaseType) setPurchaseType(draft.purchaseType);
+        selectedPaymentMethod = draft.selectedPaymentMethod || 'cash';
+        if (draft.selectedTrader) pickTrader(draft.selectedTrader);
+        selectPayment(selectedPaymentMethod);
+        renderCart();
+    }
+
     // ---------- Diamonds feature toggle (per-store) ----------
     async function checkDiamondsEnabled() {
         const { data } = await goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
@@ -581,6 +626,7 @@
         document.getElementById('trader-selected').classList.remove('hidden');
         document.getElementById('trader-selected').classList.add('flex');
         document.getElementById('trader-search-block').classList.add('hidden');
+        saveDraftToLocalStorage();
     }
 
     function clearTrader() {
@@ -590,6 +636,7 @@
         document.getElementById('trader-search-block').classList.remove('hidden');
         traderSearchInput.value = '';
         traderResults.innerHTML = '';
+        saveDraftToLocalStorage();
     }
 
     function toggleNewTraderForm() {
@@ -809,6 +856,7 @@
             document.getElementById('fab-fee-vat-total-row').classList.remove('flex');
             document.getElementById('trader-debt-total-row').classList.add('hidden');
             document.getElementById('trader-debt-total-row').classList.remove('flex');
+            saveDraftToLocalStorage();
             return;
         }
         body.innerHTML = cart.map(item => {
@@ -856,6 +904,7 @@
         document.getElementById('trader-debt-total-row').classList.toggle('hidden', !showTraderDebt);
         document.getElementById('trader-debt-total-row').classList.toggle('flex', showTraderDebt);
         document.getElementById('trader-debt-total').textContent = traderDebtTotal.toFixed(2) + ' د.إ';
+        saveDraftToLocalStorage();
     }
 
     // ---------- Save purchase invoice ----------
@@ -1186,9 +1235,26 @@
             await goldmindClient.from('trader_movements').insert(movementsPayload);
         }
 
+        clearDraftFromLocalStorage();
         showMessage('تم حفظ فاتورة الشراء وتحديث المخزون بنجاح!', false);
         setTimeout(() => { window.location.href = 'inventory-list-ar.html'; }, 900);
     });
+
+    // ---------- Keyboard shortcuts (desktop) ----------
+    // F2 → jump to the weight field (this page has no barcode scanner —
+    // purchases are entered manually). F4 → save, same as clicking the
+    // button — skipped while a save is already in flight.
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'F2') {
+            e.preventDefault();
+            document.getElementById('manual-weight').focus();
+        } else if (e.key === 'F4') {
+            e.preventDefault();
+            if (!saveBtn.disabled) saveBtn.click();
+        }
+    });
+
+    restoreDraftIfAny();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
