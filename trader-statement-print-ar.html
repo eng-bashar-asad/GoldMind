@@ -67,7 +67,7 @@
 <div class="mb-6">
 <div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">workspace_premium</span>حركات الذهب</div>
 <table class="w-full stmt-table" style="border-collapse:collapse;">
-<thead><tr><th>التاريخ</th><th>النوع</th><th>الوزن</th><th>العيار</th><th>مكافئ ٢٤</th></tr></thead>
+<thead><tr><th>التاريخ</th><th>النوع</th><th>العيار</th><th>الوزن (مكافئ عيار ٢٤)</th></tr></thead>
 <tbody id="stGoldRows"></tbody>
 </table>
 </div>
@@ -156,11 +156,10 @@ async function loadStatement() {
         return `<tr>
             <td>${fmtDate(m.created_at)}</td>
             <td>${gmEscapeHtml(label)}</td>
-            <td class="font-data-mono">${m.weight_grams != null ? fmt(m.weight_grams) + ' غ' : '—'}</td>
             <td>${m.karat || '—'}</td>
-            <td class="font-data-mono font-bold" style="color:${signed >= 0 ? '#3F6B47' : '#8A3B32'};">${signed >= 0 ? '+' : ''}${fmt(signed)}</td>
+            <td class="font-data-mono font-bold" style="color:${signed >= 0 ? '#3F6B47' : '#8A3B32'};">${signed >= 0 ? '+' : ''}${fmt(signed)} غ</td>
         </tr>`;
-    }).join('') || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
+    }).join('') || '<tr><td colspan="4" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
     document.getElementById('stGoldNet').textContent = fmt(goldNet) + ' غ';
     document.getElementById('stGoldNet').style.color = goldNet >= 0 ? '#3F6B47' : '#8A3B32';
     document.getElementById('stGoldHint').textContent = goldNet >= 0 ? '(التاجر مديون للمحل)' : '(المحل مديون للتاجر)';
