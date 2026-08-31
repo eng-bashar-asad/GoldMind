@@ -76,7 +76,7 @@
 <div>
 <div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#3F6B47;">payments</span>حركات النقد</div>
 <table class="w-full stmt-table" style="border-collapse:collapse;">
-<thead><tr><th>التاريخ</th><th>الاتجاه</th><th>المبلغ</th><th>الوصف</th></tr></thead>
+<thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>المبلغ</th><th>الوصف</th></tr></thead>
 <tbody id="stCashRows"></tbody>
 </table>
 </div>
@@ -127,15 +127,7 @@ async function loadStatement() {
     let goldQuery = goldmindClient.from('trader_movements').select('*')
         .eq('store_id', GOLDMIND_STORE_ID).eq('trader_id', traderId).order('created_at', { ascending: true });
     if (fromDate) goldQuery = goldQuery.gte('created_at', fromDate + 'T00:00:00');
-    const { data: goldMoves } = await goldQuery;
-
-    const moveIds = (goldMoves || []).map(m => m.id);
-    let cashMoves = [];
-    if (moveIds.length) {
-        const { data: cashData } = await goldmindClient.from('cash_movements').select('*')
-            .in('trader_movement_id', moveIds).order('created_at', { ascending: true });
-        cashMoves = cashData || [];
-    }
+    const { data: allMoves } = await goldQuery;
 
     // ---- Header ----
     document.getElementById('stTraderName').textContent = trader.name;
@@ -149,7 +141,8 @@ async function loadStatement() {
     // debt_increase -> shop owes the trader more (subtracts from "trader owes shop" balance)
     // debt_decrease -> trader owes the shop more / settles up (adds to that balance)
     let goldNet = 0;
-    document.getElementById('stGoldRows').innerHTML = (goldMoves || []).map(m => {
+    const goldRows = (allMoves || []).filter(m => Number(m.gold_24k_equivalent || 0) !== 0);
+    document.getElementById('stGoldRows').innerHTML = goldRows.map(m => {
         const signed = m.movement_type === 'debt_increase' ? -Number(m.gold_24k_equivalent || 0) : Number(m.gold_24k_equivalent || 0);
         goldNet += signed;
         const label = GOLD_TYPE_LABELS[m.movement_type + '|' + m.source] || (m.movement_type === 'debt_increase' ? 'استلام ذهب' : 'تسوية/دفعة');
@@ -164,34 +157,41 @@ async function loadStatement() {
     document.getElementById('stGoldNet').style.color = goldNet >= 0 ? '#3F6B47' : '#8A3B32';
     document.getElementById('stGoldHint').textContent = goldNet >= 0 ? '(التاجر مديون للمحل)' : '(المحل مديون للتاجر)';
 
-    // ---- Cash: grouped per currency, since a trader can have mixed-currency settlements ----
-    const cashByCurrency = {};
-    document.getElementById('stCashRows').innerHTML = cashMoves.map(c => {
-        const cur = c.currency || 'AED';
-        const signed = c.direction === 'in' ? Number(c.amount || 0) : -Number(c.amount || 0);
-        cashByCurrency[cur] = (cashByCurrency[cur] || 0) + signed;
+    // ---- Cash: sourced from trader_movements.fab_fee_amount, same as the
+    // live "دين نقدي" figure on ledger-ar.html — NOT from cash_movements,
+    // which only records money that actually crossed the register and
+    // completely misses debt-only entries (opening balance, stock
+    // given/received) that never touch the cash box. Sourcing from
+    // cash_movements alone made this statement's cash total wildly
+    // understate the real debt.
+    const CASH_TYPE_LABELS = {
+        'debt_increase|opening_balance': 'رصيد سابق (دين علينا)',
+        'debt_decrease|opening_balance': 'رصيد سابق (دين له)',
+        'debt_increase|stock_received': 'استلام بضاعة (مصنعية)',
+        'debt_decrease|stock_given': 'إعطاء بضاعة (مصنعية)',
+        'debt_increase|settlement': 'تسوية واردة',
+        'debt_decrease|settlement': 'تسوية صادرة'
+    };
+    let cashNet = 0;
+    const cashRows = (allMoves || []).filter(m => Number(m.fab_fee_amount || 0) !== 0);
+    document.getElementById('stCashRows').innerHTML = cashRows.map(m => {
+        const signed = m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0);
+        cashNet += signed;
+        const label = CASH_TYPE_LABELS[m.movement_type + '|' + m.source] || (signed >= 0 ? 'تخفيض دين' : 'زيادة دين');
         return `<tr>
-            <td>${fmtDate(c.created_at)}</td>
-            <td>${c.direction === 'in' ? 'قبض' : 'دفع'}</td>
-            <td class="font-data-mono font-bold" style="color:${c.direction === 'in' ? '#3F6B47' : '#8A3B32'};">${c.direction === 'in' ? '+' : '-'}${fmt(c.amount)} ${gmEscapeHtml(cur)}</td>
-            <td>${gmEscapeHtml(c.description || '—')}</td>
+            <td>${fmtDate(m.created_at)}</td>
+            <td>${signed >= 0 ? 'تخفيض دين' : 'زيادة دين'}</td>
+            <td class="font-data-mono font-bold" style="color:${signed >= 0 ? '#3F6B47' : '#8A3B32'};">${signed >= 0 ? '+' : ''}${fmt(signed)} د.إ</td>
+            <td>${gmEscapeHtml(m.notes || label)}</td>
         </tr>`;
     }).join('') || '<tr><td colspan="4" class="text-gray-400 py-6">لا توجد حركات نقدية بهذه الفترة</td></tr>';
 
     const cashCardsEl = document.getElementById('stCashCards');
-    const currencies = Object.keys(cashByCurrency);
-    if (!currencies.length) {
-        cashCardsEl.innerHTML = `<div class="summary-card flex-1" style="background:#E1EADB;">
-            <div class="text-[11px] font-bold text-[#3F6B47] mb-1">صافي حركة النقد</div>
-            <div class="text-[20px] font-bold font-data-mono">0.00</div>
-        </div>`;
-    } else {
-        cashCardsEl.innerHTML = currencies.map(cur => `
-            <div class="summary-card" style="background:#E1EADB;">
-                <div class="text-[11px] font-bold text-[#3F6B47] mb-1">صافي حركة النقد (${gmEscapeHtml(cur)})</div>
-                <div class="text-[20px] font-bold font-data-mono" style="color:${cashByCurrency[cur] >= 0 ? '#3F6B47' : '#8A3B32'};">${fmt(cashByCurrency[cur])}</div>
-            </div>`).join('');
-    }
+    cashCardsEl.innerHTML = `<div class="summary-card flex-1" style="background:#E1EADB;">
+        <div class="text-[11px] font-bold text-[#3F6B47] mb-1">صافي حركة النقد (دين، د.إ)</div>
+        <div class="text-[20px] font-bold font-data-mono" style="color:${cashNet >= 0 ? '#3F6B47' : '#8A3B32'};">${fmt(cashNet)}</div>
+        <div class="text-[10px] text-[#8a7f68] mt-1">${cashNet >= 0 ? '(التاجر مديون للمحل)' : '(المحل مديون للتاجر)'}</div>
+    </div>`;
 
     document.getElementById('loading-state').classList.add('hidden');
     document.getElementById('page-content').classList.remove('hidden');
