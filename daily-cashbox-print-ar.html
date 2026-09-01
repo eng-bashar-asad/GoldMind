@@ -24,6 +24,16 @@
 <style>
     body { font-family: 'IBM Plex Sans Arabic', sans-serif; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    /* html2pdf/html2canvas slices the rendered page at fixed-height
+       boundaries with no awareness of row content — without this, a long
+       day's log gets cut mid-row right at the page break, which looked
+       broken. page-break-inside/break-inside (read by the pagebreak
+       plugin's 'css' mode below) keeps every row + the whole totals block
+       intact on one page or the next, never split across both. */
+    #rowsBody > div, #totalsTable tr, #storeLogo, .keep-together {
+        page-break-inside: avoid;
+        break-inside: avoid;
+    }
     @media print {
         .no-print { display: none !important; }
         body { background: #fff !important; }
@@ -55,7 +65,7 @@
 <div class="bg-surface-container-lowest rounded-lg overflow-hidden">
 
 <!-- Letterhead -->
-<div class="p-6 text-center border-b-4 border-accent bg-surface-container-low">
+<div class="p-6 text-center border-b-4 border-accent bg-surface-container-low keep-together">
 <img id="storeLogo" crossorigin="anonymous" class="hidden w-16 h-16 mx-auto mb-2 object-contain"/>
 <h1 id="storeName" class="text-xl font-bold text-on-surface"></h1>
 <p id="storeAddress" class="text-[12px] text-on-surface-variant mt-1"></p>
@@ -63,8 +73,8 @@
 </div>
 
 <div class="p-5">
-<div class="flex items-center justify-between mb-4">
-<h2 class="text-lg font-bold text-on-surface">كشف الحركة اليومية</h2>
+<div class="flex items-center justify-between mb-4 keep-together">
+<h2 class="text-lg font-bold text-on-surface" id="sheetTitle">كشف الحركة اليومية</h2>
 <span id="dateLabel" class="text-[12px] text-on-surface-variant" dir="ltr"></span>
 </div>
 
@@ -89,7 +99,7 @@
 </div>
 
 <!-- Per-currency totals, mirroring the reference sheet's summary block -->
-<div class="mt-5">
+<div class="mt-5 keep-together">
 <h3 class="text-[13px] font-bold text-on-surface-variant mb-2">الرصيد الحالي بالدرج</h3>
 <div class="rounded-xl overflow-hidden border-[3px] border-accent gm-print-shadow" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
 <table class="w-full text-[15px]" id="totalsTable"></table>
@@ -109,6 +119,26 @@ function getSelectedDate() {
   const d = dateStr ? new Date(dateStr + 'T00:00:00') : new Date();
   d.setHours(0, 0, 0, 0);
   return d;
+}
+
+// A ?from=&to= pair (set from the new "تحميل كشف بفترة محددة" flow on
+// daily-cashbox-ar.html) spans multiple days into one PDF; without it,
+// this falls back to the existing single-day ?date= (or today) behavior —
+// two clearly separate paths, per بشار's request, rather than overloading
+// the single-day download with a range picker.
+function getDateRange() {
+  const params = new URLSearchParams(window.location.search);
+  const fromStr = params.get('from');
+  const toStr = params.get('to');
+  if (fromStr && toStr) {
+    const from = new Date(fromStr + 'T00:00:00');
+    const toExclusive = new Date(toStr + 'T00:00:00');
+    toExclusive.setDate(toExclusive.getDate() + 1); // make 'to' inclusive of that whole day
+    return { from, toExclusive, isRange: true };
+  }
+  const from = getSelectedDate();
+  const toExclusive = new Date(from); toExclusive.setDate(toExclusive.getDate() + 1);
+  return { from, toExclusive, isRange: false };
 }
 
 // Same deterministic pastel-per-link_group palette used on the in-app
@@ -138,9 +168,11 @@ async function load() {
     }
   }
 
-  const selectedDate = getSelectedDate();
-  const dayEnd = new Date(selectedDate); dayEnd.setDate(dayEnd.getDate() + 1);
-  document.getElementById('dateLabel').textContent = selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const { from: selectedDate, toExclusive: dayEnd, isRange } = getDateRange();
+  document.getElementById('sheetTitle').textContent = isRange ? 'كشف الحركة (فترة محددة)' : 'كشف الحركة اليومية';
+  document.getElementById('dateLabel').textContent = isRange
+    ? (selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' – ' + new Date(dayEnd.getTime() - 86400000).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' }))
+    : selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const { data: allEntries, error } = await goldmindClient
     .from('daily_cash_log')
@@ -196,7 +228,7 @@ async function load() {
     </div>`;
   }
   if (dayEntries.length === 0) {
-    rowsHtml = '<div class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا توجد عمليات بهذا اليوم</div>';
+    rowsHtml = `<div class="py-6 text-center text-on-surface-variant border-t border-outline-variant">لا توجد عمليات ${isRange ? 'بهذه الفترة' : 'بهذا اليوم'}</div>`;
   }
   rowsBody.innerHTML = rowsHtml;
 
@@ -234,7 +266,8 @@ async function generateCashboxPdfBase64() {
     margin: 10,
     image: { type: 'jpeg', quality: 0.98 },
     html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+    pagebreak: { mode: ['css', 'avoid-all', 'legacy'] }
   }).from(sheet).outputPdf('datauristring');
   return dataUriString.substring(dataUriString.indexOf(',') + 1);
 }
@@ -255,7 +288,7 @@ async function shareCashboxPdfNative(btn) {
   try {
     const base64 = await generateCashboxPdfBase64();
     const dateLabel = (document.getElementById('dateLabel')?.textContent || 'daily-cashbox').trim();
-    const filename = `goldmind-daily-cashbox-${dateLabel.replace(/\//g, '-')}.pdf`;
+    const filename = `goldmind-daily-cashbox-${dateLabel.replace(/\//g, '-').replace(/ – /g, '_إلى_')}.pdf`;
 
     const { Filesystem, Share } = window.Capacitor.Plugins;
     await Filesystem.writeFile({ path: filename, data: base64, directory: 'CACHE' });
@@ -325,10 +358,11 @@ async function downloadCashboxPdf() {
   try {
     await html2pdf().set({
       margin: 10,
-      filename: `كشف-يومي-${dateLabel}.pdf`,
+      filename: `كشف-يومي-${dateLabel.replace(/\//g, '-').replace(/ – /g, '_إلى_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
       html2canvas: { scale: 2, useCORS: true },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'avoid-all', 'legacy'] }
     }).from(sheet).save();
   } catch (err) {
     console.error('PDF generation failed', err);
