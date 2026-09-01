@@ -113,6 +113,23 @@
 <button onclick="openPrintView()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">receipt_long</span> عرض كشف قابل للطباعة
 </button>
+<button onclick="toggleRangePanel()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
+<span class="material-symbols-outlined">date_range</span> تحميل كشف بفترة محددة
+</button>
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="rangePanel">
+<div class="grid grid-cols-2 gap-3 mb-3">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">من تاريخ</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="rangeFromInput" type="date"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">إلى تاريخ</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="rangeToInput" type="date"/>
+</div>
+</div>
+<button onclick="openRangePrintView()" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">فتح الكشف</button>
+<p class="text-error text-[12px] hidden mt-2" id="rangeError"></p>
+</div>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="reportPanel">
 <p class="text-[12px] text-on-surface-variant mb-3" id="reportPanelIntro">جارِ تجهيز الجدول...</p>
 <div id="reportRecipients" class="flex flex-col gap-2"></div>
@@ -682,6 +699,40 @@ function openPrintView() {
   window.open('daily-cashbox-print-ar.html?date=' + dateStr, '_blank');
 }
 
+// Separate from the single-day flow above -- opens the print page with a
+// ?from=&to= range instead of ?date=, which daily-cashbox-print-ar.html
+// treats as an entirely different (multi-day) mode.
+function toggleRangePanel() {
+  const panel = document.getElementById('rangePanel');
+  const wasHidden = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if (wasHidden) {
+    document.getElementById('reportPanel').classList.add('hidden');
+    const todayStr = localDateStr(new Date());
+    if (!document.getElementById('rangeFromInput').value) document.getElementById('rangeFromInput').value = todayStr;
+    if (!document.getElementById('rangeToInput').value) document.getElementById('rangeToInput').value = todayStr;
+    document.getElementById('rangeError').classList.add('hidden');
+  }
+}
+
+function openRangePrintView() {
+  const errEl = document.getElementById('rangeError');
+  const from = document.getElementById('rangeFromInput').value;
+  const to = document.getElementById('rangeToInput').value;
+  if (!from || !to) {
+    errEl.textContent = 'فضلاً حدّد تاريخ البداية والنهاية';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (from > to) {
+    errEl.textContent = 'تاريخ البداية لازم يكون قبل تاريخ النهاية';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  errEl.classList.add('hidden');
+  window.open('daily-cashbox-print-ar.html?from=' + from + '&to=' + to, '_blank');
+}
+
 let reportPanelLoaded = false;
 function toggleReportPanel() {
   const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
@@ -696,6 +747,9 @@ function toggleReportPanel() {
 
   const panel = document.getElementById('reportPanel');
   panel.classList.toggle('hidden');
+  if (!panel.classList.contains('hidden')) {
+    document.getElementById('rangePanel').classList.add('hidden');
+  }
   if (!panel.classList.contains('hidden') && !reportPanelLoaded) {
     reportPanelLoaded = true;
     buildDailyReport();
