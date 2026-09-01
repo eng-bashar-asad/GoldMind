@@ -116,6 +116,28 @@
 <button onclick="toggleRangePanel()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">date_range</span> تحميل كشف بفترة محددة
 </button>
+<button onclick="toggleSearchPanel()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
+<span class="material-symbols-outlined">search</span> بحث بالحركات
+</button>
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="searchPanel">
+<div class="relative mb-3">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="searchKeywordInput">كلمة البحث (بالوصف أو نوع العملية)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="searchKeywordInput" placeholder="مثلاً اسم شخص أو نوع عملية"/>
+</div>
+<div class="grid grid-cols-2 gap-3 mb-3">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">من تاريخ (اختياري)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="searchFromInput" type="date"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">إلى تاريخ (اختياري)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="searchToInput" type="date"/>
+</div>
+</div>
+<button onclick="runCashboxSearch()" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">بحث</button>
+<p class="text-error text-[12px] hidden mt-2" id="searchError"></p>
+<div class="mt-3 flex flex-col gap-2" id="searchResults"></div>
+</div>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="rangePanel">
 <div class="grid grid-cols-2 gap-3 mb-3">
 <div>
@@ -708,6 +730,7 @@ function toggleRangePanel() {
   panel.classList.toggle('hidden');
   if (wasHidden) {
     document.getElementById('reportPanel').classList.add('hidden');
+    document.getElementById('searchPanel').classList.add('hidden');
     const todayStr = localDateStr(new Date());
     if (!document.getElementById('rangeFromInput').value) document.getElementById('rangeFromInput').value = todayStr;
     if (!document.getElementById('rangeToInput').value) document.getElementById('rangeToInput').value = todayStr;
@@ -733,6 +756,78 @@ function openRangePrintView() {
   window.open('daily-cashbox-print-ar.html?from=' + from + '&to=' + to, '_blank');
 }
 
+// Search across daily_cash_log by keyword (matches operation_type OR
+// notes), optionally narrowed to a date range -- e.g. "find every mention
+// of أحمد across last month". Tapping a result jumps straight to that
+// day's page (?date=...), where it'll show highlighted in its normal
+// context alongside everything else from that day.
+function toggleSearchPanel() {
+  const panel = document.getElementById('searchPanel');
+  const wasHidden = panel.classList.contains('hidden');
+  panel.classList.toggle('hidden');
+  if (wasHidden) {
+    document.getElementById('reportPanel').classList.add('hidden');
+    document.getElementById('rangePanel').classList.add('hidden');
+    document.getElementById('searchError').classList.add('hidden');
+    document.getElementById('searchResults').innerHTML = '';
+  }
+}
+
+async function runCashboxSearch() {
+  const errEl = document.getElementById('searchError');
+  errEl.classList.add('hidden');
+  const resultsEl = document.getElementById('searchResults');
+
+  const keyword = document.getElementById('searchKeywordInput').value.trim();
+  const from = document.getElementById('searchFromInput').value;
+  const to = document.getElementById('searchToInput').value;
+
+  if (!keyword) {
+    errEl.textContent = 'اكتب كلمة للبحث عنها';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  let query = goldmindClient.from('daily_cash_log').select('*')
+    .eq('store_id', GOLDMIND_STORE_ID)
+    .or(`notes.ilike.%${keyword}%,operation_type.ilike.%${keyword}%`)
+    .order('created_at', { ascending: false })
+    .limit(200);
+  if (from) query = query.gte('created_at', from + 'T00:00:00');
+  if (to) {
+    const toExclusive = new Date(to + 'T00:00:00'); toExclusive.setDate(toExclusive.getDate() + 1);
+    query = query.lt('created_at', toExclusive.toISOString());
+  }
+
+  resultsEl.innerHTML = '<p class="text-[12px] text-on-surface-variant text-center py-3">جارِ البحث...</p>';
+  const { data, error } = await query;
+
+  if (error) {
+    errEl.textContent = 'تعذّر البحث: ' + error.message;
+    errEl.classList.remove('hidden');
+    resultsEl.innerHTML = '';
+    return;
+  }
+  if (!data || data.length === 0) {
+    resultsEl.innerHTML = '<p class="text-[12px] text-on-surface-variant text-center py-3">لا نتائج</p>';
+    return;
+  }
+
+  resultsEl.innerHTML = '<p class="text-[11px] text-on-surface-variant mb-1">' + data.length + (data.length === 200 ? '+' : '') + ' نتيجة</p>' +
+    data.map(e => {
+      const dateStr = localDateStr(new Date(e.created_at));
+      const dayLabel = new Date(e.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' });
+      return `<a href="daily-cashbox-ar.html?date=${dateStr}" class="block bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[13px] font-semibold truncate">${gmEscapeHtml(e.operation_type)}</span>
+          <span class="text-[12px] font-bold shrink-0 ${e.direction === 'in' ? 'text-success' : 'text-error'}" dir="ltr">${e.direction === 'in' ? '+' : '-'}${fmt(e.amount)} ${gmEscapeHtml(e.currency)}</span>
+        </div>
+        ${e.notes ? `<div class="text-[11px] text-on-surface-variant mt-0.5 truncate">${gmEscapeHtml(e.notes)}</div>` : ''}
+        <div class="text-[10px] text-outline mt-1">${dayLabel}</div>
+      </a>`;
+    }).join('');
+}
+
 let reportPanelLoaded = false;
 function toggleReportPanel() {
   const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
@@ -749,6 +844,7 @@ function toggleReportPanel() {
   panel.classList.toggle('hidden');
   if (!panel.classList.contains('hidden')) {
     document.getElementById('rangePanel').classList.add('hidden');
+    document.getElementById('searchPanel').classList.add('hidden');
   }
   if (!panel.classList.contains('hidden') && !reportPanelLoaded) {
     reportPanelLoaded = true;
