@@ -140,9 +140,20 @@
 
 <!-- Diamond piece fields (shown only when item mode = diamond) -->
 <div class="hidden space-y-3 border border-dashed border-outline-variant rounded-lg p-3" id="diamond-fields">
+<div class="flex items-center justify-between border border-outline-variant rounded-lg px-3 h-12">
+<span class="font-label-md text-label-md font-semibold text-on-background text-[13px]">شراء بالجملة (صندوق ماس تُنتَج منه قطع لاحقاً)</span>
+<label class="gm-switch">
+<input id="diamond-bulk-toggle" onchange="onDiamondBulkToggle(this.checked)" type="checkbox"/>
+<span class="gm-switch-track"></span>
+</label>
+</div>
+<div class="relative hidden" id="diamond-box-name-field">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="diamond-box-name">اسم الصندوق (اختياري)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="diamond-box-name" placeholder="مثلاً: ماس فرط" type="text"/>
+</div>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="diamond-carat">وزن الماس (قيراط)</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" id="diamond-carat-label" for="diamond-carat">وزن الماس (قيراط)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="diamond-carat" placeholder="0.00" step="0.01" type="number"/>
 </div>
 <div class="relative">
@@ -150,6 +161,7 @@
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="diamond-price-per-carat" placeholder="0.00" step="0.01" type="number"/>
 </div>
 </div>
+<div id="diamond-detail-fields" class="space-y-3">
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="diamond-shape">الشكل</label>
@@ -250,6 +262,7 @@
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="diamond-gold-fab-cost">مصنعية الغرام (لحساب الربح لاحقاً)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="diamond-gold-fab-cost" placeholder="0.00" step="0.01" type="number"/>
+</div>
 </div>
 </div>
 </div>
@@ -399,6 +412,7 @@
     const cart = []; // { cartId, karat, weight, price, description, mode, fabPerGram, ...diamond fields }
     let cartCounter = 0;
     let fabFeeTouched = false; // declared here (not near currentFabFeeVat below) so the ?mode=bulk auto-open IIFE, which calls setItemMode() immediately, doesn't hit it before initialization
+    let diamondBulkMode = false; // same TDZ reasoning -- setItemMode's diamond-bulk reset branch reads this
 
     // ---------- Draft memory (localStorage) ----------
     // Same idea as new-sale-ar.html's draft cart — a purchase invoice can
@@ -470,6 +484,13 @@
         document.getElementById('bulk-fab-per-gram-field').hidden = mode !== 'bulk';
         document.getElementById('weight-karat-grid').hidden = mode === 'diamond';
         document.getElementById('diamond-fields').classList.toggle('hidden', mode !== 'diamond');
+        if (mode !== 'diamond') {
+            diamondBulkMode = false;
+            document.getElementById('diamond-bulk-toggle').checked = false;
+            document.getElementById('diamond-box-name-field').classList.add('hidden');
+            document.getElementById('diamond-detail-fields').classList.remove('hidden');
+            document.getElementById('diamond-carat-label').textContent = 'وزن الماس (قيراط)';
+        }
         document.getElementById('manual-weight-label').textContent = mode === 'bulk' ? 'الوزن الكلي (غ)' : 'الوزن (غ)';
         // A bulk lot (رصيد بالجملة) can mix different piece types under one
         // weighed batch, so a single description doesn't describe it, and
@@ -740,10 +761,58 @@
     }
 
     // ---------- Diamond item entry ----------
+    // Bulk diamond mode swaps the per-piece detail fields (shape/clarity/
+    // cut/color/cert/gold-subfields) for just a box name -- mirrors how
+    // itemMode 'bulk' works for gold (a single weight+rate lot, produced
+    // into individual pieces later on a dedicated production screen),
+    // except the lot here is diamond_stock_lots / diamond-stock-production-ar.html.
+    function onDiamondBulkToggle(checked) {
+        diamondBulkMode = checked;
+        document.getElementById('diamond-box-name-field').classList.toggle('hidden', !checked);
+        document.getElementById('diamond-detail-fields').classList.toggle('hidden', checked);
+        document.getElementById('diamond-carat-label').textContent = checked ? 'إجمالي القيراط' : 'وزن الماس (قيراط)';
+        updateFabFeeVisibility();
+    }
+
     function addDiamondToCart() {
         const caratInput = document.getElementById('diamond-carat');
         const pricePerCaratInput = document.getElementById('diamond-price-per-carat');
         const priceInput = document.getElementById('manual-price');
+
+        if (diamondBulkMode) {
+            const goldPriceOptionalForBulk = purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit';
+            [caratInput, pricePerCaratInput, priceInput].forEach(el => el.classList.remove('border-error'));
+            const carat = parseFloat(caratInput.value);
+            const pricePerCarat = parseFloat(pricePerCaratInput.value);
+            const totalPrice = goldPriceOptionalForBulk ? (parseFloat(priceInput.value) || 0) : parseFloat(priceInput.value);
+
+            let bulkValid = true;
+            if (!carat || carat <= 0) { caratInput.classList.add('border-error'); bulkValid = false; }
+            if (!pricePerCarat || pricePerCarat <= 0) { pricePerCaratInput.classList.add('border-error'); bulkValid = false; }
+            if (!goldPriceOptionalForBulk && (!totalPrice || totalPrice <= 0)) { priceInput.classList.add('border-error'); bulkValid = false; }
+            if (!bulkValid) return;
+
+            cart.push({
+                cartId: ++cartCounter,
+                mode: 'diamond_bulk',
+                price: totalPrice,
+                fabFee: 0,
+                fabFeeVat: 0,
+                description: document.getElementById('manual-desc').value.trim() || 'صندوق ماس بالجملة',
+                diamondCarat: carat,
+                diamondPricePerCarat: pricePerCarat,
+                boxName: document.getElementById('diamond-box-name').value.trim() || null
+            });
+
+            document.getElementById('manual-desc').value = '';
+            document.getElementById('manual-price').value = '';
+            document.getElementById('diamond-box-name').value = '';
+            caratInput.value = '';
+            pricePerCaratInput.value = '';
+            renderCart();
+            return;
+        }
+
         const goldWeightInput = document.getElementById('diamond-gold-weight');
         [caratInput, pricePerCaratInput, priceInput, goldWeightInput].forEach(el => el.classList.remove('border-error'));
 
@@ -819,9 +888,17 @@
         const item = cart[idx];
         cart.splice(idx, 1);
 
-        setItemMode(item.mode);
-
-        if (item.mode === 'diamond') {
+        if (item.mode === 'diamond_bulk') {
+            setItemMode('diamond');
+            document.getElementById('diamond-bulk-toggle').checked = true;
+            onDiamondBulkToggle(true);
+            document.getElementById('diamond-carat').value = item.diamondCarat || '';
+            document.getElementById('diamond-price-per-carat').value = item.diamondPricePerCarat || '';
+            document.getElementById('manual-price').value = item.price || '';
+            document.getElementById('diamond-box-name').value = item.boxName || '';
+            document.getElementById('manual-desc').value = item.description || '';
+        } else if (item.mode === 'diamond') {
+            setItemMode('diamond');
             document.getElementById('diamond-carat').value = item.diamondCarat || '';
             document.getElementById('diamond-price-per-carat').value = item.diamondPricePerCarat || '';
             document.getElementById('manual-price').value = item.price || '';
@@ -841,6 +918,7 @@
                 document.getElementById('diamond-gold-fab-cost').value = item.goldFabCost || '';
             }
         } else {
+            setItemMode(item.mode);
             document.getElementById('manual-desc').value = item.description || '';
             document.getElementById('manual-weight').value = item.weight || '';
             document.getElementById('manual-karat').value = item.karat || 21;
@@ -872,11 +950,13 @@
         }
         body.innerHTML = cart.map(item => {
             const isDiamond = item.mode === 'diamond';
+            const isDiamondBulk = item.mode === 'diamond_bulk';
             const badge = item.mode === 'bulk'
                 ? ' <span class="text-[10px] text-secondary font-semibold">(رصيد)</span>'
-                : (isDiamond ? ' <span class="text-[10px] text-secondary font-semibold">(ماس)</span>' : '');
-            const karatDisplay = isDiamond ? (item.hasGold ? item.karat + 'K' : '—') : item.karat + 'K';
-            const weightDisplay = isDiamond ? item.diamondCarat + ' ct' : item.weight;
+                : (isDiamond ? ' <span class="text-[10px] text-secondary font-semibold">(ماس)</span>'
+                : (isDiamondBulk ? ' <span class="text-[10px] text-secondary font-semibold">(صندوق ماس)</span>' : ''));
+            const karatDisplay = isDiamondBulk ? '—' : (isDiamond ? (item.hasGold ? item.karat + 'K' : '—') : item.karat + 'K');
+            const weightDisplay = isDiamondBulk ? item.diamondCarat + ' ct' : (isDiamond ? item.diamondCarat + ' ct' : item.weight);
             return `
             <tr>
                 <td class="px-3 py-3"><div class="font-body-md">${gmEscapeHtml(item.description || '—')}${badge}</div></td>
@@ -1093,6 +1173,33 @@
             return;
         }
 
+        // Bulk diamond cart items become diamond_stock_lots rows — same idea
+        // as the gold bulk lots above, produced into individual diamond_pieces
+        // later from diamond-stock-production-ar.html.
+        const diamondBulkCartItems = cart.filter(item => item.mode === 'diamond_bulk');
+        const diamondLotsPayload = diamondBulkCartItems.map(item => ({
+            store_id: GOLDMIND_STORE_ID,
+            box_name: item.boxName,
+            total_carat: item.diamondCarat,
+            remaining_carat: item.diamondCarat,
+            price_per_carat: item.diamondPricePerCarat,
+            trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
+            source_invoice_id: invoiceRow.id,
+            notes: item.description,
+            created_by: GOLDMIND_STAFF_ID
+        }));
+
+        const { data: newDiamondLots, error: diamondLotsError } = diamondLotsPayload.length > 0
+            ? await goldmindClient.from('diamond_stock_lots').insert(diamondLotsPayload).select()
+            : { data: [], error: null };
+
+        if (diamondLotsError) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ فاتورة الشراء';
+            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة صندوق الماس بالجملة: ' + diamondLotsError.message, true);
+            return;
+        }
+
         // Diamond cart items become new diamond_pieces rows — separate from the
         // gold "pieces" inventory, linked to the invoice via invoice_items.diamond_piece_id.
         const diamondCartItems = cart.filter(item => item.mode === 'diamond');
@@ -1137,8 +1244,25 @@
             return;
         }
 
-        let pieceIdx = 0, lotIdx = 0, diamondIdx = 0;
+        let pieceIdx = 0, lotIdx = 0, diamondIdx = 0, diamondLotIdx = 0;
         const itemsPayload = cart.map(item => {
+            if (item.mode === 'diamond_bulk') {
+                const dLot = newDiamondLots[diamondLotIdx++];
+                return {
+                    invoice_id: invoiceRow.id,
+                    piece_id: null,
+                    gold_stock_lot_id: null,
+                    diamond_piece_id: null,
+                    diamond_stock_lot_id: dLot ? dLot.id : null,
+                    barcode: null,
+                    karat: null,
+                    weight_grams: null,
+                    accounting_weight_grams: null,
+                    fabrication_fee: 0,
+                    line_total: item.price,
+                    description: item.description
+                };
+            }
             if (item.mode === 'bulk') {
                 const lot = newLots[lotIdx++];
                 return {
