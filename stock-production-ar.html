@@ -86,7 +86,7 @@
 </header>
 <div class="px-margin-mobile md:px-margin-desktop py-6 md:py-8 max-w-container-max mx-auto w-full space-y-4">
 
-<p class="text-[12px] md:text-[13px] text-on-surface-variant leading-5 md:max-w-2xl">حوّل رصيد الجملة (اللوتات) إلى قطع مستقلة برواكيد فردية بالمخزون — العيار والمصنعية بيتوارثوا تلقائياً من الدفعة.</p>
+<p class="text-[12px] md:text-[13px] text-on-surface-variant leading-5 md:max-w-2xl">حوّل رصيد الجملة (اللوتات) إلى قطع مستقلة برواكيد فردية بالمخزون، مع صورة لكل قطعة — العيار والمصنعية بيتوارثوا تلقائياً من الدفعة.</p>
 
 <div id="loading-state" class="text-center text-on-surface-variant text-sm py-10">جارِ التحميل...</div>
 <div id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-10">لا يوجد رصيد جملة متوفر حالياً. أضِف رصيداً من فاتورة شراء (وضع "رصيد بالجملة").</div>
@@ -105,7 +105,8 @@
 
     let lots = [];
     let openLotId = null;
-    const rowsByLot = {}; // lotId -> [{ rowId, description, weight }]
+    const rowsByLot = {}; // lotId -> [{ rowId, description, weight, photoFile, photoPreviewUrl }]
+    const destBoxByLot = {}; // lotId -> destination box_name for produced pieces
     let rowCounter = 0;
 
     function fmt(n) { return (Math.round((Number(n) + Number.EPSILON) * 100) / 100).toFixed(2); }
@@ -142,34 +143,49 @@
             const rows = rowsByLot[lot.id] || [];
             const usedInForm = rows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
             const remainingAfterForm = Number(lot.weight_grams_remaining) - usedInForm;
+            const destBoxName = destBoxByLot[lot.id] != null ? destBoxByLot[lot.id] : 'قطع مجوهرات';
 
             const rowsHtml = rows.map(r => `
-                <div class="flex gap-2 items-center">
-                    <input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm" placeholder="وصف القطعة" value="${(r.description || '').replace(/"/g, '&quot;')}" oninput="updateRow('${lot.id}', ${r.rowId}, 'description', this.value)"/>
-                    <input class="w-24 h-11 border border-outline-variant rounded-lg px-2 text-sm font-data-mono" dir="ltr" placeholder="الوزن" step="0.01" type="number" value="${r.weight || ''}" oninput="updateRow('${lot.id}', ${r.rowId}, 'weight', this.value)"/>
-                    <button type="button" onclick="removeRow('${lot.id}', ${r.rowId})" class="h-11 w-11 flex items-center justify-center rounded-lg border border-outline-variant text-error">
-                        <span class="material-symbols-outlined text-[16px]">delete</span>
-                    </button>
+                <div class="border border-outline-variant rounded-lg p-2 space-y-2">
+                    <div class="flex gap-2 items-center">
+                        <button type="button" onclick="document.getElementById('row-photo-input-${r.rowId}').click()" class="h-11 w-11 shrink-0 rounded-lg border border-dashed border-outline-variant flex items-center justify-center overflow-hidden bg-surface-container-low">
+                            ${r.photoPreviewUrl ? `<img src="${r.photoPreviewUrl}" class="w-full h-full object-cover"/>` : `<span class="material-symbols-outlined text-outline text-[18px]">photo_camera</span>`}
+                        </button>
+                        <input type="file" accept="image/*" capture="environment" class="hidden" id="row-photo-input-${r.rowId}" onchange="onRowPhotoSelected('${lot.id}', ${r.rowId}, this)"/>
+                        <input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm" placeholder="وصف القطعة" value="${(r.description || '').replace(/"/g, '&quot;')}" oninput="updateRow('${lot.id}', ${r.rowId}, 'description', this.value)"/>
+                        <input class="w-24 h-11 border border-outline-variant rounded-lg px-2 text-sm font-data-mono" dir="ltr" placeholder="الوزن" step="0.01" type="number" value="${r.weight || ''}" oninput="updateRow('${lot.id}', ${r.rowId}, 'weight', this.value)"/>
+                        <button type="button" onclick="removeRow('${lot.id}', ${r.rowId})" class="h-11 w-11 shrink-0 flex items-center justify-center rounded-lg border border-outline-variant text-error">
+                            <span class="material-symbols-outlined text-[16px]">delete</span>
+                        </button>
+                    </div>
                 </div>`).join('');
 
             return `
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
                 <button type="button" onclick="toggleLot('${lot.id}')" class="w-full p-4 flex items-center justify-between text-right">
                     <div>
-                        <div class="font-bold text-[14px]">عيار ${lot.karat}K — متبقي ${fmt(lot.weight_grams_remaining)}غ <span class="text-outline font-normal">(من أصل ${fmt(lot.weight_grams_total)}غ)</span></div>
+                        <div class="font-bold text-[14px]">${lot.box_name ? gmEscapeHtml(lot.box_name) + ' — ' : ''}عيار ${lot.karat}K — متبقي ${fmt(lot.weight_grams_remaining)}غ <span class="text-outline font-normal">(من أصل ${fmt(lot.weight_grams_total)}غ)</span></div>
                         <div class="text-[11px] text-on-surface-variant mt-1">مصنعية الغرام: ${fmt(lot.cost_fabrication_per_gram)}${lot.trader ? ' • من: ' + lot.trader.name : ''}${lot.invoice ? ' • فاتورة ' + lot.invoice.invoice_number : ''}</div>
                     </div>
                     <span class="material-symbols-outlined text-outline">${isOpen ? 'expand_less' : 'expand_more'}</span>
                 </button>
                 ${isOpen ? `
                 <div class="p-4 pt-0 border-t border-outline-variant space-y-3">
+                    <div class="relative">
+                        <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="lot-box-name-${lot.id}">اسم الصندوق المصدر (اختياري)</label>
+                        <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="lot-box-name-${lot.id}" oninput="updateLotBoxName('${lot.id}', this.value)" placeholder="مثلاً: ذهب مشغول" value="${(lot.box_name || '').replace(/"/g, '&quot;')}"/>
+                    </div>
+                    <div class="relative">
+                        <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dest-box-name-${lot.id}">اسم الصندوق الوجهة للقطع المنتجة</label>
+                        <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="dest-box-name-${lot.id}" oninput="destBoxByLot['${lot.id}'] = this.value" placeholder="مثلاً: قطع مجوهرات" value="${destBoxName.replace(/"/g, '&quot;')}"/>
+                    </div>
                     <div class="space-y-2" id="rows-${lot.id}">${rowsHtml}</div>
                     <button type="button" onclick="addRow('${lot.id}')" class="w-full h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary">+ إضافة قطعة</button>
                     <div class="text-[11.5px] ${remainingAfterForm < 0 ? 'text-error font-bold' : 'text-on-surface-variant'}" id="lot-remaining-${lot.id}">
                         المتبقي بعد الإنتاج: ${fmt(remainingAfterForm)}غ
                     </div>
                     <div class="hidden text-error text-[11.5px]" id="lot-error-${lot.id}"></div>
-                    <button type="button" onclick="produceFromLot('${lot.id}')" class="w-full h-11 bg-[#B4955A] text-white font-bold rounded-lg text-[13px]">حفظ القطع المنتَجة</button>
+                    <button type="button" onclick="produceFromLot('${lot.id}')" id="produce-btn-${lot.id}" class="w-full h-11 bg-[#B4955A] text-white font-bold rounded-lg text-[13px]">حفظ القطع المنتَجة</button>
                 </div>` : ''}
             </div>`;
         }).join('');
@@ -183,8 +199,23 @@
 
     function addRow(lotId) {
         if (!rowsByLot[lotId]) rowsByLot[lotId] = [];
-        rowsByLot[lotId].push({ rowId: ++rowCounter, description: '', weight: '' });
+        rowsByLot[lotId].push({ rowId: ++rowCounter, description: '', weight: '', photoFile: null, photoPreviewUrl: null });
         renderLots();
+    }
+
+    function onRowPhotoSelected(lotId, rowId, input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        const row = (rowsByLot[lotId] || []).find(r => r.rowId === rowId);
+        if (!row) return;
+        row.photoFile = file;
+        row.photoPreviewUrl = URL.createObjectURL(file);
+        renderLots();
+    }
+
+    function updateLotBoxName(lotId, value) {
+        const lot = lots.find(l => l.id === lotId);
+        if (lot) lot.box_name = value; // kept in memory only until "حفظ القطع المنتَجة" -- see produceFromLot
     }
 
     function updateRow(lotId, rowId, field, value) {
@@ -215,6 +246,7 @@
         const lot = lots.find(l => l.id === lotId);
         const rows = (rowsByLot[lotId] || []).filter(r => r.weight && Number(r.weight) > 0);
         const errEl = document.getElementById('lot-error-' + lotId);
+        const btn = document.getElementById('produce-btn-' + lotId);
         errEl.classList.add('hidden');
 
         if (rows.length === 0) {
@@ -230,21 +262,50 @@
             return;
         }
 
+        btn.disabled = true;
+        btn.textContent = 'جارِ الحفظ...';
+
+        // Persist the source-box rename, if the person edited it (kept in
+        // memory only up to this point -- see updateLotBoxName above).
+        const sourceBoxName = (document.getElementById('lot-box-name-' + lotId).value || '').trim() || null;
+        if (sourceBoxName !== (lot.box_name || null)) {
+            await goldmindClient.from('gold_stock_lots').update({ box_name: sourceBoxName }).eq('id', lotId);
+        }
+        const destBoxName = (document.getElementById('dest-box-name-' + lotId).value || '').trim() || null;
+
         const piecesPayload = [];
         for (const r of rows) {
             const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
             if (bcError) {
+                btn.disabled = false;
+                btn.textContent = 'حفظ القطع المنتَجة';
                 errEl.textContent = 'تعذّر توليد رقم القطعة: ' + bcError.message;
                 errEl.classList.remove('hidden');
                 return;
             }
+
+            // Photo is optional per piece -- a failed/skipped upload never
+            // blocks saving the piece itself, it just stays without a photo.
+            let photoUrl = null;
+            if (r.photoFile) {
+                const ext = (r.photoFile.name.split('.').pop() || 'jpg').toLowerCase();
+                const path = GOLDMIND_STORE_ID + '/' + barcode + '-' + Date.now() + '.' + ext;
+                const { error: uploadError } = await goldmindClient.storage.from('piece-photos').upload(path, r.photoFile, { upsert: false });
+                if (!uploadError) {
+                    const { data: publicUrlData } = goldmindClient.storage.from('piece-photos').getPublicUrl(path);
+                    photoUrl = publicUrlData ? publicUrlData.publicUrl : null;
+                }
+            }
+
             piecesPayload.push({
                 store_id: GOLDMIND_STORE_ID,
                 barcode: barcode,
+                photo_url: photoUrl,
                 weight_grams: Number(r.weight),
                 karat: lot.karat,
                 cost_fabrication_per_gram: lot.cost_fabrication_per_gram,
                 description_ar: r.description || null,
+                box_name: destBoxName,
                 status: 'available',
                 created_by: GOLDMIND_STAFF_ID
             });
@@ -252,6 +313,8 @@
 
         const { error: piecesError } = await goldmindClient.from('pieces').insert(piecesPayload);
         if (piecesError) {
+            btn.disabled = false;
+            btn.textContent = 'حفظ القطع المنتَجة';
             errEl.textContent = 'تعذّر إنشاء القطع: ' + piecesError.message;
             errEl.classList.remove('hidden');
             return;
@@ -264,6 +327,7 @@
         }
 
         delete rowsByLot[lotId];
+        delete destBoxByLot[lotId];
         openLotId = null;
         await load();
     }
