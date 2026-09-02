@@ -126,6 +126,13 @@
 </select>
 </div>
 
+<div id="box-filter-wrap" class="hidden relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="box-filter">جرد صندوق محدد (اختياري)</label>
+<select id="box-filter" class="w-full h-12 border border-outline-variant rounded-lg px-3 bg-white text-[13px]">
+<option value="">كل الصناديق</option>
+</select>
+</div>
+
 <p id="scope-error" class="hidden text-error text-[12px] text-center">اختر مستودع واحد على الأقل للمتابعة</p>
 <button id="scope-continue-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all">متابعة</button>
 </div>
@@ -340,6 +347,7 @@ function toggleScopeBox(key) {
   renderScopeBox(key);
 }
 let selectedCategory = '';
+let selectedBox = '';
 let expectedPool = []; // [{id, source:'gold'|'diamond', barcode, rfid_epc, description, karat, weight_grams}]
 let expectedByField = {};
 let currentCountId = null;
@@ -515,12 +523,12 @@ async function discardInProgressAndStartNew() {
 
 async function loadAllPieces() {
   const goldQ = goldmindClient.from('pieces')
-    .select('id, barcode, rfid_epc, description_ar, description_en, karat, weight_grams, category1')
+    .select('id, barcode, rfid_epc, description_ar, description_en, karat, weight_grams, category1, box_name')
     .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'available');
   const queries = [goldQ];
   if (storeInfo.diamonds_enabled) {
     queries.push(goldmindClient.from('diamond_pieces')
-      .select('id, barcode, description_ar, description_en, diamond_carat')
+      .select('id, barcode, description_ar, description_en, diamond_carat, box_name')
       .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'available'));
   }
   const results = await Promise.all(queries);
@@ -533,6 +541,7 @@ async function loadAllPieces() {
   }
 
   populateCategoryFilter();
+  populateBoxFilter();
   detectAndShowConflicts();
 }
 
@@ -543,6 +552,19 @@ function populateCategoryFilter() {
   if (cats.length === 0) { wrap.classList.add('hidden'); return; }
   wrap.classList.remove('hidden');
   select.innerHTML = '<option value="">كل الأصناف</option>' + cats.map(c => `<option value="${gmEscapeHtml(c)}">${gmEscapeHtml(c)}</option>`).join('');
+}
+
+// "الصندوق" here is the free-text box_name label produced pieces get
+// tagged with (see stock-production-ar.html / diamond-stock-production-ar.html),
+// e.g. "قطع مجوهرات" or "قطع ألماسية" -- lets a count be scoped to just one
+// named box instead of every available gold/diamond piece.
+function populateBoxFilter() {
+  const boxes = [...new Set(goldPieces.concat(diamondPieces).map(p => p.box_name).filter(Boolean))];
+  const select = document.getElementById('box-filter');
+  const wrap = document.getElementById('box-filter-wrap');
+  if (boxes.length === 0) { wrap.classList.add('hidden'); return; }
+  wrap.classList.remove('hidden');
+  select.innerHTML = '<option value="">كل الصناديق</option>' + boxes.map(b => `<option value="${gmEscapeHtml(b)}">${gmEscapeHtml(b)}</option>`).join('');
 }
 
 function detectAndShowConflicts() {
@@ -570,6 +592,7 @@ document.getElementById('scope-continue-btn').addEventListener('click', () => {
   scope.gold = scopeChecked.gold;
   scope.diamond = scopeChecked.diamond;
   selectedCategory = document.getElementById('category-filter').value || '';
+  selectedBox = document.getElementById('box-filter').value || '';
 
   if (!scope.gold && !scope.diamond) {
     document.getElementById('scope-error').classList.remove('hidden');
@@ -596,6 +619,7 @@ function currentScopePool() {
   if (scope.gold) pool = pool.concat(goldPieces);
   if (scope.diamond) pool = pool.concat(diamondPieces);
   if (selectedCategory) pool = pool.filter(p => p.category1 === selectedCategory);
+  if (selectedBox) pool = pool.filter(p => p.box_name === selectedBox);
   return pool;
 }
 
