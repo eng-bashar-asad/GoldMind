@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إنتاج قطع الماس | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); font-family: 'Inter', sans-serif; }
+</style>
+</head>
+<body>
+<header class="border-b sticky top-0 z-40" style="background: var(--gm-surface-lowest); border-color: var(--gm-outline-variant);">
+<div class="flex items-center gap-3 px-4 w-full h-16 max-w-md lg:max-w-2xl mx-auto">
+<button onclick="gmSmartBack('inventory-list-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold">إنتاج قطع الماس</h1>
+</div>
+</header>
+
+<main class="max-w-md lg:max-w-2xl mx-auto px-4 py-5">
+<p class="text-[12px] mb-4" style="color: var(--gm-on-surface-variant);">حوّل صندوق ماس بالجملة إلى قطع مستقلة برواكيد فردية، مع صورة وقيراط ومواصفات لكل قطعة — سعر القيراط بيتوارث تلقائياً من الصندوق.</p>
+
+<div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
+<div id="empty-state" class="hidden py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">لا يوجد صندوق ماس بالجملة متوفر حالياً. أضِف صندوقاً من فاتورة شراء (وضع "قطعة ألماس" ← "شراء بالجملة").</div>
+<div id="lots-list" class="flex flex-col gap-3"></div>
+</main>
+
+<script>
+(async function __enforcePermission() {
+    await requireGoldMindSession('login-entry-ar.html');
+    const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['add_piece'] === true));
+    if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+})();
+
+let lots = [];
+let openLotId = null;
+const rowsByLot = {}; // lotId -> [{ rowId, description, carat, shape, clarity, cut, color, certLab, certNumber, photoFile, photoPreviewUrl }]
+const destBoxByLot = {};
+let rowCounter = 0;
+
+function fmt(n) { return (Math.round((Number(n) + Number.EPSILON) * 100) / 100).toFixed(2); }
+
+async function load() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const { data, error } = await goldmindClient
+        .from('diamond_stock_lots')
+        .select('*, trader:trader_id(name), invoice:source_invoice_id(invoice_number)')
+        .eq('store_id', GOLDMIND_STORE_ID)
+        .gt('remaining_carat', 0)
+        .order('created_at', { ascending: false });
+
+    document.getElementById('loading-state').classList.add('hidden');
+
+    if (error) {
+        document.getElementById('lots-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
+        return;
+    }
+
+    lots = data || [];
+    if (lots.length === 0) {
+        document.getElementById('empty-state').classList.remove('hidden');
+        return;
+    }
+    renderLots();
+}
+
+const SHAPE_OPTIONS = [['round', 'مستدير Round'], ['princess', 'برنسيس Princess'], ['cushion', 'كوشن Cushion'], ['oval', 'بيضاوي Oval'], ['emerald', 'إمرالد Emerald'], ['pear', 'كمثرى Pear'], ['marquise', 'ماركيز Marquise'], ['heart', 'قلب Heart'], ['radiant', 'راديانت Radiant'], ['asscher', 'آشر Asscher']];
+const CLARITY_OPTIONS = ['FL', 'IF', 'VVS1', 'VVS2', 'VS1', 'VS2', 'SI1', 'SI2', 'I1', 'I2', 'I3'];
+const CUT_OPTIONS = [['excellent', 'ممتاز Excellent'], ['very_good', 'جيد جداً Very Good'], ['good', 'جيد Good'], ['fair', 'مقبول Fair'], ['poor', 'ضعيف Poor']];
+const COLOR_OPTIONS = ['D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M'];
+
+function selectHtml(rowId, field, options, current, isPairs) {
+    const opts = options.map(o => {
+        const val = isPairs ? o[0] : o;
+        const label = isPairs ? o[1] : o;
+        return `<option value="${val}" ${current === val ? 'selected' : ''}>${label}</option>`;
+    }).join('');
+    return `<option value="">—</option>${opts}`;
+}
+
+function renderLots() {
+    document.getElementById('lots-list').innerHTML = lots.map(lot => {
+        const isOpen = openLotId === lot.id;
+        const rows = rowsByLot[lot.id] || [];
+        const usedInForm = rows.reduce((s, r) => s + (Number(r.carat) || 0), 0);
+        const remainingAfterForm = Number(lot.remaining_carat) - usedInForm;
+        const destBoxName = destBoxByLot[lot.id] != null ? destBoxByLot[lot.id] : 'قطع ألماسية';
+
+        const rowsHtml = rows.map(r => `
+            <div class="border rounded-lg p-3 space-y-2" style="border-color: var(--gm-outline-variant);">
+                <div class="flex gap-2 items-center">
+                    <button type="button" onclick="document.getElementById('row-photo-input-${r.rowId}').click()" class="h-11 w-11 shrink-0 rounded-lg border border-dashed flex items-center justify-center overflow-hidden" style="border-color: var(--gm-outline-variant); background: var(--gm-surface-low);">
+                        ${r.photoPreviewUrl ? `<img src="${r.photoPreviewUrl}" class="w-full h-full object-cover"/>` : `<span class="material-symbols-outlined text-[18px]" style="color: var(--gm-on-surface-variant);">photo_camera</span>`}
+                    </button>
+                    <input type="file" accept="image/*" capture="environment" class="hidden" id="row-photo-input-${r.rowId}" onchange="onRowPhotoSelected('${lot.id}', ${r.rowId}, this)"/>
+                    <input class="flex-1 h-11 border rounded-lg px-3 text-sm" style="border-color: var(--gm-outline-variant);" placeholder="وصف القطعة" value="${(r.description || '').replace(/"/g, '&quot;')}" oninput="updateRow('${lot.id}', ${r.rowId}, 'description', this.value)"/>
+                    <input class="w-20 h-11 border rounded-lg px-2 text-sm" style="border-color: var(--gm-outline-variant); font-family: monospace;" dir="ltr" placeholder="قيراط" step="0.01" type="number" value="${r.carat || ''}" oninput="updateRow('${lot.id}', ${r.rowId}, 'carat', this.value)"/>
+                    <button type="button" onclick="removeRow('${lot.id}', ${r.rowId})" class="h-11 w-11 shrink-0 flex items-center justify-center rounded-lg border text-error" style="border-color: var(--gm-outline-variant);">
+                        <span class="material-symbols-outlined text-[16px]">delete</span>
+                    </button>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <select class="h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);" onchange="updateRow('${lot.id}', ${r.rowId}, 'shape', this.value)">${selectHtml(r.rowId, 'shape', SHAPE_OPTIONS, r.shape, true)}</select>
+                    <select class="h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);" onchange="updateRow('${lot.id}', ${r.rowId}, 'clarity', this.value)">${selectHtml(r.rowId, 'clarity', CLARITY_OPTIONS, r.clarity, false)}</select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <select class="h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);" onchange="updateRow('${lot.id}', ${r.rowId}, 'cut', this.value)">${selectHtml(r.rowId, 'cut', CUT_OPTIONS, r.cut, true)}</select>
+                    <select class="h-10 border rounded-lg px-2 text-[12.5px]" style="border-color: var(--gm-outline-variant);" onchange="updateRow('${lot.id}', ${r.rowId}, 'color', this.value)">${selectHtml(r.rowId, 'color', COLOR_OPTIONS, r.color, false)}</select>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <input class="h-10 border rounded-lg px-2 text-[12px]" style="border-color: var(--gm-outline-variant);" placeholder="جهة الشهادة (اختياري)" value="${(r.certLab || '').replace(/"/g, '&quot;')}" oninput="updateRow('${lot.id}', ${r.rowId}, 'certLab', this.value)"/>
+                    <input class="h-10 border rounded-lg px-2 text-[12px]" style="border-color: var(--gm-outline-variant); font-family: monospace;" dir="ltr" placeholder="رقم الشهادة" value="${(r.certNumber || '').replace(/"/g, '&quot;')}" oninput="updateRow('${lot.id}', ${r.rowId}, 'certNumber', this.value)"/>
+                </div>
+            </div>`).join('');
+
+        return `
+        <div class="rounded-xl shadow-sm overflow-hidden" style="background: var(--gm-surface-lowest); border: 1px solid var(--gm-outline-variant);">
+            <button type="button" onclick="toggleLot('${lot.id}')" class="w-full p-4 flex items-center justify-between text-right">
+                <div>
+                    <div class="font-bold text-[14px]">${lot.box_name ? gmEscapeHtml(lot.box_name) + ' — ' : ''}متبقي ${fmt(lot.remaining_carat)} ct <span class="font-normal" style="color: var(--gm-on-surface-variant);">(من أصل ${fmt(lot.total_carat)} ct)</span></div>
+                    <div class="text-[11px] mt-1" style="color: var(--gm-on-surface-variant);">سعر القيراط: ${fmt(lot.price_per_carat)}${lot.trader ? ' • من: ' + gmEscapeHtml(lot.trader.name) : ''}${lot.invoice ? ' • فاتورة ' + gmEscapeHtml(lot.invoice.invoice_number) : ''}</div>
+                </div>
+                <span class="material-symbols-outlined" style="color: var(--gm-on-surface-variant);">${isOpen ? 'expand_less' : 'expand_more'}</span>
+            </button>
+            ${isOpen ? `
+            <div class="p-4 pt-0 space-y-3" style="border-top: 1px solid var(--gm-outline-variant);">
+                <div class="relative">
+                    <label class="block text-[10px] font-semibold mb-1" style="color: var(--gm-on-surface-variant);">اسم الصندوق المصدر (اختياري)</label>
+                    <input class="w-full h-10 border rounded-lg px-3 text-[13px]" style="border-color: var(--gm-outline-variant);" id="lot-box-name-${lot.id}" oninput="updateLotBoxName('${lot.id}', this.value)" placeholder="مثلاً: ماس فرط" value="${(lot.box_name || '').replace(/"/g, '&quot;')}"/>
+                </div>
+                <div class="relative">
+                    <label class="block text-[10px] font-semibold mb-1" style="color: var(--gm-on-surface-variant);">اسم الصندوق الوجهة للقطع المنتجة</label>
+                    <input class="w-full h-10 border rounded-lg px-3 text-[13px]" style="border-color: var(--gm-outline-variant);" id="dest-box-name-${lot.id}" oninput="destBoxByLot['${lot.id}'] = this.value" placeholder="مثلاً: قطع ألماسية" value="${destBoxName.replace(/"/g, '&quot;')}"/>
+                </div>
+                <div class="space-y-2" id="rows-${lot.id}">${rowsHtml}</div>
+                <button type="button" onclick="addRow('${lot.id}')" class="w-full h-10 border border-dashed rounded-lg text-[12px] font-semibold text-primary" style="border-color: var(--gm-outline-variant);">+ إضافة قطعة</button>
+                <div class="text-[11.5px] ${remainingAfterForm < 0 ? 'text-error font-bold' : ''}" style="${remainingAfterForm < 0 ? '' : 'color: var(--gm-on-surface-variant);'}" id="lot-remaining-${lot.id}">
+                    المتبقي بعد الإنتاج: ${fmt(remainingAfterForm)} ct
+                </div>
+                <div class="hidden text-error text-[11.5px]" id="lot-error-${lot.id}"></div>
+                <button type="button" onclick="produceFromLot('${lot.id}')" id="produce-btn-${lot.id}" class="w-full h-11 bg-primary text-on-primary font-bold rounded-lg text-[13px]">حفظ القطع المنتَجة</button>
+            </div>` : ''}
+        </div>`;
+    }).join('');
+}
+
+function toggleLot(lotId) {
+    openLotId = openLotId === lotId ? null : lotId;
+    if (openLotId && !rowsByLot[lotId]) rowsByLot[lotId] = [];
+    renderLots();
+}
+
+function addRow(lotId) {
+    if (!rowsByLot[lotId]) rowsByLot[lotId] = [];
+    rowsByLot[lotId].push({ rowId: ++rowCounter, description: '', carat: '', shape: '', clarity: '', cut: '', color: '', certLab: '', certNumber: '', photoFile: null, photoPreviewUrl: null });
+    renderLots();
+}
+
+function onRowPhotoSelected(lotId, rowId, input) {
+    const file = input.files && input.files[0];
+    if (!file) return;
+    const row = (rowsByLot[lotId] || []).find(r => r.rowId === rowId);
+    if (!row) return;
+    row.photoFile = file;
+    row.photoPreviewUrl = URL.createObjectURL(file);
+    renderLots();
+}
+
+function updateLotBoxName(lotId, value) {
+    const lot = lots.find(l => l.id === lotId);
+    if (lot) lot.box_name = value;
+}
+
+function updateRow(lotId, rowId, field, value) {
+    const row = (rowsByLot[lotId] || []).find(r => r.rowId === rowId);
+    if (row) row[field] = value;
+    const rows = rowsByLot[lotId] || [];
+    const lot = lots.find(l => l.id === lotId);
+    if (lot && field === 'carat') {
+        const usedInForm = rows.reduce((s, r) => s + (Number(r.carat) || 0), 0);
+        const remainingAfterForm = Number(lot.remaining_carat) - usedInForm;
+        const el = document.getElementById('lot-remaining-' + lotId);
+        if (el) {
+            el.textContent = 'المتبقي بعد الإنتاج: ' + fmt(remainingAfterForm) + ' ct';
+            el.className = (remainingAfterForm < 0 ? 'text-error font-bold' : '') + ' text-[11.5px]';
+            if (remainingAfterForm >= 0) el.style.color = 'var(--gm-on-surface-variant)';
+        }
+    }
+}
+
+function removeRow(lotId, rowId) {
+    rowsByLot[lotId] = (rowsByLot[lotId] || []).filter(r => r.rowId !== rowId);
+    renderLots();
+}
+
+async function produceFromLot(lotId) {
+    const lot = lots.find(l => l.id === lotId);
+    const rows = (rowsByLot[lotId] || []).filter(r => r.carat && Number(r.carat) > 0);
+    const errEl = document.getElementById('lot-error-' + lotId);
+    const btn = document.getElementById('produce-btn-' + lotId);
+    errEl.classList.add('hidden');
+
+    if (rows.length === 0) {
+        errEl.textContent = 'أضف قطعة واحدة على الأقل بقيراط صحيح.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const totalCarat = rows.reduce((s, r) => s + Number(r.carat), 0);
+    if (totalCarat > Number(lot.remaining_carat)) {
+        errEl.textContent = `مجموع قيراط القطع (${fmt(totalCarat)}) أكبر من المتبقي بالصندوق (${fmt(lot.remaining_carat)}).`;
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'جارِ الحفظ...';
+
+    const sourceBoxName = (document.getElementById('lot-box-name-' + lotId).value || '').trim() || null;
+    if (sourceBoxName !== (lot.box_name || null)) {
+        await goldmindClient.from('diamond_stock_lots').update({ box_name: sourceBoxName }).eq('id', lotId);
+    }
+    const destBoxName = (document.getElementById('dest-box-name-' + lotId).value || '').trim() || null;
+
+    const piecesPayload = [];
+    for (const r of rows) {
+        const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'diamond' });
+        if (bcError) {
+            btn.disabled = false;
+            btn.textContent = 'حفظ القطع المنتَجة';
+            errEl.textContent = 'تعذّر توليد رقم القطعة: ' + bcError.message;
+            errEl.classList.remove('hidden');
+            return;
+        }
+
+        let photoUrl = null;
+        if (r.photoFile) {
+            const ext = (r.photoFile.name.split('.').pop() || 'jpg').toLowerCase();
+            const path = GOLDMIND_STORE_ID + '/' + barcode + '-' + Date.now() + '.' + ext;
+            const { error: uploadError } = await goldmindClient.storage.from('piece-photos').upload(path, r.photoFile, { upsert: false });
+            if (!uploadError) {
+                const { data: publicUrlData } = goldmindClient.storage.from('piece-photos').getPublicUrl(path);
+                photoUrl = publicUrlData ? publicUrlData.publicUrl : null;
+            }
+        }
+
+        piecesPayload.push({
+            store_id: GOLDMIND_STORE_ID,
+            barcode: barcode,
+            photo_url: photoUrl,
+            diamond_carat: Number(r.carat),
+            diamond_price_per_carat: lot.price_per_carat,
+            shape: r.shape || null,
+            clarity: r.clarity || null,
+            cut: r.cut || null,
+            color: r.color || null,
+            certificate_lab: r.certLab || null,
+            certificate_number: r.certNumber || null,
+            description_ar: r.description || null,
+            box_name: destBoxName,
+            diamond_stock_lot_id: lotId,
+            has_gold: false,
+            status: 'available',
+            created_by: GOLDMIND_STAFF_ID
+        });
+    }
+
+    const { error: piecesError } = await goldmindClient.from('diamond_pieces').insert(piecesPayload);
+    if (piecesError) {
+        btn.disabled = false;
+        btn.textContent = 'حفظ القطع المنتَجة';
+        errEl.textContent = 'تعذّر إنشاء القطع: ' + piecesError.message;
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const { error: consumeError } = await goldmindClient.rpc('consume_diamond_stock_lot', { target_lot_id: lotId, amount: totalCarat });
+    if (consumeError) {
+        errEl.textContent = 'تم إنشاء القطع لكن تعذّر خصم القيراط من الصندوق: ' + consumeError.message + ' — راجع الرصيد يدوياً.';
+        errEl.classList.remove('hidden');
+    }
+
+    delete rowsByLot[lotId];
+    delete destBoxByLot[lotId];
+    openLotId = null;
+    await load();
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
