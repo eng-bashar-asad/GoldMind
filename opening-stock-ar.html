@@ -184,8 +184,9 @@ async function load() {
 
   listEl.innerHTML = data.map(lot => {
     const date = gmFormatDateTime(lot.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
+    const untouched = Number(lot.weight_grams_remaining) === Number(lot.weight_grams_total) && Number(lot.fabrication_pool_remaining) === Number(lot.fabrication_pool_total);
     return `
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="os-lot-${lot.id}">
         <div class="flex items-center justify-between mb-1">
           <span class="text-[13px] font-semibold">عيار ${lot.karat}</span>
           <span class="text-[11px] text-on-surface-variant">${date}</span>
@@ -193,8 +194,105 @@ async function load() {
         <p class="text-[12px] font-data-mono">الوزن المتبقي: ${fmt(lot.weight_grams_remaining)}غ / أصل ${fmt(lot.weight_grams_total)}غ</p>
         <p class="text-[12px] font-data-mono">المصنعية المتبقية: ${fmt(lot.fabrication_pool_remaining)} د.إ / أصل ${fmt(lot.fabrication_pool_total)} د.إ</p>
         ${lot.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(lot.notes)}</p>` : ''}
+        <div class="flex gap-2 mt-3 pt-3 border-t border-outline-variant">
+          <button onclick="toggleEditLot('${lot.id}')" class="flex-1 h-9 border border-outline-variant text-on-surface rounded-lg text-[12px] font-semibold">تعديل</button>
+          ${untouched ? `<button onclick="deleteOpeningStockLot('${lot.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">حذف</button>` : ''}
+        </div>
+        <div class="hidden mt-3 pt-3 border-t border-outline-variant space-y-2" id="os-edit-form-${lot.id}">
+          <div class="grid grid-cols-2 gap-2">
+            <select id="os-edit-karat-${lot.id}" class="h-10 border border-outline-variant rounded-lg px-2 text-[13px]">
+              <option value="18" ${lot.karat == 18 ? 'selected' : ''}>18</option>
+              <option value="21" ${lot.karat == 21 ? 'selected' : ''}>21</option>
+              <option value="22" ${lot.karat == 22 ? 'selected' : ''}>22</option>
+              <option value="24" ${lot.karat == 24 ? 'selected' : ''}>24</option>
+            </select>
+            <input id="os-edit-weight-${lot.id}" type="number" step="0.01" dir="ltr" placeholder="الوزن الإجمالي" class="h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${lot.weight_grams_total}"/>
+          </div>
+          <input id="os-edit-fab-${lot.id}" type="number" step="0.01" dir="ltr" placeholder="مجموع المصنعية" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${lot.fabrication_pool_total}"/>
+          <input id="os-edit-notes-${lot.id}" type="text" placeholder="ملاحظة" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px]" value="${(lot.notes || '').replace(/"/g, '&quot;')}"/>
+          ${!untouched ? `<p class="text-[11px] text-on-surface-variant">تنبيه: جزء من هالدفعة استُهلك فعلاً (إنتاج قطع)، فتقليل الوزن/المصنعية بيتجاوب مع المتبقي بس، لن يقل عن الصفر.</p>` : ''}
+          <div class="flex gap-2">
+            <button onclick="saveEditLot('${lot.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
+            <button onclick="toggleEditLot('${lot.id}')" class="flex-1 h-9 border border-outline-variant text-on-surface rounded-lg text-[12px] font-semibold">إلغاء</button>
+          </div>
+          <p class="hidden text-error text-[11px]" id="os-edit-error-${lot.id}"></p>
+        </div>
       </div>`;
   }).join('');
+}
+
+function toggleEditLot(lotId) {
+  document.getElementById('os-edit-form-' + lotId).classList.toggle('hidden');
+}
+
+async function saveEditLot(lotId) {
+  const errEl = document.getElementById('os-edit-error-' + lotId);
+  errEl.classList.add('hidden');
+
+  const { data: current, error: fetchError } = await goldmindClient.from('gold_stock_lots').select('*').eq('id', lotId).maybeSingle();
+  if (fetchError || !current) {
+    errEl.textContent = 'تعذّر تحميل بيانات الدفعة الحالية.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const newKarat = parseInt(document.getElementById('os-edit-karat-' + lotId).value, 10);
+  const newWeightTotal = parseFloat(document.getElementById('os-edit-weight-' + lotId).value);
+  const newFabTotal = parseFloat(document.getElementById('os-edit-fab-' + lotId).value);
+  const newNotes = document.getElementById('os-edit-notes-' + lotId).value.trim();
+
+  if (!newWeightTotal || newWeightTotal <= 0) {
+    errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (isNaN(newFabTotal) || newFabTotal < 0) {
+    errEl.textContent = 'فضلاً أدخل مجموع مصنعية صحيح';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  // Adjust the "remaining" side by the same delta as the total, so any
+  // pieces already produced from this lot stay correctly accounted for --
+  // editing the total must never silently erase already-consumed history.
+  const weightDelta = newWeightTotal - Number(current.weight_grams_total);
+  const fabDelta = newFabTotal - Number(current.fabrication_pool_total);
+  const newWeightRemaining = Number(current.weight_grams_remaining) + weightDelta;
+  const newFabRemaining = Number(current.fabrication_pool_remaining) + fabDelta;
+
+  if (newWeightRemaining < 0 || newFabRemaining < 0) {
+    errEl.textContent = 'التعديل بيخلي المتبقي أقل من صفر — قلّل مقدار التخفيض.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const { error } = await goldmindClient.from('gold_stock_lots').update({
+    karat: newKarat,
+    weight_grams_total: newWeightTotal,
+    weight_grams_remaining: newWeightRemaining,
+    fabrication_pool_total: newFabTotal,
+    fabrication_pool_remaining: newFabRemaining,
+    cost_fabrication_per_gram: +(newFabTotal / newWeightTotal).toFixed(4),
+    notes: newNotes || 'بضاعة أول المدة'
+  }).eq('id', lotId);
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  await load();
+}
+
+async function deleteOpeningStockLot(lotId) {
+  if (!confirm('هل تريد حذف دفعة بضاعة أول المدة هذه نهائياً؟ هذا الإجراء لا يمكن التراجع عنه.')) return;
+  const { error } = await goldmindClient.from('gold_stock_lots').delete().eq('id', lotId);
+  if (error) {
+    alert('تعذّر الحذف: ' + error.message);
+    return;
+  }
+  await load();
 }
 
 load();
