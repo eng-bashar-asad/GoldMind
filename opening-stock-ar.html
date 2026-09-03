@@ -165,6 +165,13 @@ async function submitOpeningStock() {
 }
 
 async function load() {
+  // Must wait for the session first -- this used to fire without waiting
+  // for __enforcePermission's requireGoldMindSession() call above, so on a
+  // fresh page load it could hit this RLS-protected table before the auth
+  // token was attached, silently getting zero rows back and showing "لا
+  // توجد دفعات مسجّلة بعد" even when entries genuinely existed.
+  await requireGoldMindSession('login-entry-ar.html');
+
   const { data, error } = await goldmindClient
     .from('gold_stock_lots')
     .select('*')
