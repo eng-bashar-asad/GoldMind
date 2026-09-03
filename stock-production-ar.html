@@ -162,13 +162,13 @@
 
             return `
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-                <button type="button" onclick="toggleLot('${lot.id}')" class="w-full p-4 flex items-center justify-between text-right">
+                <div onclick="toggleLot('${lot.id}')" role="button" tabindex="0" class="w-full p-4 flex items-center justify-between text-right cursor-pointer">
                     <div>
                         <div class="font-bold text-[14px]">${lot.box_name ? gmEscapeHtml(lot.box_name) + ' — ' : ''}عيار ${lot.karat}K — متبقي ${fmt(lot.weight_grams_remaining)}غ <span class="text-outline font-normal">(من أصل ${fmt(lot.weight_grams_total)}غ)</span></div>
-                        <div class="text-[11px] text-on-surface-variant mt-1">مصنعية الغرام: ${fmt(lot.cost_fabrication_per_gram)}${lot.trader ? ' • من: ' + lot.trader.name : ''}${lot.invoice ? ' • فاتورة ' + lot.invoice.invoice_number : ''}</div>
+                        <div class="text-[11px] text-on-surface-variant mt-1">مصنعية الغرام: ${fmt(lot.cost_fabrication_per_gram)}${lot.trader ? ' • من: ' + gmEscapeHtml(lot.trader.name) : ''}${lot.invoice ? ` • <a href="invoice-print-ar.html?id=${lot.source_invoice_id}" onclick="event.stopPropagation()" class="text-secondary font-semibold underline">فاتورة ${gmEscapeHtml(lot.invoice.invoice_number)} ←</a>` : ''}</div>
                     </div>
                     <span class="material-symbols-outlined text-outline">${isOpen ? 'expand_less' : 'expand_more'}</span>
-                </button>
+                </div>
                 ${isOpen ? `
                 <div class="p-4 pt-0 border-t border-outline-variant space-y-3">
                     <div class="relative">
