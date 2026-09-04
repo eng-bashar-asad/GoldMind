@@ -1,0 +1,67 @@
+name: Daily Cashbox WhatsApp Report
+
+# Runs automatically every day at 23:59 Asia/Dubai (UTC+4 = 19:59 UTC), and
+# can also be triggered manually from the Actions tab (workflow_dispatch)
+# to test it immediately instead of waiting for the schedule.
+on:
+  schedule:
+    - cron: '59 19 * * *'
+  workflow_dispatch: {}
+
+jobs:
+  send-report:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fetch today's cashbox data and send WhatsApp
+        env:
+          SUPABASE_URL: https://puzkfwbmipldzgwofhjg.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          CALLMEBOT_PHONE: ${{ secrets.CALLMEBOT_PHONE }}
+          CALLMEBOT_API_KEY: ${{ secrets.CALLMEBOT_API_KEY }}
+          STORE_ID: 9c2ce2f0-6d22-4a09-9b6a-6067f4c90ef0
+        run: |
+          python3 - <<'PYEOF'
+          import os, json, urllib.request, urllib.parse
+          from datetime import datetime, timedelta, timezone
+
+          tz = timezone(timedelta(hours=4))  # Asia/Dubai, no DST
+          now = datetime.now(tz)
+          today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+          tomorrow_start = today_start + timedelta(days=1)
+
+          base_url = os.environ['SUPABASE_URL'] + '/rest/v1/daily_cash_log'
+          query = urllib.parse.urlencode([
+              ('store_id', 'eq.' + os.environ['STORE_ID']),
+              ('created_at', 'gte.' + today_start.isoformat()),
+              ('created_at', 'lt.' + tomorrow_start.isoformat()),
+              ('select', 'direction,amount,currency,operation_type,notes'),
+          ])
+          req = urllib.request.Request(base_url + '?' + query, headers={
+              'apikey': os.environ['SUPABASE_SERVICE_ROLE_KEY'],
+              'Authorization': 'Bearer ' + os.environ['SUPABASE_SERVICE_ROLE_KEY'],
+          })
+          rows = json.loads(urllib.request.urlopen(req).read())
+
+          totals = {}
+          for r in rows:
+              cur = r.get('currency') or 'AED'
+              totals.setdefault(cur, {'in': 0.0, 'out': 0.0})
+              totals[cur][r['direction']] += float(r.get('amount') or 0)
+
+          lines = ['*كشف الصندوق اليومي - GoldMind*', 'التاريخ: ' + today_start.strftime('%d/%m/%Y'), '']
+          for cur, t in totals.items():
+              lines.append('*' + cur + '*')
+              lines.append('  الداخل: %.2f' % t['in'])
+              lines.append('  الصادر: %.2f' % t['out'])
+              lines.append('  الصافي: %.2f' % (t['in'] - t['out']))
+              lines.append('')
+          lines.append('عدد الحركات: ' + str(len(rows)))
+          message = '\n'.join(lines)
+
+          wa_url = 'https://api.callmebot.com/whatsapp.php?' + urllib.parse.urlencode({
+              'phone': os.environ['CALLMEBOT_PHONE'],
+              'text': message,
+              'apikey': os.environ['CALLMEBOT_API_KEY'],
+          })
+          print(urllib.request.urlopen(wa_url).read().decode())
+          PYEOF
