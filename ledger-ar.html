@@ -1991,6 +1991,19 @@ function goBack() {
 }
 
 load();
+
+// Quick-access shortcut support: ledger-ar.html?action=addTrader jumps
+// straight to the "إضافة تاجر جديد" form instead of landing on the plain
+// trader list, matching the ?mode=bulk pattern used elsewhere in the app.
+(function () {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('action') === 'addTrader') {
+        setTimeout(() => {
+            toggleAddTraderForm();
+            document.getElementById('addTraderForm').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 400);
+    }
+})();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
