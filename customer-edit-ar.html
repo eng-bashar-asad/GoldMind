@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>تعديل بيانات العميل | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); font-family: 'Inter', sans-serif; }
+    /* Company/individual toggle switch */
+    .gm-switch { position: relative; display: inline-block; width: 46px; height: 26px; flex-shrink: 0; }
+    .gm-switch input { opacity: 0; width: 0; height: 0; }
+    .gm-switch-track { position: absolute; cursor: pointer; inset: 0; background-color: var(--gm-outline-variant, #76777d); transition: .2s; border-radius: 999px; }
+    .gm-switch-track:before { position: absolute; content: ""; height: 20px; width: 20px; left: 3px; bottom: 3px; background-color: #fff; transition: .2s; border-radius: 50%; }
+    .gm-switch input:checked + .gm-switch-track { background-color: var(--gm-primary, #131b2e); }
+    .gm-switch input:checked + .gm-switch-track:before { transform: translateX(-20px); }
+</style>
+</head>
+<body>
+<header class="border-b sticky top-0 z-40" style="background: var(--gm-surface-lowest); border-color: var(--gm-outline-variant);">
+<div class="flex items-center gap-3 px-4 w-full h-16 max-w-md mx-auto">
+<button onclick="gmSmartBack('customer-debts-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold">تعديل بيانات العميل</h1>
+</div>
+</header>
+
+<main class="max-w-md mx-auto px-4 py-5 flex flex-col gap-4" id="page-content">
+<div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
+
+<div class="hidden flex flex-col gap-4" id="form-wrap">
+<p class="text-[12px]" style="color: var(--gm-on-surface-variant);">هالصفحة بتخليك تحوّل عميل فرد إلى شركة (أو العكس) وتضيف/تعدّل رقم التسجيل الضريبي (TRN) — لازمة لو رح تبيعله كفاتورة B2B (فوترة إلكترونية) بالمستقبل.</p>
+
+<div class="flex items-center justify-between border rounded-xl px-4 h-14" style="border-color: var(--gm-outline-variant);">
+<span class="font-semibold text-[14px]">عميل شركة (له TRN)</span>
+<label class="gm-switch">
+<input id="isCompanyToggle" onchange="onIsCompanyToggle(this.checked)" type="checkbox"/>
+<span class="gm-switch-track"></span>
+</label>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-name">الاسم</label>
+<input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-name" type="text"/>
+</div>
+
+<!-- Company-only fields -->
+<div class="hidden flex-col gap-4" id="company-fields">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-legal-name">الاسم القانوني للشركة</label>
+<input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-legal-name" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-tax-number">الرقم الضريبي (TRN)</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-tax-number" placeholder="100XXXXXXXXXXXX" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-trade-license">رقم الرخصة/السجل التجاري</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-trade-license" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-activity">نشاط الشركة</label>
+<input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-activity" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-email">إيميل الشركة</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-email" type="email"/>
+</div>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-phone">رقم الهاتف</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-phone" type="tel"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-address">العنوان</label>
+<textarea class="w-full h-20 border rounded-lg px-4 py-3 resize-none" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-address"></textarea>
+</div>
+
+<div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
+<button id="save-btn" onclick="saveCustomer()" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md active:scale-[0.98] transition-all">حفظ التعديلات</button>
+</div>
+</main>
+
+<script>
+(async function __enforcePermission() {
+    await requireGoldMindSession('login-entry-ar.html');
+    const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['add_customers'] === true));
+    if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+})();
+
+const params = new URLSearchParams(window.location.search);
+const customerId = params.get('id');
+
+async function load() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+    if (!customerId) {
+        document.getElementById('loading-state').textContent = 'لم يتم تحديد عميل.';
+        return;
+    }
+
+    const { data: c, error } = await goldmindClient.from('customers').select('*').eq('id', customerId).maybeSingle();
+    document.getElementById('loading-state').classList.add('hidden');
+    if (error || !c) {
+        document.getElementById('page-content').innerHTML = '<p class="text-error text-sm text-center py-8">تعذّر تحميل بيانات العميل.</p>';
+        return;
+    }
+
+    document.getElementById('form-wrap').classList.remove('hidden');
+    document.getElementById('isCompanyToggle').checked = !!c.is_company;
+    onIsCompanyToggle(!!c.is_company);
+    document.getElementById('f-name').value = c.name || '';
+    document.getElementById('f-legal-name').value = c.legal_name || '';
+    document.getElementById('f-tax-number').value = c.tax_number || '';
+    document.getElementById('f-trade-license').value = c.trade_license_number || '';
+    document.getElementById('f-activity').value = c.business_activity || '';
+    document.getElementById('f-email').value = c.email || '';
+    document.getElementById('f-phone').value = c.phone || '';
+    document.getElementById('f-address').value = c.address || '';
+}
+
+function onIsCompanyToggle(checked) {
+    document.getElementById('company-fields').classList.toggle('hidden', !checked);
+    document.getElementById('company-fields').classList.toggle('flex', checked);
+}
+
+function showMessage(text, isError) {
+    const el = document.getElementById('save-message');
+    el.textContent = text;
+    el.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
+    el.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
+}
+
+async function saveCustomer() {
+    const btn = document.getElementById('save-btn');
+    const isCompany = document.getElementById('isCompanyToggle').checked;
+    const name = document.getElementById('f-name').value.trim();
+
+    if (!name) {
+        showMessage('اسم العميل مطلوب.', true);
+        return;
+    }
+    // TRN is the whole point of this screen for a company customer -- warn
+    // (but don't hard-block, since some legitimate company customers may
+    // not have registered for VAT/Corporate Tax yet) if it's left empty.
+    const taxNumber = document.getElementById('f-tax-number').value.trim();
+    if (isCompany && !taxNumber) {
+        if (!confirm('ما أدخلت رقم TRN — بدون هالرقم ما فيك تصدر فاتورة إلكترونية B2B لهالعميل لاحقاً. تكمل الحفظ بدون TRN؟')) return;
+    }
+
+    btn.disabled = true;
+    btn.textContent = 'جارِ الحفظ...';
+
+    const updatePayload = {
+        name: name,
+        is_company: isCompany,
+        phone: document.getElementById('f-phone').value.trim() || null,
+        address: document.getElementById('f-address').value.trim() || null
+    };
+    if (isCompany) {
+        updatePayload.legal_name = document.getElementById('f-legal-name').value.trim() || null;
+        updatePayload.tax_number = taxNumber || null;
+        updatePayload.trade_license_number = document.getElementById('f-trade-license').value.trim() || null;
+        updatePayload.business_activity = document.getElementById('f-activity').value.trim() || null;
+        updatePayload.email = document.getElementById('f-email').value.trim() || null;
+    }
+
+    const { error } = await goldmindClient.from('customers').update(updatePayload).eq('id', customerId);
+
+    btn.disabled = false;
+    btn.textContent = 'حفظ التعديلات';
+
+    if (error) {
+        showMessage('تعذّر الحفظ: ' + error.message, true);
+        return;
+    }
+
+    showMessage('تم حفظ التعديلات بنجاح.', false);
+    setTimeout(() => { window.location.href = 'customer-debts-ar.html'; }, 900);
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
