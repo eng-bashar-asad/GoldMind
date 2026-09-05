@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>سجل الموظفين | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); font-family: 'Inter', sans-serif; }
+</style>
+</head>
+<body>
+<header class="border-b sticky top-0 z-40" style="background: var(--gm-surface-lowest); border-color: var(--gm-outline-variant);">
+<div class="flex items-center gap-3 px-4 w-full h-16 max-w-md mx-auto">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold flex-1">سجل الموظفين</h1>
+<a href="hr-leaves-ar.html" class="h-9 px-3 flex items-center gap-1 rounded-full text-[11px] font-semibold" style="background: var(--gm-secondary-container); color: var(--gm-on-secondary-container);">
+<span class="material-symbols-outlined text-[16px]">event_busy</span> الإجازات
+</a>
+</div>
+</header>
+
+<main class="max-w-md mx-auto px-4 py-5 flex flex-col gap-4">
+<p class="text-[12px]" style="color: var(--gm-on-surface-variant);">سجل مستقل لكل موظفين الشركة الفعليين — بغض النظر هل عندهم حساب دخول للبرنامج ولا لأ. مطلوب أساساً لتسجيل الإجازات وربطها بموظف حقيقي.</p>
+
+<button onclick="toggleAddForm()" class="w-full h-12 rounded-xl flex items-center justify-center gap-2 font-bold" style="background: var(--gm-secondary); color: var(--gm-on-secondary);">
+<span class="material-symbols-outlined">person_add</span> إضافة موظف جديد
+</button>
+
+<div class="hidden flex-col gap-3 p-4 rounded-xl border" style="border-color: var(--gm-outline-variant); background: var(--gm-surface-lowest);" id="add-form">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-name">اسم الموظف</label>
+<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-name" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-job">المسمى الوظيفي</label>
+<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-job" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-dept">القسم</label>
+<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-dept" type="text"/>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-phone">رقم الهاتف</label>
+<input class="w-full h-12 border rounded-lg px-3 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-phone" type="tel"/>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-hire">تاريخ التعيين</label>
+<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-hire" type="date"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-leave-days">رصيد الإجازة السنوي (يوم)</label>
+<input class="w-full h-12 border rounded-lg px-3 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-leave-days" type="number" value="30"/>
+</div>
+</div>
+<div class="relative" id="linked-staff-wrap">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-linked-staff">مرتبط بحساب دخول (اختياري)</label>
+<select class="w-full h-12 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-linked-staff">
+<option value="">— بدون حساب دخول —</option>
+</select>
+</div>
+<textarea class="w-full h-16 border rounded-lg px-3 py-2 resize-none" placeholder="ملاحظات (اختياري)" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-notes"></textarea>
+<div class="hidden text-error text-[12px]" id="add-error"></div>
+<button onclick="addEmployee()" id="add-btn" class="w-full h-12 rounded-lg font-bold" style="background: var(--gm-primary); color: var(--gm-on-primary);">حفظ الموظف</button>
+</div>
+
+<div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
+<div id="empty-state" class="hidden py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">لا يوجد موظفون مسجّلون بعد.</div>
+<div id="employees-list" class="flex flex-col gap-3"></div>
+</main>
+
+<script>
+(async function __enforcePermission() {
+    await requireGoldMindSession('login-entry-ar.html');
+    const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['manage_payroll'] === true));
+    if (!__allowed) { alert('هذه الشاشة مخصّصة لصلاحية الرواتب والموارد البشرية فقط.'); window.location.href = 'index-ar.html'; }
+})();
+
+function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 0, maximumFractionDigits: 1 }); }
+
+let employees = [];
+let allLeaves = [];
+
+async function load() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const [{ data: emps, error }, { data: staffRows }, { data: leaves }] = await Promise.all([
+        goldmindClient.from('hr_employees').select('*').eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }),
+        goldmindClient.from('staff').select('id, name').eq('store_id', GOLDMIND_STORE_ID),
+        goldmindClient.from('hr_leave_requests').select('employee_id, days_count, status, start_date').eq('store_id', GOLDMIND_STORE_ID).eq('status', 'approved')
+    ]);
+
+    document.getElementById('loading-state').classList.add('hidden');
+    if (error) {
+        document.getElementById('employees-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
+        return;
+    }
+
+    employees = emps || [];
+    allLeaves = leaves || [];
+
+    const staffSelect = document.getElementById('f-linked-staff');
+    (staffRows || []).forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s.id;
+        opt.textContent = s.name;
+        staffSelect.appendChild(opt);
+    });
+
+    if (employees.length === 0) {
+        document.getElementById('empty-state').classList.remove('hidden');
+        return;
+    }
+    render();
+}
+
+function usedLeaveDaysThisYear(employeeId) {
+    const currentYear = new Date().getFullYear();
+    return allLeaves
+        .filter(l => l.employee_id === employeeId && new Date(l.start_date).getFullYear() === currentYear)
+        .reduce((s, l) => s + Number(l.days_count || 0), 0);
+}
+
+function render() {
+    document.getElementById('employees-list').innerHTML = employees.map(e => {
+        const used = usedLeaveDaysThisYear(e.id);
+        const remaining = Number(e.annual_leave_days || 0) - used;
+        return `
+        <div class="p-4 rounded-xl border" style="border-color: var(--gm-outline-variant); background: var(--gm-surface-lowest);">
+            <div class="flex items-start justify-between gap-2">
+                <div>
+                    <div class="font-bold text-[14px]">${gmEscapeHtml(e.name)} ${e.status === 'inactive' ? '<span class="text-[10px] text-error">(غير نشط)</span>' : ''}</div>
+                    <div class="text-[12px] mt-0.5" style="color: var(--gm-on-surface-variant);">${gmEscapeHtml(e.job_title || '—')}${e.department ? ' • ' + gmEscapeHtml(e.department) : ''}</div>
+                    ${e.phone ? `<div class="text-[11px] font-data-mono mt-0.5" dir="ltr" style="color: var(--gm-on-surface-variant);">${gmEscapeHtml(e.phone)}</div>` : ''}
+                </div>
+                <button onclick="toggleEditRow('${e.id}')" class="shrink-0 h-8 px-3 rounded-full border text-[11px] font-semibold" style="border-color: var(--gm-outline-variant);">تعديل</button>
+            </div>
+            <div class="flex items-center justify-between mt-3 pt-3 border-t text-[12px]" style="border-color: var(--gm-outline-variant);">
+                <span style="color: var(--gm-on-surface-variant);">رصيد الإجازة المتبقي (${new Date().getFullYear()})</span>
+                <span class="font-bold font-data-mono ${remaining < 0 ? 'text-error' : ''}">${fmt(remaining)} / ${fmt(e.annual_leave_days)} يوم</span>
+            </div>
+            <a href="hr-leaves-ar.html?employee=${e.id}" class="mt-2 w-full h-9 flex items-center justify-center gap-1 rounded-lg border text-[12px] font-semibold" style="border-color: var(--gm-outline-variant);">
+                <span class="material-symbols-outlined text-[16px]">event_busy</span> عرض/تسجيل إجازة
+            </a>
+            <div class="hidden mt-3 pt-3 border-t flex-col gap-2" style="border-color: var(--gm-outline-variant);" id="edit-row-${e.id}">
+                <input class="w-full h-10 border rounded-lg px-3 text-[13px]" style="border-color: var(--gm-outline-variant);" id="edit-name-${e.id}" value="${(e.name || '').replace(/"/g, '&quot;')}"/>
+                <div class="grid grid-cols-2 gap-2">
+                    <input class="h-10 border rounded-lg px-2 text-[12px]" style="border-color: var(--gm-outline-variant);" id="edit-job-${e.id}" placeholder="المسمى الوظيفي" value="${(e.job_title || '').replace(/"/g, '&quot;')}"/>
+                    <input class="h-10 border rounded-lg px-2 text-[12px]" style="border-color: var(--gm-outline-variant);" id="edit-dept-${e.id}" placeholder="القسم" value="${(e.department || '').replace(/"/g, '&quot;')}"/>
+                </div>
+                <input class="w-full h-10 border rounded-lg px-3 text-[12px] font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant);" id="edit-phone-${e.id}" placeholder="الهاتف" value="${(e.phone || '').replace(/"/g, '&quot;')}"/>
+                <input class="w-full h-10 border rounded-lg px-3 text-[12px] font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant);" id="edit-leavedays-${e.id}" type="number" value="${e.annual_leave_days}"/>
+                <div class="flex items-center justify-between h-10 px-1">
+                    <span class="text-[12px]">موظف نشط</span>
+                    <input type="checkbox" id="edit-active-${e.id}" ${e.status !== 'inactive' ? 'checked' : ''}/>
+                </div>
+                <div class="flex gap-2">
+                    <button onclick="saveEmployeeEdit('${e.id}')" class="flex-1 h-9 rounded-lg text-[12px] font-semibold" style="background: var(--gm-primary); color: var(--gm-on-primary);">حفظ</button>
+                    <button onclick="toggleEditRow('${e.id}')" class="flex-1 h-9 rounded-lg border text-[12px] font-semibold" style="border-color: var(--gm-outline-variant);">إلغاء</button>
+                </div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleEditRow(id) {
+    document.getElementById('edit-row-' + id).classList.toggle('hidden');
+    document.getElementById('edit-row-' + id).classList.toggle('flex');
+}
+
+async function saveEmployeeEdit(id) {
+    const payload = {
+        name: document.getElementById('edit-name-' + id).value.trim(),
+        job_title: document.getElementById('edit-job-' + id).value.trim() || null,
+        department: document.getElementById('edit-dept-' + id).value.trim() || null,
+        phone: document.getElementById('edit-phone-' + id).value.trim() || null,
+        annual_leave_days: parseFloat(document.getElementById('edit-leavedays-' + id).value) || 0,
+        status: document.getElementById('edit-active-' + id).checked ? 'active' : 'inactive'
+    };
+    if (!payload.name) { alert('اسم الموظف مطلوب.'); return; }
+    const { error } = await goldmindClient.from('hr_employees').update(payload).eq('id', id);
+    if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+    await load();
+}
+
+function toggleAddForm() {
+    document.getElementById('add-form').classList.toggle('hidden');
+    document.getElementById('add-form').classList.toggle('flex');
+}
+
+async function addEmployee() {
+    const errEl = document.getElementById('add-error');
+    errEl.classList.add('hidden');
+    const name = document.getElementById('f-name').value.trim();
+    if (!name) {
+        errEl.textContent = 'اسم الموظف مطلوب.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('add-btn');
+    btn.disabled = true;
+    btn.textContent = 'جارِ الحفظ...';
+
+    const { error } = await goldmindClient.from('hr_employees').insert({
+        store_id: GOLDMIND_STORE_ID,
+        name: name,
+        job_title: document.getElementById('f-job').value.trim() || null,
+        department: document.getElementById('f-dept').value.trim() || null,
+        phone: document.getElementById('f-phone').value.trim() || null,
+        hire_date: document.getElementById('f-hire').value || null,
+        annual_leave_days: parseFloat(document.getElementById('f-leave-days').value) || 30,
+        linked_staff_id: document.getElementById('f-linked-staff').value || null,
+        notes: document.getElementById('f-notes').value.trim() || null,
+        created_by: GOLDMIND_STAFF_ID
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'حفظ الموظف';
+
+    if (error) {
+        errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    document.getElementById('f-name').value = '';
+    document.getElementById('f-job').value = '';
+    document.getElementById('f-dept').value = '';
+    document.getElementById('f-phone').value = '';
+    document.getElementById('f-hire').value = '';
+    document.getElementById('f-leave-days').value = '30';
+    document.getElementById('f-linked-staff').value = '';
+    document.getElementById('f-notes').value = '';
+    toggleAddForm();
+    await load();
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
