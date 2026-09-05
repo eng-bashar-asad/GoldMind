@@ -150,8 +150,12 @@ function render() {
                     <div class="font-bold text-[14px]">${gmEscapeHtml(e.name)} ${e.status === 'inactive' ? '<span class="text-[10px] text-error">(غير نشط)</span>' : ''}</div>
                     <div class="text-[12px] mt-0.5" style="color: var(--gm-on-surface-variant);">${gmEscapeHtml(e.job_title || '—')}${e.department ? ' • ' + gmEscapeHtml(e.department) : ''}</div>
                     ${e.phone ? `<div class="text-[11px] font-data-mono mt-0.5" dir="ltr" style="color: var(--gm-on-surface-variant);">${gmEscapeHtml(e.phone)}</div>` : ''}
+                    ${e.linked_staff_id ? `<div class="text-[10px] mt-1 flex items-center gap-1" style="color: var(--gm-secondary);"><span class="material-symbols-outlined text-[13px]">link</span> مرتبط بحساب دخول للبرنامج</div>` : ''}
                 </div>
-                <button onclick="toggleEditRow('${e.id}')" class="shrink-0 h-8 px-3 rounded-full border text-[11px] font-semibold" style="border-color: var(--gm-outline-variant);">تعديل</button>
+                <div class="shrink-0 flex flex-col gap-1.5">
+                    <button onclick="toggleEditRow('${e.id}')" class="h-8 px-3 rounded-full border text-[11px] font-semibold" style="border-color: var(--gm-outline-variant);">تعديل</button>
+                    <button onclick="deleteEmployee('${e.id}')" class="h-8 px-3 rounded-full border text-error text-[11px] font-semibold" style="border-color: var(--gm-outline-variant);">حذف</button>
+                </div>
             </div>
             <div class="flex items-center justify-between mt-3 pt-3 border-t text-[12px]" style="border-color: var(--gm-outline-variant);">
                 <span style="color: var(--gm-on-surface-variant);">رصيد الإجازة المتبقي (${new Date().getFullYear()})</span>
@@ -172,6 +176,11 @@ function render() {
                     <span class="text-[12px]">موظف نشط</span>
                     <input type="checkbox" id="edit-active-${e.id}" ${e.status !== 'inactive' ? 'checked' : ''}/>
                 </div>
+                ${e.linked_staff_id ? `
+                <div class="flex items-center justify-between h-10 px-1">
+                    <span class="text-[12px]">مرتبط بحساب دخول (مثلاً: مو موظف حقيقي، متل محاسب خارجي؟ فُك الربط)</span>
+                    <input type="checkbox" id="edit-unlink-${e.id}"/>
+                </div>` : ''}
                 <div class="flex gap-2">
                     <button onclick="saveEmployeeEdit('${e.id}')" class="flex-1 h-9 rounded-lg text-[12px] font-semibold" style="background: var(--gm-primary); color: var(--gm-on-primary);">حفظ</button>
                     <button onclick="toggleEditRow('${e.id}')" class="flex-1 h-9 rounded-lg border text-[12px] font-semibold" style="border-color: var(--gm-outline-variant);">إلغاء</button>
@@ -195,9 +204,23 @@ async function saveEmployeeEdit(id) {
         annual_leave_days: parseFloat(document.getElementById('edit-leavedays-' + id).value) || 0,
         status: document.getElementById('edit-active-' + id).checked ? 'active' : 'inactive'
     };
+    const unlinkEl = document.getElementById('edit-unlink-' + id);
+    if (unlinkEl && unlinkEl.checked) payload.linked_staff_id = null;
     if (!payload.name) { alert('اسم الموظف مطلوب.'); return; }
     const { error } = await goldmindClient.from('hr_employees').update(payload).eq('id', id);
     if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+    await load();
+}
+
+async function deleteEmployee(id) {
+    const emp = employees.find(e => e.id === id);
+    const warning = emp && emp.linked_staff_id
+        ? 'هذا الموظف مرتبط بحساب دخول للبرنامج — حذفه من هنا ما بيلغي حساب الدخول، بس بيشيل سجله من الموارد البشرية (رصيد الإجازة والإحصائيات). متأكد؟'
+        : 'حذف هذا الموظف نهائياً؟ (رح ينحذف معه سجل إجازاته)';
+    if (!confirm(warning)) return;
+    await goldmindClient.from('hr_leave_requests').delete().eq('employee_id', id);
+    const { error } = await goldmindClient.from('hr_employees').delete().eq('id', id);
+    if (error) { alert('تعذّر الحذف: ' + error.message); return; }
     await load();
 }
 
