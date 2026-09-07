@@ -125,16 +125,21 @@
         .luxury-shadow {
             box-shadow: 0px 4px 20px rgba(15, 23, 42, 0.05);
         }
-        /* Matte gold hero tile (الصندوق اليومي) -- a muted brushed-metal
-           gradient (not a flat/bright gold) plus a soft diagonal sheen via
+        /* Matte metallic hero tile (الصندوق اليومي) -- a muted brushed-metal
+           gradient (not a flat/bright color) plus a soft diagonal sheen via
            ::after, so it reads as "premium metal catching light" rather
-           than a glossy plastic highlight. */
+           than a glossy plastic highlight. Built from the ACTIVE THEME's
+           own accent/secondary/primary variables (not hardcoded gold) so
+           it actually changes with the selected theme -- previously this
+           was a fixed gold gradient regardless of theme, which was why
+           every theme looked identical on the single most prominent tile
+           on the dashboard. */
         .gold-accent {
             position: relative;
             overflow: hidden;
             background:
-                linear-gradient(150deg, #8a6d3f 0%, #c2a05a 38%, #a3823f 68%, #7a5f34 100%);
-            box-shadow: 0 6px 16px -4px rgba(122, 95, 52, 0.5), inset 0 1px 0 rgba(255,255,255,0.16);
+                linear-gradient(150deg, var(--gm-secondary) 0%, var(--gm-accent) 38%, var(--gm-secondary) 68%, var(--gm-primary) 100%);
+            box-shadow: 0 6px 16px -4px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255,255,255,0.16);
         }
         .gold-accent::after {
             content: "";
@@ -162,16 +167,18 @@
         .gold-accent .qa-icon-badge {
             background: rgba(255,255,255,0.2);
         }
-        /* Row-2 tiles: a tint close to the gold accent, with a visibly
-           stronger border + shadow than the plain-white tiles above them. */
+        /* Row-2 tiles: a tint close to the theme's own accent, with a
+           visibly stronger border + shadow than the plain-white tiles
+           above them. Theme-reactive (was hardcoded gold before). */
         .qa-gold-tint {
-            background: #FBF4E4;
-            border: 1.5px solid #DCC287;
-            color: #6b4f21;
-            box-shadow: 0 5px 14px -4px rgba(180, 149, 90, 0.4);
+            background: var(--gm-surface-low);
+            border: 1.5px solid var(--gm-outline-variant);
+            color: var(--gm-secondary);
+            box-shadow: 0 5px 14px -4px rgba(0, 0, 0, 0.18);
         }
         .qa-gold-tint .qa-icon-badge {
-            background: rgba(180, 149, 90, 0.22);
+            background: var(--gm-surface-lowest);
+            border: 1px solid var(--gm-outline-variant);
         }
         /* Hide scrollbar for clean mobile look */
         ::-webkit-scrollbar {
