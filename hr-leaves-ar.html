@@ -45,6 +45,7 @@
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-type">نوع الإجازة</label>
 <select class="w-full h-12 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-type">
 <option value="annual">سنوية</option>
+<option value="weekly">أسبوعية</option>
 <option value="sick">مرضية</option>
 <option value="emergency">طارئة</option>
 <option value="unpaid">بدون راتب</option>
@@ -89,7 +90,7 @@
     if (!__allowed) { alert('هذه الشاشة مخصّصة لصلاحية الرواتب والموارد البشرية فقط.'); window.location.href = 'index-ar.html'; }
 })();
 
-const LEAVE_TYPE_LABELS = { annual: 'سنوية', sick: 'مرضية', emergency: 'طارئة', unpaid: 'بدون راتب', other: 'أخرى' };
+const LEAVE_TYPE_LABELS = { annual: 'سنوية', weekly: 'أسبوعية', sick: 'مرضية', emergency: 'طارئة', unpaid: 'بدون راتب', other: 'أخرى' };
 const STATUS_LABELS = { pending: 'قيد الانتظار', approved: 'موافق عليها', rejected: 'مرفوضة' };
 const STATUS_COLORS = { pending: 'color:#8a6d1f;', approved: 'color:#3F6B47;', rejected: 'color:#8A3B32;' };
 
@@ -132,7 +133,7 @@ async function load() {
 function usedLeaveDaysThisYear(employeeId, excludeLeaveId) {
     const currentYear = new Date().getFullYear();
     return leaves
-        .filter(l => l.employee_id === employeeId && l.status === 'approved' && l.id !== excludeLeaveId && new Date(l.start_date).getFullYear() === currentYear)
+        .filter(l => l.employee_id === employeeId && l.status === 'approved' && l.leave_type === 'annual' && l.id !== excludeLeaveId && new Date(l.start_date).getFullYear() === currentYear)
         .reduce((s, l) => s + Number(l.days_count || 0), 0);
 }
 
