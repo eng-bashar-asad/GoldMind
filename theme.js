@@ -298,29 +298,28 @@ const GOLDMIND_THEMES = {
     }
   },
   'velvet-wine': {
-    // Soft, light-dominant burgundy/wine — several wine shades woven in as
-    // subtle accents ("تكحيلات داخلة") rather than an overpowering dark
-    // theme. lightCanvas keeps the page bright; the wine tones live in
-    // text, accents, and the shimmer sweep, not the base background.
+    // Same neutral cream canvas as warm-ingot (بس، دون أي صبغة وردية على
+    // الخلفية نفسها) — الخمري محصور بالأيقونات/التمييز فقط (accent +
+    // secondary + shimmer), بدرجة "دم الغزال" الغامقة الدافئة، مش وردي فاتح.
     label: 'الخمري الناعم',
-    swatch: ['#7B2438', '#FBF2F1', '#F3E1DF'],
+    swatch: ['#7A1B2B', '#F3EEDF', '#EFE7D2'],
     lightCanvas: true,
     shimmer: true,
     vars: {
-      '--gm-bg': '#FBF2F1',
-      '--gm-bg-elevated': '#FBF2F1',
+      '--gm-bg': '#F3EEDF',
+      '--gm-bg-elevated': '#F3EEDF',
       '--gm-surface-lowest': '#FFFFFF',
-      '--gm-surface-low': '#F3E1DF',
-      '--gm-primary': '#3A1420',
-      '--gm-on-primary': '#FBF3F1',
-      '--gm-accent': '#7B2438',
+      '--gm-surface-low': '#EFE7D2',
+      '--gm-primary': '#1C1A16',
+      '--gm-on-primary': '#FBF8F1',
+      '--gm-accent': '#7A1B2B',
       '--gm-on-accent': '#ffffff',
-      '--gm-secondary': '#9C4A5C',
-      '--gm-on-surface': '#2E1017',
-      '--gm-on-surface-variant': '#7A5259',
-      '--gm-outline-variant': '#E6CBCB',
-      '--gm-shimmer-grad': 'linear-gradient(120deg, #4A1420 0%, #7B2438 28%, #E3A9B4 50%, #7B2438 72%, #4A1420 100%)',
-      '--gm-avatar-grad': 'linear-gradient(135deg, #7B2438 0%, #B76E79 60%, #f0c8ce 100%)'
+      '--gm-secondary': '#5E1420',
+      '--gm-on-surface': '#211D17',
+      '--gm-on-surface-variant': '#6B6355',
+      '--gm-outline-variant': '#CBBF9E',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #430A13 0%, #7A1B2B 28%, #C07884 50%, #7A1B2B 72%, #430A13 100%)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #5E1420 0%, #7A1B2B 60%, #C07884 100%)'
     }
   },
 };
