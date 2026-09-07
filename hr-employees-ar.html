@@ -105,7 +105,7 @@ async function load() {
     const [{ data: emps, error }, { data: staffRows }, { data: leaves }] = await Promise.all([
         goldmindClient.from('hr_employees').select('*').eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }),
         goldmindClient.from('staff').select('id, name').eq('store_id', GOLDMIND_STORE_ID),
-        goldmindClient.from('hr_leave_requests').select('employee_id, days_count, status, start_date').eq('store_id', GOLDMIND_STORE_ID).eq('status', 'approved')
+        goldmindClient.from('hr_leave_requests').select('employee_id, days_count, status, start_date, leave_type').eq('store_id', GOLDMIND_STORE_ID).eq('status', 'approved')
     ]);
 
     document.getElementById('loading-state').classList.add('hidden');
@@ -135,7 +135,7 @@ async function load() {
 function usedLeaveDaysThisYear(employeeId) {
     const currentYear = new Date().getFullYear();
     return allLeaves
-        .filter(l => l.employee_id === employeeId && new Date(l.start_date).getFullYear() === currentYear)
+        .filter(l => l.employee_id === employeeId && l.leave_type === 'annual' && new Date(l.start_date).getFullYear() === currentYear)
         .reduce((s, l) => s + Number(l.days_count || 0), 0);
 }
 
