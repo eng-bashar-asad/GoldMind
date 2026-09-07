@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>فحص القوائم الرسمية (EOCN) | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { background: var(--gm-bg-elevated); color: var(--gm-on-surface); min-height: max(884px, 100dvh); font-family: 'Inter', sans-serif; }
+</style>
+</head>
+<body>
+<header class="border-b sticky top-0 z-40" style="background: var(--gm-surface-lowest); border-color: var(--gm-outline-variant);">
+<div class="flex items-center gap-3 px-4 w-full h-16 max-w-md mx-auto">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold">فحص القوائم الرسمية (EOCN)</h1>
+</div>
+</header>
+
+<main class="max-w-md mx-auto px-4 py-5 flex flex-col gap-4">
+<div class="p-4 rounded-xl border flex flex-col gap-2" style="border-color: var(--gm-outline-variant); background: var(--gm-surface-lowest);">
+<p class="text-[12px] leading-5" style="color: var(--gm-on-surface-variant);">فحص إلزامي (بموجب قرار مجلس الوزراء رقم ٧٤ لسنة ٢٠٢٠) لكل عميل شركة أو تاجر مقابل قائمة مجلس الأمن الدولي الموحّدة والقائمة المحلية للإرهاب. البحث نفسه بيصير على موقع EOCN الرسمي — هالصفحة بس لتسجيل تاريخ الفحص ونتيجته وربطه بملف KYC.</p>
+<a href="https://www.uaeiec.gov.ae/en-us/un-page" target="_blank" class="w-full h-11 flex items-center justify-center gap-2 rounded-lg font-bold text-[13px]" style="background: var(--gm-primary); color: var(--gm-on-primary);">
+<span class="material-symbols-outlined text-[18px]">open_in_new</span> تحميل قوائم EOCN الرسمية (PDF/Excel)
+</a>
+<p class="text-[11px]" style="color: var(--gm-on-surface-variant);">الموقع بيقدّم القوائم كملف قابل للتحميل (مو بحث فوري بالاسم) — نزّل الملف وفتّش عن اسم العميل/التاجر فيه (Ctrl+F أو بحث Excel).</p>
+</div>
+
+<div class="relative">
+<input class="w-full h-11 border rounded-lg px-3 text-[13px]" style="border-color: var(--gm-outline-variant); background: var(--gm-surface-lowest);" id="search-input" oninput="render()" placeholder="ابحث باسم عميل أو تاجر..." type="text"/>
+</div>
+
+<div class="flex gap-2">
+<button onclick="setFilter('due')" id="filter-due" class="flex-1 h-9 rounded-full text-[11px] font-semibold border" style="border-color: var(--gm-outline-variant);">مستحق لإعادة الفحص</button>
+<button onclick="setFilter('all')" id="filter-all" class="flex-1 h-9 rounded-full text-[11px] font-semibold border" style="border-color: var(--gm-outline-variant);">الكل</button>
+</div>
+
+<div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
+<div id="empty-state" class="hidden py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);"></div>
+<div id="subjects-list" class="flex flex-col gap-3"></div>
+</main>
+
+<!-- Log-screening modal -->
+<div class="hidden fixed inset-0 z-50 flex items-end justify-center" id="log-modal" style="background: rgba(0,0,0,0.4);">
+<div class="w-full max-w-md rounded-t-2xl p-5 flex flex-col gap-3" style="background: var(--gm-surface-lowest);">
+<h3 class="font-bold text-[15px]" id="log-modal-title">تسجيل نتيجة الفحص</h3>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="log-result">النتيجة</label>
+<select class="w-full h-12 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="log-result">
+<option value="clear">لا يوجد تطابق (نظيف)</option>
+<option value="inconclusive">نتيجة غير حاسمة — بحاجة مراجعة</option>
+<option value="match_found">⚠️ يوجد تطابق محتمل</option>
+</select>
+</div>
+<textarea class="w-full h-16 border rounded-lg px-3 py-2 resize-none" placeholder="ملاحظة (اختياري)" style="border-color: var(--gm-outline-variant); background: transparent;" id="log-notes"></textarea>
+<div class="hidden text-error text-[12px]" id="log-error"></div>
+<div class="flex gap-2">
+<button onclick="saveScreening()" id="log-save-btn" class="flex-1 h-12 rounded-lg font-bold" style="background: var(--gm-primary); color: var(--gm-on-primary);">حفظ</button>
+<button onclick="closeLogModal()" class="flex-1 h-12 rounded-lg border font-bold" style="border-color: var(--gm-outline-variant);">إلغاء</button>
+</div>
+</div>
+</div>
+
+<script>
+(async function __enforcePermission() {
+    await requireGoldMindSession('login-entry-ar.html');
+    const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_customers'] === true));
+    if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+})();
+
+// Re-screening interval — adjustable here if the business wants a
+// different cadence than 12 months.
+const RESCREEN_DAYS = 365;
+
+let subjects = []; // merged customers + traders, each with a computed lastScreening
+let currentFilter = 'due';
+let activeSubjectForLog = null;
+
+function daysSince(dateStr) {
+    return Math.floor((new Date() - new Date(dateStr)) / 86400000);
+}
+
+async function load() {
+    const session = await requireGoldMindSession('login-entry-ar.html');
+    if (!session) return;
+
+    const [{ data: customers }, { data: traders }, { data: screenings }] = await Promise.all([
+        goldmindClient.from('customers').select('id, name, is_company').eq('store_id', GOLDMIND_STORE_ID),
+        goldmindClient.from('traders').select('id, name, is_company').eq('store_id', GOLDMIND_STORE_ID),
+        goldmindClient.from('kyc_screenings').select('*').eq('store_id', GOLDMIND_STORE_ID).order('screened_at', { ascending: false })
+    ]);
+
+    document.getElementById('loading-state').classList.add('hidden');
+
+    const screeningsByOwner = {};
+    (screenings || []).forEach(s => {
+        const key = s.owner_type + ':' + s.owner_id;
+        if (!screeningsByOwner[key]) screeningsByOwner[key] = [];
+        screeningsByOwner[key].push(s);
+    });
+
+    const customerSubjects = (customers || []).map(c => ({ type: 'customer', id: c.id, name: c.name, isCompany: c.is_company, history: screeningsByOwner['customer:' + c.id] || [] }));
+    const traderSubjects = (traders || []).map(t => ({ type: 'trader', id: t.id, name: t.name, isCompany: t.is_company, history: screeningsByOwner['trader:' + t.id] || [] }));
+    subjects = customerSubjects.concat(traderSubjects);
+
+    render();
+}
+
+function setFilter(f) {
+    currentFilter = f;
+    document.getElementById('filter-due').className = 'flex-1 h-9 rounded-full text-[11px] font-semibold border' + (f === 'due' ? '' : '');
+    document.getElementById('filter-due').style.cssText = f === 'due' ? 'background: var(--gm-primary); color: var(--gm-on-primary); border-color: var(--gm-primary);' : 'border-color: var(--gm-outline-variant);';
+    document.getElementById('filter-all').style.cssText = f === 'all' ? 'background: var(--gm-primary); color: var(--gm-on-primary); border-color: var(--gm-primary);' : 'border-color: var(--gm-outline-variant);';
+    render();
+}
+setFilter('due');
+
+function render() {
+    const q = document.getElementById('search-input').value.trim().toLowerCase();
+    let list = subjects.filter(s => !q || s.name.toLowerCase().includes(q));
+
+    if (currentFilter === 'due') {
+        list = list.filter(s => s.history.length === 0 || daysSince(s.history[0].screened_at) >= RESCREEN_DAYS);
+    }
+
+    // Never-screened and overdue first, most-overdue at the very top.
+    list.sort((a, b) => {
+        const aDays = a.history.length ? daysSince(a.history[0].screened_at) : Infinity;
+        const bDays = b.history.length ? daysSince(b.history[0].screened_at) : Infinity;
+        return bDays - aDays;
+    });
+
+    if (list.length === 0) {
+        document.getElementById('empty-state').classList.remove('hidden');
+        document.getElementById('empty-state').textContent = currentFilter === 'due' ? '👍 كل العملاء والتجار مفحوصين ضمن المدة المطلوبة.' : 'لا توجد نتائج.';
+        document.getElementById('subjects-list').innerHTML = '';
+        return;
+    }
+    document.getElementById('empty-state').classList.add('hidden');
+
+    document.getElementById('subjects-list').innerHTML = list.map(s => {
+        const last = s.history[0];
+        const overdue = !last || daysSince(last.screened_at) >= RESCREEN_DAYS;
+        const statusLabel = !last
+            ? 'لم يُفحص بعد'
+            : (overdue ? `آخر فحص قبل ${daysSince(last.screened_at)} يوم — مستحق لإعادة الفحص` : `آخر فحص قبل ${daysSince(last.screened_at)} يوم`);
+        const resultBadge = last && last.result === 'match_found' ? '<span class="text-error text-[10px] font-bold">⚠️ تطابق سابق</span>' : '';
+        return `
+        <div class="p-4 rounded-xl border" style="border-color: var(--gm-outline-variant); background: var(--gm-surface-lowest);">
+            <div class="flex items-center justify-between gap-2">
+                <div>
+                    <div class="font-bold text-[14px]">${gmEscapeHtml(s.name)} <span class="text-[10px] font-normal" style="color: var(--gm-on-surface-variant);">(${s.type === 'customer' ? 'عميل' : 'تاجر'}${s.isCompany ? ' — شركة' : ''})</span></div>
+                    <div class="text-[11px] mt-0.5 ${overdue ? 'text-error font-semibold' : ''}" style="${overdue ? '' : 'color: var(--gm-on-surface-variant);'}">${statusLabel}</div>
+                </div>
+                ${resultBadge}
+            </div>
+            <div class="flex gap-2 mt-3 pt-3 border-t" style="border-color: var(--gm-outline-variant);">
+                <button onclick="openLogModal('${s.type}', '${s.id}', '${(s.name || '').replace(/'/g, "\\'")}')" class="flex-1 h-9 rounded-lg text-[12px] font-semibold" style="background: var(--gm-primary); color: var(--gm-on-primary);">تسجيل فحص جديد</button>
+                ${s.history.length > 0 ? `<button onclick="toggleHistory('${s.type}-${s.id}')" class="h-9 px-3 rounded-lg border text-[12px] font-semibold" style="border-color: var(--gm-outline-variant);">السجل (${s.history.length})</button>` : ''}
+            </div>
+            <div class="hidden mt-3 pt-3 border-t flex-col gap-1.5" style="border-color: var(--gm-outline-variant);" id="history-${s.type}-${s.id}">
+                ${s.history.map(h => `
+                    <div class="text-[11px] flex justify-between">
+                        <span>${new Date(h.screened_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' })}${h.notes ? ' — ' + gmEscapeHtml(h.notes) : ''}</span>
+                        <span class="${h.result === 'match_found' ? 'text-error font-bold' : ''}">${h.result === 'clear' ? 'نظيف' : (h.result === 'match_found' ? 'تطابق' : 'غير حاسم')}</span>
+                    </div>`).join('')}
+            </div>
+        </div>`;
+    }).join('');
+}
+
+function toggleHistory(key) {
+    const el = document.getElementById('history-' + key);
+    el.classList.toggle('hidden');
+    el.classList.toggle('flex');
+}
+
+function openLogModal(type, id, name) {
+    activeSubjectForLog = { type, id };
+    document.getElementById('log-modal-title').textContent = 'تسجيل نتيجة فحص — ' + name;
+    document.getElementById('log-result').value = 'clear';
+    document.getElementById('log-notes').value = '';
+    document.getElementById('log-error').classList.add('hidden');
+    document.getElementById('log-modal').classList.remove('hidden');
+    document.getElementById('log-modal').classList.add('flex');
+}
+
+function closeLogModal() {
+    document.getElementById('log-modal').classList.add('hidden');
+    document.getElementById('log-modal').classList.remove('flex');
+    activeSubjectForLog = null;
+}
+
+async function saveScreening() {
+    if (!activeSubjectForLog) return;
+    const errEl = document.getElementById('log-error');
+    errEl.classList.add('hidden');
+
+    const btn = document.getElementById('log-save-btn');
+    btn.disabled = true;
+    btn.textContent = 'جارِ الحفظ...';
+
+    const { error } = await goldmindClient.from('kyc_screenings').insert({
+        store_id: GOLDMIND_STORE_ID,
+        owner_type: activeSubjectForLog.type,
+        owner_id: activeSubjectForLog.id,
+        screened_by: GOLDMIND_STAFF_ID,
+        result: document.getElementById('log-result').value,
+        notes: document.getElementById('log-notes').value.trim() || null
+    });
+
+    btn.disabled = false;
+    btn.textContent = 'حفظ';
+
+    if (error) {
+        errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+        errEl.classList.remove('hidden');
+        return;
+    }
+
+    closeLogModal();
+    await load();
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
