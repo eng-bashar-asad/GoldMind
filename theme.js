@@ -322,6 +322,32 @@ const GOLDMIND_THEMES = {
       '--gm-avatar-grad': 'linear-gradient(135deg, #5E1420 0%, #7A1B2B 60%, #C07884 100%)'
     }
   },
+  'cosmic-steel': {
+    // Deep calm navy base with crisp silver-metallic lines and a single
+    // warm terracotta-orange accent (evoking Claude's own star mark) --
+    // a "space-tech" feel: dark, precise, and cool, with one warm point
+    // of light rather than an all-over glow.
+    label: 'الفولاذ الفضائي',
+    swatch: ['#DA7756', '#101B2C', '#8B94A3'],
+    lightCanvas: false,
+    shimmer: true,
+    vars: {
+      '--gm-bg': '#101B2C',
+      '--gm-bg-elevated': '#101B2C',
+      '--gm-surface-lowest': '#FFFFFF',
+      '--gm-surface-low': '#E7EAF0',
+      '--gm-primary': '#101B2C',
+      '--gm-on-primary': '#FFFFFF',
+      '--gm-accent': '#DA7756',
+      '--gm-on-accent': '#FFFFFF',
+      '--gm-secondary': '#5B6472',
+      '--gm-on-surface': '#101B2C',
+      '--gm-on-surface-variant': '#5B6472',
+      '--gm-outline-variant': '#C9D2DC',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #101B2C 0%, #5B6472 26%, #C9D2DC 45%, #DA7756 54%, #C9D2DC 63%, #5B6472 80%, #101B2C 100%)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #DA7756 0%, #8B94A3 55%, #101B2C 100%)'
+    }
+  },
 };
 
 function goldmindApplyTheme(name) {
