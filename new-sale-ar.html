@@ -195,6 +195,13 @@
 <!-- Manual Entry (no barcode) -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة يدوية (بدون باركود)</h2>
+
+<button type="button" id="voice-entry-btn" onclick="toggleVoiceEntry()" class="hidden w-full h-11 border border-dashed border-secondary rounded-lg flex items-center justify-center gap-2 text-secondary font-semibold text-[13px]">
+<span class="material-symbols-outlined" id="voice-entry-icon">mic</span>
+<span id="voice-entry-label">تعبئة بالصوت — قول مثلاً "خاتم عيار 21 وزن 5 غرام بسعر 900"</span>
+</button>
+<div class="hidden text-[11.5px] bg-surface-container-high rounded-lg p-2" id="voice-entry-transcript"></div>
+
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-desc">وصف القطعة</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-desc" placeholder="خاتم، حلق، سلسال..." type="text"/>
@@ -971,6 +978,111 @@
     }
 
     // ---------- Manual entry (no barcode) ----------
+    // Voice entry -- uses the browser's built-in, free Web Speech API
+    // (no external service, no API key, no usage limit). Support varies by
+    // browser/WebView, so the button only appears when the API actually
+    // exists; everything else in the page keeps working exactly the same
+    // if it doesn't. The recognized text always stays visible so the
+    // person can verify it before saving -- this never auto-submits a
+    // sale, it only fills the manual-entry fields above.
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    let voiceRecognition = null;
+    let voiceListening = false;
+
+    if (SpeechRecognitionAPI) {
+        document.getElementById('voice-entry-btn').classList.remove('hidden');
+        voiceRecognition = new SpeechRecognitionAPI();
+        voiceRecognition.lang = 'ar-SA';
+        voiceRecognition.interimResults = false;
+        voiceRecognition.maxAlternatives = 1;
+
+        voiceRecognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            applyVoiceTranscript(transcript);
+        };
+        voiceRecognition.onerror = () => {
+            setVoiceListening(false);
+            const el = document.getElementById('voice-entry-transcript');
+            el.textContent = 'تعذّر التعرّف على الصوت -- جرّب مرة ثانية بصوت أوضح.';
+            el.classList.remove('hidden');
+        };
+        voiceRecognition.onend = () => setVoiceListening(false);
+    }
+
+    function setVoiceListening(isListening) {
+        voiceListening = isListening;
+        document.getElementById('voice-entry-icon').textContent = isListening ? 'stop_circle' : 'mic';
+        document.getElementById('voice-entry-label').textContent = isListening
+            ? 'جارِ الاستماع... اضغط للإيقاف'
+            : 'تعبئة بالصوت — قول مثلاً "خاتم عيار 21 وزن 5 غرام بسعر 900"';
+    }
+
+    function toggleVoiceEntry() {
+        if (!voiceRecognition) return;
+        if (voiceListening) {
+            voiceRecognition.stop();
+            return;
+        }
+        document.getElementById('voice-entry-transcript').classList.add('hidden');
+        setVoiceListening(true);
+        try {
+            voiceRecognition.start();
+        } catch (e) {
+            setVoiceListening(false);
+        }
+    }
+
+    // Arabic-numeral word map, since the recognizer sometimes spells small
+    // numbers out ("خمسة" instead of "5") depending on the phrase.
+    const ARABIC_NUMBER_WORDS = {
+        'صفر': 0, 'واحد': 1, 'واحدة': 1, 'اثنين': 2, 'اثنان': 2, 'ثلاثة': 3, 'ثلاث': 3,
+        'أربعة': 4, 'اربعة': 4, 'خمسة': 5, 'ستة': 6, 'سبعة': 7, 'ثمانية': 8, 'تسعة': 9,
+        'عشرة': 10, 'عشرين': 20, 'ثلاثين': 30, 'أربعين': 40, 'اربعين': 40, 'خمسين': 50,
+        'ستين': 60, 'سبعين': 70, 'ثمانين': 80, 'تسعين': 90, 'مئة': 100, 'مية': 100, 'ألف': 1000, 'الف': 1000
+    };
+
+    function wordsToDigits(text) {
+        let out = text;
+        for (const [word, num] of Object.entries(ARABIC_NUMBER_WORDS)) {
+            out = out.replace(new RegExp(word, 'g'), ' ' + num + ' ');
+        }
+        return out;
+    }
+
+    function applyVoiceTranscript(rawText) {
+        const transcriptEl = document.getElementById('voice-entry-transcript');
+        transcriptEl.textContent = 'سمعت: "' + rawText + '"';
+        transcriptEl.classList.remove('hidden');
+
+        const text = wordsToDigits(rawText);
+
+        // Karat: any of 18/21/22/24 immediately following "عيار"
+        const karatMatch = text.match(/عيار\s*(\d{2})/);
+        if (karatMatch && ['18', '21', '22', '24'].includes(karatMatch[1])) {
+            document.getElementById('manual-karat').value = karatMatch[1];
+        }
+
+        // Weight: a number right before/after "وزن" or "غرام"/"غ"
+        const weightMatch = text.match(/(?:وزن\D{0,4})?(\d+(?:\.\d+)?)\s*غ(?:رام)?/) || text.match(/وزن\D{0,4}(\d+(?:\.\d+)?)/);
+        if (weightMatch) {
+            document.getElementById('manual-weight').value = weightMatch[1];
+        }
+
+        // Price: a number after "سعر"/"بسعر"/"درهم"
+        const priceMatch = text.match(/(?:ب?سعر)\D{0,4}(\d+(?:\.\d+)?)/) || text.match(/(\d+(?:\.\d+)?)\s*درهم/);
+        if (priceMatch) {
+            document.getElementById('manual-price').value = priceMatch[1];
+        }
+
+        // Description: whatever text comes before the first recognized
+        // number/keyword, trimmed -- best-effort only, the person can
+        // always edit the field directly if it's off.
+        const descMatch = rawText.match(/^(.*?)(?:عيار|وزن|سعر|\d)/);
+        if (descMatch && descMatch[1].trim()) {
+            document.getElementById('manual-desc').value = descMatch[1].trim();
+        }
+    }
+
     function addManualToCart() {
         const weight = parseFloat(document.getElementById('manual-weight').value);
         const karat = parseInt(document.getElementById('manual-karat').value, 10);
