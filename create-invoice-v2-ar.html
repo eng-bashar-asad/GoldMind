@@ -114,6 +114,13 @@
 </div>
 <p class="text-[10.5px] text-outline" id="itemModeHint">قطعة واحدة محددة الوزن تُسجَّل بالمخزون فوراً.</p>
 
+<button type="button" id="ocr-photo-btn" onclick="document.getElementById('ocr-photo-input').click()" class="w-full h-11 border border-dashed border-secondary rounded-lg flex items-center justify-center gap-2 text-secondary font-semibold text-[13px]">
+<span class="material-symbols-outlined" id="ocr-photo-icon">photo_camera</span>
+<span id="ocr-photo-label">صوّر فاتورة التاجر — تُعبّى الحقول تلقائياً</span>
+</button>
+<input type="file" accept="image/*" capture="environment" class="hidden" id="ocr-photo-input" onchange="onOcrPhotoSelected(this)"/>
+<div class="hidden text-[11.5px] bg-surface-container-high rounded-lg p-2" id="ocr-result-note"></div>
+
 <div class="relative" id="manual-desc-wrap">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-desc">وصف القطعة (عربي)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-desc" placeholder="خاتم، سبيكة، قطع كسر..." type="text"/>
@@ -705,6 +712,75 @@
         preview.classList.toggle('hidden', bulkPhotoFiles.length === 0);
         preview.innerHTML = bulkPhotoFiles.map(f => `<img src="${URL.createObjectURL(f)}" class="w-16 h-16 object-cover rounded-lg border border-outline-variant"/>`).join('');
     });
+
+    // ---------- Invoice photo OCR (Gemini, via a protected Edge Function) ----------
+    // Reads a photographed paper invoice and prefills the fields below --
+    // the person still reviews everything and presses "إضافة للفاتورة"
+    // themselves, exactly like the voice-entry feature. Nothing is saved
+    // automatically from a photo.
+    async function onOcrPhotoSelected(input) {
+        const file = input.files && input.files[0];
+        if (!file) return;
+        input.value = ''; // allow re-selecting the same file next time
+
+        const btn = document.getElementById('ocr-photo-btn');
+        const icon = document.getElementById('ocr-photo-icon');
+        const label = document.getElementById('ocr-photo-label');
+        const noteEl = document.getElementById('ocr-result-note');
+        noteEl.classList.add('hidden');
+        btn.disabled = true;
+        icon.textContent = 'hourglass_top';
+        label.textContent = 'جارِ قراءة الفاتورة...';
+
+        try {
+            const base64 = await new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result.split(',')[1]);
+                reader.onerror = reject;
+                reader.readAsDataURL(file);
+            });
+
+            const { data, error } = await goldmindClient.functions.invoke('extract-invoice-ocr', {
+                body: { image_base64: base64, mime_type: file.type || 'image/jpeg' }
+            });
+
+            if (error || !data || data.error) {
+                noteEl.textContent = 'تعذّرت قراءة الفاتورة تلقائياً -- عبّي الحقول يدوياً.';
+                noteEl.classList.remove('hidden');
+                return;
+            }
+
+            const ex = data.extracted;
+            if (ex.description) document.getElementById('manual-desc').value = ex.description;
+            if (ex.weight_grams) document.getElementById('manual-weight').value = ex.weight_grams;
+            if (ex.karat && ['18', '21', '22', '24'].includes(String(ex.karat))) {
+                document.getElementById('manual-karat').value = String(ex.karat);
+            }
+            if (ex.price_per_gram_or_total && ex.weight_grams) {
+                const totalPrice = ex.is_total_not_per_gram
+                    ? ex.price_per_gram_or_total
+                    : ex.price_per_gram_or_total * ex.weight_grams;
+                document.getElementById('manual-price').value = totalPrice.toFixed(2);
+            }
+            if (ex.fabrication_fee) {
+                const fabInput = document.getElementById('manual-fabfee');
+                if (fabInput) fabInput.value = ex.fabrication_fee;
+            }
+
+            let note = 'تمت القراءة -- راجع الحقول قبل الإضافة.';
+            if (ex.trader_name) note += ' التاجر المذكور بالفاتورة: ' + ex.trader_name + ' (اختره يدوياً أعلاه لو صحيح).';
+            if (ex.confidence_note) note += ' ' + ex.confidence_note;
+            noteEl.textContent = note;
+            noteEl.classList.remove('hidden');
+        } catch (e) {
+            noteEl.textContent = 'تعذّرت قراءة الفاتورة تلقائياً -- عبّي الحقول يدوياً.';
+            noteEl.classList.remove('hidden');
+        } finally {
+            btn.disabled = false;
+            icon.textContent = 'photo_camera';
+            label.textContent = 'صوّر فاتورة التاجر — تُعبّى الحقول تلقائياً';
+        }
+    }
 
     // ---------- Manual item entry ----------
     function addManualToCart() {
