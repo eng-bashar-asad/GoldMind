@@ -978,18 +978,29 @@
     }
 
     // ---------- Manual entry (no barcode) ----------
-    // Voice entry -- uses the browser's built-in, free Web Speech API
-    // (no external service, no API key, no usage limit). Support varies by
-    // browser/WebView, so the button only appears when the API actually
-    // exists; everything else in the page keeps working exactly the same
-    // if it doesn't. The recognized text always stays visible so the
-    // person can verify it before saving -- this never auto-submits a
-    // sale, it only fills the manual-entry fields above.
+    // Voice entry -- two engines, both free, chosen automatically:
+    //   1) Inside the installed app (Capacitor): the native
+    //      @capacitor-community/speech-recognition plugin, using Android's
+    //      own on-device speech engine -- this is what actually works
+    //      inside the app, since the WebView's browser-style Web Speech
+    //      API doesn't support it at all.
+    //   2) In a regular browser (Chrome etc.): the browser's built-in Web
+    //      Speech API, same as before.
+    // The recognized text always stays visible so the person can verify
+    // it before saving -- this never auto-submits a sale, it only fills
+    // the manual-entry fields above.
+    const isNativeApp = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+    const NativeSpeechPlugin = isNativeApp && window.Capacitor.Plugins ? window.Capacitor.Plugins.SpeechRecognition : null;
     const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
     let voiceRecognition = null;
     let voiceListening = false;
 
-    if (SpeechRecognitionAPI) {
+    if (NativeSpeechPlugin) {
+        // Native path: just show the button: available()/permission checks
+        // happen lazily on first tap (see toggleVoiceEntry) rather than at
+        // page load, since they're async native calls.
+        document.getElementById('voice-entry-btn').classList.remove('hidden');
+    } else if (SpeechRecognitionAPI) {
         document.getElementById('voice-entry-btn').classList.remove('hidden');
         voiceRecognition = new SpeechRecognitionAPI();
         voiceRecognition.lang = 'ar-SA';
@@ -1017,7 +1028,50 @@
             : 'تعبئة بالصوت — قول مثلاً "خاتم عيار 21 وزن 5 غرام بسعر 900"';
     }
 
-    function toggleVoiceEntry() {
+    async function toggleVoiceEntry() {
+        if (NativeSpeechPlugin) {
+            if (voiceListening) {
+                setVoiceListening(false);
+                try { await NativeSpeechPlugin.stop(); } catch (e) {}
+                return;
+            }
+            const errEl = document.getElementById('voice-entry-transcript');
+            errEl.classList.add('hidden');
+            try {
+                const { available } = await NativeSpeechPlugin.available();
+                if (!available) {
+                    errEl.textContent = 'التعرّف على الصوت غير متاح على هذا الجهاز.';
+                    errEl.classList.remove('hidden');
+                    return;
+                }
+                const perm = await NativeSpeechPlugin.checkPermissions();
+                if (perm.speechRecognition !== 'granted') {
+                    const req = await NativeSpeechPlugin.requestPermissions();
+                    if (req.speechRecognition !== 'granted') {
+                        errEl.textContent = 'لازم تسمح بصلاحية المايكروفون عشان تستخدم هذي الميزة.';
+                        errEl.classList.remove('hidden');
+                        return;
+                    }
+                }
+                setVoiceListening(true);
+                const result = await NativeSpeechPlugin.start({
+                    language: 'ar-SA',
+                    maxResults: 1,
+                    partialResults: false,
+                    popup: false
+                });
+                setVoiceListening(false);
+                if (result && result.matches && result.matches.length) {
+                    applyVoiceTranscript(result.matches[0]);
+                }
+            } catch (e) {
+                setVoiceListening(false);
+                errEl.textContent = 'تعذّر التعرّف على الصوت -- جرّب مرة ثانية بصوت أوضح.';
+                errEl.classList.remove('hidden');
+            }
+            return;
+        }
+
         if (!voiceRecognition) return;
         if (voiceListening) {
             voiceRecognition.stop();
