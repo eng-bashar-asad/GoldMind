@@ -328,24 +328,25 @@ const GOLDMIND_THEMES = {
     // a "space-tech" feel: dark, precise, and cool, with one warm point
     // of light rather than an all-over glow.
     label: 'الفولاذ الفضائي',
-    swatch: ['#DA7756', '#101B2C', '#8B94A3'],
+    swatch: ['#DA7756', '#1B2C46', '#8B94A3'],
     lightCanvas: false,
     shimmer: true,
     vars: {
-      '--gm-bg': '#101B2C',
-      '--gm-bg-elevated': '#101B2C',
+      '--gm-bg': '#1B2C46',
+      '--gm-bg-elevated': '#1B2C46',
       '--gm-surface-lowest': '#FFFFFF',
       '--gm-surface-low': '#E7EAF0',
-      '--gm-primary': '#101B2C',
+      '--gm-primary': '#1B2C46',
       '--gm-on-primary': '#FFFFFF',
       '--gm-accent': '#DA7756',
       '--gm-on-accent': '#FFFFFF',
-      '--gm-secondary': '#5B6472',
-      '--gm-on-surface': '#101B2C',
-      '--gm-on-surface-variant': '#5B6472',
-      '--gm-outline-variant': '#C9D2DC',
-      '--gm-shimmer-grad': 'linear-gradient(120deg, #101B2C 0%, #5B6472 26%, #C9D2DC 45%, #DA7756 54%, #C9D2DC 63%, #5B6472 80%, #101B2C 100%)',
-      '--gm-avatar-grad': 'linear-gradient(135deg, #DA7756 0%, #8B94A3 55%, #101B2C 100%)'
+      '--gm-secondary': '#7A8494',
+      '--gm-on-surface': '#1B2C46',
+      '--gm-on-surface-variant': '#7A8494',
+      '--gm-outline-variant': '#AEB9C8',
+      '--gm-shadow-color': 'rgba(6, 12, 24, 0.55)',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #1B2C46 0%, #7A8494 26%, #D8DEE7 45%, #DA7756 54%, #D8DEE7 63%, #7A8494 80%, #1B2C46 100%)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #DA7756 0%, #8B94A3 55%, #1B2C46 100%)'
     }
   },
 };
