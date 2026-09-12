@@ -734,6 +734,29 @@ goldmindLoadSavedFont();
   document.head.appendChild(style);
 })();
 
+// Fifth shape: plain text with no color class at all (e.g. a trader or
+// customer name rendered as `<p class="font-bold text-[14px]">`) inherits
+// color straight from <body>, which on a dark-background theme is a
+// light/white tone meant for the page's own dark canvas -- not for text
+// sitting inside a white/light card. Result: a name that's invisible on a
+// white row and barely a pale smear on a slightly tinted one (exactly the
+// zebra-striped trader rows). Setting color on the light-surface
+// container itself relies on normal CSS inheritance -- any child that
+// already has its own explicit text-* class (text-error, text-success,
+// text-secondary, the muted classes above, etc.) keeps winning, since a
+// directly-applied rule always beats an inherited value regardless of
+// specificity. No !important needed here for that reason.
+(function () {
+  const lightSurfaces = ['bg-surface-container-lowest', 'bg-surface-container-low', 'bg-surface-container', 'bg-surface-container-high', 'bg-surface-container-highest', 'bg-white'];
+  const style = document.createElement('style');
+  style.textContent = `
+    ${lightSurfaces.map(function (s) { return '.' + s; }).join(', ')} {
+      color: var(--gm-on-surface, #191c1e);
+    }
+  `;
+  document.head.appendChild(style);
+})();
+
 // Fifth shape: same placeholder-legibility gap, but for the WHITE-background
 // inputs from the second fix above (company-settings, ledger forms, etc.).
 // Their typed text is now dark (on-surface) via that fix, but an empty
