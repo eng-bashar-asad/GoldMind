@@ -892,7 +892,29 @@ function showTraderDetail(traderId) {
         </div>
         ${first.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(first.notes)}</p>` : ''}
         <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+          <button onclick="toggleEditStockBatch('${group.batchId}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
           <button onclick="deleteStockMovementBatch('${group.batchId}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف السند بالكامل</button>
+        </div>
+        <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-batch-form-${group.batchId}">
+          ${rows.map((r, idx) => `
+            <div class="border border-outline-variant rounded-lg p-2 grid grid-cols-3 gap-2">
+              <input id="edit-batch-weight-${group.batchId}-${idx}" type="number" step="0.001" dir="ltr" placeholder="الوزن القائم" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.weight_grams || ''}"/>
+              <input id="edit-batch-accweight-${group.batchId}-${idx}" type="number" step="0.001" dir="ltr" placeholder="الوزن المحاسبي" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.accounting_weight_grams || ''}"/>
+              <select id="edit-batch-karat-${group.batchId}-${idx}" class="h-9 border border-outline-variant rounded-lg px-1 text-[12px]">
+                <option value="24" ${r.karat == 24 ? 'selected' : ''}>24</option>
+                <option value="22" ${r.karat == 22 ? 'selected' : ''}>22</option>
+                <option value="21" ${r.karat == 21 ? 'selected' : ''}>21</option>
+                <option value="18" ${r.karat == 18 ? 'selected' : ''}>18</option>
+              </select>
+              <input id="edit-batch-fee-${group.batchId}-${idx}" type="number" step="0.01" dir="ltr" placeholder="مصنعية/غ" class="col-span-3 h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.fab_fee_per_gram || ''}"/>
+              <input type="hidden" id="edit-batch-id-${group.batchId}-${idx}" value="${r.id}"/>
+            </div>`).join('')}
+          <textarea id="edit-batch-notes-${group.batchId}" class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]">${gmEscapeHtml(first.notes || '')}</textarea>
+          <p class="text-error text-[11px] hidden" id="edit-batch-error-${group.batchId}"></p>
+          <div class="flex gap-2">
+            <button onclick="saveEditStockBatch('${group.batchId}', ${rows.length})" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديلات</button>
+            <button onclick="toggleEditStockBatch('${group.batchId}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+          </div>
         </div>
       </div>`;
     }
@@ -1181,6 +1203,72 @@ async function deleteStockMovementBatch(batchId) {
   const { error } = await goldmindClient.from('trader_movements').delete().eq('batch_id', batchId);
   if (error) {
     alert('تعذّر الحذف: ' + error.message);
+    return;
+  }
+
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+}
+
+function toggleEditStockBatch(batchId) {
+  const el = document.getElementById('edit-batch-form-' + batchId);
+  el.classList.toggle('hidden');
+  el.classList.toggle('flex');
+}
+
+async function saveEditStockBatch(batchId, rowCount) {
+  const errEl = document.getElementById('edit-batch-error-' + batchId);
+  errEl.classList.add('hidden');
+
+  const notes = document.getElementById('edit-batch-notes-' + batchId).value.trim();
+  const updates = [];
+
+  for (let idx = 0; idx < rowCount; idx++) {
+    const id = document.getElementById(`edit-batch-id-${batchId}-${idx}`).value;
+    const weight = parseFloat(document.getElementById(`edit-batch-weight-${batchId}-${idx}`).value);
+    const accWeight = parseFloat(document.getElementById(`edit-batch-accweight-${batchId}-${idx}`).value) || weight;
+    const karat = parseInt(document.getElementById(`edit-batch-karat-${batchId}-${idx}`).value, 10);
+    const fee = parseFloat(document.getElementById(`edit-batch-fee-${batchId}-${idx}`).value) || 0;
+
+    if (!weight || weight <= 0) {
+      errEl.textContent = 'كل سطر لازم يكون له وزن قائم صحيح.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+
+    updates.push({
+      id,
+      weight_grams: weight,
+      accounting_weight_grams: accWeight,
+      karat,
+      // Gold-24k-equivalent must be recomputed from the (possibly edited)
+      // accounting weight + karat -- it's what the trader's gold-debt
+      // balance is actually built from, so it can never be left stale
+      // after an edit.
+      gold_24k_equivalent: +(accWeight * (karat / 24)).toFixed(3),
+      fab_fee_per_gram: fee,
+      fab_fee_amount: +(accWeight * fee).toFixed(2),
+      notes: notes || null
+    });
+  }
+
+  const results = await Promise.all(
+    updates.map(u => goldmindClient.from('trader_movements').update({
+      weight_grams: u.weight_grams,
+      accounting_weight_grams: u.accounting_weight_grams,
+      karat: u.karat,
+      gold_24k_equivalent: u.gold_24k_equivalent,
+      fab_fee_per_gram: u.fab_fee_per_gram,
+      fab_fee_amount: u.fab_fee_amount,
+      notes: u.notes
+    }).eq('id', u.id))
+  );
+
+  const failed = results.find(r => r.error);
+  if (failed) {
+    errEl.textContent = 'تعذّر حفظ بعض الأسطر: ' + failed.error.message;
+    errEl.classList.remove('hidden');
     return;
   }
 
