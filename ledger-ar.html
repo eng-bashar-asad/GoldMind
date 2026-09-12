@@ -924,8 +924,7 @@ function showTraderDetail(traderId) {
     const date = gmFormatDateTime(m.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
     const isStockMovement = m.source === 'stock_given' || m.source === 'stock_received';
     const isOpeningBalance = m.source === 'opening_balance';
-    const isManualSettlement = !isStockMovement && !isOpeningBalance && !(m.invoice && m.invoice.invoice_number) &&
-      (m.movement_type === 'debt_decrease' || (m.movement_type === 'debt_increase' && Number(m.fab_fee_amount || 0) > 0 && Number(m.weight_grams || 0) === 0));
+    const isManualSettlement = !isStockMovement && !isOpeningBalance && !(m.invoice && m.invoice.invoice_number);
     const settlementIsCash = isManualSettlement && Number(m.fab_fee_amount || 0) > 0;
     const weightLine = isStockMovement
       ? `${fmt(m.weight_grams)}غ قائم${m.accounting_weight_grams ? ` / ${fmt(m.accounting_weight_grams)}غ محاسبي` : ''} عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)`
@@ -1002,9 +1001,10 @@ function showTraderDetail(traderId) {
           <button onclick="deleteSettlementMovement('${m.id}', ${settlementIsCash})" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>
         <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-settle-form-${m.id}">
-          <div class="flex rounded-lg border border-outline-variant overflow-hidden">
-            <button type="button" id="edit-settle-type-gold-${m.id}" onclick="setEditSettlementType('${m.id}','gold')" class="flex-1 h-9 text-[11px] font-semibold">تسوية ذهب</button>
-            <button type="button" id="edit-settle-type-cash-${m.id}" onclick="setEditSettlementType('${m.id}','cash')" class="flex-1 h-9 text-[11px] font-semibold">تسوية نقدية</button>
+          <p class="text-[11px] text-outline">فعّل جزء الذهب و/أو النقدي حسب محتوى هذه التسوية -- إبقِ الاثنين مفعّلين لو كانت مدمجة أصلاً، وإلا رح يُصفَّر الجزء المعطّل.</p>
+          <div class="flex gap-2">
+            <button type="button" id="edit-settle-type-gold-${m.id}" onclick="toggleEditSettlementPart('${m.id}','gold')" class="flex-1 h-9 rounded-lg border border-outline-variant text-[11px] font-semibold">ذهب</button>
+            <button type="button" id="edit-settle-type-cash-${m.id}" onclick="toggleEditSettlementPart('${m.id}','cash')" class="flex-1 h-9 rounded-lg border border-outline-variant text-[11px] font-semibold">نقدي</button>
           </div>
           <div class="flex rounded-lg border border-outline-variant overflow-hidden">
             <button type="button" id="edit-settle-dir-out-${m.id}" onclick="setEditSettlementDirection('${m.id}','out')" class="flex-1 h-9 text-[11px] font-semibold">صادر (منّا للتاجر)</button>
@@ -1288,11 +1288,37 @@ function toggleEditSettlement(id) {
   form.classList.toggle('flex', wasHidden);
   if (wasHidden) {
     const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === id);
-    const type = (m.weight_grams && Number(m.weight_grams) > 0) ? 'gold' : 'cash';
+    // Initialize each toggle from what this entry actually has -- a
+    // combined gold+cash settlement starts with BOTH parts on, so saving
+    // without touching anything preserves both instead of silently
+    // zeroing whichever part wasn't the single selected "type" before.
+    settleEditState[id] = {
+      gold: !!(m.weight_grams && Number(m.weight_grams) > 0),
+      cash: !!(m.fab_fee_amount && Number(m.fab_fee_amount) > 0)
+    };
     settleEditDirState[id] = m.movement_type === 'debt_increase' ? 'in' : 'out';
-    setEditSettlementType(id, type);
+    applyEditSettlementPartUI(id);
     setEditSettlementDirection(id, settleEditDirState[id]);
   }
+}
+
+function toggleEditSettlementPart(id, part) {
+  const state = settleEditState[id] || { gold: false, cash: false };
+  state[part] = !state[part];
+  settleEditState[id] = state;
+  applyEditSettlementPartUI(id);
+}
+
+function applyEditSettlementPartUI(id) {
+  const state = settleEditState[id] || { gold: false, cash: false };
+  const active = 'flex-1 h-9 rounded-lg text-[11px] font-semibold bg-primary text-white';
+  const inactive = 'flex-1 h-9 rounded-lg border border-outline-variant text-[11px] font-semibold';
+  document.getElementById('edit-settle-type-gold-' + id).className = state.gold ? active : inactive;
+  document.getElementById('edit-settle-type-cash-' + id).className = state.cash ? active : inactive;
+  document.getElementById('edit-settle-gold-wrap-' + id).classList.toggle('hidden', !state.gold);
+  document.getElementById('edit-settle-gold-wrap-' + id).classList.toggle('grid', state.gold);
+  document.getElementById('edit-settle-cash-wrap-' + id).classList.toggle('hidden', !state.cash);
+  document.getElementById('edit-settle-cash-wrap-' + id).classList.toggle('flex', state.cash);
 }
 
 function setEditSettlementDirection(id, dir) {
@@ -1305,51 +1331,53 @@ function setEditSettlementDirection(id, dir) {
   inBtn.className = dir === 'in' ? active : inactive;
 }
 
-function setEditSettlementType(id, type) {
-  settleEditState[id] = type;
-  document.getElementById('edit-settle-type-gold-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (type === 'gold' ? 'bg-primary text-white' : 'text-on-surface-variant');
-  document.getElementById('edit-settle-type-cash-' + id).className = 'flex-1 h-9 text-[11px] font-semibold ' + (type === 'cash' ? 'bg-primary text-white' : 'text-on-surface-variant');
-  document.getElementById('edit-settle-gold-wrap-' + id).classList.toggle('hidden', type !== 'gold');
-  document.getElementById('edit-settle-gold-wrap-' + id).classList.toggle('grid', type === 'gold');
-  document.getElementById('edit-settle-cash-wrap-' + id).classList.toggle('hidden', type !== 'cash');
-  document.getElementById('edit-settle-cash-wrap-' + id).classList.toggle('flex', type === 'cash');
-}
-
 async function saveEditSettlement(id) {
   const errEl = document.getElementById('edit-settle-error-' + id);
   errEl.classList.add('hidden');
-  const type = settleEditState[id] || 'gold';
+  const state = settleEditState[id] || { gold: false, cash: false };
   const direction = settleEditDirState[id] || 'out';
   const notes = document.getElementById('edit-settle-notes-' + id).value.trim();
   const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === id);
 
-  const update = { notes: notes || null };
+  if (!state.gold && !state.cash) {
+    errEl.textContent = 'فعّل جزء الذهب أو النقدي على الأقل.';
+    errEl.classList.remove('hidden');
+    return;
+  }
 
-  if (type === 'gold') {
+  const update = {
+    notes: notes || null,
+    movement_type: direction === 'out' ? 'debt_decrease' : 'debt_increase'
+  };
+
+  if (state.gold) {
     const weight = parseFloat(document.getElementById('edit-settle-weight-' + id).value);
     const karat = parseInt(document.getElementById('edit-settle-karat-' + id).value, 10);
     if (!weight || weight <= 0) {
-      errEl.textContent = 'فضلاً أدخل وزناً صحيحاً';
+      errEl.textContent = 'فضلاً أدخل وزناً صحيحاً لجزء الذهب.';
       errEl.classList.remove('hidden');
       return;
     }
     update.weight_grams = weight;
     update.karat = karat;
     update.gold_24k_equivalent = +(weight * (karat / 24)).toFixed(3);
-    update.fab_fee_amount = 0;
-    update.movement_type = direction === 'out' ? 'debt_decrease' : 'debt_increase';
   } else {
-    const amount = parseFloat(document.getElementById('edit-settle-cash-' + id).value);
-    if (!amount || amount <= 0) {
-      errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً';
-      errEl.classList.remove('hidden');
-      return;
-    }
     update.weight_grams = 0;
     update.karat = null;
     update.gold_24k_equivalent = 0;
-    update.fab_fee_amount = amount;
-    update.movement_type = direction === 'out' ? 'debt_decrease' : 'debt_increase';
+  }
+
+  let cashAmount = 0;
+  if (state.cash) {
+    cashAmount = parseFloat(document.getElementById('edit-settle-cash-' + id).value);
+    if (!cashAmount || cashAmount <= 0) {
+      errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً لجزء النقدي.';
+      errEl.classList.remove('hidden');
+      return;
+    }
+    update.fab_fee_amount = cashAmount;
+  } else {
+    update.fab_fee_amount = 0;
   }
 
   const { error } = await goldmindClient.from('trader_movements').update(update).eq('id', id);
@@ -1359,21 +1387,21 @@ async function saveEditSettlement(id) {
     return;
   }
 
-  // Keep the linked cash-register entry in sync if this settlement was cash
-  // (either before or after the edit) and has a linked cash_movements row.
+  // Keep the linked cash-register entry in sync if this settlement has a
+  // cash portion (either before or after the edit) and a linked
+  // cash_movements row.
   const linkedId = m && m.linked_cash_movement_id;
   const traderName = (traders.find(t => t.id === currentTraderId) || {}).name || 'تاجر';
   if (linkedId) {
-    if (type === 'cash') {
+    if (state.cash) {
       await goldmindClient.from('cash_movements').update({
-        amount: update.fab_fee_amount,
+        amount: cashAmount,
         direction: direction,
         description: (direction === 'out' ? 'تسوية مصنعية نقدية - ' : 'استلام دفعة نقدية من التاجر - ') + traderName
       }).eq('id', linkedId);
     } else {
-      // Switched from a cash settlement to a gold settlement -> the cash
-      // that moved no longer has a matching debt reduction, so remove the
-      // now-orphaned register entry instead of leaving it.
+      // The cash portion was turned off -> the linked register entry no
+      // longer matches anything, so remove it instead of leaving it orphaned.
       await goldmindClient.from('cash_movements').delete().eq('id', linkedId);
     }
   }
