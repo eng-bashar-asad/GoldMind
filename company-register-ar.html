@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#F7F1E4"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>تسجيل شركة جديدة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    :root {
+        --ink: #251C12; --ink-soft: #6E5C46; --parchment: #F7F1E4;
+        --card: #FFFDF8; --gold: #A97C2F; --gold-deep: #7C5620;
+        --gold-bright: #D6A94B; --hairline: #E1D5B8;
+    }
+    body { font-family: 'IBM Plex Sans Arabic', sans-serif; background: var(--parchment); color: var(--ink); min-height: max(884px, 100dvh); }
+    .display { font-family: 'Markazi Text', 'IBM Plex Sans Arabic', serif; font-weight: 700; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; vertical-align: middle; }
+    .btn-gold { background: linear-gradient(160deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-deep) 100%); box-shadow: 0 10px 24px -10px rgba(124, 86, 32, 0.55), inset 0 1px 0 rgba(255,255,255,0.35); }
+    .btn-gold:active { transform: scale(0.98); }
+    .btn-gold:disabled { opacity: 0.6; }
+</style>
+</head>
+<body>
+<header class="max-w-md mx-auto px-5 pt-7 pb-4 flex items-center gap-3">
+<img src="logo-shield.png" alt="GoldMind" class="w-11 h-11 rounded-lg object-contain"/>
+<span class="display text-xl" style="color: var(--ink);">GoldMind</span>
+</header>
+
+<main class="max-w-md mx-auto px-5 pb-16">
+<div id="form-view">
+<h1 class="display text-2xl mb-1.5">سجّل شركتك</h1>
+<p class="text-[13px] leading-relaxed mb-6" style="color: var(--ink-soft);">تجربة مجانية 60 يوم، بدون بطاقة ائتمان. حسابك بيصير جاهز فوراً.</p>
+
+<div class="flex flex-col gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--ink-soft);" for="f-company">اسم الشركة / المحل</label>
+<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--hairline); background: var(--card);" id="f-company" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--ink-soft);" for="f-owner">اسمك (المالك)</label>
+<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--hairline); background: var(--card);" id="f-owner" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--ink-soft);" for="f-email">الإيميل</label>
+<input class="w-full h-12 border rounded-lg px-3 font-data-mono" dir="ltr" style="border-color: var(--hairline); background: var(--card);" id="f-email" type="email"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--ink-soft);" for="f-phone">رقم الهاتف (اختياري)</label>
+<input class="w-full h-12 border rounded-lg px-3 font-data-mono" dir="ltr" style="border-color: var(--hairline); background: var(--card);" id="f-phone" type="tel"/>
+</div>
+
+<div class="hidden text-error text-[12.5px] p-3 rounded-lg" style="background: #FBEAEA;" id="error-box"></div>
+
+<button onclick="registerCompany()" id="submit-btn" class="btn-gold w-full h-12 font-bold rounded-lg" style="color: #2E2113;">إنشاء الحساب</button>
+<p class="text-[11px] text-center leading-relaxed" style="color: var(--ink-soft);">بالمتابعة أنت موافق على <a href="terms-ar.html" class="underline">الشروط والأحكام</a> و<a href="privacy-policy-ar.html" class="underline">سياسة الخصوصية</a>.</p>
+</div>
+</div>
+
+<div class="hidden text-center" id="success-view">
+<span class="material-symbols-outlined mb-3 inline-block" style="color: var(--gold-deep); font-size: 40px;">check_circle</span>
+<h1 class="display text-2xl mb-2">تم إنشاء حسابك!</h1>
+<p class="text-[13px] leading-relaxed mb-6" style="color: var(--ink-soft);">احفظ بيانات الدخول هاي (ما رح تظهر مرة ثانية) — بعدها اضغط "دخول الآن".</p>
+
+<div class="text-right p-4 rounded-xl border mb-6" style="border-color: var(--hairline); background: var(--card);">
+<p class="text-[11px] mb-1" style="color: var(--ink-soft);">الإيميل</p>
+<p class="font-data-mono text-[14px] font-bold mb-3" dir="ltr" id="result-email"></p>
+<p class="text-[11px] mb-1" style="color: var(--ink-soft);">كلمة المرور المؤقتة</p>
+<p class="font-data-mono text-[16px] font-bold" dir="ltr" id="result-password"></p>
+</div>
+
+<button onclick="window.location.href='login-entry-ar.html'" class="btn-gold w-full h-12 font-bold rounded-lg" style="color: #2E2113;">دخول الآن</button>
+</div>
+</main>
+
+<script>
+async function registerCompany() {
+    const errBox = document.getElementById('error-box');
+    errBox.classList.add('hidden');
+
+    const company_name = document.getElementById('f-company').value.trim();
+    const owner_name = document.getElementById('f-owner').value.trim();
+    const owner_email = document.getElementById('f-email').value.trim();
+    const owner_phone = document.getElementById('f-phone').value.trim();
+
+    if (!company_name || !owner_name || !owner_email) {
+        errBox.textContent = 'فضلاً عبّي اسم الشركة واسمك والإيميل.';
+        errBox.classList.remove('hidden');
+        return;
+    }
+
+    const btn = document.getElementById('submit-btn');
+    btn.disabled = true;
+    btn.textContent = 'جارِ الإنشاء...';
+
+    try {
+        const { data, error } = await goldmindClient.functions.invoke('register-company', {
+            body: { company_name, owner_name, owner_email, owner_phone }
+        });
+
+        if (error || !data || data.error) {
+            errBox.textContent = (data && data.error) || 'تعذّر إنشاء الحساب، حاول مرة ثانية.';
+            errBox.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'إنشاء الحساب';
+            return;
+        }
+
+        document.getElementById('result-email').textContent = data.email;
+        document.getElementById('result-password').textContent = data.temp_password;
+        document.getElementById('form-view').classList.add('hidden');
+        document.getElementById('success-view').classList.remove('hidden');
+    } catch (e) {
+        errBox.textContent = 'حصل خطأ غير متوقع، حاول مرة ثانية.';
+        errBox.classList.remove('hidden');
+        btn.disabled = false;
+        btn.textContent = 'إنشاء الحساب';
+    }
+}
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
