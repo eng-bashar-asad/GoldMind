@@ -201,6 +201,25 @@
 </div>
 <p class="text-[12px] text-on-surface-variant mb-4" id="storeDetailMeta"></p>
 
+<div class="border border-outline-variant rounded-xl p-3 mb-5" id="storeSubBox">
+<h4 class="font-semibold text-[13px] mb-2">الاشتراك</h4>
+<p class="text-[13px] mb-3" id="storeSubSummary"></p>
+<div class="flex gap-2 mb-2">
+<button type="button" id="subModeTrialBtn" onclick="setSubExtendMode('trial')" class="flex-1 h-9 rounded-lg border border-outline-variant text-[12px] font-semibold">تمديد التجربة</button>
+<button type="button" id="subModeAnnualBtn" onclick="setSubExtendMode('annual')" class="flex-1 h-9 rounded-lg border border-outline-variant text-[12px] font-semibold">تجديد اشتراك سنوي</button>
+</div>
+<div class="hidden flex-col gap-2" id="subTrialWrap">
+<label class="text-[11px] text-on-surface-variant">تاريخ انتهاء التجربة الجديد</label>
+<input type="date" id="subTrialDateInput" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]"/>
+</div>
+<div class="hidden flex-col gap-2" id="subAnnualWrap">
+<label class="text-[11px] text-on-surface-variant">تاريخ انتهاء الاشتراك الجديد (افتراضياً: بعد سنة من اليوم)</label>
+<input type="date" id="subAnnualDateInput" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]"/>
+</div>
+<button id="saveSubExtendBtn" onclick="saveSubExtend()" class="hidden w-full h-10 mt-2 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ</button>
+<p class="text-error text-[11px] hidden mt-1" id="subExtendError"></p>
+</div>
+
 <h4 class="font-semibold text-[13px] mb-2">الموظفون المسجّلون (<span id="storeStaffCount">0</span>)</h4>
 <div id="storeStaffList" class="flex flex-col gap-2 mb-5"></div>
 
@@ -226,6 +245,7 @@
 
 <script>
 const STATUS_LABELS = { open: 'مفتوح', in_progress: 'قيد المعالجة', resolved: 'تم الحل' };
+const SUB_STATUS_LABELS = { trialing: 'تجريبي', active: 'مدفوع (سنوي)', canceled: 'ملغى', expired: 'منتهي', grace: 'مهلة سماح', none: 'بدون اشتراك' };
 let replyingRequestId = null;
 
 function showToast(msg, isError) {
@@ -274,6 +294,8 @@ function renderStores() {
     const card = document.createElement('div');
     card.className = 'bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4 cursor-pointer';
     card.dataset.storeId = s.id;
+    const expiryDate = s.subscription_status === 'active' ? s.current_period_end : s.trial_end;
+    const expiryLabel = s.subscription_status === 'active' ? 'ينتهي الاشتراك' : 'تنتهي التجربة';
     card.innerHTML = `
       <div class="flex items-center justify-between mb-2">
         <p class="font-bold text-[15px]"></p>
@@ -284,7 +306,8 @@ function renderStores() {
       <div class="flex flex-wrap gap-x-4 gap-y-1 text-[12px] text-on-surface-variant">
         <span>الموظفون: ${gmEscapeHtml(s.staff_count)}</span>
         <span>الخطة: ${gmEscapeHtml(s.plan_name || '—')}</span>
-        <span>الحالة: ${gmEscapeHtml(STATUS_LABELS[s.subscription_status] || s.subscription_status || '—')}</span>
+        <span>الحالة: ${gmEscapeHtml(SUB_STATUS_LABELS[s.subscription_status] || s.subscription_status || '—')}</span>
+        ${expiryDate ? `<span class="font-semibold">${expiryLabel}: ${gmEscapeHtml(fmtDate(expiryDate))}</span>` : ''}
         <span>تاريخ التسجيل: ${gmEscapeHtml(fmtDate(s.created_at))}</span>
       </div>`;
     card.querySelector('p.font-bold').textContent = s.name;
@@ -440,7 +463,9 @@ async function openStoreDetailModal(storeId) {
   document.getElementById('storeDetailNameRow').classList.remove('hidden');
   document.getElementById('storeRenameRow').classList.add('hidden');
   document.getElementById('storeDetailMeta').textContent =
-    `الخطة: ${store.plan_name || '—'} · الحالة: ${STATUS_LABELS[store.subscription_status] || store.subscription_status || '—'} · تسجّلت: ${fmtDate(store.created_at)}`;
+    `الخطة: ${store.plan_name || '—'} · تسجّلت: ${fmtDate(store.created_at)}`;
+  renderSubSummary(store);
+  resetSubExtendForm();
   document.getElementById('storeStaffList').innerHTML = '<p class="text-[12px] text-on-surface-variant">جارِ التحميل...</p>';
   document.getElementById('storeInviteList').innerHTML = '';
 
@@ -485,6 +510,84 @@ document.getElementById('storeInviteList').addEventListener('click', function (e
   const btn = e.target.closest('.revoke-invite-btn');
   if (btn) revokeInvite(btn.dataset.inviteId);
 });
+
+function renderSubSummary(store) {
+  const statusLabel = SUB_STATUS_LABELS[store.subscription_status] || store.subscription_status || 'بدون اشتراك';
+  let line = `الحالة: <strong>${gmEscapeHtml(statusLabel)}</strong>`;
+  if (store.subscription_status === 'active' && store.current_period_end) {
+    line += ` — ينتهي ${gmEscapeHtml(fmtDate(store.current_period_end))}`;
+  } else if (store.trial_end) {
+    line += ` — تنتهي التجربة ${gmEscapeHtml(fmtDate(store.trial_end))}`;
+  }
+  document.getElementById('storeSubSummary').innerHTML = line;
+}
+
+let subExtendMode = null;
+
+function resetSubExtendForm() {
+  subExtendMode = null;
+  document.getElementById('subTrialWrap').classList.add('hidden');
+  document.getElementById('subAnnualWrap').classList.add('hidden');
+  document.getElementById('saveSubExtendBtn').classList.add('hidden');
+  document.getElementById('subExtendError').classList.add('hidden');
+  document.getElementById('subModeTrialBtn').className = 'flex-1 h-9 rounded-lg border border-outline-variant text-[12px] font-semibold';
+  document.getElementById('subModeAnnualBtn').className = 'flex-1 h-9 rounded-lg border border-outline-variant text-[12px] font-semibold';
+
+  const in30 = new Date(); in30.setDate(in30.getDate() + 30);
+  document.getElementById('subTrialDateInput').value = in30.toISOString().slice(0, 10);
+  const in1y = new Date(); in1y.setFullYear(in1y.getFullYear() + 1);
+  document.getElementById('subAnnualDateInput').value = in1y.toISOString().slice(0, 10);
+}
+
+function setSubExtendMode(mode) {
+  subExtendMode = mode;
+  const active = 'flex-1 h-9 rounded-lg text-[12px] font-semibold bg-primary text-on-primary';
+  const inactive = 'flex-1 h-9 rounded-lg border border-outline-variant text-[12px] font-semibold';
+  document.getElementById('subModeTrialBtn').className = mode === 'trial' ? active : inactive;
+  document.getElementById('subModeAnnualBtn').className = mode === 'annual' ? active : inactive;
+  document.getElementById('subTrialWrap').classList.toggle('hidden', mode !== 'trial');
+  document.getElementById('subTrialWrap').classList.toggle('flex', mode === 'trial');
+  document.getElementById('subAnnualWrap').classList.toggle('hidden', mode !== 'annual');
+  document.getElementById('subAnnualWrap').classList.toggle('flex', mode === 'annual');
+  document.getElementById('saveSubExtendBtn').classList.remove('hidden');
+}
+
+async function saveSubExtend() {
+  const errEl = document.getElementById('subExtendError');
+  errEl.classList.add('hidden');
+  if (!currentDetailStoreId || !subExtendMode) return;
+
+  const btn = document.getElementById('saveSubExtendBtn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  let params;
+  if (subExtendMode === 'trial') {
+    const dateStr = document.getElementById('subTrialDateInput').value;
+    if (!dateStr) { errEl.textContent = 'اختر تاريخاً.'; errEl.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'حفظ'; return; }
+    params = { target_store_id: currentDetailStoreId, p_status: 'trialing', p_trial_end: new Date(dateStr + 'T23:59:59').toISOString(), p_current_period_end: null };
+  } else {
+    const dateStr = document.getElementById('subAnnualDateInput').value;
+    if (!dateStr) { errEl.textContent = 'اختر تاريخاً.'; errEl.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'حفظ'; return; }
+    params = { target_store_id: currentDetailStoreId, p_status: 'active', p_trial_end: null, p_current_period_end: new Date(dateStr + 'T23:59:59').toISOString() };
+  }
+
+  const { error } = await goldmindClient.rpc('admin_extend_subscription', params);
+  btn.disabled = false;
+  btn.textContent = 'حفظ';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  showToast('تم تحديث الاشتراك.');
+  resetSubExtendForm();
+  await loadStores();
+  const updated = allStores.find(s => s.id === currentDetailStoreId);
+  if (updated) renderSubSummary(updated);
+}
 
 function closeStoreDetailModal() {
   const modal = document.getElementById('storeDetailModal');
