@@ -359,6 +359,12 @@ function goToStatementPrint() {
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="give-stock-form">
+<div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
+<button type="button" id="gs-mode-barcode-btn" onclick="setGiveStockMode('barcode')" class="flex-1 h-10 text-[12px] font-semibold">قطعة بالباركود</button>
+<button type="button" id="gs-mode-bulk-btn" onclick="setGiveStockMode('bulk')" class="flex-1 h-10 text-[12px] font-semibold">وزن بالجملة</button>
+</div>
+
+<div id="gs-barcode-mode">
 <p class="text-[12px] text-on-surface-variant mb-3">امسح أو اكتب باركود كل قطعة عم تسلّمها للتاجر. القطعة بتتحدد تلقائياً "معطاة لتاجر" — ما بتظهر ناقصة بالجرد ولا ضمن وزن البضاعة المتوفرة بعدها.</p>
 <div class="flex gap-2 mb-3">
 <input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gs-barcode-input" placeholder="امسح أو اكتب الباركود" type="text"/>
@@ -384,6 +390,43 @@ function goToStatementPrint() {
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="gs-notes" placeholder="ملاحظة عامة على السند (اختياري)"></textarea>
 <button onclick="submitGiveStock()" id="gs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold disabled:opacity-50" disabled="">حفظ التسليم</button>
 <p class="text-error text-[12px] hidden mt-2" id="gs-error"></p>
+</div>
+
+<div class="hidden flex-col" id="gs-bulk-mode">
+<p class="text-[12px] text-on-surface-variant mb-3">تسليم وزن خام بالجملة (مو قطعة مسجّلة بباركود) — بيسجّل دين ذهب ودين مصنعية على التاجر مباشرة، بدون ربط بقطعة محددة بالمخزون.</p>
+<div class="grid grid-cols-2 gap-3 mb-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-weight">الوزن (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gsb-weight" oninput="renderGiveStockBulkPreview()" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-karat">العيار</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="gsb-karat" onchange="renderGiveStockBulkPreview()">
+<option value="18">18</option>
+<option selected value="21">21</option>
+<option value="22">22</option>
+<option value="24">24</option>
+</select>
+</div>
+</div>
+<div class="relative mb-3">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-fab">مصنعية الغرام</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gsb-fab" oninput="renderGiveStockBulkPreview()" step="0.01" type="number"/>
+</div>
+<div class="bg-surface-container-low rounded-lg p-3 mb-3 text-[12px] flex flex-col gap-1" id="gsb-preview">
+<div class="flex justify-between"><span class="text-on-surface-variant">دين الذهب (مكافئ ٢٤)</span><span class="font-data-mono font-semibold" id="gsb-preview-gold">0.00 غ</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant" id="gsb-preview-fee-label">إجمالي المصنعية قبل الضريبة</span><span class="font-data-mono font-semibold" id="gsb-preview-fee">0.00</span></div>
+<div class="flex justify-between"><span class="text-on-surface-variant">قيمة الضريبة</span><span class="font-data-mono font-semibold" id="gsb-preview-vat">0.00</span></div>
+<div class="flex justify-between font-bold pt-1 border-t border-outline-variant"><span>إجمالي دين المصنعية (شامل الضريبة)</span><span class="font-data-mono" id="gsb-preview-fee-total">0.00</span></div>
+</div>
+<div class="relative mb-3">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-vat-rate">نسبة الضريبة على المصنعية (%)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gsb-vat-rate" oninput="renderGiveStockBulkPreview()" step="0.01" type="number"/>
+</div>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="gsb-notes" placeholder="ملاحظة (اختياري)"></textarea>
+<button onclick="submitGiveStockBulk()" id="gsb-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ التسليم</button>
+<p class="text-error text-[12px] hidden mt-2" id="gsb-error"></p>
+</div>
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form">
@@ -1809,6 +1852,7 @@ function clearGiveStockDraft() {
 // resetGiveStockCart() directly, so an in-progress sending session
 // (accidentally closed mid-scan) can be offered back before wiping it.
 function openGiveStockForm() {
+  setGiveStockMode('barcode');
   let draft;
   try { draft = JSON.parse(localStorage.getItem(giveStockDraftKey()) || 'null'); } catch (e) { draft = null; }
   if (draft && Array.isArray(draft.giveStockCart) && draft.giveStockCart.length > 0) {
@@ -2013,6 +2057,91 @@ async function submitGiveStock() {
 
   clearGiveStockDraft();
   resetGiveStockCart();
+  document.getElementById('give-stock-form').classList.add('hidden');
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+}
+
+// Bulk give-stock: raw weight handed to the trader that isn't a specific
+// barcoded piece (e.g. loose/unworked gold) -- pure debt bookkeeping, same
+// as the barcode mode, just without a piece_id or pieces.status update
+// since there's no specific registered piece involved.
+function setGiveStockMode(mode) {
+  const active = 'flex-1 h-10 text-[12px] font-semibold bg-primary text-white';
+  const inactive = 'flex-1 h-10 text-[12px] font-semibold text-on-surface-variant';
+  document.getElementById('gs-mode-barcode-btn').className = mode === 'barcode' ? active : inactive;
+  document.getElementById('gs-mode-bulk-btn').className = mode === 'bulk' ? active : inactive;
+  document.getElementById('gs-barcode-mode').classList.toggle('hidden', mode !== 'barcode');
+  document.getElementById('gs-bulk-mode').classList.toggle('hidden', mode !== 'bulk');
+  document.getElementById('gs-bulk-mode').classList.toggle('flex', mode === 'bulk');
+}
+
+function renderGiveStockBulkPreview() {
+  const weight = parseFloat(document.getElementById('gsb-weight').value) || 0;
+  const karat = parseInt(document.getElementById('gsb-karat').value, 10) || 0;
+  const fab = parseFloat(document.getElementById('gsb-fab').value) || 0;
+  const vatRate = parseFloat(document.getElementById('gsb-vat-rate').value) || 0;
+
+  const gold24k = weight * (karat / 24);
+  const feeBeforeVat = weight * fab;
+  const vatAmount = feeBeforeVat * (vatRate / 100);
+
+  document.getElementById('gsb-preview-gold').textContent = fmt(gold24k) + ' غ';
+  document.getElementById('gsb-preview-fee').textContent = fmtMoney(feeBeforeVat);
+  document.getElementById('gsb-preview-vat').textContent = fmtMoney(vatAmount);
+  document.getElementById('gsb-preview-fee-total').textContent = fmtMoney(feeBeforeVat + vatAmount);
+}
+
+async function submitGiveStockBulk() {
+  const errEl = document.getElementById('gsb-error');
+  errEl.classList.add('hidden');
+
+  const weight = parseFloat(document.getElementById('gsb-weight').value);
+  const karat = parseInt(document.getElementById('gsb-karat').value, 10);
+  const fab = parseFloat(document.getElementById('gsb-fab').value) || 0;
+  const vatRate = parseFloat(document.getElementById('gsb-vat-rate').value) || 0;
+  const notes = document.getElementById('gsb-notes').value.trim();
+
+  if (!weight || weight <= 0) {
+    errEl.textContent = 'أدخل وزناً صحيحاً.';
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  const btn = document.getElementById('gsb-btn');
+  btn.disabled = true;
+  btn.textContent = 'جارِ الحفظ...';
+
+  const feeBeforeVat = weight * fab;
+  const { error } = await goldmindClient.from('trader_movements').insert({
+    store_id: GOLDMIND_STORE_ID,
+    trader_id: currentTraderId,
+    piece_id: null,
+    movement_type: 'debt_decrease',
+    weight_grams: weight,
+    karat: karat,
+    accounting_weight_grams: weight,
+    gold_24k_equivalent: +(weight * (karat / 24)).toFixed(3),
+    fab_fee_per_gram: fab,
+    fab_fee_amount: +(feeBeforeVat * (1 + vatRate / 100)).toFixed(2),
+    source: 'stock_given',
+    notes: (notes ? notes + ' — ' : '') + 'وزن بالجملة (بدون باركود)'
+  });
+
+  btn.disabled = false;
+  btn.textContent = 'حفظ التسليم';
+
+  if (error) {
+    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
+    errEl.classList.remove('hidden');
+    return;
+  }
+
+  document.getElementById('gsb-weight').value = '';
+  document.getElementById('gsb-fab').value = '';
+  document.getElementById('gsb-notes').value = '';
+  renderGiveStockBulkPreview();
   document.getElementById('give-stock-form').classList.add('hidden');
   const traderIdToReopen = currentTraderId;
   await load();
