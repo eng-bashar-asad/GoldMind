@@ -396,10 +396,16 @@ function goToStatementPrint() {
 <p class="text-[12px] text-on-surface-variant mb-3">تسليم وزن خام بالجملة (مو قطعة مسجّلة بباركود) — بيسجّل دين ذهب ودين مصنعية على التاجر مباشرة، بدون ربط بقطعة محددة بالمخزون.</p>
 <div class="grid grid-cols-2 gap-3 mb-3">
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-weight">الوزن (غ)</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-weight">الوزن القائم (غ)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gsb-weight" oninput="renderGiveStockBulkPreview()" step="0.01" type="number"/>
 </div>
 <div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-accweight">الوزن المحاسبي (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gsb-accweight" oninput="renderGiveStockBulkPreview()" placeholder="نفس القائم لو فاضي" step="0.01" type="number"/>
+</div>
+</div>
+<p class="text-[10.5px] text-outline mb-3">الوزن القائم هو يلي بيتوثّق بالسند. الوزن المحاسبي (لو اختلف بسبب فرق دقة أو فص) يُستخدم فقط لحساب دين الذهب — لو تركته فاضي بيُحسب بنفس الوزن القائم.</p>
+<div class="relative mb-3">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-karat">العيار</label>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="gsb-karat" onchange="renderGiveStockBulkPreview()">
 <option value="18">18</option>
@@ -407,7 +413,6 @@ function goToStatementPrint() {
 <option value="22">22</option>
 <option value="24">24</option>
 </select>
-</div>
 </div>
 <div class="relative mb-3">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-fab">مصنعية الغرام</label>
@@ -2078,13 +2083,17 @@ function setGiveStockMode(mode) {
 }
 
 function renderGiveStockBulkPreview() {
-  const weight = parseFloat(document.getElementById('gsb-weight').value) || 0;
+  const grossWeight = parseFloat(document.getElementById('gsb-weight').value) || 0;
+  const accWeightInput = parseFloat(document.getElementById('gsb-accweight').value);
+  const accWeight = accWeightInput > 0 ? accWeightInput : grossWeight;
   const karat = parseInt(document.getElementById('gsb-karat').value, 10) || 0;
   const fab = parseFloat(document.getElementById('gsb-fab').value) || 0;
   const vatRate = parseFloat(document.getElementById('gsb-vat-rate').value) || 0;
 
-  const gold24k = weight * (karat / 24);
-  const feeBeforeVat = weight * fab;
+  // Billed on the accounting (billable) weight, not the gross/stated
+  // weight -- same convention as the barcode mode above.
+  const gold24k = accWeight * (karat / 24);
+  const feeBeforeVat = accWeight * fab;
   const vatAmount = feeBeforeVat * (vatRate / 100);
 
   document.getElementById('gsb-preview-gold').textContent = fmt(gold24k) + ' غ';
@@ -2097,14 +2106,16 @@ async function submitGiveStockBulk() {
   const errEl = document.getElementById('gsb-error');
   errEl.classList.add('hidden');
 
-  const weight = parseFloat(document.getElementById('gsb-weight').value);
+  const grossWeight = parseFloat(document.getElementById('gsb-weight').value);
+  const accWeightInput = parseFloat(document.getElementById('gsb-accweight').value);
+  const accWeight = accWeightInput > 0 ? accWeightInput : grossWeight;
   const karat = parseInt(document.getElementById('gsb-karat').value, 10);
   const fab = parseFloat(document.getElementById('gsb-fab').value) || 0;
   const vatRate = parseFloat(document.getElementById('gsb-vat-rate').value) || 0;
   const notes = document.getElementById('gsb-notes').value.trim();
 
-  if (!weight || weight <= 0) {
-    errEl.textContent = 'أدخل وزناً صحيحاً.';
+  if (!grossWeight || grossWeight <= 0) {
+    errEl.textContent = 'أدخل وزناً قائماً صحيحاً.';
     errEl.classList.remove('hidden');
     return;
   }
@@ -2113,16 +2124,16 @@ async function submitGiveStockBulk() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const feeBeforeVat = weight * fab;
+  const feeBeforeVat = accWeight * fab;
   const { error } = await goldmindClient.from('trader_movements').insert({
     store_id: GOLDMIND_STORE_ID,
     trader_id: currentTraderId,
     piece_id: null,
     movement_type: 'debt_decrease',
-    weight_grams: weight,
+    weight_grams: grossWeight,
     karat: karat,
-    accounting_weight_grams: weight,
-    gold_24k_equivalent: +(weight * (karat / 24)).toFixed(3),
+    accounting_weight_grams: accWeight,
+    gold_24k_equivalent: +(accWeight * (karat / 24)).toFixed(3),
     fab_fee_per_gram: fab,
     fab_fee_amount: +(feeBeforeVat * (1 + vatRate / 100)).toFixed(2),
     source: 'stock_given',
@@ -2139,6 +2150,7 @@ async function submitGiveStockBulk() {
   }
 
   document.getElementById('gsb-weight').value = '';
+  document.getElementById('gsb-accweight').value = '';
   document.getElementById('gsb-fab').value = '';
   document.getElementById('gsb-notes').value = '';
   renderGiveStockBulkPreview();
