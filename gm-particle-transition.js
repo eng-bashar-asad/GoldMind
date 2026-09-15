@@ -47,7 +47,7 @@ async function gmCaptureBody() {
 function gmMakeOverlay(w, h) {
     const overlay = document.createElement('canvas');
     overlay.width = w; overlay.height = h;
-    overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:99999;pointer-events:none;';
+    overlay.style.cssText = 'position:fixed;inset:0;width:100vw;height:100vh;z-index:99999;pointer-events:none;visibility:visible;';
     document.body.appendChild(overlay);
     return overlay;
 }
