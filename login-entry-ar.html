@@ -230,11 +230,25 @@ function goToStep(stepId, direction) {
     direction = direction || 'forward'; // 'forward' or 'back'
     const outgoing = document.getElementById('step-' + currentStep);
     const incoming = document.getElementById('step-' + stepId);
-    const exitClass = 'step-exit-' + direction;
-    const enterClass = 'step-enter-' + direction;
 
     if (stepId === 'quick') quickBackTarget = currentStep === 'start' ? 'start' : 'method';
 
+    const doSwap = () => {
+        outgoing.classList.add('hidden');
+        outgoing.classList.remove('flex');
+        incoming.classList.remove('hidden');
+        incoming.classList.add('flex');
+    };
+
+    if (typeof gmDissolveStepSwap === 'function') {
+        gmDissolveStepSwap(outgoing, incoming, doSwap);
+        currentStep = stepId;
+        return;
+    }
+
+    // Fallback (particle module not loaded): original CSS slide transition.
+    const exitClass = 'step-exit-' + direction;
+    const enterClass = 'step-enter-' + direction;
     outgoing.classList.add(exitClass);
     setTimeout(() => {
         outgoing.classList.add('hidden');
