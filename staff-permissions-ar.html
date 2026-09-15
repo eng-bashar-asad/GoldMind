@@ -690,11 +690,25 @@ async function sendInvite() {
     return;
   }
 
-  showToast('تم إرسال الدعوة');
+  showToast('تم إنشاء الدعوة — جارِ إرسال الإيميل...');
   document.getElementById('invite-email').value = '';
   document.getElementById('invite-whatsapp').value = '';
   document.getElementById('invite-form').classList.add('hidden');
   loadInvites();
+
+  await sendInviteEmail(email, true);
+}
+
+async function sendInviteEmail(email, isFirstSend) {
+  const { error: fnError } = await goldmindClient.functions.invoke('send-invite-email', {
+    body: { store_id: GOLDMIND_STORE_ID, invite_email: email }
+  });
+  if (fnError) {
+    showToast((isFirstSend ? 'الدعوة محفوظة لكن تعذّر إرسال الإيميل: ' : 'تعذّر إعادة إرسال الإيميل: ') + fnError.message, true);
+    return false;
+  }
+  showToast(isFirstSend ? 'تم إرسال الدعوة بالإيميل' : 'تمت إعادة إرسال الدعوة بالإيميل');
+  return true;
 }
 
 async function revokeInvite(id) {
@@ -722,7 +736,10 @@ async function loadInvites() {
         <p class="text-[13px] font-semibold text-on-surface truncate" dir="ltr">${gmEscapeHtml(inv.email)}</p>
         <p class="text-[11px] text-on-surface-variant">بانتظار أول تسجيل دخول</p>
       </div>
+      <div class="flex items-center gap-3 shrink-0">
+      <button class="text-primary text-[12px] font-semibold shrink-0" onclick="sendInviteEmail('${gmEscapeHtml(inv.email)}', false)">إعادة إرسال</button>
       <button class="text-error text-[12px] font-semibold shrink-0" onclick="revokeInvite('${inv.id}')">إلغاء</button>
+      </div>
     </div>`).join('');
 }
 
