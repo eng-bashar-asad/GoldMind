@@ -150,6 +150,21 @@
 </div>
 
 <div class="border-t border-outline-variant pt-5 mt-1">
+<h3 class="font-label-md text-label-md text-secondary font-bold mb-1">معادلة المصنعية على ملصق الباركود (MC)</h3>
+<p class="text-[11px] text-on-surface-variant leading-5 mb-4">الرقم المطبوع بخانة MC على ملصق القطعة = أجرة مصنعية القطعة (كما أدخلها الموظف) × المضروب + المضاف. الملصق بيعرض الناتج النهائي فقط، مش المعادلة. مثال: مصنعية 22، مضروب 4، مضاف 10 → يطبع MC: 98.00.</p>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="label-mc-multiplier">المضروب</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="label-mc-multiplier" step="0.01" type="number" placeholder="1"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="label-mc-addend">المضاف</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="label-mc-addend" step="0.01" type="number" placeholder="0"/>
+</div>
+</div>
+</div>
+
+<div class="border-t border-outline-variant pt-5 mt-1">
 <h3 class="font-label-md text-label-md text-secondary font-bold mb-1">ترقيم القطع (الباركود)</h3>
 <p class="text-[11px] text-on-surface-variant leading-5 mb-4">حدّد حرف/رمز ثابت أول باركود كل نوع قطعة، ورقم البداية (مفيد إذا كنت لسا بأول اشتراكك وعندك ترقيم قديم من نظام سابق). كل قطعة جديدة تتسجّل تلقائياً بهالتسلسل — ذهب برمز لحاله بمستودعه، وألماس برمز لحاله بمستودعه.</p>
 </div>
@@ -691,6 +706,8 @@
         document.getElementById('store-phone').value = data.phone || '';
         document.getElementById('store-vat').value = data.vat_rate != null ? data.vat_rate : 5;
         document.getElementById('fab-rate-retail').value = data.fab_rate_retail != null ? data.fab_rate_retail : '';
+        document.getElementById('label-mc-multiplier').value = data.label_mc_multiplier != null ? data.label_mc_multiplier : 1;
+        document.getElementById('label-mc-addend').value = data.label_mc_addend != null ? data.label_mc_addend : 0;
         document.getElementById('store-email').value = data.email || '';
         document.getElementById('store-instagram').value = data.social_instagram || '';
         document.getElementById('store-tiktok').value = data.social_tiktok || '';
@@ -734,6 +751,8 @@
         const phone = document.getElementById('store-phone').value.trim();
         const vat = parseFloat(document.getElementById('store-vat').value);
         const fabRateRetail = parseFloat(document.getElementById('fab-rate-retail').value);
+        const labelMcMultiplier = parseFloat(document.getElementById('label-mc-multiplier').value);
+        const labelMcAddend = parseFloat(document.getElementById('label-mc-addend').value);
         const email = document.getElementById('store-email').value.trim();
         const instagram = document.getElementById('store-instagram').value.trim();
         const tiktok = document.getElementById('store-tiktok').value.trim();
@@ -772,6 +791,8 @@
                 phone: phone || null,
                 vat_rate: isNaN(vat) ? 5 : vat,
                 fab_rate_retail: isNaN(fabRateRetail) ? null : fabRateRetail,
+                label_mc_multiplier: isNaN(labelMcMultiplier) ? 1 : labelMcMultiplier,
+                label_mc_addend: isNaN(labelMcAddend) ? 0 : labelMcAddend,
                 logo_url: logo || null,
                 email: email || null,
                 social_instagram: instagram || null,
