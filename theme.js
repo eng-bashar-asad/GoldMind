@@ -196,46 +196,8 @@ function gmFormatDualCurrency(amount, store) {
 }
 
 const GOLDMIND_THEMES = {
-  'royal-gold': {
-    label: 'الذهبي الملكي',
-    swatch: ['#FFD700', '#0f232a', '#1e333b'],
-    vars: {
-      '--gm-bg': '#0f172a',
-      '--gm-bg-elevated': '#0f172a',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#eaeef5',
-      '--gm-primary': '#000000',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#FFD700',
-      '--gm-on-accent': '#0f172a',
-      '--gm-secondary': '#745a25',
-      '--gm-on-surface': '#191c1e',
-      '--gm-on-surface-variant': '#45464d',
-      '--gm-outline-variant': '#c6c6cd',
-      '--gm-avatar-grad': 'linear-gradient(135deg, #745a25 0%, #FFD700 100%)'
-    }
-  },
-  'rose-gold': {
-    label: 'الوردي الملكي',
-    swatch: ['#E8B4B8', '#2b1620', '#3d1f2c'],
-    vars: {
-      '--gm-bg': '#2b1620',
-      '--gm-bg-elevated': '#2b1620',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#f4dfe1',
-      '--gm-primary': '#2b1620',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#B76E79',
-      '--gm-on-accent': '#ffffff',
-      '--gm-secondary': '#9c5a63',
-      '--gm-on-surface': '#2b1620',
-      '--gm-on-surface-variant': '#5e4249',
-      '--gm-outline-variant': '#e3cdd1',
-      '--gm-avatar-grad': 'linear-gradient(135deg, #9c5a63 0%, #E8B4B8 100%)'
-    }
-  },
   'warm-ingot': {
-    label: 'المسبوكة الهادئة',
+    label: 'المسبوكة',
     swatch: ['#9C8552', '#F3EEDF', '#EFE7D2'],
     lightCanvas: true,
     vars: {
@@ -254,62 +216,19 @@ const GOLDMIND_THEMES = {
       '--gm-avatar-grad': 'linear-gradient(135deg, #7A6640 0%, #9C8552 100%)'
     }
   },
-  'golden-hour': {
-    label: 'غروب الذهب',
-    swatch: ['#D4AF37', '#FBF6EA', '#F4ECD6'],
-    lightCanvas: true,
-    shimmer: true,
-    vars: {
-      '--gm-bg': '#FBF6EA',
-      '--gm-bg-elevated': '#FBF6EA',
-      '--gm-surface-lowest': '#FFFFFF',
-      '--gm-surface-low': '#F4ECD6',
-      '--gm-primary': '#4A403A',
-      '--gm-on-primary': '#FBF8F1',
-      '--gm-accent': '#D4AF37',
-      '--gm-on-accent': '#3c2f00',
-      '--gm-secondary': '#8A6A1F',
-      '--gm-on-surface': '#211D17',
-      '--gm-on-surface-variant': '#6B6355',
-      '--gm-outline-variant': '#CBBF9E',
-      '--gm-shimmer-grad': 'linear-gradient(120deg, #7a5a12 0%, #d4af37 28%, #fff2b8 50%, #d4af37 72%, #b8860b 100%)',
-      '--gm-avatar-grad': 'linear-gradient(135deg, #8A6A1F 0%, #D4AF37 60%, #fff2b8 100%)'
-    }
-  },
-  'midnight-galaxy': {
-    label: 'مجرة منتصف الليل',
-    swatch: ['#A490C2', '#1c1430', '#241a3d'],
-    shimmer: true,
-    vars: {
-      '--gm-bg': '#1c1430',
-      '--gm-bg-elevated': '#1c1430',
-      '--gm-surface-lowest': '#ffffff',
-      '--gm-surface-low': '#e6e2f5',
-      '--gm-primary': '#1c1430',
-      '--gm-on-primary': '#ffffff',
-      '--gm-accent': '#A490C2',
-      '--gm-on-accent': '#1c1430',
-      '--gm-secondary': '#4A4E8F',
-      '--gm-on-surface': '#1c1430',
-      '--gm-on-surface-variant': '#5b4f78',
-      '--gm-outline-variant': '#d6cfe8',
-      '--gm-shimmer-grad': 'linear-gradient(120deg, #241a3d 0%, #4a4e8f 30%, #d9d2f0 50%, #4a4e8f 70%, #241a3d 100%)',
-      '--gm-avatar-grad': 'linear-gradient(135deg, #4A4E8F 0%, #A490C2 100%)'
-    }
-  },
   'velvet-wine': {
-    // Same neutral cream canvas as warm-ingot (بس، دون أي صبغة وردية على
-    // الخلفية نفسها) — الخمري محصور بالأيقونات/التمييز فقط (accent +
-    // secondary + shimmer), بدرجة "دم الغزال" الغامقة الدافئة، مش وردي فاتح.
-    label: 'الخمري الناعم',
-    swatch: ['#7A1B2B', '#F3EEDF', '#EFE7D2'],
+    // Burgundy now carries through the whole canvas (bg/surface/outline),
+    // not just the accent/secondary/shimmer — a warm blush-wine tint
+    // throughout, with "دم الغزال" as the deep accent anchor.
+    label: 'الخمري',
+    swatch: ['#7A1B2B', '#C07884', '#F6EDEA'],
     lightCanvas: true,
     shimmer: true,
     vars: {
-      '--gm-bg': '#F3EEDF',
-      '--gm-bg-elevated': '#F3EEDF',
+      '--gm-bg': '#F6EDEA',
+      '--gm-bg-elevated': '#F6EDEA',
       '--gm-surface-lowest': '#FFFFFF',
-      '--gm-surface-low': '#EFE7D2',
+      '--gm-surface-low': '#EFD9D9',
       '--gm-primary': '#1C1A16',
       '--gm-on-primary': '#FBF8F1',
       '--gm-accent': '#7A1B2B',
@@ -317,7 +236,7 @@ const GOLDMIND_THEMES = {
       '--gm-secondary': '#5E1420',
       '--gm-on-surface': '#211D17',
       '--gm-on-surface-variant': '#6B6355',
-      '--gm-outline-variant': '#CBBF9E',
+      '--gm-outline-variant': '#D9BEC2',
       '--gm-shimmer-grad': 'linear-gradient(120deg, #430A13 0%, #7A1B2B 28%, #C07884 50%, #7A1B2B 72%, #430A13 100%)',
       '--gm-avatar-grad': 'linear-gradient(135deg, #5E1420 0%, #7A1B2B 60%, #C07884 100%)'
     }
@@ -327,7 +246,7 @@ const GOLDMIND_THEMES = {
     // warm terracotta-orange accent (evoking Claude's own star mark) --
     // a "space-tech" feel: dark, precise, and cool, with one warm point
     // of light rather than an all-over glow.
-    label: 'الفولاذ الفضائي',
+    label: 'الفولاذي',
     swatch: ['#DA7756', '#1B2C46', '#8B94A3'],
     lightCanvas: false,
     shimmer: true,
@@ -352,7 +271,7 @@ const GOLDMIND_THEMES = {
 };
 
 function goldmindApplyTheme(name) {
-  const theme = GOLDMIND_THEMES[name] || GOLDMIND_THEMES['royal-gold'];
+  const theme = GOLDMIND_THEMES[name] || GOLDMIND_THEMES['warm-ingot'];
   const root = document.documentElement;
   Object.keys(theme.vars).forEach(function (key) {
     root.style.setProperty(key, theme.vars[key]);
@@ -619,7 +538,7 @@ function goldmindLoadSavedFont() {
 
 
 function goldmindLoadSavedTheme() {
-  const saved = localStorage.getItem('goldmind_theme') || 'royal-gold';
+  const saved = localStorage.getItem('goldmind_theme') || 'warm-ingot';
   goldmindApplyTheme(saved);
   return saved;
 }
