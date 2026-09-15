@@ -43,15 +43,22 @@
 <div id="loading" class="py-16 text-center text-gray-500 text-sm">جارِ التحميل...</div>
 <div id="error-box" class="hidden py-10 px-6 text-center text-red-700 bg-red-100 max-w-sm mx-auto mt-6 rounded-lg"></div>
 
-<div id="label" class="hidden max-w-xs mx-auto my-8 bg-white shadow rounded-lg border border-gray-200 p-4 text-center">
-<div id="storeName" class="text-sm font-bold mb-1"></div>
-<div id="description" class="text-xs text-gray-600 mb-2 truncate"></div>
-<div id="specs" class="text-[11px] text-gray-500 mb-3"></div>
+<div id="label" class="hidden max-w-sm mx-auto my-8 bg-white shadow rounded-lg border border-gray-200 flex text-center" dir="ltr">
+<div id="panelBarcode" class="flex-1 px-2 py-3 border-l border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 min-w-0">
+<div id="barcodeNumber" class="text-[11px] font-bold"></div>
 <svg id="barcodeSvg" class="w-full"></svg>
-<div id="rfidBadge" class="hidden mt-2 text-[10px] font-semibold text-amber-700 flex items-center justify-center gap-1">
+<div id="storeName" class="text-[11px] font-bold truncate w-full"></div>
+</div>
+<div id="panelSpecs" class="flex-1 px-2 py-3 flex flex-col items-start justify-center gap-1.5 text-[12px] font-bold min-w-0">
+<div id="specWeight"></div>
+<div id="specKarat"></div>
+<div id="specMc"></div>
+<div id="specType" class="truncate w-full"></div>
+</div>
+</div>
+<div id="rfidBadge" class="hidden text-[10px] font-semibold text-amber-700 flex items-center justify-center gap-1 mb-6">
 <span class="material-symbols-outlined" style="font-size:13px;">sensors</span>
 <span>محمّلة RFID</span>
-</div>
 </div>
 
 <script>
@@ -80,7 +87,7 @@
 
         const [{ data: piece, error: pieceError }, { data: store }] = await Promise.all([
             goldmindClient.from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
-            goldmindClient.from('stores').select('name, rfid_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend').eq('id', GOLDMIND_STORE_ID).maybeSingle()
         ]);
 
         loading.classList.add('hidden');
@@ -95,16 +102,23 @@
         currentStore = store;
 
         document.getElementById('storeName').textContent = (store && store.name) ? store.name : 'GoldMind';
-        document.getElementById('description').textContent = piece.description_ar || piece.description_en || (piece.piece_type || '');
 
-        const specParts = [(piece.weight_grams || 0) + ' غ', 'عيار ' + (piece.karat || '')];
-        document.getElementById('specs').textContent = specParts.join(' · ');
+        document.getElementById('specWeight').textContent = 'W: ' + Number(piece.weight_grams || 0).toFixed(2);
+        document.getElementById('specKarat').textContent = 'Kt: ' + (piece.karat || '');
+
+        const mcMultiplier = (store && store.label_mc_multiplier != null) ? Number(store.label_mc_multiplier) : 1;
+        const mcAddend = (store && store.label_mc_addend != null) ? Number(store.label_mc_addend) : 0;
+        const rawFab = piece.cost_fabrication_per_gram;
+        document.getElementById('specMc').textContent = 'MC: ' + (rawFab != null ? (Number(rawFab) * mcMultiplier + mcAddend).toFixed(2) : '—');
+
+        document.getElementById('specType').textContent = piece.description_ar || piece.piece_type || piece.description_en || '';
 
         const barcodeValue = piece.barcode || pieceId.slice(0, 12).toUpperCase();
+        document.getElementById('barcodeNumber').textContent = barcodeValue;
         try {
             JsBarcode('#barcodeSvg', barcodeValue, {
-                format: 'CODE128', width: 2, height: 46, displayValue: true,
-                fontSize: 13, margin: 4, font: 'IBM Plex Sans'
+                format: 'CODE128', width: 1.3, height: 34, displayValue: false,
+                margin: 2
             });
         } catch (e) {
             document.getElementById('barcodeSvg').outerHTML = '<div class="text-xs text-red-600">تعذّر توليد الباركود</div>';
