@@ -9,6 +9,14 @@
 //     swapping two sections within the SAME page (e.g. login-entry-ar.html's
 //     step panels) — no navigation involved.
 //
+// Key rule: the INCOMING content must never be captured while it's really
+// on screen — capturing takes real time (html2canvas isn't instant), and
+// showing the final real content for that whole window before hiding it
+// and playing the reform animation looks like "pops in fully, vanishes,
+// then re-forms" instead of one smooth motion. So incoming content is
+// always captured from an invisible off-screen clone instead, while the
+// real element stays hidden the entire time until the animation lands.
+//
 // If anything goes wrong (html2canvas missing, capture fails, tainted
 // canvas, etc.) everything here always falls back to an instant plain
 // swap/navigation — this effect must never block the login flow.
@@ -43,6 +51,29 @@ async function gmCaptureElement(el) {
     buf.width = w; buf.height = h;
     buf.getContext('2d').drawImage(snap, 0, 0);
     return { w: w, h: h, particles: gmSampleParticles(buf, w, h, gmGrainSize(w, h)) };
+}
+
+// Captures `el`'s final appearance via an invisible off-screen clone, so
+// the real on-screen `el` never has to be visible during the (non-instant)
+// capture. `applyFinalState`, if given, runs on the clone before capture
+// (e.g. to remove a "hidden" class) so it reflects how el is ABOUT to look.
+async function gmCaptureElementOffscreen(el, applyFinalState) {
+    const rect = el.getBoundingClientRect();
+    const clone = el.cloneNode(true);
+    if (applyFinalState) applyFinalState(clone);
+    clone.style.position = 'fixed';
+    clone.style.left = '-10000px';
+    clone.style.top = '0px';
+    clone.style.width = rect.width + 'px';
+    clone.style.boxSizing = 'border-box';
+    clone.style.visibility = 'visible';
+    document.body.appendChild(clone);
+    try {
+        const cap = await gmCaptureElement(clone);
+        return cap;
+    } finally {
+        clone.remove();
+    }
 }
 
 function gmMakeOverlayAt(rect, w, h) {
@@ -107,7 +138,7 @@ function gmAnimateReform(ctx, cap) {
 async function gmDissolveNavigate(url) {
     try {
         if (typeof html2canvas === 'undefined') { window.location.href = url; return; }
-        const cap = await gmCaptureElement(document.body);
+        const cap = await gmCaptureElement(document.body); // outgoing: real page is genuinely on screen here, that's correct
         const overlay = gmMakeOverlayAt({ left: 0, top: 0 }, cap.w, cap.h);
         document.body.style.visibility = 'hidden';
         await gmAnimateDissolve(overlay.getContext('2d'), cap);
@@ -123,11 +154,13 @@ async function gmReformOnLoad() {
     sessionStorage.removeItem(GM_TRANSITION_FLAG);
     try {
         if (typeof html2canvas === 'undefined') return;
-        // Let fonts/images/layout settle before the snapshot, while the
-        // page is still normally visible (a hidden element captures blank).
-        await new Promise(function (r) { setTimeout(r, 60); });
-        const cap = await gmCaptureElement(document.body);
+        // Hide the real page immediately — before any capture — so it is
+        // never shown fully-formed even for a moment. We capture a
+        // duplicate off-screen instead.
         document.body.style.visibility = 'hidden';
+        // Let fonts/images/layout settle before the snapshot.
+        await new Promise(function (r) { setTimeout(r, 60); });
+        const cap = await gmCaptureElementOffscreen(document.body);
         const overlay = gmMakeOverlayAt({ left: 0, top: 0 }, cap.w, cap.h);
         await gmAnimateReform(overlay.getContext('2d'), cap);
         overlay.remove();
@@ -145,6 +178,7 @@ async function gmDissolveStepSwap(outgoingEl, incomingEl, swapFn) {
     try {
         if (typeof html2canvas === 'undefined') { swapFn(); return; }
 
+        // 1) Dissolve the outgoing panel — it's genuinely on screen, capture it as-is.
         const rectOut = outgoingEl.getBoundingClientRect();
         const capOut = await gmCaptureElement(outgoingEl);
         const overlayOut = gmMakeOverlayAt(rectOut, capOut.w, capOut.h);
@@ -152,14 +186,17 @@ async function gmDissolveStepSwap(outgoingEl, incomingEl, swapFn) {
         await gmAnimateDissolve(overlayOut.getContext('2d'), capOut);
         overlayOut.remove();
 
-        swapFn(); // actual DOM swap (hide outgoing, show incoming)
+        // 2) Swap the DOM, but hide the incoming panel in the very same
+        // tick — before the browser paints — so it's never seen fully
+        // formed. Its true appearance is captured from an off-screen clone.
+        swapFn();
+        incomingEl.style.visibility = 'hidden';
         outgoingEl.style.visibility = 'visible'; // reset for next time it's shown again
 
-        await new Promise(function (r) { setTimeout(r, 30); }); // let layout settle
+        await new Promise(function (r) { requestAnimationFrame(function () { requestAnimationFrame(r); }); });
         const rectIn = incomingEl.getBoundingClientRect();
-        const capIn = await gmCaptureElement(incomingEl);
+        const capIn = await gmCaptureElementOffscreen(incomingEl);
         const overlayIn = gmMakeOverlayAt(rectIn, capIn.w, capIn.h);
-        incomingEl.style.visibility = 'hidden';
         await gmAnimateReform(overlayIn.getContext('2d'), capIn);
         overlayIn.remove();
         incomingEl.style.visibility = 'visible';
