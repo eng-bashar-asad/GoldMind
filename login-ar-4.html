@@ -219,6 +219,16 @@
             });
             const nextEmpty = digits.length < otpInputs.length ? digits.length : otpInputs.length - 1;
             otpInputs[nextEmpty].focus();
+            maybeAutoSubmit();
+        }
+
+        // Once all 8 boxes are filled (paste or manual typing), submit immediately
+        // without waiting for the "تحقق" button — mirrors native OTP autofill UX.
+        function maybeAutoSubmit() {
+            const code = Array.from(otpInputs).map(i => i.value).join('');
+            if (code.length === otpInputs.length) {
+                document.getElementById('otpForm').requestSubmit();
+            }
         }
 
         otpInputs.forEach((input, idx) => {
@@ -237,6 +247,7 @@
                 if (digitsOnly && idx < otpInputs.length - 1) {
                     otpInputs[idx + 1].focus();
                 }
+                maybeAutoSubmit();
             });
             input.addEventListener('keydown', (e) => {
                 if (e.key === 'Backspace' && !input.value && idx > 0) {
@@ -262,8 +273,10 @@
         });
 
         // Real verification against Supabase, then create the owner profile on first login
+        let otpSubmitting = false;
         document.getElementById('otpForm').addEventListener('submit', async function(e) {
             e.preventDefault();
+            if (otpSubmitting) return; // ponytail: simple in-flight guard, no cancellation/retry logic
             const email = sessionStorage.getItem('goldmind_email');
             const code = Array.from(otpInputs).map(i => i.value).join('');
             const errEl = document.getElementById('otpFormError');
@@ -275,6 +288,7 @@
                 return;
             }
 
+            otpSubmitting = true;
             const { data, error } = await goldmindClient.auth.verifyOtp({
                 email: email,
                 token: code,
@@ -284,6 +298,7 @@
             if (error) {
                 errEl.textContent = 'الرمز غير صحيح أو منتهي الصلاحية: ' + error.message;
                 errEl.classList.remove('hidden');
+                otpSubmitting = false;
                 return;
             }
 
@@ -304,6 +319,7 @@
                             errEl.textContent = 'تعذّر الانضمام للشركة: ' + rpcError.message;
                         }
                         errEl.classList.remove('hidden');
+                        otpSubmitting = false;
                         await goldmindClient.auth.signOut();
                         return;
                     }
@@ -319,6 +335,7 @@
                 if (rpcError) {
                     errEl.textContent = 'تعذّر إنشاء الشركة: ' + rpcError.message;
                     errEl.classList.remove('hidden');
+                    otpSubmitting = false;
                     return;
                 }
                 if (newStoreId) {
@@ -342,6 +359,7 @@
 
                     errEl.textContent = 'فضلاً ابدأ من صفحة تسجيل الدخول واختر شركة أو سجّل شركة جديدة.';
                     errEl.classList.remove('hidden');
+                    otpSubmitting = false;
                     await goldmindClient.auth.signOut();
                     return;
                 }
