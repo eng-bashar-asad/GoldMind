@@ -50,9 +50,11 @@
         .gold-border-focus:focus-within { border-color: var(--royal-gold); box-shadow: 0 0 0 1px var(--royal-gold); }
         .gold-gradient { background: linear-gradient(135deg, #FFD700 0%, #B4955A 100%); }
         .glass-panel { background: rgba(30, 51, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 215, 0, 0.1); }
-        .step-panel { transition: opacity 200ms ease, transform 200ms ease; opacity: 1; transform: scale(1); }
-        .step-panel.step-exit { opacity: 0; transform: scale(0.94); }
-        .step-panel.step-enter { opacity: 0; transform: scale(0.94); }
+        .step-panel { transition: opacity 260ms ease, transform 260ms ease; opacity: 1; transform: translateX(0) scale(1); }
+        .step-panel.step-exit-forward { opacity: 0; transform: translateX(-24px) scale(0.96); }
+        .step-panel.step-exit-back { opacity: 0; transform: translateX(24px) scale(0.96); }
+        .step-panel.step-enter-forward { opacity: 0; transform: translateX(24px) scale(0.96); }
+        .step-panel.step-enter-back { opacity: 0; transform: translateX(-24px) scale(0.96); }
         .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; vertical-align: middle; font-size: 18px; }
         .error-text { display: none; }
         .tab-btn { transition: all .15s ease; }
@@ -104,7 +106,7 @@
 
 <!-- STEP: method (email vs username) -->
 <div class="step-panel hidden flex-col gap-3" id="step-method">
-<button class="flex items-center gap-1 text-primary/60 text-sm mb-1" onclick="goToStep('start')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
+<button class="flex items-center gap-1 text-primary/60 text-sm mb-1" onclick="goToStep('start', 'back')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
 <div class="text-center mb-2">
 <h2 class="text-lg font-bold text-white">كيف بدك تسجّل دخول؟</h2>
 </div>
@@ -114,7 +116,7 @@
 
 <!-- STEP: quick (username/email + password, no OTP) -->
 <div class="step-panel hidden flex-col" id="step-quick">
-<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep(quickBackTarget)" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
+<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep(quickBackTarget, 'back')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
 <div class="text-center mb-4">
 <h2 class="text-lg font-bold text-white">دخول سريع بكلمة السر</h2>
 <p class="text-xs text-primary/70 mt-2">ادخل باسم المستخدم أو بريدك الإلكتروني وكلمة السر — بدون رمز تحقق</p>
@@ -140,7 +142,7 @@
 
 <!-- STEP: email (company search + email) -->
 <div class="step-panel hidden flex-col" id="step-email">
-<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep('method')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
+<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep('method', 'back')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
 <div class="text-center mb-4">
 <h2 class="text-lg font-bold text-white">ابحث عن شركتك</h2>
 <p class="text-xs text-primary/70 mt-2">اكتب اسم الشركة يلي عندك حساب فيها</p>
@@ -170,7 +172,7 @@
 
 <!-- STEP: new company -->
 <div class="step-panel hidden flex-col" id="step-new">
-<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep('start')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
+<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep('start', 'back')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
 <div class="text-center mb-4">
 <h2 class="text-lg font-bold text-white">سجّل شركتك</h2>
 <p class="text-xs text-primary/70 mt-2">أنشئ حساباً جديداً وستصبح مالك الشركة تلقائياً</p>
@@ -219,26 +221,29 @@ let selectedCompany = null; // { id, name }
 let currentStep = 'start';
 let quickBackTarget = 'method'; // "دخول سريع" can be reached from step-start OR step-method
 
-const STEP_TRANSITION_MS = 200;
+const STEP_TRANSITION_MS = 260;
 
-function goToStep(stepId) {
+function goToStep(stepId, direction) {
     if (stepId === currentStep) return;
+    direction = direction || 'forward'; // 'forward' or 'back'
     const outgoing = document.getElementById('step-' + currentStep);
     const incoming = document.getElementById('step-' + stepId);
+    const exitClass = 'step-exit-' + direction;
+    const enterClass = 'step-enter-' + direction;
 
     if (stepId === 'quick') quickBackTarget = currentStep === 'start' ? 'start' : 'method';
 
-    outgoing.classList.add('step-exit');
+    outgoing.classList.add(exitClass);
     setTimeout(() => {
         outgoing.classList.add('hidden');
-        outgoing.classList.remove('flex', 'step-exit');
+        outgoing.classList.remove('flex', exitClass);
 
         incoming.classList.remove('hidden');
-        incoming.classList.add('flex', 'step-enter');
+        incoming.classList.add('flex', enterClass);
         // Force a reflow so the browser registers the "enter" starting
         // state before we remove it -- otherwise the transition doesn't play.
         void incoming.offsetWidth;
-        incoming.classList.remove('step-enter');
+        incoming.classList.remove(enterClass);
 
         currentStep = stepId;
     }, STEP_TRANSITION_MS);
