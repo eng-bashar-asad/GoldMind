@@ -50,6 +50,9 @@
         .gold-border-focus:focus-within { border-color: var(--royal-gold); box-shadow: 0 0 0 1px var(--royal-gold); }
         .gold-gradient { background: linear-gradient(135deg, #FFD700 0%, #B4955A 100%); }
         .glass-panel { background: rgba(30, 51, 59, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 215, 0, 0.1); }
+        .step-panel { transition: opacity 200ms ease, transform 200ms ease; opacity: 1; transform: scale(1); }
+        .step-panel.step-exit { opacity: 0; transform: scale(0.94); }
+        .step-panel.step-enter { opacity: 0; transform: scale(0.94); }
         .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24; vertical-align: middle; font-size: 18px; }
         .error-text { display: none; }
         .tab-btn { transition: all .15s ease; }
@@ -84,19 +87,34 @@
 <p class="text-xl text-primary/80 opacity-90 mt-2">مرحباً بك في جولد مايند</p>
 </div>
 
-<div class="glass-panel w-full p-6 rounded-xl shadow-2xl space-y-6">
+<div class="glass-panel w-full p-6 rounded-xl shadow-2xl space-y-6 overflow-hidden" id="wizardCard">
 
-<!-- Mode tabs -->
 <div class="hidden bg-amber-500/10 border border-amber-400/30 text-amber-200 text-xs rounded-lg px-4 py-3 mb-4 text-center" id="idleNotice">تم تسجيل خروجك تلقائياً بسبب عدم النشاط لأكثر من ساعتين. فضلاً سجّل الدخول مرة أخرى.</div>
 
-<div class="flex bg-black/20 rounded-lg p-1 gap-1">
-<button class="tab-btn active flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabJoin" type="button" onclick="setMode('join')">الدخول لشركتي</button>
-<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabNew" type="button" onclick="setMode('new')">تسجيل شركة جديدة</button>
-<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabQuick" type="button" onclick="setMode('quick')">دخول سريع</button>
+<!-- STEP: start -->
+<div class="step-panel flex flex-col gap-3" id="step-start">
+<div class="text-center mb-2">
+<h2 class="text-lg font-bold text-white">أهلاً فيك</h2>
+<p class="text-xs text-primary/70 mt-2">اختر كيف بدك تدخل</p>
+</div>
+<button class="w-full gold-gradient text-on-primary font-bold py-5 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" onclick="goToStep('method')" type="button">الدخول إلى شركتي</button>
+<button class="w-full border border-primary/30 text-white font-bold py-5 rounded-lg hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" onclick="goToStep('new')" type="button">تسجيل شركة جديدة</button>
+<button class="text-primary/50 text-xs underline mt-2" onclick="goToStep('quick')" type="button">دخول سريع بكلمة سر (بدون رمز تحقق)</button>
 </div>
 
-<!-- QUICK LOGIN mode (username/email + password, no OTP) -->
-<div class="hidden" id="quickPanel">
+<!-- STEP: method (email vs username) -->
+<div class="step-panel hidden flex-col gap-3" id="step-method">
+<button class="flex items-center gap-1 text-primary/60 text-sm mb-1" onclick="goToStep('start')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
+<div class="text-center mb-2">
+<h2 class="text-lg font-bold text-white">كيف بدك تسجّل دخول؟</h2>
+</div>
+<button class="w-full gold-gradient text-on-primary font-bold py-5 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" onclick="goToStep('email')" type="button">الدخول عن طريق البريد</button>
+<button class="w-full border border-primary/30 text-white font-bold py-5 rounded-lg hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" onclick="goToStep('quick')" type="button">الدخول باسم المستخدم</button>
+</div>
+
+<!-- STEP: quick (username/email + password, no OTP) -->
+<div class="step-panel hidden flex-col" id="step-quick">
+<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep(quickBackTarget)" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
 <div class="text-center mb-4">
 <h2 class="text-lg font-bold text-white">دخول سريع بكلمة السر</h2>
 <p class="text-xs text-primary/70 mt-2">ادخل باسم المستخدم أو بريدك الإلكتروني وكلمة السر — بدون رمز تحقق</p>
@@ -120,8 +138,9 @@
 </form>
 </div>
 
-<!-- JOIN mode -->
-<div id="joinPanel">
+<!-- STEP: email (company search + email) -->
+<div class="step-panel hidden flex-col" id="step-email">
+<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep('method')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
 <div class="text-center mb-4">
 <h2 class="text-lg font-bold text-white">ابحث عن شركتك</h2>
 <p class="text-xs text-primary/70 mt-2">اكتب اسم الشركة يلي عندك حساب فيها</p>
@@ -149,8 +168,9 @@
 </form>
 </div>
 
-<!-- NEW COMPANY mode -->
-<div class="hidden" id="newPanel">
+<!-- STEP: new company -->
+<div class="step-panel hidden flex-col" id="step-new">
+<button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep('start')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
 <div class="text-center mb-4">
 <h2 class="text-lg font-bold text-white">سجّل شركتك</h2>
 <p class="text-xs text-primary/70 mt-2">أنشئ حساباً جديداً وستصبح مالك الشركة تلقائياً</p>
@@ -192,26 +212,49 @@
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 let selectedCompany = null; // { id, name }
 
-function setMode(mode) {
-    document.getElementById('tabJoin').classList.toggle('active', mode === 'join');
-    document.getElementById('tabNew').classList.toggle('active', mode === 'new');
-    document.getElementById('tabQuick').classList.toggle('active', mode === 'quick');
-    document.getElementById('joinPanel').classList.toggle('hidden', mode !== 'join');
-    document.getElementById('newPanel').classList.toggle('hidden', mode !== 'new');
-    document.getElementById('quickPanel').classList.toggle('hidden', mode !== 'quick');
+// Each "step" is a full panel; goToStep animates the current one closing
+// (scale+fade out) then the target one opening (scale+fade in) -- pure
+// CSS/JS, works identically in a browser tab or inside the installed app,
+// no native features involved.
+let currentStep = 'start';
+let quickBackTarget = 'method'; // "دخول سريع" can be reached from step-start OR step-method
+
+const STEP_TRANSITION_MS = 200;
+
+function goToStep(stepId) {
+    if (stepId === currentStep) return;
+    const outgoing = document.getElementById('step-' + currentStep);
+    const incoming = document.getElementById('step-' + stepId);
+
+    if (stepId === 'quick') quickBackTarget = currentStep === 'start' ? 'start' : 'method';
+
+    outgoing.classList.add('step-exit');
+    setTimeout(() => {
+        outgoing.classList.add('hidden');
+        outgoing.classList.remove('flex', 'step-exit');
+
+        incoming.classList.remove('hidden');
+        incoming.classList.add('flex', 'step-enter');
+        // Force a reflow so the browser registers the "enter" starting
+        // state before we remove it -- otherwise the transition doesn't play.
+        void incoming.offsetWidth;
+        incoming.classList.remove('step-enter');
+
+        currentStep = stepId;
+    }, STEP_TRANSITION_MS);
 }
 
 // Lets a direct link (e.g. the WhatsApp message a manager sends a newly
-// added employee) open straight into the quick-login tab instead of the
-// default "join my company" search tab, and optionally pre-fill the email.
+// added employee) open straight into the quick-login step instead of the
+// default start screen, and optionally pre-fill the email.
 (function () {
     const params = new URLSearchParams(window.location.search);
-    if (params.get('mode') === 'quick') setMode('quick');
-    if (params.get('mode') === 'new') setMode('new');
+    if (params.get('mode') === 'quick') goToStep('quick');
+    if (params.get('mode') === 'new') goToStep('new');
     const prefillEmail = params.get('email');
     if (prefillEmail) document.getElementById('quickIdentifier').value = prefillEmail;
     if (params.get('idle') === '1') {
-        setMode('quick');
+        goToStep('quick');
         document.getElementById('idleNotice').classList.remove('hidden');
     }
 })();
