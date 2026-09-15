@@ -46,6 +46,14 @@ jobs:
 
       - name: Set up Android SDK
         uses: android-actions/setup-android@v3
+        with:
+          # Google removed the legacy 'tools' SDK package from the
+          # repository (2026-09-14) -- the action's own default packages
+          # input is still 'tools platform-tools', which now fails
+          # immediately. platform-tools (adb) is the only extra this build
+          # actually needs; build-tools/platforms are installed by the
+          # explicit "Install Android Build Tools" step below.
+          packages: 'platform-tools'
 
       - name: Set up Node
         uses: actions/setup-node@v4
