@@ -189,6 +189,11 @@
 <input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="zebra-label-x-offset" step="0.5" type="number" placeholder="0"/>
 <p class="text-[10px] text-on-surface-variant mt-1">تزيح كل محتوى الملصق يمين/يسار مع بعضه. رقم سالب = يسار، رقم موجب = يمين. جرّب قيمة وشوف اتجاهها بالطباعة الفعلية، خصوصاً لو الملصق عندك مقلوب.</p>
 </div>
+<div class="relative mt-3">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="zebra-barcode-height">ارتفاع خطوط الباركود (ملم)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="zebra-barcode-height" step="0.5" type="number" placeholder="5"/>
+<p class="text-[10px] text-on-surface-variant mt-1">طول خطوط الباركود نفسها (مش النص). لو طالعة طويلة كتير وآكلة مساحة باقي البيانات، صغّر الرقم.</p>
+</div>
 </div>
 </div>
 
@@ -740,6 +745,7 @@
         document.getElementById('zebra-label-height').value = data.zebra_label_height_mm != null ? data.zebra_label_height_mm : 25;
         document.getElementById('zebra-label-dpi').value = data.zebra_label_dpi != null ? data.zebra_label_dpi : 203;
         document.getElementById('zebra-label-x-offset').value = data.zebra_label_x_offset_mm != null ? data.zebra_label_x_offset_mm : 0;
+        document.getElementById('zebra-barcode-height').value = data.zebra_barcode_height_mm != null ? data.zebra_barcode_height_mm : 5;
         document.getElementById('store-email').value = data.email || '';
         document.getElementById('store-instagram').value = data.social_instagram || '';
         document.getElementById('store-tiktok').value = data.social_tiktok || '';
@@ -789,6 +795,7 @@
         const zebraLabelHeight = parseFloat(document.getElementById('zebra-label-height').value);
         const zebraLabelDpi = parseInt(document.getElementById('zebra-label-dpi').value, 10);
         const zebraLabelXOffset = parseFloat(document.getElementById('zebra-label-x-offset').value);
+        const zebraBarcodeHeight = parseFloat(document.getElementById('zebra-barcode-height').value);
         const email = document.getElementById('store-email').value.trim();
         const instagram = document.getElementById('store-instagram').value.trim();
         const tiktok = document.getElementById('store-tiktok').value.trim();
@@ -833,6 +840,7 @@
                 zebra_label_height_mm: isNaN(zebraLabelHeight) ? 25 : zebraLabelHeight,
                 zebra_label_dpi: isNaN(zebraLabelDpi) ? 203 : zebraLabelDpi,
                 zebra_label_x_offset_mm: isNaN(zebraLabelXOffset) ? 0 : zebraLabelXOffset,
+                zebra_barcode_height_mm: isNaN(zebraBarcodeHeight) ? 5 : zebraBarcodeHeight,
                 logo_url: logo || null,
                 email: email || null,
                 social_instagram: instagram || null,
