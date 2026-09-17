@@ -90,7 +90,7 @@
 
         const [{ data: piece, error: pieceError }, { data: store }] = await Promise.all([
             goldmindClient.from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
-            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi').eq('id', GOLDMIND_STORE_ID).maybeSingle()
         ]);
 
         loading.classList.add('hidden');
@@ -166,11 +166,17 @@
             const rawFab = currentPiece.cost_fabrication_per_gram;
             const mcText = rawFab != null ? (Number(rawFab) * mcMultiplier + mcAddend).toFixed(2) : '—';
 
+            const dpi = (currentStore && currentStore.zebra_label_dpi) || 203;
+            const widthDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_width_mm) || 50, dpi);
+            const heightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_height_mm) || 25, dpi);
+
             await GMZebra.printBarcodeLabel({
                 storeName: (currentStore && currentStore.name) || 'GoldMind',
                 line1: currentPiece.description_en || currentPiece.description_ar || currentPiece.piece_type || '',
                 line2: 'W:' + Number(currentPiece.weight_grams || 0).toFixed(2) + '  K' + (currentPiece.karat || '') + '  MC:' + mcText,
-                barcode: barcodeValue
+                barcode: barcodeValue,
+                widthDots: widthDots,
+                heightDots: heightDots
             });
 
             showRfidStatus('تم إرسال الملصقة لطابعة Zebra.', false);
@@ -200,12 +206,18 @@
             const epcSource = GMZebra.buildEpcSource(barcodeValue, GOLDMIND_STORE_ID.slice(0, 8));
             const epcHex = GMZebra.asciiToHex(epcSource);
 
+            const dpi = (currentStore && currentStore.zebra_label_dpi) || 203;
+            const widthDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_width_mm) || 50, dpi);
+            const heightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_height_mm) || 25, dpi);
+
             await GMZebra.printAndEncodeRfid({
                 storeName: (currentStore && currentStore.name) || 'GoldMind',
                 line1: currentPiece.description_en || currentPiece.description_ar || currentPiece.piece_type || '',
                 line2: (currentPiece.weight_grams || 0) + 'g  ' + (currentPiece.karat || '') + 'K',
                 barcode: barcodeValue,
-                epcHex: epcHex
+                epcHex: epcHex,
+                widthDots: widthDots,
+                heightDots: heightDots
             });
 
             const { error: updateError } = await goldmindClient.from('pieces').update({
