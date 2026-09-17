@@ -15,8 +15,14 @@
 // doesn't publish it on an official CDN (only as a manual download from
 // their developer portal), but the same file is mirrored on jsDelivr as
 // the npm package "zebra-browser-print-min". Every page that calls
-// GMZebra.isAvailable()/print*() must load it BEFORE this file:
-//   <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/"></script>
+// GMZebra.isAvailable()/print*() must load it BEFORE this file -- and
+// MUST reference the exact minified filename, not just the package
+// directory: jsDelivr serves an HTML landing page (not the JS) for a
+// bare "…/zebra-browser-print-min@3.0.216/" URL with no filename, which
+// a <script> tag then silently fails to execute as JS. This bit
+// GoldMind once already -- confirm any URL change actually returns
+// Content-Type: application/javascript (curl -I) before relying on it.
+//   <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
 //   <script src="zebra-rfid.js"></script>
 // Skipping that script tag is exactly why isAvailable() will always
 // return false and printing will always show the "not installed" error,
