@@ -92,7 +92,7 @@ var GMZebra = (function () {
     var w = opts.widthDots || 406;
     var h = opts.heightDots || 203;
     var scale = h / 203;
-    var y1 = Math.round(8 * scale), y2 = Math.round(32 * scale), y3 = Math.round(54 * scale), y4 = Math.round(78 * scale);
+    var y1 = Math.round(8 * scale), y2 = Math.round(38 * scale), y3 = Math.round(60 * scale), y4 = Math.round(84 * scale);
     // Bar height is its own explicit setting (mm -> dots, same as the
     // label's own width/height). Floor is just "not literally zero" --
     // an earlier floor of 20 silently overrode small intentional values
@@ -110,7 +110,7 @@ var GMZebra = (function () {
     return '^XA' + invert + darkness +
       '^PW' + w + '^LL' + h +
       '^FO' + x + ',' + y1 + '^A0N,20,20^FD' + storeName + '^FS' +
-      '^FO' + x + ',' + y2 + '^A0N,18,18^FD' + line1 + '^FS' +
+      '^FO' + x + ',' + y2 + '^A0N,22,22^FD' + line1 + '^FS' +
       '^FO' + x + ',' + y3 + '^A0N,16,16^FD' + line2 + '^FS' +
       '^FO' + x + ',' + y4 + '^BY2' +
       '^BCN,' + barHeight + ',Y,N,N' +
