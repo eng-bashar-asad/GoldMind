@@ -93,9 +93,13 @@ var GMZebra = (function () {
     var h = opts.heightDots || 203;
     var scale = h / 203;
     var y1 = Math.round(8 * scale), y2 = Math.round(32 * scale), y3 = Math.round(54 * scale), y4 = Math.round(78 * scale);
-    var barHeight = Math.max(30, Math.round(60 * scale));
-    // Shifts every field left/right together. Positive = right, negative =
-    // left. Clamped so content can't be pushed off either edge of the label.
+    // Bar height used to be a fixed fraction of the label height (60 dots
+    // at 203dpi/1in) -- too tall for small labels, crowding out the text
+    // fields and the auto interpretation line Zebra prints below the
+    // bars. Now it's its own explicit setting (mm -> dots, same as the
+    // label's own width/height) so it can be tuned per store/label stock
+    // instead of guessed at.
+    var barHeight = Math.max(20, opts.barHeightDots || Math.round(40 * scale));
     var x = Math.max(0, Math.min(w - 10, 10 + (opts.xOffsetDots || 0)));
     return '^XA' +
       '^PW' + w + '^LL' + h +
