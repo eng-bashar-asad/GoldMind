@@ -94,12 +94,15 @@ var GMZebra = (function () {
     var scale = h / 203;
     var y1 = Math.round(8 * scale), y2 = Math.round(32 * scale), y3 = Math.round(54 * scale), y4 = Math.round(78 * scale);
     var barHeight = Math.max(30, Math.round(60 * scale));
+    // Shifts every field left/right together. Positive = right, negative =
+    // left. Clamped so content can't be pushed off either edge of the label.
+    var x = Math.max(0, Math.min(w - 10, 10 + (opts.xOffsetDots || 0)));
     return '^XA' +
       '^PW' + w + '^LL' + h +
-      '^FO10,' + y1 + '^A0N,20,20^FD' + storeName + '^FS' +
-      '^FO10,' + y2 + '^A0N,18,18^FD' + line1 + '^FS' +
-      '^FO10,' + y3 + '^A0N,16,16^FD' + line2 + '^FS' +
-      '^FO10,' + y4 + '^BY2' +
+      '^FO' + x + ',' + y1 + '^A0N,20,20^FD' + storeName + '^FS' +
+      '^FO' + x + ',' + y2 + '^A0N,18,18^FD' + line1 + '^FS' +
+      '^FO' + x + ',' + y3 + '^A0N,16,16^FD' + line2 + '^FS' +
+      '^FO' + x + ',' + y4 + '^BY2' +
       '^BCN,' + barHeight + ',Y,N,N' +
       '^FD' + barcode + '^FS' +
       '^XZ';
