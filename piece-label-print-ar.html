@@ -44,6 +44,9 @@
 <button id="reset-orientation-btn" class="flex items-center gap-2 bg-gray-500 text-white px-3 py-2 rounded-lg text-xs font-semibold" title="لو دوران الطابعة عم يطلع غير مستجيب لأي إعداد، جرّب هاد مرة وحدة">
 <span class="material-symbols-outlined text-[16px]">restart_alt</span> إعادة ضبط دوران الطابعة
 </button>
+<a href="zebra-label-designer-ar.html" class="flex items-center gap-2 border border-gray-400 text-gray-700 px-3 py-2 rounded-lg text-xs font-semibold">
+<span class="material-symbols-outlined text-[16px]">design_services</span> تعديل تصميم الملصق
+</a>
 </div>
 </div>
 
@@ -77,6 +80,7 @@
 
     let currentPiece = null;
     let currentStore = null;
+    let labelFields = [];
 
     async function loadLabel() {
         const session = await requireGoldMindSession('login-entry-ar.html');
@@ -94,10 +98,12 @@
             return;
         }
 
-        const [{ data: piece, error: pieceError }, { data: store }] = await Promise.all([
+        const [{ data: piece, error: pieceError }, { data: store }, { data: fields }] = await Promise.all([
             goldmindClient.from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
-            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('zebra_label_fields').select('*').eq('store_id', GOLDMIND_STORE_ID).order('column_num').order('row_order')
         ]);
+        labelFields = fields || [];
 
         loading.classList.add('hidden');
 
@@ -152,6 +158,27 @@
         box.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
     }
 
+    // Resolves the data each configurable field (see zebra-label-designer-ar.html)
+    // can reference. Shared by both print paths below.
+    function buildZebraValues() {
+        const mcMultiplier = (currentStore && currentStore.label_mc_multiplier != null) ? Number(currentStore.label_mc_multiplier) : 1;
+        const mcAddend = (currentStore && currentStore.label_mc_addend != null) ? Number(currentStore.label_mc_addend) : 0;
+        const rawFab = currentPiece.cost_fabrication_per_gram;
+        const mcText = rawFab != null ? (Number(rawFab) * mcMultiplier + mcAddend).toFixed(2) : '—';
+        return {
+            barcode: currentPiece.barcode || currentPiece.id.slice(0, 12).toUpperCase(),
+            storeName: (currentStore && currentStore.name) || 'GoldMind',
+            weight: Number(currentPiece.weight_grams || 0).toFixed(2),
+            karat: currentPiece.karat || '',
+            mc: mcText,
+            // Zebra's default font can't render Arabic -- never fall back to
+            // description_ar/piece_type here (that's exactly what caused
+            // garbled text before); the on-screen HTML label can still use
+            // Arabic fine.
+            description: currentPiece.description_en || ''
+        };
+    }
+
     document.getElementById('zebra-btn').addEventListener('click', async function () {
         if (!currentPiece) return;
         const btn = this;
@@ -166,12 +193,6 @@
         btn.innerHTML = '<span class="material-symbols-outlined">hourglass_top</span> جارِ الطباعة...';
 
         try {
-            const barcodeValue = currentPiece.barcode || currentPiece.id.slice(0, 12).toUpperCase();
-            const mcMultiplier = (currentStore && currentStore.label_mc_multiplier != null) ? Number(currentStore.label_mc_multiplier) : 1;
-            const mcAddend = (currentStore && currentStore.label_mc_addend != null) ? Number(currentStore.label_mc_addend) : 0;
-            const rawFab = currentPiece.cost_fabrication_per_gram;
-            const mcText = rawFab != null ? (Number(rawFab) * mcMultiplier + mcAddend).toFixed(2) : '—';
-
             const dpi = (currentStore && currentStore.zebra_label_dpi) || 203;
             const widthDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_width_mm) || 50, dpi);
             const heightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_height_mm) || 25, dpi);
@@ -181,10 +202,8 @@
             const darkness = (currentStore && currentStore.zebra_darkness != null) ? currentStore.zebra_darkness : 15;
 
             await GMZebra.printBarcodeLabel({
-                storeName: (currentStore && currentStore.name) || 'GoldMind',
-                line1: currentPiece.description_en || '', // Zebra's default font can't render Arabic -- never fall back to description_ar/piece_type here (that's exactly what caused garbled text before); the on-screen HTML label can still use Arabic fine.
-                line2: 'W:' + Number(currentPiece.weight_grams || 0).toFixed(2) + '  K' + (currentPiece.karat || '') + '  MC:' + mcText,
-                barcode: barcodeValue,
+                fields: labelFields,
+                values: buildZebraValues(),
                 widthDots: widthDots,
                 heightDots: heightDots,
                 xOffsetDots: xOffsetDots,
@@ -229,9 +248,8 @@
             const darkness = (currentStore && currentStore.zebra_darkness != null) ? currentStore.zebra_darkness : 15;
 
             await GMZebra.printAndEncodeRfid({
-                storeName: (currentStore && currentStore.name) || 'GoldMind',
-                line1: currentPiece.description_en || '', // Zebra's default font can't render Arabic -- never fall back to description_ar/piece_type here (that's exactly what caused garbled text before); the on-screen HTML label can still use Arabic fine.
-                line2: (currentPiece.weight_grams || 0) + 'g  ' + (currentPiece.karat || '') + 'K',
+                fields: labelFields,
+                values: buildZebraValues(),
                 barcode: barcodeValue,
                 epcHex: epcHex,
                 widthDots: widthDots,
