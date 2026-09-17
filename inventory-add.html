@@ -337,6 +337,11 @@
                     حفظ القطعة بالمخزون
                 </button>
 </div>
+<!-- Session list: pieces saved so far in this visit -->
+<section class="hidden pt-6" id="session-list-section">
+<h2 class="font-label-md text-label-md text-on-surface-variant font-semibold mb-2">القطع المضافة بهذه الجلسة (<span id="session-list-count">0</span>)</h2>
+<div class="space-y-2" id="session-list"></div>
+</section>
 </section>
 </div>
 </div>
@@ -631,6 +636,47 @@
         const saveBtn = document.getElementById('save-btn');
         const messageBox = document.getElementById('save-message');
 
+        // ---------- Session list: pieces saved so far on this page visit ----------
+        const sessionPieces = [];
+
+        function gmEscapeHtml(s) {
+            return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function addToSessionList(piece) {
+            sessionPieces.unshift(piece); // newest first
+            renderSessionList();
+        }
+
+        function renderSessionList() {
+            const section = document.getElementById('session-list-section');
+            const list = document.getElementById('session-list');
+            document.getElementById('session-list-count').textContent = sessionPieces.length;
+            if (sessionPieces.length === 0) { section.classList.add('hidden'); return; }
+            section.classList.remove('hidden');
+            list.innerHTML = sessionPieces.map((p, i) => `
+                <div class="relative border border-outline-variant rounded-lg px-3 py-2 flex items-center gap-3 text-[12px] bg-surface-container-low cursor-pointer" onclick="toggleSessionThumb(${i})">
+                    <span class="font-data-mono font-bold shrink-0" dir="ltr">${gmEscapeHtml(p.barcode)}</span>
+                    <span class="shrink-0">${Number(p.weight_grams || 0).toFixed(2)} غ</span>
+                    <span class="shrink-0">عيار ${gmEscapeHtml(p.karat)}</span>
+                    <span class="flex-1 truncate text-on-surface-variant">${gmEscapeHtml(p.description_ar || p.piece_type || '')}</span>
+                    ${p.photo_url ? `<span class="material-symbols-outlined text-outline text-[16px] shrink-0">photo_camera</span>` : ''}
+                    ${p.photo_url ? `
+                    <div class="hidden absolute z-20 top-full mt-1 left-2 shadow-lg rounded-lg overflow-hidden border border-outline-variant bg-white" id="session-thumb-${i}">
+                        <img src="${p.photo_url}" class="w-28 h-28 object-cover"/>
+                    </div>` : ''}
+                </div>
+            `).join('');
+        }
+
+        function toggleSessionThumb(i) {
+            const el = document.getElementById('session-thumb-' + i);
+            if (!el) return;
+            const wasHidden = el.classList.contains('hidden');
+            document.querySelectorAll('[id^="session-thumb-"]').forEach(e => e.classList.add('hidden'));
+            if (wasHidden) el.classList.remove('hidden');
+        }
+
         function showMessage(text, isError) {
             messageBox.textContent = text;
             messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
@@ -726,6 +772,7 @@
             }
 
             showMessage('تم حفظ القطعة بنجاح! الباركود: ' + barcode, false);
+            addToSessionList(newPiece);
             document.getElementById('barcode-id').value = '';
             document.getElementById('weight').value = '';
             document.getElementById('accounting-weight').value = '';
