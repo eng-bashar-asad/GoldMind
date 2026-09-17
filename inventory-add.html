@@ -14,6 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="theme.js?v=20"></script>
+<script src="gm-camera.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
@@ -194,7 +195,7 @@
 <!-- Camera Section -->
 <section>
 <input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
-<div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200" id="photo-trigger" onclick="document.getElementById('photo-input').click()">
+<div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200" id="photo-trigger" onclick="triggerPhotoCapture()">
 <div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
 <span class="material-symbols-outlined text-outline text-5xl mb-4">photo_camera</span>
 <p class="font-label-md text-label-md text-on-surface-variant font-semibold">التقط صورة للقطعة</p>
@@ -378,8 +379,7 @@
         const photoPreview = document.getElementById('photo-preview');
         const photoRemoveBtn = document.getElementById('photo-remove-btn');
 
-        photoInput.addEventListener('change', () => {
-            const file = photoInput.files && photoInput.files[0];
+        function applyPhotoFile(file) {
             if (!file) return;
             selectedPhotoFile = file;
             const url = URL.createObjectURL(file);
@@ -388,6 +388,23 @@
             photoPlaceholder.classList.add('hidden');
             photoRemoveBtn.classList.remove('hidden');
             photoRemoveBtn.classList.add('flex');
+        }
+
+        async function triggerPhotoCapture() {
+            if (typeof GMCamera !== 'undefined' && GMCamera.isSupported()) {
+                const file = await GMCamera.capture();
+                if (file) { applyPhotoFile(file); return; }
+                // GMCamera resolves null on cancel/no-camera/permission-denied —
+                // the person may have tapped "اختيار من الملفات" inside the
+                // overlay itself, in which case falling through to the file
+                // picker here is exactly the right move either way.
+            }
+            photoInput.click();
+        }
+
+        photoInput.addEventListener('change', () => {
+            const file = photoInput.files && photoInput.files[0];
+            applyPhotoFile(file);
         });
 
         function removePhoto() {
