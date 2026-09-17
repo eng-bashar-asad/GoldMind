@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>مصمم ملصق الباركود | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+        html { font-size: 87.5%; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400;
+            font-size: 18px;
+        }</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('company-settings-ar.html')" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">مصمم ملصق الباركود</h1>
+</div>
+<span class="text-[11px] font-semibold text-on-surface-variant bg-surface-container-low px-3 py-1.5 rounded-full" id="active-store-badge"></span>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-4xl mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+
+<div id="content" class="hidden py-6 flex flex-col gap-6">
+
+<p class="text-[12px] text-on-surface-variant leading-5 -mb-2">هاي الإعدادات خاصة بشكل طباعة الباركود على طابعة Zebra بس (كل شركة عندها إعداداتها الخاصة) — منفصلة عن باقي إعدادات الشركة. جرّب الطباعة الفعلية من صفحة ملصق أي قطعة بعد أي تعديل هون.</p>
+
+<!-- Dimensions -->
+<div class="border border-outline-variant rounded-xl p-4 bg-surface-container-lowest">
+<h2 class="font-label-md text-label-md text-secondary font-bold mb-3">أبعاد الملصق</h2>
+<div class="grid grid-cols-3 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dim-width">العرض (ملم)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="dim-width" step="0.5" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dim-height">الطول (ملم)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="dim-height" step="0.5" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dim-dpi">دقة الطابعة</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none bg-surface-container-lowest" id="dim-dpi">
+<option value="203">203 dpi</option>
+<option value="300">300 dpi</option>
+</select>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3 mt-3">
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dim-xoffset">إزاحة أفقية (ملم)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="dim-xoffset" step="0.5" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dim-barheight">ارتفاع خطوط الباركود (ملم)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="dim-barheight" step="0.5" type="number"/>
+</div>
+</div>
+<label class="flex items-center gap-2 mt-3 cursor-pointer">
+<input class="w-4 h-4" id="dim-rotate180" type="checkbox"/>
+<span class="text-[12px] text-on-background">قلب الملصق ١٨٠° (كل الحقول مع بعض)</span>
+</label>
+<div class="relative mt-3">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dim-darkness">تغميق الطباعة (٠-٣٠)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="dim-darkness" max="30" min="0" step="1" type="number"/>
+</div>
+<button class="w-full h-12 mt-4 bg-secondary text-on-secondary rounded-lg font-bold text-[13px]" id="save-dims-btn">حفظ الأبعاد</button>
+<p class="hidden text-center text-[12px] font-semibold mt-2" id="dims-msg"></p>
+</div>
+
+<!-- Fields -->
+<div class="border border-outline-variant rounded-xl p-4 bg-surface-container-lowest">
+<h2 class="font-label-md text-label-md text-secondary font-bold mb-1">حقول الملصق</h2>
+<p class="text-[11px] text-on-surface-variant leading-5 mb-3">رتّب شو بينكتب على الملصق وبأي عمود. كل حقل تحت اللي قبله بنفس العمود. اضغط "+ إضافة حقل" تحت أي عمود لتضيف حقل جديد فيه.</p>
+<div class="grid grid-cols-2 gap-3">
+<div>
+<h3 class="text-center text-[12px] font-bold text-on-surface-variant mb-2">العمود الأول (يمين)</h3>
+<div class="space-y-2" id="col-1-list"></div>
+<button class="w-full mt-2 h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary" onclick="showAddForm(1)">+ إضافة حقل</button>
+<div class="hidden mt-2 border border-outline-variant rounded-lg p-2 space-y-2 bg-surface-container-low" id="add-form-1"></div>
+</div>
+<div>
+<h3 class="text-center text-[12px] font-bold text-on-surface-variant mb-2">العمود الثاني (يسار)</h3>
+<div class="space-y-2" id="col-2-list"></div>
+<button class="w-full mt-2 h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary" onclick="showAddForm(2)">+ إضافة حقل</button>
+<div class="hidden mt-2 border border-outline-variant rounded-lg p-2 space-y-2 bg-surface-container-low" id="add-form-2"></div>
+</div>
+</div>
+</div>
+
+</div>
+</main>
+<script>
+    const CONTENT_TYPE_LABELS = {
+        barcode_number: 'رقم الباركود',
+        barcode_graphic: 'خطوط الباركود',
+        company_name: 'اسم الشركة',
+        weight: 'الوزن',
+        karat: 'العيار',
+        mc: 'المصنعية (MC)',
+        description: 'نوع/وصف القطعة',
+        custom_text: 'نص مخصص'
+    };
+
+    let allFields = []; // rows from zebra_label_fields, current in-memory state
+
+    function showMsg(el, text, isError) {
+        el.textContent = text;
+        el.className = 'text-center text-[12px] font-semibold mt-2 ' + (isError ? 'text-error' : 'text-green-700');
+        el.classList.remove('hidden');
+        setTimeout(() => el.classList.add('hidden'), 2500);
+    }
+
+    function renderFields() {
+        [1, 2].forEach(colNum => {
+            const list = document.getElementById('col-' + colNum + '-list');
+            const colFields = allFields.filter(f => f.column_num === colNum).sort((a, b) => a.row_order - b.row_order);
+            list.innerHTML = colFields.map((f, i) => `
+                <div class="border border-outline-variant rounded-lg p-2 bg-surface-container-lowest">
+                    <div class="flex items-center justify-between gap-1 mb-1">
+                        <span class="text-[12px] font-semibold truncate">${CONTENT_TYPE_LABELS[f.content_type] || f.content_type}${f.content_type === 'custom_text' && f.custom_text ? ': ' + f.custom_text : ''}</span>
+                        <div class="flex items-center gap-0.5 shrink-0">
+                            <button class="w-6 h-6 flex items-center justify-center text-outline disabled:opacity-30" ${i === 0 ? 'disabled' : ''} onclick="moveField('${f.id}', -1)"><span class="material-symbols-outlined text-[16px]">keyboard_arrow_up</span></button>
+                            <button class="w-6 h-6 flex items-center justify-center text-outline disabled:opacity-30" ${i === colFields.length - 1 ? 'disabled' : ''} onclick="moveField('${f.id}', 1)"><span class="material-symbols-outlined text-[16px]">keyboard_arrow_down</span></button>
+                            <button class="w-6 h-6 flex items-center justify-center text-error" onclick="deleteField('${f.id}')"><span class="material-symbols-outlined text-[16px]">close</span></button>
+                        </div>
+                    </div>
+                    ${f.content_type !== 'barcode_graphic' ? `
+                    <label class="flex items-center gap-2 text-[10px] text-on-surface-variant">حجم الخط
+                        <input type="number" min="8" max="60" value="${f.font_size}" class="w-16 h-7 border border-outline-variant rounded px-1 text-[11px]" onchange="updateFontSize('${f.id}', this.value)"/>
+                    </label>` : ''}
+                </div>
+            `).join('') || '<p class="text-center text-[11px] text-on-surface-variant py-3">ولا حقل بعد</p>';
+        });
+    }
+
+    function showAddForm(colNum) {
+        const box = document.getElementById('add-form-' + colNum);
+        box.classList.remove('hidden');
+        box.innerHTML = `
+            <select class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[12px] bg-surface-container-lowest" id="add-type-${colNum}" onchange="onAddTypeChange(${colNum})">
+                ${Object.entries(CONTENT_TYPE_LABELS).map(([k, v]) => `<option value="${k}">${v}</option>`).join('')}
+            </select>
+            <input class="hidden w-full h-10 border border-outline-variant rounded-lg px-2 text-[12px]" id="add-customtext-${colNum}" placeholder="اكتب النص هون"/>
+            <div class="flex items-center gap-2">
+                <label class="text-[10px] text-on-surface-variant shrink-0">حجم الخط</label>
+                <input type="number" min="8" max="60" value="20" class="flex-1 h-9 border border-outline-variant rounded px-2 text-[11px]" id="add-fontsize-${colNum}"/>
+            </div>
+            <div class="flex gap-2">
+                <button class="flex-1 h-9 bg-secondary text-on-secondary rounded-lg text-[12px] font-semibold" onclick="confirmAddField(${colNum})">إضافة</button>
+                <button class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px]" onclick="document.getElementById('add-form-${colNum}').classList.add('hidden')">إلغاء</button>
+            </div>
+        `;
+    }
+
+    function onAddTypeChange(colNum) {
+        const type = document.getElementById('add-type-' + colNum).value;
+        document.getElementById('add-customtext-' + colNum).classList.toggle('hidden', type !== 'custom_text');
+    }
+
+    async function confirmAddField(colNum) {
+        const type = document.getElementById('add-type-' + colNum).value;
+        const customText = document.getElementById('add-customtext-' + colNum).value.trim();
+        const fontSize = parseInt(document.getElementById('add-fontsize-' + colNum).value, 10) || 20;
+        if (type === 'custom_text' && !customText) { alert('اكتب النص أول.'); return; }
+
+        const colFields = allFields.filter(f => f.column_num === colNum);
+        const nextOrder = colFields.length ? Math.max(...colFields.map(f => f.row_order)) + 1 : 1;
+
+        const { data, error } = await goldmindClient.from('zebra_label_fields').insert({
+            store_id: GOLDMIND_STORE_ID,
+            column_num: colNum,
+            row_order: nextOrder,
+            content_type: type,
+            custom_text: type === 'custom_text' ? customText : null,
+            font_size: fontSize
+        }).select().single();
+
+        if (error) { alert('تعذّرت الإضافة: ' + error.message); return; }
+        allFields.push(data);
+        document.getElementById('add-form-' + colNum).classList.add('hidden');
+        renderFields();
+    }
+
+    async function deleteField(id) {
+        const { error } = await goldmindClient.from('zebra_label_fields').delete().eq('id', id);
+        if (error) { alert('تعذّر الحذف: ' + error.message); return; }
+        allFields = allFields.filter(f => f.id !== id);
+        renderFields();
+    }
+
+    async function updateFontSize(id, value) {
+        const size = parseInt(value, 10) || 20;
+        const { error } = await goldmindClient.from('zebra_label_fields').update({ font_size: size }).eq('id', id);
+        if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+        const f = allFields.find(x => x.id === id);
+        if (f) f.font_size = size;
+    }
+
+    async function moveField(id, direction) {
+        const field = allFields.find(f => f.id === id);
+        if (!field) return;
+        const colFields = allFields.filter(f => f.column_num === field.column_num).sort((a, b) => a.row_order - b.row_order);
+        const idx = colFields.findIndex(f => f.id === id);
+        const swapIdx = idx + direction;
+        if (swapIdx < 0 || swapIdx >= colFields.length) return;
+        const other = colFields[swapIdx];
+
+        const a = field.row_order, b = other.row_order;
+        const { error: e1 } = await goldmindClient.from('zebra_label_fields').update({ row_order: b }).eq('id', field.id);
+        const { error: e2 } = await goldmindClient.from('zebra_label_fields').update({ row_order: a }).eq('id', other.id);
+        if (e1 || e2) { alert('تعذّر الترتيب.'); return; }
+        field.row_order = b;
+        other.row_order = a;
+        renderFields();
+    }
+
+    document.getElementById('save-dims-btn').addEventListener('click', async () => {
+        const payload = {
+            zebra_label_width_mm: parseFloat(document.getElementById('dim-width').value) || 50,
+            zebra_label_height_mm: parseFloat(document.getElementById('dim-height').value) || 25,
+            zebra_label_dpi: parseInt(document.getElementById('dim-dpi').value, 10) || 203,
+            zebra_label_x_offset_mm: parseFloat(document.getElementById('dim-xoffset').value) || 0,
+            zebra_barcode_height_mm: parseFloat(document.getElementById('dim-barheight').value) || 5,
+            zebra_label_rotate_180: document.getElementById('dim-rotate180').checked,
+            zebra_darkness: Math.max(0, Math.min(30, parseInt(document.getElementById('dim-darkness').value, 10) || 15))
+        };
+        const { error } = await goldmindClient.from('stores').update(payload).eq('id', GOLDMIND_STORE_ID);
+        const msgEl = document.getElementById('dims-msg');
+        if (error) showMsg(msgEl, 'تعذّر الحفظ: ' + error.message, true);
+        else showMsg(msgEl, 'تم الحفظ ✓', false);
+    });
+
+    (async function init() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+
+        const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+        const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions.edit_settings === true));
+        if (!allowed) { alert('ليس لديك صلاحية الدخول لهذه الصفحة.'); window.location.href = 'index-ar.html'; return; }
+
+        const [{ data: store, error: storeErr }, { data: fields, error: fieldsErr }] = await Promise.all([
+            goldmindClient.from('stores').select('name, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('zebra_label_fields').select('*').eq('store_id', GOLDMIND_STORE_ID).order('column_num').order('row_order')
+        ]);
+
+        if (storeErr || fieldsErr) {
+            document.getElementById('loading-state').textContent = 'خطأ بالتحميل: ' + ((storeErr || fieldsErr).message);
+            return;
+        }
+
+        document.getElementById('active-store-badge').textContent = (store && store.name) || '';
+        document.getElementById('dim-width').value = store.zebra_label_width_mm != null ? store.zebra_label_width_mm : 50;
+        document.getElementById('dim-height').value = store.zebra_label_height_mm != null ? store.zebra_label_height_mm : 25;
+        document.getElementById('dim-dpi').value = store.zebra_label_dpi != null ? store.zebra_label_dpi : 203;
+        document.getElementById('dim-xoffset').value = store.zebra_label_x_offset_mm != null ? store.zebra_label_x_offset_mm : 0;
+        document.getElementById('dim-barheight').value = store.zebra_barcode_height_mm != null ? store.zebra_barcode_height_mm : 5;
+        document.getElementById('dim-rotate180').checked = store.zebra_label_rotate_180 === true;
+        document.getElementById('dim-darkness').value = store.zebra_darkness != null ? store.zebra_darkness : 15;
+
+        allFields = fields || [];
+        renderFields();
+
+        document.getElementById('loading-state').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+    })();
+</script>
+</body></html>
