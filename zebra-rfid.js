@@ -56,22 +56,38 @@ var GMZebra = (function () {
 
   // ---- ZPL builders --------------------------------------------------
   // Barcode-only label (no RFID programming) — used when rfid_enabled is
-  // off for the store, or as a plain reprint.
+  // off for the store, or as a plain reprint. widthDots/heightDots (Zebra
+  // dot units = mm * dpi / 25.4) are optional -- callers resolve them
+  // from the store's configured label size; the original hardcoded
+  // 406x203 (roughly 50mm x 25mm at 203dpi) is the fallback so existing
+  // callers that don't pass them keep working unchanged. Content
+  // vertical positions scale proportionally to the configured height so
+  // other label sizes don't get cut off or float in empty space.
   function buildBarcodeZPL(opts) {
     opts = opts || {};
     var storeName = escapeZpl(opts.storeName || 'GoldMind');
     var line1 = escapeZpl(opts.line1 || '');
     var line2 = escapeZpl(opts.line2 || '');
     var barcode = escapeZpl(opts.barcode || '');
+    var w = opts.widthDots || 406;
+    var h = opts.heightDots || 203;
+    var scale = h / 203;
+    var y1 = Math.round(8 * scale), y2 = Math.round(32 * scale), y3 = Math.round(54 * scale), y4 = Math.round(78 * scale);
+    var barHeight = Math.max(30, Math.round(60 * scale));
     return '^XA' +
-      '^PW406^LL203' +
-      '^FO10,8^A0N,20,20^FD' + storeName + '^FS' +
-      '^FO10,32^A0N,18,18^FD' + line1 + '^FS' +
-      '^FO10,54^A0N,16,16^FD' + line2 + '^FS' +
-      '^FO10,78^BY2' +
-      '^BCN,60,Y,N,N' +
+      '^PW' + w + '^LL' + h +
+      '^FO10,' + y1 + '^A0N,20,20^FD' + storeName + '^FS' +
+      '^FO10,' + y2 + '^A0N,18,18^FD' + line1 + '^FS' +
+      '^FO10,' + y3 + '^A0N,16,16^FD' + line2 + '^FS' +
+      '^FO10,' + y4 + '^BY2' +
+      '^BCN,' + barHeight + ',Y,N,N' +
       '^FD' + barcode + '^FS' +
       '^XZ';
+  }
+
+  // mm (and DPI) -> Zebra dots. 1 inch = 25.4mm.
+  function mmToDots(mm, dpi) {
+    return Math.round((mm || 0) * (dpi || 203) / 25.4);
   }
 
   // Barcode label + RFID tag programming in the same pass.
@@ -141,6 +157,7 @@ var GMZebra = (function () {
     buildEpcSource: buildEpcSource,
     buildBarcodeZPL: buildBarcodeZPL,
     buildRfidEncodeZPL: buildRfidEncodeZPL,
+    mmToDots: mmToDots,
     isAvailable: isAvailable,
     getDefaultPrinter: getDefaultPrinter,
     sendZpl: sendZpl,
