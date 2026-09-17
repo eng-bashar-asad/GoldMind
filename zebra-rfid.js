@@ -106,7 +106,8 @@ var GMZebra = (function () {
     // barcode's symmetric-looking bars correctly but garbles the text,
     // since the driver has no idea those glyphs need to flip too).
     var invert = opts.rotate180 ? '^POI' : '';
-    return '^XA' + invert +
+    var darkness = opts.darkness != null ? '^MD' + opts.darkness : '';
+    return '^XA' + invert + darkness +
       '^PW' + w + '^LL' + h +
       '^FO' + x + ',' + y1 + '^A0N,20,20^FD' + storeName + '^FS' +
       '^FO' + x + ',' + y2 + '^A0N,18,18^FD' + line1 + '^FS' +
