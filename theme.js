@@ -802,11 +802,23 @@ goldmindLoadSavedFont();
 (function () {
   try {
     var STACK_KEY = 'gm_nav_stack';
+    var AUTH_PAGES = ['login-entry-ar.html', 'login-ar-4.html', 'auth-callback-ar.html', 'admin-login-ar.html', 'landing-ar.html'];
     var stack = JSON.parse(sessionStorage.getItem(STACK_KEY) || '[]');
     var here = location.pathname + location.search;
+    var pageName = location.pathname.split('/').pop();
     var wasBack = sessionStorage.getItem('gm_nav_going_back') === '1';
     sessionStorage.removeItem('gm_nav_going_back');
-    if (!wasBack && stack[stack.length - 1] !== here) {
+    // Auth pages themselves never get pushed (there's nothing to "go back
+    // to" there), and any that are ALREADY sitting in an existing stack
+    // from before this fix get swept out here too -- otherwise repeated
+    // gmSmartBack() presses could still walk down to one of them and load
+    // it while the person is fully signed in, which some of those pages
+    // treat as an error state and sign out of.
+    stack = stack.filter(function (entry) {
+      var name = entry.split('?')[0].split('/').pop();
+      return AUTH_PAGES.indexOf(name) === -1;
+    });
+    if (AUTH_PAGES.indexOf(pageName) === -1 && !wasBack && stack[stack.length - 1] !== here) {
       stack.push(here);
     }
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack.slice(-30)));
@@ -930,4 +942,83 @@ function gmSmartBack(fallbackHref) {
     }
   `;
   document.head.appendChild(style);
+})();
+
+// Thirteenth shape: a persistent right-edge nav rail, injected site-wide,
+// so jumping between sections never requires walking back through
+// gmSmartBack() one page at a time. Collapsed to an icon-only strip by
+// default; hovering it (desktop/mouse only -- see the guard below) slides
+// it open to show full labels, closing again on mouseleave. Skipped on
+// auth/landing pages (nothing to navigate to yet) and on touch/narrow
+// viewports, where a fixed hover rail doesn't make sense and each page's
+// own mobile nav pattern already covers this.
+(function () {
+  var AUTH_PAGES = ['login-entry-ar.html', 'login-ar-4.html', 'auth-callback-ar.html', 'admin-login-ar.html', 'landing-ar.html'];
+  var pageName = location.pathname.split('/').pop();
+  if (AUTH_PAGES.indexOf(pageName) !== -1) return;
+  if (!window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 860px)').matches) return;
+
+  var LINKS = [
+    { href: 'index-ar.html', icon: 'dashboard', label: 'لوحة التحكم' },
+    { href: 'inventory-add.html', icon: 'add_box', label: 'إضافة قطعة' },
+    { href: 'new-sale-ar.html', icon: 'receipt_long', label: 'بيع جديد / فاتورة' },
+    { href: 'inventory-list-ar.html', icon: 'inventory_2', label: 'المخزن' },
+    { href: 'invoices-list-ar.html', icon: 'list_alt', label: 'كل الفواتير' },
+    { href: 'ledger-ar.html', icon: 'account_balance_wallet', label: 'سجل حركات التاجر' },
+    { href: 'daily-cashbox-ar.html', icon: 'point_of_sale', label: 'الصندوق اليومي' },
+    { href: 'customer-debts-ar.html', icon: 'groups', label: 'ديون العملاء' },
+    { href: 'reports-ar.html', icon: 'bar_chart', label: 'التقارير والتحليلات' },
+    { href: 'staff-permissions-ar.html', icon: 'badge', label: 'الموظفون والصلاحيات' },
+    { href: 'company-settings-ar.html', icon: 'store', label: 'إعدادات الشركة' },
+    { href: 'settings-ar.html', icon: 'settings', label: 'الإعدادات' },
+    { href: 'support-contact-ar.html', icon: 'support_agent', label: 'تواصل مع الدعم' }
+  ];
+
+  var style2 = document.createElement('style');
+  style2.textContent = `
+    #gm-rail {
+      position: fixed; top: 0; right: 0; height: 100vh; width: 52px;
+      background: rgba(20, 20, 22, 0.92); backdrop-filter: blur(6px);
+      z-index: 120; display: flex; flex-direction: column;
+      overflow: hidden; transition: width .18s ease;
+      box-shadow: -2px 0 10px rgba(0,0,0,.15);
+      direction: rtl;
+    }
+    #gm-rail:hover { width: 230px; }
+    #gm-rail .gm-rail-head {
+      height: 52px; min-height: 52px; display: flex; align-items: center;
+      padding: 0 14px; color: #FFD700; font-weight: bold; font-size: 13px;
+      white-space: nowrap; border-bottom: 1px solid rgba(255,255,255,.1);
+    }
+    #gm-rail .gm-rail-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; }
+    #gm-rail .gm-rail-link {
+      display: flex; align-items: center; gap: 14px; height: 42px;
+      padding: 0 14px; color: #e8e8ea; text-decoration: none;
+      white-space: nowrap; font-size: 13px;
+    }
+    #gm-rail .gm-rail-link:hover { background: rgba(255,255,255,.08); }
+    #gm-rail .gm-rail-link .material-symbols-outlined {
+      font-size: 20px; flex: none; color: #FFD700;
+    }
+    #gm-rail .gm-rail-foot { border-top: 1px solid rgba(255,255,255,.1); }
+    #gm-rail .gm-rail-link.gm-rail-signout .material-symbols-outlined { color: #f28b82; }
+  `;
+  document.head.appendChild(style2);
+
+  var rail = document.createElement('div');
+  rail.id = 'gm-rail';
+  var linksHtml = LINKS.map(function (l) {
+    return '<a class="gm-rail-link" href="' + l.href + '"><span class="material-symbols-outlined">' + l.icon + '</span><span>' + l.label + '</span></a>';
+  }).join('');
+  rail.innerHTML =
+    '<div class="gm-rail-head"><span class="material-symbols-outlined" style="color:#FFD700;">apps</span>&nbsp;GoldMind</div>' +
+    '<div class="gm-rail-scroll">' + linksHtml + '</div>' +
+    '<div class="gm-rail-foot"><a class="gm-rail-link gm-rail-signout" href="#" onclick="event.preventDefault(); if(typeof goldMindSignOut===\'function\') goldMindSignOut();"><span class="material-symbols-outlined">logout</span><span>تسجيل الخروج</span></a></div>';
+
+  function mount() { document.body.appendChild(rail); }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', mount);
+  } else {
+    mount();
+  }
 })();
