@@ -977,7 +977,7 @@ function gmSmartBack(fallbackHref) {
   var style2 = document.createElement('style');
   style2.textContent = `
     #gm-rail {
-      position: fixed; top: 0; right: 0; height: 100vh; width: 52px;
+      position: fixed; top: 64px; right: 0; height: calc(100vh - 64px); width: 52px;
       background: rgba(20, 20, 22, 0.92); backdrop-filter: blur(6px);
       z-index: 120; display: flex; flex-direction: column;
       overflow: hidden; transition: width .18s ease;
@@ -1022,7 +1022,14 @@ function gmSmartBack(fallbackHref) {
     '<div class="gm-rail-foot"><a class="gm-rail-link gm-rail-signout" href="#" onclick="event.preventDefault(); if(typeof goldMindSignOut===\'function\') goldMindSignOut();"><span class="material-symbols-outlined">logout</span><span class="gm-rail-label">تسجيل الخروج</span></a></div>';
 
 
-  function mount() { document.body.appendChild(rail); }
+  function mount() {
+    // Checked here (not at the top of the IIFE) because the DOM body --
+    // and any navDrawer inside it -- isn't parsed yet when this script
+    // runs; checking too early always finds nothing and this guard would
+    // never actually trigger.
+    if (document.getElementById('navDrawer')) return;
+    document.body.appendChild(rail);
+  }
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', mount);
   } else {
