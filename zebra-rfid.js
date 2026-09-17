@@ -5,9 +5,23 @@
 // Scope on purpose:
 //  - EPC <-> hex helpers (Zebra RFID commands need the EPC as raw hex)
 //  - ZPL builders for a barcode-only label and a barcode+RFID-encode label
-//  - Discovery + send via BrowserPrint (window.BrowserPrint, injected by
-//    the Zebra Browser Print SDK the user installs locally — NOT loaded
-//    from a CDN, there isn't one; the desktop agent injects it)
+//  - Discovery + send via BrowserPrint (window.BrowserPrint)
+//
+// IMPORTANT: window.BrowserPrint is NOT injected automatically just
+// because the Zebra Browser Print desktop app is installed and running.
+// That app only runs a local HTTP agent (127.0.0.1:9100, or :9101 over
+// HTTPS) that the BROWSER PRINT JS BRIDGE talks to -- the bridge script
+// itself must still be loaded by the page like any other library. Zebra
+// doesn't publish it on an official CDN (only as a manual download from
+// their developer portal), but the same file is mirrored on jsDelivr as
+// the npm package "zebra-browser-print-min". Every page that calls
+// GMZebra.isAvailable()/print*() must load it BEFORE this file:
+//   <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/"></script>
+//   <script src="zebra-rfid.js"></script>
+// Skipping that script tag is exactly why isAvailable() will always
+// return false and printing will always show the "not installed" error,
+// even with the desktop agent correctly installed and a printer set as
+// default in its own settings window -- this bit GoldMind once already.
 //
 // This file intentionally has zero UI. Pages call GMZebra.* and render
 // their own status/errors.
@@ -108,10 +122,10 @@ var GMZebra = (function () {
   }
 
   // ---- Browser Print integration -------------------------------------
-  // Requires the Zebra Browser Print desktop app/SDK running locally
-  // (injects window.BrowserPrint). We never load it from a CDN — Zebra
-  // doesn't publish one; it must be installed by the user and the page
-  // loads it from the local agent at http://127.0.0.1:9100 under the hood.
+  // Requires (1) the Zebra Browser Print desktop app running locally, AND
+  // (2) the calling page having actually loaded the BrowserPrint JS bridge
+  // script (see the file header) -- window.BrowserPrint only exists once
+  // both are true.
   function isAvailable() {
     return typeof window !== 'undefined' && !!window.BrowserPrint;
   }
