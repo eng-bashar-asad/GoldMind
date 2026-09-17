@@ -301,17 +301,6 @@
 </button>
 </div>
 </div>
-<!-- Bilingual Description -->
-<div class="grid grid-cols-1 gap-4">
-<div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-ar">الوصف (عربي)</label>
-<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-right text-on-background" dir="rtl" id="desc-ar" placeholder="مثال: خاتم ذهب مرصّع"/>
-</div>
-<div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="desc-en">الوصف (إنجليزي)</label>
-<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all text-on-background" dir="ltr" id="desc-en" placeholder="e.g. Gold ring with stone"/>
-</div>
-</div>
 <!-- Weights -->
 <div class="grid grid-cols-2 gap-4">
 <div class="relative">
@@ -503,13 +492,14 @@
 
         // ---------- Type / Category expandable dropdowns ----------
         const ADD_NEW_VALUE = '__add_new__';
-        const classificationCache = {}; // field_key -> array of values already loaded
+        const classificationCache = {}; // field_key -> array of Arabic values already loaded
+        const classificationCacheEn = {}; // field_key -> { arabicValue: englishValue } (currently only populated for 'type')
 
         async function loadClassificationOptions(selectId, fieldKey, label) {
             const select = document.getElementById(selectId);
             const { data, error } = await goldmindClient
                 .from('piece_classification_options')
-                .select('value')
+                .select('value, value_en')
                 .eq('store_id', GOLDMIND_STORE_ID)
                 .eq('field_key', fieldKey)
                 .order('value', { ascending: true });
@@ -520,6 +510,8 @@
             }
 
             classificationCache[fieldKey] = (data || []).map(r => r.value);
+            classificationCacheEn[fieldKey] = {};
+            (data || []).forEach(r => { classificationCacheEn[fieldKey][r.value] = r.value_en || null; });
             renderClassificationSelect(select, fieldKey, label);
         }
 
@@ -552,10 +544,16 @@
             const select = document.getElementById(selectId);
             if (select.value !== ADD_NEW_VALUE) return;
 
-            const newValue = (prompt('أدخل قيمة ' + label + ' الجديدة:') || '').trim();
+            const newValue = (prompt('أدخل قيمة ' + label + ' الجديدة (بالعربي):') || '').trim();
             if (!newValue) {
                 renderClassificationSelect(select, fieldKey, label, '');
                 return;
+            }
+
+            let newValueEn = null;
+            if (fieldKey === 'type') {
+                // English name is what gets printed on barcode labels for this type.
+                newValueEn = (prompt('الاسم بالإنجليزي لـ"' + newValue + '" (يُستخدم على ملصقات الباركود):') || '').trim() || null;
             }
 
             // Already exists locally? just select it.
@@ -568,6 +566,7 @@
                 store_id: GOLDMIND_STORE_ID,
                 field_key: fieldKey,
                 value: newValue,
+                value_en: newValueEn,
                 created_by: GOLDMIND_STAFF_ID
             });
 
@@ -580,6 +579,8 @@
             if (!classificationCache[fieldKey]) classificationCache[fieldKey] = [];
             classificationCache[fieldKey].push(newValue);
             classificationCache[fieldKey].sort((a, b) => a.localeCompare(b, 'ar'));
+            if (!classificationCacheEn[fieldKey]) classificationCacheEn[fieldKey] = {};
+            classificationCacheEn[fieldKey][newValue] = newValueEn;
             renderClassificationSelect(select, fieldKey, label, newValue);
         }
 
@@ -659,6 +660,10 @@
                 const totalFab = fabPerGram * Number(p.weight_grams || 0);
                 return `
                 <div class="border border-outline-variant rounded-xl p-3 flex items-center gap-3 bg-surface-container-low">
+                    <div class="shrink-0 text-center">
+                        <div class="text-[9px] text-on-surface-variant">باركود</div>
+                        <div class="font-data-mono font-bold text-[13px]" dir="ltr">${gmEscapeHtml(p.barcode)}</div>
+                    </div>
                     ${p.photo_url
                         ? `<img src="${p.photo_url}" class="w-16 h-16 rounded-lg object-cover shrink-0 border border-outline-variant"/>`
                         : `<div class="w-16 h-16 rounded-lg shrink-0 border border-outline-variant flex items-center justify-center bg-surface-container"><span class="material-symbols-outlined text-outline text-[20px]">photo_camera</span></div>`
@@ -742,8 +747,8 @@
                 weight_grams: weight,
                 accounting_weight_grams: parseFloat(document.getElementById('accounting-weight').value) || null,
                 cost_fabrication_per_gram: parseFloat(document.getElementById('fab-cost').value) || null,
-                description_ar: document.getElementById('desc-ar').value.trim() || null,
-                description_en: document.getElementById('desc-en').value.trim() || null,
+                description_ar: document.getElementById('piece-type').value || null,
+                description_en: (classificationCacheEn['type'] || {})[document.getElementById('piece-type').value] || null,
                 piece_type: document.getElementById('piece-type').value || null,
                 category1: document.getElementById('category1').value || null,
                 category2: document.getElementById('category2').value || null,
@@ -774,8 +779,6 @@
             document.getElementById('weight').value = '';
             document.getElementById('accounting-weight').value = '';
             document.getElementById('fab-cost').value = '';
-            document.getElementById('desc-ar').value = '';
-            document.getElementById('desc-en').value = '';
             renderClassificationSelect(document.getElementById('piece-type'), 'type', 'النوع', '');
             renderClassificationSelect(document.getElementById('category1'), 'category1', 'صنف ١', '');
             renderClassificationSelect(document.getElementById('category2'), 'category2', 'صنف ٢', '');
