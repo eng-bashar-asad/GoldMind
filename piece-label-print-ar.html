@@ -41,6 +41,9 @@
 <button id="rfid-btn" class="hidden flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined">wifi_tethering</span> طباعة + برمجة RFID
 </button>
+<button id="reset-orientation-btn" class="flex items-center gap-2 bg-gray-500 text-white px-3 py-2 rounded-lg text-xs font-semibold" title="لو دوران الطابعة عم يطلع غير مستجيب لأي إعداد، جرّب هاد مرة وحدة">
+<span class="material-symbols-outlined text-[16px]">restart_alt</span> إعادة ضبط دوران الطابعة
+</button>
 </div>
 </div>
 
@@ -252,6 +255,26 @@
             }
         } catch (err) {
             showRfidStatus(err.message || 'فشل غير متوقع أثناء الطباعة.', true);
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    });
+
+    document.getElementById('reset-orientation-btn').addEventListener('click', async function () {
+        const btn = this;
+        if (!GMZebra.isAvailable()) {
+            showRfidStatus('Zebra Browser Print غير متاح على هذا الجهاز — يجب تثبيت تطبيق Zebra Browser Print أولاً.', true);
+            return;
+        }
+        btn.disabled = true;
+        const originalHtml = btn.innerHTML;
+        btn.innerHTML = '<span class="material-symbols-outlined text-[16px]">hourglass_top</span> جارِ الإرسال...';
+        try {
+            await GMZebra.resetPrinterOrientation();
+            showRfidStatus('تم إرسال أمر إعادة الضبط للطابعة. جرّب الطباعة من جديد الآن.', false);
+        } catch (err) {
+            showRfidStatus(err.message || 'فشل غير متوقع.', true);
         } finally {
             btn.disabled = false;
             btn.innerHTML = originalHtml;
