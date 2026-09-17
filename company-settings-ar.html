@@ -194,6 +194,11 @@
 <input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="zebra-barcode-height" step="0.5" type="number" placeholder="5"/>
 <p class="text-[10px] text-on-surface-variant mt-1">طول خطوط الباركود نفسها (مش النص). لو طالعة طويلة كتير وآكلة مساحة باقي البيانات، صغّر الرقم.</p>
 </div>
+<label class="flex items-center gap-2 mt-3 cursor-pointer">
+<input class="w-4 h-4" id="zebra-rotate-180" type="checkbox"/>
+<span class="text-[12px] text-on-background">قلب الملصق ١٨٠° (النص والباركود مع بعض)</span>
+</label>
+<p class="text-[10px] text-on-surface-variant mt-1">فعّل هاد بدل أي تدوير عملته من إعدادات طابعة ويندوز — التدوير من هون بيقلب النص والباركود مع بعض بنفس الاتجاه، فما يصير النص مقلوب والباركود لأ. لو مفعّل عندك تدوير من الطابعة/الدرايفر، رجعه لوضعه الطبيعي (٠°) واعتمد هاد الخيار بدالو.</p>
 </div>
 </div>
 
@@ -746,6 +751,7 @@
         document.getElementById('zebra-label-dpi').value = data.zebra_label_dpi != null ? data.zebra_label_dpi : 203;
         document.getElementById('zebra-label-x-offset').value = data.zebra_label_x_offset_mm != null ? data.zebra_label_x_offset_mm : 0;
         document.getElementById('zebra-barcode-height').value = data.zebra_barcode_height_mm != null ? data.zebra_barcode_height_mm : 5;
+        document.getElementById('zebra-rotate-180').checked = data.zebra_label_rotate_180 === true;
         document.getElementById('store-email').value = data.email || '';
         document.getElementById('store-instagram').value = data.social_instagram || '';
         document.getElementById('store-tiktok').value = data.social_tiktok || '';
@@ -796,6 +802,7 @@
         const zebraLabelDpi = parseInt(document.getElementById('zebra-label-dpi').value, 10);
         const zebraLabelXOffset = parseFloat(document.getElementById('zebra-label-x-offset').value);
         const zebraBarcodeHeight = parseFloat(document.getElementById('zebra-barcode-height').value);
+        const zebraRotate180 = document.getElementById('zebra-rotate-180').checked;
         const email = document.getElementById('store-email').value.trim();
         const instagram = document.getElementById('store-instagram').value.trim();
         const tiktok = document.getElementById('store-tiktok').value.trim();
@@ -841,6 +848,7 @@
                 zebra_label_dpi: isNaN(zebraLabelDpi) ? 203 : zebraLabelDpi,
                 zebra_label_x_offset_mm: isNaN(zebraLabelXOffset) ? 0 : zebraLabelXOffset,
                 zebra_barcode_height_mm: isNaN(zebraBarcodeHeight) ? 5 : zebraBarcodeHeight,
+                zebra_label_rotate_180: zebraRotate180,
                 logo_url: logo || null,
                 email: email || null,
                 social_instagram: instagram || null,
