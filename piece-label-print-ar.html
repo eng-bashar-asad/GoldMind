@@ -93,7 +93,7 @@
 
         const [{ data: piece, error: pieceError }, { data: store }] = await Promise.all([
             goldmindClient.from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
-            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness').eq('id', GOLDMIND_STORE_ID).maybeSingle()
         ]);
 
         loading.classList.add('hidden');
@@ -175,6 +175,7 @@
             const xOffsetDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_x_offset_mm) || 0, dpi);
             const barHeightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_barcode_height_mm) || 5, dpi);
             const rotate180 = !!(currentStore && currentStore.zebra_label_rotate_180);
+            const darkness = (currentStore && currentStore.zebra_darkness != null) ? currentStore.zebra_darkness : 15;
 
             await GMZebra.printBarcodeLabel({
                 storeName: (currentStore && currentStore.name) || 'GoldMind',
@@ -185,7 +186,8 @@
                 heightDots: heightDots,
                 xOffsetDots: xOffsetDots,
                 barHeightDots: barHeightDots,
-                rotate180: rotate180
+                rotate180: rotate180,
+                darkness: darkness
             });
 
             showRfidStatus('تم إرسال الملصقة لطابعة Zebra.', false);
@@ -221,6 +223,7 @@
             const xOffsetDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_x_offset_mm) || 0, dpi);
             const barHeightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_barcode_height_mm) || 5, dpi);
             const rotate180 = !!(currentStore && currentStore.zebra_label_rotate_180);
+            const darkness = (currentStore && currentStore.zebra_darkness != null) ? currentStore.zebra_darkness : 15;
 
             await GMZebra.printAndEncodeRfid({
                 storeName: (currentStore && currentStore.name) || 'GoldMind',
@@ -232,7 +235,8 @@
                 heightDots: heightDots,
                 xOffsetDots: xOffsetDots,
                 barHeightDots: barHeightDots,
-                rotate180: rotate180
+                rotate180: rotate180,
+                darkness: darkness
             });
 
             const { error: updateError } = await goldmindClient.from('pieces').update({
