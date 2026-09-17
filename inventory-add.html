@@ -370,7 +370,17 @@
             await requireGoldMindSession();
             const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
             const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['add_piece'] === true));
-            if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+            if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; return; }
+
+            // These used to run at top-level, unawaited, before
+            // GOLDMIND_STORE_ID was resolved -- querying with store_id
+            // null every time, which silently returned zero rows (no
+            // error) and made "+ إضافة صنف جديد" fail too (it inserts
+            // with the same null store_id). Now they only run once the
+            // session above has actually finished resolving the store.
+            loadClassificationOptions('piece-type', 'type', 'النوع');
+            loadClassificationOptions('category1', 'category1', 'صنف ١');
+            loadClassificationOptions('category2', 'category2', 'صنف ٢');
         })();
 
         // ---------- Photo capture ----------
@@ -583,10 +593,6 @@
             classificationCacheEn[fieldKey][newValue] = newValueEn;
             renderClassificationSelect(select, fieldKey, label, newValue);
         }
-
-        loadClassificationOptions('piece-type', 'type', 'النوع');
-        loadClassificationOptions('category1', 'category1', 'صنف ١');
-        loadClassificationOptions('category2', 'category2', 'صنف ٢');
 
         document.getElementById('piece-type').addEventListener('change', () => handleClassificationChange('piece-type', 'type', 'النوع'));
         document.getElementById('category1').addEventListener('change', () => handleClassificationChange('category1', 'category1', 'صنف ١'));
