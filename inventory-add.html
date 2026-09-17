@@ -195,16 +195,18 @@
 <!-- Camera Section -->
 <section>
 <input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
-<div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200" id="photo-trigger" onclick="triggerPhotoCapture()">
+<div class="relative group cursor-pointer active:scale-[0.98] transition-transform duration-200" id="photo-trigger" onclick="onPhotoBoxClick()">
 <div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
 <span class="material-symbols-outlined text-outline text-5xl mb-4">photo_camera</span>
 <p class="font-label-md text-label-md text-on-surface-variant font-semibold">التقط صورة للقطعة</p>
 <p class="font-label-md text-label-md text-outline mt-1">اضغط لالتقاط أو اختيار صورة</p>
 </div>
+<div class="hidden aspect-square w-full rounded-xl overflow-hidden border border-outline-variant" id="photo-live-wrap"></div>
 <img alt="" class="hidden aspect-square w-full rounded-xl object-cover border border-outline-variant" id="photo-preview"/>
 <button class="hidden absolute top-2 right-2 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" onclick="event.stopPropagation(); removePhoto();" type="button">
 <span class="material-symbols-outlined text-[18px]">close</span>
 </button>
+<p class="hidden text-center text-[11px] text-on-surface-variant mt-2" id="photo-live-hint">الكاميرا شغالة — عاير القطعة، وبتنلتقط الصورة تلقائياً لما تحفظ (أو اضغط هون لالتقاطها هلق)</p>
 </div>
 </section>
 <!-- Barcode Section -->
@@ -374,47 +376,95 @@
 
         // ---------- Photo capture ----------
         let selectedPhotoFile = null;
+        let photoIsFromCamera = false; // gates the "also save a local copy" behavior below
+        let livePreview = null; // GMCamera.openLivePreview() controller, while the feed is running
         const photoInput = document.getElementById('photo-input');
         const photoPlaceholder = document.getElementById('photo-placeholder');
+        const photoLiveWrap = document.getElementById('photo-live-wrap');
+        const photoLiveHint = document.getElementById('photo-live-hint');
         const photoPreview = document.getElementById('photo-preview');
         const photoRemoveBtn = document.getElementById('photo-remove-btn');
 
-        function applyPhotoFile(file) {
+        function applyPhotoFile(file, fromCamera) {
             if (!file) return;
             selectedPhotoFile = file;
+            photoIsFromCamera = !!fromCamera;
             const url = URL.createObjectURL(file);
             photoPreview.src = url;
             photoPreview.classList.remove('hidden');
             photoPlaceholder.classList.add('hidden');
+            photoLiveWrap.classList.add('hidden');
+            photoLiveHint.classList.add('hidden');
             photoRemoveBtn.classList.remove('hidden');
             photoRemoveBtn.classList.add('flex');
         }
 
-        async function triggerPhotoCapture() {
+        // Starts the live camera feed embedded in the photo box itself (not
+        // a modal) as soon as the page loads, so the person can see and
+        // adjust framing while filling in the rest of the form. If no
+        // camera is available/permission is refused, this just resolves to
+        // nothing and the box stays as the normal tap-to-choose placeholder.
+        async function startLivePhotoPreview() {
+            if (typeof GMCamera === 'undefined' || !GMCamera.isSupported()) return;
+            const controller = await GMCamera.openLivePreview(photoLiveWrap);
+            if (!controller) return;
+            livePreview = controller;
+            photoPlaceholder.classList.add('hidden');
+            photoLiveWrap.classList.remove('hidden');
+            photoLiveHint.classList.remove('hidden');
+        }
+
+        async function onPhotoBoxClick() {
+            if (livePreview) {
+                // Lock in the current frame right now instead of waiting for Save.
+                const file = await livePreview.captureFrame();
+                if (file) {
+                    livePreview.stop();
+                    livePreview = null;
+                    applyPhotoFile(file, true);
+                }
+                return;
+            }
+            // No live feed running (camera unavailable/already picked a
+            // photo) -- fall back to the one-shot modal, then the plain
+            // file picker, exactly as before.
             if (typeof GMCamera !== 'undefined' && GMCamera.isSupported()) {
                 const file = await GMCamera.capture();
-                if (file) { applyPhotoFile(file); return; }
-                // GMCamera resolves null on cancel/no-camera/permission-denied —
-                // the person may have tapped "اختيار من الملفات" inside the
-                // overlay itself, in which case falling through to the file
-                // picker here is exactly the right move either way.
+                if (file) { applyPhotoFile(file, true); return; }
             }
             photoInput.click();
         }
 
         photoInput.addEventListener('change', () => {
             const file = photoInput.files && photoInput.files[0];
-            applyPhotoFile(file);
+            applyPhotoFile(file, false); // an explicitly-picked file, not a camera capture
         });
 
         function removePhoto() {
             selectedPhotoFile = null;
+            photoIsFromCamera = false;
             photoInput.value = '';
             photoPreview.classList.add('hidden');
             photoPlaceholder.classList.remove('hidden');
             photoRemoveBtn.classList.add('hidden');
             photoRemoveBtn.classList.remove('flex');
+            startLivePhotoPreview(); // offer the live feed again for the next piece
         }
+
+        // Saves a second copy of a camera-captured photo to the person's
+        // own machine (a plain browser download), alongside the copy that
+        // goes to Supabase Storage on save. Only for camera-sourced shots
+        // -- a file the person picked from disk is already on their disk.
+        function downloadPhotoCopy(file) {
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(file);
+            a.download = file.name;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+        }
+
+        startLivePhotoPreview();
 
         // ---------- Type / Category expandable dropdowns ----------
         const ADD_NEW_VALUE = '__add_new__';
@@ -582,8 +632,16 @@
             saveBtn.disabled = true;
             saveBtn.textContent = 'جارِ الحفظ...';
 
+            if (!selectedPhotoFile && livePreview) {
+                const autoFile = await livePreview.captureFrame();
+                if (autoFile) applyPhotoFile(autoFile, true);
+                livePreview.stop();
+                livePreview = null;
+            }
+
             let photoUrl = null;
             if (selectedPhotoFile) {
+                if (photoIsFromCamera) downloadPhotoCopy(selectedPhotoFile); // second copy, on this machine
                 showMessage('جارِ رفع الصورة...', false);
                 const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
                 const path = GOLDMIND_STORE_ID + '/' + barcode + '-' + Date.now() + '.' + ext;
