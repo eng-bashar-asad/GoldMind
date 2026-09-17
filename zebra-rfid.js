@@ -123,12 +123,71 @@ var GMZebra = (function () {
     return Math.round((mm || 0) * (dpi || 203) / 25.4);
   }
 
+  // Flexible field-based label builder, backing the Zebra Label Designer
+  // (zebra-label-designer-ar.html): each store configures its OWN list of
+  // fields (content type + column + order + font size) in
+  // zebra_label_fields, instead of a fixed hardcoded layout. Two columns,
+  // each field stacks under the previous one in its column; a
+  // 'barcode_graphic' field reserves extra height for the bars plus
+  // Zebra's own auto-printed interpretation line below them.
+  function buildBarcodeZPLFromFields(opts) {
+    opts = opts || {};
+    var fields = opts.fields || [];
+    var values = opts.values || {};
+    var w = opts.widthDots || 406;
+    var h = opts.heightDots || 203;
+    var scale = h / 203;
+    var barHeight = Math.max(5, opts.barHeightDots != null ? opts.barHeightDots : Math.round(40 * scale));
+    var xBase = Math.max(0, Math.min(w - 10, 10 + (opts.xOffsetDots || 0)));
+    var colWidth = Math.round((w - xBase) / 2);
+    var margin = Math.round(6 * scale);
+
+    function textFor(field) {
+      switch (field.content_type) {
+        case 'barcode_number': return values.barcode || '';
+        case 'company_name': return values.storeName || '';
+        case 'weight': return 'W:' + (values.weight != null ? values.weight : '');
+        case 'karat': return 'K' + (values.karat || '');
+        case 'mc': return 'MC:' + (values.mc != null ? values.mc : '');
+        case 'description': return values.description || '';
+        case 'custom_text': return field.custom_text || '';
+        default: return '';
+      }
+    }
+
+    var body = '';
+    [1, 2].forEach(function (colNum) {
+      var colX = colNum === 1 ? xBase : xBase + colWidth;
+      var y = Math.round(8 * scale);
+      fields
+        .filter(function (f) { return f.column_num === colNum; })
+        .sort(function (a, b) { return a.row_order - b.row_order; })
+        .forEach(function (f) {
+          if (f.content_type === 'barcode_graphic') {
+            body += '^FO' + colX + ',' + y + '^BY2' +
+              '^BCN,' + barHeight + ',Y,N,N' +
+              '^FD' + escapeZpl(values.barcode || '') + '^FS';
+            y += barHeight + margin + Math.round(16 * scale); // room for Zebra's own interpretation line below the bars
+          } else {
+            var fontSize = f.font_size || 20;
+            var txt = escapeZpl(textFor(f));
+            body += '^FO' + colX + ',' + y + '^A0N,' + fontSize + ',' + fontSize + '^FD' + txt + '^FS';
+            y += fontSize + margin;
+          }
+        });
+    });
+
+    var invert = opts.rotate180 ? '^POI' : '';
+    var darkness = opts.darkness != null ? '^MD' + opts.darkness : '';
+    return '^XA' + invert + darkness + '^PW' + w + '^LL' + h + body + '^XZ';
+  }
+
   // Barcode label + RFID tag programming in the same pass.
   // ^RS8 selects the RFID module; ^RFW,H writes the hex payload to the
   // EPC memory bank; ^RFR,H right after (optional) re-reads to verify.
   function buildRfidEncodeZPL(opts) {
     opts = opts || {};
-    var base = buildBarcodeZPL(opts);
+    var base = (opts.fields && opts.fields.length) ? buildBarcodeZPLFromFields(opts) : buildBarcodeZPL(opts);
     var epcHex = padEvenBytes((opts.epcHex || '').toUpperCase());
     // splice the RFID block in right after ^XA
     var rfidBlock = '^RS8' +
@@ -175,7 +234,9 @@ var GMZebra = (function () {
 
   // High-level: print a barcode-only label.
   function printBarcodeLabel(opts) {
-    return sendZpl(buildBarcodeZPL(opts));
+    opts = opts || {};
+    var zpl = (opts.fields && opts.fields.length) ? buildBarcodeZPLFromFields(opts) : buildBarcodeZPL(opts);
+    return sendZpl(zpl);
   }
 
   // High-level: print + program the RFID tag in one label pass.
@@ -202,6 +263,7 @@ var GMZebra = (function () {
     padEvenBytes: padEvenBytes,
     buildEpcSource: buildEpcSource,
     buildBarcodeZPL: buildBarcodeZPL,
+    buildBarcodeZPLFromFields: buildBarcodeZPLFromFields,
     buildRfidEncodeZPL: buildRfidEncodeZPL,
     mmToDots: mmToDots,
     isAvailable: isAvailable,
