@@ -165,6 +165,28 @@
 </div>
 
 <div class="border-t border-outline-variant pt-5 mt-1">
+<h3 class="font-label-md text-label-md text-secondary font-bold mb-1">أبعاد ملصق طابعة Zebra</h3>
+<p class="text-[11px] text-on-surface-variant leading-5 mb-4">مقاس ورق الملصقات المركّب فعلياً بالطابعة. الأبعاد الافتراضية (٥٠×٢٥ ملم) قياسية شائعة — لو ملصقاتك مقاس مختلف، عدّلها هون بدل ما يصير القص أو الفراغ غلط بالطباعة.</p>
+<div class="grid grid-cols-3 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="zebra-label-width">العرض (ملم)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="zebra-label-width" step="0.5" type="number" placeholder="50"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="zebra-label-height">الطول (ملم)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="zebra-label-height" step="0.5" type="number" placeholder="25"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="zebra-label-dpi">دقة الطابعة</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none bg-surface-container-lowest" id="zebra-label-dpi">
+<option value="203">203 dpi</option>
+<option value="300">300 dpi</option>
+</select>
+</div>
+</div>
+</div>
+
+<div class="border-t border-outline-variant pt-5 mt-1">
 <h3 class="font-label-md text-label-md text-secondary font-bold mb-1">ترقيم القطع (الباركود)</h3>
 <p class="text-[11px] text-on-surface-variant leading-5 mb-4">حدّد حرف/رمز ثابت أول باركود كل نوع قطعة، ورقم البداية (مفيد إذا كنت لسا بأول اشتراكك وعندك ترقيم قديم من نظام سابق). كل قطعة جديدة تتسجّل تلقائياً بهالتسلسل — ذهب برمز لحاله بمستودعه، وألماس برمز لحاله بمستودعه.</p>
 </div>
@@ -708,6 +730,9 @@
         document.getElementById('fab-rate-retail').value = data.fab_rate_retail != null ? data.fab_rate_retail : '';
         document.getElementById('label-mc-multiplier').value = data.label_mc_multiplier != null ? data.label_mc_multiplier : 1;
         document.getElementById('label-mc-addend').value = data.label_mc_addend != null ? data.label_mc_addend : 0;
+        document.getElementById('zebra-label-width').value = data.zebra_label_width_mm != null ? data.zebra_label_width_mm : 50;
+        document.getElementById('zebra-label-height').value = data.zebra_label_height_mm != null ? data.zebra_label_height_mm : 25;
+        document.getElementById('zebra-label-dpi').value = data.zebra_label_dpi != null ? data.zebra_label_dpi : 203;
         document.getElementById('store-email').value = data.email || '';
         document.getElementById('store-instagram').value = data.social_instagram || '';
         document.getElementById('store-tiktok').value = data.social_tiktok || '';
@@ -753,6 +778,9 @@
         const fabRateRetail = parseFloat(document.getElementById('fab-rate-retail').value);
         const labelMcMultiplier = parseFloat(document.getElementById('label-mc-multiplier').value);
         const labelMcAddend = parseFloat(document.getElementById('label-mc-addend').value);
+        const zebraLabelWidth = parseFloat(document.getElementById('zebra-label-width').value);
+        const zebraLabelHeight = parseFloat(document.getElementById('zebra-label-height').value);
+        const zebraLabelDpi = parseInt(document.getElementById('zebra-label-dpi').value, 10);
         const email = document.getElementById('store-email').value.trim();
         const instagram = document.getElementById('store-instagram').value.trim();
         const tiktok = document.getElementById('store-tiktok').value.trim();
@@ -793,6 +821,9 @@
                 fab_rate_retail: isNaN(fabRateRetail) ? null : fabRateRetail,
                 label_mc_multiplier: isNaN(labelMcMultiplier) ? 1 : labelMcMultiplier,
                 label_mc_addend: isNaN(labelMcAddend) ? 0 : labelMcAddend,
+                zebra_label_width_mm: isNaN(zebraLabelWidth) ? 50 : zebraLabelWidth,
+                zebra_label_height_mm: isNaN(zebraLabelHeight) ? 25 : zebraLabelHeight,
+                zebra_label_dpi: isNaN(zebraLabelDpi) ? 203 : zebraLabelDpi,
                 logo_url: logo || null,
                 email: email || null,
                 social_instagram: instagram || null,
