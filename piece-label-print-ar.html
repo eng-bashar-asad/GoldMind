@@ -182,7 +182,7 @@
 
             await GMZebra.printBarcodeLabel({
                 storeName: (currentStore && currentStore.name) || 'GoldMind',
-                line1: currentPiece.description_en || currentPiece.description_ar || currentPiece.piece_type || '',
+                line1: currentPiece.description_en || '', // Zebra's default font can't render Arabic -- never fall back to description_ar/piece_type here (that's exactly what caused garbled text before); the on-screen HTML label can still use Arabic fine.
                 line2: 'W:' + Number(currentPiece.weight_grams || 0).toFixed(2) + '  K' + (currentPiece.karat || '') + '  MC:' + mcText,
                 barcode: barcodeValue,
                 widthDots: widthDots,
@@ -230,7 +230,7 @@
 
             await GMZebra.printAndEncodeRfid({
                 storeName: (currentStore && currentStore.name) || 'GoldMind',
-                line1: currentPiece.description_en || currentPiece.description_ar || currentPiece.piece_type || '',
+                line1: currentPiece.description_en || '', // Zebra's default font can't render Arabic -- never fall back to description_ar/piece_type here (that's exactly what caused garbled text before); the on-screen HTML label can still use Arabic fine.
                 line2: (currentPiece.weight_grams || 0) + 'g  ' + (currentPiece.karat || '') + 'K',
                 barcode: barcodeValue,
                 epcHex: epcHex,
