@@ -93,15 +93,20 @@ var GMZebra = (function () {
     var h = opts.heightDots || 203;
     var scale = h / 203;
     var y1 = Math.round(8 * scale), y2 = Math.round(32 * scale), y3 = Math.round(54 * scale), y4 = Math.round(78 * scale);
-    // Bar height used to be a fixed fraction of the label height (60 dots
-    // at 203dpi/1in) -- too tall for small labels, crowding out the text
-    // fields and the auto interpretation line Zebra prints below the
-    // bars. Now it's its own explicit setting (mm -> dots, same as the
-    // label's own width/height) so it can be tuned per store/label stock
-    // instead of guessed at.
-    var barHeight = Math.max(20, opts.barHeightDots || Math.round(40 * scale));
+    // Bar height is its own explicit setting (mm -> dots, same as the
+    // label's own width/height). Floor is just "not literally zero" --
+    // an earlier floor of 20 silently overrode small intentional values
+    // like 1mm (~8 dots), which is exactly the bug that prompted this.
+    var barHeight = Math.max(5, opts.barHeightDots != null ? opts.barHeightDots : Math.round(40 * scale));
     var x = Math.max(0, Math.min(w - 10, 10 + (opts.xOffsetDots || 0)));
-    return '^XA' +
+    // ^POI inverts the WHOLE label 180 degrees as one unit -- text and
+    // barcode together, from the same ^FO coordinates -- instead of
+    // rotating each field individually (error-prone) or relying on an
+    // external Windows-driver-level rotation (which only flips the
+    // barcode's symmetric-looking bars correctly but garbles the text,
+    // since the driver has no idea those glyphs need to flip too).
+    var invert = opts.rotate180 ? '^POI' : '';
+    return '^XA' + invert +
       '^PW' + w + '^LL' + h +
       '^FO' + x + ',' + y1 + '^A0N,20,20^FD' + storeName + '^FS' +
       '^FO' + x + ',' + y2 + '^A0N,18,18^FD' + line1 + '^FS' +
