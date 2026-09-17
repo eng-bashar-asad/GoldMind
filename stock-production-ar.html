@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="theme.js?v=20"></script>
+<script src="gm-camera.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
         tailwind.config = { darkMode: "class", theme: { extend: {
@@ -148,7 +149,7 @@
             const rowsHtml = rows.map(r => `
                 <div class="border border-outline-variant rounded-lg p-2 space-y-2">
                     <div class="flex gap-2 items-center">
-                        <button type="button" onclick="document.getElementById('row-photo-input-${r.rowId}').click()" class="h-11 w-11 shrink-0 rounded-lg border border-dashed border-outline-variant flex items-center justify-center overflow-hidden bg-surface-container-low">
+                        <button type="button" onclick="triggerRowPhotoCapture('${lot.id}', ${r.rowId}, 'row-photo-input-${r.rowId}')" class="h-11 w-11 shrink-0 rounded-lg border border-dashed border-outline-variant flex items-center justify-center overflow-hidden bg-surface-container-low">
                             ${r.photoPreviewUrl ? `<img src="${r.photoPreviewUrl}" class="w-full h-full object-cover"/>` : `<span class="material-symbols-outlined text-outline text-[18px]">photo_camera</span>`}
                         </button>
                         <input type="file" accept="image/*" capture="environment" class="hidden" id="row-photo-input-${r.rowId}" onchange="onRowPhotoSelected('${lot.id}', ${r.rowId}, this)"/>
@@ -203,14 +204,26 @@
         renderLots();
     }
 
-    function onRowPhotoSelected(lotId, rowId, input) {
-        const file = input.files && input.files[0];
+    function applyRowPhotoFile(lotId, rowId, file) {
         if (!file) return;
         const row = (rowsByLot[lotId] || []).find(r => r.rowId === rowId);
         if (!row) return;
         row.photoFile = file;
         row.photoPreviewUrl = URL.createObjectURL(file);
         renderLots();
+    }
+
+    async function triggerRowPhotoCapture(lotId, rowId, inputId) {
+        if (typeof GMCamera !== 'undefined' && GMCamera.isSupported()) {
+            const file = await GMCamera.capture();
+            if (file) { applyRowPhotoFile(lotId, rowId, file); return; }
+        }
+        document.getElementById(inputId).click();
+    }
+
+    function onRowPhotoSelected(lotId, rowId, input) {
+        const file = input.files && input.files[0];
+        applyRowPhotoFile(lotId, rowId, file);
     }
 
     function updateLotBoxName(lotId, value) {
