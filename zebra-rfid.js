@@ -183,6 +183,19 @@ var GMZebra = (function () {
     return sendZpl(buildRfidEncodeZPL(opts));
   }
 
+  // Zebra printers keep their OWN persistent orientation setting in the
+  // printer's memory (the "zpl.label_orientation" SGD variable) --
+  // separate from both the Windows driver's rotation option AND our
+  // per-label ^PO command. If that ever gets set to "inverted" (e.g. from
+  // an earlier driver-level rotation attempt), it can combine with our
+  // ^POI to cancel out or otherwise make rotation look like it's doing
+  // nothing no matter what's toggled in GoldMind or in Windows. This
+  // clears that printer-side setting back to normal so ^POI (the
+  // "rotate 180" store setting) is the ONLY thing controlling rotation.
+  function resetPrinterOrientation() {
+    return sendZpl('! U1 setvar "zpl.label_orientation" "normal"\r\n');
+  }
+
   return {
     asciiToHex: asciiToHex,
     hexToAscii: hexToAscii,
@@ -195,6 +208,7 @@ var GMZebra = (function () {
     getDefaultPrinter: getDefaultPrinter,
     sendZpl: sendZpl,
     printBarcodeLabel: printBarcodeLabel,
-    printAndEncodeRfid: printAndEncodeRfid
+    printAndEncodeRfid: printAndEncodeRfid,
+    resetPrinterOrientation: resetPrinterOrientation
   };
 })();
