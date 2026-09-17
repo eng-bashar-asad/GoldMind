@@ -329,7 +329,7 @@
 <!-- Session list: pieces saved so far in this visit -->
 <section class="hidden pt-6" id="session-list-section">
 <h2 class="font-label-md text-label-md text-on-surface-variant font-semibold mb-2">القطع المضافة بهذه الجلسة (<span id="session-list-count">0</span>)</h2>
-<div class="space-y-2" id="session-list"></div>
+<div class="grid grid-cols-2 gap-2" id="session-list"></div>
 </section>
 </section>
 </div>
@@ -659,22 +659,26 @@
                 const fabPerGram = Number(p.cost_fabrication_per_gram || 0);
                 const totalFab = fabPerGram * Number(p.weight_grams || 0);
                 return `
-                <div class="border border-outline-variant rounded-xl p-3 flex items-center gap-3 bg-surface-container-low">
-                    <div class="shrink-0 text-center">
-                        <div class="text-[9px] text-on-surface-variant">باركود</div>
-                        <div class="font-data-mono font-bold text-[13px]" dir="ltr">${gmEscapeHtml(p.barcode)}</div>
+                <div class="border border-outline-variant rounded-xl p-2 bg-surface-container-low text-[10px]">
+                    <div class="flex items-center gap-2 mb-1.5">
+                        ${p.photo_url
+                            ? `<img src="${p.photo_url}" class="w-11 h-11 rounded-lg object-cover shrink-0 border border-outline-variant"/>`
+                            : `<div class="w-11 h-11 rounded-lg shrink-0 border border-outline-variant flex items-center justify-center bg-surface-container"><span class="material-symbols-outlined text-outline text-[16px]">photo_camera</span></div>`
+                        }
+                        <div class="min-w-0 flex-1">
+                            <div class="font-data-mono font-bold text-[11px] truncate" dir="ltr">${gmEscapeHtml(p.barcode)}</div>
+                            <span class="text-[9px] font-semibold px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 inline-block mt-0.5">متوفرة</span>
+                        </div>
                     </div>
-                    ${p.photo_url
-                        ? `<img src="${p.photo_url}" class="w-16 h-16 rounded-lg object-cover shrink-0 border border-outline-variant"/>`
-                        : `<div class="w-16 h-16 rounded-lg shrink-0 border border-outline-variant flex items-center justify-center bg-surface-container"><span class="material-symbols-outlined text-outline text-[20px]">photo_camera</span></div>`
-                    }
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] flex-1">
-                        <div><span class="text-on-surface-variant">الوزن القائم:</span> <span class="font-bold font-data-mono">${Number(p.weight_grams || 0).toFixed(2)} غ</span></div>
-                        <div><span class="text-on-surface-variant">وزن المحاسبة:</span> <span class="font-bold font-data-mono">${p.accounting_weight_grams != null ? Number(p.accounting_weight_grams).toFixed(2) : '—'} غ</span></div>
-                        <div><span class="text-on-surface-variant">مصنعية الغرام:</span> <span class="font-bold font-data-mono">${fabPerGram.toFixed(2)} د.إ</span></div>
-                        <div><span class="text-on-surface-variant">إجمالي المصنعية:</span> <span class="font-bold font-data-mono">${totalFab.toFixed(2)} د.إ</span></div>
+                    <div class="space-y-0.5 mb-2 text-on-surface-variant">
+                        <div>قائم: <span class="font-bold font-data-mono text-on-background">${Number(p.weight_grams || 0).toFixed(2)}غ</span></div>
+                        <div>محاسبة: <span class="font-bold font-data-mono text-on-background">${p.accounting_weight_grams != null ? Number(p.accounting_weight_grams).toFixed(2) : '—'}غ</span></div>
+                        <div>مصنعية/غ: <span class="font-bold font-data-mono text-on-background">${fabPerGram.toFixed(2)}</span></div>
+                        <div>إجمالي المصنعية: <span class="font-bold font-data-mono text-on-background">${totalFab.toFixed(2)}</span></div>
                     </div>
-                    <span class="text-[10px] font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700 shrink-0 self-start">متوفرة بالمستودع</span>
+                    <a href="piece-label-print-ar.html?id=${p.id}" target="_blank" class="flex items-center justify-center gap-1 w-full py-1.5 rounded-lg bg-primary text-on-primary text-[10px] font-semibold active:scale-95 transition-transform">
+                        <span class="material-symbols-outlined text-[13px]">print</span> طباعة الباركود
+                    </a>
                 </div>`;
             }).join('');
         }
