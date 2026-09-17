@@ -654,27 +654,24 @@
             document.getElementById('session-list-count').textContent = sessionPieces.length;
             if (sessionPieces.length === 0) { section.classList.add('hidden'); return; }
             section.classList.remove('hidden');
-            list.innerHTML = sessionPieces.map((p, i) => `
-                <div class="relative border border-outline-variant rounded-lg px-3 py-2 flex items-center gap-3 text-[12px] bg-surface-container-low cursor-pointer" onclick="toggleSessionThumb(${i})">
-                    <span class="font-data-mono font-bold shrink-0" dir="ltr">${gmEscapeHtml(p.barcode)}</span>
-                    <span class="shrink-0">${Number(p.weight_grams || 0).toFixed(2)} غ</span>
-                    <span class="shrink-0">عيار ${gmEscapeHtml(p.karat)}</span>
-                    <span class="flex-1 truncate text-on-surface-variant">${gmEscapeHtml(p.description_ar || p.piece_type || '')}</span>
-                    ${p.photo_url ? `<span class="material-symbols-outlined text-outline text-[16px] shrink-0">photo_camera</span>` : ''}
-                    ${p.photo_url ? `
-                    <div class="hidden absolute z-20 top-full mt-1 left-2 shadow-lg rounded-lg overflow-hidden border border-outline-variant bg-white" id="session-thumb-${i}">
-                        <img src="${p.photo_url}" class="w-28 h-28 object-cover"/>
-                    </div>` : ''}
-                </div>
-            `).join('');
-        }
-
-        function toggleSessionThumb(i) {
-            const el = document.getElementById('session-thumb-' + i);
-            if (!el) return;
-            const wasHidden = el.classList.contains('hidden');
-            document.querySelectorAll('[id^="session-thumb-"]').forEach(e => e.classList.add('hidden'));
-            if (wasHidden) el.classList.remove('hidden');
+            list.innerHTML = sessionPieces.map((p) => {
+                const fabPerGram = Number(p.cost_fabrication_per_gram || 0);
+                const totalFab = fabPerGram * Number(p.weight_grams || 0);
+                return `
+                <div class="border border-outline-variant rounded-xl p-3 flex items-center gap-3 bg-surface-container-low">
+                    ${p.photo_url
+                        ? `<img src="${p.photo_url}" class="w-16 h-16 rounded-lg object-cover shrink-0 border border-outline-variant"/>`
+                        : `<div class="w-16 h-16 rounded-lg shrink-0 border border-outline-variant flex items-center justify-center bg-surface-container"><span class="material-symbols-outlined text-outline text-[20px]">photo_camera</span></div>`
+                    }
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-1 text-[11px] flex-1">
+                        <div><span class="text-on-surface-variant">الوزن القائم:</span> <span class="font-bold font-data-mono">${Number(p.weight_grams || 0).toFixed(2)} غ</span></div>
+                        <div><span class="text-on-surface-variant">وزن المحاسبة:</span> <span class="font-bold font-data-mono">${p.accounting_weight_grams != null ? Number(p.accounting_weight_grams).toFixed(2) : '—'} غ</span></div>
+                        <div><span class="text-on-surface-variant">مصنعية الغرام:</span> <span class="font-bold font-data-mono">${fabPerGram.toFixed(2)} د.إ</span></div>
+                        <div><span class="text-on-surface-variant">إجمالي المصنعية:</span> <span class="font-bold font-data-mono">${totalFab.toFixed(2)} د.إ</span></div>
+                    </div>
+                    <span class="text-[10px] font-semibold px-2 py-1 rounded-full bg-green-100 text-green-700 shrink-0 self-start">متوفرة بالمستودع</span>
+                </div>`;
+            }).join('');
         }
 
         function showMessage(text, isError) {
