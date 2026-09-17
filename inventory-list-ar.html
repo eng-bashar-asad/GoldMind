@@ -142,7 +142,10 @@
 <!-- Summary bar -->
 <div class="flex justify-between items-center py-4 text-on-surface-variant font-label-md text-label-md">
 <span id="piece-count">جارِ التحميل...</span>
+<div class="flex items-center gap-3">
+<span id="total-fab"></span>
 <span id="total-weight"></span>
+</div>
 </div>
 
 <!-- Loading state -->
@@ -280,6 +283,10 @@
         return karatTint[karat] || { bg: '#EEF0F2', ink: '#565E74', ring: '#B7BCC9' };
     }
 
+    function totalFabValue(pieces) {
+        return pieces.reduce((sum, p) => sum + Number(p.cost_fabrication_per_gram || 0) * Number(p.weight_grams || 0), 0);
+    }
+
     function karatBoxHtml(karat, pieces) {
         const t = tintFor(karat);
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
@@ -308,6 +315,7 @@
         const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
         document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
+        document.getElementById('total-fab').textContent = 'مصنعية ' + totalFabValue(ALL_PIECES).toFixed(2) + ' د.إ';
 
         showKaratBoxes();
     }
@@ -319,6 +327,7 @@
         const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
         document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
+        document.getElementById('total-fab').textContent = 'مصنعية ' + totalFabValue(ALL_PIECES).toFixed(2) + ' د.إ';
     }
 
     function showKaratPieces(karat) {
@@ -331,6 +340,7 @@
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
         document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
+        document.getElementById('total-fab').textContent = 'مصنعية ' + totalFabValue(pieces).toFixed(2) + ' د.إ';
 
         document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
     }
