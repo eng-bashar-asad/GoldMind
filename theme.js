@@ -996,7 +996,7 @@ function gmSmartBack(fallbackHref) {
       padding: 0 16px; color: #e8e8ea; text-decoration: none;
       white-space: nowrap; font-size: 13px;
     }
-    #gm-rail .gm-rail-link:hover { background: rgba(255,255,255,.08); }
+    #gm-rail .gm-rail-link:hover { background: #000; }
     #gm-rail .gm-rail-link .material-symbols-outlined {
       font-size: 20px; flex: none; color: #FFD700;
     }
