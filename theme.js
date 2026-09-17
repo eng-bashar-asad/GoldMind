@@ -993,7 +993,7 @@ function gmSmartBack(fallbackHref) {
     #gm-rail .gm-rail-scroll { flex: 1; overflow-y: auto; overflow-x: hidden; }
     #gm-rail .gm-rail-link {
       display: flex; align-items: center; gap: 14px; height: 42px;
-      padding: 0 14px; color: #e8e8ea; text-decoration: none;
+      padding: 0 16px; color: #e8e8ea; text-decoration: none;
       white-space: nowrap; font-size: 13px;
     }
     #gm-rail .gm-rail-link:hover { background: rgba(255,255,255,.08); }
@@ -1002,18 +1002,25 @@ function gmSmartBack(fallbackHref) {
     }
     #gm-rail .gm-rail-foot { border-top: 1px solid rgba(255,255,255,.1); }
     #gm-rail .gm-rail-link.gm-rail-signout .material-symbols-outlined { color: #f28b82; }
+    /* Labels (and the head title) are fully removed from render -- not
+       just clipped -- while collapsed, so nothing can ever peek out
+       mid-transition or in browsers that handle width-transition/overflow
+       clipping differently. Only :hover brings them back. */
+    #gm-rail .gm-rail-label, #gm-rail .gm-rail-head-label { display: none; }
+    #gm-rail:hover .gm-rail-label, #gm-rail:hover .gm-rail-head-label { display: inline; }
   `;
   document.head.appendChild(style2);
 
   var rail = document.createElement('div');
   rail.id = 'gm-rail';
   var linksHtml = LINKS.map(function (l) {
-    return '<a class="gm-rail-link" href="' + l.href + '"><span class="material-symbols-outlined">' + l.icon + '</span><span>' + l.label + '</span></a>';
+    return '<a class="gm-rail-link" href="' + l.href + '"><span class="material-symbols-outlined">' + l.icon + '</span><span class="gm-rail-label">' + l.label + '</span></a>';
   }).join('');
   rail.innerHTML =
-    '<div class="gm-rail-head"><span class="material-symbols-outlined" style="color:#FFD700;">apps</span>&nbsp;GoldMind</div>' +
+    '<div class="gm-rail-head"><span class="material-symbols-outlined" style="color:#FFD700;">apps</span><span class="gm-rail-head-label">&nbsp;GoldMind</span></div>' +
     '<div class="gm-rail-scroll">' + linksHtml + '</div>' +
-    '<div class="gm-rail-foot"><a class="gm-rail-link gm-rail-signout" href="#" onclick="event.preventDefault(); if(typeof goldMindSignOut===\'function\') goldMindSignOut();"><span class="material-symbols-outlined">logout</span><span>تسجيل الخروج</span></a></div>';
+    '<div class="gm-rail-foot"><a class="gm-rail-link gm-rail-signout" href="#" onclick="event.preventDefault(); if(typeof goldMindSignOut===\'function\') goldMindSignOut();"><span class="material-symbols-outlined">logout</span><span class="gm-rail-label">تسجيل الخروج</span></a></div>';
+
 
   function mount() { document.body.appendChild(rail); }
   if (document.readyState === 'loading') {
