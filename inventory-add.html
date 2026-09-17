@@ -15,6 +15,7 @@
 <script src="supabase-config.js"></script>
 <script src="theme.js?v=20"></script>
 <script src="gm-camera.js"></script>
+<script src="gm-local-folder.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&display=swap" rel="stylesheet"/>
@@ -207,6 +208,10 @@
 <span class="material-symbols-outlined text-[18px]">close</span>
 </button>
 <p class="hidden text-center text-[11px] text-on-surface-variant mt-2" id="photo-live-hint">الكاميرا شغالة — عاير القطعة، وبتنلتقط الصورة تلقائياً لما تحفظ (أو اضغط هون لالتقاطها هلق)</p>
+<div class="flex items-center justify-between mt-2 text-[11px]" id="local-folder-row">
+<span class="text-on-surface-variant" id="local-folder-status">مجلد الحفظ المحلي: غير محدد</span>
+<button type="button" onclick="event.stopPropagation(); pickLocalFolder();" class="text-primary font-semibold underline">اختيار مجلد</button>
+</div>
 </div>
 </section>
 <!-- Barcode Section -->
@@ -451,11 +456,19 @@
             startLivePhotoPreview(); // offer the live feed again for the next piece
         }
 
-        // Saves a second copy of a camera-captured photo to the person's
-        // own machine (a plain browser download), alongside the copy that
-        // goes to Supabase Storage on save. Only for camera-sourced shots
-        // -- a file the person picked from disk is already on their disk.
-        function downloadPhotoCopy(file) {
+        // Saves a second copy of a camera-captured photo on the person's
+        // own machine, alongside the copy that goes to Supabase Storage on
+        // save. Only for camera-sourced shots -- a file picked from disk
+        // is already on their disk. Writes straight into the configured
+        // local folder if one is set up; otherwise falls back to a plain
+        // browser download (Downloads folder).
+        async function saveLocalPhotoCopy(file) {
+            if (typeof GMLocalFolder !== 'undefined' && GMLocalFolder.isSupported()) {
+                const folder = await GMLocalFolder.getActiveFolder();
+                if (folder) {
+                    try { await GMLocalFolder.saveFile(folder, file); return; } catch (e) { /* fall through to download */ }
+                }
+            }
             const a = document.createElement('a');
             a.href = URL.createObjectURL(file);
             a.download = file.name;
@@ -464,6 +477,23 @@
             a.remove();
         }
 
+        async function refreshFolderStatus() {
+            const row = document.getElementById('local-folder-row');
+            const statusEl = document.getElementById('local-folder-status');
+            if (typeof GMLocalFolder === 'undefined' || !GMLocalFolder.isSupported()) {
+                row.classList.add('hidden');
+                return;
+            }
+            const handle = await GMLocalFolder.getSavedHandle();
+            statusEl.textContent = 'مجلد الحفظ المحلي: ' + (handle ? handle.name : 'غير محدد (Downloads افتراضياً)');
+        }
+
+        async function pickLocalFolder() {
+            await GMLocalFolder.pickFolder();
+            await refreshFolderStatus();
+        }
+
+        refreshFolderStatus();
         startLivePhotoPreview();
 
         // ---------- Type / Category expandable dropdowns ----------
@@ -641,7 +671,7 @@
 
             let photoUrl = null;
             if (selectedPhotoFile) {
-                if (photoIsFromCamera) downloadPhotoCopy(selectedPhotoFile); // second copy, on this machine
+                if (photoIsFromCamera) await saveLocalPhotoCopy(selectedPhotoFile); // second copy, on this machine
                 showMessage('جارِ رفع الصورة...', false);
                 const ext = (selectedPhotoFile.name.split('.').pop() || 'jpg').toLowerCase();
                 const path = GOLDMIND_STORE_ID + '/' + barcode + '-' + Date.now() + '.' + ext;
