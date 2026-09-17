@@ -138,7 +138,61 @@ var GMCamera = (function () {
     });
   }
 
-  return { isSupported: isSupported, capture: capture };
+  // ---- Live embedded preview -----------------------------------------
+  // Unlike capture() (a full-screen modal that opens, takes one shot, and
+  // closes), this mounts a live camera feed directly inside a container
+  // the caller already has on the page -- meant for forms where the
+  // person wants to see + adjust framing WHILE filling in the rest of
+  // the fields, then grab a frame on demand (e.g. right when they hit
+  // Save) rather than as a single modal interaction.
+  //
+  // Resolves with a controller { captureFrame(), stop(), video } once the
+  // stream is actually flowing, or null if a camera isn't available/the
+  // person refuses permission -- callers fall back to capture() or the
+  // plain file input exactly as when isSupported() is false.
+  function openLivePreview(container) {
+    return new Promise(function (resolve) {
+      if (!isSupported()) { resolve(null); return; }
+
+      var video = document.createElement('video');
+      video.autoplay = true; video.playsInline = true; video.muted = true;
+      video.style.cssText = 'width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;';
+
+      navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false })
+        .then(function (stream) {
+          video.srcObject = stream;
+          container.innerHTML = '';
+          container.appendChild(video);
+
+          function captureFrame() {
+            if (!video.videoWidth) return Promise.resolve(null); // stream not flowing yet
+            return new Promise(function (res) {
+              var canvas = document.createElement('canvas');
+              canvas.width = video.videoWidth;
+              canvas.height = video.videoHeight;
+              var ctx = canvas.getContext('2d');
+              // Un-mirror on capture, same reasoning as capture()'s shutter handler.
+              ctx.translate(canvas.width, 0);
+              ctx.scale(-1, 1);
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              canvas.toBlob(function (blob) {
+                if (!blob) { res(null); return; }
+                res(new File([blob], 'piece-' + Date.now() + '.jpg', { type: 'image/jpeg' }));
+              }, 'image/jpeg', 0.9);
+            });
+          }
+
+          function stop() {
+            stream.getTracks().forEach(function (t) { t.stop(); });
+          }
+
+          resolve({ captureFrame: captureFrame, stop: stop, video: video });
+        })
+        .catch(function () { resolve(null); });
+    });
+  }
+
+  return { isSupported: isSupported, capture: capture, openLivePreview: openLivePreview };
 })();
 
 
