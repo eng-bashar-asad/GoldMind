@@ -604,6 +604,7 @@
     async function resetPieceSeq(category) {
         const inputId = category === 'diamond' ? 'next-diamond-seq-input' : 'next-gold-seq-input';
         const btnId = category === 'diamond' ? 'reset-diamond-seq-btn' : 'reset-gold-seq-btn';
+        const prefixInputId = category === 'diamond' ? 'diamond-prefix-input' : 'gold-prefix-input';
         const input = document.getElementById(inputId);
         const rawValue = input.value.trim();
         const newSeq = parseInt(rawValue, 10);
@@ -614,6 +615,11 @@
         // Width comes straight from what was typed -- "0001" -> 4,
         // "000001" -> 6, "1" -> no padding at all. Never auto-adjusted.
         const seqWidth = /^0/.test(rawValue) ? rawValue.length : null;
+        // Send the prefix currently sitting in its input too (whatever
+        // the user has typed, saved or not) so this one click commits
+        // both together -- otherwise the loadStore() reload below would
+        // overwrite an in-progress prefix edit with the still-old DB value.
+        const currentPrefix = document.getElementById(prefixInputId).value;
         if (!confirm('هل أنت متأكد؟ ستبدأ القطعة القادمة من هذا النوع بهذا الرقم. تأكد أنه لا يتعارض مع قطع مسجّلة فعلياً.')) return;
 
         const btn = document.getElementById(btnId);
@@ -622,7 +628,8 @@
             target_store_id: GOLDMIND_STORE_ID,
             category: category,
             new_seq: newSeq,
-            seq_width: seqWidth
+            seq_width: seqWidth,
+            new_prefix: currentPrefix
         });
         btn.disabled = false;
 
