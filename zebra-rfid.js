@@ -107,12 +107,13 @@ var GMZebra = (function () {
     // since the driver has no idea those glyphs need to flip too).
     var invert = opts.rotate180 ? '^POI' : '';
     var darkness = opts.darkness != null ? '^MD' + opts.darkness : '';
+    var moduleWidth = opts.moduleWidth != null ? opts.moduleWidth : 2;
     return '^XA' + invert + darkness +
       '^PW' + w + '^LL' + h +
       '^FO' + x + ',' + y1 + '^A0N,20,20^FD' + storeName + '^FS' +
       '^FO' + x + ',' + y2 + '^A0N,22,22^FD' + line1 + '^FS' +
       '^FO' + x + ',' + y3 + '^A0N,16,16^FD' + line2 + '^FS' +
-      '^FO' + x + ',' + y4 + '^BY2' +
+      '^FO' + x + ',' + y4 + '^BY' + moduleWidth +
       '^BCN,' + barHeight + ',Y,N,N' +
       '^FD' + barcode + '^FS' +
       '^XZ';
@@ -147,6 +148,13 @@ var GMZebra = (function () {
     // since Browser Print sends raw ZPL straight to the printer and never
     // goes through the Windows printer driver at all.
     var margin = opts.spacingDots != null ? opts.spacingDots : Math.round(6 * scale);
+    // ^BCN's "show interpretation line" flag used to be hardcoded on,
+    // printing the number under the bars even when the user never added
+    // "رقم الباركود" as its own field -- now it only shows if that field
+    // is actually present, so the field list is the one place controlling
+    // what's on the label.
+    var showBarcodeNumber = fields.some(function (f) { return f.content_type === 'barcode_number'; });
+    var moduleWidth = opts.moduleWidth != null ? opts.moduleWidth : 2;
 
     function textFor(field) {
       switch (field.content_type) {
@@ -170,10 +178,10 @@ var GMZebra = (function () {
         .sort(function (a, b) { return a.row_order - b.row_order; })
         .forEach(function (f) {
           if (f.content_type === 'barcode_graphic') {
-            body += '^FO' + colX + ',' + y + '^BY2' +
-              '^BCN,' + barHeight + ',Y,N,N' +
+            body += '^FO' + colX + ',' + y + '^BY' + moduleWidth +
+              '^BCN,' + barHeight + ',' + (showBarcodeNumber ? 'Y' : 'N') + ',N,N' +
               '^FD' + escapeZpl(values.barcode || '') + '^FS';
-            y += barHeight + margin + Math.round(16 * scale); // room for Zebra's own interpretation line below the bars
+            y += barHeight + margin + (showBarcodeNumber ? Math.round(16 * scale) : 0);
           } else {
             var fontSize = f.font_size || 20;
             var txt = escapeZpl(textFor(f));
