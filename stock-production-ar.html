@@ -286,6 +286,26 @@
         }
         const destBoxName = (document.getElementById('dest-box-name-' + lotId).value || '').trim() || null;
 
+        // One "سند إنتاج" per production run, linked back to the source
+        // lot -- every piece produced here gets tagged with it, so this
+        // batch (and the lot it came from) can be reopened later to see
+        // exactly which pieces came out of it, instead of pieces landing
+        // in inventory with no traceable origin.
+        const { data: batch, error: batchError } = await goldmindClient.from('piece_intake_batches').insert({
+            store_id: GOLDMIND_STORE_ID,
+            source_type: 'production',
+            source_lot_id: lotId,
+            created_by: GOLDMIND_STAFF_ID
+        }).select().single();
+        if (batchError) {
+            btn.disabled = false;
+            btn.textContent = 'حفظ القطع المنتَجة';
+            errEl.textContent = 'تعذّر إنشاء سند الإنتاج: ' + batchError.message;
+            errEl.classList.remove('hidden');
+            return;
+        }
+        const batchId = batch.id;
+
         const piecesPayload = [];
         for (const r of rows) {
             const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
@@ -320,6 +340,7 @@
                 description_ar: r.description || null,
                 box_name: destBoxName,
                 status: 'available',
+                intake_batch_id: batchId,
                 created_by: GOLDMIND_STAFF_ID
             });
         }
