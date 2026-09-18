@@ -97,6 +97,11 @@
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="fab-cost" step="0.01" type="number"/>
 </div>
 
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="accounting-weight">وزن المحاسبة</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="accounting-weight" step="0.01" type="number"/>
+</div>
+
 <!-- Type / Category -->
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="piece-type">النوع</label>
@@ -357,6 +362,7 @@ async function load() {
   document.getElementById('weight').value = piece.weight_grams;
   document.getElementById('karat').value = piece.karat;
   document.getElementById('fab-cost').value = piece.cost_fabrication_per_gram != null ? piece.cost_fabrication_per_gram : '';
+  document.getElementById('accounting-weight').value = piece.accounting_weight_grams != null ? piece.accounting_weight_grams : '';
   document.getElementById('status').value = piece.status;
   setColor(piece.color || 'Gold');
   loadClassificationOptions('piece-type', 'type', 'النوع', piece.piece_type || '');
@@ -409,6 +415,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const karat = parseInt(document.getElementById('karat').value, 10);
   const fabCostInput = document.getElementById('fab-cost').value;
   const fabCost = fabCostInput === '' ? null : parseFloat(fabCostInput);
+  const accountingWeightInput = document.getElementById('accounting-weight').value;
+  const accountingWeight = accountingWeightInput === '' ? weight : parseFloat(accountingWeightInput);
   const status = document.getElementById('status').value;
 
   if (!weight || weight <= 0) { showMessage('فضلاً أدخل وزناً صحيحاً.', true); return; }
@@ -441,6 +449,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     weight_grams: weight,
     karat: karat,
     cost_fabrication_per_gram: (fabCost != null && !isNaN(fabCost)) ? fabCost : null,
+    accounting_weight_grams: accountingWeight,
     color: selectedColor,
     status: status,
     photo_url: photoUrl,
