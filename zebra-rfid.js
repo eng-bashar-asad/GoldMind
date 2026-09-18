@@ -139,6 +139,7 @@ var GMZebra = (function () {
     var scale = h / 203;
     var barHeight = Math.max(5, opts.barHeightDots != null ? opts.barHeightDots : Math.round(40 * scale));
     var xBase = Math.max(0, Math.min(w - 10, 10 + (opts.xOffsetDots || 0)));
+    var yStart = Math.max(0, Math.min(h - 10, Math.round(8 * scale) + (opts.yOffsetDots || 0)));
     var colWidth = Math.round((w - xBase) / 2);
     // Gap between one field and the next in the same column. Used to be a
     // fixed 6 dots -- now its own setting so lines can be pulled tighter
@@ -163,7 +164,7 @@ var GMZebra = (function () {
     var body = '';
     [1, 2].forEach(function (colNum) {
       var colX = colNum === 1 ? xBase : xBase + colWidth;
-      var y = Math.round(8 * scale);
+      var y = yStart;
       fields
         .filter(function (f) { return f.column_num === colNum; })
         .sort(function (a, b) { return a.row_order - b.row_order; })
