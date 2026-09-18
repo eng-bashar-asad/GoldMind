@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>سندات الإدخال والإنتاج | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=20"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+        html { font-size: 87.5%; }
+.material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400;
+            font-size: 18px;
+        }</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold" id="page-title">سندات الإدخال والإنتاج</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
+
+<div id="list-view">
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="empty-state" class="hidden py-16 text-center text-on-surface-variant text-sm">ولا سند بعد.</div>
+<div class="py-4 flex flex-col gap-2" id="batch-list"></div>
+</div>
+
+<div class="hidden" id="detail-view">
+<button onclick="showList()" class="flex items-center gap-1 text-primary text-[13px] font-semibold mt-4 mb-2">
+<span class="material-symbols-outlined text-[16px]">arrow_forward</span> رجوع لكل السندات
+</button>
+<div class="border border-outline-variant rounded-xl p-4 bg-surface-container-lowest mb-4" id="batch-summary"></div>
+<div class="flex flex-col gap-1.5" id="batch-pieces"></div>
+</div>
+
+</main>
+<script>
+    const SOURCE_LABELS = { manual: 'بضاعة مُدخلة يدوياً', production: 'إنتاج من دفعة ذهب' };
+
+    function gmEscapeHtml(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+    }
+
+    function showList() {
+        document.getElementById('detail-view').classList.add('hidden');
+        document.getElementById('list-view').classList.remove('hidden');
+        document.getElementById('page-title').textContent = 'سندات الإدخال والإنتاج';
+    }
+
+    function batchRowHtml(b) {
+        const date = new Date(b.created_at);
+        const dateStr = date.toLocaleDateString('ar-AE', { year: 'numeric', month: 'short', day: 'numeric' });
+        const timeStr = date.toLocaleTimeString('ar-AE', { hour: '2-digit', minute: '2-digit' });
+        const icon = b.source_type === 'production' ? 'precision_manufacturing' : 'inventory_2';
+        return `
+        <button onclick="openBatch('${b.id}')" class="flex items-center gap-3 border border-outline-variant rounded-lg p-3 bg-surface-container-lowest text-right active:scale-[0.99] transition-transform">
+            <div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center shrink-0">
+                <span class="material-symbols-outlined text-[20px] text-primary">${icon}</span>
+            </div>
+            <div class="flex-1 min-w-0">
+                <div class="text-[13px] font-bold">${SOURCE_LABELS[b.source_type] || b.source_type}</div>
+                <div class="text-[11px] text-on-surface-variant">${dateStr} — ${timeStr}</div>
+            </div>
+            <div class="text-left shrink-0">
+                <div class="text-[13px] font-bold font-data-mono">${b.piece_count} قطعة</div>
+                <div class="text-[11px] text-on-surface-variant font-data-mono">${b.total_weight.toFixed(2)} غ</div>
+            </div>
+        </button>`;
+    }
+
+    function pieceRowHtml(p) {
+        const fabPerGram = Number(p.cost_fabrication_per_gram || 0);
+        const totalFab = fabPerGram * Number(p.weight_grams || 0);
+        return `
+        <div class="flex items-center gap-2 border border-outline-variant rounded-lg px-2 py-1.5 bg-surface-container-low text-[13px] cursor-pointer active:scale-[0.99] transition-transform" onclick="window.location.href='piece-edit-ar.html?id=${p.id}'">
+            ${p.photo_url
+                ? `<img src="${p.photo_url}" class="w-12 h-12 rounded-lg object-cover shrink-0 border border-outline-variant"/>`
+                : `<div class="w-12 h-12 rounded-lg shrink-0 border border-outline-variant flex items-center justify-center bg-surface-container"><span class="material-symbols-outlined text-outline text-[16px]">photo_camera</span></div>`
+            }
+            <div class="flex-1 min-w-0 flex items-center gap-3 overflow-x-auto text-on-surface-variant whitespace-nowrap">
+                <span class="font-bold font-data-mono text-on-background" dir="ltr">${gmEscapeHtml(p.barcode)}</span>
+                <span class="truncate">${gmEscapeHtml(p.piece_type || p.description_ar || '—')}</span>
+                <span>وزن: <span class="font-bold font-data-mono text-on-background">${Number(p.weight_grams || 0).toFixed(2)}غ</span></span>
+                <span>مصنعية: <span class="font-bold font-data-mono text-on-background">${totalFab.toFixed(2)}</span></span>
+                <span class="text-[11px] px-1.5 py-0.5 rounded-full ${p.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}">${p.status === 'available' ? 'متوفرة' : p.status}</span>
+            </div>
+        </div>`;
+    }
+
+    async function loadBatches() {
+        const { data, error } = await goldmindClient
+            .from('piece_intake_batches')
+            .select('id, source_type, created_at, pieces(weight_grams)')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .order('created_at', { ascending: false });
+
+        document.getElementById('loading-state').classList.add('hidden');
+
+        if (error) {
+            document.getElementById('loading-state').classList.remove('hidden');
+            document.getElementById('loading-state').textContent = 'خطأ: ' + error.message;
+            return;
+        }
+        if (!data || data.length === 0) {
+            document.getElementById('empty-state').classList.remove('hidden');
+            return;
+        }
+
+        const batches = data.map(b => ({
+            id: b.id,
+            source_type: b.source_type,
+            created_at: b.created_at,
+            piece_count: (b.pieces || []).length,
+            total_weight: (b.pieces || []).reduce((s, p) => s + Number(p.weight_grams || 0), 0)
+        }));
+
+        document.getElementById('batch-list').innerHTML = batches.map(batchRowHtml).join('');
+    }
+
+    async function openBatch(batchId) {
+        document.getElementById('list-view').classList.add('hidden');
+        document.getElementById('detail-view').classList.remove('hidden');
+        document.getElementById('page-title').textContent = 'تفاصيل السند';
+        document.getElementById('batch-summary').textContent = 'جارِ التحميل...';
+        document.getElementById('batch-pieces').innerHTML = '';
+
+        const [{ data: batch }, { data: pieces }] = await Promise.all([
+            goldmindClient.from('piece_intake_batches').select('*').eq('id', batchId).maybeSingle(),
+            goldmindClient.from('pieces').select('*').eq('intake_batch_id', batchId).order('created_at', { ascending: false })
+        ]);
+
+        const totalWeight = (pieces || []).reduce((s, p) => s + Number(p.weight_grams || 0), 0);
+        const date = new Date(batch.created_at);
+        document.getElementById('batch-summary').innerHTML = `
+            <div class="text-[14px] font-bold mb-1">${SOURCE_LABELS[batch.source_type] || batch.source_type}</div>
+            <div class="text-[12px] text-on-surface-variant">${date.toLocaleDateString('ar-AE', { year: 'numeric', month: 'long', day: 'numeric' })} — ${date.toLocaleTimeString('ar-AE', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div class="flex gap-4 mt-2 text-[13px] font-data-mono font-bold">
+                <span>${(pieces || []).length} قطعة</span>
+                <span>${totalWeight.toFixed(2)} غ</span>
+            </div>
+        `;
+        document.getElementById('batch-pieces').innerHTML = (pieces || []).map(pieceRowHtml).join('') || '<p class="text-center text-[12px] text-on-surface-variant py-6">ما فيه قطع بهاد السند.</p>';
+    }
+
+    (async function init() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+        loadBatches();
+    })();
+</script>
+</body></html>
