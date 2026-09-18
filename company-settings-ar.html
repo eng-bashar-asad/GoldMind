@@ -212,21 +212,23 @@
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-center font-data-mono uppercase" dir="ltr" id="diamond-prefix-input" maxlength="4" type="text"/>
 </div>
 </div>
+<p class="text-[10px] text-on-surface-variant -mt-2">اتركه فاضي لو مش شغالين على ألماس — رمز الألماس اختياري.</p>
 
 <div class="bg-surface-container-low rounded-lg p-3 flex flex-col gap-2">
 <span class="text-[11px] font-semibold text-outline">رقم قطعة الذهب القادمة</span>
 <p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="next-gold-piece-preview">—</p>
 <div class="flex gap-2">
-<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="next-gold-seq-input" min="1" placeholder="مثال: 100001" type="number"/>
+<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="next-gold-seq-input" inputmode="numeric" pattern="[0-9]*" placeholder="مثال: 0001 أو 100001" type="text"/>
 <button type="button" id="reset-gold-seq-btn" class="h-11 px-4 rounded-lg bg-secondary text-on-secondary text-sm font-semibold whitespace-nowrap">تحديث الرقم</button>
 </div>
+<p class="text-[10px] text-outline">اكتب أصفار بالبداية لو بدك يضلوا يظهروا بكل رقم قطعة جاي (مثلاً 0001 → 0001, 0002...).</p>
 </div>
 
 <div class="bg-surface-container-low rounded-lg p-3 flex flex-col gap-2">
 <span class="text-[11px] font-semibold text-outline">رقم قطعة الألماس القادمة</span>
 <p class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" id="next-diamond-piece-preview">—</p>
 <div class="flex gap-2">
-<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="next-diamond-seq-input" min="1" placeholder="مثال: 100001" type="number"/>
+<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm font-data-mono" dir="ltr" id="next-diamond-seq-input" inputmode="numeric" pattern="[0-9]*" placeholder="مثال: 0001 أو 100001" type="text"/>
 <button type="button" id="reset-diamond-seq-btn" class="h-11 px-4 rounded-lg bg-secondary text-on-secondary text-sm font-semibold whitespace-nowrap">تحديث الرقم</button>
 </div>
 <p class="text-[10.5px] text-outline">احذر من تعيين رقم أقل من قطع مسجّلة فعلياً لتجنّب التكرار.</p>
@@ -581,26 +583,37 @@
         document.getElementById('next-invoice-seq-input').value = nextSeq;
     }
 
+    function padSeq(seq, width) {
+        const s = String(seq);
+        return width ? s.padStart(width, '0') : s;
+    }
+
     function renderNextPiecePreview(store) {
-        document.getElementById('gold-prefix-input').value = store.piece_barcode_prefix_gold || 'G';
-        document.getElementById('diamond-prefix-input').value = store.piece_barcode_prefix_diamond || 'D';
+        document.getElementById('gold-prefix-input').value = store.piece_barcode_prefix_gold || '';
+        document.getElementById('diamond-prefix-input').value = store.piece_barcode_prefix_diamond || '';
+        const goldSeq = store.next_piece_seq_gold || 1;
+        const diamondSeq = store.next_piece_seq_diamond || 1;
         document.getElementById('next-gold-piece-preview').textContent =
-            (store.piece_barcode_prefix_gold || 'G') + (store.next_piece_seq_gold || 1);
-        document.getElementById('next-gold-seq-input').value = store.next_piece_seq_gold || 1;
+            (store.piece_barcode_prefix_gold || '') + padSeq(goldSeq, store.piece_barcode_seq_width_gold);
+        document.getElementById('next-gold-seq-input').value = padSeq(goldSeq, store.piece_barcode_seq_width_gold);
         document.getElementById('next-diamond-piece-preview').textContent =
-            (store.piece_barcode_prefix_diamond || 'D') + (store.next_piece_seq_diamond || 1);
-        document.getElementById('next-diamond-seq-input').value = store.next_piece_seq_diamond || 1;
+            (store.piece_barcode_prefix_diamond || '') + padSeq(diamondSeq, store.piece_barcode_seq_width_diamond);
+        document.getElementById('next-diamond-seq-input').value = padSeq(diamondSeq, store.piece_barcode_seq_width_diamond);
     }
 
     async function resetPieceSeq(category) {
         const inputId = category === 'diamond' ? 'next-diamond-seq-input' : 'next-gold-seq-input';
         const btnId = category === 'diamond' ? 'reset-diamond-seq-btn' : 'reset-gold-seq-btn';
         const input = document.getElementById(inputId);
-        const newSeq = parseInt(input.value, 10);
+        const rawValue = input.value.trim();
+        const newSeq = parseInt(rawValue, 10);
         if (!newSeq || newSeq < 1) {
             showMessage('فضلاً أدخل رقماً صحيحاً أكبر من صفر.', true);
             return;
         }
+        // Width comes straight from what was typed -- "0001" -> 4,
+        // "000001" -> 6, "1" -> no padding at all. Never auto-adjusted.
+        const seqWidth = /^0/.test(rawValue) ? rawValue.length : null;
         if (!confirm('هل أنت متأكد؟ ستبدأ القطعة القادمة من هذا النوع بهذا الرقم. تأكد أنه لا يتعارض مع قطع مسجّلة فعلياً.')) return;
 
         const btn = document.getElementById(btnId);
@@ -608,7 +621,8 @@
         const { error } = await goldmindClient.rpc('reset_piece_barcode_sequence', {
             target_store_id: GOLDMIND_STORE_ID,
             category: category,
-            new_seq: newSeq
+            new_seq: newSeq,
+            seq_width: seqWidth
         });
         btn.disabled = false;
 
@@ -834,7 +848,7 @@
         const emirate = document.getElementById('store-emirate').value;
         const peppolId = document.getElementById('store-peppol-id').value.trim();
         const goldPrefix = document.getElementById('gold-prefix-input').value.trim().toUpperCase() || 'G';
-        const diamondPrefix = document.getElementById('diamond-prefix-input').value.trim().toUpperCase() || 'D';
+        const diamondPrefix = document.getElementById('diamond-prefix-input').value.trim().toUpperCase() || null;
         const logo = logoInput.value.trim();
 
         if (!name) {
