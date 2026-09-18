@@ -153,7 +153,14 @@ var GMZebra = (function () {
     // "رقم الباركود" as its own field -- now it only shows if that field
     // is actually present, so the field list is the one place controlling
     // what's on the label.
-    var showBarcodeNumber = fields.some(function (f) { return f.content_type === 'barcode_number'; });
+    // Zebra's own auto-printed "interpretation line" under the bars used
+    // to be tied to whether a barcode_number field existed ANYWHERE in
+    // the list -- but a standalone barcode_number field (positioned
+    // wherever the user wants) still counted, so having one meant the
+    // number printed BOTH from that field AND again automatically under
+    // the bars. Now the interpretation line is always off; the
+    // barcode_number field (if added) is the only way the number shows,
+    // positioned exactly where its row/column says.
     var moduleWidth = opts.moduleWidth != null ? opts.moduleWidth : 2;
 
     function textFor(field) {
