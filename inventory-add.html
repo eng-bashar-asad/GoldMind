@@ -14,6 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
 <script src="theme.js?v=20"></script>
+<script src="zebra-rfid.js"></script>
 <script src="gm-camera.js"></script>
 <script src="gm-local-folder.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -381,6 +382,16 @@
             loadClassificationOptions('piece-type', 'type', 'النوع');
             loadClassificationOptions('category1', 'category1', 'صنف ١');
             loadClassificationOptions('category2', 'category2', 'صنف ٢');
+
+            // Loaded once here and reused for every "print" tap in the
+            // session list below, instead of opening piece-label-print-ar.html
+            // and re-fetching this per click.
+            const [{ data: __store }, { data: __fields }] = await Promise.all([
+                goldmindClient.from('stores').select('name, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_label_y_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness, zebra_field_spacing_mm, zebra_barcode_module_width').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+                goldmindClient.from('zebra_label_fields').select('*').eq('store_id', GOLDMIND_STORE_ID).order('column_num').order('row_order')
+            ]);
+            zebraPrintStore = __store;
+            zebraPrintFields = __fields || [];
         })();
 
         // ---------- Photo capture ----------
@@ -645,6 +656,50 @@
 
         // ---------- Session list: pieces saved so far on this page visit ----------
         const sessionPieces = [];
+        let zebraPrintStore = null;
+        let zebraPrintFields = [];
+
+        async function printPieceDirectly(p, btnEl) {
+            if (!GMZebra.isAvailable()) {
+                alert('Zebra Browser Print غير متاح على هذا الجهاز.');
+                return;
+            }
+            const store = zebraPrintStore;
+            const mcMultiplier = (store && store.label_mc_multiplier != null) ? Number(store.label_mc_multiplier) : 1;
+            const mcAddend = (store && store.label_mc_addend != null) ? Number(store.label_mc_addend) : 0;
+            const rawFab = p.cost_fabrication_per_gram;
+            const mcText = rawFab != null ? (Number(rawFab) * mcMultiplier + mcAddend).toFixed(2) : '—';
+            const values = {
+                barcode: p.barcode,
+                storeName: (store && store.name) || 'GoldMind',
+                weight: Number(p.weight_grams || 0).toFixed(2),
+                karat: p.karat || '',
+                mc: mcText,
+                description: p.description_en || ''
+            };
+            const dpi = (store && store.zebra_label_dpi) || 203;
+            const originalHtml = btnEl.innerHTML;
+            btnEl.innerHTML = '<span class="material-symbols-outlined text-[16px] animate-spin">progress_activity</span>';
+            try {
+                await GMZebra.printBarcodeLabel({
+                    fields: zebraPrintFields,
+                    values: values,
+                    widthDots: GMZebra.mmToDots((store && store.zebra_label_width_mm) || 50, dpi),
+                    heightDots: GMZebra.mmToDots((store && store.zebra_label_height_mm) || 25, dpi),
+                    xOffsetDots: GMZebra.mmToDots((store && store.zebra_label_x_offset_mm) || 0, dpi),
+                    yOffsetDots: GMZebra.mmToDots((store && store.zebra_label_y_offset_mm) || 0, dpi),
+                    barHeightDots: GMZebra.mmToDots((store && store.zebra_barcode_height_mm) || 5, dpi),
+                    spacingDots: GMZebra.mmToDots((store && store.zebra_field_spacing_mm != null) ? store.zebra_field_spacing_mm : 0.75, dpi),
+                    moduleWidth: (store && store.zebra_barcode_module_width) || 2,
+                    rotate180: !!(store && store.zebra_label_rotate_180),
+                    darkness: (store && store.zebra_darkness != null) ? store.zebra_darkness : 15
+                });
+            } catch (err) {
+                alert('تعذّرت الطباعة: ' + (err.message || err));
+            } finally {
+                btnEl.innerHTML = originalHtml;
+            }
+        }
 
         function gmEscapeHtml(s) {
             return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -679,9 +734,9 @@
                         <span>مصنعية/غ: <span class="font-bold font-data-mono text-on-background">${fabPerGram.toFixed(2)}</span></span>
                         <span>إجمالي: <span class="font-bold font-data-mono text-on-background">${totalFab.toFixed(2)}</span></span>
                     </div>
-                    <a href="piece-label-print-ar.html?id=${p.id}" target="_blank" onclick="event.stopPropagation()" class="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-primary text-on-primary active:scale-95 transition-transform" title="طباعة الباركود">
+                    <button onclick="event.stopPropagation(); printPieceDirectly(sessionPieces.find(x => x.id === '${p.id}'), this)" class="shrink-0 w-9 h-9 flex items-center justify-center rounded-lg bg-primary text-on-primary active:scale-95 transition-transform" title="طباعة الباركود مباشرة">
                         <span class="material-symbols-outlined text-[16px]">print</span>
-                    </a>
+                    </button>
                 </div>`;
             }).join('');
         }
@@ -693,8 +748,18 @@
         }
 
         saveBtn.addEventListener('click', async () => {
+            // Guard against double-submit: this used to disable the button
+            // only AFTER generating the barcode number, so two rapid clicks
+            // could both pass validation and each generate their own
+            // barcode before either one got disabled -- saving the same
+            // piece twice under two different barcode numbers. Now nothing
+            // else runs until the button is confirmed available and
+            // immediately locked.
+            if (saveBtn.disabled) return;
+            saveBtn.disabled = true;
+
             const session = await requireGoldMindSession();
-            if (!session) return;
+            if (!session) { saveBtn.disabled = false; return; }
 
             let barcode = document.getElementById('barcode-id').value.trim();
             const weight = parseFloat(document.getElementById('weight').value);
@@ -702,6 +767,7 @@
 
             if (!weight || weight <= 0) {
                 showMessage('فضلاً أدخل وزناً صحيحاً.', true);
+                saveBtn.disabled = false;
                 return;
             }
 
@@ -709,12 +775,12 @@
                 const { data: generated, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
                 if (bcError) {
                     showMessage('تعذّر توليد رقم القطعة: ' + bcError.message, true);
+                    saveBtn.disabled = false;
                     return;
                 }
                 barcode = generated;
             }
 
-            saveBtn.disabled = true;
             saveBtn.textContent = 'جارِ الحفظ...';
 
             if (!selectedPhotoFile && livePreview) {
@@ -752,7 +818,7 @@
                 barcode: barcode,
                 photo_url: photoUrl,
                 weight_grams: weight,
-                accounting_weight_grams: parseFloat(document.getElementById('accounting-weight').value) || null,
+                accounting_weight_grams: parseFloat(document.getElementById('accounting-weight').value) || weight,
                 cost_fabrication_per_gram: parseFloat(document.getElementById('fab-cost').value) || null,
                 description_ar: document.getElementById('piece-type').value || null,
                 description_en: (classificationCacheEn['type'] || {})[document.getElementById('piece-type').value] || null,
