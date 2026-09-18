@@ -100,7 +100,7 @@
 
         const [{ data: piece, error: pieceError }, { data: store }, { data: fields }] = await Promise.all([
             goldmindClient.from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
-            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness, zebra_field_spacing_mm').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('stores').select('name, rfid_enabled, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_label_y_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness, zebra_field_spacing_mm').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
             goldmindClient.from('zebra_label_fields').select('*').eq('store_id', GOLDMIND_STORE_ID).order('column_num').order('row_order')
         ]);
         labelFields = fields || [];
@@ -197,6 +197,7 @@
             const widthDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_width_mm) || 50, dpi);
             const heightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_height_mm) || 25, dpi);
             const xOffsetDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_x_offset_mm) || 0, dpi);
+            const yOffsetDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_y_offset_mm) || 0, dpi);
             const barHeightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_barcode_height_mm) || 5, dpi);
             const spacingDots = GMZebra.mmToDots((currentStore && currentStore.zebra_field_spacing_mm != null) ? currentStore.zebra_field_spacing_mm : 0.75, dpi);
             const rotate180 = !!(currentStore && currentStore.zebra_label_rotate_180);
@@ -208,6 +209,7 @@
                 widthDots: widthDots,
                 heightDots: heightDots,
                 xOffsetDots: xOffsetDots,
+                yOffsetDots: yOffsetDots,
                 barHeightDots: barHeightDots,
                 spacingDots: spacingDots,
                 rotate180: rotate180,
@@ -245,6 +247,7 @@
             const widthDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_width_mm) || 50, dpi);
             const heightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_height_mm) || 25, dpi);
             const xOffsetDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_x_offset_mm) || 0, dpi);
+            const yOffsetDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_y_offset_mm) || 0, dpi);
             const barHeightDots = GMZebra.mmToDots((currentStore && currentStore.zebra_barcode_height_mm) || 5, dpi);
             const spacingDots = GMZebra.mmToDots((currentStore && currentStore.zebra_field_spacing_mm != null) ? currentStore.zebra_field_spacing_mm : 0.75, dpi);
             const rotate180 = !!(currentStore && currentStore.zebra_label_rotate_180);
@@ -258,6 +261,7 @@
                 widthDots: widthDots,
                 heightDots: heightDots,
                 xOffsetDots: xOffsetDots,
+                yOffsetDots: yOffsetDots,
                 barHeightDots: barHeightDots,
                 spacingDots: spacingDots,
                 rotate180: rotate180,
