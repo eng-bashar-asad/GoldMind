@@ -656,6 +656,23 @@
 
         // ---------- Session list: pieces saved so far on this page visit ----------
         const sessionPieces = [];
+        let currentBatchId = null; // piece_intake_batches row for this add-piece session, created lazily on first save
+
+        // Creates the batch ("سند إدخال بضاعة") on the FIRST successful save
+        // of this page visit, not on page load -- so visiting the page
+        // without ever saving anything never leaves an empty batch behind.
+        // Every piece saved afterward in this same visit reuses it.
+        async function getOrCreateBatch() {
+            if (currentBatchId) return currentBatchId;
+            const { data, error } = await goldmindClient.from('piece_intake_batches').insert({
+                store_id: GOLDMIND_STORE_ID,
+                source_type: 'manual',
+                created_by: GOLDMIND_STAFF_ID
+            }).select().single();
+            if (error) { console.error('تعذّر إنشاء سند الإدخال:', error.message); return null; }
+            currentBatchId = data.id;
+            return currentBatchId;
+        }
         let zebraPrintStore = null;
         let zebraPrintFields = [];
 
@@ -813,6 +830,8 @@
                 photoUrl = publicUrlData ? publicUrlData.publicUrl : null;
             }
 
+            const batchId = await getOrCreateBatch();
+
             const { data: newPiece, error } = await goldmindClient.from('pieces').insert({
                 store_id: GOLDMIND_STORE_ID,
                 barcode: barcode,
@@ -828,6 +847,7 @@
                 karat: karat,
                 color: selectedColor,
                 status: 'available',
+                intake_batch_id: batchId,
                 created_by: GOLDMIND_STAFF_ID
             }).select().single();
 
