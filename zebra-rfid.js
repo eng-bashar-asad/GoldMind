@@ -140,7 +140,12 @@ var GMZebra = (function () {
     var barHeight = Math.max(5, opts.barHeightDots != null ? opts.barHeightDots : Math.round(40 * scale));
     var xBase = Math.max(0, Math.min(w - 10, 10 + (opts.xOffsetDots || 0)));
     var colWidth = Math.round((w - xBase) / 2);
-    var margin = Math.round(6 * scale);
+    // Gap between one field and the next in the same column. Used to be a
+    // fixed 6 dots -- now its own setting so lines can be pulled tighter
+    // (or spread further apart) without touching anything in Windows,
+    // since Browser Print sends raw ZPL straight to the printer and never
+    // goes through the Windows printer driver at all.
+    var margin = opts.spacingDots != null ? opts.spacingDots : Math.round(6 * scale);
 
     function textFor(field) {
       switch (field.content_type) {
