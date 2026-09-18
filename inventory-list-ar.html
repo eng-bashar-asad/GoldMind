@@ -211,6 +211,7 @@
 </nav>
 
 <script>
+    let currentStore = null;
     (async function __enforcePermission() {
         await requireGoldMindSession('login-entry-ar.html');
         const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
@@ -315,7 +316,7 @@
         const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
         document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-        document.getElementById('total-fab').textContent = 'مصنعية ' + totalFabValue(ALL_PIECES).toFixed(2) + ' د.إ';
+        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(ALL_PIECES), currentStore);
 
         showKaratBoxes();
     }
@@ -327,7 +328,7 @@
         const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
         document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-        document.getElementById('total-fab').textContent = 'مصنعية ' + totalFabValue(ALL_PIECES).toFixed(2) + ' د.إ';
+        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(ALL_PIECES), currentStore);
     }
 
     function showKaratPieces(karat) {
@@ -340,7 +341,7 @@
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
         document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-        document.getElementById('total-fab').textContent = 'مصنعية ' + totalFabValue(pieces).toFixed(2) + ' د.إ';
+        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(pieces), currentStore);
 
         document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
     }
@@ -355,17 +356,28 @@
         const countLabel = document.getElementById('piece-count');
 
         try {
+            // Was hardcoded to AED (د.إ) on every total-fab line below,
+            // ignoring whatever currency the store is actually configured
+            // with -- fetched here (alongside pieces, so it's guaranteed
+            // ready before renderKaratBoxes() first runs) and now uses the
+            // same store-aware formatter (gmFormatDualCurrency, theme.js)
+            // every other page in the app uses.
+            //
             // "المخزن" shows what's actually sitting in the warehouse right
             // now -- pieces that have been sold or given to a trader have
             // physically left, so they're excluded here (same status='available'
             // convention already used by reports-ar.html's stock-weight total
             // and inventory-count-ar.html's expected list).
-            const { data, error } = await goldmindClient
-                .from('pieces')
-                .select('*')
-                .eq('store_id', GOLDMIND_STORE_ID)
-                .eq('status', 'available')
-                .order('created_at', { ascending: false });
+            const [{ data, error }, { data: storeData }] = await Promise.all([
+                goldmindClient
+                    .from('pieces')
+                    .select('*')
+                    .eq('store_id', GOLDMIND_STORE_ID)
+                    .eq('status', 'available')
+                    .order('created_at', { ascending: false }),
+                goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            ]);
+            currentStore = storeData;
 
             loading.classList.add('hidden');
 
