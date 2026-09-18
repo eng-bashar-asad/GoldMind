@@ -90,6 +90,11 @@
 <input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="dim-barheight" step="0.5" type="number"/>
 </div>
 </div>
+<div class="relative mt-3">
+<label class="absolute -top-2 right-2 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dim-spacing">المسافة بين الأسطر (ملم)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-2 text-right text-[13px] focus:ring-1 focus:ring-primary outline-none" id="dim-spacing" step="0.1" type="number"/>
+<p class="text-[10px] text-on-surface-variant mt-1">المسافة العمودية بين كل حقل واللي بعده بنفس العمود. صغّرها لتقريب الأسطر من بعض.</p>
+</div>
 <label class="flex items-center gap-2 mt-3 cursor-pointer">
 <input class="w-4 h-4" id="dim-rotate180" type="checkbox"/>
 <span class="text-[12px] text-on-background">قلب الملصق ١٨٠° (كل الحقول مع بعض)</span>
@@ -256,6 +261,7 @@
             zebra_label_dpi: parseInt(document.getElementById('dim-dpi').value, 10) || 203,
             zebra_label_x_offset_mm: parseFloat(document.getElementById('dim-xoffset').value) || 0,
             zebra_barcode_height_mm: parseFloat(document.getElementById('dim-barheight').value) || 5,
+            zebra_field_spacing_mm: parseFloat(document.getElementById('dim-spacing').value) || 0.75,
             zebra_label_rotate_180: document.getElementById('dim-rotate180').checked,
             zebra_darkness: Math.max(0, Math.min(30, parseInt(document.getElementById('dim-darkness').value, 10) || 15))
         };
@@ -274,7 +280,7 @@
         if (!allowed) { alert('ليس لديك صلاحية الدخول لهذه الصفحة.'); window.location.href = 'index-ar.html'; return; }
 
         const [{ data: store, error: storeErr }, { data: fields, error: fieldsErr }] = await Promise.all([
-            goldmindClient.from('stores').select('name, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('stores').select('name, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness, zebra_field_spacing_mm').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
             goldmindClient.from('zebra_label_fields').select('*').eq('store_id', GOLDMIND_STORE_ID).order('column_num').order('row_order')
         ]);
 
@@ -289,6 +295,7 @@
         document.getElementById('dim-dpi').value = store.zebra_label_dpi != null ? store.zebra_label_dpi : 203;
         document.getElementById('dim-xoffset').value = store.zebra_label_x_offset_mm != null ? store.zebra_label_x_offset_mm : 0;
         document.getElementById('dim-barheight').value = store.zebra_barcode_height_mm != null ? store.zebra_barcode_height_mm : 5;
+        document.getElementById('dim-spacing').value = store.zebra_field_spacing_mm != null ? store.zebra_field_spacing_mm : 0.75;
         document.getElementById('dim-rotate180').checked = store.zebra_label_rotate_180 === true;
         document.getElementById('dim-darkness').value = store.zebra_darkness != null ? store.zebra_darkness : 15;
 
