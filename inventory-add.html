@@ -329,7 +329,13 @@
 </div>
 <!-- Session list: pieces saved so far in this visit -->
 <section class="hidden pt-6" id="session-list-section">
-<h2 class="font-label-md text-label-md text-on-surface-variant font-semibold mb-2">القطع المضافة بهذه الجلسة (<span id="session-list-count">0</span>)</h2>
+<div class="flex items-center justify-between mb-2">
+<h2 class="font-label-md text-label-md text-on-surface-variant font-semibold">القطع المضافة بهذه الجلسة (<span id="session-list-count">0</span>)</h2>
+<div class="text-[11px] text-on-surface-variant font-data-mono text-left">
+<div>قائم: <span class="font-bold text-on-background" id="session-total-weight">0.00</span>غ</div>
+<div>محاسبة: <span class="font-bold text-on-background" id="session-total-accounting">0.00</span>غ</div>
+</div>
+</div>
 <div class="flex flex-col gap-1.5" id="session-list"></div>
 </section>
 </section>
@@ -731,6 +737,10 @@
             const section = document.getElementById('session-list-section');
             const list = document.getElementById('session-list');
             document.getElementById('session-list-count').textContent = sessionPieces.length;
+            const totalWeight = sessionPieces.reduce((s, p) => s + Number(p.weight_grams || 0), 0);
+            const totalAccounting = sessionPieces.reduce((s, p) => s + Number(p.accounting_weight_grams || 0), 0);
+            document.getElementById('session-total-weight').textContent = totalWeight.toFixed(2);
+            document.getElementById('session-total-accounting').textContent = totalAccounting.toFixed(2);
             if (sessionPieces.length === 0) { section.classList.add('hidden'); return; }
             section.classList.remove('hidden');
             list.innerHTML = sessionPieces.map((p) => {
