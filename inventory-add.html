@@ -883,9 +883,11 @@
             document.getElementById('weight').value = '';
             document.getElementById('accounting-weight').value = '';
             document.getElementById('fab-cost').value = '';
-            renderClassificationSelect(document.getElementById('piece-type'), 'type', 'النوع', '');
-            renderClassificationSelect(document.getElementById('category1'), 'category1', 'صنف ١', '');
-            renderClassificationSelect(document.getElementById('category2'), 'category2', 'صنف ٢', '');
+            // Type/category1/category2 are intentionally NOT cleared here --
+            // when adding several pieces of the same kind in a row (e.g.
+            // rings), re-picking the same dropdown value every single time
+            // was pure friction. They only reset on an actual fresh page
+            // load, not after each save.
             document.getElementById('weight').focus();
             removePhoto();
         });
