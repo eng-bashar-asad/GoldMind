@@ -143,6 +143,7 @@
             const isOpen = openLotId === lot.id;
             const rows = rowsByLot[lot.id] || [];
             const usedInForm = rows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
+            const usedAccountingInForm = rows.reduce((s, r) => s + (Number(r.accountingWeight) || Number(r.weight) || 0), 0);
             const remainingAfterForm = Number(lot.weight_grams_remaining) - usedInForm;
             const destBoxName = destBoxByLot[lot.id] != null ? destBoxByLot[lot.id] : 'قطع مجوهرات';
 
@@ -158,6 +159,10 @@
                         <button type="button" onclick="removeRow('${lot.id}', ${r.rowId})" class="h-11 w-11 shrink-0 flex items-center justify-center rounded-lg border border-outline-variant text-error">
                             <span class="material-symbols-outlined text-[16px]">delete</span>
                         </button>
+                    </div>
+                    <div class="flex items-center gap-2 mr-[52px]">
+                        <span class="text-[11px] text-on-surface-variant shrink-0">وزن المحاسبة (لو فيه أحجار):</span>
+                        <input class="w-24 h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" dir="ltr" placeholder="= الوزن إذا فارغ" step="0.01" type="number" value="${r.accountingWeight || ''}" oninput="updateRow('${lot.id}', ${r.rowId}, 'accountingWeight', this.value)"/>
                     </div>
                 </div>`).join('');
 
@@ -185,6 +190,9 @@
                     <div class="text-[11.5px] font-bold text-on-background" id="lot-used-${lot.id}">
                         مجموع الوزن المدخل بهذا السند حتى الآن: ${fmt(usedInForm)}غ
                     </div>
+                    <div class="text-[11.5px] font-bold text-on-background" id="lot-used-accounting-${lot.id}">
+                        مجموع وزن المحاسبة بهذا السند حتى الآن: ${fmt(usedAccountingInForm)}غ
+                    </div>
                     <div class="text-[11.5px] ${remainingAfterForm < 0 ? 'text-error font-bold' : 'text-on-surface-variant'}" id="lot-remaining-${lot.id}">
                         المتبقي بعد الإنتاج: ${fmt(remainingAfterForm)}غ
                     </div>
@@ -203,7 +211,7 @@
 
     function addRow(lotId) {
         if (!rowsByLot[lotId]) rowsByLot[lotId] = [];
-        rowsByLot[lotId].push({ rowId: ++rowCounter, description: '', weight: '', photoFile: null, photoPreviewUrl: null });
+        rowsByLot[lotId].push({ rowId: ++rowCounter, description: '', weight: '', accountingWeight: '', photoFile: null, photoPreviewUrl: null });
         renderLots();
     }
 
@@ -338,6 +346,7 @@
                 barcode: barcode,
                 photo_url: photoUrl,
                 weight_grams: Number(r.weight),
+                accounting_weight_grams: parseFloat(r.accountingWeight) || Number(r.weight),
                 karat: lot.karat,
                 cost_fabrication_per_gram: lot.cost_fabrication_per_gram,
                 description_ar: r.description || null,
