@@ -292,6 +292,7 @@
                 إعادة إرسال الرمز
             </button>
 <p class="text-error text-sm mt-3 hidden text-center" id="otpFormError"></p>
+<div class="hidden flex-col gap-2 mt-3" id="otpInviteList"></div>
 </div>
 </form>
 <!-- Footer / Language Switcher -->
@@ -470,26 +471,76 @@
             const mode = sessionStorage.getItem('goldmind_mode');
 
             if (mode === 'join') {
-                const storeId = sessionStorage.getItem('goldmind_store_id');
-                const { data: alreadyMember } = await goldmindClient
-                    .from('staff').select('id').eq('user_id', user.id).eq('store_id', storeId).maybeSingle();
+                const { data: anyMembership } = await goldmindClient
+                    .from('staff').select('id').eq('user_id', user.id).limit(1).maybeSingle();
 
-                if (!alreadyMember) {
-                    const { error: rpcError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: storeId });
-                    if (rpcError) {
-                        if (rpcError.message && rpcError.message.includes('NOT_INVITED')) {
-                            errEl.textContent = 'هذا البريد الإلكتروني غير مدعو من "' + (sessionStorage.getItem('goldmind_store_name') || 'هذه الشركة') + '". تواصل مع مدير الشركة ليضيفك، أو سجّل شركة جديدة.';
-                        } else {
-                            errEl.textContent = 'تعذّر الانضمام للشركة: ' + rpcError.message;
-                        }
+                if (!anyMembership) {
+                    // Which company(ies) this email is invited to is only
+                    // resolved NOW, after the code has proven this person
+                    // actually owns the email -- find_my_pending_invites()
+                    // is scoped entirely to auth.uid()'s own verified email
+                    // server-side, so no company name or invite is ever
+                    // exposed based on a client-supplied value.
+                    const { data: invites, error: invitesError } = await goldmindClient.rpc('find_my_pending_invites');
+
+                    if (invitesError || !invites || invites.length === 0) {
+                        errEl.textContent = 'هذا البريد الإلكتروني مو مدعو من أي شركة. تواصل مع مدير الشركة ليضيفك، أو سجّل شركة جديدة.';
                         errEl.classList.remove('hidden');
                         otpSubmitting = false;
                         setOtpButtonState('idle');
                         await goldmindClient.auth.signOut();
                         return;
                     }
+
+                    if (invites.length === 1) {
+                        const { error: rpcError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: invites[0].store_id });
+                        if (rpcError) {
+                            errEl.textContent = 'تعذّر الانضمام للشركة: ' + rpcError.message;
+                            errEl.classList.remove('hidden');
+                            otpSubmitting = false;
+                            setOtpButtonState('idle');
+                            await goldmindClient.auth.signOut();
+                            return;
+                        }
+                        localStorage.setItem('goldmind_active_store', invites[0].store_id);
+                    } else {
+                        // Rare: same email invited to more than one company.
+                        // Show only THEIR OWN invited companies to pick from.
+                        otpSubmitting = false;
+                        setOtpButtonState('idle');
+                        const listEl = document.getElementById('otpInviteList');
+                        listEl.classList.remove('hidden');
+                        listEl.classList.add('flex');
+                        listEl.innerHTML = '';
+                        invites.forEach(inv => {
+                            const btn = document.createElement('button');
+                            btn.type = 'button';
+                            btn.className = 'w-full h-12 rounded-lg font-bold text-black';
+                            btn.style.background = 'linear-gradient(135deg, #FFD700 0%, #B4955A 100%)';
+                            btn.textContent = inv.store_name;
+                            btn.onclick = async () => {
+                                listEl.innerHTML = '';
+                                listEl.classList.add('hidden');
+                                setOtpButtonState('loading');
+                                const { error: joinError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: inv.store_id });
+                                if (joinError) {
+                                    errEl.textContent = 'تعذّر الانضمام للشركة: ' + joinError.message;
+                                    errEl.classList.remove('hidden');
+                                    setOtpButtonState('idle');
+                                    await goldmindClient.auth.signOut();
+                                    return;
+                                }
+                                localStorage.setItem('goldmind_active_store', inv.store_id);
+                                sessionStorage.removeItem('goldmind_email');
+                                sessionStorage.removeItem('goldmind_mode');
+                                sessionStorage.removeItem('goldmind_company_name');
+                                showVerifiedThenNavigate('index-ar.html');
+                            };
+                            listEl.appendChild(btn);
+                        });
+                        return; // wait for the user's pick above
+                    }
                 }
-                localStorage.setItem('goldmind_active_store', storeId);
             } else if (mode === 'new') {
                 // A "new company" request must always create the company,
                 // even if this email already owns/joined other companies
