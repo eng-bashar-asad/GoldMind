@@ -146,19 +146,8 @@
 <div class="step-panel hidden flex-col" id="step-email">
 <button class="flex items-center gap-1 text-primary/60 text-sm mb-3" onclick="goToStep('method', 'back')" type="button"><span class="material-symbols-outlined text-base">arrow_forward</span> رجوع</button>
 <div class="text-center mb-4">
-<h2 class="text-lg font-bold text-white">ابحث عن شركتك</h2>
-<p class="text-xs text-primary/70 mt-2">اكتب اسم الشركة يلي عندك حساب فيها</p>
-</div>
-<div class="relative mb-3">
-<div class="flex items-center gold-border-focus border border-primary/30 rounded-lg bg-black/20 overflow-hidden transition-all" id="companyInputWrap">
-<span class="material-symbols-outlined text-primary/50 px-3">search</span>
-<input autocomplete="off" autocorrect="off" class="flex-1 bg-transparent py-3.5 pl-4 text-white placeholder:text-white/30 focus:outline-none" id="companySearch" name="company-search-nofill" placeholder="اسم الشركة..." spellcheck="false" type="text"/>
-</div>
-<div class="absolute top-full right-0 left-0 bg-[#0f172a] border border-t-0 border-primary/30 rounded-b-lg overflow-hidden hidden z-20 max-h-48 overflow-y-auto shadow-lg" id="companyResults"></div>
-</div>
-<div class="hidden items-center justify-between company-chip rounded-lg px-4 py-3 mb-4" id="selectedCompanyChip">
-<span class="text-sm font-semibold" id="selectedCompanyName"></span>
-<button class="text-white/50 hover:text-white" onclick="clearSelectedCompany()" type="button"><span class="material-symbols-outlined text-base">close</span></button>
+<h2 class="text-lg font-bold text-white">الانضمام لشركتك</h2>
+<p class="text-xs text-primary/70 mt-2">لازم يكون مديرك ضافك كموظف بإيميلك هذا مسبقاً</p>
 </div>
 <form class="space-y-5" id="joinForm">
 <div>
@@ -214,7 +203,6 @@
 </main>
 <script>
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-let selectedCompany = null; // { id, name }
 
 // Each "step" is a full panel; goToStep animates the current one closing
 // (scale+fade out) then the target one opening (scale+fade in) -- pure
@@ -282,86 +270,12 @@ function goToStep(stepId, direction) {
     }
 })();
 
-function closeCompanyResults() {
-    document.getElementById('companyResults').classList.add('hidden');
-    document.getElementById('companyInputWrap').classList.remove('rounded-b-none');
-}
-
-function openCompanyResults() {
-    document.getElementById('companyResults').classList.remove('hidden');
-    document.getElementById('companyInputWrap').classList.add('rounded-b-none');
-}
-
-function clearSelectedCompany() {
-    selectedCompany = null;
-    document.getElementById('selectedCompanyChip').classList.add('hidden');
-    document.getElementById('selectedCompanyChip').classList.remove('flex');
-    document.getElementById('companySearch').value = '';
-    document.getElementById('companyInputWrap').classList.remove('hidden');
-    closeCompanyResults();
-}
-
-function selectCompany(id, name) {
-    selectedCompany = { id, name };
-    document.getElementById('selectedCompanyName').textContent = name;
-    document.getElementById('selectedCompanyChip').classList.remove('hidden');
-    document.getElementById('selectedCompanyChip').classList.add('flex');
-    closeCompanyResults();
-    document.getElementById('companyInputWrap').classList.add('hidden');
-}
-
-let searchDebounce;
-document.getElementById('companySearch').addEventListener('input', function () {
-    clearTimeout(searchDebounce);
-    const q = this.value.trim();
-    const resultsBox = document.getElementById('companyResults');
-    if (q.length < 1) { closeCompanyResults(); return; }
-    searchDebounce = setTimeout(async () => {
-        const { data, error } = await goldmindClient.rpc('search_companies', { q });
-        if (error || !data || data.length === 0) {
-            resultsBox.innerHTML = '<div class="px-4 py-3 text-sm text-white/40">لا توجد نتائج</div>';
-            openCompanyResults();
-            return;
-        }
-        resultsBox.innerHTML = '';
-        data.forEach(function (c) {
-            const row = document.createElement('div');
-            row.className = 'company-result px-4 py-3 text-sm cursor-pointer text-white/90';
-            row.textContent = c.name;
-            row.dataset.companyId = c.id;
-            row.dataset.companyName = c.name;
-            resultsBox.appendChild(row);
-        });
-        openCompanyResults();
-    }, 150);
-});
-
-document.getElementById('companyResults').addEventListener('click', function (e) {
-    const row = e.target.closest('.company-result');
-    if (row) {
-        selectCompany(row.dataset.companyId, row.dataset.companyName);
-    }
-});
-
-document.addEventListener('click', function (e) {
-    const wrap = document.getElementById('companyInputWrap');
-    const resultsBox = document.getElementById('companyResults');
-    if (!wrap.contains(e.target) && !resultsBox.contains(e.target)) {
-        closeCompanyResults();
-    }
-});
-
 document.getElementById('joinForm').addEventListener('submit', async function (e) {
     e.preventDefault();
     const email = document.getElementById('joinEmail').value.trim();
     const errEl = document.getElementById('joinFormError');
     errEl.classList.add('hidden');
 
-    if (!selectedCompany) {
-        errEl.textContent = 'فضلاً اختر اسم الشركة أولاً من نتائج البحث';
-        errEl.classList.remove('hidden');
-        return;
-    }
     if (!emailPattern.test(email)) {
         errEl.textContent = 'فضلاً أدخل بريد إلكتروني صحيح';
         errEl.classList.remove('hidden');
@@ -386,10 +300,13 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
         return;
     }
 
+    // No company is chosen or even known at this point -- which
+    // store(s) this email is invited to gets resolved securely by
+    // auth-callback-ar.html AFTER the OTP proves this person actually
+    // owns the email, via find_my_pending_invites() (auth.uid()-scoped,
+    // never a client-supplied store id).
     sessionStorage.setItem('goldmind_email', email);
     sessionStorage.setItem('goldmind_mode', 'join');
-    sessionStorage.setItem('goldmind_store_id', selectedCompany.id);
-    sessionStorage.setItem('goldmind_store_name', selectedCompany.name);
     gmDissolveNavigate('login-ar-4.html');
 });
 
