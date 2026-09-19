@@ -186,9 +186,9 @@ var GMZebra = (function () {
         .forEach(function (f) {
           if (f.content_type === 'barcode_graphic') {
             body += '^FO' + colX + ',' + y + '^BY' + moduleWidth +
-              '^BCN,' + barHeight + ',' + (showBarcodeNumber ? 'Y' : 'N') + ',N,N' +
+              '^BCN,' + barHeight + ',N,N,N' +
               '^FD' + escapeZpl(values.barcode || '') + '^FS';
-            y += barHeight + margin + (showBarcodeNumber ? Math.round(16 * scale) : 0);
+            y += barHeight + margin;
           } else {
             var fontSize = f.font_size || 20;
             var txt = escapeZpl(textFor(f));
