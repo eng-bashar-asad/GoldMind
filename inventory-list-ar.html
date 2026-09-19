@@ -131,6 +131,9 @@
 </button>
 <h1 class="font-headline-md text-headline-md font-bold text-primary">المخزن</h1>
 </div>
+<button onclick="toggleSearch()" class="flex items-center gap-1 px-2 py-2 border border-outline-variant rounded-lg active:scale-95 transition-all" title="بحث بالمخزون">
+<span class="material-symbols-outlined text-[20px]">search</span>
+</button>
 <button onclick="window.location.href='intake-batches-ar.html'" class="flex items-center gap-1 px-2 py-2 border border-outline-variant rounded-lg active:scale-95 transition-all" title="سندات الإدخال والإنتاج">
 <span class="material-symbols-outlined text-[20px]">receipt_long</span>
 </button>
@@ -149,6 +152,52 @@
 <span id="total-fab"></span>
 <span id="total-weight"></span>
 </div>
+</div>
+
+<!-- Search / filter panel (hidden by default) -->
+<div class="hidden border border-outline-variant rounded-xl p-4 bg-surface-container-lowest mt-2 flex flex-col gap-3" id="search-panel">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="search-barcode">رقم الباركود</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" dir="ltr" id="search-barcode" placeholder="مثال: G000012" type="text"/>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="search-weight-from">الوزن من (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" id="search-weight-from" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="search-weight-to">الوزن إلى (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" id="search-weight-to" step="0.01" type="number"/>
+</div>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="search-type">النوع/الصنف</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest" id="search-type">
+<option value="">الكل</option>
+</select>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="search-status">الحالة</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest" id="search-status">
+<option value="">الكل</option>
+<option value="available">متوفرة</option>
+<option value="sold">مباعة</option>
+<option value="reserved">محجوزة</option>
+<option value="given_to_trader">معطاة لتاجر</option>
+</select>
+</div>
+</div>
+<button onclick="runSearch()" class="w-full h-11 bg-primary text-on-primary rounded-lg font-bold text-[13px]">بحث</button>
+</div>
+
+<!-- Search results -->
+<div class="hidden" id="search-results-view">
+<button onclick="closeSearch()" class="flex items-center gap-1 text-primary font-semibold text-[13px] my-3">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+رجوع لعرض العيارات
+</button>
+<div id="search-results-list" class="grid grid-cols-1 lg:grid-cols-3 gap-3 lg:gap-4 pb-8"></div>
 </div>
 
 <!-- Loading state -->
@@ -274,6 +323,53 @@
     }
 
     let ALL_PIECES = [];
+    let ALL_PIECES_RAW = [];
+
+    function populateSearchTypeOptions() {
+        const types = [...new Set(ALL_PIECES_RAW.map(p => p.piece_type).filter(Boolean))].sort();
+        const select = document.getElementById('search-type');
+        select.innerHTML = '<option value="">الكل</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+    }
+
+    function toggleSearch() {
+        const panel = document.getElementById('search-panel');
+        panel.classList.toggle('hidden');
+    }
+
+    function closeSearch() {
+        document.getElementById('search-results-view').classList.add('hidden');
+        document.getElementById('search-panel').classList.add('hidden');
+        showKaratBoxes();
+    }
+
+    function runSearch() {
+        const barcode = document.getElementById('search-barcode').value.trim().toLowerCase();
+        const weightFrom = parseFloat(document.getElementById('search-weight-from').value);
+        const weightTo = parseFloat(document.getElementById('search-weight-to').value);
+        const type = document.getElementById('search-type').value;
+        const status = document.getElementById('search-status').value;
+
+        const results = ALL_PIECES_RAW.filter(p => {
+            if (barcode && !(p.barcode || '').toLowerCase().includes(barcode)) return false;
+            if (!isNaN(weightFrom) && Number(p.weight_grams || 0) < weightFrom) return false;
+            if (!isNaN(weightTo) && Number(p.weight_grams || 0) > weightTo) return false;
+            if (type && p.piece_type !== type) return false;
+            if (status && p.status !== status) return false;
+            return true;
+        });
+
+        document.getElementById('karat-boxes').classList.add('hidden');
+        document.getElementById('karat-boxes').classList.remove('grid');
+        document.getElementById('piece-list-view').classList.add('hidden');
+        document.getElementById('search-results-view').classList.remove('hidden');
+
+        const totalWeight = results.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
+        document.getElementById('piece-count').textContent = results.length + ' نتيجة';
+        document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
+        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(results), currentStore);
+
+        document.getElementById('search-results-list').innerHTML = results.map(pieceCardHtml).join('') || '<p class="col-span-full text-center text-[12px] text-on-surface-variant py-8">ما فيه نتائج مطابقة.</p>';
+    }
 
     // Karat "box" cards -- distinct karat/color tints so they scan at a
     // glance, matching the colorSwatch palette already used per-piece below.
@@ -371,12 +467,16 @@
             // physically left, so they're excluded here (same status='available'
             // convention already used by reports-ar.html's stock-weight total
             // and inventory-count-ar.html's expected list).
+            // Fetches every piece regardless of status now -- ALL_PIECES
+            // (available-only, derived below) still drives the karat-box
+            // drill-down exactly as before, but search needs to reach sold/
+            // reserved/given-to-trader pieces too (status is itself one of
+            // the filters), so the raw fetch can no longer exclude them.
             const [{ data, error }, { data: storeData }] = await Promise.all([
                 goldmindClient
                     .from('pieces')
                     .select('*')
                     .eq('store_id', GOLDMIND_STORE_ID)
-                    .eq('status', 'available')
                     .order('created_at', { ascending: false }),
                 goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
             ]);
@@ -390,13 +490,16 @@
                 return;
             }
 
-            if (!data || data.length === 0) {
+            ALL_PIECES_RAW = data || [];
+            ALL_PIECES = ALL_PIECES_RAW.filter(p => p.status === 'available');
+            populateSearchTypeOptions();
+
+            if (ALL_PIECES.length === 0) {
                 empty.classList.remove('hidden');
                 countLabel.textContent = '0 قطعة';
                 return;
             }
 
-            ALL_PIECES = data;
             renderKaratBoxes();
         } catch (err) {
             // A thrown exception (network drop, CORS, etc.) used to leave the
