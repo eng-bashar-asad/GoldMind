@@ -56,6 +56,7 @@
 <h1 class="text-xl font-bold mb-2" id="statusTitle">جارِ تأكيد تسجيل الدخول...</h1>
 <p class="text-sm text-primary/70" id="statusMsg" style="color:rgba(255,215,0,0.7)">لحظات ويتم تحويلك للوحة التحكم</p>
 <a class="hidden gold-gradient text-black font-bold inline-block mt-6 py-3 px-6 rounded-lg" href="login-entry-ar.html" id="retryBtn">حاول مرة أخرى</a>
+<div class="hidden flex-col gap-2 mt-4" id="inviteList"></div>
 </main>
 <script>
         (async function () {
@@ -87,11 +88,57 @@
             let rpcError = null;
 
             if (mode === 'join') {
-                const storeId = sessionStorage.getItem('goldmind_store_id');
-                const { data: alreadyMember } = await goldmindClient
-                    .from('staff').select('id').eq('user_id', user.id).eq('store_id', storeId).maybeSingle();
-                if (!alreadyMember) {
-                    ({ error: rpcError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: storeId }));
+                const { data: anyMembership } = await goldmindClient
+                    .from('staff').select('id').eq('user_id', user.id).limit(1).maybeSingle();
+                if (!anyMembership) {
+                    // Which company(ies) this email is invited to is only
+                    // resolved NOW, after the OTP has proven this person
+                    // actually owns the email -- find_my_pending_invites()
+                    // is scoped entirely to auth.uid()'s own verified
+                    // email server-side, so no company name or invite is
+                    // ever exposed based on a client-supplied value.
+                    const { data: invites, error: invitesError } = await goldmindClient.rpc('find_my_pending_invites');
+                    if (invitesError) {
+                        rpcError = invitesError;
+                    } else if (!invites || invites.length === 0) {
+                        rpcError = { message: 'NOT_INVITED' };
+                    } else if (invites.length === 1) {
+                        ({ error: rpcError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: invites[0].store_id }));
+                    } else {
+                        // Rare: same email invited to more than one company.
+                        // Show only THEIR OWN invited companies to pick from.
+                        spinnerWrap.classList.add('hidden');
+                        statusTitle.textContent = 'عندك أكثر من دعوة';
+                        statusMsg.textContent = 'اختر الشركة يلي بدك تدخلها';
+                        const listEl = document.getElementById('inviteList');
+                        listEl.classList.remove('hidden');
+                        listEl.classList.add('flex');
+                        invites.forEach(inv => {
+                            const btn = document.createElement('button');
+                            btn.className = 'gold-gradient text-black font-bold py-3 px-6 rounded-lg';
+                            btn.textContent = inv.store_name;
+                            btn.onclick = async () => {
+                                listEl.innerHTML = '';
+                                listEl.classList.add('hidden');
+                                spinnerWrap.classList.remove('hidden');
+                                const { error: joinError } = await goldmindClient.rpc('join_company_by_invite', { target_store_id: inv.store_id });
+                                if (joinError) {
+                                    spinnerWrap.classList.add('hidden');
+                                    statusIcon.textContent = 'error';
+                                    statusIcon.style.color = '#ff6b6b';
+                                    statusIcon.classList.remove('hidden');
+                                    statusTitle.textContent = 'تعذّر إكمال التسجيل';
+                                    statusMsg.textContent = 'فضلاً حاول تسجيل الدخول من جديد.';
+                                    retryBtn.classList.remove('hidden');
+                                    await goldmindClient.auth.signOut();
+                                    return;
+                                }
+                                finishLogin();
+                            };
+                            listEl.appendChild(btn);
+                        });
+                        return; // wait for the user's pick above
+                    }
                 }
             } else {
                 const { data: anyMembership } = await goldmindClient
@@ -113,26 +160,28 @@
                 statusIcon.classList.remove('hidden');
                 statusTitle.textContent = 'تعذّر إكمال التسجيل';
                 statusMsg.textContent = rpcError.message && rpcError.message.includes('NOT_INVITED')
-                    ? 'هذا البريد غير مدعو من هذه الشركة.'
+                    ? 'هذا البريد مو مدعو من أي شركة.'
                     : 'فضلاً حاول تسجيل الدخول من جديد.';
                 retryBtn.classList.remove('hidden');
                 await goldmindClient.auth.signOut();
                 return;
             }
 
-            sessionStorage.removeItem('goldmind_email');
-            sessionStorage.removeItem('goldmind_mode');
-            sessionStorage.removeItem('goldmind_company_name');
-            sessionStorage.removeItem('goldmind_store_id');
-            sessionStorage.removeItem('goldmind_store_name');
+            finishLogin();
 
-            spinnerWrap.classList.add('hidden');
-            statusIcon.textContent = 'check_circle';
-            statusIcon.classList.remove('hidden');
-            statusTitle.textContent = 'تم تسجيل الدخول بنجاح';
-            statusMsg.textContent = 'جارِ تحويلك...';
+            function finishLogin() {
+                sessionStorage.removeItem('goldmind_email');
+                sessionStorage.removeItem('goldmind_mode');
+                sessionStorage.removeItem('goldmind_company_name');
 
-            setTimeout(() => { window.location.href = 'index-ar.html'; }, 900);
+                spinnerWrap.classList.add('hidden');
+                statusIcon.textContent = 'check_circle';
+                statusIcon.classList.remove('hidden');
+                statusTitle.textContent = 'تم تسجيل الدخول بنجاح';
+                statusMsg.textContent = 'جارِ تحويلك...';
+
+                setTimeout(() => { window.location.href = 'index-ar.html'; }, 900);
+            }
         })();
     </script>
 <script>
