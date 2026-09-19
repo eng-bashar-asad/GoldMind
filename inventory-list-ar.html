@@ -412,6 +412,15 @@
         const karats = Object.keys(byKarat).map(Number).sort((a, b) => b - a);
         boxesEl.innerHTML = karats.map(k => karatBoxHtml(k, byKarat[k])).join('');
 
+        // With only one karat in stock, the "choose a karat" screen was a
+        // pointless extra click every single time -- go straight to that
+        // karat's piece list instead. Only show the box-picker screen when
+        // there's actually more than one karat to choose between.
+        if (karats.length === 1) {
+            showKaratPieces(karats[0]);
+            return;
+        }
+
         const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
         document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
