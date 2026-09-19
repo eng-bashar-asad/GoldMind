@@ -1192,7 +1192,7 @@ async function saveEditStockMovement(id) {
 
   const weight = parseFloat(document.getElementById('edit-sm-weight-' + id).value);
   const karat = parseInt(document.getElementById('edit-sm-karat-' + id).value, 10);
-  const accounting = parseFloat(document.getElementById('edit-sm-accounting-' + id).value);
+  const accountingInput = parseFloat(document.getElementById('edit-sm-accounting-' + id).value);
   const fabPerGram = parseFloat(document.getElementById('edit-sm-fabpergram-' + id).value) || 0;
   const notes = document.getElementById('edit-sm-notes-' + id).value.trim();
 
@@ -1201,11 +1201,9 @@ async function saveEditStockMovement(id) {
     errEl.classList.remove('hidden');
     return;
   }
-  if (!accounting || accounting <= 0) {
-    errEl.textContent = 'فضلاً أدخل وزناً محاسبياً صحيحاً';
-    errEl.classList.remove('hidden');
-    return;
-  }
+  // Accounting weight left empty/zero defaults to the live weight, same
+  // convention as everywhere else in the app.
+  const accounting = (accountingInput > 0) ? accountingInput : weight;
 
   const update = {
     weight_grams: weight,
@@ -1698,16 +1696,24 @@ function updateReceiveStockLine(lineId, field, value) {
   renderReceiveStockLines(field !== 'karat'); // karat is a <select>, safe to re-render; number inputs skip re-render to keep focus
 }
 
+function receiveStockEffectiveAcc(l) {
+  // Accounting weight left empty/zero means "same as the live weight" --
+  // matches the same convention already used everywhere else in the app
+  // (inventory-add, production, piece-edit) instead of blocking the save.
+  return l.accountingWeight > 0 ? l.accountingWeight : l.grossWeight;
+}
+
 function renderReceiveStockLines(previewOnly) {
   const totals = receiveStockLines.reduce((acc, l) => {
     acc.gross += l.grossWeight;
-    acc.accounting += l.accountingWeight;
+    const accW = receiveStockEffectiveAcc(l);
+    acc.accounting += accW;
     // Billed on the accounting (billable) weight, not the physical gross
     // weight — matches accounting_weight_grams' role everywhere else in the
     // app (profit-report-ar.html, invoice-print-ar.html's COGS, and the
     // give-stock flow above).
-    acc.gold24k += l.accountingWeight * ((l.karat || 0) / 24);
-    acc.fee += l.accountingWeight * l.fabPerGram;
+    acc.gold24k += accW * ((l.karat || 0) / 24);
+    acc.fee += accW * l.fabPerGram;
     return acc;
   }, { gross: 0, accounting: 0, gold24k: 0, fee: 0 });
 
@@ -1768,12 +1774,6 @@ async function submitReceiveStock() {
     errEl.classList.remove('hidden');
     return;
   }
-  const badAccounting = validLines.find(l => !(l.accountingWeight > 0));
-  if (badAccounting) {
-    errEl.textContent = 'فضلاً أدخل وزناً محاسبياً صحيحاً لكل سطر';
-    errEl.classList.remove('hidden');
-    return;
-  }
 
   const batchRef = document.getElementById('rs-batch-ref').value.trim();
   const notes = document.getElementById('rs-notes').value.trim();
@@ -1781,7 +1781,8 @@ async function submitReceiveStock() {
   const rsVatRate = parseFloat(document.getElementById('rs-vat-rate').value) || 0;
 
   const movements = validLines.map(l => {
-    const feeBeforeVat = l.accountingWeight * l.fabPerGram;
+    const accW = receiveStockEffectiveAcc(l);
+    const feeBeforeVat = accW * l.fabPerGram;
     return {
       store_id: GOLDMIND_STORE_ID,
       trader_id: currentTraderId,
@@ -1790,8 +1791,8 @@ async function submitReceiveStock() {
       karat: l.karat,
       // Billed on the accounting (billable) weight, not the physical gross
       // weight — see comment in renderReceiveStockLines above.
-      gold_24k_equivalent: +(l.accountingWeight * ((l.karat || 0) / 24)).toFixed(3),
-      accounting_weight_grams: l.accountingWeight,
+      gold_24k_equivalent: +(accW * ((l.karat || 0) / 24)).toFixed(3),
+      accounting_weight_grams: accW,
       fab_fee_per_gram: l.fabPerGram,
       // Includes VAT on the fab fee too, at the rate the user set for this
       // voucher — matches trader_movements.fab_fee_amount's role everywhere
