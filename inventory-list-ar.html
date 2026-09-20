@@ -151,6 +151,7 @@
 <div class="flex items-center gap-3">
 <span id="total-fab"></span>
 <span id="total-weight"></span>
+<span id="total-accounting-weight" class="hidden"></span>
 </div>
 </div>
 
@@ -264,11 +265,17 @@
 
 <script>
     let currentStore = null;
+    let canViewAccWeight = false;
     (async function __enforcePermission() {
         await requireGoldMindSession('login-entry-ar.html');
         const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
         const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_inventory'] === true));
         if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+        // Accounting weight is billing-relevant, same sensitivity class as
+        // the reports/financial figures elsewhere in the app -- gated
+        // behind the same view_reports permission rather than shown to
+        // every employee who can merely view inventory.
+        canViewAccWeight = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_reports'] === true));
     })();
 
     function openPhotoLightbox(url) {
@@ -363,10 +370,8 @@
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('search-results-view').classList.remove('hidden');
 
-        const totalWeight = results.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = results.length + ' نتيجة';
-        document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(results), currentStore);
+        renderTotals(results);
 
         document.getElementById('search-results-list').innerHTML = results.map(pieceCardHtml).join('') || '<p class="col-span-full text-center text-[12px] text-on-surface-variant py-8">ما فيه نتائج مطابقة.</p>';
     }
@@ -385,6 +390,21 @@
 
     function totalFabValue(pieces) {
         return pieces.reduce((sum, p) => sum + Number(p.cost_fabrication_per_gram || 0) * Number(p.weight_grams || 0), 0);
+    }
+
+    function renderTotals(pieces) {
+        const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
+        document.getElementById('total-weight').textContent = 'القائم ' + totalWeight.toFixed(2) + ' غ';
+        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(pieces), currentStore);
+
+        const accEl = document.getElementById('total-accounting-weight');
+        if (canViewAccWeight) {
+            const totalAcc = pieces.reduce((sum, p) => sum + Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : (p.weight_grams || 0)), 0);
+            accEl.textContent = 'المحاسبي ' + totalAcc.toFixed(2) + ' غ';
+            accEl.classList.remove('hidden');
+        } else {
+            accEl.classList.add('hidden');
+        }
     }
 
     function karatBoxHtml(karat, pieces) {
@@ -421,10 +441,8 @@
             return;
         }
 
-        const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
-        document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(ALL_PIECES), currentStore);
+        renderTotals(ALL_PIECES);
 
         showKaratBoxes();
     }
@@ -433,10 +451,8 @@
         document.getElementById('karat-boxes').classList.remove('hidden');
         document.getElementById('karat-boxes').classList.add('grid');
         document.getElementById('piece-list-view').classList.add('hidden');
-        const totalWeight = ALL_PIECES.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
-        document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(ALL_PIECES), currentStore);
+        renderTotals(ALL_PIECES);
     }
 
     function showKaratPieces(karat) {
@@ -446,10 +462,8 @@
         document.getElementById('piece-list-view').classList.remove('hidden');
         document.getElementById('piece-list-title').textContent = 'عيار ' + karat;
 
-        const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
-        document.getElementById('total-weight').textContent = 'الإجمالي ' + totalWeight.toFixed(2) + ' غ';
-        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(pieces), currentStore);
+        renderTotals(pieces);
 
         document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
     }
@@ -481,15 +495,20 @@
             // drill-down exactly as before, but search needs to reach sold/
             // reserved/given-to-trader pieces too (status is itself one of
             // the filters), so the raw fetch can no longer exclude them.
-            const [{ data, error }, { data: storeData }] = await Promise.all([
+            const [{ data, error }, { data: storeData }, { data: staffPerm2 }] = await Promise.all([
                 goldmindClient
                     .from('pieces')
                     .select('*')
                     .eq('store_id', GOLDMIND_STORE_ID)
                     .order('created_at', { ascending: false }),
-                goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+                goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+                goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle()
             ]);
             currentStore = storeData;
+            // Fetched here (not just from the separate __enforcePermission
+            // check above) so it's guaranteed ready before renderKaratBoxes()
+            // first runs, rather than racing a second independent request.
+            canViewAccWeight = staffPerm2 && (staffPerm2.role === 'owner' || (staffPerm2.permissions && staffPerm2.permissions['view_reports'] === true));
 
             loading.classList.add('hidden');
 
