@@ -14,6 +14,8 @@
 <script src="supabase-config.js"></script>
 <script src="theme.js?v=20"></script>
 <script src="gm-camera.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
+<script src="zebra-rfid.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -57,7 +59,10 @@
 
 <div id="form-wrap" class="hidden py-6 flex flex-col gap-6">
 
+<div class="flex flex-col gap-6 lg:grid lg:grid-cols-[320px_1fr] lg:gap-8 lg:items-start">
+
 <!-- Photo -->
+<div class="lg:order-2">
 <input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
 <div class="relative cursor-pointer active:scale-[0.98] transition-transform" onclick="triggerPhotoCapture()">
 <div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
@@ -69,6 +74,9 @@
 <span class="material-symbols-outlined text-[18px]">close</span>
 </button>
 </div>
+</div>
+
+<div class="flex flex-col gap-4 lg:order-1">
 
 <!-- Barcode -->
 <div class="relative">
@@ -92,14 +100,15 @@
 </div>
 </div>
 
+<div class="grid grid-cols-2 gap-4">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="fab-cost">كلفة المصنعية / غرام</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="fab-cost" step="0.01" type="number"/>
 </div>
-
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="accounting-weight">وزن المحاسبة</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="accounting-weight" step="0.01" type="number"/>
+</div>
 </div>
 
 <!-- Type / Category -->
@@ -151,9 +160,12 @@
 </select>
 </div>
 
+</div>
+</div>
+
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
-<button id="print-label-btn" onclick="openLabelPrint()" type="button" class="w-full h-14 border border-secondary text-secondary rounded-lg font-bold active:scale-[0.98] transition-all flex items-center justify-center gap-2">
+<button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="w-full h-14 border border-secondary text-secondary rounded-lg font-bold active:scale-[0.98] transition-all flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">print</span> طباعة ملصق القطعة
 </button>
 
@@ -319,9 +331,55 @@ function showMessage(text, isError) {
   box.classList.add(isError ? 'bg-error-container' : 'bg-green-100', isError ? 'text-on-error-container' : 'text-green-700');
 }
 
-function openLabelPrint() {
-  if (!pieceId) return;
-  window.location.href = 'piece-label-print-ar.html?id=' + encodeURIComponent(pieceId);
+let currentStore = null;
+let zebraPrintFields = [];
+
+async function printLabelDirectly() {
+  const btn = document.getElementById('print-label-btn');
+  if (!currentPiece) return;
+  if (!GMZebra.isAvailable()) {
+    showMessage('Zebra Browser Print غير متاح على هذا الجهاز.', true);
+    return;
+  }
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> جارِ الطباعة...';
+
+  const mcMultiplier = (currentStore && currentStore.label_mc_multiplier != null) ? Number(currentStore.label_mc_multiplier) : 1;
+  const mcAddend = (currentStore && currentStore.label_mc_addend != null) ? Number(currentStore.label_mc_addend) : 0;
+  const rawFab = currentPiece.cost_fabrication_per_gram;
+  const mcText = rawFab != null ? (Number(rawFab) * mcMultiplier + mcAddend).toFixed(2) : '—';
+  const values = {
+    barcode: currentPiece.barcode,
+    storeName: (currentStore && currentStore.name) || 'GoldMind',
+    weight: Number(currentPiece.weight_grams || 0).toFixed(2),
+    karat: currentPiece.karat || '',
+    mc: mcText,
+    description: currentPiece.description_en || ''
+  };
+  const dpi = (currentStore && currentStore.zebra_label_dpi) || 203;
+
+  try {
+    await GMZebra.printBarcodeLabel({
+      fields: zebraPrintFields,
+      values: values,
+      widthDots: GMZebra.mmToDots((currentStore && currentStore.zebra_label_width_mm) || 50, dpi),
+      heightDots: GMZebra.mmToDots((currentStore && currentStore.zebra_label_height_mm) || 25, dpi),
+      xOffsetDots: GMZebra.mmToDots((currentStore && currentStore.zebra_label_x_offset_mm) || 0, dpi),
+      yOffsetDots: GMZebra.mmToDots((currentStore && currentStore.zebra_label_y_offset_mm) || 0, dpi),
+      barHeightDots: GMZebra.mmToDots((currentStore && currentStore.zebra_barcode_height_mm) || 5, dpi),
+      spacingDots: GMZebra.mmToDots((currentStore && currentStore.zebra_field_spacing_mm != null) ? currentStore.zebra_field_spacing_mm : 0.75, dpi),
+      moduleWidth: (currentStore && currentStore.zebra_barcode_module_width) || 2,
+      rotate180: !!(currentStore && currentStore.zebra_label_rotate_180),
+      darkness: (currentStore && currentStore.zebra_darkness != null) ? currentStore.zebra_darkness : 15
+    });
+    showMessage('تم إرسال الملصقة للطباعة.', false);
+  } catch (err) {
+    showMessage('تعذّرت الطباعة: ' + (err.message || err), true);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = originalHtml;
+  }
 }
 
 async function load() {
@@ -346,8 +404,13 @@ async function load() {
     return;
   }
 
-  const { data: piece, error } = await goldmindClient
-    .from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).single();
+  const [{ data: piece, error }, { data: storeData }, { data: fieldsData }] = await Promise.all([
+    goldmindClient.from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).single(),
+    goldmindClient.from('stores').select('name, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_label_y_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness, zebra_field_spacing_mm, zebra_barcode_module_width').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('zebra_label_fields').select('*').eq('store_id', GOLDMIND_STORE_ID).order('column_num').order('row_order')
+  ]);
+  currentStore = storeData;
+  zebraPrintFields = fieldsData || [];
 
   document.getElementById('loading-state').classList.add('hidden');
 
