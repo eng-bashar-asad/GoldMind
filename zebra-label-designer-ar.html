@@ -181,6 +181,11 @@
                     <label class="flex items-center gap-2 text-[10px] text-on-surface-variant">${f.content_type === 'blank_line' ? 'ارتفاع الفراغ' : 'حجم الخط'}
                         <input type="number" min="8" max="60" value="${f.font_size}" class="w-16 h-7 border border-outline-variant rounded px-1 text-[11px]" onchange="updateFontSize('${f.id}', this.value)"/>
                     </label>` : ''}
+                    ${f.content_type !== 'blank_line' ? `
+                    <label class="flex items-center gap-2 text-[10px] text-on-surface-variant mt-1">
+                        <input type="checkbox" ${f.center_align ? 'checked' : ''} onchange="updateCenterAlign('${f.id}', this.checked)"/>
+                        توسيط على عرض الملصق كامل (يتجاهل العمود)
+                    </label>` : ''}
                 </div>
             `).join('') || '<p class="text-center text-[11px] text-on-surface-variant py-3">ولا حقل بعد</p>';
         });
@@ -198,6 +203,10 @@
                 <label class="text-[10px] text-on-surface-variant shrink-0" id="add-fontsize-label-${colNum}">حجم الخط</label>
                 <input type="number" min="8" max="60" value="20" class="flex-1 h-9 border border-outline-variant rounded px-2 text-[11px]" id="add-fontsize-${colNum}"/>
             </div>
+            <label class="flex items-center gap-2 text-[10px] text-on-surface-variant" id="add-center-wrap-${colNum}">
+                <input type="checkbox" id="add-center-${colNum}"/>
+                توسيط على عرض الملصق كامل (يتجاهل العمود)
+            </label>
             <div class="flex gap-2">
                 <button class="flex-1 h-9 bg-secondary text-on-secondary rounded-lg text-[12px] font-semibold" onclick="confirmAddField(${colNum})">إضافة</button>
                 <button class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px]" onclick="document.getElementById('add-form-${colNum}').classList.add('hidden')">إلغاء</button>
@@ -209,12 +218,14 @@
         const type = document.getElementById('add-type-' + colNum).value;
         document.getElementById('add-customtext-' + colNum).classList.toggle('hidden', type !== 'custom_text');
         document.getElementById('add-fontsize-label-' + colNum).textContent = type === 'blank_line' ? 'ارتفاع الفراغ' : 'حجم الخط';
+        document.getElementById('add-center-wrap-' + colNum).classList.toggle('hidden', type === 'blank_line');
     }
 
     async function confirmAddField(colNum) {
         const type = document.getElementById('add-type-' + colNum).value;
         const customText = document.getElementById('add-customtext-' + colNum).value.trim();
         const fontSize = parseInt(document.getElementById('add-fontsize-' + colNum).value, 10) || 20;
+        const centerAlign = type !== 'blank_line' && document.getElementById('add-center-' + colNum).checked;
         if (type === 'custom_text' && !customText) { alert('اكتب النص أول.'); return; }
 
         const colFields = allFields.filter(f => f.column_num === colNum);
@@ -226,7 +237,8 @@
             row_order: nextOrder,
             content_type: type,
             custom_text: type === 'custom_text' ? customText : null,
-            font_size: fontSize
+            font_size: fontSize,
+            center_align: centerAlign
         }).select().single();
 
         if (error) { alert('تعذّرت الإضافة: ' + error.message); return; }
@@ -248,6 +260,13 @@
         if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
         const f = allFields.find(x => x.id === id);
         if (f) f.font_size = size;
+    }
+
+    async function updateCenterAlign(id, checked) {
+        const { error } = await goldmindClient.from('zebra_label_fields').update({ center_align: checked }).eq('id', id);
+        if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+        const f = allFields.find(x => x.id === id);
+        if (f) f.center_align = checked;
     }
 
     async function moveField(id, direction) {
