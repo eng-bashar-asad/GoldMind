@@ -176,6 +176,7 @@ var GMZebra = (function () {
       }
     }
 
+    var dpi = opts.dpi || 203;
     var body = '';
     [1, 2].forEach(function (colNum) {
       var colX = colNum === 1 ? xBase : xBase + colWidth;
@@ -184,37 +185,24 @@ var GMZebra = (function () {
         .filter(function (f) { return f.column_num === colNum; })
         .sort(function (a, b) { return a.row_order - b.row_order; })
         .forEach(function (f) {
+          // Per-field horizontal nudge, independent of column position --
+          // replaces the earlier "center on full label width" toggle,
+          // which turned out not to be practical to use.
+          var fieldX = colX + mmToDots(f.x_offset_mm || 0, dpi);
+
           if (f.content_type === 'blank_line') {
             // Nothing to draw -- just advances Y, same as a text field
             // would, so it opens up a gap before the next field.
             y += (f.font_size || 20) + margin;
           } else if (f.content_type === 'barcode_graphic') {
-            var barcodeVal = values.barcode || '';
-            var barX = colX;
-            if (f.center_align) {
-              // ZPL has no native "center this barcode" option -- ^FB only
-              // centers text fields. Code 128 (subset B, what ^BCN uses)
-              // renders at roughly 11 dots/char plus ~35 dots of start/
-              // stop/check overhead, so estimate the rendered width and
-              // center it across the full label width from that.
-              var estWidth = moduleWidth * (11 * barcodeVal.length + 35);
-              barX = Math.max(0, Math.round((w - estWidth) / 2));
-            }
-            body += '^FO' + barX + ',' + y + '^BY' + moduleWidth +
+            body += '^FO' + fieldX + ',' + y + '^BY' + moduleWidth +
               '^BCN,' + barHeight + ',N,N,N' +
-              '^FD' + escapeZpl(barcodeVal) + '^FS';
+              '^FD' + escapeZpl(values.barcode || '') + '^FS';
             y += barHeight + margin;
           } else {
             var fontSize = f.font_size || 20;
             var txt = escapeZpl(textFor(f));
-            if (f.center_align) {
-              // ^FB<width>,<lines>,<spacing>,<justification>,<indent> --
-              // centers the text within a block spanning the full label
-              // width, ignoring which column this field is nominally in.
-              body += '^FO0,' + y + '^A0N,' + fontSize + ',' + fontSize + '^FB' + w + ',1,0,C,0^FD' + txt + '^FS';
-            } else {
-              body += '^FO' + colX + ',' + y + '^A0N,' + fontSize + ',' + fontSize + '^FD' + txt + '^FS';
-            }
+            body += '^FO' + fieldX + ',' + y + '^A0N,' + fontSize + ',' + fontSize + '^FD' + txt + '^FS';
             y += fontSize + margin;
           }
         });
