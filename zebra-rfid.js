@@ -184,7 +184,11 @@ var GMZebra = (function () {
         .filter(function (f) { return f.column_num === colNum; })
         .sort(function (a, b) { return a.row_order - b.row_order; })
         .forEach(function (f) {
-          if (f.content_type === 'barcode_graphic') {
+          if (f.content_type === 'blank_line') {
+            // Nothing to draw -- just advances Y, same as a text field
+            // would, so it opens up a gap before the next field.
+            y += (f.font_size || 20) + margin;
+          } else if (f.content_type === 'barcode_graphic') {
             body += '^FO' + colX + ',' + y + '^BY' + moduleWidth +
               '^BCN,' + barHeight + ',N,N,N' +
               '^FD' + escapeZpl(values.barcode || '') + '^FS';
