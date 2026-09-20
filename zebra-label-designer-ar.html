@@ -150,7 +150,8 @@
         karat: 'العيار',
         mc: 'المصنعية (MC)',
         description: 'نوع/وصف القطعة',
-        custom_text: 'نص مخصص'
+        custom_text: 'نص مخصص',
+        blank_line: 'سطر فارغ (مسافة)'
     };
 
     let allFields = []; // rows from zebra_label_fields, current in-memory state
@@ -177,7 +178,7 @@
                         </div>
                     </div>
                     ${f.content_type !== 'barcode_graphic' ? `
-                    <label class="flex items-center gap-2 text-[10px] text-on-surface-variant">حجم الخط
+                    <label class="flex items-center gap-2 text-[10px] text-on-surface-variant">${f.content_type === 'blank_line' ? 'ارتفاع الفراغ' : 'حجم الخط'}
                         <input type="number" min="8" max="60" value="${f.font_size}" class="w-16 h-7 border border-outline-variant rounded px-1 text-[11px]" onchange="updateFontSize('${f.id}', this.value)"/>
                     </label>` : ''}
                 </div>
@@ -194,7 +195,7 @@
             </select>
             <input class="hidden w-full h-10 border border-outline-variant rounded-lg px-2 text-[12px]" id="add-customtext-${colNum}" placeholder="اكتب النص هون"/>
             <div class="flex items-center gap-2">
-                <label class="text-[10px] text-on-surface-variant shrink-0">حجم الخط</label>
+                <label class="text-[10px] text-on-surface-variant shrink-0" id="add-fontsize-label-${colNum}">حجم الخط</label>
                 <input type="number" min="8" max="60" value="20" class="flex-1 h-9 border border-outline-variant rounded px-2 text-[11px]" id="add-fontsize-${colNum}"/>
             </div>
             <div class="flex gap-2">
@@ -207,6 +208,7 @@
     function onAddTypeChange(colNum) {
         const type = document.getElementById('add-type-' + colNum).value;
         document.getElementById('add-customtext-' + colNum).classList.toggle('hidden', type !== 'custom_text');
+        document.getElementById('add-fontsize-label-' + colNum).textContent = type === 'blank_line' ? 'ارتفاع الفراغ' : 'حجم الخط';
     }
 
     async function confirmAddField(colNum) {
