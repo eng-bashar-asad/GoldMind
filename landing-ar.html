@@ -73,6 +73,35 @@
 
     .rule { height: 1px; background: var(--hairline); }
 
+    /* Hero mark: the big logo entrance (particles fly in and converge --
+       see gmParticleImageIntro in gm-particle-transition.js), followed by
+       a slow, occasional light reflection across it once settled. */
+    .hero-logo-wrap {
+        max-width: 260px;
+        margin: 0.25rem auto 1.75rem auto;
+        position: relative;
+        aspect-ratio: 1408 / 900;
+    }
+    .hero-logo-img { width: 100%; height: 100%; display: block; object-fit: contain; visibility: hidden; }
+    .hero-logo-shine {
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        background: linear-gradient(100deg, transparent 35%, rgba(255,255,255,0.5) 48%, rgba(255,255,255,0.85) 50%, rgba(255,255,255,0.5) 52%, transparent 65%);
+        background-size: 260% 100%;
+        background-position: 130% 0;
+        mix-blend-mode: overlay;
+        animation: heroLogoShine 7s ease-in-out 1.3s infinite;
+    }
+    @keyframes heroLogoShine {
+        0%, 70% { background-position: 130% 0; }
+        100% { background-position: -60% 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .hero-logo-img { visibility: visible; }
+        .hero-logo-shine { animation: none; display: none; }
+    }
+
     .btn-gold {
         background: linear-gradient(160deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-deep) 100%);
         box-shadow: 0 10px 24px -10px rgba(124, 86, 32, 0.55), inset 0 1px 0 rgba(255,255,255,0.35);
@@ -100,6 +129,10 @@
 
 <!-- Hero -->
 <main class="max-w-3xl mx-auto px-5 pt-10 pb-16 text-center">
+<div class="hero-logo-wrap">
+<img id="heroLogo" src="logo-full-banner.svg?v=20260921" alt="GoldMind" class="hero-logo-img"/>
+<div class="hero-logo-shine"></div>
+</div>
 <h1 class="display leaf-shine text-4xl md:text-5xl leading-[1.15] mb-5">
 نظام إدارة محلات الذهب<br/>والمجوهرات، بمكان واحد
 </h1>
@@ -176,8 +209,15 @@
 </div>
 </div>
 
+<script src="gm-particle-transition.js"></script>
 <script>
 function showPaidComingSoon() { document.getElementById('paidModal').classList.remove('hidden'); }
 function hidePaidComingSoon() { document.getElementById('paidModal').classList.add('hidden'); }
+
+(function () {
+    const heroLogo = document.getElementById('heroLogo');
+    if (heroLogo && typeof gmParticleImageIntro === 'function') gmParticleImageIntro(heroLogo);
+    else if (heroLogo) heroLogo.style.visibility = 'visible';
+})();
 </script>
 </body></html>
