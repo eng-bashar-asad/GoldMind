@@ -499,13 +499,21 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('settle-cash-amount-label').textContent = `المبلغ المدفوع (${unit})`;
 });
 
-const MOVEMENT_LABELS = { debt_increase: 'استلام ذهب (زيادة دين)', debt_decrease: 'تسوية / دفعة (تخفيض دين)' };
-
 function movementLabel(m) {
   if (m.source === 'stock_given') return 'إخراج بضاعة (تسليم للتاجر)';
   if (m.source === 'stock_received') return 'إدخال بضاعة (استلام من التاجر)';
   if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
-  return MOVEMENT_LABELS[m.movement_type] || m.movement_type;
+
+  // Manual settlements (and older single-purpose entries) can be gold-only,
+  // cash-only, or both -- the old hardcoded label always said "gold" for
+  // any debt_increase, even for a cash-only settlement.
+  const hasGold = Number(m.weight_grams || 0) > 0;
+  const hasCash = Number(m.fab_fee_amount || 0) > 0;
+  const what = hasGold && hasCash ? 'ذهب ونقدي' : hasGold ? 'ذهب' : hasCash ? 'نقدي' : '';
+  const isIncrease = m.movement_type === 'debt_increase';
+
+  if (isIncrease) return what ? ('استلام ' + what + ' (زيادة دين)') : 'استلام (زيادة دين)';
+  return what ? ('تسوية ' + what + ' / دفعة (تخفيض دين)') : 'تسوية / دفعة (تخفيض دين)';
 }
 
 async function load() {
