@@ -195,6 +195,18 @@
 </details>
 <details class="mt-2 group space-y-4">
 <summary class="flex items-center justify-between cursor-pointer list-none marker:content-none py-2.5 px-3 rounded-lg bg-surface-container-low">
+<h3 class="font-label-md text-label-md text-secondary font-bold">أنواع وتصنيفات القطع (الترجمة الإنجليزية)</h3>
+<span class="material-symbols-outlined text-[20px] text-outline transition-transform duration-200 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="pt-4 flex flex-col gap-4">
+<p class="text-[11px] text-on-surface-variant leading-5">اسم كل نوع/صنف بالعربي يلي بتشوفه بالقوائم المنسدلة، مع مرادفه بالإنجليزي يلي بيطبع على ملصق الباركود بحقل "نوع/وصف القطعة" — لو تركته فاضي، ما رح يطبع شي بهذا الحقل لهاي القطع.</p>
+<div id="classification-options-list" class="flex flex-col gap-4">
+<p class="text-[12px] text-on-surface-variant">جارِ التحميل...</p>
+</div>
+</div>
+</details>
+<details class="mt-2 group space-y-4">
+<summary class="flex items-center justify-between cursor-pointer list-none marker:content-none py-2.5 px-3 rounded-lg bg-surface-container-low">
 <h3 class="font-label-md text-label-md text-secondary font-bold">ترقيم القطع (الباركود)</h3>
 <span class="material-symbols-outlined text-[20px] text-outline transition-transform duration-200 group-open:rotate-180">expand_more</span>
 </summary>
@@ -823,6 +835,49 @@
         renderNextPiecePreview(data);
 
         form.classList.remove('hidden');
+        loadClassificationOptions();
+    }
+
+    const FIELD_KEY_LABELS = { type: 'النوع', category1: 'صنف ١ (الموديل)', category2: 'صنف ٢' };
+
+    async function loadClassificationOptions() {
+        const { data, error } = await goldmindClient
+            .from('piece_classification_options')
+            .select('id, field_key, value, value_en')
+            .eq('store_id', GOLDMIND_STORE_ID)
+            .order('field_key')
+            .order('value');
+
+        const listEl = document.getElementById('classification-options-list');
+        if (error) { listEl.innerHTML = '<p class="text-[12px] text-error">تعذّر التحميل: ' + error.message + '</p>'; return; }
+        if (!data || data.length === 0) { listEl.innerHTML = '<p class="text-[12px] text-on-surface-variant">ما في تصنيفات مضافة بعد.</p>'; return; }
+
+        const groups = {};
+        data.forEach(row => {
+            (groups[row.field_key] = groups[row.field_key] || []).push(row);
+        });
+
+        listEl.innerHTML = Object.keys(groups).map(key => `
+            <div class="border border-outline-variant rounded-lg p-3">
+                <h4 class="text-[12px] font-bold text-secondary mb-2">${FIELD_KEY_LABELS[key] || key}</h4>
+                <div class="flex flex-col gap-2">
+                    ${groups[key].map(row => `
+                        <div class="grid grid-cols-2 gap-2 items-center">
+                            <span class="text-[13px] font-semibold">${gmEscapeHtml(row.value)}</span>
+                            <input type="text" dir="ltr" placeholder="English" value="${gmEscapeHtml(row.value_en || '')}"
+                                class="h-10 border border-outline-variant rounded-lg px-3 text-[12px]"
+                                onchange="updateClassificationEn('${row.id}', this.value)"/>
+                        </div>`).join('')}
+                </div>
+            </div>`).join('');
+    }
+
+    async function updateClassificationEn(id, valueEn) {
+        const { error } = await goldmindClient
+            .from('piece_classification_options')
+            .update({ value_en: valueEn.trim() || null })
+            .eq('id', id);
+        if (error) alert('تعذّر الحفظ: ' + error.message);
     }
 
     saveBtn.addEventListener('click', async () => {
