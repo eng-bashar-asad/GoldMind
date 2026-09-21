@@ -85,6 +85,17 @@ function gmMakeOverlayAt(rect, w, h) {
     return overlay;
 }
 
+// Pure per-particle position math, shared by the time-driven animations
+// below AND by the scroll-scrubbed version further down -- kept in one
+// place so both stay visually identical.
+function gmDissolvePos(p, t2) {
+    return { x: p.x + p.vx * t2, y: p.y + 380 * t2 * t2, alpha: p.a * (1 - t2) };
+}
+function gmReformPos(p, t2) {
+    const ease = 1 - Math.pow(1 - t2, 3);
+    return { x: p.sx + (p.x - p.sx) * ease, y: p.sy + (p.y - p.sy) * ease, alpha: p.a * ease };
+}
+
 // Particles fall apart with gravity and fade out. Resolves when done.
 function gmAnimateDissolve(ctx, cap) {
     cap.particles.forEach(function (p) { p.vx = (Math.random() - 0.5) * 140; });
@@ -94,12 +105,10 @@ function gmAnimateDissolve(ctx, cap) {
             const t = Math.min(1, (now - start) / GM_TRANSITION_DURATION);
             ctx.clearRect(0, 0, cap.w, cap.h);
             for (const p of cap.particles) {
-                const px = p.x + p.vx * t;
-                const py = p.y + 380 * t * t;
-                const alpha = p.a * (1 - t);
-                if (alpha <= 0.02) continue;
-                ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + alpha + ')';
-                ctx.fillRect(px, py, p.size, p.size);
+                const pos = gmDissolvePos(p, t);
+                if (pos.alpha <= 0.02) continue;
+                ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + pos.alpha + ')';
+                ctx.fillRect(pos.x, pos.y, p.size, p.size);
             }
             if (t < 1) requestAnimationFrame(frame); else resolve();
         }
@@ -118,20 +127,19 @@ function gmAnimateReform(ctx, cap) {
         const start = performance.now();
         function frame(now) {
             const t = Math.min(1, (now - start) / GM_TRANSITION_DURATION);
-            const ease = 1 - Math.pow(1 - t, 3);
             ctx.clearRect(0, 0, cap.w, cap.h);
             for (const p of cap.particles) {
-                const px = p.sx + (p.x - p.sx) * ease;
-                const py = p.sy + (p.y - p.sy) * ease;
-                const alpha = p.a * ease;
-                ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + alpha + ')';
-                ctx.fillRect(px, py, p.size, p.size);
+                const pos = gmReformPos(p, t);
+                if (pos.alpha <= 0.02) continue;
+                ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + pos.alpha + ')';
+                ctx.fillRect(pos.x, pos.y, p.size, p.size);
             }
             if (t < 1) requestAnimationFrame(frame); else resolve();
         }
         requestAnimationFrame(frame);
     });
 }
+
 
 // ---------- Cross-page navigation ----------
 
@@ -245,4 +253,101 @@ function gmParticleImageIntro(imgEl) {
             img.src = src;
         } catch (e) { done(); }
     });
+}
+
+// ---------- Scroll-scrubbed dissolve/reform (e.g. hero logo -> headline) ----------
+//
+// Ties the SAME dissolve/reform particle motion above directly to scroll
+// position instead of time, so it's fully reversible: scroll down and the
+// outgoing element (outEl) dissolves into particles while the incoming
+// element (inEl) reforms from them; scroll back up and it runs in
+// reverse, at whatever point the user stopped.
+//
+// zoneEl must be a tall wrapper (e.g. height: 200vh) with a
+// `.hero-scroll-pin` child that stays pinned on screen (position: sticky)
+// while the zone scrolls past -- that pinned box is what outEl/inEl sit
+// inside, absolutely stacked on top of each other. Progress (t) is
+// derived from how far the zone has scrolled past the top of the
+// viewport. Never blocks: any failure just shows both elements normally.
+async function gmScrollParticleZone(zoneEl, outEl, inEl) {
+    const showBoth = function () { outEl.style.visibility = 'visible'; inEl.style.visibility = 'visible'; };
+    try {
+        if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { showBoth(); return; }
+        if (typeof html2canvas === 'undefined') { showBoth(); return; }
+
+        const pin = zoneEl.querySelector('.hero-scroll-pin');
+        if (!pin) { showBoth(); return; }
+
+        // outEl is genuinely on screen right now -> capture as-is.
+        const capOut = await gmCaptureElement(outEl);
+        // inEl isn't shown yet -> capture from an off-screen clone.
+        const capIn = await gmCaptureElementOffscreen(inEl, function (clone) { clone.style.visibility = 'visible'; });
+
+        // Randomized per-particle drift/entry offsets, assigned ONCE so the
+        // scrub is stable and reversible rather than re-randomized per frame.
+        capOut.particles.forEach(function (p) { p.vx = (Math.random() - 0.5) * 140; });
+        capIn.particles.forEach(function (p) {
+            p.sx = p.x + (Math.random() - 0.5) * 260;
+            p.sy = p.y - 260 - Math.random() * 220;
+        });
+
+        const pinRect = pin.getBoundingClientRect();
+        const outRect = outEl.getBoundingClientRect();
+        const inRect = inEl.getBoundingClientRect(); // visibility:hidden keeps layout, so this is meaningful
+        const outOffX = outRect.left - pinRect.left, outOffY = outRect.top - pinRect.top;
+        const inOffX = inRect.left - pinRect.left, inOffY = inRect.top - pinRect.top;
+
+        const overlay = document.createElement('canvas');
+        overlay.width = Math.round(pinRect.width);
+        overlay.height = Math.round(pinRect.height);
+        overlay.style.cssText = 'position:fixed;left:' + pinRect.left + 'px;top:' + pinRect.top + 'px;' +
+            'width:' + pinRect.width + 'px;height:' + pinRect.height + 'px;z-index:5;pointer-events:none;display:none;';
+        pin.appendChild(overlay);
+        const ctx = overlay.getContext('2d');
+
+        let ticking = false;
+        function render() {
+            ticking = false;
+            const zRect = zoneEl.getBoundingClientRect();
+            const scrollable = zoneEl.offsetHeight - window.innerHeight;
+            const t = scrollable > 0 ? Math.min(1, Math.max(0, -zRect.top / scrollable)) : 0;
+
+            if (t <= 0.001) {
+                overlay.style.display = 'none';
+                outEl.style.visibility = 'visible'; inEl.style.visibility = 'hidden';
+                return;
+            }
+            if (t >= 0.999) {
+                overlay.style.display = 'none';
+                outEl.style.visibility = 'hidden'; inEl.style.visibility = 'visible';
+                return;
+            }
+            outEl.style.visibility = 'hidden'; inEl.style.visibility = 'hidden';
+            overlay.style.display = 'block';
+            ctx.clearRect(0, 0, overlay.width, overlay.height);
+            if (t <= 0.5) {
+                const t2 = t / 0.5;
+                for (const p of capOut.particles) {
+                    const pos = gmDissolvePos(p, t2);
+                    if (pos.alpha <= 0.02) continue;
+                    ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + pos.alpha + ')';
+                    ctx.fillRect(outOffX + pos.x, outOffY + pos.y, p.size, p.size);
+                }
+            } else {
+                const t2 = (t - 0.5) / 0.5;
+                for (const p of capIn.particles) {
+                    const pos = gmReformPos(p, t2);
+                    if (pos.alpha <= 0.02) continue;
+                    ctx.fillStyle = 'rgba(' + p.r + ',' + p.g + ',' + p.b + ',' + pos.alpha + ')';
+                    ctx.fillRect(inOffX + pos.x, inOffY + pos.y, p.size, p.size);
+                }
+            }
+        }
+        function onScroll() { if (!ticking) { ticking = true; requestAnimationFrame(render); } }
+        window.addEventListener('scroll', onScroll, { passive: true });
+        window.addEventListener('resize', onScroll);
+        render();
+    } catch (e) {
+        showBoth();
+    }
 }
