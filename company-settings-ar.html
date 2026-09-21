@@ -839,6 +839,7 @@
     }
 
     const FIELD_KEY_LABELS = { type: 'النوع', category1: 'صنف ١ (الموديل)', category2: 'صنف ٢' };
+    let classificationOptionsCache = [];
 
     async function loadClassificationOptions() {
         const { data, error } = await goldmindClient
@@ -850,24 +851,44 @@
 
         const listEl = document.getElementById('classification-options-list');
         if (error) { listEl.innerHTML = '<p class="text-[12px] text-error">تعذّر التحميل: ' + error.message + '</p>'; return; }
-        if (!data || data.length === 0) { listEl.innerHTML = '<p class="text-[12px] text-on-surface-variant">ما في تصنيفات مضافة بعد.</p>'; return; }
 
-        const groups = {};
-        data.forEach(row => {
-            (groups[row.field_key] = groups[row.field_key] || []).push(row);
+        classificationOptionsCache = data || [];
+        renderClassificationOptions();
+    }
+
+    function renderClassificationOptions() {
+        const listEl = document.getElementById('classification-options-list');
+        const groups = { type: [], category1: [], category2: [] };
+        classificationOptionsCache.forEach(row => {
+            if (groups[row.field_key]) groups[row.field_key].push(row);
         });
 
-        listEl.innerHTML = Object.keys(groups).map(key => `
+        listEl.innerHTML = Object.keys(FIELD_KEY_LABELS).map(key => `
             <div class="border border-outline-variant rounded-lg p-3">
-                <h4 class="text-[12px] font-bold text-secondary mb-2">${FIELD_KEY_LABELS[key] || key}</h4>
+                <h4 class="text-[12px] font-bold text-secondary mb-2">${FIELD_KEY_LABELS[key]}</h4>
                 <div class="flex flex-col gap-2">
                     ${groups[key].map(row => `
                         <div class="grid grid-cols-2 gap-2 items-center">
-                            <span class="text-[13px] font-semibold">${gmEscapeHtml(row.value)}</span>
+                            <input type="text" value="${gmEscapeHtml(row.value)}"
+                                class="h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-semibold"
+                                onchange="updateClassificationValue('${row.id}', this.value)"/>
                             <input type="text" dir="ltr" placeholder="English" value="${gmEscapeHtml(row.value_en || '')}"
                                 class="h-10 border border-outline-variant rounded-lg px-3 text-[12px]"
                                 onchange="updateClassificationEn('${row.id}', this.value)"/>
                         </div>`).join('')}
+                    ${groups[key].length === 0 ? '<p class="text-[11px] text-on-surface-variant">ما في قيم مضافة بعد.</p>' : ''}
+                </div>
+                <div class="grid grid-cols-2 gap-2 items-center mt-2 pt-2 border-t border-dashed border-outline-variant">
+                    <input type="text" placeholder="قيمة عربية جديدة" id="new-classification-ar-${key}"
+                        class="h-10 border border-outline-variant rounded-lg px-3 text-[13px]"/>
+                    <div class="flex gap-2">
+                        <input type="text" dir="ltr" placeholder="English" id="new-classification-en-${key}"
+                            class="flex-1 h-10 border border-outline-variant rounded-lg px-3 text-[12px]"/>
+                        <button type="button" onclick="addClassificationOption('${key}')"
+                            class="h-10 w-10 shrink-0 rounded-lg bg-secondary text-on-secondary flex items-center justify-center">
+                            <span class="material-symbols-outlined text-[18px]">add</span>
+                        </button>
+                    </div>
                 </div>
             </div>`).join('');
     }
@@ -877,7 +898,39 @@
             .from('piece_classification_options')
             .update({ value_en: valueEn.trim() || null })
             .eq('id', id);
-        if (error) alert('تعذّر الحفظ: ' + error.message);
+        if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+        const row = classificationOptionsCache.find(r => r.id === id);
+        if (row) row.value_en = valueEn.trim() || null;
+    }
+
+    async function updateClassificationValue(id, value) {
+        const trimmed = value.trim();
+        if (!trimmed) { alert('القيمة ما ممكن تكون فاضية.'); loadClassificationOptions(); return; }
+        const { error } = await goldmindClient
+            .from('piece_classification_options')
+            .update({ value: trimmed })
+            .eq('id', id);
+        if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+        const row = classificationOptionsCache.find(r => r.id === id);
+        if (row) row.value = trimmed;
+    }
+
+    async function addClassificationOption(fieldKey) {
+        const arInput = document.getElementById('new-classification-ar-' + fieldKey);
+        const enInput = document.getElementById('new-classification-en-' + fieldKey);
+        const value = arInput.value.trim();
+        const valueEn = enInput.value.trim();
+        if (!value) { alert('اكتب القيمة العربية أول.'); return; }
+
+        const { data, error } = await goldmindClient
+            .from('piece_classification_options')
+            .insert({ store_id: GOLDMIND_STORE_ID, field_key: fieldKey, value: value, value_en: valueEn || null })
+            .select('id, field_key, value, value_en')
+            .single();
+
+        if (error) { alert('تعذّر الإضافة: ' + error.message); return; }
+        classificationOptionsCache.push(data);
+        renderClassificationOptions();
     }
 
     saveBtn.addEventListener('click', async () => {
