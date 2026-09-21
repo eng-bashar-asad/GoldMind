@@ -206,3 +206,43 @@ async function gmDissolveStepSwap(outgoingEl, incomingEl, swapFn) {
         swapFn();
     }
 }
+
+// ---------- Static image "reform" (e.g. a hero logo entrance) ----------
+// Loads a plain <img> or <object type="image/svg+xml"> element's real
+// image, samples it into a particle grid, and animates the particles
+// flying in from scattered positions and converging into place -- same
+// motion as gmAnimateReform, but for a one-off entrance rather than a
+// step/page transition. No html2canvas needed here since the source is
+// already a plain image. The real element stays hidden until particles
+// land, then it's revealed and the overlay removed. Never blocks: any
+// failure (missing image, zero-size box, reduced-motion) just shows the
+// real element immediately.
+function gmParticleImageIntro(imgEl) {
+    return new Promise(function (resolveOuter) {
+        const done = function () { imgEl.style.visibility = 'visible'; resolveOuter(); };
+        try {
+            if (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) { done(); return; }
+            const src = imgEl.tagName === 'OBJECT' ? imgEl.data : (imgEl.currentSrc || imgEl.src);
+            const rect = imgEl.getBoundingClientRect();
+            const w = Math.round(rect.width), h = Math.round(rect.height);
+            if (!src || !w || !h) { done(); return; }
+            const img = new Image();
+            img.onload = function () {
+                try {
+                    const buf = document.createElement('canvas');
+                    buf.width = w; buf.height = h;
+                    buf.getContext('2d').drawImage(img, 0, 0, w, h);
+                    const particles = gmSampleParticles(buf, w, h, gmGrainSize(w, h));
+                    imgEl.style.visibility = 'hidden';
+                    const overlay = gmMakeOverlayAt(rect, w, h);
+                    gmAnimateReform(overlay.getContext('2d'), { w: w, h: h, particles: particles }).then(function () {
+                        overlay.remove();
+                        done();
+                    });
+                } catch (e) { done(); }
+            };
+            img.onerror = function () { done(); };
+            img.src = src;
+        } catch (e) { done(); }
+    });
+}
