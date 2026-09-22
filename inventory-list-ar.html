@@ -159,7 +159,7 @@
 <div class="hidden border border-outline-variant rounded-xl p-4 bg-surface-container-lowest mt-2 flex flex-col gap-3" id="search-panel">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="search-barcode">رقم الباركود</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" dir="ltr" id="search-barcode" placeholder="مثال: G000012" type="text"/>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono" dir="ltr" id="search-barcode" onkeydown="if (event.key === 'Enter') { event.preventDefault(); runSearch(); }" placeholder="مثال: G000012" type="text"/>
 </div>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
@@ -357,7 +357,7 @@
         const status = document.getElementById('search-status').value;
 
         const results = ALL_PIECES_RAW.filter(p => {
-            if (barcode && !(p.barcode || '').toLowerCase().includes(barcode)) return false;
+            if (barcode && !(p.barcode || '').toLowerCase().startsWith(barcode)) return false;
             if (!isNaN(weightFrom) && Number(p.weight_grams || 0) < weightFrom) return false;
             if (!isNaN(weightTo) && Number(p.weight_grams || 0) > weightTo) return false;
             if (type && p.piece_type !== type) return false;
