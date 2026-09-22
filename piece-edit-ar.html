@@ -543,8 +543,25 @@ document.getElementById('save-btn').addEventListener('click', async () => {
 
   if (error) { showMessage('خطأ: ' + error.message, true); return; }
 
+  // Keep the in-memory piece in sync with what was just saved, so printing
+  // a barcode right after editing (e.g. after changing the barcode itself)
+  // uses the fresh values instead of the ones from before the edit.
+  currentPiece.barcode = barcode || null;
+  currentPiece.weight_grams = weight;
+  currentPiece.karat = karat;
+  currentPiece.cost_fabrication_per_gram = (fabCost != null && !isNaN(fabCost)) ? fabCost : null;
+  currentPiece.accounting_weight_grams = accountingWeight;
+  currentPiece.color = selectedColor;
+  currentPiece.status = status;
+  currentPiece.photo_url = photoUrl;
+  currentPiece.piece_type = document.getElementById('piece-type').value || null;
+  currentPiece.category1 = document.getElementById('category1').value || null;
+  currentPiece.category2 = document.getElementById('category2').value || null;
+  selectedPhotoFile = null;
+  photoRemoved = false;
+
   showMessage('تم حفظ التعديلات بنجاح!', false);
-  setTimeout(() => { window.location.href = 'inventory-list-ar.html'; }, 700);
+  loadPieceLog();
 });
 
 document.getElementById('delete-btn').addEventListener('click', async () => {
