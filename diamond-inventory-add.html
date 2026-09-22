@@ -206,6 +206,15 @@
 </div>
 <p class="text-[10px] text-outline mt-1 px-1">اتركه فارغاً لاستخدام (وزن الماس × سعر القيراط) تلقائياً + قيمة الذهب إن وجدت.</p>
 </div>
+<!-- Secondary stones cost (Cs) -->
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="secondary-stones-cost">كلفة الأحجار الصغيرة (اختياري)</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="secondary-stones-cost" placeholder="0.00" step="0.01" type="number"/>
+<div class="bg-surface-container-high px-4 h-full flex items-center border-r border-outline-variant text-on-surface-variant font-label-md">د.إ</div>
+</div>
+<p class="text-[10px] text-outline mt-1 px-1">كلفة أحجار جانبية غير الألماسة الرئيسية، منفصلة عنها.</p>
+</div>
 <!-- Diamond 4Cs: Shape, Clarity, Cut, Color -->
 <div class="grid grid-cols-2 gap-4">
 <div class="relative">
@@ -499,6 +508,8 @@
 
             const suggestedPriceInput = parseFloat(document.getElementById('suggested-price').value);
             const suggestedPrice = suggestedPriceInput > 0 ? suggestedPriceInput : null;
+            const secondaryStonesCostInput = parseFloat(document.getElementById('secondary-stones-cost').value);
+            const secondaryStonesCost = secondaryStonesCostInput > 0 ? secondaryStonesCostInput : null;
 
             const { error } = await goldmindClient.from('diamond_pieces').insert({
                 store_id: GOLDMIND_STORE_ID,
@@ -517,6 +528,7 @@
                 certificate_lab: document.getElementById('certificate-lab').value.trim() || null,
                 certificate_number: document.getElementById('certificate-number').value.trim() || null,
                 suggested_sale_price: suggestedPrice,
+                secondary_stones_cost: secondaryStonesCost,
                 description_ar: document.getElementById('desc-ar').value.trim() || null,
                 description_en: document.getElementById('desc-en').value.trim() || null,
                 status: 'available',
@@ -536,6 +548,7 @@
             document.getElementById('diamond-carat').value = '';
             document.getElementById('diamond-price-per-carat').value = '';
             document.getElementById('suggested-price').value = '';
+            document.getElementById('secondary-stones-cost').value = '';
             document.getElementById('diamond-shape').value = '';
             document.getElementById('diamond-clarity').value = '';
             document.getElementById('diamond-cut').value = '';
