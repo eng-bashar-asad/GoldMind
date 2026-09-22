@@ -480,8 +480,38 @@
             const mode = sessionStorage.getItem('goldmind_mode');
 
             if (mode === 'join') {
-                const { data: anyMembership } = await goldmindClient
-                    .from('staff').select('id').eq('user_id', user.id).limit(1).maybeSingle();
+                // Check EXISTING memberships first -- someone already
+                // belonging to more than one company needs to pick which
+                // to enter now, same as someone with 2+ pending invites.
+                const { data: memberships } = await goldmindClient
+                    .from('staff').select('store_id, stores(name)').eq('user_id', user.id);
+
+                if (memberships && memberships.length > 1) {
+                    otpSubmitting = false;
+                    setOtpButtonState('idle');
+                    const listEl = document.getElementById('otpInviteList');
+                    listEl.classList.remove('hidden');
+                    listEl.classList.add('flex');
+                    listEl.innerHTML = '';
+                    memberships.forEach(m => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'w-full h-12 rounded-lg font-bold text-black';
+                        btn.style.background = 'linear-gradient(135deg, #FFD700 0%, #B4955A 100%)';
+                        btn.textContent = (m.stores && m.stores.name) || m.store_id;
+                        btn.onclick = () => {
+                            localStorage.setItem('goldmind_active_store', m.store_id);
+                            sessionStorage.removeItem('goldmind_email');
+                            sessionStorage.removeItem('goldmind_mode');
+                            sessionStorage.removeItem('goldmind_company_name');
+                            showVerifiedThenNavigate('index-ar.html');
+                        };
+                        listEl.appendChild(btn);
+                    });
+                    return; // wait for the user's pick above
+                }
+
+                const anyMembership = memberships && memberships.length === 1 ? memberships[0] : null;
 
                 if (!anyMembership) {
                     // Which company(ies) this email is invited to is only
