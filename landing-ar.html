@@ -11,7 +11,6 @@
 <meta name="description" content="GoldMind — نظام إدارة شامل لمحلات الذهب والمجوهرات: مخزون، فواتير، حسابات تجار، وتقارير مالية. جرّب مجاناً 60 يوم بدون بطاقة ائتمان."/>
 <title>GoldMind | نظام إدارة محلات الذهب والمجوهرات</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Markazi+Text:wght@500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -74,45 +73,9 @@
 
     .rule { height: 1px; background: var(--hairline); }
 
-    /* Hero mark: the big logo entrance (particles fly in and converge --
-       see gmParticleImageIntro in gm-particle-transition.js), followed by
-       a slow, occasional light reflection across it once settled. Then a
-       scroll-scrubbed zone (gmScrollParticleZone) dissolves the logo into
-       the headline as the user scrolls down, reversible on scroll up. */
-    .hero-scroll-zone { height: 200vh; position: relative; margin-bottom: 2.5rem; }
-    .hero-scroll-pin { position: sticky; top: 0; height: 100vh; display: flex; align-items: center; justify-content: center; }
-    .hero-logo-wrap, .hero-headline-wrap {
-        position: absolute; inset: 0; margin: auto; height: fit-content;
-        display: flex; flex-direction: column; align-items: center; justify-content: center;
-    }
-    .hero-logo-wrap { max-width: 260px; aspect-ratio: 1408 / 900; }
-    .hero-headline-wrap { max-width: 32rem; padding: 0 1.25rem; }
-    .hero-logo-img { width: 100%; height: 100%; display: block; object-fit: contain; visibility: hidden; }
-    .hero-headline-wrap { visibility: hidden; }
-    .hero-logo-shine {
-        position: absolute;
-        inset: 0;
-        pointer-events: none;
-        background: linear-gradient(100deg, transparent 35%, rgba(255,255,255,0.5) 48%, rgba(255,255,255,0.85) 50%, rgba(255,255,255,0.5) 52%, transparent 65%);
-        background-size: 260% 100%;
-        background-position: 130% 0;
-        mix-blend-mode: overlay;
-        animation: heroLogoShine 7s ease-in-out 1.3s infinite;
-    }
-    @keyframes heroLogoShine {
-        0%, 70% { background-position: 130% 0; }
-        100% { background-position: -60% 0; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-        /* No scroll-scrubbing or shine -- both pieces just sit in normal
-           document flow, stacked and fully visible. */
-        .hero-scroll-zone { height: auto; }
-        .hero-scroll-pin { position: static; height: auto; display: block; }
-        .hero-logo-wrap, .hero-headline-wrap { position: static; margin: 0 auto 1.75rem auto; }
-        .hero-logo-img { visibility: visible; }
-        .hero-headline-wrap { visibility: visible; }
-        .hero-logo-shine { animation: none; display: none; }
-    }
+    /* Hero mark: a plain, large static logo. No animation. */
+    .hero-logo-wrap { max-width: 340px; margin: 0.5rem auto 2rem auto; }
+    .hero-logo-img { width: 100%; display: block; object-fit: contain; }
 
     .btn-gold {
         background: linear-gradient(160deg, var(--gold-bright) 0%, var(--gold) 55%, var(--gold-deep) 100%);
@@ -141,22 +104,15 @@
 
 <!-- Hero -->
 <main class="max-w-3xl mx-auto px-5 pt-10 pb-16 text-center">
-<div class="hero-scroll-zone" id="heroScrollZone">
-<div class="hero-scroll-pin">
-<div class="hero-logo-wrap" id="heroLogoWrap">
-<img id="heroLogo" src="logo-full-banner.svg?v=20260921" alt="GoldMind" class="hero-logo-img"/>
-<div class="hero-logo-shine"></div>
+<div class="hero-logo-wrap">
+<img src="logo-full-banner.svg?v=20260921" alt="GoldMind" class="hero-logo-img"/>
 </div>
-<div class="hero-headline-wrap" id="heroHeadlineWrap">
 <h1 class="display leaf-shine text-4xl md:text-5xl leading-[1.15] mb-5">
 نظام إدارة محلات الذهب<br/>والمجوهرات، بمكان واحد
 </h1>
-<p class="text-[15px] leading-relaxed max-w-xl mx-auto" style="color: var(--ink-soft);">
+<p class="text-[15px] leading-relaxed max-w-xl mx-auto mb-12" style="color: var(--ink-soft);">
 المخزون، الفواتير، حسابات التجار، الصندوق اليومي، والتقارير المالية — كل شي مربوط ببعض بنظام واحد مصمم خصيصاً لمحلات الذهب.
 </p>
-</div>
-</div>
-</div>
 
 <!-- Two entry paths -->
 <div class="grid sm:grid-cols-2 gap-4 mb-14 text-right">
@@ -227,24 +183,8 @@
 </div>
 </div>
 
-<script src="gm-particle-transition.js"></script>
 <script>
 function showPaidComingSoon() { document.getElementById('paidModal').classList.remove('hidden'); }
 function hidePaidComingSoon() { document.getElementById('paidModal').classList.add('hidden'); }
-
-(async function () {
-    const heroLogo = document.getElementById('heroLogo');
-    if (heroLogo && typeof gmParticleImageIntro === 'function') await gmParticleImageIntro(heroLogo);
-    else if (heroLogo) heroLogo.style.visibility = 'visible';
-
-    const zone = document.getElementById('heroScrollZone');
-    const outEl = document.getElementById('heroLogoWrap');
-    const inEl = document.getElementById('heroHeadlineWrap');
-    if (zone && outEl && inEl && typeof gmScrollParticleZone === 'function') {
-        gmScrollParticleZone(zone, outEl, inEl);
-    } else if (inEl) {
-        inEl.style.visibility = 'visible';
-    }
-})();
 </script>
 </body></html>
