@@ -216,7 +216,11 @@
 <!-- Error state -->
 <div id="error-state" class="hidden py-6 px-4 rounded-lg bg-red-100 text-red-700 font-label-md text-label-md text-center"></div>
 
-<!-- Karat boxes (default view): pick a karat to see what's actually in stock -->
+<!-- Karat boxes (default view, or scoped inside a box): pick a karat -->
+<button id="karat-boxes-back" onclick="showTopLevel()" class="hidden items-center gap-1 text-primary font-semibold text-[13px] mb-3">
+<span class="material-symbols-outlined text-[18px]">arrow_forward</span>
+<span id="karat-boxes-back-label">العودة لكل الصناديق</span>
+</button>
 <div id="karat-boxes" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3 pb-3"></div>
 
 <!-- Box/location boxes: only boxes that actually have pieces show up here -->
@@ -224,7 +228,7 @@
 
 <!-- Piece list for the selected karat -->
 <div id="piece-list-view" class="hidden">
-<button onclick="showKaratBoxes()" class="flex items-center gap-1 text-primary font-semibold text-[13px] mb-3">
+<button onclick="backFromPieceList()" class="flex items-center gap-1 text-primary font-semibold text-[13px] mb-3">
 <span class="material-symbols-outlined text-[18px]">arrow_forward</span>
 العودة لعرض العيارات
 </button>
@@ -410,6 +414,8 @@
         }
     }
 
+    let currentBoxScope = null; // box_name we've drilled into, or null at top level
+
     function karatBoxHtml(karat, pieces) {
         const t = tintFor(karat);
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
@@ -424,54 +430,93 @@
         </button>`;
     }
 
-    function renderKaratBoxes() {
+    // Renders karat cards for a given piece set -- used both at the top
+    // level (all pieces) and scoped inside a single box (that box's pieces
+    // only), so every box still breaks down by karat same as before.
+    function renderKaratBoxesFor(pieces) {
         const boxesEl = document.getElementById('karat-boxes');
         const byKarat = {};
-        ALL_PIECES.forEach(p => {
+        pieces.forEach(p => {
             const k = p.karat || 0;
             if (!byKarat[k]) byKarat[k] = [];
             byKarat[k].push(p);
         });
         const karats = Object.keys(byKarat).map(Number).sort((a, b) => b - a);
         boxesEl.innerHTML = karats.map(k => karatBoxHtml(k, byKarat[k])).join('');
-
-        // With only one karat in stock, the "choose a karat" screen was a
-        // pointless extra click every single time -- go straight to that
-        // karat's piece list instead. Only show the box-picker screen when
-        // there's actually more than one karat to choose between.
-        if (karats.length === 1) {
-            showKaratPieces(karats[0]);
-            return;
-        }
-
-        document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
-        renderTotals(ALL_PIECES);
-
-        showKaratBoxes();
+        document.getElementById('piece-count').textContent = pieces.length + ' قطعة متوفرة';
+        renderTotals(pieces);
+        boxesEl.classList.remove('hidden');
+        boxesEl.classList.add('grid');
     }
 
-    function showKaratBoxes() {
-        document.getElementById('karat-boxes').classList.remove('hidden');
-        document.getElementById('karat-boxes').classList.add('grid');
+    function renderKaratBoxes() {
+        // Initial entry point (called once after pieces load): skip straight
+        // to the piece list if there's only one karat in stock overall,
+        // otherwise show the normal top-level screen (karats + boxes).
+        const byKarat = {};
+        ALL_PIECES.forEach(p => { const k = p.karat || 0; (byKarat[k] = byKarat[k] || []).push(p); });
+        if (Object.keys(byKarat).length === 1) {
+            showKaratPieces(Number(Object.keys(byKarat)[0]));
+            return;
+        }
+        showTopLevel();
+    }
+
+    // Top level: both the karat cards (all stock) and the box cards.
+    function showTopLevel() {
+        currentBoxScope = null;
+        document.getElementById('karat-boxes-back').classList.add('hidden');
+        document.getElementById('karat-boxes-back').classList.remove('flex');
+        renderKaratBoxesFor(ALL_PIECES);
         renderBoxBoxes();
+        document.getElementById('box-boxes').classList.remove('hidden');
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
         renderTotals(ALL_PIECES);
     }
+    // Kept as an alias -- older calls in this file still reference it.
+    function showKaratBoxes() { showTopLevel(); }
+
+    // Drill into one box: show that box's own karat breakdown.
+    function showBoxKarats(boxName) {
+        currentBoxScope = boxName;
+        const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName);
+        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.remove('grid');
+        document.getElementById('piece-list-view').classList.add('hidden');
+        document.getElementById('karat-boxes-back-label').textContent = 'العودة لكل الصناديق';
+        document.getElementById('karat-boxes-back').classList.remove('hidden');
+        document.getElementById('karat-boxes-back').classList.add('flex');
+        document.getElementById('piece-list-title').textContent = 'صندوق: ' + boxName;
+        renderKaratBoxesFor(pieces);
+    }
 
     function showKaratPieces(karat) {
-        const pieces = ALL_PIECES.filter(p => (p.karat || 0) === karat);
+        const pieces = ALL_PIECES.filter(p =>
+            (p.karat || 0) === karat &&
+            (currentBoxScope === null || (p.box_name || '').trim() === currentBoxScope)
+        );
         document.getElementById('karat-boxes').classList.add('hidden');
         document.getElementById('karat-boxes').classList.remove('grid');
+        document.getElementById('karat-boxes-back').classList.add('hidden');
+        document.getElementById('karat-boxes-back').classList.remove('flex');
         document.getElementById('box-boxes').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.remove('hidden');
-        document.getElementById('piece-list-title').textContent = 'عيار ' + karat;
+        document.getElementById('piece-list-title').textContent =
+            (currentBoxScope ? currentBoxScope + ' — ' : '') + 'عيار ' + karat;
 
         document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
         renderTotals(pieces);
 
         document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
+    }
+
+    // The piece-list "back" button: return to this box's karat view if we
+    // drilled in from a box, otherwise back to the very top level.
+    function backFromPieceList() {
+        if (currentBoxScope) showBoxKarats(currentBoxScope);
+        else showTopLevel();
     }
 
     // Box/location cards: one per distinct box_name actually in use --
@@ -498,7 +543,7 @@
         const safeName = gmEscapeHtml(boxName);
         const t = boxTintFor(boxName);
         return `
-        <button onclick="showBoxPieces('${boxName.replace(/'/g, "\\'")}')" class="text-right rounded-xl p-4 border active:scale-95 transition-transform" style="background:${t.bg};border-color:${t.ring};">
+        <button onclick="showBoxKarats('${boxName.replace(/'/g, "\\'")}')" class="text-right rounded-xl p-4 border active:scale-95 transition-transform" style="background:${t.bg};border-color:${t.ring};">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-[13px] font-bold truncate" style="color:${t.ink};">${safeName}</span>
                 <span class="material-symbols-outlined text-[18px]" style="color:${t.ink};">chevron_left</span>
@@ -526,21 +571,6 @@
             boxesEl.classList.add('hidden');
             boxesEl.classList.remove('grid');
         }
-    }
-
-    function showBoxPieces(boxName) {
-        const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName);
-        document.getElementById('karat-boxes').classList.add('hidden');
-        document.getElementById('karat-boxes').classList.remove('grid');
-        document.getElementById('box-boxes').classList.add('hidden');
-        document.getElementById('box-boxes').classList.remove('grid');
-        document.getElementById('piece-list-view').classList.remove('hidden');
-        document.getElementById('piece-list-title').textContent = 'صندوق: ' + boxName;
-
-        document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
-        renderTotals(pieces);
-
-        document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
     }
 
     async function loadPieces() {
