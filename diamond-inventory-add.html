@@ -217,11 +217,12 @@
 </div>
 <!-- Box / location -->
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="box-name">الصندوق (اختياري)</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="box-name">الصندوق *</label>
 <div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-14 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
-<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-label-md text-on-background" id="box-name" placeholder="مثلاً: Mirruba" type="text"/>
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-label-md text-on-background" id="box-name" list="box-name-options" placeholder="مثلاً: قطع ألماسية أو Mirruba" type="text" value="قطع ألماسية"/>
 </div>
-<p class="text-[10px] text-outline mt-1 px-1">اسم صندوق/موقع تخزين القطعة (اختياري) — يظهر كخيار عند الجرد.</p>
+<datalist id="box-name-options"></datalist>
+<p class="text-[10px] text-outline mt-1 px-1">إجباري — كل قطعة لازم تنتمي لصندوق حتى تكون قابلة للإيجاد والتقارير لاحقاً.</p>
 </div>
 <!-- Diamond 4Cs: Shape, Clarity, Cut, Color -->
 <div class="grid grid-cols-2 gap-4">
@@ -394,8 +395,25 @@
             const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['add_piece'] === true));
             if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'diamond-inventory-list-ar.html'; return; }
             const { data: __store } = await goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-            if (!__store || !__store.diamonds_enabled) { window.location.href = 'index-ar.html'; }
+            if (!__store || !__store.diamonds_enabled) { window.location.href = 'index-ar.html'; return; }
+            loadBoxNameOptions();
         })();
+
+        // Every box name already in use, gold or diamond side, so staff can
+        // pick an existing one instead of retyping/misspelling it.
+        async function loadBoxNameOptions() {
+            const datalist = document.getElementById('box-name-options');
+            if (!datalist) return;
+            const [goldRes, diamondRes] = await Promise.all([
+                goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null),
+                goldmindClient.from('diamond_pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null)
+            ]);
+            const names = new Set();
+            (goldRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
+            (diamondRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
+            datalist.innerHTML = Array.from(names).sort((a, b) => a.localeCompare(b))
+                .map(n => `<option value="${gmEscapeHtml(n)}"></option>`).join('');
+        }
 
         // ---------- Photo capture ----------
         let selectedPhotoFile = null;
@@ -460,6 +478,7 @@
             let barcode = document.getElementById('barcode-id').value.trim();
             const diamondCarat = parseFloat(document.getElementById('diamond-carat').value);
             const diamondPricePerCarat = parseFloat(document.getElementById('diamond-price-per-carat').value);
+            const boxName = document.getElementById('box-name').value.trim();
 
             if (!diamondCarat || diamondCarat <= 0) {
                 showMessage('فضلاً أدخل وزن ماس صحيحاً (قيراط).', true);
@@ -467,6 +486,11 @@
             }
             if (!diamondPricePerCarat || diamondPricePerCarat <= 0) {
                 showMessage('فضلاً أدخل سعر القيراط.', true);
+                return;
+            }
+            if (!boxName) {
+                showMessage('فضلاً اختر أو اكتب صندوقاً للقطعة.', true);
+                document.getElementById('box-name').focus();
                 return;
             }
 
@@ -540,7 +564,7 @@
                 description_ar: document.getElementById('desc-ar').value.trim() || null,
                 description_en: document.getElementById('desc-en').value.trim() || null,
                 status: 'available',
-                box_name: document.getElementById('box-name').value.trim() || null,
+                box_name: boxName || null,
                 created_by: GOLDMIND_STAFF_ID
             });
 
