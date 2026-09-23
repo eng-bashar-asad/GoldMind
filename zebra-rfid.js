@@ -171,6 +171,7 @@ var GMZebra = (function () {
         case 'karat': return 'K' + (values.karat || '');
         case 'mc': return 'MC:' + (values.mc != null ? values.mc : '');
         case 'description': return values.description || '';
+        case 'diamond_carat': return (values.diamondCarat != null && values.diamondCarat !== '') ? (values.diamondCarat + 'ct') : '';
         case 'custom_text': return field.custom_text || '';
         default: return '';
       }
