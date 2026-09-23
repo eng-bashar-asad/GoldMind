@@ -459,26 +459,27 @@
         boxesEl.classList.add('grid');
     }
 
+    // Only this one box breaks down further by karat -- it's the general
+    // gold bucket where that grouping actually helps. Every other box
+    // (Mirruba, custom brand boxes, ...) goes straight to its pieces once
+    // past the batch/prefix picker, since the user manages those as one
+    // group by design.
+    const KARAT_GROUPED_BOX = 'قطع ذهبية';
+    function usesKaratGrouping(boxName) { return boxName === KARAT_GROUPED_BOX; }
+
     function renderKaratBoxes() {
-        // Initial entry point (called once after pieces load): skip straight
-        // to the piece list if there's only one karat in stock overall,
-        // otherwise show the normal top-level screen (karats + boxes).
-        const byKarat = {};
-        ALL_PIECES.forEach(p => { const k = p.karat || 0; (byKarat[k] = byKarat[k] || []).push(p); });
-        if (Object.keys(byKarat).length === 1) {
-            showKaratPieces(Number(Object.keys(byKarat)[0]));
-            return;
-        }
+        // Initial entry point (called once after pieces load).
         showTopLevel();
     }
 
-    // Top level: both the karat cards (all stock) and the box cards.
+    // Top level: just the main boxes -- karats live inside "قطع ذهبية" only.
     function showTopLevel() {
         currentBoxScope = null;
         currentPrefixScope = null;
         document.getElementById('karat-boxes-back').classList.add('hidden');
         document.getElementById('karat-boxes-back').classList.remove('flex');
-        renderKaratBoxesFor(ALL_PIECES);
+        document.getElementById('karat-boxes').classList.add('hidden');
+        document.getElementById('karat-boxes').classList.remove('grid');
         renderBoxBoxes();
         document.getElementById('box-boxes').classList.remove('hidden');
         document.getElementById('piece-list-view').classList.add('hidden');
@@ -490,13 +491,13 @@
 
     // Entry point when a box card is clicked: if the box actually contains
     // more than one barcode-prefix "batch", show the batch picker first;
-    // a box with just one batch skips straight to its karat breakdown
-    // (same reasoning as skipping the karat picker when there's only one).
+    // a box with just one batch goes straight into its scope (karat cards
+    // for "قطع ذهبية", the piece list directly for every other box).
     function enterBox(boxName) {
         const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName);
         const prefixes = new Set(pieces.map(p => prefixOf(p.barcode)));
         if (prefixes.size > 1) showBoxPrefixes(boxName);
-        else showBoxKarats(boxName);
+        else enterScope(boxName, null);
     }
 
     // Batch cards: one per distinct barcode-prefix within this box.
@@ -504,7 +505,7 @@
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         const t = boxTintFor(prefix);
         return `
-        <button onclick="showPrefixKarats('${boxName.replace(/'/g, "\\'")}', '${prefix.replace(/'/g, "\\'")}')" class="text-right rounded-xl p-4 border active:scale-95 transition-transform" style="background:${t.bg};border-color:${t.ring};">
+        <button onclick="enterScope('${boxName.replace(/'/g, "\\'")}', '${prefix.replace(/'/g, "\\'")}')" class="text-right rounded-xl p-4 border active:scale-95 transition-transform" style="background:${t.bg};border-color:${t.ring};">
             <div class="flex items-center justify-between mb-2">
                 <span class="text-[13px] font-bold" style="color:${t.ink};">${gmEscapeHtml(prefix)}</span>
                 <span class="material-symbols-outlined text-[18px]" style="color:${t.ink};">chevron_left</span>
@@ -539,6 +540,41 @@
         renderTotals(pieces);
         boxesEl.classList.remove('hidden');
         boxesEl.classList.add('grid');
+    }
+
+    // Enter a box's (optionally batch-scoped) contents: karat cards for
+    // "قطع ذهبية", straight to the piece list for every other box.
+    function enterScope(boxName, prefix) {
+        if (usesKaratGrouping(boxName)) {
+            if (prefix) showPrefixKarats(boxName, prefix);
+            else showBoxKarats(boxName);
+        } else {
+            showScopePieces(boxName, prefix);
+        }
+    }
+
+    // Straight to the piece list for a box (or box+batch) that doesn't use
+    // karat grouping -- all karats mixed together in one list.
+    function showScopePieces(boxName, prefix) {
+        currentBoxScope = boxName;
+        currentPrefixScope = prefix;
+        const pieces = ALL_PIECES.filter(p =>
+            (p.box_name || '').trim() === boxName &&
+            (prefix === null || prefixOf(p.barcode) === prefix)
+        );
+        document.getElementById('karat-boxes').classList.add('hidden');
+        document.getElementById('karat-boxes').classList.remove('grid');
+        document.getElementById('karat-boxes-back').classList.add('hidden');
+        document.getElementById('karat-boxes-back').classList.remove('flex');
+        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.remove('grid');
+        document.getElementById('piece-list-view').classList.remove('hidden');
+        document.getElementById('piece-list-title').textContent = boxName + (prefix ? ' — ' + prefix : '');
+
+        document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
+        renderTotals(pieces);
+
+        document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
     }
 
     // Drill into one box (and, if applicable, one batch within it): show
@@ -601,12 +637,18 @@
         document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
     }
 
-    // The piece-list "back" button: return to the karat view for whatever
-    // scope we drilled in from (box+batch, box only, or the very top).
+    // The piece-list "back" button: return to wherever we drilled in from.
+    // "قطع ذهبية" has a karat layer to return to; every other box goes
+    // straight back to its batch picker (if it has one) or the top level.
     function backFromPieceList() {
-        if (currentPrefixScope) showPrefixKarats(currentBoxScope, currentPrefixScope);
-        else if (currentBoxScope) showBoxKarats(currentBoxScope);
-        else showTopLevel();
+        if (currentBoxScope && usesKaratGrouping(currentBoxScope)) {
+            if (currentPrefixScope) showPrefixKarats(currentBoxScope, currentPrefixScope);
+            else showBoxKarats(currentBoxScope);
+        } else if (currentBoxScope && currentPrefixScope) {
+            showBoxPrefixes(currentBoxScope);
+        } else {
+            showTopLevel();
+        }
     }
 
     // Box/location cards: one per distinct box_name actually in use --
