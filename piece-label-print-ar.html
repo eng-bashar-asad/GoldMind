@@ -124,7 +124,7 @@
         const mcMultiplier = (store && store.label_mc_multiplier != null) ? Number(store.label_mc_multiplier) : 1;
         const mcAddend = (store && store.label_mc_addend != null) ? Number(store.label_mc_addend) : 0;
         const rawFab = piece.cost_fabrication_per_gram;
-        document.getElementById('specMc').textContent = 'MC: ' + (rawFab != null ? (Number(rawFab) * mcMultiplier + mcAddend).toFixed(2) : '—');
+        document.getElementById('specMc').textContent = 'MC: ' + (rawFab != null ? String(Math.round(Number(rawFab) * mcMultiplier + mcAddend)) : '—');
 
         document.getElementById('specType').textContent = piece.description_en || piece.description_ar || piece.piece_type || '';
 
@@ -164,7 +164,7 @@
         const mcMultiplier = (currentStore && currentStore.label_mc_multiplier != null) ? Number(currentStore.label_mc_multiplier) : 1;
         const mcAddend = (currentStore && currentStore.label_mc_addend != null) ? Number(currentStore.label_mc_addend) : 0;
         const rawFab = currentPiece.cost_fabrication_per_gram;
-        const mcText = rawFab != null ? (Number(rawFab) * mcMultiplier + mcAddend).toFixed(2) : '—';
+        const mcText = rawFab != null ? String(Math.round(Number(rawFab) * mcMultiplier + mcAddend)) : '—';
         return {
             barcode: currentPiece.barcode || currentPiece.id.slice(0, 12).toUpperCase(),
             storeName: (currentStore && currentStore.name) || 'GoldMind',
