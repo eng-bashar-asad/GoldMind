@@ -279,6 +279,13 @@
 </select>
 <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
 </div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="box-name">الصندوق *</label>
+<select class="w-full h-12 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none font-label-md text-on-background" id="box-name">
+<option value="">اختر الصندوق</option>
+</select>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+</div>
 </div>
 
 <!-- Color Selector -->
@@ -337,15 +344,6 @@
 </div>
 <p class="text-[10px] text-outline -mt-1 px-1">اختياري — لو القطعة فيها أحجار ألماس صغيرة كإكسسوار (مو ألماسة أساسية لحالها).</p>
 </div>
-<!-- Box / location -->
-<div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="box-name">الصندوق *</label>
-<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-12 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
-<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-label-md text-on-background" id="box-name" list="box-name-options" placeholder="مثلاً: قطع ذهبية أو Mirruba" type="text" value="قطع ذهبية"/>
-</div>
-<datalist id="box-name-options"></datalist>
-<p class="text-[10px] text-outline mt-1 px-1">إجباري — كل قطعة لازم تنتمي لصندوق حتى تكون قابلة للإيجاد لاحقاً. اختر من القائمة أو اكتب اسم صندوق/براند جديد.</p>
-</div>
 <!-- Status Message -->
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 <!-- Save Button -->
@@ -366,7 +364,6 @@
 <div class="flex flex-col gap-1.5" id="session-list"></div>
 </section>
 </section>
-</div>
 </div>
 </div>
 </main>
@@ -550,14 +547,12 @@
         const classificationCache = {}; // field_key -> array of Arabic values already loaded
         const classificationCacheEn = {}; // field_key -> { arabicValue: englishValue } (currently only populated for 'type')
 
-        // Populates the box-name datalist with every distinct box already in
-        // use (from both gold pieces and diamond pieces), so staff can pick
-        // an existing box instead of retyping/misspelling it -- fragmenting
-        // the same box under two slightly different names defeats the whole
-        // point of grouping by box.
+        // Every box name already in use (gold + diamond pieces), rendered as
+        // a real <select> -- the earlier <input list> (datalist) version
+        // was unreliable (some browsers/devices never popped the suggestions
+        // open). Same "+ إضافة جديد" pattern already used for type/category.
+        let boxNameOptions = [];
         async function loadBoxNameOptions() {
-            const datalist = document.getElementById('box-name-options');
-            if (!datalist) return;
             const [goldRes, diamondRes] = await Promise.all([
                 goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null),
                 goldmindClient.from('diamond_pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null)
@@ -565,9 +560,50 @@
             const names = new Set();
             (goldRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
             (diamondRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
-            datalist.innerHTML = Array.from(names).sort((a, b) => a.localeCompare(b))
-                .map(n => `<option value="${gmEscapeHtml(n)}"></option>`).join('');
+            boxNameOptions = Array.from(names).sort((a, b) => a.localeCompare(b));
+            renderBoxNameSelect(boxNameOptions.includes('قطع ذهبية') ? 'قطع ذهبية' : '');
         }
+
+        function renderBoxNameSelect(selectedValue) {
+            const select = document.getElementById('box-name');
+            const current = selectedValue !== undefined ? selectedValue : select.value;
+            select.innerHTML = '';
+            const emptyOpt = document.createElement('option');
+            emptyOpt.value = '';
+            emptyOpt.textContent = 'اختر الصندوق';
+            select.appendChild(emptyOpt);
+
+            boxNameOptions.forEach(v => {
+                const opt = document.createElement('option');
+                opt.value = v;
+                opt.textContent = v;
+                select.appendChild(opt);
+            });
+
+            const addOpt = document.createElement('option');
+            addOpt.value = ADD_NEW_VALUE;
+            addOpt.textContent = '+ إضافة صندوق جديد...';
+            select.appendChild(addOpt);
+
+            if (current && boxNameOptions.includes(current)) select.value = current;
+        }
+
+        function handleBoxNameChange() {
+            const select = document.getElementById('box-name');
+            if (select.value !== ADD_NEW_VALUE) return;
+
+            const newValue = (prompt('أدخل اسم الصندوق الجديد:') || '').trim();
+            if (!newValue) {
+                renderBoxNameSelect('');
+                return;
+            }
+            if (!boxNameOptions.includes(newValue)) {
+                boxNameOptions.push(newValue);
+                boxNameOptions.sort((a, b) => a.localeCompare(b));
+            }
+            renderBoxNameSelect(newValue);
+        }
+        document.getElementById('box-name').addEventListener('change', handleBoxNameChange);
 
         async function loadClassificationOptions(selectId, fieldKey, label) {
             const select = document.getElementById(selectId);
