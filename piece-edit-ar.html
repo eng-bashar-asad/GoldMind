@@ -52,31 +52,16 @@
 </div>
 </div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
+<main class="pb-32 max-w-md lg:max-w-5xl mx-auto px-4">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">لا تملك صلاحية تعديل القطع.</div>
 
 <div id="form-wrap" class="hidden py-6 flex flex-col gap-6">
 
-<div class="flex flex-col gap-6 lg:grid lg:grid-cols-[320px_1fr] lg:gap-8 lg:items-start">
+<div class="flex flex-col gap-6 lg:grid lg:grid-cols-[1fr_320px] lg:gap-8 lg:items-stretch">
 
-<!-- Photo -->
-<div class="lg:order-2">
-<input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
-<div class="relative cursor-pointer active:scale-[0.98] transition-transform" onclick="triggerPhotoCapture()">
-<div class="aspect-square w-full rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
-<span class="material-symbols-outlined text-outline text-5xl mb-3">photo_camera</span>
-<p class="font-label-md text-label-md text-on-surface-variant font-semibold">اضغط لتغيير الصورة</p>
-</div>
-<img alt="" class="hidden aspect-square w-full rounded-xl object-cover border border-outline-variant" id="photo-preview"/>
-<button class="hidden absolute top-2 left-2 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" onclick="event.stopPropagation(); removePhoto();" type="button">
-<span class="material-symbols-outlined text-[18px]">close</span>
-</button>
-</div>
-</div>
-
-<div class="flex flex-col gap-4 lg:order-1">
+<div class="flex flex-col gap-4">
 
 <!-- Barcode -->
 <div class="relative">
@@ -108,17 +93,6 @@
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="accounting-weight">وزن المحاسبة</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="accounting-weight" step="0.01" type="number"/>
-</div>
-</div>
-
-<div class="grid grid-cols-2 gap-4">
-<div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="accent-diamond-carat">وزن الماس (قيراط)</label>
-<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="accent-diamond-carat" placeholder="0.00" step="0.01" type="number"/>
-</div>
-<div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="accent-diamond-price">سعر القيراط</label>
-<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="accent-diamond-price" placeholder="0.00" step="0.01" type="number"/>
 </div>
 </div>
 
@@ -171,6 +145,21 @@
 </select>
 </div>
 
+</div>
+
+<!-- Photo -->
+<div>
+<input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
+<div class="relative cursor-pointer active:scale-[0.98] transition-transform h-full min-h-[280px]" onclick="triggerPhotoCapture()">
+<div class="h-full min-h-[280px] rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
+<span class="material-symbols-outlined text-outline text-5xl mb-3">photo_camera</span>
+<p class="font-label-md text-label-md text-on-surface-variant font-semibold">اضغط لتغيير الصورة</p>
+</div>
+<img alt="" class="hidden h-full min-h-[280px] w-full rounded-xl object-cover border border-outline-variant" id="photo-preview"/>
+<button class="hidden absolute top-2 left-2 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" onclick="event.stopPropagation(); removePhoto();" type="button">
+<span class="material-symbols-outlined text-[18px]">close</span>
+</button>
+</div>
 </div>
 </div>
 
@@ -439,8 +428,6 @@ async function load() {
   document.getElementById('karat').value = piece.karat;
   document.getElementById('fab-cost').value = piece.cost_fabrication_per_gram != null ? piece.cost_fabrication_per_gram : '';
   document.getElementById('accounting-weight').value = piece.accounting_weight_grams != null ? piece.accounting_weight_grams : '';
-  document.getElementById('accent-diamond-carat').value = piece.accent_diamond_carat != null ? piece.accent_diamond_carat : '';
-  document.getElementById('accent-diamond-price').value = piece.accent_diamond_price_per_carat != null ? piece.accent_diamond_price_per_carat : '';
   document.getElementById('status').value = piece.status;
   setColor(piece.color || 'Gold');
   loadClassificationOptions('piece-type', 'type', 'النوع', piece.piece_type || '');
@@ -495,10 +482,6 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const fabCost = fabCostInput === '' ? null : parseFloat(fabCostInput);
   const accountingWeightInput = document.getElementById('accounting-weight').value;
   const accountingWeight = accountingWeightInput === '' ? weight : parseFloat(accountingWeightInput);
-  const diamondCaratInput = document.getElementById('accent-diamond-carat').value;
-  const diamondCarat = diamondCaratInput === '' ? null : parseFloat(diamondCaratInput);
-  const diamondPriceInput = document.getElementById('accent-diamond-price').value;
-  const diamondPrice = diamondPriceInput === '' ? null : parseFloat(diamondPriceInput);
   const status = document.getElementById('status').value;
 
   if (!weight || weight <= 0) { showMessage('فضلاً أدخل وزناً صحيحاً.', true); return; }
@@ -532,8 +515,6 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     karat: karat,
     cost_fabrication_per_gram: (fabCost != null && !isNaN(fabCost)) ? fabCost : null,
     accounting_weight_grams: accountingWeight,
-    accent_diamond_carat: (diamondCarat != null && !isNaN(diamondCarat)) ? diamondCarat : null,
-    accent_diamond_price_per_carat: (diamondPrice != null && !isNaN(diamondPrice)) ? diamondPrice : null,
     color: selectedColor,
     status: status,
     photo_url: photoUrl,
@@ -571,8 +552,6 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   currentPiece.karat = karat;
   currentPiece.cost_fabrication_per_gram = (fabCost != null && !isNaN(fabCost)) ? fabCost : null;
   currentPiece.accounting_weight_grams = accountingWeight;
-  currentPiece.accent_diamond_carat = (diamondCarat != null && !isNaN(diamondCarat)) ? diamondCarat : null;
-  currentPiece.accent_diamond_price_per_carat = (diamondPrice != null && !isNaN(diamondPrice)) ? diamondPrice : null;
   currentPiece.color = selectedColor;
   currentPiece.status = status;
   currentPiece.photo_url = photoUrl;
