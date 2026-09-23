@@ -339,11 +339,12 @@
 </div>
 <!-- Box / location -->
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="box-name">الصندوق (اختياري)</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="box-name">الصندوق *</label>
 <div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-12 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
-<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-label-md text-on-background" id="box-name" placeholder="مثلاً: Mirruba" type="text"/>
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-label-md text-on-background" id="box-name" list="box-name-options" placeholder="مثلاً: قطع ذهبية أو Mirruba" type="text" value="قطع ذهبية"/>
 </div>
-<p class="text-[10px] text-outline mt-1 px-1">اسم صندوق/موقع تخزين القطعة (اختياري) — يظهر كخيار عند الجرد.</p>
+<datalist id="box-name-options"></datalist>
+<p class="text-[10px] text-outline mt-1 px-1">إجباري — كل قطعة لازم تنتمي لصندوق حتى تكون قابلة للإيجاد لاحقاً. اختر من القائمة أو اكتب اسم صندوق/براند جديد.</p>
 </div>
 <!-- Status Message -->
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
@@ -414,6 +415,7 @@
             loadClassificationOptions('piece-type', 'type', 'النوع');
             loadClassificationOptions('category1', 'category1', 'صنف ١');
             loadClassificationOptions('category2', 'category2', 'صنف ٢');
+            loadBoxNameOptions();
 
             // Loaded once here and reused for every "print" tap in the
             // session list below, instead of opening piece-label-print-ar.html
@@ -547,6 +549,25 @@
         const ADD_NEW_VALUE = '__add_new__';
         const classificationCache = {}; // field_key -> array of Arabic values already loaded
         const classificationCacheEn = {}; // field_key -> { arabicValue: englishValue } (currently only populated for 'type')
+
+        // Populates the box-name datalist with every distinct box already in
+        // use (from both gold pieces and diamond pieces), so staff can pick
+        // an existing box instead of retyping/misspelling it -- fragmenting
+        // the same box under two slightly different names defeats the whole
+        // point of grouping by box.
+        async function loadBoxNameOptions() {
+            const datalist = document.getElementById('box-name-options');
+            if (!datalist) return;
+            const [goldRes, diamondRes] = await Promise.all([
+                goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null),
+                goldmindClient.from('diamond_pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null)
+            ]);
+            const names = new Set();
+            (goldRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
+            (diamondRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
+            datalist.innerHTML = Array.from(names).sort((a, b) => a.localeCompare(b))
+                .map(n => `<option value="${gmEscapeHtml(n)}"></option>`).join('');
+        }
 
         async function loadClassificationOptions(selectId, fieldKey, label) {
             const select = document.getElementById(selectId);
@@ -818,10 +839,18 @@
             let barcode = document.getElementById('barcode-id').value.trim();
             const weight = parseFloat(document.getElementById('weight').value);
             const karat = parseInt(document.getElementById('karat').value, 10);
+            const boxName = document.getElementById('box-name').value.trim();
 
             if (!weight || weight <= 0) {
                 showMessage('فضلاً أدخل وزناً صحيحاً.', true);
                 saveBtn.disabled = false;
+                return;
+            }
+
+            if (!boxName) {
+                showMessage('فضلاً اختر أو اكتب صندوقاً للقطعة.', true);
+                saveBtn.disabled = false;
+                document.getElementById('box-name').focus();
                 return;
             }
 
@@ -887,7 +916,7 @@
                 color: selectedColor,
                 status: 'available',
                 intake_batch_id: batchId,
-                box_name: document.getElementById('box-name').value.trim() || null,
+                box_name: boxName || null,
                 created_by: GOLDMIND_STAFF_ID
             }).select().single();
 
