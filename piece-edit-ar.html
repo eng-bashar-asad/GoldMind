@@ -96,6 +96,30 @@
 </div>
 </div>
 
+<!-- Di: small accent diamonds. Filled -> auto-replaces karat with Di:x.xxct on the printed label. -->
+<div class="grid grid-cols-2 gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="accent-diamond-carat">وزن الماس Di (قيراط)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="accent-diamond-carat" placeholder="0.00" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="accent-diamond-price">سعر قيراط Di</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="accent-diamond-price" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+
+<!-- Cs: single center stone. Filled -> auto-replaces piece type with Cs:x.xxct on the printed label. -->
+<div class="grid grid-cols-2 gap-4">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="center-stone-carat">وزن الحجر المركزي Cs (قيراط)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="center-stone-carat" placeholder="0.00" step="0.01" type="number"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="center-stone-price">سعر قيراط Cs</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="center-stone-price" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+
 <!-- Type / Category -->
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="piece-type">النوع</label>
@@ -356,7 +380,8 @@ async function printLabelDirectly() {
     karat: currentPiece.karat || '',
     mc: mcText,
     description: currentPiece.description_en || '',
-    diamondCarat: currentPiece.accent_diamond_carat != null ? Number(currentPiece.accent_diamond_carat).toFixed(2) : ''
+    diamondCarat: currentPiece.accent_diamond_carat != null ? Number(currentPiece.accent_diamond_carat).toFixed(2) : '',
+    centerStoneCarat: currentPiece.center_stone_carat != null ? Number(currentPiece.center_stone_carat).toFixed(2) : ''
   };
   const dpi = (currentStore && currentStore.zebra_label_dpi) || 203;
 
@@ -428,6 +453,10 @@ async function load() {
   document.getElementById('karat').value = piece.karat;
   document.getElementById('fab-cost').value = piece.cost_fabrication_per_gram != null ? piece.cost_fabrication_per_gram : '';
   document.getElementById('accounting-weight').value = piece.accounting_weight_grams != null ? piece.accounting_weight_grams : '';
+  document.getElementById('accent-diamond-carat').value = piece.accent_diamond_carat != null ? piece.accent_diamond_carat : '';
+  document.getElementById('accent-diamond-price').value = piece.accent_diamond_price_per_carat != null ? piece.accent_diamond_price_per_carat : '';
+  document.getElementById('center-stone-carat').value = piece.center_stone_carat != null ? piece.center_stone_carat : '';
+  document.getElementById('center-stone-price').value = piece.center_stone_price_per_carat != null ? piece.center_stone_price_per_carat : '';
   document.getElementById('status').value = piece.status;
   setColor(piece.color || 'Gold');
   loadClassificationOptions('piece-type', 'type', 'النوع', piece.piece_type || '');
@@ -482,6 +511,14 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const fabCost = fabCostInput === '' ? null : parseFloat(fabCostInput);
   const accountingWeightInput = document.getElementById('accounting-weight').value;
   const accountingWeight = accountingWeightInput === '' ? weight : parseFloat(accountingWeightInput);
+  const diamondCaratInput = document.getElementById('accent-diamond-carat').value;
+  const diamondCarat = diamondCaratInput === '' ? null : parseFloat(diamondCaratInput);
+  const diamondPriceInput = document.getElementById('accent-diamond-price').value;
+  const diamondPrice = diamondPriceInput === '' ? null : parseFloat(diamondPriceInput);
+  const centerStoneCaratInput = document.getElementById('center-stone-carat').value;
+  const centerStoneCarat = centerStoneCaratInput === '' ? null : parseFloat(centerStoneCaratInput);
+  const centerStonePriceInput = document.getElementById('center-stone-price').value;
+  const centerStonePrice = centerStonePriceInput === '' ? null : parseFloat(centerStonePriceInput);
   const status = document.getElementById('status').value;
 
   if (!weight || weight <= 0) { showMessage('فضلاً أدخل وزناً صحيحاً.', true); return; }
@@ -514,6 +551,10 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     weight_grams: weight,
     karat: karat,
     cost_fabrication_per_gram: (fabCost != null && !isNaN(fabCost)) ? fabCost : null,
+    accent_diamond_carat: (diamondCarat != null && !isNaN(diamondCarat)) ? diamondCarat : null,
+    accent_diamond_price_per_carat: (diamondPrice != null && !isNaN(diamondPrice)) ? diamondPrice : null,
+    center_stone_carat: (centerStoneCarat != null && !isNaN(centerStoneCarat)) ? centerStoneCarat : null,
+    center_stone_price_per_carat: (centerStonePrice != null && !isNaN(centerStonePrice)) ? centerStonePrice : null,
     accounting_weight_grams: accountingWeight,
     color: selectedColor,
     status: status,
@@ -552,6 +593,10 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   currentPiece.karat = karat;
   currentPiece.cost_fabrication_per_gram = (fabCost != null && !isNaN(fabCost)) ? fabCost : null;
   currentPiece.accounting_weight_grams = accountingWeight;
+  currentPiece.accent_diamond_carat = (diamondCarat != null && !isNaN(diamondCarat)) ? diamondCarat : null;
+  currentPiece.accent_diamond_price_per_carat = (diamondPrice != null && !isNaN(diamondPrice)) ? diamondPrice : null;
+  currentPiece.center_stone_carat = (centerStoneCarat != null && !isNaN(centerStoneCarat)) ? centerStoneCarat : null;
+  currentPiece.center_stone_price_per_carat = (centerStonePrice != null && !isNaN(centerStonePrice)) ? centerStonePrice : null;
   currentPiece.color = selectedColor;
   currentPiece.status = status;
   currentPiece.photo_url = photoUrl;
