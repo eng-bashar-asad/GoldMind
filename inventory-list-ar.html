@@ -150,6 +150,7 @@
 <span id="piece-count">جارِ التحميل...</span>
 <div class="flex items-center gap-3">
 <span id="total-fab"></span>
+<span id="total-diamond-carat" class="hidden"></span>
 <span id="total-weight"></span>
 <span id="total-accounting-weight" class="hidden"></span>
 </div>
@@ -403,6 +404,19 @@
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         document.getElementById('total-weight').textContent = 'القائم ' + totalWeight.toFixed(2) + ' غ';
         document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(pieces), currentStore);
+
+        // Di (accent diamonds) + Cs (center stone) combined, across whatever
+        // scope is currently shown -- so staff can see how much diamond
+        // carat is on hand without opening every single piece.
+        const diamondEl = document.getElementById('total-diamond-carat');
+        const totalDiamondCarat = pieces.reduce((sum, p) =>
+            sum + Number(p.accent_diamond_carat || 0) + Number(p.center_stone_carat || 0), 0);
+        if (totalDiamondCarat > 0) {
+            diamondEl.textContent = 'ماس ' + totalDiamondCarat.toFixed(2) + 'ct';
+            diamondEl.classList.remove('hidden');
+        } else {
+            diamondEl.classList.add('hidden');
+        }
 
         const accEl = document.getElementById('total-accounting-weight');
         if (canViewAccWeight) {
