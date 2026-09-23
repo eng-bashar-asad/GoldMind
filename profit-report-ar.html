@@ -59,6 +59,26 @@
 
 <p class="text-[11px] text-outline">الربح = سعر البيع − قيمة الذهب (بسعر السوق وقت البيع نفسه) − الضريبة − كلفة المصنعية المسجّلة على القطعة (وزن القطعة × كلفة المصنعية للغرام). هذا هو صافي ربح المصنعية الفعلي — سعر الذهب نفسه لا يُحتسب ربحاً لأنك تشتري بديله بسعر السوق.</p>
 
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex flex-col gap-3">
+<div class="grid grid-cols-2 gap-2">
+<div>
+<label class="text-[10px] text-outline block mb-1">من تاريخ</label>
+<input id="date-from" type="date" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[12px]"/>
+</div>
+<div>
+<label class="text-[10px] text-outline block mb-1">إلى تاريخ</label>
+<input id="date-to" type="date" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[12px]"/>
+</div>
+</div>
+<div>
+<label class="text-[10px] text-outline block mb-1">الصندوق</label>
+<select id="box-filter" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[12px]">
+<option value="">كل البضاعة</option>
+</select>
+</div>
+<button id="apply-filters-btn" class="w-full h-10 bg-primary text-on-primary rounded-lg font-semibold text-[13px]">تطبيق الفلتر</button>
+</div>
+
 <div class="grid grid-cols-2 gap-3">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl text-center">
 <span class="text-[11px] text-on-surface-variant block mb-1">إجمالي المبيعات</span>
@@ -94,7 +114,10 @@
 </main>
 
 <script>
-async function load() {
+let vatMultiplier = 1;
+let livePriceMap = {};
+
+async function init() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
 
@@ -111,17 +134,55 @@ async function load() {
   // Live prices are only a fallback for old sales made before we started
   // snapshotting the price per item at the moment of sale.
   const { data: prices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
-  const livePriceMap = {};
   (prices || []).forEach(p => livePriceMap[p.karat] = Number(p.price_per_gram));
 
   const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
   const vatRate = Number((storeRow && storeRow.vat_rate) || 0);
-  const vatMultiplier = 1 + (vatRate / 100);
+  vatMultiplier = 1 + (vatRate / 100);
 
-  const { data: invoices } = await goldmindClient
+  await loadBoxFilterOptions();
+  document.getElementById('apply-filters-btn').addEventListener('click', applyFilters);
+
+  document.getElementById('page-content').classList.remove('hidden');
+  applyFilters();
+}
+
+// Every box name in use, gold or diamond side, so "الصندوق" covers both --
+// e.g. "قطع ذهبية", "قطع ألماسية", or a custom brand box like "Mirruba".
+async function loadBoxFilterOptions() {
+  const select = document.getElementById('box-filter');
+  const [goldRes, diamondRes] = await Promise.all([
+    goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null),
+    goldmindClient.from('diamond_pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null)
+  ]);
+  const names = new Set();
+  (goldRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
+  (diamondRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
+  Array.from(names).sort((a, b) => a.localeCompare(b)).forEach(n => {
+    const opt = document.createElement('option');
+    opt.value = n; opt.textContent = n;
+    select.appendChild(opt);
+  });
+}
+
+async function applyFilters() {
+  const fromDate = document.getElementById('date-from').value;
+  const toDate = document.getElementById('date-to').value;
+  const boxFilter = document.getElementById('box-filter').value;
+
+  document.getElementById('empty-state').classList.add('hidden');
+
+  let invoiceQuery = goldmindClient
     .from('invoices').select('id, invoice_number, created_at, type')
     .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return']).neq('status', 'cancelled')
-    .order('created_at', { ascending: false }).limit(200);
+    .order('created_at', { ascending: false });
+  if (fromDate) invoiceQuery = invoiceQuery.gte('created_at', fromDate + 'T00:00:00');
+  if (toDate) invoiceQuery = invoiceQuery.lte('created_at', toDate + 'T23:59:59');
+  // With no date range given, keep the previous safety cap; a bounded
+  // range is presumably deliberate and shouldn't be silently truncated.
+  if (!fromDate && !toDate) invoiceQuery = invoiceQuery.limit(200);
+
+  const { data: invoices } = await invoiceQuery;
 
   const invoiceMap = {};
   (invoices || []).forEach(i => invoiceMap[i.id] = i);
@@ -136,7 +197,7 @@ async function load() {
 
   const { data: items, error } = await goldmindClient
     .from('invoice_items')
-    .select('*, piece:piece_id(cost_fabrication_per_gram, accent_diamond_carat, accent_diamond_price_per_carat), lot:gold_stock_lot_id(cost_fabrication_per_gram), diamond:diamond_piece_id(diamond_carat, diamond_price_per_carat, has_gold, gold_cost_fabrication_per_gram)')
+    .select('*, piece:piece_id(cost_fabrication_per_gram, accent_diamond_carat, accent_diamond_price_per_carat, box_name), lot:gold_stock_lot_id(cost_fabrication_per_gram), diamond:diamond_piece_id(diamond_carat, diamond_price_per_carat, has_gold, gold_cost_fabrication_per_gram, box_name)')
     .in('invoice_id', invoiceIds);
 
   if (error) {
@@ -144,7 +205,7 @@ async function load() {
     return;
   }
 
-  if (!prices || prices.length === 0) {
+  if (Object.keys(livePriceMap).length === 0) {
     const hasAnySnapshot = (items || []).some(it => it.gold_price_per_gram != null);
     if (!hasAnySnapshot) {
       document.getElementById('no-prices').classList.remove('hidden');
@@ -153,8 +214,14 @@ async function load() {
     }
   }
 
+  // A box can live on either side (a plain gold piece, or a diamond
+  // piece) -- match whichever one this line actually is.
+  const filteredItems = boxFilter
+    ? (items || []).filter(it => (it.piece && it.piece.box_name === boxFilter) || (it.diamond && it.diamond.box_name === boxFilter))
+    : (items || []);
+
   let totalRevenue = 0, totalVat = 0, totalGold = 0, totalProfit = 0;
-  const rows = (items || []).map(it => {
+  const rows = filteredItems.map(it => {
     // Prefer the price snapshotted at the moment of THIS sale; only fall
     // back to today's live price for older sales made before snapshotting existed.
     const goldPrice = it.gold_price_per_gram != null ? Number(it.gold_price_per_gram) : (livePriceMap[it.karat] || 0);
@@ -214,7 +281,7 @@ async function load() {
     </tr>`).join('');
 }
 
-load();
+init();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
