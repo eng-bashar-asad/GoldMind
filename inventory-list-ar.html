@@ -477,17 +477,34 @@
     // Box/location cards: one per distinct box_name actually in use --
     // pieces with no box assigned don't get a card, and a box with zero
     // pieces currently in it simply never appears (nothing to compute).
+    // A small rotating palette (warm/jewel tones, distinct from the karat
+    // cards' cooler tints) so box cards read as their own category and
+    // multiple boxes stay visually distinguishable from each other.
+    const boxTintPalette = [
+        { bg: '#FBEFE0', ink: '#8A5A2B', ring: '#E0B37E' },
+        { bg: '#EFE6F5', ink: '#5C3F82', ring: '#B79AD9' },
+        { bg: '#E3F0EC', ink: '#2F6F5C', ring: '#8FC7B4' },
+        { bg: '#FCE9EC', ink: '#9C3B54', ring: '#E497A9' },
+        { bg: '#E8EEF9', ink: '#33517E', ring: '#9AB3DD' }
+    ];
+    function boxTintFor(boxName) {
+        let hash = 0;
+        for (let i = 0; i < boxName.length; i++) hash = (hash * 31 + boxName.charCodeAt(i)) >>> 0;
+        return boxTintPalette[hash % boxTintPalette.length];
+    }
+
     function boxBoxHtml(boxName, pieces) {
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         const safeName = gmEscapeHtml(boxName);
+        const t = boxTintFor(boxName);
         return `
-        <button onclick="showBoxPieces('${boxName.replace(/'/g, "\\'")}')" class="text-right rounded-xl p-4 border active:scale-95 transition-transform bg-surface-container-low border-outline-variant">
+        <button onclick="showBoxPieces('${boxName.replace(/'/g, "\\'")}')" class="text-right rounded-xl p-4 border active:scale-95 transition-transform" style="background:${t.bg};border-color:${t.ring};">
             <div class="flex items-center justify-between mb-2">
-                <span class="text-[13px] font-bold text-primary truncate">${safeName}</span>
-                <span class="material-symbols-outlined text-[18px] text-primary">chevron_left</span>
+                <span class="text-[13px] font-bold truncate" style="color:${t.ink};">${safeName}</span>
+                <span class="material-symbols-outlined text-[18px]" style="color:${t.ink};">chevron_left</span>
             </div>
-            <div class="font-data-mono text-data-mono font-bold text-[19px] text-on-background">${totalWeight.toFixed(2)} غ</div>
-            <div class="text-[11px] mt-1 text-on-surface-variant">${pieces.length} قطعة</div>
+            <div class="font-data-mono text-data-mono font-bold text-[19px]" style="color:${t.ink};">${totalWeight.toFixed(2)} غ</div>
+            <div class="text-[11px] mt-1" style="color:${t.ink};opacity:.8;">${pieces.length} قطعة</div>
         </button>`;
     }
 
