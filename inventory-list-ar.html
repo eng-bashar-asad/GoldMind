@@ -217,7 +217,10 @@
 <div id="error-state" class="hidden py-6 px-4 rounded-lg bg-red-100 text-red-700 font-label-md text-label-md text-center"></div>
 
 <!-- Karat boxes (default view): pick a karat to see what's actually in stock -->
-<div id="karat-boxes" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3 pb-8"></div>
+<div id="karat-boxes" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3 pb-3"></div>
+
+<!-- Box/location boxes: only boxes that actually have pieces show up here -->
+<div id="box-boxes" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3 pb-8"></div>
 
 <!-- Piece list for the selected karat -->
 <div id="piece-list-view" class="hidden">
@@ -450,6 +453,7 @@
     function showKaratBoxes() {
         document.getElementById('karat-boxes').classList.remove('hidden');
         document.getElementById('karat-boxes').classList.add('grid');
+        renderBoxBoxes();
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
         renderTotals(ALL_PIECES);
@@ -459,8 +463,62 @@
         const pieces = ALL_PIECES.filter(p => (p.karat || 0) === karat);
         document.getElementById('karat-boxes').classList.add('hidden');
         document.getElementById('karat-boxes').classList.remove('grid');
+        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.remove('hidden');
         document.getElementById('piece-list-title').textContent = 'عيار ' + karat;
+
+        document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
+        renderTotals(pieces);
+
+        document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
+    }
+
+    // Box/location cards: one per distinct box_name actually in use --
+    // pieces with no box assigned don't get a card, and a box with zero
+    // pieces currently in it simply never appears (nothing to compute).
+    function boxBoxHtml(boxName, pieces) {
+        const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
+        const safeName = gmEscapeHtml(boxName);
+        return `
+        <button onclick="showBoxPieces('${boxName.replace(/'/g, "\\'")}')" class="text-right rounded-xl p-4 border active:scale-95 transition-transform bg-surface-container-low border-outline-variant">
+            <div class="flex items-center justify-between mb-2">
+                <span class="text-[13px] font-bold text-primary truncate">${safeName}</span>
+                <span class="material-symbols-outlined text-[18px] text-primary">chevron_left</span>
+            </div>
+            <div class="font-data-mono text-data-mono font-bold text-[19px] text-on-background">${totalWeight.toFixed(2)} غ</div>
+            <div class="text-[11px] mt-1 text-on-surface-variant">${pieces.length} قطعة</div>
+        </button>`;
+    }
+
+    function renderBoxBoxes() {
+        const boxesEl = document.getElementById('box-boxes');
+        const byBox = {};
+        ALL_PIECES.forEach(p => {
+            const b = (p.box_name || '').trim();
+            if (!b) return;
+            if (!byBox[b]) byBox[b] = [];
+            byBox[b].push(p);
+        });
+        const boxNames = Object.keys(byBox).sort((a, b) => a.localeCompare(b));
+        boxesEl.innerHTML = boxNames.map(b => boxBoxHtml(b, byBox[b])).join('');
+        if (boxNames.length > 0) {
+            boxesEl.classList.remove('hidden');
+            boxesEl.classList.add('grid');
+        } else {
+            boxesEl.classList.add('hidden');
+            boxesEl.classList.remove('grid');
+        }
+    }
+
+    function showBoxPieces(boxName) {
+        const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName);
+        document.getElementById('karat-boxes').classList.add('hidden');
+        document.getElementById('karat-boxes').classList.remove('grid');
+        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.remove('grid');
+        document.getElementById('piece-list-view').classList.remove('hidden');
+        document.getElementById('piece-list-title').textContent = 'صندوق: ' + boxName;
 
         document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
         renderTotals(pieces);
