@@ -320,6 +320,23 @@
 </div>
 </div>
 </div>
+<!-- Accent diamonds (optional, for a gold piece with small diamond accents) -->
+<div class="grid grid-cols-2 gap-3">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="accent-diamond-carat">وزن الماس (قيراط)</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-12 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="accent-diamond-carat" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="accent-diamond-price">سعر القيراط</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-12 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="accent-diamond-price" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+</div>
+<p class="text-[10px] text-outline -mt-1 px-1">اختياري — لو القطعة فيها أحجار ألماس صغيرة كإكسسوار (مو ألماسة أساسية لحالها).</p>
+</div>
 <!-- Box / location -->
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="box-name">الصندوق (اختياري)</label>
@@ -859,6 +876,8 @@
                 weight_grams: weight,
                 accounting_weight_grams: parseFloat(document.getElementById('accounting-weight').value) || weight,
                 cost_fabrication_per_gram: parseFloat(document.getElementById('fab-cost').value) || null,
+                accent_diamond_carat: parseFloat(document.getElementById('accent-diamond-carat').value) || null,
+                accent_diamond_price_per_carat: parseFloat(document.getElementById('accent-diamond-price').value) || null,
                 description_ar: document.getElementById('piece-type').value || null,
                 description_en: (classificationCacheEn['type'] || {})[document.getElementById('piece-type').value] || null,
                 piece_type: document.getElementById('piece-type').value || null,
@@ -892,6 +911,8 @@
             document.getElementById('barcode-id').value = '';
             document.getElementById('weight').value = '';
             document.getElementById('accounting-weight').value = '';
+            document.getElementById('accent-diamond-carat').value = '';
+            document.getElementById('accent-diamond-price').value = '';
             // Fab cost is intentionally NOT cleared -- it usually stays the
             // same across a run of pieces, so it stays fixed until the
             // employee changes it themselves.
