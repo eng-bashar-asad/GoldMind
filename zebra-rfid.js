@@ -168,9 +168,18 @@ var GMZebra = (function () {
         case 'barcode_number': return values.barcode || '';
         case 'company_name': return values.storeName || '';
         case 'weight': return 'W:' + (values.weight != null ? values.weight : '');
-        case 'karat': return 'K' + (values.karat || '');
+        // Di (small accent diamonds) automatically takes the karat's place
+        // on the label when it's filled -- no need to redesign the label
+        // per piece, the karat slot just becomes the diamond slot.
+        case 'karat':
+          if (values.diamondCarat != null && values.diamondCarat !== '') return 'Di:' + values.diamondCarat + 'ct';
+          return 'K' + (values.karat || '');
         case 'mc': return 'MC:' + (values.mc != null ? values.mc : '');
-        case 'description': return values.description || '';
+        // Cs (a single larger center stone) automatically takes the piece
+        // type/description's place on the label when it's filled.
+        case 'description':
+          if (values.centerStoneCarat != null && values.centerStoneCarat !== '') return 'Cs:' + values.centerStoneCarat + 'ct';
+          return values.description || '';
         case 'diamond_carat': return (values.diamondCarat != null && values.diamondCarat !== '') ? ('Di:' + values.diamondCarat + 'ct') : '';
         case 'custom_text': return field.custom_text || '';
         default: return '';
