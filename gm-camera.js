@@ -60,7 +60,7 @@ var GMCamera = (function () {
 
       var video = document.createElement('video');
       video.autoplay = true; video.playsInline = true; video.muted = true;
-      video.style.cssText = 'width:100%;height:100%;object-fit:cover;transform:scaleX(-1);';
+      video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
 
       var hint = document.createElement('p');
       hint.textContent = 'جارِ فتح الكاميرا...';
@@ -109,11 +109,6 @@ var GMCamera = (function () {
         canvas.width = video.videoWidth;
         canvas.height = video.videoHeight;
         var ctx = canvas.getContext('2d');
-        // Mirror the frame back to normal orientation on capture — the
-        // preview is mirrored (::scaleX(-1)) only so it feels like a mirror
-        // while framing the shot, matching every other camera UI.
-        ctx.translate(canvas.width, 0);
-        ctx.scale(-1, 1);
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         canvas.toBlob(function (blob) {
           if (!blob) { finish(null); return; }
@@ -122,7 +117,7 @@ var GMCamera = (function () {
         }, 'image/jpeg', 0.9);
       });
 
-      navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false })
+      navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 1280 }, facingMode: { ideal: 'environment' } }, audio: false })
         .then(function (s) {
           if (settled) { s.getTracks().forEach(function (t) { t.stop(); }); return; }
           stream = s;
@@ -156,9 +151,9 @@ var GMCamera = (function () {
 
       var video = document.createElement('video');
       video.autoplay = true; video.playsInline = true; video.muted = true;
-      video.style.cssText = 'width:100%;height:100%;object-fit:cover;transform:scaleX(-1);display:block;';
+      video.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
 
-      navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 1280 } }, audio: false })
+      navigator.mediaDevices.getUserMedia({ video: { width: { ideal: 1280 }, height: { ideal: 1280 }, facingMode: { ideal: 'environment' } }, audio: false })
         .then(function (stream) {
           video.srcObject = stream;
           container.innerHTML = '';
@@ -171,9 +166,6 @@ var GMCamera = (function () {
               canvas.width = video.videoWidth;
               canvas.height = video.videoHeight;
               var ctx = canvas.getContext('2d');
-              // Un-mirror on capture, same reasoning as capture()'s shutter handler.
-              ctx.translate(canvas.width, 0);
-              ctx.scale(-1, 1);
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               canvas.toBlob(function (blob) {
                 if (!blob) { res(null); return; }
