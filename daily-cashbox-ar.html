@@ -300,6 +300,7 @@ function addExtraRow() {
     <button type="button" onclick="removeExtraRow(${idx})" class="h-9 w-9 shrink-0 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-error">close</span></button>
   `;
   document.getElementById('extraRowsContainer').appendChild(row);
+  if (window.__storeCurrency) document.getElementById('extraCurrency' + idx).value = window.__storeCurrency;
 }
 function setExtraDir(idx, dir) {
   document.getElementById('extraRow' + idx).dataset.dir = dir;
@@ -431,7 +432,7 @@ async function submitEntry() {
 async function loadAll() {
   const { data, error } = await goldmindClient
     .from('daily_cash_log')
-    .select('*, staff:created_by(full_name)')
+    .select('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id)')
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('created_at', { ascending: true });
 
@@ -597,7 +598,7 @@ function renderAll() {
     const dateLabel = showFullHistory ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit' }) + ' ' : '';
     return `
       <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>
-        <div class="font-semibold">${gmEscapeHtml(e.operation_type)}</div>
+        <div class="font-semibold">${e.cash_movement_id ? '<span class="material-symbols-outlined align-middle" style="font-size:13px" title="تلقائي من فاتورة">receipt_long</span> ' : ''}${gmEscapeHtml(e.operation_type)}</div>
         ${e.notes ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(e.notes)}</div>` : ''}
         <div class="text-[10px] ${metaClass}">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
       </td>
@@ -627,6 +628,13 @@ function setModalDirection(dir) {
 function openEditModal(id) {
   const e = allEntries.find(x => x.id === id);
   if (!e) return;
+  // Rows posted automatically from an invoice follow that invoice (edit /
+  // cancel / delete it there) -- editing them here would put the two boxes
+  // out of sync, so open the invoice instead.
+  if (e.cash_movement_id) {
+    if (e.cm && e.cm.invoice_id) window.location.href = 'invoice-print-ar.html?id=' + e.cm.invoice_id;
+    return;
+  }
   modalEntryId = id;
   setModalDirection(e.direction);
   document.getElementById('modalOpType').value = e.operation_type || '';
@@ -917,6 +925,11 @@ async function load() {
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
   setDirection('in');
+  // New entries default to the store's own currency (the list starts with AED).
+  const { data: curRow } = await goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  const cur = curRow && curRow.currency ? String(curRow.currency).toUpperCase() : null;
+  const sel = document.getElementById('currencySelect');
+  if (cur && [...sel.options].some(o => o.value === cur)) { sel.value = cur; window.__storeCurrency = cur; }
   await loadAll();
 }
 
