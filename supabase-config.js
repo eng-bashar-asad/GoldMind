@@ -148,6 +148,11 @@ async function requireGoldMindSession(redirectTo) {
 // Set the active branch for this account and reload into it.
 function goldMindSetActiveStore(storeId) {
     localStorage.setItem('goldmind_active_store', storeId);
+    // per-company display caches: don't flash the previous company's name,
+    // logo or currency after switching
+    ['goldmind_store_name', 'goldmind_store_logo', 'goldmind_currency_code'].forEach(function (k) {
+        try { localStorage.removeItem(k); } catch (e) { /* ignore */ }
+    });
     GOLDMIND_STORE_ID = storeId;
     GOLDMIND_STAFF_ID = null;
     window.location.href = 'index-ar.html';

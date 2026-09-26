@@ -571,6 +571,7 @@
         <div class="dsk-store-banner-shine"></div>
         <div class="dsk-store-logo" id="dskStoreAvatarEl" style="visibility:hidden;"></div>
         <div class="dsk-store-name" id="dskStoreNameEl" style="visibility:hidden;"></div>
+        <button type="button" class="hidden" id="dskStoreSwitchBtn" onclick="openStoreSwitcher()" title="تبديل الشركة" style="position:relative;z-index:1;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);color:#fff;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;align-items:center;gap:4px;cursor:pointer;"><span class="material-symbols-outlined" style="font-size:16px;">swap_horiz</span>تبديل</button>
       </div>
       <div class="dsk-topbar-utility">
         <div class="dsk-page-title">لوحة التحكم</div>
@@ -867,6 +868,7 @@
 <div class="w-12 h-12 rounded-full gm-avatar-grad flex items-center justify-center font-bold text-lg shrink-0 overflow-hidden" id="storeAvatarEl" style="visibility:hidden;"></div>
 <div class="min-w-0">
 <h2 class="font-headline-md text-on-primary font-bold" style="font-size:26px; line-height:32px; visibility:hidden;" id="storeNameEl"></h2>
+<button type="button" class="hidden mt-1" id="storeSwitchBtn" onclick="openStoreSwitcher()" style="position:relative;z-index:1;background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.35);color:inherit;border-radius:999px;padding:3px 10px;font-size:12px;font-weight:600;align-items:center;gap:4px;cursor:pointer;"><span class="material-symbols-outlined" style="font-size:16px;">swap_horiz</span>تبديل الشركة</button>
 <script>
   // Show the store name/logo from last time instantly (no flash of
   // empty/wrong content) while the real values load from the database
@@ -2194,5 +2196,46 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
   });
 }
+</script>
+<!-- Quick company switcher (only for accounts that belong to 2+ companies).
+     Same session, no OTP or re-login: it just changes the active company. -->
+<div id="storeSwitchOverlay" class="hidden fixed inset-0 z-[300] bg-black/40 items-center justify-center p-4" onclick="if (event.target === this) closeStoreSwitcher()">
+<div class="bg-white rounded-2xl shadow-xl w-full max-w-sm overflow-hidden" dir="rtl">
+<div class="px-4 py-3 border-b border-gray-200 flex items-center justify-between">
+<span class="font-bold text-[15px] text-gray-900">تبديل الشركة</span>
+<button type="button" class="material-symbols-outlined text-gray-500" onclick="closeStoreSwitcher()">close</button>
+</div>
+<div id="storeSwitchList" class="p-2 flex flex-col gap-1 max-h-[60vh] overflow-y-auto"></div>
+</div>
+</div>
+<script>
+    (async function initStoreSwitcher() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+        const { data } = await goldmindClient.rpc('my_stores');
+        if (!Array.isArray(data) || data.length < 2) return;
+        window.__myStores = data;
+        ['dskStoreSwitchBtn', 'storeSwitchBtn'].forEach(function (id) {
+            const b = document.getElementById(id);
+            if (b) { b.classList.remove('hidden'); b.style.display = 'inline-flex'; }
+        });
+    })();
+    function openStoreSwitcher() {
+        const roles = { owner: 'مالك', manager: 'مدير' };
+        document.getElementById('storeSwitchList').innerHTML = (window.__myStores || []).map(function (st) {
+            const current = st.store_id === GOLDMIND_STORE_ID;
+            return '<button type="button" ' + (current ? 'disabled ' : '') + 'onclick="goldMindSetActiveStore(\'' + st.store_id + '\')" class="w-full text-right px-3 py-3 rounded-xl flex items-center justify-between gap-2 ' + (current ? 'bg-amber-50 border border-amber-300' : 'hover:bg-gray-100') + '">'
+                + '<span class="flex flex-col"><span class="font-semibold text-[14px] text-gray-900">' + gmEscapeHtml(st.store_name || '') + '</span>'
+                + '<span class="text-[11px] text-gray-500">' + (roles[st.role] || 'موظف') + '</span></span>'
+                + (current ? '<span class="text-[11px] font-semibold text-amber-700">الحالية</span>' : '<span class="material-symbols-outlined text-gray-400">chevron_left</span>')
+                + '</button>';
+        }).join('');
+        const o = document.getElementById('storeSwitchOverlay');
+        o.classList.remove('hidden'); o.classList.add('flex');
+    }
+    function closeStoreSwitcher() {
+        const o = document.getElementById('storeSwitchOverlay');
+        o.classList.add('hidden'); o.classList.remove('flex');
+    }
 </script>
 </body></html>
