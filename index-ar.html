@@ -582,7 +582,7 @@
           <span class="dsk-gt-live"><span class="dsk-gt-live-dot"></span>سعر الذهب</span>
           <span class="dsk-gt-sep">·</span>
           <span class="dsk-gt-karat" id="dskHallmarkKaratLabel">عيار 21</span>
-          <b><span id="dskHallmarkPriceLabel">—</span><span class="dsk-gt-unit">د.إ / غرام</span></b>
+          <b><span id="dskHallmarkPriceLabel">—</span><span class="dsk-gt-unit" id="dskGoldUnit">د.إ / غرام</span></b>
         </button>
         <button type="button" class="dsk-icon-btn" onclick="toggleCurrency()" title="تبديل العملة" id="dskCurrencyBtn">د.إ</button>
         <div class="dsk-account-trigger" onclick="location.href='account-security-ar.html'" title="حسابي">
@@ -664,7 +664,7 @@
           <div class="dsk-panel">
             <div class="dsk-panel-head">
               <div class="dsk-panel-title"><span class="material-symbols-outlined dsk-ic">receipt_long</span>حركات اليوم</div>
-              <a class="dsk-panel-link" href="ledger-ar.html">عرض الكل ←</a>
+              <a class="dsk-panel-link" href="main-cashbox-ar.html">عرض الكل ←</a>
             </div>
             <div id="dskRecentMovementsEl">
               <div class="dsk-empty">جارِ التحميل...</div>
@@ -724,10 +724,21 @@
     { id: 'production', icon: 'precision_manufacturing', label: 'إنتاج قطعة', href: 'stock-production-ar.html', permission: 'add_piece', tint: '#DCE8EA', ink: '#3B6B7A' },
     { id: 'purchaseInvoice', icon: 'local_shipping', label: 'فاتورة شراء', href: 'create-invoice-v2-ar.html', permission: 'create_invoice', tint: '#DCE8EA', ink: '#3B6B7A' },
     { id: 'merchantLedger', icon: 'groups', label: 'حسابات التجار', href: 'ledger-ar.html', permission: null, tint: '#F1E9D6', ink: '#9C8552' },
-    { id: 'inventoryCount', icon: 'checklist', label: 'الجرد', href: 'inventory-count-ar.html', permission: 'run_inventory_count', tint: '#DCE8EA', ink: '#3B6B7A' }
+    { id: 'inventoryCount', icon: 'checklist', label: 'الجرد', href: 'inventory-count-ar.html', permission: 'run_inventory_count', tint: '#DCE8EA', ink: '#3B6B7A' },
+    { id: 'inventoryList', icon: 'inventory', label: 'المخزن', href: 'inventory-list-ar.html', permission: 'view_inventory', tint: '#F1E9D6', ink: '#9C8552' },
+    { id: 'invoicesList', icon: 'list_alt', label: 'كل الفواتير', href: 'invoices-list-ar.html', permission: 'view_invoices', tint: '#E6E1F0', ink: '#5B4A86' },
+    { id: 'customerDebts', icon: 'request_quote', label: 'ديون العملاء', href: 'customer-debts-ar.html', permission: 'view_customers', tint: '#F3DEDA', ink: '#8A3B32' },
+    { id: 'goldPrice', icon: 'price_change', label: 'سعر الذهب', href: 'gold-price-ar.html', permission: 'manage_gold_price', tint: '#F2E2C9', ink: '#8A5A2A' },
+    { id: 'mainCashbox', icon: 'savings', label: 'الصندوق الرئيسي', href: 'main-cashbox-ar.html', permission: 'view_profit_report', tint: '#E1EADB', ink: '#3F6B47' },
+    { id: 'expense', icon: 'payments', label: 'تسجيل مصروف', href: 'expense-entry-ar.html', permission: 'manage_daily_cashbox', tint: '#F3DEDA', ink: '#8A3B32' },
+    { id: 'reports', icon: 'bar_chart', label: 'التقارير', href: 'reports-ar.html', permission: 'view_reports', tint: '#DCE8EA', ink: '#3B6B7A' },
+    { id: 'profitReport', icon: 'trending_up', label: 'تقرير الربح', href: 'profit-report-ar.html', permission: 'view_profit_report', tint: '#E1EADB', ink: '#3F6B47' },
+    { id: 'payroll', icon: 'badge', label: 'الرواتب', href: 'payroll-ar.html', permission: 'manage_payroll', tint: '#E6E1F0', ink: '#5B4A86' },
+    { id: 'staff', icon: 'manage_accounts', label: 'الموظفون والصلاحيات', href: 'staff-permissions-ar.html', permission: 'manage_staff', tint: '#E6E1F0', ink: '#5B4A86' },
+    { id: 'companySettings', icon: 'store', label: 'إعدادات الشركة', href: 'company-settings-ar.html', permission: 'edit_settings', tint: '#F1E9D6', ink: '#9C8552' }
   ];
   var DEFAULTS = ['cashbox', 'newSale', 'stockIn', 'salesReturn', 'addCustomer', 'repairs', 'production', 'inventoryCount'];
-  var MAX_ACTIONS = 8;
+  var MAX_ACTIONS = 16; // desktop row has room for two full lines
 
   var stripEl = document.getElementById('dskActionStrip');
   var panelEl = document.getElementById('dskCustomizePanel');
@@ -1398,7 +1409,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <span class="text-[11px] text-on-surface font-semibold font-data-mono" id="movementsDayLabel"></span>
 <button onclick="shiftMovementsDay(1)" class="w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px] text-on-surface">chevron_left</span></button>
 </div>
-<a class="text-secondary text-xs font-semibold" href="ledger-ar.html">عرض الكل</a>
+<a class="text-secondary text-xs font-semibold" href="main-cashbox-ar.html">عرض الكل</a>
 </div>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant overflow-hidden" id="recentMovementsEl">
@@ -1838,7 +1849,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!recent || recent.length === 0) {
                 container.innerHTML = '<div class="p-6 text-center text-on-surface-variant text-sm">لا توجد حركات بهذا اليوم.</div>';
             } else {
-                container.innerHTML = recent.map(m => {
+                const SHOWN = 3; // dashboard shows the latest few; the rest via "عرض الكل"
+                container.innerHTML = recent.slice(0, SHOWN).map(m => {
                     const isIn = m.direction === 'in';
                     const dateStr = new Date(m.created_at).toLocaleString('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
                     const clickable = !!m.invoice_id;
@@ -1864,7 +1876,9 @@ document.addEventListener('DOMContentLoaded', function () {
                                 ${clickable ? '<span class="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_left</span>' : ''}
                             </div>
                         </div>`;
-                }).join('');
+                }).join('') + (recent.length > SHOWN
+                    ? `<a href="main-cashbox-ar.html" class="block p-3 text-center text-[12px] font-semibold text-secondary hover:bg-surface-container-low">+${recent.length - SHOWN} حركات تانية اليوم — عرض الكل</a>`
+                    : '');
             }
             const dskRecentEl = document.getElementById('dskRecentMovementsEl');
             if (dskRecentEl) dskRecentEl.innerHTML = container.innerHTML;
@@ -2066,6 +2080,8 @@ document.addEventListener('DOMContentLoaded', function () {
         if (btn) btn.textContent = currencySymbolFor(active);
         const dskBtn = document.getElementById('dskCurrencyBtn');
         if (dskBtn) dskBtn.textContent = currencySymbolFor(active);
+        const unit = document.getElementById('dskGoldUnit'); // gold prices are stored in the store currency
+        if (unit) unit.textContent = currencySymbolFor(storeCurrency) + ' / غرام';
     }
     initCurrencyButton();
 
