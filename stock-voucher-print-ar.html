@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>سند بضاعة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.16?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=23"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    body { font-family: 'Inter', sans-serif; }
+    .material-symbols-outlined { font-size: 18px; }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; margin: 0 !important; }
+        html { font-size: 100% !important; }
+        #print-wrap { max-width: 100% !important; padding: 0 !important; }
+        /* frame around the whole page; zero page margin = no browser header/footer */
+        #sheet:not(.hidden) { box-shadow: none !important; margin: 10mm !important; width: auto !important; max-width: 100% !important;
+            padding: 16px !important; display: flex !important; flex-direction: column; min-height: calc(100vh - 20mm); }
+        #signature-block { margin-top: auto !important; }
+        @page { margin: 0; }
+    }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 h-14">
+<button onclick="gmSmartBack('stock-transfer-ar.html')" class="flex items-center gap-1 text-sm font-semibold"><span class="material-symbols-outlined">arrow_forward</span>رجوع</button>
+<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold"><span class="material-symbols-outlined">print</span>طباعة</button>
+</div>
+
+<div class="max-w-md lg:max-w-3xl mx-auto p-4" id="print-wrap">
+<div id="loading" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
+<div id="error" class="hidden py-20 text-center text-red-600 text-sm"></div>
+<div id="sheet" class="hidden bg-white shadow-sm p-6 border border-gray-300 rounded-xl">
+
+<div class="flex items-center gap-3 pb-2 mb-2 border-b border-dashed border-gray-300" dir="rtl">
+<div style="flex:1; min-width:0; text-align:right; overflow-wrap:anywhere;" class="text-[9.5px] text-gray-600 leading-[1.45]" id="info-ar"></div>
+<div class="text-center shrink-0" style="max-width:38%;">
+<img class="hidden mx-auto mb-1 h-14 object-contain" id="logo" crossorigin="anonymous"/>
+<div class="font-bold text-base leading-tight" id="store-name"></div>
+</div>
+<div style="flex:1; min-width:0; text-align:left; overflow-wrap:anywhere;" class="text-[9.5px] text-gray-600 leading-[1.45]" dir="ltr" id="info-en"></div>
+</div>
+
+<div class="text-center mb-3">
+<div class="font-bold text-[14px]" id="doc-title"></div>
+<div class="text-[10px] text-gray-500 tracking-widest uppercase" id="doc-title-en"></div>
+</div>
+
+<div class="flex justify-between text-[11.5px] text-gray-600 mb-3">
+<div>
+<div>رقم السند: <span class="font-bold text-gray-900" id="v-number"></span></div>
+<div>التاريخ: <span id="v-date"></span></div>
+</div>
+<div class="text-left">
+<div><span id="party-label">الجهة</span>: <span class="font-bold text-gray-900" id="v-party"></span></div>
+<div>الموظف: <span id="v-staff"></span></div>
+</div>
+</div>
+<div class="hidden bg-gray-50 rounded-lg px-3 py-2 mb-3 text-[11.5px]" id="v-notes"></div>
+
+<table class="w-full text-[10.5px] mb-3">
+<thead>
+<tr class="border-b-2 border-gray-800 text-gray-600">
+<th class="py-1 text-right">#</th>
+<th class="py-1 text-right">الباركود / الوصف</th>
+<th class="py-1 text-center">العيار</th>
+<th class="py-1 text-center">القائم</th>
+<th class="py-1 text-center">المحاسبي</th>
+<th class="py-1 text-center">مصنعية/غ</th>
+<th class="py-1 text-left">الكلفة</th>
+</tr>
+</thead>
+<tbody id="lines" class="divide-y divide-gray-100"></tbody>
+</table>
+
+<div class="border-t-2 border-gray-800 pt-2 text-[11.5px] space-y-1" style="width:62%; margin-inline-start:auto;">
+<div class="flex justify-between text-gray-600"><span>عدد القطع</span><span id="t-count"></span></div>
+<div class="flex justify-between text-gray-600"><span>إجمالي الوزن القائم</span><span id="t-gross"></span></div>
+<div id="t-karats" class="text-gray-600 space-y-1"></div>
+<div class="flex justify-between font-bold text-base pt-1 border-t border-gray-200"><span>إجمالي الكلفة</span><span id="t-cost"></span></div>
+</div>
+
+<div class="mt-8 pt-2 flex justify-between items-end gap-6 text-[11px] text-gray-600" id="signature-block">
+<div class="flex items-end gap-2" style="width:30%;"><span class="shrink-0">توقيع الموظف:</span><span class="flex-1 border-b border-gray-500 h-7"></span></div>
+<div class="flex items-end gap-2" style="width:30%;"><span class="shrink-0" id="sig-party">توقيع المستلم:</span><span class="flex-1 border-b border-gray-500 h-7"></span></div>
+</div>
+</div>
+</div>
+
+<script>
+const FRAMES = { classic: 'border border-gray-300', gold: 'border-2 border-amber-500', double: 'border-4 border-double border-gray-400', dashed: 'border-2 border-dashed border-gray-400', none: 'border-0' };
+const SHAPES = { square: 'rounded-none', soft: 'rounded-xl', round: 'rounded-3xl' };
+const KIND = { intermediary: 'وسيط تعديل', box: 'صندوق', gift: 'هدايا' };
+const n = (v, d = 2) => Number(v || 0).toFixed(d);
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const id = new URLSearchParams(location.search).get('id');
+  const fail = t => { document.getElementById('loading').classList.add('hidden'); const e = document.getElementById('error'); e.textContent = t; e.classList.remove('hidden'); };
+  if (!id) return fail('ما في رقم سند.');
+  const [{ data: v, error }, { data: store }, { data: lines }] = await Promise.all([
+    goldmindClient.from('stock_vouchers').select('*, party:party_id(name, kind), staff:created_by(full_name)').eq('id', id).maybeSingle(),
+    goldmindClient.from('stores').select('*').eq('id', GOLDMIND_STORE_ID).single(),
+    goldmindClient.from('stock_voucher_lines').select('*, piece:piece_id(description_ar)').eq('voucher_id', id).order('barcode')
+  ]);
+  if (error || !v) return fail('تعذّر تحميل السند' + (error ? ': ' + error.message : ''));
+
+  const cur = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س' })[String(store.currency || 'AED').toUpperCase()] || store.currency;
+  const money = x => Number(x || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur;
+  const sheet = document.getElementById('sheet');
+  sheet.className = 'bg-white shadow-sm p-6 ' + (FRAMES[store.invoice_print_frame] || FRAMES.classic) + ' ' + (SHAPES[store.invoice_print_shape] || SHAPES.soft);
+
+  // header (same layout as the invoice)
+  if (store.logo_url) { const l = document.getElementById('logo'); l.src = store.logo_url; l.classList.remove('hidden'); }
+  document.getElementById('store-name').textContent = store.name || '';
+  const info = en => {
+    const rows = [], addr = en ? (store.address_en || store.address) : (store.address || store.address_en);
+    if (addr) rows.push(`<div>${en ? 'Address' : 'العنوان'}: ${esc(addr)}</div>`);
+    if (store.phone) rows.push(`<div>${en ? 'Phone' : 'الهاتف'}: <span dir="ltr">${esc(store.phone)}</span></div>`);
+    return rows.join('');
+  };
+  document.getElementById('info-ar').innerHTML = info(false);
+  document.getElementById('info-en').innerHTML = info(true);
+
+  const kind = v.party ? v.party.kind : '';
+  const out = v.direction === 'out';
+  document.getElementById('doc-title').textContent = kind === 'gift' ? 'سند إخراج هدايا (بالكلفة)' : (out ? 'سند إخراج بضاعة بالكلفة' : 'سند إدخال بضاعة بالكلفة');
+  document.getElementById('doc-title-en').textContent = kind === 'gift' ? 'Gift Issue Voucher (at cost)' : (out ? 'Stock Issue Voucher (at cost)' : 'Stock Receipt Voucher (at cost)');
+  document.title = v.voucher_number + ' | GoldMind';
+  document.getElementById('v-number').textContent = v.voucher_number;
+  document.getElementById('v-date').textContent = gmFormatDateTime(v.created_at);
+  document.getElementById('party-label').textContent = KIND[kind] || 'الجهة';
+  document.getElementById('v-party').textContent = v.party ? v.party.name : '—';
+  document.getElementById('v-staff').textContent = v.staff && v.staff.full_name ? v.staff.full_name : '—';
+  if (v.notes) { const e = document.getElementById('v-notes'); e.textContent = 'ملاحظة: ' + v.notes; e.classList.remove('hidden'); }
+  document.getElementById('sig-party').textContent = out ? 'توقيع المستلم:' : 'توقيع المسلِّم:';
+
+  const L = lines || [];
+  document.getElementById('lines').innerHTML = L.map((l, i) => `
+    <tr>
+      <td class="py-1">${i + 1}</td>
+      <td class="py-1"><span class="font-semibold" dir="ltr">${esc(l.barcode)}</span>${l.piece && l.piece.description_ar ? ' — ' + esc(l.piece.description_ar) : ''}</td>
+      <td class="py-1 text-center">${l.karat}K</td>
+      <td class="py-1 text-center">${n(l.weight_grams, 3)}</td>
+      <td class="py-1 text-center">${n(l.accounting_weight_grams, 3)}</td>
+      <td class="py-1 text-center">${n(l.fab_per_gram)}</td>
+      <td class="py-1 text-left font-semibold">${money(l.cost_value)}</td>
+    </tr>`).join('');
+  const byK = {};
+  L.forEach(l => { byK[l.karat] = (byK[l.karat] || 0) + Number(l.accounting_weight_grams); });
+  document.getElementById('t-count').textContent = L.length;
+  document.getElementById('t-gross').textContent = n(L.reduce((s, l) => s + Number(l.weight_grams), 0), 3) + ' غ';
+  document.getElementById('t-karats').innerHTML = Object.keys(byK).sort().map(k => `<div class="flex justify-between"><span>المحاسبي عيار ${k}</span><span>${n(byK[k], 3)} غ</span></div>`).join('');
+  document.getElementById('t-cost').textContent = money(L.reduce((s, l) => s + Number(l.cost_value), 0));
+
+  document.getElementById('loading').classList.add('hidden');
+  sheet.classList.remove('hidden');
+})();
+</script>
+</body></html>
