@@ -27,14 +27,14 @@ function matches(row, key, expr) {
 }
 
 // db: { table: rows[] }, rpc: { name: (args) => ({status, body}) }
-async function install(page, { db = {}, rpc = {}, generic = false } = {}) {
+async function install(page, { db = {}, rpc = {}, generic = false, realCdn = false } = {}) {
   const calls = [];
   // Playwright's offline mode doesn't stop routed requests, so we cut them here.
   const state = { offline: false };
   page.__gmNet = state;
-  await page.route(/cdn\.tailwindcss\.com/, r => r.fulfill({ contentType: 'text/javascript', body: 'window.tailwind={config:{}};' }));
+  if (!realCdn) await page.route(/cdn\.tailwindcss\.com/, r => r.fulfill({ contentType: 'text/javascript', body: 'window.tailwind={config:{}};' }));
   await page.route(/cdn\.jsdelivr\.net\/npm\/@supabase/, r => r.fulfill({ contentType: 'text/javascript', body: SUPABASE_UMD }));
-  await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ contentType: 'text/css', body: '' }));
+  if (!realCdn) await page.route(/fonts\.(googleapis|gstatic)\.com/, r => r.fulfill({ contentType: 'text/css', body: '' }));
   await page.route(/cdnjs\.cloudflare\.com|cdn\.jsdelivr\.net\/npm\/(?!@supabase)|unpkg\.com|api\.github\.com/, r => r.fulfill({ contentType: 'text/javascript', body: '' }));
   await page.route(/\.supabase\.co\//, async route => {
     if (state.offline) return route.abort('internetdisconnected');
@@ -50,7 +50,8 @@ async function install(page, { db = {}, rpc = {}, generic = false } = {}) {
     if (kind === 'rest/v1') {
       if (req.method() !== 'GET') return route.fulfill({ status: 201, json: [] });
       let rows = db[name] || (generic ? [genericRow()] : []);
-      url.searchParams.forEach((expr, key) => {
+      if (!db[name] && generic) url.searchParams.forEach(() => {}); // generic row matches any filter
+      else url.searchParams.forEach((expr, key) => {
         if (['select', 'order', 'limit', 'offset'].includes(key)) return;
         if (key === 'or') return;
         rows = rows.filter(r => matches(r, key, expr));

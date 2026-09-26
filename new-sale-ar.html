@@ -16,7 +16,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=24"></script>
-<script src="theme.js?v=24"></script>
+<script src="theme.js?v=25"></script>
 <script id="tailwind-config">
         tailwind.config = {
           darkMode: "class",
@@ -88,7 +88,8 @@
     .sale-tab[aria-selected="true"] { background: #775a19; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
     .sale-tab.hidden { display: none; }
     [data-sale-tab].tab-off { display: none !important; }
-    </style>
+      #save-invoice-btn[data-total]::after { content: attr(data-total); padding-inline-start: 12px; border-inline-start: 1px solid rgba(255,255,255,.55); unicode-bidi: isolate; }
+</style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
 <body class="bg-background font-body-md text-on-background antialiased min-h-screen flex flex-col md:flex-row-reverse overflow-x-hidden">
@@ -149,7 +150,7 @@
 <div class="font-bold" id="customer-selected-name"></div>
 <div class="text-on-surface-variant text-sm font-data-mono" id="customer-selected-phone" dir="ltr"></div>
 </div>
-<button onclick="clearCustomer()" class="text-error text-sm font-semibold">تغيير</button>
+<button onclick="clearCustomer()" class="text-secondary text-sm font-semibold px-3 h-10 rounded-lg hover:bg-surface-container-low">تغيير</button>
 </div>
 
 <div id="customer-search-block" class="space-y-3">
@@ -409,7 +410,7 @@
 
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
-<button id="save-invoice-btn" class="w-full py-4 bg-[#B4955A] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
+<button id="save-invoice-btn" class="sticky bottom-[76px] md:bottom-4 z-30 w-full py-4 bg-[#B4955A] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
 <span class="material-symbols-outlined">save</span>
                 حفظ الفاتورة
             </button>
@@ -1426,6 +1427,7 @@
         if (cart.length === 0) {
             body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
             document.getElementById('grand-total').textContent = '0.00 ' + CUR;
+            document.getElementById('save-invoice-btn').removeAttribute('data-total');
             saveDraftToLocalStorage();
             return;
         }
@@ -1440,7 +1442,7 @@
                 <td class="px-2 py-3 text-left">${item.mode === 'diamond' ? item.weight + ' ct' : item.weight}</td>
                 <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}</td>
                 <td class="px-2 py-3 text-left">
-                    <button onclick="removeFromCart(${item.cartId})" class="text-error">
+                    <button onclick="removeFromCart(${item.cartId})" aria-label="شيل القطعة من الفاتورة" class="text-error w-10 h-10 -my-2 inline-flex items-center justify-center rounded-full hover:bg-red-50">
                         <span class="material-symbols-outlined text-[18px]">close</span>
                     </button>
                 </td>
@@ -1449,6 +1451,7 @@
 
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         document.getElementById('grand-total').textContent = total.toFixed(2) + ' ' + CUR;
+        document.getElementById('save-invoice-btn').setAttribute('data-total', total.toFixed(2) + ' ' + CUR); // total stays visible on the sticky save button
         saveDraftToLocalStorage();
     }
 

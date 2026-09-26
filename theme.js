@@ -1041,3 +1041,70 @@ function gmSmartBack(fallbackHref) {
     mount();
   }
 })();
+
+// ---------- UI polish (applies to every page) ----------
+// Built from the ui-ux-pro-max checklist (fonts stay as chosen: Times New Roman
+// + Arial, see "Twelfth shape" above): visible keyboard focus, steady-width numbers, reduced motion, no tap delay,
+// and screen-reader names for icon-only buttons and placeholder-only fields.
+(function gmUiPolish() {
+  const css = `
+  body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  /* money and weights line up in columns */
+  .font-data-mono,td,th,input[type=number],[dir=ltr]{font-variant-numeric:tabular-nums;}
+  /* keyboard focus is always visible (mouse/touch clicks stay clean) */
+  :focus-visible{outline:2px solid var(--gm-secondary,#9C8552)!important;outline-offset:2px;border-radius:6px;}
+  input:focus-visible,select:focus-visible,textarea:focus-visible{outline-offset:0;}
+  /* no 300ms tap delay, no grey flash on Android */
+  a,button,[role=button],label,summary,select{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
+  button:disabled,[aria-disabled=true]{cursor:not-allowed;opacity:.55;}
+  /* small icon buttons keep their look but get a finger-sized (44px) tap area */
+  .gm-hit{position:relative;}
+  .gm-hit::before{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%);}
+  /* bottom navigation labels were 10px: too small to read on a phone */
+  nav.fixed.bottom-0 .text-\\[10px\\]{font-size:11.5px;}
+  @media (prefers-reduced-motion: reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important;}}
+  `;
+  const style = document.createElement('style');
+  style.id = 'gm-ui-polish';
+  style.textContent = css;
+  (document.head || document.documentElement).appendChild(style);
+
+  const ICON_LABELS = {
+    arrow_forward: 'رجوع', arrow_back: 'رجوع', close: 'إغلاق', search: 'بحث', menu: 'القائمة', more_vert: 'خيارات إضافية',
+    add: 'إضافة', delete: 'حذف', edit: 'تعديل', print: 'طباعة', refresh: 'تحديث', share: 'مشاركة', download: 'تنزيل',
+    photo_camera: 'تصوير', qr_code_scanner: 'مسح الرمز', barcode_scanner: 'مسح الباركود', mic: 'إدخال بالصوت',
+    filter_list: 'تصفية', tune: 'تخصيص', settings: 'الإعدادات', logout: 'تسجيل الخروج', history: 'السجل',
+    schedule: 'السجل', attach_money: 'العملة', paid: 'العملة', notifications: 'التنبيهات', dark_mode: 'الوضع الليلي',
+    light_mode: 'الوضع النهاري', expand_more: 'عرض المزيد', expand_less: 'عرض أقل', chevron_left: 'التالي', chevron_right: 'السابق', visibility: 'إظهار',
+    visibility_off: 'إخفاء', content_copy: 'نسخ', swap_horiz: 'تبديل', check: 'تأكيد', remove: 'إنقاص', info: 'معلومات'
+  };
+  const iconName = el => { const i = el.querySelector('.material-symbols-outlined'); return i ? i.textContent.trim() : ''; };
+
+  function label(root) {
+    // icon ligature names ("search", "arrow_forward") must not be read aloud
+    root.querySelectorAll('.material-symbols-outlined:not([aria-hidden])').forEach(i => i.setAttribute('aria-hidden', 'true'));
+    root.querySelectorAll('button:not([aria-label]), a:not([aria-label]), [role=button]:not([aria-label])').forEach(b => {
+      const icon = iconName(b);
+      const text = b.textContent.replace(icon, '').trim();
+      if (text) return;
+      const name = b.getAttribute('title') || ICON_LABELS[icon];
+      if (name) b.setAttribute('aria-label', name);
+      if (icon && !b.classList.contains('gm-hit')) {
+        const r = b.getBoundingClientRect();
+        if (r.width && r.width < 44 && r.height < 44 && getComputedStyle(b).position === 'static') b.classList.add('gm-hit');
+      }
+    });
+    root.querySelectorAll('input:not([type=hidden]):not([aria-label]), select:not([aria-label]), textarea:not([aria-label])').forEach(f => {
+      if (f.labels && f.labels.length) return;
+      const name = f.getAttribute('placeholder') || f.getAttribute('title');
+      if (name) f.setAttribute('aria-label', name.replace(/\.\.\.$/, ''));
+    });
+  }
+  let queued = false;
+  function run() { queued = false; if (document.body) label(document.body); }
+  document.addEventListener('DOMContentLoaded', () => {
+    run();
+    new MutationObserver(() => { if (!queued) { queued = true; requestAnimationFrame(run); } })
+      .observe(document.body, { childList: true, subtree: true });
+  });
+})();
