@@ -1008,6 +1008,8 @@ function gmSmartBack(fallbackHref) {
        clipping differently. Only :hover brings them back. */
     #gm-rail .gm-rail-label, #gm-rail .gm-rail-head-label { display: none; }
     #gm-rail:hover .gm-rail-label, #gm-rail:hover .gm-rail-head-label { display: inline; }
+    /* Screen navigation only: never on paper / print preview. */
+    @media print { #gm-rail, #gm-update-banner { display: none !important; } }
   `;
   document.head.appendChild(style2);
 
