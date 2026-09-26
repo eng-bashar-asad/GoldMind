@@ -116,6 +116,13 @@ begin
     raise exception 'FAIL 12: health check missed a wrong total';
   end if;
 
+  -- 13) a customer added offline on the sale screen is created with the sale
+  r := post_sale_invoice(jsonb_build_object('store_id', usd, 'new_customer', jsonb_build_object('name', 'زبون جديد', 'phone', '050'),
+        'payment_method', 'cash', 'items', jsonb_build_array(jsonb_build_object('piece_id', p2, 'price', 700))));
+  if (select c.name from invoices i join customers c on c.id = i.customer_id where i.id = (r->>'id')::uuid) <> 'زبون جديد' then
+    raise exception 'FAIL 13: new customer not created';
+  end if;
+
   raise notice 'ALL ACCOUNTING TESTS PASSED';
 end $$;
 rollback;

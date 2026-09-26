@@ -158,7 +158,7 @@
 <span class="absolute right-3 top-3 material-symbols-outlined text-outline">search</span>
 </div>
 <div id="customer-results" class="space-y-2"></div>
-<button onclick="window.location.href='customer-add-ar.html'" class="w-full h-12 flex items-center justify-center gap-2 border border-primary text-primary font-semibold rounded-lg active:scale-95 transition-all">
+<button onclick="addNewCustomer()" class="w-full h-12 flex items-center justify-center gap-2 border border-primary text-primary font-semibold rounded-lg active:scale-95 transition-all">
 <span class="material-symbols-outlined">person_add</span>
                     إضافة عميل جديد
                 </button>
@@ -1091,6 +1091,16 @@
         saveDraftToLocalStorage();
     }
 
+    // Offline there's no customer page to go to: take name + phone here and the
+    // customer is created together with the sale when it posts.
+    function addNewCustomer() {
+        if (navigator.onLine) { window.location.href = 'customer-add-ar.html'; return; }
+        const name = (prompt('ما في إنترنت — اكتب اسم العميل الجديد:') || '').trim();
+        if (!name) return;
+        const phone = (prompt('رقم هاتفه (اختياري):') || '').trim();
+        pickCustomer({ id: null, name, phone, _new: true });
+    }
+
     function clearCustomer() {
         selectedCustomer = null;
         document.getElementById('customer-selected').classList.add('hidden');
@@ -1509,6 +1519,7 @@
             store_id: GOLDMIND_STORE_ID,
             client_ref: clientRef,
             customer_id: selectedCustomer.id,
+            new_customer: selectedCustomer._new ? { name: selectedCustomer.name, phone: selectedCustomer.phone || null } : null,
             payment_method: selectedPaymentMethod,
             cash_paid: selectedPaymentMethod === 'mixed' ? mixedCashAmt : null,
             bank_paid: selectedPaymentMethod === 'mixed' ? mixedBankAmt : null,

@@ -55,3 +55,27 @@ test('sale without internet is kept on the device and posted later', async ({ pa
   await expect(page.locator('#gm-offline-badge')).toHaveCount(0);
   expect(posted[0].items[0].piece_id).toBe('p1');
 });
+
+test('offline: a brand-new customer can be added and goes with the sale', async ({ page, context }) => {
+  const posted = [];
+  await install(page, { db: db(), rpc: { post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-3', invoice_number: 'INV-3' } }; } } });
+  await page.goto('/new-sale-ar.html');
+  await page.waitForFunction(() => localStorage.getItem('gm_snapshot_at'));
+  page.__gmNet.offline = true;
+  await context.setOffline(true);
+  const answers = ['سامر', '0509999999'];
+  page.on('dialog', d => d.type() === 'prompt' ? d.accept(answers.shift()) : d.accept());
+  await page.fill('#barcode-search-input', 'GM-0001');
+  await page.click('button[onclick="searchByBarcode()"]');
+  await page.fill('#barcode-price-input', '1500');
+  await page.press('#barcode-price-input', 'Enter');
+  await page.click('button[onclick="addNewCustomer()"]');
+  await expect(page.locator('#customer-selected-name')).toHaveText('سامر');
+  await page.click('#save-invoice-btn');
+  await expect(page.locator('#save-message')).toContainText('انحفظت الفاتورة على الجهاز');
+  page.__gmNet.offline = false;
+  await context.setOffline(false);
+  await expect.poll(() => posted.length, { timeout: 10000 }).toBe(1);
+  expect(posted[0].customer_id).toBeNull();
+  expect(posted[0].new_customer).toEqual({ name: 'سامر', phone: '0509999999' });
+});
