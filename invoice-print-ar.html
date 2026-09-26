@@ -3,7 +3,7 @@
 <html class="light" dir="rtl" lang="ar"><head>
 <style>
 :root { --gm-bg: #0f172a; --gm-bg-elevated: #f7f9fb; --gm-surface-lowest: #ffffff; --gm-surface-low: #f2f4f6; --gm-primary: #000000; --gm-on-primary: #ffffff; --gm-accent: #FFD700; --gm-on-accent: #0f172a; --gm-secondary: #745a25; --gm-on-surface: #191c1e; --gm-on-surface-variant: #45464d; --gm-outline-variant: #c6c6cd; }
-.item-photo { display: none; width: 44px; height: 44px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; flex-shrink: 0; }
+.item-photo { display: none; width: 36px; height: 36px; object-fit: cover; border-radius: 6px; border: 1px solid #e5e7eb; flex-shrink: 0; }
 #items-table-generic.with-photos .item-photo { display: block; }
 </style>
 
@@ -38,7 +38,7 @@
            their printer dialog (A5, A4, thermal...) instead of staying
            locked to the small mobile-card width used on screen. */
         #print-wrap { max-width: 100% !important; padding: 0 !important; }
-        #invoice-sheet { box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; padding: 28px !important; }
+        #invoice-sheet { box-shadow: none !important; margin: 0 !important; width: 100% !important; max-width: 100% !important; padding: 16px !important; }
         #policy-page-wrap { display: block !important; page-break-before: always; }
         @page { margin: 10mm; }
     }
@@ -116,30 +116,31 @@
 <div class="no-print hidden flex-col gap-2 mb-3" id="diamond-cert-buttons"></div>
 <div id="invoice-sheet" class="hidden bg-white shadow-sm p-6">
 
-<!-- Header: logo + store info (right: Arabic / left: English) -->
-<div class="text-center pb-3 mb-3">
-<img class="hidden mx-auto mb-2 h-14 object-contain" id="store-logo" crossorigin="anonymous"/>
-<div class="font-bold text-lg" id="store-name"></div>
+<!-- Header: logo + name in the middle, store info beside it (Arabic on
+     the right, English on the left), wrapped and compact. -->
+<div class="flex items-center gap-3 pb-2 mb-2 border-b border-dashed border-gray-300" dir="rtl">
+<div style="flex:1; min-width:0; text-align:right; overflow-wrap:anywhere;" class="text-[9.5px] text-gray-600 leading-[1.45]" dir="rtl" id="store-info-ar"></div>
+<div class="text-center shrink-0" style="max-width:38%;">
+<img class="hidden mx-auto mb-1 h-14 object-contain" id="store-logo" crossorigin="anonymous"/>
+<div class="font-bold text-base leading-tight" id="store-name"></div>
+</div>
+<div style="flex:1; min-width:0; text-align:left; overflow-wrap:anywhere;" class="text-[9.5px] text-gray-600 leading-[1.45]" dir="ltr" id="store-info-en"></div>
 </div>
 
 <!-- Document type: "Tax Invoice" only when the store has a TRN on file
      (an unregistered store must not label its invoices as tax invoices);
      a return prints as a Credit Note instead, per FTA labeling rules, with
      a reference line to the original invoice it corrects. -->
-<div class="text-center mb-3">
+<div class="text-center mb-2">
 <div class="font-bold text-[13px] tracking-wide" id="doc-type-ar"></div>
 <div class="text-[10px] text-gray-500 tracking-widest uppercase" id="doc-type-en"></div>
 <div class="hidden text-[11px] text-gray-600 mt-1" id="doc-related-invoice"></div>
 </div>
 
-<div class="border-b border-dashed border-gray-300 pb-3 mb-4 flex" dir="rtl">
-<div style="flex:1; text-align:right;" class="text-[10.5px] text-gray-600 leading-5" dir="rtl" id="store-info-ar"></div>
-<div style="flex:1; text-align:left; border-right: 1px solid #e5e7eb; padding-right: 10px; margin-right: 10px;" class="text-[10.5px] text-gray-600 leading-5" dir="ltr" id="store-info-en"></div>
-</div>
-<div class="text-center text-[10px] text-gray-400 mb-4" id="store-legal"></div>
+<div class="text-center text-[10px] text-gray-400 mb-2" id="store-legal"></div>
 
 <!-- Invoice meta -->
-<div class="flex justify-between text-[12px] text-gray-600 mb-4">
+<div class="flex justify-between text-[11.5px] text-gray-600 mb-2">
 <div>
 <div>رقم الفاتورة: <span class="font-bold text-gray-900" id="inv-number"></span></div>
 <div>التاريخ: <span id="inv-date"></span></div>
@@ -151,7 +152,7 @@
 </div>
 
 <!-- Counterparty info (customer or trader) -->
-<div class="bg-gray-50 rounded-lg p-3 mb-4 text-[12px] no-print-hide-edit">
+<div class="bg-gray-50 rounded-lg px-3 py-2 mb-3 text-[11.5px] no-print-hide-edit">
 <div class="flex items-start justify-between gap-2">
 <div class="flex-1">
 <div class="text-gray-500 text-[10px] uppercase tracking-wide mb-1" id="cust-label">بيانات العميل</div>
@@ -179,14 +180,14 @@
 </div>
 
 <!-- Items table (sale / return / buyRetail — no per-item VAT breakdown) -->
-<table class="w-full text-[11px] mb-4" id="items-table-generic">
+<table class="w-full text-[10.5px] mb-3" id="items-table-generic">
 <thead>
 <tr class="border-b-2 border-gray-800 text-gray-600">
-<th class="py-2 text-right">الوصف</th>
-<th class="py-2 text-center">الكمية</th>
-<th class="py-2 text-center">العيار</th>
-<th class="py-2 text-center">الوزن</th>
-<th class="py-2 text-left">الإجمالي</th>
+<th class="py-1 text-right">الوصف</th>
+<th class="py-1 text-center">الكمية</th>
+<th class="py-1 text-center">العيار</th>
+<th class="py-1 text-center">الوزن</th>
+<th class="py-1 text-left">الإجمالي</th>
 </tr>
 </thead>
 <tbody id="items-body" class="divide-y divide-gray-100"></tbody>
@@ -215,18 +216,18 @@
 </table>
 
 <!-- Totals: subtotal / VAT / grand total, stacked, aligned left -->
-<div class="flex items-start justify-between gap-3 mb-4">
+<div class="flex items-start justify-between gap-3 mb-3">
 <div id="einvoice-qr-box" class="hidden flex-col items-center gap-1 shrink-0">
 <div id="einvoice-qr"></div>
 <p class="text-[8px] text-gray-400 text-center leading-tight w-24">جاهزية فاتورة إلكترونية<br/>بانتظار التسجيل الرسمي</p>
 </div>
-<div class="border-t-2 border-gray-800 pt-3 text-[12px] flex-1" style="width: 62%; margin-inline-start: auto;">
+<div class="border-t-2 border-gray-800 pt-2 text-[11.5px] flex-1" style="width: 62%; margin-inline-start: auto;">
 <div class="flex justify-between text-gray-600">
 <span id="sum-before-tax-label">الإجمالي قبل الضريبة</span>
 <span id="sum-before-tax"></span>
 </div>
 <div class="flex justify-between text-gray-600 mt-1">
-<span>قيمة الضريبة (<span id="vat-rate-label"></span>%)</span>
+<span>قيمة الضريبة</span>
 <span id="sum-tax"></span>
 </div>
 <div class="flex justify-between font-bold text-base pt-1 border-t border-gray-200 mt-1">
@@ -243,7 +244,7 @@
 </div>
 
 <!-- Signature(s) -->
-<div class="mt-10 pt-3 flex justify-between items-end gap-6 text-[11px] text-gray-500" id="signature-block">
+<div class="mt-6 pt-2 flex justify-between items-end gap-6 text-[11px] text-gray-500" id="signature-block">
 <div class="flex-1">
 <div class="border-b border-gray-400 h-8"></div>
 <div class="mt-1" id="signature-label-1">توقيع العميل</div>
@@ -254,7 +255,7 @@
 </div>
 </div>
 
-<div class="text-center text-[10px] text-gray-400 mt-6">شكراً لتعاملكم معنا</div>
+<div class="text-center text-[10px] text-gray-400 mt-3">شكراً لتعاملكم معنا</div>
 
 </div>
 
@@ -655,11 +656,11 @@
 
             return `
                 <tr>
-                    <td class="py-2"><div class="flex items-center gap-2">${(item.item_photo_url || piecePhotoById[item.piece_id]) ? `<img class="item-photo" src="${gmEscapeHtml(item.item_photo_url || piecePhotoById[item.piece_id])}" crossorigin="anonymous" alt=""/>` : ''}<div>${gmEscapeHtml(item.description) || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${gmEscapeHtml(item.description_en)}</span>` : ''}</div></div></td>
-                    <td class="py-2 text-center">1</td>
-                    <td class="py-2 text-center">${item.karat}K</td>
-                    <td class="py-2 text-center">${fmt(item.weight_grams)}</td>
-                    <td class="py-2 text-left font-semibold">${fmt(full)}</td>
+                    <td class="py-1"><div class="flex items-center gap-2">${(item.item_photo_url || piecePhotoById[item.piece_id]) ? `<img class="item-photo" src="${gmEscapeHtml(item.item_photo_url || piecePhotoById[item.piece_id])}" crossorigin="anonymous" alt=""/>` : ''}<div>${gmEscapeHtml(item.description) || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${gmEscapeHtml(item.description_en)}</span>` : ''}</div></div></td>
+                    <td class="py-1 text-center">1</td>
+                    <td class="py-1 text-center">${item.karat}K</td>
+                    <td class="py-1 text-center">${fmt(item.weight_grams)}</td>
+                    <td class="py-1 text-left font-semibold">${fmt(full)}</td>
                 </tr>
             `;
         }).join('');
@@ -699,7 +700,6 @@
             apply();
         }
 
-        document.getElementById('vat-rate-label').textContent = fmt(vatRate).replace(/\.00$/, '');
         document.getElementById('sum-before-tax').textContent = gmFormatDualCurrency(sumBeforeTax, store);
         document.getElementById('sum-tax').textContent = gmFormatDualCurrency(sumTax, store);
         document.getElementById('sum-total').textContent = gmFormatDualCurrency(sumTotal, store);
