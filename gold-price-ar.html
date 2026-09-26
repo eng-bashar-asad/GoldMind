@@ -128,30 +128,15 @@ async function saveGoldPrices() {
     return;
   }
 
-  const pricePerGram24 = (ounce / OUNCE_GRAMS) * rate;
-  const rows = [24, 22, 21, 18].map(k => ({
-    store_id: GOLDMIND_STORE_ID,
-    karat: k,
-    price_per_gram: +(pricePerGram24 * KARAT_PURITY[k]).toFixed(2),
-    mode: 'manual_ounce'
-  }));
-
   const btn = document.getElementById('saveBtn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.from('gold_prices').upsert(rows, { onConflict: 'store_id,karat' });
-
-  if (!error) {
-    // Persist to the store row too — this is what makes the value follow
-    // the account across devices/browsers instead of living only in this
-    // one browser's localStorage (which is what used to get wiped and
-    // force retyping it on every visit).
-    await goldmindClient.from('stores').update({
-      last_gold_ounce_price: ounce,
-      last_gold_ounce_rate: rate
-    }).eq('id', GOLDMIND_STORE_ID);
-  }
+  // One server-side step (gold_prices + stores' last ounce price/rate),
+  // permission-checked by manage_gold_price. The old two-call version let
+  // a manager without edit_settings save gold_prices while the stores
+  // update silently did nothing.
+  const { error } = await goldmindClient.rpc('set_gold_ounce_price', { target_store_id: GOLDMIND_STORE_ID, ounce, rate });
 
   btn.disabled = false;
   btn.textContent = 'حفظ الأسعار';
@@ -162,6 +147,7 @@ async function saveGoldPrices() {
     return;
   }
 
+  if (gmStore) { gmStore.last_gold_ounce_price = ounce; gmStore.last_gold_ounce_rate = rate; }
   okEl.textContent = 'تم حفظ الأسعار بنجاح';
   okEl.classList.remove('hidden');
   loadLastUpdated();

@@ -166,21 +166,29 @@
 </section>
 
 <!-- Ounce price (internal — profit calc only, never printed) -->
-<section class="hidden bg-emerald-50 border border-emerald-200 rounded-xl shadow-sm p-4 space-y-2" id="ounce-price-section">
-<h2 class="font-label-md text-label-md text-emerald-800 uppercase tracking-wider flex items-center gap-1">
-<span class="material-symbols-outlined text-[16px]">visibility_off</span>
-                سعر الأونصة اليوم (خاص — لحساب الربح فقط)
-            </h2>
-<p class="text-[11px] text-emerald-700 leading-5">اختياري. لو عبّيته، البرنامج بيحسب ربح هالفاتورة على أساسه (حسب عيار ووزن محاسبة كل قطعة مباعة) بدل سعر الغرام المسجّل بصفحة "سعر الذهب". هالرقم داخلي بس — ما بيظهر أبداً بفاتورة الزبون ولا بالطباعة.</p>
+<!-- Ounce price used for profit: compact chip showing the current value;
+     tapping opens the editor. Saving applies store-wide (same as the
+     "سعر الذهب" page). Internal only, never on the customer's invoice. -->
+<section class="hidden" id="ounce-price-section">
+<button type="button" id="ounce-chip" onclick="toggleOunceEditor()" class="h-9 px-3 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-800 text-[13px] font-semibold flex items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">monitoring</span>
+<span>أونصة حساب الربح: <b class="font-data-mono" dir="ltr" id="ounce-chip-value">…</b></span>
+<span class="material-symbols-outlined text-[18px] hidden" id="ounce-chip-icon">expand_more</span>
+</button>
+<div id="ounce-editor" class="hidden mt-2 bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
+<p class="text-[11px] text-emerald-700 leading-5">ربح الفاتورة بينحسب على هالسعر. إذا غيّرته وحفظت، بيتغيّر لكل البرنامج (صفحة سعر الذهب وكل الفواتير الجاية) لحتى حدا معه صلاحية يغيّره. داخلي بس، ما بيطلع بفاتورة الزبون.</p>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-emerald-50 px-1 text-[10px] font-semibold text-emerald-700" for="sale-ounce-price">سعر الأونصة (دولار)</label>
-<input class="w-full h-12 border border-emerald-300 rounded-lg px-3 text-right font-data-mono bg-white" dir="ltr" id="sale-ounce-price" placeholder="2400.00" step="0.01" type="number"/>
+<label class="absolute -top-2 right-3 bg-emerald-50 px-1 text-[10px] font-semibold text-emerald-700" for="ounce-edit-price">سعر الأونصة (دولار)</label>
+<input class="w-full h-11 border border-emerald-300 rounded-lg px-3 text-right font-data-mono bg-white" dir="ltr" id="ounce-edit-price" placeholder="2400.00" step="0.01" type="number"/>
 </div>
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-emerald-50 px-1 text-[10px] font-semibold text-emerald-700" for="sale-ounce-rate">سعر صرف الدولار</label>
-<input class="w-full h-12 border border-emerald-300 rounded-lg px-3 text-right font-data-mono bg-white" dir="ltr" id="sale-ounce-rate" placeholder="3.67" step="0.0001" type="number"/>
+<label class="absolute -top-2 right-3 bg-emerald-50 px-1 text-[10px] font-semibold text-emerald-700" for="ounce-edit-rate">سعر صرف الدولار</label>
+<input class="w-full h-11 border border-emerald-300 rounded-lg px-3 text-right font-data-mono bg-white" dir="ltr" id="ounce-edit-rate" placeholder="1" step="0.0001" type="number"/>
 </div>
+</div>
+<button type="button" id="ounce-save-btn" onclick="saveOuncePrice()" class="w-full h-10 rounded-lg bg-emerald-700 text-white font-semibold text-[13px]">حفظ لكل البرنامج</button>
+<p id="ounce-msg" class="hidden text-[12px]"></p>
 </div>
 </section>
 
@@ -435,6 +443,10 @@
 </a>
 </nav>
 
+<!-- Piece photo viewer (tap the small photo in the barcode preview) -->
+<div id="piece-photo-lightbox" class="hidden fixed inset-0 z-[70] bg-black/80 items-center justify-center p-4" onclick="this.classList.add('hidden'); this.classList.remove('flex');">
+<img id="piece-photo-big" alt="صورة القطعة" class="max-w-full max-h-full rounded-lg object-contain"/>
+</div>
 <!-- Held (unsaved) invoices picker -->
 <div id="drafts-modal" class="hidden fixed inset-0 z-[60] bg-black/40 items-center justify-center p-4" onclick="if (event.target === this) closeDraftsModal()">
 <div class="bg-surface-container-lowest rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
@@ -467,28 +479,64 @@
         }
     })();
 
-    // Show the internal ounce-price section only to owner/manager (same
-    // gate as the invoice-print-ar.html profit reveal) — a regular sales
-    // clerk shouldn't see or influence the store's cost basis. Pre-fills
-    // from the store's last saved ounce price/rate (gold-price-ar.html)
-    // purely as a starting suggestion; always editable, and saving here
-    // never touches stores.last_gold_ounce_price/gold_prices — it only
-    // affects this one invoice's profit-calc snapshot.
-    (async function __showOuncePriceSectionIfAllowed() {
+    // ---------- Ounce price used for profit (store-wide) ----------
+    // Chip visible to owner / view_profit_report / manage_gold_price; only
+    // owner / manage_gold_price can change it (enforced server-side by the
+    // set_gold_ounce_price RPC). Profit snapshots at save time read the
+    // per-karat gold_prices this RPC writes.
+    let __canManageOunce = false;
+    let __canSeeCost = false; // accounting weight + fabrication cost in the barcode preview
+    function renderOunceChip(price, rate, mode) {
+        const el = document.getElementById('ounce-chip-value');
+        if (mode && mode !== 'manual_ounce') { el.textContent = 'سعر غرام يدوي'; return; }
+        if (price == null) { el.textContent = 'غير محدد'; return; }
+        const r = Number(rate) || 1;
+        el.textContent = '$' + Number(price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + (r !== 1 ? ' × ' + r : '');
+    }
+    (async function __loadOunceChip() {
         await requireGoldMindSession('login-entry-ar.html');
-        const [{ data: __staffPerm2 }, { data: __storeRates }] = await Promise.all([
+        const [{ data: perm }, { data: st }, { data: g24 }] = await Promise.all([
             goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
-            goldmindClient.from('stores').select('currency, last_gold_ounce_price, last_gold_ounce_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            goldmindClient.from('stores').select('currency, last_gold_ounce_price, last_gold_ounce_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('gold_prices').select('mode').eq('store_id', GOLDMIND_STORE_ID).eq('karat', 24).maybeSingle()
         ]);
-        const __canSeeOunce = __staffPerm2 && (__staffPerm2.role === 'owner' || (__staffPerm2.permissions && __staffPerm2.permissions.view_profit_report === true));
-        if (!__canSeeOunce) return;
+        const isOwner = perm && perm.role === 'owner';
+        const has = k => !!(perm && perm.permissions && perm.permissions[k] === true);
+        __canManageOunce = isOwner || has('manage_gold_price');
+        __canSeeCost = isOwner || has('view_reports');
+        if (!(isOwner || has('view_profit_report') || __canManageOunce)) return;
         document.getElementById('ounce-price-section').classList.remove('hidden');
-        if (__storeRates && __storeRates.last_gold_ounce_rate != null) {
-            document.getElementById('sale-ounce-rate').value = __storeRates.last_gold_ounce_rate;
-        } else if (__storeRates && __storeRates.currency === 'USD') {
-            document.getElementById('sale-ounce-rate').value = 1;
-        }
+        renderOunceChip(st && st.last_gold_ounce_price, st && st.last_gold_ounce_rate, g24 && g24.mode);
+        if (st && st.last_gold_ounce_price != null) document.getElementById('ounce-edit-price').value = st.last_gold_ounce_price;
+        document.getElementById('ounce-edit-rate').value = st && st.last_gold_ounce_rate != null ? st.last_gold_ounce_rate : (st && st.currency === 'USD' ? 1 : '');
+        if (__canManageOunce) document.getElementById('ounce-chip-icon').classList.remove('hidden');
     })();
+    function toggleOunceEditor() {
+        if (!__canManageOunce) return;
+        const ed = document.getElementById('ounce-editor');
+        const open = ed.classList.toggle('hidden') === false;
+        document.getElementById('ounce-chip-icon').textContent = open ? 'expand_less' : 'expand_more';
+        if (open) document.getElementById('ounce-edit-price').focus();
+    }
+    async function saveOuncePrice() {
+        const price = parseFloat(document.getElementById('ounce-edit-price').value);
+        const rate = parseFloat(document.getElementById('ounce-edit-rate').value) || 1;
+        const msg = document.getElementById('ounce-msg');
+        const show = (t, bad) => { msg.textContent = t; msg.className = 'text-[12px] ' + (bad ? 'text-error' : 'text-emerald-700'); };
+        if (!price || price <= 0) return show('أدخل سعر أونصة صحيح', true);
+        const btn = document.getElementById('ounce-save-btn');
+        btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+        const { error } = await goldmindClient.rpc('set_gold_ounce_price', { target_store_id: GOLDMIND_STORE_ID, ounce: price, rate });
+        btn.disabled = false; btn.textContent = 'حفظ لكل البرنامج';
+        if (error) return show('تعذّر الحفظ: ' + error.message, true);
+        renderOunceChip(price, rate, 'manual_ounce');
+        show('تم الحفظ — صار هالسعر المعتمد لكل البرنامج', false);
+        // refresh per-gram prices used by the price suggestion
+        const { data: gp } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
+        (gp || []).forEach(p => { __goldPriceByKarat[p.karat] = Number(p.price_per_gram); });
+        updateManualPriceSuggestion();
+        setTimeout(() => { document.getElementById('ounce-editor').classList.add('hidden'); document.getElementById('ounce-chip-icon').textContent = 'expand_more'; msg.classList.add('hidden'); }, 1500);
+    }
 
     // ---------- Price suggestion ----------
     // Purely advisory: pre-computes weight × (today's gold price for that
@@ -1076,24 +1124,52 @@
             return;
         }
 
-        const pieceId = data.id;
-        barcodeResult.innerHTML = `
-            <div class="p-3 bg-surface-container-low rounded-lg flex flex-col gap-2">
-                <div class="flex items-center justify-between gap-2">
-                    <div class="min-w-0">
-                        <div class="font-data-mono font-bold text-sm">${data.weight_grams} غ &middot; عيار ${data.karat}</div>
-                        <div class="text-outline text-[11px] font-data-mono truncate">${gmEscapeHtml(data.barcode)}</div>
+        barcodeResult.innerHTML = renderBarcodePreview(data);
+        document.getElementById('barcode-price-input').focus();
+    }
+
+    const COLOR_NAMES = { Gold: 'ذهبي', White: 'أبيض', Rose: 'وردي' };
+    function renderBarcodePreview(p) {
+        const n = (v, d = 2) => Number(v).toFixed(d).replace(/\.?0+$/, '');
+        const specs = [
+            ['الباركود', p.barcode, true],
+            ['النوع', [p.piece_type, p.category1, p.category2].filter(Boolean).join(' · ')],
+            ['العيار', p.karat ? p.karat + 'K' : ''],
+            ['اللون', COLOR_NAMES[p.color] || p.color],
+            ['الوزن', p.weight_grams != null ? n(p.weight_grams, 3) + ' غ' : '', true],
+            __canSeeCost && p.accounting_weight_grams != null ? ['المحاسبي', n(p.accounting_weight_grams, 3) + ' غ', true] : null,
+            __canSeeCost && p.cost_fabrication_per_gram != null ? ['مصنعية/غ', n(p.cost_fabrication_per_gram) + ' ' + CUR, true] : null,
+            p.center_stone_carat ? ['حجر وسط', n(p.center_stone_carat, 3) + ' ct', true] : null,
+            p.accent_diamond_carat ? ['ماس جانبي', n(p.accent_diamond_carat, 3) + ' ct', true] : null,
+            ['الصندوق', p.box_name]
+        ].filter(x => x && x[1]);
+        const photo = p.photo_url
+            ? `<img src="${gmEscapeHtml(p.photo_url)}" alt="صورة القطعة" onclick="openPiecePhoto(this.src)" style="width:72px;height:72px" class="rounded-lg object-cover border border-outline-variant cursor-zoom-in shrink-0 bg-white"/>`
+            : `<div style="width:72px;height:72px" class="rounded-lg border border-dashed border-outline-variant flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-outline">no_photography</span></div>`;
+        const pieceJson = JSON.stringify(p).replace(/'/g, '&apos;');
+        return `
+            <div class="p-2 bg-surface-container-low rounded-lg flex flex-col gap-2">
+                <div class="flex items-center gap-3">
+                    ${photo}
+                    <div class="flex-1 min-w-0 flex flex-wrap gap-x-4 gap-y-1 text-[12px]">
+                        ${specs.map(([k, v, mono]) => `<span class="whitespace-nowrap"><span class="text-outline">${k}:</span> <b class="${mono ? 'font-data-mono' : ''}">${gmEscapeHtml(String(v))}</b></span>`).join('')}
                     </div>
                 </div>
-                <input type="text" placeholder="وصف القطعة (خاتم، حلق...)" class="w-full h-10 border border-outline-variant rounded px-3 text-right" id="barcode-desc-input" value="${gmEscapeHtml(data.description_ar || '')}"/>
-                <div class="flex items-center gap-2">
-                    <input type="number" placeholder="السعر" class="flex-1 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input"/>
-                    <button onclick='confirmAddBarcodePiece(${JSON.stringify(data).replace(/'/g, "&apos;")})' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all shrink-0">
-                        <span class="material-symbols-outlined">add</span>
-                    </button>
+                <div class="flex flex-col md:flex-row gap-2">
+                    <input type="text" placeholder="وصف القطعة (خاتم، حلق...)" class="flex-1 h-10 border border-outline-variant rounded px-3 text-right" id="barcode-desc-input" value="${gmEscapeHtml(p.description_ar || '')}"/>
+                    <div class="flex items-center gap-2 md:w-56">
+                        <input type="number" placeholder="السعر" class="flex-1 min-w-0 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input" onkeydown="if (event.key === 'Enter') this.nextElementSibling.click()"/>
+                        <button onclick='confirmAddBarcodePiece(${pieceJson})' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all shrink-0" title="إضافة للفاتورة">
+                            <span class="material-symbols-outlined">add</span>
+                        </button>
+                    </div>
                 </div>
-            </div>
-        `;
+            </div>`;
+    }
+    function openPiecePhoto(src) {
+        document.getElementById('piece-photo-big').src = src;
+        const box = document.getElementById('piece-photo-lightbox');
+        box.classList.remove('hidden'); box.classList.add('flex');
     }
 
     function confirmAddBarcodePiece(piece) {
@@ -1439,23 +1515,6 @@
             .from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
         const goldPriceMap = {};
         (goldPrices || []).forEach(p => { goldPriceMap[p.karat] = Number(p.price_per_gram); });
-
-        // If the (owner/manager-only) internal ounce-price field was filled
-        // in for this sale, it overrides the per-karat prices above for
-        // this invoice's profit snapshot only — gold-price-ar.html's saved
-        // per-gram rates and stores.last_gold_ounce_price are left
-        // untouched. This value is never sent to invoice-print-ar.html's
-        // customer-facing rendering, only stored in invoice_items.gold_price_per_gram
-        // (already screen-only/no-print, used solely by the profit panel).
-        const __ouncePriceInput = parseFloat(document.getElementById('sale-ounce-price') ? document.getElementById('sale-ounce-price').value : '');
-        const __ounceRateInput = parseFloat(document.getElementById('sale-ounce-rate') ? document.getElementById('sale-ounce-rate').value : '');
-        if (__ouncePriceInput && __ouncePriceInput > 0) {
-            const OUNCE_GRAMS = 31.1034768;
-            const KARAT_PURITY = { 24: 1, 22: 22 / 24, 21: 21 / 24, 18: 18 / 24 };
-            const rate = (__ounceRateInput && __ounceRateInput > 0) ? __ounceRateInput : 1;
-            const pricePerGram24 = (__ouncePriceInput / OUNCE_GRAMS) * rate;
-            [24, 22, 21, 18].forEach(k => { goldPriceMap[k] = pricePerGram24 * KARAT_PURITY[k]; });
-        }
 
         const { data: invoiceRow, error: invoiceError } = await goldmindClient
             .from('invoices')
