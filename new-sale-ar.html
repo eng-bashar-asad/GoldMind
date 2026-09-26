@@ -84,6 +84,10 @@
         }
         .scroll-hide::-webkit-scrollbar { display: none; }
         .scroll-hide { -ms-overflow-style: none; scrollbar-width: none; }
+    .sale-tab { flex: 1; height: 40px; border-radius: 10px; display: flex; align-items: center; justify-content: center; gap: 4px; font-size: 13px; font-weight: 600; color: #5f5e5e; }
+    .sale-tab[aria-selected="true"] { background: #775a19; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+    .sale-tab.hidden { display: none; }
+    [data-sale-tab].tab-off { display: none !important; }
     </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
@@ -180,8 +184,22 @@
 </div>
 </section>
 
+<!-- Add-item method tabs: only one method is shown at a time (was all
+     four stacked open together). Choice remembered per device. -->
+<div class="flex flex-col gap-2">
+<button type="button" id="held-drafts-btn" onclick="openDraftsModal()" class="hidden self-start h-9 px-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-[13px] font-semibold items-center gap-1">
+<span class="material-symbols-outlined text-[18px]">pending_actions</span><span id="held-drafts-label">فواتير معلّقة</span>
+</button>
+<div class="flex gap-1 p-1 bg-surface-container-low border border-outline-variant rounded-xl" id="sale-tabs" role="tablist">
+<button type="button" role="tab" data-tab="barcode" class="sale-tab" onclick="showSaleTab('barcode')"><span class="material-symbols-outlined text-[18px]">barcode_scanner</span>بالباركود</button>
+<button type="button" role="tab" data-tab="manual" class="sale-tab" onclick="showSaleTab('manual')"><span class="material-symbols-outlined text-[18px]">edit_note</span>يدوي</button>
+<button type="button" role="tab" data-tab="stock" class="sale-tab" onclick="showSaleTab('stock')"><span class="material-symbols-outlined text-[18px]">inventory_2</span>بالجملة</button>
+<button type="button" role="tab" data-tab="diamond" class="sale-tab hidden" id="sale-tab-diamond" onclick="showSaleTab('diamond')"><span class="material-symbols-outlined text-[18px]">diamond</span>ماس</button>
+</div>
+</div>
+
 <!-- Barcode Search -->
-<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
+<section data-sale-tab="barcode" class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة قطعة بالباركود</h2>
 <div class="flex gap-2">
 <input class="flex-1 h-12 px-4 border border-outline-variant rounded-lg font-data-mono text-right" dir="ltr" id="barcode-search-input" placeholder="امسح أو اكتب الباركود" type="text"/>
@@ -193,7 +211,7 @@
 </section>
 
 <!-- Manual Entry (no barcode) -->
-<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
+<section data-sale-tab="manual" class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة يدوية (بدون باركود)</h2>
 
 <button type="button" id="voice-entry-btn" onclick="toggleVoiceEntry()" class="hidden w-full h-11 border border-dashed border-secondary rounded-lg flex items-center justify-center gap-2 text-secondary font-semibold text-[13px]">
@@ -236,7 +254,7 @@
 </section>
 
 <!-- Sell directly from bulk stock (رصيد بالجملة) -->
-<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
+<section data-sale-tab="stock" class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">بيع من الرصيد بالجملة</h2>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
@@ -273,7 +291,7 @@
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-price" step="0.01" type="number"/>
 </div>
 <div class="relative hidden" id="stock-fab-wrap">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-fab-fee">مصنعية هذه القطعة (د.إ)</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-fab-fee">مصنعية هذه القطعة (<span class="cur-label">د.إ</span>)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-fab-fee" step="0.01" type="number"/>
 <p class="text-[10px] text-on-surface-variant mt-1">هذه الدفعة "بضاعة أول المدة" — لا يوجد سعر مصنعية ثابت للغرام، اكتب مصنعية هذه القطعة تحديداً وبتنخصم من مجموع المصنعية المتبقي بالدفعة.</p>
 </div>
@@ -291,7 +309,7 @@
 </section>
 
 <!-- Sell a diamond piece (only shown if diamonds_enabled) -->
-<section class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3" id="diamond-sale-section">
+<section data-sale-tab="diamond" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3" id="diamond-sale-section">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">بيع قطعة ماس</h2>
 <div class="flex gap-2">
 <input class="flex-1 h-12 px-4 border border-outline-variant rounded-lg font-data-mono text-right" dir="ltr" id="diamond-search-input" placeholder="الباركود، الوصف، أو القيراط" type="text"/>
@@ -417,6 +435,19 @@
 </a>
 </nav>
 
+<!-- Held (unsaved) invoices picker -->
+<div id="drafts-modal" class="hidden fixed inset-0 z-[60] bg-black/40 items-center justify-center p-4" onclick="if (event.target === this) closeDraftsModal()">
+<div class="bg-surface-container-lowest rounded-xl shadow-xl w-full max-w-md max-h-[80vh] flex flex-col">
+<div class="p-4 border-b border-outline-variant">
+<h3 class="font-bold text-[16px] text-on-surface">فواتير معلّقة (غير مرحّلة)</h3>
+<p class="text-[12px] text-on-surface-variant mt-1">اختار فاتورة لتكمّل فيها، أو احذف يلي ما بدك ياها. ما إلها رقم لسا.</p>
+</div>
+<div id="drafts-modal-list" class="p-4 flex flex-col gap-2 overflow-y-auto"></div>
+<div class="p-4 border-t border-outline-variant">
+<button type="button" onclick="closeDraftsModal()" class="w-full h-11 rounded-lg border border-primary text-primary font-semibold">فاتورة جديدة</button>
+</div>
+</div>
+</div>
 <script>
     (async function __enforcePermission() {
         await requireGoldMindSession('login-entry-ar.html');
@@ -431,6 +462,8 @@
         const { data: __store } = await goldmindClient.from('stores').select('diamonds_enabled').eq('id', GOLDMIND_STORE_ID).maybeSingle();
         if (__store && __store.diamonds_enabled) {
             document.getElementById('diamond-sale-section').classList.remove('hidden');
+            document.getElementById('sale-tab-diamond').classList.remove('hidden');
+            if (__savedSaleTab === 'diamond') showSaleTab('diamond', false);
         }
     })();
 
@@ -509,43 +542,152 @@
     // الفاتورة" used to lose the whole cart with no way back. Scoped per
     // store (GOLDMIND_STORE_ID) so this never leaks across different
     // stores/tenants sharing the same device/browser.
-    const DRAFT_KEY = 'gm_sale_draft_' + GOLDMIND_STORE_ID;
+    // Several held (not yet posted) invoices per store, each with its own id,
+    // so starting a new invoice never throws the previous one away; the user
+    // picks which to continue or deletes one (it has no number yet).
+    // ponytail: localStorage = this device/browser only. Upgrade path: a
+    // sale_drafts table if held invoices must follow the user across devices.
+    const DRAFTS_KEY = 'gm_sale_drafts_' + GOLDMIND_STORE_ID;
+    const OLD_DRAFT_KEY = 'gm_sale_draft_' + GOLDMIND_STORE_ID; // single-draft format, migrated once
+    let currentDraftId = null;
+
+    function readDrafts() {
+        try {
+            const a = JSON.parse(localStorage.getItem(DRAFTS_KEY) || '[]');
+            return Array.isArray(a) ? a.filter(d => d && d.id && Array.isArray(d.cart)) : [];
+        } catch (e) { return []; }
+    }
+    function writeDrafts(list) {
+        try {
+            if (list.length) localStorage.setItem(DRAFTS_KEY, JSON.stringify(list));
+            else localStorage.removeItem(DRAFTS_KEY);
+        } catch (e) { /* storage unavailable (private mode, quota) — not critical */ }
+    }
 
     function saveDraftToLocalStorage() {
-        try {
-            if (cart.length === 0 && !selectedCustomer) {
-                localStorage.removeItem(DRAFT_KEY);
-                return;
-            }
-            localStorage.setItem(DRAFT_KEY, JSON.stringify({
-                cart, cartCounter, selectedCustomer, selectedPaymentMethod,
-                savedAt: new Date().toISOString()
-            }));
-        } catch (e) { /* storage unavailable (private mode, quota) — silently skip, not critical */ }
+        const others = readDrafts().filter(d => d.id !== currentDraftId);
+        if (cart.length === 0 && !selectedCustomer) { writeDrafts(others); return; }
+        if (!currentDraftId) currentDraftId = 'd' + Date.now();
+        others.push({
+            id: currentDraftId, cart, cartCounter, selectedCustomer, selectedPaymentMethod,
+            savedAt: new Date().toISOString()
+        });
+        writeDrafts(others);
     }
 
     function clearDraftFromLocalStorage() {
-        try { localStorage.removeItem(DRAFT_KEY); } catch (e) { /* ignore */ }
+        writeDrafts(readDrafts().filter(d => d.id !== currentDraftId));
+        currentDraftId = null;
     }
 
-    function restoreDraftIfAny() {
-        let draft;
-        try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { draft = null; }
-        if (!draft || !Array.isArray(draft.cart) || draft.cart.length === 0) return;
-
-        const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
-        if (!confirm('في فاتورة غير محفوظة (' + draft.cart.length + ' قطعة) من ' + savedLabel + ' — بدك تسترجعها؟')) {
-            clearDraftFromLocalStorage();
-            return;
-        }
-
+    function loadDraft(draft) {
+        currentDraftId = draft.id;
         cart.push(...draft.cart);
         cartCounter = draft.cartCounter || draft.cart.length;
+        // bulk-stock weight/fee already taken by this cart (same as when added)
+        draft.cart.filter(i => i.mode === 'stock').forEach(i => {
+            reservedByLot[i.lotId] = (reservedByLot[i.lotId] || 0) + (Number(i.weight) || 0);
+            if (i.isPooled) reservedByLot[i.lotId + '_fee'] = (reservedByLot[i.lotId + '_fee'] || 0) + (Number(i.manualFabFee) || 0);
+        });
         selectedPaymentMethod = draft.selectedPaymentMethod || 'cash';
         if (draft.selectedCustomer) pickCustomer(draft.selectedCustomer);
         selectPayment(selectedPaymentMethod);
         renderCart();
     }
+
+    const draftTotal = d => d.cart.reduce((s, i) => s + (Number(i.price) || 0), 0);
+    const draftTime = d => d.savedAt ? new Date(d.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+
+    function refreshHeldButton() {
+        const n = readDrafts().filter(d => d.id !== currentDraftId).length;
+        const btn = document.getElementById('held-drafts-btn');
+        document.getElementById('held-drafts-label').textContent = 'فواتير معلّقة (' + n + ')';
+        btn.classList.toggle('hidden', n === 0);
+        btn.classList.toggle('flex', n > 0);
+    }
+
+    function openDraftsModal() {
+        const list = readDrafts().filter(d => d.id !== currentDraftId)
+            .sort((a, b) => String(b.savedAt).localeCompare(String(a.savedAt)));
+        refreshHeldButton();
+        const box = document.getElementById('drafts-modal');
+        if (!list.length) { box.classList.add('hidden'); box.classList.remove('flex'); return; }
+        document.getElementById('drafts-modal-list').innerHTML = list.map(d => `
+            <div class="border border-outline-variant rounded-lg p-3 flex items-center gap-3">
+                <div class="flex-1 min-w-0">
+                    <div class="font-semibold text-[14px] truncate">${gmEscapeHtml(d.selectedCustomer ? d.selectedCustomer.name : 'بدون عميل')}</div>
+                    <div class="text-[12px] text-on-surface-variant">${d.cart.length} قطعة · ${draftTotal(d).toFixed(2)} ${CUR} · ${gmEscapeHtml(draftTime(d))}</div>
+                </div>
+                <button type="button" onclick="resumeDraft('${d.id}')" class="h-9 px-3 rounded-lg bg-primary text-white text-[13px] font-semibold">متابعة</button>
+                <button type="button" onclick="deleteDraft('${d.id}')" class="h-9 w-9 rounded-lg border border-error text-error flex items-center justify-center" title="حذف">
+                    <span class="material-symbols-outlined text-[18px]">delete</span>
+                </button>
+            </div>`).join('');
+        box.classList.remove('hidden');
+        box.classList.add('flex');
+    }
+    function closeDraftsModal() {
+        const box = document.getElementById('drafts-modal');
+        box.classList.add('hidden');
+        box.classList.remove('flex');
+    }
+    function resumeDraft(id) {
+        // The invoice on screen (if any) is already auto-saved as held, so
+        // just reopen the page on the chosen one: clean state guaranteed.
+        window.location.href = 'new-sale-ar.html?draft=' + encodeURIComponent(id);
+    }
+    function deleteDraft(id) {
+        const d = readDrafts().find(x => x.id === id);
+        if (!d) return openDraftsModal();
+        if (!confirm('حذف الفاتورة المعلّقة (' + d.cart.length + ' قطعة، ' + draftTotal(d).toFixed(2) + ' ' + CUR + ')؟\nما لها رقم بعد، فما رح تنحفظ بأي مكان.')) return;
+        writeDrafts(readDrafts().filter(x => x.id !== id));
+        openDraftsModal();
+    }
+
+    function restoreDraftIfAny() {
+        // one-time migration from the old single-draft key
+        try {
+            const old = JSON.parse(localStorage.getItem(OLD_DRAFT_KEY) || 'null');
+            if (old && Array.isArray(old.cart) && old.cart.length) {
+                writeDrafts([...readDrafts(), { ...old, id: 'd' + (Date.parse(old.savedAt || '') || Date.now()) }]);
+            }
+            localStorage.removeItem(OLD_DRAFT_KEY);
+        } catch (e) { /* ignore */ }
+
+        const wanted = new URLSearchParams(location.search).get('draft');
+        const draft = wanted && readDrafts().find(d => d.id === wanted);
+        if (draft) loadDraft(draft);
+        else openDraftsModal();
+        refreshHeldButton();
+    }
+
+    // ---------- Add-item tabs ----------
+    let __savedSaleTab = 'barcode';
+    try { __savedSaleTab = localStorage.getItem('gm_sale_tab') || 'barcode'; } catch (e) { /* ignore */ }
+    function showSaleTab(name, focus = true) {
+        document.querySelectorAll('[data-sale-tab]').forEach(s => s.classList.toggle('tab-off', s.dataset.saleTab !== name));
+        document.querySelectorAll('#sale-tabs [data-tab]').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === name)));
+        try { localStorage.setItem('gm_sale_tab', name); } catch (e) { /* ignore */ }
+        if (focus && name === 'barcode') document.getElementById('barcode-search-input').focus();
+    }
+    showSaleTab(__savedSaleTab === 'diamond' ? 'barcode' : __savedSaleTab, false); // diamond tab shows once enabled
+
+    // ---------- Store currency (company settings) ----------
+    const CUR_SYMBOLS = { AED: 'د.إ', USD: '$', SAR: 'ر.س', EUR: '€', GBP: '£', KWD: 'د.ك', QAR: 'ر.ق', OMR: 'ر.ع', BHD: 'د.ب', SYP: 'ل.س', TRY: '₺' };
+    let CUR = 'د.إ';
+    (async function __loadStoreCurrency() {
+        await requireGoldMindSession('login-entry-ar.html');
+        const { data } = await goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+        const code = (data && data.currency || 'AED').toUpperCase();
+        const prev = CUR;
+        CUR = CUR_SYMBOLS[code] || code;
+        document.querySelectorAll('.cur-label').forEach(el => { el.textContent = CUR; });
+        ['grand-total', 'mixed-paid-now', 'mixed-remaining-note'].forEach(id => {
+            const el = document.getElementById(id);
+            if (el) el.textContent = el.textContent.replace(prev, CUR);
+        });
+        if (!document.getElementById('drafts-modal').classList.contains('hidden')) openDraftsModal();
+    })();
 
     // ---------- Sell from bulk stock (gold_stock_lots) ----------
     let stockLotsCache = []; // lots for the currently selected karat
@@ -576,7 +718,7 @@
             const available = (Number(lot.weight_grams_remaining) - (reservedByLot[lot.id] || 0)).toFixed(2);
             const isPooled = lot.fabrication_pool_remaining !== null && lot.fabrication_pool_remaining !== undefined;
             const label = isPooled
-                ? `متبقي ${available}غ (بضاعة أول المدة — مصنعية متبقية ${Number(lot.fabrication_pool_remaining).toFixed(2)} د.إ، من أصل ${lot.weight_grams_total}غ)`
+                ? `متبقي ${available}غ (بضاعة أول المدة — مصنعية متبقية ${Number(lot.fabrication_pool_remaining).toFixed(2)} ${CUR}، من أصل ${lot.weight_grams_total}غ)`
                 : `متبقي ${available}غ (مصنعية ${Number(lot.cost_fabrication_per_gram).toFixed(2)}/غ، من أصل ${lot.weight_grams_total}غ)`;
             return `<option value="${lot.id}">${label}</option>`;
         }).join('');
@@ -644,7 +786,7 @@
             const reservedFee = reservedByLot[lot.id + '_fee'] || 0;
             const availableFee = Number(lot.fabrication_pool_remaining) - reservedFee;
             if (manualFabFee > availableFee) {
-                errEl.textContent = `مصنعية هذه القطعة (${manualFabFee.toFixed(2)}) أكبر من المصنعية المتبقية بالدفعة (${availableFee.toFixed(2)} د.إ).`;
+                errEl.textContent = `مصنعية هذه القطعة (${manualFabFee.toFixed(2)}) أكبر من المصنعية المتبقية بالدفعة (${availableFee.toFixed(2)} ${CUR}).`;
                 errEl.classList.remove('hidden');
                 return;
             }
@@ -817,7 +959,7 @@
     function onMixedAmountInput() {
         const { remaining } = getMixedAmounts();
         const paidNow = getMixedAmounts();
-        document.getElementById('mixed-paid-now').textContent = (paidNow.cashAmt + paidNow.bankAmt).toFixed(2) + ' د.إ';
+        document.getElementById('mixed-paid-now').textContent = (paidNow.cashAmt + paidNow.bankAmt).toFixed(2) + ' ' + CUR;
 
         const label = document.getElementById('mixed-remaining-label');
         const note = document.getElementById('mixed-remaining-note');
@@ -827,7 +969,7 @@
             note.className = 'text-[13px] font-bold font-data-mono text-success';
         } else if (remaining > 0) {
             label.textContent = 'المتبقي كدين على الزبون';
-            note.textContent = remaining.toFixed(2) + ' د.إ';
+            note.textContent = remaining.toFixed(2) + ' ' + CUR;
             note.className = 'text-[13px] font-bold font-data-mono text-error';
         } else {
             label.textContent = 'تنبيه';
@@ -1186,7 +1328,7 @@
         const body = document.getElementById('cart-body');
         if (cart.length === 0) {
             body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
-            document.getElementById('grand-total').textContent = '0.00 د.إ';
+            document.getElementById('grand-total').textContent = '0.00 ' + CUR;
             saveDraftToLocalStorage();
             return;
         }
@@ -1209,7 +1351,7 @@
         `).join('');
 
         const total = cart.reduce((sum, item) => sum + item.price, 0);
-        document.getElementById('grand-total').textContent = total.toFixed(2) + ' د.إ';
+        document.getElementById('grand-total').textContent = total.toFixed(2) + ' ' + CUR;
         saveDraftToLocalStorage();
     }
 
@@ -1260,6 +1402,28 @@
             mixedBankAmt = m.bankAmt;
             mixedRemaining = Math.max(0, m.remaining);
         }
+        // Held invoices can contain the same piece; make sure every piece is
+        // still available before posting, so nothing is sold twice.
+        const __pieceIds = cart.filter(i => i.piece && i.mode !== 'diamond').map(i => i.piece.id);
+        const __diamondIds = cart.filter(i => i.mode === 'diamond').map(i => i.diamondPieceId);
+        const [__p, __d] = await Promise.all([
+            __pieceIds.length ? goldmindClient.from('pieces').select('id, barcode, status').in('id', __pieceIds) : { data: [] },
+            __diamondIds.length ? goldmindClient.from('diamond_pieces').select('id, barcode, status').in('id', __diamondIds) : { data: [] }
+        ]);
+        if (__p.error || __d.error) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ الفاتورة';
+            showMessage('تعذّر التحقق من حالة القطع: ' + (__p.error || __d.error).message, true);
+            return;
+        }
+        const __gone = [...(__p.data || []), ...(__d.data || [])].filter(r => r.status !== 'available');
+        if (__gone.length) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ الفاتورة';
+            showMessage('هالقطع مو متاحة للبيع (انباعت أو تغيّرت حالتها): ' + __gone.map(r => r.barcode || r.id).join('، ') + ' — شيلها من الفاتورة.', true);
+            return;
+        }
+
         const { data: invoiceNumber, error: numError } = await goldmindClient.rpc('next_invoice_number', { target_store_id: GOLDMIND_STORE_ID, prefix: 'INV' });
         if (numError) {
             saveBtn.disabled = false;
