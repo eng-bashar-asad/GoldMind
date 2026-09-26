@@ -742,7 +742,15 @@
   function allowed(item) { return !item.permission || !window.GOLDMIND_HAS_PERM || window.GOLDMIND_HAS_PERM(item.permission); }
   function allowedIds(ids) { return ids.filter(function (id) { var a = byId(id); return a && allowed(a); }); }
 
-  var selection = DEFAULTS.slice();
+  // Start from the saved choice right away (it was permission-filtered when
+  // saved), so the strip doesn't first flash the defaults and then change.
+  var selection = (function () {
+    try {
+      var saved = JSON.parse(localStorage.getItem('goldmind_quick_actions_' + (window.GOLDMIND_STAFF_ID || 'default')) || 'null');
+      if (Array.isArray(saved)) { saved = saved.filter(function (id) { return !!byId(id); }); if (saved.length) return saved; }
+    } catch (e) { /* ignore */ }
+    return DEFAULTS.slice();
+  })();
   var draft = selection.slice();
 
   function renderStrip() {
@@ -1008,7 +1016,15 @@
   function allowed(item) { return diamondsOk(item) && (!item.permission || !window.GOLDMIND_HAS_PERM || window.GOLDMIND_HAS_PERM(item.permission)); }
   function allowedIds(ids) { return ids.filter(function (id) { var a = byId(id); return a && allowed(a); }); }
 
-  var selection = DEFAULTS.slice();
+  // Start from the saved choice right away (it was permission-filtered when
+  // saved), so the strip doesn't first flash the defaults and then change.
+  var selection = (function () {
+    try {
+      var saved = JSON.parse(localStorage.getItem('goldmind_mobile_quick_actions_v4_' + (window.GOLDMIND_STAFF_ID || 'default')) || 'null');
+      if (Array.isArray(saved)) { saved = saved.filter(function (id) { return !!byId(id); }); if (saved.length) return saved; }
+    } catch (e) { /* ignore */ }
+    return DEFAULTS.slice();
+  })();
   var draft = selection.slice();
 
   function tileHtml(a) {
