@@ -1,0 +1,42 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  pages-and-offline:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: tests
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - run: npm install
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: test-results
+          path: tests/test-results
+
+  # Runs the accounting checks against the real database inside a transaction
+  # that is always rolled back. Needs the repo secret SUPABASE_DB_URL
+  # (Supabase → Project Settings → Database → connection string); skipped without it.
+  accounting-db:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run accounting tests
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "SUPABASE_DB_URL not set — skipping"; exit 0; fi
+          sudo apt-get install -y -qq postgresql-client >/dev/null
+          psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f tests/db/accounting.test.sql

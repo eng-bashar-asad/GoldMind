@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>فحص الحسابات | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=24"></script>
+<script src="theme.js?v=24"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" aria-label="رجوع" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">فحص الحسابات</h1>
+</div>
+<button onclick="runCheck()" class="flex items-center gap-1 text-sm font-semibold px-3 h-10 rounded-lg border border-outline-variant" type="button"><span class="material-symbols-outlined">refresh</span>إعادة الفحص</button>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4 py-6 flex flex-col gap-4">
+<p class="text-[12px] text-on-surface-variant leading-5">البرنامج بيراجع الأرقام لحاله: عملة سعر الذهب، مجموع كل فاتورة، المقبوض مقابل الصندوق، ديون الزبائن، القطع المباعة، ورصيد الجملة. أي شي مو مظبوط بيطلع هون.</p>
+<div id="state" class="py-10 text-center text-on-surface-variant text-sm">جارِ الفحص...</div>
+<div id="summary" class="hidden rounded-xl p-4 flex items-center gap-3"></div>
+<div id="list" class="flex flex-col gap-2"></div>
+</main>
+<script>
+const LINK = { invoice: id => 'invoice-print-ar.html?id=' + id, piece: id => 'piece-edit-ar.html?id=' + id };
+const CODE_LINK = { invoice_currency: 'invoice', invoice_lines_total: 'invoice', invoice_cash_mismatch: 'invoice', invoice_debt_mismatch: 'invoice', cash_currency: 'invoice', piece_still_available: 'piece' };
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+
+async function runCheck() {
+  const state = document.getElementById('state'), sum = document.getElementById('summary'), list = document.getElementById('list');
+  state.classList.remove('hidden'); state.textContent = 'جارِ الفحص...'; sum.classList.add('hidden'); list.innerHTML = '';
+  const { data, error } = await goldmindClient.rpc('accounting_health_check', { sid: GOLDMIND_STORE_ID });
+  if (error) { state.textContent = error.code === '42501' ? 'هالصفحة بدها صلاحية التقارير.' : 'تعذّر الفحص: ' + error.message; return; }
+  state.classList.add('hidden');
+  const rows = data || [];
+  const errors = rows.filter(r => r.severity === 'error').length;
+  sum.className = 'rounded-xl p-4 flex items-center gap-3 border ' + (rows.length === 0 ? 'bg-green-50 border-green-200 text-green-800' : errors ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800');
+  sum.innerHTML = rows.length === 0
+    ? '<span class="material-symbols-outlined" style="font-size:28px">verified</span><div><div class="font-bold">كل الحسابات مظبوطة</div><div class="text-[12px]">ما لقينا ولا مشكلة.</div></div>'
+    : `<span class="material-symbols-outlined" style="font-size:28px">${errors ? 'error' : 'warning'}</span><div><div class="font-bold">${rows.length} ملاحظة</div><div class="text-[12px]">${errors} مشكلة لازم تنصلّح${rows.length - errors ? ' و' + (rows.length - errors) + ' تنبيه للمراجعة' : ''}.</div></div>`;
+  sum.classList.remove('hidden');
+  list.innerHTML = rows.map(r => {
+    const kind = CODE_LINK[r.code];
+    const href = kind && r.ref_id ? LINK[kind](r.ref_id) : (r.code === 'gold_price_currency' ? 'gold-price-ar.html' : null);
+    const tag = r.severity === 'error' ? '<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">مشكلة</span>' : '<span class="text-[11px] font-bold px-2 py-0.5 rounded-full bg-amber-100 text-amber-800">تنبيه</span>';
+    return `<${href ? 'a href="' + href + '"' : 'div'} class="block bg-surface-container-lowest border border-outline-variant rounded-xl p-4 ${href ? 'hover:border-primary' : ''}">
+      <div class="flex items-center justify-between gap-2 mb-1"><div class="font-semibold text-[13px]">${esc(r.title)}</div>${tag}</div>
+      <div class="text-[12px] text-on-surface-variant leading-5">${r.ref_label ? '<b dir="ltr">' + esc(r.ref_label) + '</b> — ' : ''}${esc(r.details)}</div>
+    </${href ? 'a' : 'div'}>`;
+  }).join('');
+}
+
+(async () => {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  runCheck();
+})();
+</script>
+</body></html>

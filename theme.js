@@ -965,6 +965,7 @@ function gmSmartBack(fallbackHref) {
     { href: 'inventory-list-ar.html', icon: 'inventory_2', label: 'المخزن' },
     { href: 'stock-transfer-ar.html', icon: 'swap_vert', label: 'إخراج/إدخال بالكلفة' },
     { href: 'gifts-ar.html', icon: 'redeem', label: 'إخراج هدية' },
+    { href: 'accounting-check-ar.html', icon: 'fact_check', label: 'فحص الحسابات' },
     { href: 'invoices-list-ar.html', icon: 'list_alt', label: 'كل الفواتير' },
     { href: 'ledger-ar.html', icon: 'account_balance_wallet', label: 'سجل حركات التاجر' },
     { href: 'daily-cashbox-ar.html', icon: 'point_of_sale', label: 'الصندوق اليومي' },

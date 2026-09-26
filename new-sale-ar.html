@@ -15,8 +15,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
-<script src="theme.js?v=23"></script>
+<script src="supabase-config.js?v=24"></script>
+<script src="theme.js?v=24"></script>
 <script id="tailwind-config">
         tailwind.config = {
           darkMode: "class",
@@ -465,7 +465,10 @@
         await requireGoldMindSession('login-entry-ar.html');
         const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
         const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['create_invoice'] === true));
-        if (!__allowed) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+        // offline with no saved copy of the permissions: let the server decide when the sale syncs
+        if (!__allowed && (navigator.onLine || __staffPerm)) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+        // keep an on-device copy of pieces/customers/prices so selling works without internet
+        if (navigator.onLine && Date.now() - Number(localStorage.getItem('gm_snapshot_at') || 0) > 5 * 60 * 1000) gmRefreshSnapshots().catch(() => {});
     })();
 
     // Show the diamond-sale section only for stores that have diamonds_enabled
@@ -1486,78 +1489,15 @@
             mixedBankAmt = m.bankAmt;
             mixedRemaining = Math.max(0, m.remaining);
         }
-        // Held invoices can contain the same piece; make sure every piece is
-        // still available before posting, so nothing is sold twice.
-        const __pieceIds = cart.filter(i => i.piece && i.mode !== 'diamond').map(i => i.piece.id);
-        const __diamondIds = cart.filter(i => i.mode === 'diamond').map(i => i.diamondPieceId);
-        const [__p, __d] = await Promise.all([
-            __pieceIds.length ? goldmindClient.from('pieces').select('id, barcode, status').in('id', __pieceIds) : { data: [] },
-            __diamondIds.length ? goldmindClient.from('diamond_pieces').select('id, barcode, status').in('id', __diamondIds) : { data: [] }
-        ]);
-        if (__p.error || __d.error) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ الفاتورة';
-            showMessage('تعذّر التحقق من حالة القطع: ' + (__p.error || __d.error).message, true);
-            return;
-        }
-        const __gone = [...(__p.data || []), ...(__d.data || [])].filter(r => r.status !== 'available');
-        if (__gone.length) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ الفاتورة';
-            showMessage('هالقطع مو متاحة للبيع (انباعت أو تغيّرت حالتها): ' + __gone.map(r => r.barcode || r.id).join('، ') + ' — شيلها من الفاتورة.', true);
-            return;
-        }
-
-        const { data: invoiceNumber, error: numError } = await goldmindClient.rpc('next_invoice_number', { target_store_id: GOLDMIND_STORE_ID, prefix: 'INV' });
-        if (numError) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ الفاتورة';
-            showMessage('تعذّر توليد رقم الفاتورة: ' + numError.message, true);
-            return;
-        }
-
-        // Snapshot today's gold price per karat so profit reports stay
-        // accurate to the market price at the moment of THIS sale, not
-        // whatever the price happens to be when the report is viewed later.
-        const { data: goldPrices } = await goldmindClient
-            .from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
-        const goldPriceMap = {};
-        (goldPrices || []).forEach(p => { goldPriceMap[p.karat] = Number(p.price_per_gram); });
-
-        const { data: invoiceRow, error: invoiceError } = await goldmindClient
-            .from('invoices')
-            .insert({
-                store_id: GOLDMIND_STORE_ID,
-                invoice_number: invoiceNumber,
-                type: 'sale',
-                customer_id: selectedCustomer.id,
-                payment_method: selectedPaymentMethod,
-                cash_paid_amount: selectedPaymentMethod === 'mixed' ? mixedCashAmt : null,
-                bank_paid_amount: selectedPaymentMethod === 'mixed' ? mixedBankAmt : null,
-                fabrication_fees: 0,
-                vat_amount: 0,
-                total_amount: total,
-                amount_paid: selectedPaymentMethod === 'credit' ? 0 : (selectedPaymentMethod === 'mixed' ? (mixedCashAmt + mixedBankAmt) : total),
-                status: (selectedPaymentMethod === 'credit' || (selectedPaymentMethod === 'mixed' && mixedRemaining > 0.01)) ? 'unpaid' : 'paid',
-                created_by: GOLDMIND_STAFF_ID
-            })
-            .select()
-            .single();
-
-        if (invoiceError) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ الفاتورة';
-            showMessage('خطأ بحفظ الفاتورة: ' + invoiceError.message, true);
-            return;
-        }
-
-        // Sell-from-stock cart items may have an optional photo taken at
-        // the moment of sale — upload it first so we have the URL ready.
+        // Photos taken at the moment of sale are uploaded first (needs internet);
+        // everything else is posted by ONE server step (post_sale_invoice) that
+        // saves the whole sale or nothing, and re-checks the numbers itself.
+        const clientRef = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
         const stockPhotoUrls = {};
         for (const item of cart) {
-            if (item.mode === 'stock' && item.photoFile) {
+            if (item.mode === 'stock' && item.photoFile && navigator.onLine) {
                 const ext = (item.photoFile.name.split('.').pop() || 'jpg').toLowerCase();
-                const path = GOLDMIND_STORE_ID + '/' + invoiceNumber + '-' + item.cartId + '.' + ext;
+                const path = GOLDMIND_STORE_ID + '/' + clientRef + '-' + item.cartId + '.' + ext;
                 const { error: upErr } = await goldmindClient.storage.from('piece-photos').upload(path, item.photoFile, { upsert: false });
                 if (!upErr) {
                     const { data: pub } = goldmindClient.storage.from('piece-photos').getPublicUrl(path);
@@ -1565,114 +1505,50 @@
                 }
             }
         }
-
-        const itemsPayload = cart.map(item => ({
-            invoice_id: invoiceRow.id,
-            piece_id: (item.piece && item.mode !== 'diamond') ? item.piece.id : null,
-            diamond_piece_id: item.mode === 'diamond' ? item.diamondPieceId : null,
-            gold_stock_lot_id: item.mode === 'stock' ? item.lotId : null,
-            barcode: item.barcode,
-            karat: item.karat,
-            weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : item.weight,
-            accounting_weight_grams: item.mode === 'diamond' ? (item.piece.has_gold ? item.piece.gold_weight_grams : null) : (item.piece ? (item.piece.accounting_weight_grams || item.piece.weight_grams) : (item.mode === 'stock' ? item.accountingWeight : item.weight)),
-            fabrication_fee: item.mode === 'stock' && item.isPooled ? item.manualFabFee : 0,
-            line_total: item.price,
-            description: (item.piece && item.piece.description_ar) || item.description,
-            description_en: item.piece ? item.piece.description_en : null,
-            item_photo_url: item.mode === 'stock' ? (stockPhotoUrls[item.cartId] || null) : null,
-            gold_price_per_gram: item.mode === 'diamond' ? (item.piece.has_gold ? (goldPriceMap[item.piece.gold_karat] || null) : null) : (goldPriceMap[item.karat] || null)
-        }));
-
-        const { error: itemsError } = await goldmindClient.from('invoice_items').insert(itemsPayload);
-
-        if (itemsError) {
+        const payload = {
+            store_id: GOLDMIND_STORE_ID,
+            client_ref: clientRef,
+            customer_id: selectedCustomer.id,
+            payment_method: selectedPaymentMethod,
+            cash_paid: selectedPaymentMethod === 'mixed' ? mixedCashAmt : null,
+            bank_paid: selectedPaymentMethod === 'mixed' ? mixedBankAmt : null,
+            sold_at: new Date().toISOString(),
+            items: cart.map(item => ({
+                mode: item.mode || 'manual',
+                piece_id: (item.piece && item.mode !== 'diamond') ? item.piece.id : null,
+                diamond_piece_id: item.mode === 'diamond' ? item.diamondPieceId : null,
+                lot_id: item.mode === 'stock' ? item.lotId : null,
+                is_pooled: !!(item.mode === 'stock' && item.isPooled),
+                manual_fab_fee: item.mode === 'stock' && item.isPooled ? item.manualFabFee : 0,
+                barcode: item.barcode || null,
+                karat: item.karat || null,
+                weight: item.mode === 'diamond' ? null : item.weight,
+                accounting_weight: item.mode === 'stock' ? item.accountingWeight : null,
+                price: item.price,
+                description: (item.piece && item.piece.description_ar) || item.description || null,
+                description_en: item.piece ? item.piece.description_en : null,
+                photo_url: item.mode === 'stock' ? (stockPhotoUrls[item.cartId] || null) : null
+            }))
+        };
+        const result = await gmPostSale(payload, { customerName: selectedCustomer.name });
+        if (result.error) {
             saveBtn.disabled = false;
             saveBtn.textContent = 'حفظ الفاتورة';
-            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة القطع: ' + itemsError.message, true);
+            showMessage(result.error, true);
             return;
         }
-
-        const pieceIds = cart.filter(item => item.piece && item.mode !== 'diamond').map(item => item.piece.id);
-        if (pieceIds.length > 0) {
-            await goldmindClient.from('pieces').update({ status: 'sold' }).in('id', pieceIds);
-            await goldmindClient.from('piece_movements').insert(pieceIds.map(id => ({
-                store_id: GOLDMIND_STORE_ID, piece_id: id, event_type: 'sold',
-                note: 'بيع بفاتورة ' + invoiceNumber, created_by: GOLDMIND_STAFF_ID
-            })));
+        if (result.queued) {
+            // Offline: the sale waits on this device and posts itself when the internet is back.
+            cart.length = 0;
+            clearDraftFromLocalStorage();
+            renderCart();
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ الفاتورة';
+            showMessage('ما في إنترنت — انحفظت الفاتورة على الجهاز وبتترحّل لحالها أول ما يرجع النت.', false);
+            return;
         }
-
-        const diamondPieceIds = cart.filter(item => item.mode === 'diamond').map(item => item.diamondPieceId);
-        if (diamondPieceIds.length > 0) {
-            await goldmindClient.from('diamond_pieces').update({ status: 'sold' }).in('id', diamondPieceIds);
-        }
-
-        // Deduct the sold weight (and, for pooled opening-stock lots, the
-        // manually entered fabrication fee) from each bulk stock lot used.
-        const stockItems = cart.filter(item => item.mode === 'stock');
-        let stockConsumeWarning = '';
-        for (const item of stockItems) {
-            const { error: consumeError } = item.isPooled
-                ? await goldmindClient.rpc('consume_gold_stock_lot_pooled', { target_lot_id: item.lotId, weight_amount: item.weight, fee_amount: item.manualFabFee })
-                : await goldmindClient.rpc('consume_gold_stock_lot', { target_lot_id: item.lotId, amount: item.weight });
-            if (consumeError) {
-                stockConsumeWarning = ' (تنبيه: تعذّر خصم الوزن/المصنعية من رصيد الجملة لبعض القطع — راجع الرصيد يدوياً: ' + consumeError.message + ')';
-            }
-        }
-
-        // Cash/bank/mixed sale -> record as a cash-in movement so the daily cash box reflects it
-        if (selectedPaymentMethod === 'cash' || selectedPaymentMethod === 'bank') {
-            await goldmindClient.from('cash_movements').insert({
-                store_id: GOLDMIND_STORE_ID,
-                box: 'main',
-                direction: 'in',
-                amount: total,
-                description: 'تحصيل فاتورة بيع ' + invoiceNumber,
-                created_by: GOLDMIND_STAFF_ID,
-                invoice_id: invoiceRow.id
-            });
-        }
-        if (selectedPaymentMethod === 'mixed' && (mixedCashAmt + mixedBankAmt) > 0) {
-            // Only the amount actually collected now -- not the full invoice
-            // total, which used to be booked here even on a partial payment
-            // and silently overstated the cash box.
-            await goldmindClient.from('cash_movements').insert({
-                store_id: GOLDMIND_STORE_ID,
-                box: 'main',
-                direction: 'in',
-                amount: mixedCashAmt + mixedBankAmt,
-                description: `تحصيل جزئي لفاتورة بيع ${invoiceNumber} (${mixedCashAmt.toFixed(2)} نقدي + ${mixedBankAmt.toFixed(2)} فيزا/بنك)`,
-                created_by: GOLDMIND_STAFF_ID,
-                invoice_id: invoiceRow.id
-            });
-        }
-
-        // Credit sale -> registers as a customer debt (accounts receivable)
-        if (selectedPaymentMethod === 'credit') {
-            await goldmindClient.from('customer_debts').insert({
-                store_id: GOLDMIND_STORE_ID,
-                customer_id: selectedCustomer.id,
-                invoice_id: invoiceRow.id,
-                movement_type: 'debt_increase',
-                cash_amount: total,
-                gold_grams_24k: 0,
-                notes: 'فاتورة بيع ' + invoiceNumber,
-                created_by: GOLDMIND_STAFF_ID
-            });
-        }
-        // Partial payment (mixed) with a remainder -> the uncollected part
-        // becomes a customer debt too, same mechanism as a full credit sale.
-        if (selectedPaymentMethod === 'mixed' && mixedRemaining > 0.01) {
-            await goldmindClient.from('customer_debts').insert({
-                store_id: GOLDMIND_STORE_ID,
-                customer_id: selectedCustomer.id,
-                invoice_id: invoiceRow.id,
-                movement_type: 'debt_increase',
-                cash_amount: mixedRemaining,
-                gold_grams_24k: 0,
-                notes: `متبقي فاتورة بيع ${invoiceNumber} (دُفع ${(mixedCashAmt + mixedBankAmt).toFixed(2)} من ${total.toFixed(2)})`,
-                created_by: GOLDMIND_STAFF_ID
-            });
-        }
+        const invoiceRow = { id: result.id };
+        const stockConsumeWarning = '';
 
         clearDraftFromLocalStorage();
         showMessage('تم حفظ الفاتورة بنجاح!' + stockConsumeWarning, stockConsumeWarning !== '');

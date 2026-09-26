@@ -102,6 +102,11 @@ jobs:
           npx tailwindcss -i build-tools/input.css -o www/tailwind-built.css --config build-tools/tailwind.config.js --minify
           node build-tools/strip-tailwind-cdn.js
 
+      # Offline: bundle the Supabase library and icon font inside the app.
+      - name: Bundle libraries for offline use
+        working-directory: app
+        run: node build-tools/localize-cdn.js
+
       - name: Sync Capacitor Android project
         working-directory: app
         run: npx cap sync android

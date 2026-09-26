@@ -1,45 +1,73 @@
-const CACHE_NAME = 'goldmind-shell-v8';
+const CACHE_NAME = 'goldmind-shell-v9';
+// Pages and files needed to keep selling with no internet. Each is cached on
+// its own so one missing file can't block the rest.
 const SHELL_ASSETS = [
   './manifest.json',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  './supabase-config.js?v=24',
+  './theme.js?v=24',
+  './index-ar.html',
+  './new-sale-ar.html',
+  './invoice-print-ar.html',
+  './login-entry-ar.html',
+  './customer-add-ar.html'
 ];
+// Versioned libraries and fonts from these CDNs are safe to keep offline.
+// Supabase itself is NEVER cached here (live data must always be fresh; the
+// app keeps its own offline copy of data, see supabase-config.js).
+const CDN_HOSTS = ['cdn.jsdelivr.net', 'cdn.tailwindcss.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_ASSETS)).catch(() => {})
+    caches.open(CACHE_NAME).then((cache) =>
+      Promise.all(SHELL_ASSETS.map((u) => cache.add(u).catch(() => {})))
+    )
   );
   self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
+  // Only remove this worker's own old versions — other caches (like the
+  // app's offline data copy) belong to the page and must survive updates.
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k.startsWith('goldmind-shell-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
 });
 
-// Only HTML documents go network-first/no-store (deploys must show up
-// immediately). Static assets (JS/CSS/images/fonts) use stale-while-
-// revalidate: serve instantly from cache if we have it, then quietly
-// refresh the cache in the background — this is what actually keeps the
-// app fast, since re-fetching every single asset from the network on every
-// navigation (the previous blanket behavior) made every page feel slow.
+function staleWhileRevalidate(event) {
+  event.respondWith(
+    caches.match(event.request).then((cached) => {
+      const network = fetch(event.request)
+        .then((response) => {
+          if (response && (response.ok || response.type === 'opaque')) {
+            const copy = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
+          }
+          return response;
+        })
+        .catch(() => cached);
+      return cached || network;
+    })
+  );
+}
+
+// HTML documents: network-first (deploys show up immediately), cached copy
+// when offline. Same-origin static files and CDN libraries: served from cache
+// instantly and refreshed in the background.
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
+  const url = new URL(event.request.url);
 
-  // Cross-origin requests (Supabase REST/data API, CDNs serving JSON, etc.)
-  // must NEVER be cached by this worker — only this app's own same-origin
-  // static files are safe to cache. Caching Supabase API responses was
-  // exactly what made balances/figures look "stuck" until a manual reload
-  // after adding an entry: the worker was serving a stale snapshot of the
-  // database instead of letting the real request through.
-  if (new URL(event.request.url).origin !== self.location.origin) return;
+  if (url.origin !== self.location.origin) {
+    if (CDN_HOSTS.includes(url.hostname)) staleWhileRevalidate(event);
+    return;
+  }
 
   const isDocument = event.request.mode === 'navigate' || event.request.destination === 'document';
-
   if (isDocument) {
     event.respondWith(
       fetch(event.request, { cache: 'no-store' })
@@ -48,21 +76,10 @@ self.addEventListener('fetch', (event) => {
           caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
           return response;
         })
-        .catch(() => caches.match(event.request))
+        .catch(() => caches.match(event.request, { ignoreSearch: true }))
     );
     return;
   }
 
-  event.respondWith(
-    caches.match(event.request).then((cached) => {
-      const network = fetch(event.request)
-        .then((response) => {
-          const copy = response.clone();
-          caches.open(CACHE_NAME).then((cache) => cache.put(event.request, copy)).catch(() => {});
-          return response;
-        })
-        .catch(() => cached);
-      return cached || network;
-    })
-  );
+  staleWhileRevalidate(event);
 });

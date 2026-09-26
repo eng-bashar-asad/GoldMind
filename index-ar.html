@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=23"></script>
+<script src="theme.js?v=24"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -486,7 +486,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js"></script>
+<script src="supabase-config.js?v=24"></script>
 </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
 <!-- ============================================================
@@ -545,6 +545,7 @@
         <div class="dsk-nav-group-label">الإدارة</div>
         <div class="dsk-nav">
           <a class="dsk-nav-link" href="reports-ar.html"><span class="material-symbols-outlined dsk-ic">bar_chart</span>التقارير</a>
+          <a class="dsk-nav-link" href="accounting-check-ar.html"><span class="material-symbols-outlined dsk-ic">fact_check</span>فحص الحسابات</a>
           <a class="dsk-nav-link" href="staff-permissions-ar.html"><span class="material-symbols-outlined dsk-ic">badge</span>الموظفون والصلاحيات</a>
           <a class="dsk-nav-link" href="settings-ar.html"><span class="material-symbols-outlined dsk-ic">settings</span>الإعدادات</a>
           <a class="dsk-nav-link" href="theme-picker-ar.html"><span class="material-symbols-outlined dsk-ic">palette</span>مظهر التطبيق</a>
@@ -727,6 +728,7 @@
     { id: 'companySettings', icon: 'store', label: 'إعدادات الشركة', href: 'company-settings-ar.html', permission: 'edit_settings', tint: '#F1E9D6', ink: '#9C8552' },
     { id: 'stockTransfer', icon: 'swap_vert', label: 'إخراج/إدخال بالكلفة', href: 'stock-transfer-ar.html', permission: 'stock_transfers', tint: '#DCE8EA', ink: '#3B6B7A' },
     { id: 'gifts', icon: 'redeem', label: 'إخراج هدية', href: 'gifts-ar.html', permission: 'give_gifts', tint: '#F3DEDA', ink: '#8A3B32' },
+    { id: 'accountingCheck', icon: 'fact_check', label: 'فحص الحسابات', href: 'accounting-check-ar.html', permission: 'view_reports', tint: '#DDEBDD', ink: '#2F6B3A' },
     { id: 'subscription', icon: 'workspace_premium', label: 'الاشتراك والفوترة', href: 'subscription-ar.html', permission: 'manage_subscription', tint: '#F2E2C9', ink: '#8A5A2A' }
   ];
   var DEFAULTS = ['cashbox', 'newSale', 'stockIn', 'salesReturn', 'addCustomer', 'repairs', 'production', 'inventoryCount'];
@@ -1939,6 +1941,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
 <p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">الإدارة والتقارير</p>
 <a href="reports-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">bar_chart</span><span class="font-label-md text-label-md">التقارير والتحليلات</span></a>
+<a href="accounting-check-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">fact_check</span><span class="font-label-md text-label-md">فحص الحسابات</span></a>
 <a href="tax-report-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt_long</span><span class="font-label-md text-label-md">كشف الضريبة</span></a>
 <a href="audit-log-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">history</span><span class="font-label-md text-label-md">سجل النشاط</span></a>
 <a href="staff-permissions-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">badge</span><span class="font-label-md text-label-md">الموظفون والصلاحيات</span></a>
@@ -2241,5 +2244,28 @@ if ('serviceWorker' in navigator) {
         const o = document.getElementById('storeSwitchOverlay');
         o.classList.add('hidden'); o.classList.remove('flex');
     }
+</script>
+<script>
+// Accounting self-check: if anything doesn't add up, say so at the top of the dashboard.
+(async function gmAccountingAlert() {
+  const session = await requireGoldMindSession();
+  if (!session || !navigator.onLine) return;
+  const { data, error } = await goldmindClient.rpc('accounting_health_check', { sid: GOLDMIND_STORE_ID });
+  if (error || !data) return; // no report permission: stay quiet
+  const n = data.filter(r => r.severity === 'error').length;
+  if (!n) return;
+  const make = () => {
+    const a = document.createElement('a');
+    a.href = 'accounting-check-ar.html';
+    a.setAttribute('role', 'alert');
+    a.style.cssText = 'display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#FDECEA;border:1px solid #F5C2BC;color:#8A1C12;font-weight:600;font-size:13px;text-decoration:none;';
+    a.innerHTML = '<span class="material-symbols-outlined" style="font-size:22px">error</span><span style="flex:1">فحص الحسابات لقى ' + n + ' مشكلة — اضغط لتشوفها</span><span class="material-symbols-outlined" style="font-size:18px">chevron_left</span>';
+    return a;
+  };
+  const mob = document.querySelector('main.lg\\:hidden');
+  if (mob) mob.prepend(make());
+  const dsk = document.querySelector('.dsk-main .dsk-topbar');
+  if (dsk) dsk.after(make());
+})();
 </script>
 </body></html>
