@@ -508,7 +508,15 @@
         document.getElementById('ounce-price-section').classList.remove('hidden');
         renderOunceChip(st && st.last_gold_ounce_price, st && st.last_gold_ounce_rate, g24 && g24.mode);
         if (st && st.last_gold_ounce_price != null) document.getElementById('ounce-edit-price').value = st.last_gold_ounce_price;
-        document.getElementById('ounce-edit-rate').value = st && st.last_gold_ounce_rate != null ? st.last_gold_ounce_rate : (st && st.currency === 'USD' ? 1 : '');
+        const rateInput = document.getElementById('ounce-edit-rate');
+        if (st && String(st.currency).toUpperCase() === 'USD') {
+            // ounce is quoted in USD: a USD store never needs a rate (server forces 1 too)
+            rateInput.value = 1;
+            rateInput.parentElement.classList.add('hidden');
+            rateInput.parentElement.parentElement.classList.replace('grid-cols-2', 'grid-cols-1');
+        } else {
+            rateInput.value = st && st.last_gold_ounce_rate != null ? st.last_gold_ounce_rate : '';
+        }
         if (__canManageOunce) document.getElementById('ounce-chip-icon').classList.remove('hidden');
     })();
     function toggleOunceEditor() {
