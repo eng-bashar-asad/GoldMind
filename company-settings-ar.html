@@ -106,8 +106,13 @@
 </div>
 
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-address">العنوان</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-address">العنوان بالعربي</label>
 <textarea class="w-full h-24 border border-outline-variant rounded-lg px-4 py-3 focus:ring-1 focus:ring-primary outline-none text-right resize-none" id="store-address" placeholder="الشارع، المدينة، الدولة"></textarea>
+</div>
+
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-address-en">العنوان بالإنجليزي</label>
+<textarea class="w-full h-24 border border-outline-variant rounded-lg px-4 py-3 focus:ring-1 focus:ring-primary outline-none text-left resize-none" dir="ltr" id="store-address-en" placeholder="Street, City, Country"></textarea>
 </div>
 
 <div class="relative">
@@ -800,6 +805,7 @@
         document.getElementById('store-secondary-rate').value = data.secondary_currency_rate != null ? data.secondary_currency_rate : '';
         renderSecondaryRateUpdatedLabel(data.secondary_currency_rate_updated_at);
         document.getElementById('store-address').value = data.address || '';
+        document.getElementById('store-address-en').value = data.address_en || '';
         document.getElementById('store-phone').value = data.phone || '';
         document.getElementById('store-vat').value = data.vat_rate != null ? data.vat_rate : 5;
         document.getElementById('fab-rate-retail').value = data.fab_rate_retail != null ? data.fab_rate_retail : '';
@@ -941,6 +947,7 @@
         const country = document.getElementById('store-country').value;
         const currency = document.getElementById('store-currency').value.trim().toUpperCase();
         const address = document.getElementById('store-address').value.trim();
+        const addressEn = document.getElementById('store-address-en').value.trim();
         const phone = document.getElementById('store-phone').value.trim();
         const vat = parseFloat(document.getElementById('store-vat').value);
         const fabRateRetail = parseFloat(document.getElementById('fab-rate-retail').value);
@@ -981,6 +988,7 @@
                 country: country || null,
                 currency: currency || 'AED',
                 address: address || null,
+                address_en: addressEn || null,
                 phone: phone || null,
                 vat_rate: isNaN(vat) ? 5 : vat,
                 fab_rate_retail: isNaN(fabRateRetail) ? null : fabRateRetail,

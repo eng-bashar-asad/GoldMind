@@ -480,7 +480,9 @@
 
         function buildStoreInfoRows(labels) {
             const rows = [];
-            if (store.address) rows.push(`<div>${labels.address}: ${gmEscapeHtml(store.address)}</div>`);
+            // Arabic side: Arabic address (falls back to the English one); English side: the reverse.
+            const addr = labels.en ? (store.address_en || store.address) : (store.address || store.address_en);
+            if (addr) rows.push(`<div>${labels.address}: ${gmEscapeHtml(addr)}</div>`);
             if (store.phone) rows.push(`<div>${labels.phone}: <span dir="ltr" style="unicode-bidi: embed;">${gmEscapeHtml(store.phone)}</span></div>`);
             if (store.website_url) rows.push(`<div>${labels.website}: <span dir="ltr" style="unicode-bidi: embed;">${gmEscapeHtml(store.website_url)}</span></div>`);
             if (store.social_instagram) rows.push(`<div>${labels.instagram}: <span dir="ltr" style="unicode-bidi: embed;">${gmEscapeHtml(store.social_instagram)}</span></div>`);
@@ -494,7 +496,7 @@
             instagram: 'إنستغرام', tiktok: 'تيك توك', snapchat: 'سناب شات'
         });
         document.getElementById('store-info-en').innerHTML = buildStoreInfoRows({
-            address: 'Address', phone: 'Phone', website: 'Website',
+            en: true, address: 'Address', phone: 'Phone', website: 'Website',
             instagram: 'Instagram', tiktok: 'TikTok', snapchat: 'Snapchat'
         });
 
