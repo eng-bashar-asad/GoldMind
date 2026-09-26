@@ -44,6 +44,10 @@
            (site title, date/time, URL), so they never print. The 10mm white
            border is kept as spacing on the sheet itself instead. */
         @page { margin: 0; }
+        /* frames run around the whole sheet, not just the text */
+        #invoice-sheet:not(.hidden) { display: flex !important; flex-direction: column; min-height: calc(100vh - 20mm); }
+        #signature-block { margin-top: auto !important; }
+        #policy-sheet { min-height: calc(100vh - 20mm); }
     }
 </style>
 </head>
@@ -251,15 +255,11 @@
 </div>
 
 <!-- Signature(s) -->
-<div class="mt-6 pt-2 flex justify-between items-end gap-6 text-[11px] text-gray-500" id="signature-block">
-<div class="flex-1">
-<div class="border-b border-gray-400 h-8"></div>
-<div class="mt-1" id="signature-label-1">توقيع العميل</div>
-</div>
-<div class="hidden flex-1" id="signature-block-2">
-<div class="border-b border-gray-400 h-8"></div>
-<div class="mt-1">توقيع مندوب التاجر</div>
-</div>
+<!-- Staff signs on the right, the other party (customer / trader / seller)
+     on the left, each on a line next to its label. -->
+<div class="mt-8 pt-2 flex justify-between items-end gap-10 text-[11px] text-gray-600" id="signature-block">
+<div class="flex-1 flex items-end gap-2"><span class="shrink-0" id="signature-label-staff">توقيع الموظف:</span><span class="flex-1 border-b border-gray-500 h-7"></span></div>
+<div class="flex-1 flex items-end gap-2"><span class="shrink-0" id="signature-label-party">توقيع العميل:</span><span class="flex-1 border-b border-gray-500 h-7"></span></div>
 </div>
 
 <div class="text-center text-[10px] text-gray-400 mt-3">شكراً لتعاملكم معنا</div>
@@ -616,11 +616,8 @@
         // ---- Signature block: purchase docs need "who handed it over" vs
         // "who received it", not the sale-invoice "customer signature" ----
         if (isPurchaseDoc) {
-            document.getElementById('signature-label-1').textContent = 'توقيع المستلم (المحل)';
-            if (invoice.type === 'buyTrader') {
-                document.getElementById('signature-block-2').classList.remove('hidden');
-                document.getElementById('signature-block-2').classList.add('flex');
-            }
+            document.getElementById('signature-label-staff').textContent = 'توقيع المستلم (المحل):';
+            document.getElementById('signature-label-party').textContent = invoice.type === 'buyTrader' ? 'توقيع مندوب التاجر:' : 'توقيع البائع:';
         }
 
         // ---- Optional bulk-lot photos (buyTrader stock intake) ----
