@@ -64,6 +64,10 @@
 <span class="material-symbols-outlined">share</span>
                 واتساب
             </button>
+<button class="hidden items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-semibold" id="delete-invoice-btn" onclick="deleteInvoiceFlow()">
+<span class="material-symbols-outlined">delete_forever</span>
+                حذف نهائي
+            </button>
 <button class="hidden items-center gap-2 bg-red-50 text-red-700 border border-red-200 px-3 py-2 rounded-lg text-sm font-semibold" id="cancel-invoice-btn" onclick="cancelInvoiceFlow()">
 <span class="material-symbols-outlined">cancel</span>
                 إلغاء الفاتورة
@@ -541,6 +545,24 @@
             }
         }
 
+        // Owner-only hard delete, offered only on the latest sale invoice so
+        // its number is reused with no gap (server re-checks all of this).
+        {
+            const m = String(invoice.invoice_number || '').split('-');
+            const isLast = invoice.type === 'sale' && Number(m[1]) === Number(store.next_invoice_seq_year)
+                && Number(m[2]) === Number(store.next_invoice_seq) - 1;
+            if (isLast) {
+                const { data: ownerRow } = await goldmindClient.from('staff').select('role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+                if (ownerRow && ownerRow.role === 'owner') {
+                    const delBtn = document.getElementById('delete-invoice-btn');
+                    delBtn.classList.remove('hidden');
+                    delBtn.classList.add('flex');
+                    window.__currentInvoiceId = invoiceId;
+                    window.__currentInvoiceNumber = invoice.invoice_number;
+                }
+            }
+        }
+
         // ---- Counterparty (customer or trader) ----
         document.getElementById('cust-label').textContent = counterpartyLabel;
         document.getElementById('cust-name').textContent = counterparty ? counterparty.name : '—';
@@ -965,6 +987,19 @@
             return;
         }
         window.location.reload();
+    }
+
+    async function deleteInvoiceFlow() {
+        const num = window.__currentInvoiceNumber || '';
+        if (!confirm('حذف الفاتورة ' + num + ' نهائياً؟\n\n• القطع بترجع للمخزون\n• حركات الصندوق والديون تبعها بتنمسح\n• رقمها بيرجع للفاتورة الجاية\n\nما في تراجع بعد الحذف.')) return;
+        if (prompt('للتأكيد اكتب رقم الفاتورة: ' + num) !== num) { alert('ما تطابق الرقم — ما انحذفت.'); return; }
+        const btn = document.getElementById('delete-invoice-btn');
+        btn.disabled = true;
+        const { error } = await goldmindClient.rpc('delete_last_sale_invoice', { target_invoice_id: window.__currentInvoiceId });
+        btn.disabled = false;
+        if (error) { alert('تعذّر الحذف: ' + error.message); return; }
+        alert('انحذفت الفاتورة ' + num + '، ورقمها رجع متاح.');
+        window.location.href = 'invoices-list-ar.html';
     }
 
     async function restoreInvoiceFlow() {
