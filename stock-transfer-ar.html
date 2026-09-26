@@ -62,11 +62,10 @@
 </div>
 <select id="party-select" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" onchange="onPartyChange()"></select>
 <div id="new-party" class="hidden flex flex-col gap-2 p-3 bg-surface-container-low rounded-lg">
-<input id="np-name" class="h-11 border border-outline-variant rounded-lg px-3 text-right" placeholder="الاسم — مثال: أبو سمير (تعديل)، هدايا"/>
+<input id="np-name" class="h-11 border border-outline-variant rounded-lg px-3 text-right" placeholder="الاسم — مثال: هدايا، أبو سمير (تعديل)"/>
 <select id="np-kind" class="h-11 border border-outline-variant rounded-lg px-3 text-right">
 <option value="gift">هدايا — القطعة بتطلع هدية وكلفتها مصروف فوراً</option>
 <option value="intermediary">وسيط تعديل (تفصيل، تصغير، تعديل...)</option>
-<option value="box">صندوق حفظ (عرض، حجز... وبترجع للمخزن)</option>
 </select>
 <button type="button" onclick="createParty()" class="h-11 bg-primary text-white rounded-lg font-semibold text-[13px]">حفظ الجهة</button>
 </div>
@@ -142,7 +141,7 @@ let parties = [], traders = [], prices = {}, CUR = '', current = null, outCart =
 const opts = { type: [], category1: [], category2: [] };
 const n = (v, d = 2) => Number(v || 0).toFixed(d);
 const money = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CUR;
-const KIND = { intermediary: 'وسيط تعديل', box: 'صندوق', gift: 'هدايا' };
+const KIND = { intermediary: 'وسيط تعديل', gift: 'هدايا' };
 const esc = v => gmEscapeHtml(v == null ? '' : String(v));
 function showPhoto(src) { document.getElementById('photo-big').src = src; const b = document.getElementById('photo-lightbox'); b.classList.remove('hidden'); b.classList.add('flex'); }
 function msg(id, t, bad) { const e = document.getElementById(id); e.textContent = t; e.classList.toggle('hidden', !t); if (bad !== undefined) e.className = 'text-[12px] text-center ' + (bad ? 'text-error' : 'text-success'); }
@@ -151,7 +150,7 @@ const costOf = p => { const w = Number(p.accounting_weight_grams != null ? p.acc
 function renderPartySelect(selected) {
   const sel = document.getElementById('party-select');
   sel.innerHTML = '<option value="">— اختار الجهة —</option>'
-    + (parties.length ? '<optgroup label="وسطاء وصناديق">' + parties.map(p => `<option value="p:${p.id}">${esc(p.name)} — ${KIND[p.kind]}</option>`).join('') + '</optgroup>' : '')
+    + (parties.length ? '<optgroup label="هدايا ووسطاء التعديل">' + parties.map(p => `<option value="p:${p.id}">${esc(p.name)} — ${KIND[p.kind]}</option>`).join('') + '</optgroup>' : '')
     + (traders.length ? '<optgroup label="تجار الجملة">' + traders.map(t => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('') + '</optgroup>' : '');
   if (selected) sel.value = selected;
 }
