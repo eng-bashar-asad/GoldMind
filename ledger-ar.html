@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js"></script>
-<script src="theme.js?v=22"></script>
+<script src="theme.js?v=23"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -387,6 +387,10 @@ function goToStatementPrint() {
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gs-vat-rate">نسبة الضريبة على المصنعية (%)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gs-vat-rate" oninput="renderGiveStockCart()" step="0.01" type="number"/>
 </div>
+<div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3 text-[12px] font-semibold" id="gs-kind">
+<label class="flex-1 h-10 flex items-center justify-center gap-1 cursor-pointer"><input type="radio" name="gs-kind" value="إرجاع للتاجر" checked/> إرجاع للتاجر</label>
+<label class="flex-1 h-10 flex items-center justify-center gap-1 cursor-pointer border-r border-outline-variant"><input type="radio" name="gs-kind" value="بيع للتاجر بالكلفة"/> بيع بالكلفة</label>
+</div>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="gs-notes" placeholder="ملاحظة عامة على السند (اختياري)"></textarea>
 <button onclick="submitGiveStock()" id="gs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold disabled:opacity-50" disabled="">حفظ التسليم</button>
 <p class="text-error text-[12px] hidden mt-2" id="gs-error"></p>
@@ -564,6 +568,11 @@ async function load() {
   const traderParam = new URLSearchParams(window.location.search).get('trader');
   if (traderParam && traders.some(t => t.id === traderParam)) {
     showTraderDetail(traderParam);
+    // ?action=give / receive (from stock-transfer-ar.html) opens that form directly
+    const act = new URLSearchParams(window.location.search).get('action');
+    if (act === 'give') setTimeout(toggleGiveStockForm, 300);
+    if (act === 'receive') setTimeout(toggleReceiveStockForm, 300);
+    if (act) history.replaceState(null, '', location.pathname + '?trader=' + traderParam); // only once, not after every reload
   } else {
     showTradersList();
   }
@@ -2019,7 +2028,11 @@ async function submitGiveStock() {
     return;
   }
 
-  const notes = document.getElementById('gs-notes').value.trim();
+  // "return" vs "sold at cost" book the same ledger effect (trader owes
+  // the weight + fab back); the kind is kept on the note for the record.
+  const gsKind = (document.querySelector('input[name="gs-kind"]:checked') || {}).value || '';
+  const typedNotes = document.getElementById('gs-notes').value.trim();
+  const notes = gsKind + (typedNotes ? ' — ' + typedNotes : '');
   const btn = document.getElementById('gs-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';

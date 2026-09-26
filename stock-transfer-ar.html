@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إخراج وإدخال بضاعة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js"></script>
+<script src="theme.js?v=23"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+  .tab-btn[aria-selected="true"] { background: #775a19; color: #fff; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex items-center gap-4 px-4 w-full h-16">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">إخراج وإدخال بضاعة بالكلفة</h1>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية إخراج وإدخال البضاعة.</div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-5">
+
+<!-- 1) the party -->
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
+<div class="flex items-center justify-between">
+<h2 class="font-semibold text-[13px]">الجهة</h2>
+<button type="button" onclick="document.getElementById('new-party').classList.toggle('hidden')" class="text-[12px] font-semibold text-primary flex items-center gap-1"><span class="material-symbols-outlined">add</span>جهة جديدة</button>
+</div>
+<select id="party-select" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" onchange="onPartyChange()"></select>
+<div id="new-party" class="hidden flex flex-col gap-2 p-3 bg-surface-container-low rounded-lg">
+<input id="np-name" class="h-11 border border-outline-variant rounded-lg px-3 text-right" placeholder="الاسم — مثال: أبو سمير (تعديل)، هدايا"/>
+<select id="np-kind" class="h-11 border border-outline-variant rounded-lg px-3 text-right">
+<option value="intermediary">وسيط تعديل (تفصيل، تصغير، تعديل...)</option>
+<option value="box">صندوق (مثل: هدايا، عرض، حجز...)</option>
+</select>
+<button type="button" onclick="createParty()" class="h-11 bg-primary text-white rounded-lg font-semibold text-[13px]">حفظ الجهة</button>
+</div>
+<div id="party-balance" class="text-[12px]"></div>
+</div>
+
+<!-- trader: handled on the trader ledger -->
+<div id="trader-box" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
+<p class="text-[12px] text-on-surface-variant leading-5">إخراج وإدخال البضاعة مع التجار بينسجل على <b>حساب التاجر</b> (الوزن والمصنعية)، ومنها بتختار «إرجاع للتاجر» أو «بيع بالكلفة».</p>
+<div class="grid grid-cols-2 gap-2">
+<button type="button" onclick="goTrader('give')" class="h-12 rounded-lg bg-primary text-white font-semibold text-[13px] flex items-center justify-center gap-1"><span class="material-symbols-outlined">upload</span>إخراج للتاجر</button>
+<button type="button" onclick="goTrader('receive')" class="h-12 rounded-lg border border-primary text-primary font-semibold text-[13px] flex items-center justify-center gap-1"><span class="material-symbols-outlined">download</span>إدخال من التاجر</button>
+</div>
+</div>
+
+<div id="party-work" class="hidden flex flex-col gap-5">
+<div class="flex gap-1 p-1 bg-surface-container-low border border-outline-variant rounded-xl">
+<button type="button" class="tab-btn flex-1 h-10 rounded-lg text-[13px] font-semibold" data-tab="out" onclick="showTab('out')">إخراج</button>
+<button type="button" class="tab-btn flex-1 h-10 rounded-lg text-[13px] font-semibold" data-tab="in" onclick="showTab('in')">إدخال</button>
+</div>
+
+<!-- OUT -->
+<div id="tab-out" class="flex flex-col gap-3">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
+<div class="flex gap-2">
+<input class="flex-1 h-12 px-4 border border-outline-variant rounded-lg font-data-mono text-right" dir="ltr" id="out-barcode" placeholder="امسح أو اكتب الباركود" type="text"/>
+<button onclick="addOutPiece()" class="w-12 h-12 bg-primary text-white rounded-lg flex items-center justify-center" type="button"><span class="material-symbols-outlined">add</span></button>
+</div>
+<p class="text-error text-[12px] hidden" id="out-msg"></p>
+<div id="out-list" class="flex flex-col gap-2"></div>
+<div id="out-total" class="text-[12px] font-semibold"></div>
+<textarea id="out-notes" class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-right" placeholder="ملاحظة (اختياري) — مثال: تقسيم لقطعتين"></textarea>
+<button type="button" id="out-btn" onclick="saveOut()" class="w-full h-12 bg-secondary text-on-secondary rounded-lg font-bold">حفظ سند الإخراج</button>
+</div>
+</div>
+
+<!-- IN -->
+<div id="tab-in" class="hidden flex flex-col gap-3">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-2">
+<h3 class="font-semibold text-[13px]">قطع راجعة متل ما هي</h3>
+<div id="held-list" class="flex flex-col gap-1"></div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3" id="new-pieces-box">
+<div class="flex items-center justify-between">
+<h3 class="font-semibold text-[13px]">قطع جديدة (بعد التعديل)</h3>
+<button type="button" onclick="addNewRow()" class="text-[12px] font-semibold text-primary flex items-center gap-1"><span class="material-symbols-outlined">add</span>قطعة</button>
+</div>
+<div id="new-rows" class="flex flex-col gap-3"></div>
+</div>
+<textarea id="in-notes" class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-right" placeholder="ملاحظة (اختياري)"></textarea>
+<button type="button" id="in-btn" onclick="saveIn()" class="w-full h-12 bg-secondary text-on-secondary rounded-lg font-bold">حفظ سند الإدخال</button>
+</div>
+
+<p class="text-error text-[12px] hidden text-center" id="save-error"></p>
+<p class="text-success text-[12px] hidden text-center" id="save-success"></p>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="px-4 py-3 border-b border-outline-variant"><h2 class="font-semibold text-[13px]">سندات هالجهة</h2></div>
+<div id="vouchers" class="divide-y divide-outline-variant"></div>
+</div>
+</div>
+
+</div>
+</main>
+
+<div id="photo-lightbox" class="hidden fixed inset-0 z-[70] bg-black/80 items-center justify-center p-4" onclick="this.classList.add('hidden'); this.classList.remove('flex');">
+<img id="photo-big" alt="" class="max-w-full max-h-full rounded-lg object-contain"/>
+</div>
+
+<script>
+let parties = [], traders = [], prices = {}, CUR = '', current = null, outCart = [], newRowSeq = 0;
+const opts = { type: [], category1: [], category2: [] };
+const n = (v, d = 2) => Number(v || 0).toFixed(d);
+const money = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CUR;
+const KIND = { intermediary: 'وسيط تعديل', box: 'صندوق' };
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+function showPhoto(src) { document.getElementById('photo-big').src = src; const b = document.getElementById('photo-lightbox'); b.classList.remove('hidden'); b.classList.add('flex'); }
+function msg(id, t, bad) { const e = document.getElementById(id); e.textContent = t; e.classList.toggle('hidden', !t); if (bad !== undefined) e.className = 'text-[12px] text-center ' + (bad ? 'text-error' : 'text-success'); }
+const costOf = p => { const w = Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams) || 0; return w * ((prices[p.karat] || 0) + (Number(p.cost_fabrication_per_gram) || 0)); };
+
+function renderPartySelect(selected) {
+  const sel = document.getElementById('party-select');
+  sel.innerHTML = '<option value="">— اختار الجهة —</option>'
+    + (parties.length ? '<optgroup label="وسطاء وصناديق">' + parties.map(p => `<option value="p:${p.id}">${esc(p.name)} — ${KIND[p.kind]}</option>`).join('') + '</optgroup>' : '')
+    + (traders.length ? '<optgroup label="تجار الجملة">' + traders.map(t => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('') + '</optgroup>' : '');
+  if (selected) sel.value = selected;
+}
+
+async function createParty() {
+  const name = document.getElementById('np-name').value.trim();
+  if (!name) return;
+  const { data, error } = await goldmindClient.from('stock_parties').insert({ store_id: GOLDMIND_STORE_ID, name, kind: document.getElementById('np-kind').value }).select().single();
+  if (error) { alert(error.code === '23505' ? 'في جهة بنفس الاسم' : 'تعذّر: ' + error.message); return; }
+  parties.push(data);
+  document.getElementById('np-name').value = '';
+  document.getElementById('new-party').classList.add('hidden');
+  renderPartySelect('p:' + data.id);
+  onPartyChange();
+}
+
+function goTrader(action) {
+  const v = document.getElementById('party-select').value;
+  location.href = 'ledger-ar.html?trader=' + encodeURIComponent(v.slice(2)) + '&action=' + action;
+}
+
+function showTab(t) {
+  document.querySelectorAll('.tab-btn').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === t)));
+  document.getElementById('tab-out').classList.toggle('hidden', t !== 'out');
+  document.getElementById('tab-in').classList.toggle('hidden', t !== 'in');
+  msg('save-error', ''); msg('save-success', '');
+}
+
+async function onPartyChange() {
+  const v = document.getElementById('party-select').value;
+  current = v.startsWith('p:') ? parties.find(p => p.id === v.slice(2)) : null;
+  document.getElementById('trader-box').classList.toggle('hidden', !v.startsWith('t:'));
+  document.getElementById('party-work').classList.toggle('hidden', !current);
+  document.getElementById('party-balance').innerHTML = '';
+  if (!current) return;
+  outCart = []; renderOut();
+  document.getElementById('new-rows').innerHTML = '';
+  document.getElementById('new-pieces-box').classList.toggle('hidden', current.kind !== 'intermediary');
+  showTab('out');
+  await refreshParty();
+}
+
+async function refreshParty() {
+  const [{ data: lines }, { data: vouchers }] = await Promise.all([
+    goldmindClient.from('stock_voucher_lines').select('voucher_id, direction, piece_id, barcode, karat, weight_grams, accounting_weight_grams, cost_value').eq('party_id', current.id),
+    goldmindClient.from('stock_vouchers').select('id, voucher_number, direction, notes, created_at, staff:created_by(full_name)').eq('party_id', current.id).order('created_at', { ascending: false }).limit(50)
+  ]);
+  const L = lines || [];
+  // pieces currently held by this party = the last line for the piece here is an "out" and the piece is still out
+  const lastByPiece = {};
+  L.forEach(l => { if (l.piece_id) lastByPiece[l.piece_id] = l; });
+  const outIds = Object.values(lastByPiece).filter(l => l.direction === 'out').map(l => l.piece_id);
+  let held = [];
+  if (outIds.length) {
+    const { data } = await goldmindClient.from('pieces').select('id, barcode, karat, weight_grams, accounting_weight_grams, cost_fabrication_per_gram, photo_url, description_ar, status').in('id', outIds).in('status', ['in_box', 'at_intermediary']);
+    held = data || [];
+  }
+  // balance
+  const bal = document.getElementById('party-balance');
+  if (current.kind === 'intermediary') {
+    const byK = {};
+    L.forEach(l => { const s = l.direction === 'out' ? 1 : -1; const b = byK[l.karat] = byK[l.karat] || { w: 0, aw: 0, c: 0 }; b.w += s * l.weight_grams; b.aw += s * l.accounting_weight_grams; b.c += s * l.cost_value; });
+    const ks = Object.keys(byK).filter(k => Math.abs(byK[k].w) > 0.0005 || Math.abs(byK[k].aw) > 0.0005);
+    bal.innerHTML = ks.length
+      ? '<div class="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 space-y-1"><div class="font-bold">رصيد الوسيط (طالع − راجع)</div>'
+        + ks.map(k => `<div class="flex justify-between font-data-mono"><span>عيار ${k}</span><span>${n(byK[k].w, 3)}غ قائم · ${n(byK[k].aw, 3)}غ محاسبي · ${money(byK[k].c)}</span></div>`).join('')
+        + '<div class="text-[11px] opacity-80">موجب = عند الوسيط لإلنا · سالب = رجع أكتر من يلي طلع</div></div>'
+      : '<div class="text-on-surface-variant">ما في رصيد عند هالوسيط.</div>';
+  } else {
+    const w = held.reduce((s, p) => s + Number(p.weight_grams || 0), 0);
+    bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">بالصندوق هلق: <b>${held.length}</b> قطعة · <b class="font-data-mono">${n(w, 3)}غ</b> · كلفة <b class="font-data-mono">${money(held.reduce((s, p) => s + costOf(p), 0))}</b></div>`;
+  }
+  // held pieces (for "in")
+  document.getElementById('held-list').innerHTML = held.length ? held.map(p => `
+    <label class="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-container-low cursor-pointer">
+      <input type="checkbox" class="held-cb" value="${p.id}"/>
+      <span class="font-data-mono text-[12px] flex-1">${esc(p.barcode)} · ${p.karat}K · ${n(p.weight_grams, 3)}غ ${p.description_ar ? '· ' + esc(p.description_ar) : ''}</span>
+    </label>`).join('') : '<p class="text-[12px] text-on-surface-variant">ما في قطع عند هالجهة.</p>';
+  // vouchers
+  const byV = {};
+  L.forEach(l => { const v = byV[l.voucher_id] = byV[l.voucher_id] || { cnt: 0, w: 0, c: 0 }; v.cnt++; v.w += Number(l.weight_grams); v.c += Number(l.cost_value); });
+  document.getElementById('vouchers').innerHTML = (vouchers || []).length ? vouchers.map(v => { const t = byV[v.id] || { cnt: 0, w: 0, c: 0 }; return `
+    <div class="p-3 flex items-center gap-3">
+      <span class="material-symbols-outlined ${v.direction === 'out' ? 'text-error' : 'text-success'}">${v.direction === 'out' ? 'upload' : 'download'}</span>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-[13px] font-data-mono">${esc(v.voucher_number)} <span class="font-normal text-on-surface-variant">${v.direction === 'out' ? 'إخراج' : 'إدخال'}</span></div>
+        <div class="text-[11px] text-on-surface-variant">${gmFormatDateTime(v.created_at)}${v.staff && v.staff.full_name ? ' · ' + esc(v.staff.full_name) : ''}${v.notes ? ' · ' + esc(v.notes) : ''}</div>
+      </div>
+      <div class="text-left text-[12px] font-data-mono">${t.cnt} قطعة · ${n(t.w, 3)}غ<br/>${money(t.c)}</div>
+    </div>`; }).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">ما في سندات لسا.</p>';
+}
+
+// ---- OUT ----
+document.getElementById('out-barcode').addEventListener('keydown', e => { if (e.key === 'Enter') addOutPiece(); });
+async function addOutPiece() {
+  const inp = document.getElementById('out-barcode'); const code = inp.value.trim();
+  msg('out-msg', '');
+  if (!code) return;
+  if (outCart.some(p => p.barcode === code)) { msg('out-msg', 'القطعة مضافة من قبل'); return; }
+  const { data: p } = await goldmindClient.from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).eq('barcode', code).eq('status', 'available').maybeSingle();
+  if (!p) { msg('out-msg', 'ما في قطعة متاحة بالمخزن بهالباركود'); return; }
+  outCart.push(p); inp.value = ''; renderOut();
+}
+function removeOut(id) { outCart = outCart.filter(p => p.id !== id); renderOut(); }
+function renderOut() {
+  document.getElementById('out-list').innerHTML = outCart.map(p => `
+    <div class="flex items-center gap-3 p-2 bg-surface-container-low rounded-lg">
+      ${p.photo_url ? `<img src="${esc(p.photo_url)}" onclick="showPhoto(this.src)" style="width:56px;height:56px" class="rounded-lg object-cover border border-outline-variant cursor-zoom-in"/>` : '<div style="width:56px;height:56px" class="rounded-lg border border-dashed border-outline-variant"></div>'}
+      <div class="flex-1 min-w-0 text-[12px]">
+        <div class="font-semibold font-data-mono">${esc(p.barcode)} · ${p.karat}K</div>
+        <div class="text-on-surface-variant">${n(p.weight_grams, 3)}غ قائم · ${n(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams, 3)}غ محاسبي · مصنعية ${n(p.cost_fabrication_per_gram)}/غ</div>
+      </div>
+      <div class="text-left text-[12px] font-data-mono">${money(costOf(p))}</div>
+      <button type="button" onclick="removeOut('${p.id}')" class="text-error"><span class="material-symbols-outlined">close</span></button>
+    </div>`).join('');
+  document.getElementById('out-total').textContent = outCart.length ? `المجموع: ${outCart.length} قطعة · ${n(outCart.reduce((s, p) => s + Number(p.weight_grams), 0), 3)}غ · كلفة ${money(outCart.reduce((s, p) => s + costOf(p), 0))}` : '';
+}
+async function saveOut() {
+  msg('save-error', ''); msg('save-success', '');
+  if (!outCart.length) { msg('save-error', 'أضف قطعة واحدة على الأقل', true); return; }
+  if (!confirm('إخراج ' + outCart.length + ' قطعة إلى ' + current.name + '؟')) return;
+  const btn = document.getElementById('out-btn'); btn.disabled = true;
+  const { error } = await goldmindClient.rpc('stock_out_to_party', { target_party_id: current.id, piece_ids: outCart.map(p => p.id), p_notes: document.getElementById('out-notes').value.trim() || null });
+  btn.disabled = false;
+  if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
+  outCart = []; renderOut(); document.getElementById('out-notes').value = '';
+  msg('save-success', 'انحفظ سند الإخراج', false);
+  refreshParty();
+}
+
+// ---- IN ----
+function optionList(key) { return '<option value="">—</option>' + opts[key].map(v => `<option>${esc(v)}</option>`).join(''); }
+function addNewRow() {
+  const i = ++newRowSeq;
+  const div = document.createElement('div');
+  div.className = 'new-row p-3 border border-outline-variant rounded-lg grid grid-cols-2 md:grid-cols-4 gap-2 text-[12px]';
+  div.dataset.i = i;
+  div.innerHTML = `
+    <label class="flex flex-col gap-1">العيار<select class="h-10 border border-outline-variant rounded px-2" data-f="karat"><option>18</option><option>21</option><option>22</option><option>24</option></select></label>
+    <label class="flex flex-col gap-1">الوزن القائم (غ)<input type="number" step="0.001" class="h-10 border border-outline-variant rounded px-2 font-data-mono" data-f="weight"/></label>
+    <label class="flex flex-col gap-1">الوزن المحاسبي (غ)<input type="number" step="0.001" class="h-10 border border-outline-variant rounded px-2 font-data-mono" data-f="acc_weight" placeholder="نفس القائم"/></label>
+    <label class="flex flex-col gap-1">المصنعية للغرام<input type="number" step="0.01" class="h-10 border border-outline-variant rounded px-2 font-data-mono" data-f="fab_per_gram"/></label>
+    <label class="flex flex-col gap-1">النوع<select class="h-10 border border-outline-variant rounded px-2" data-f="piece_type">${optionList('type')}</select></label>
+    <label class="flex flex-col gap-1">تصنيف ١<select class="h-10 border border-outline-variant rounded px-2" data-f="category1">${optionList('category1')}</select></label>
+    <label class="flex flex-col gap-1">تصنيف ٢<select class="h-10 border border-outline-variant rounded px-2" data-f="category2">${optionList('category2')}</select></label>
+    <label class="flex flex-col gap-1">اللون<select class="h-10 border border-outline-variant rounded px-2" data-f="color"><option value="Gold">ذهبي</option><option value="White">أبيض</option><option value="Rose">وردي</option></select></label>
+    <label class="flex flex-col gap-1 col-span-2">الوصف<input class="h-10 border border-outline-variant rounded px-2" data-f="description_ar"/></label>
+    <label class="flex flex-col gap-1">صورة<input type="file" accept="image/*" capture="environment" class="text-[11px]" data-f="photo"/></label>
+    <button type="button" onclick="this.closest('.new-row').remove()" class="self-end h-10 rounded border border-error text-error">حذف</button>`;
+  document.getElementById('new-rows').appendChild(div);
+}
+async function saveIn() {
+  msg('save-error', ''); msg('save-success', '');
+  const back = [...document.querySelectorAll('.held-cb:checked')].map(c => c.value);
+  const rows = [...document.querySelectorAll('.new-row')];
+  const lines = [];
+  for (const r of rows) {
+    const g = f => r.querySelector(`[data-f="${f}"]`);
+    const w = parseFloat(g('weight').value), aw = parseFloat(g('acc_weight').value), fab = parseFloat(g('fab_per_gram').value);
+    if (!w || w <= 0) { msg('save-error', 'اكتب الوزن القائم لكل قطعة جديدة', true); return; }
+    if (isNaN(fab) || fab < 0) { msg('save-error', 'اكتب المصنعية لكل قطعة جديدة (ولو صفر)', true); return; }
+    lines.push({ row: r, karat: +g('karat').value, weight: w, acc_weight: aw > 0 ? aw : w, fab_per_gram: fab,
+      piece_type: g('piece_type').value, category1: g('category1').value, category2: g('category2').value,
+      color: g('color').value, description_ar: g('description_ar').value.trim(), file: g('photo').files[0] || null });
+  }
+  if (!back.length && !lines.length) { msg('save-error', 'اختار قطعة راجعة أو ضيف قطعة جديدة', true); return; }
+  if (!confirm('حفظ سند إدخال من ' + current.name + '؟')) return;
+  const btn = document.getElementById('in-btn'); btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  // photos are optional: a failed upload never blocks the voucher
+  for (const l of lines) {
+    if (!l.file) continue;
+    const ext = (l.file.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = GOLDMIND_STORE_ID + '/mod-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.' + ext;
+    const { error } = await goldmindClient.storage.from('piece-photos').upload(path, l.file, { upsert: false });
+    if (!error) { const { data } = goldmindClient.storage.from('piece-photos').getPublicUrl(path); l.photo_url = data ? data.publicUrl : null; }
+  }
+  const payload = lines.map(({ row, file, ...rest }) => rest);
+  const { error } = await goldmindClient.rpc('stock_in_from_party', { target_party_id: current.id, return_piece_ids: back, new_lines: payload, p_notes: document.getElementById('in-notes').value.trim() || null });
+  btn.disabled = false; btn.textContent = 'حفظ سند الإدخال';
+  if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
+  document.getElementById('new-rows').innerHTML = ''; document.getElementById('in-notes').value = '';
+  msg('save-success', 'انحفظ سند الإدخال' + (lines.length ? ' — القطع الجديدة انضافت للمخزن بباركود جديد (فيك تطبعلها ليبل من صفحة المخزن)' : ''), false);
+  refreshParty();
+}
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const [{ data: me }, { data: store }] = await Promise.all([
+    goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+    goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+  ]);
+  document.getElementById('loading-state').classList.add('hidden');
+  const has = k => me && (me.role === 'owner' || (me.permissions && me.permissions[k] === true));
+  if (!has('stock_transfers')) { document.getElementById('no-access').classList.remove('hidden'); return; }
+  const code = (store && store.currency || 'AED').toUpperCase();
+  CUR = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س' })[code] || code;
+  const [{ data: ps }, { data: ts }, { data: gp }, { data: cls }] = await Promise.all([
+    goldmindClient.from('stock_parties').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
+    has('view_traders') ? goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name') : Promise.resolve({ data: [] }),
+    goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID),
+    goldmindClient.from('piece_classification_options').select('field_key, value').eq('store_id', GOLDMIND_STORE_ID).order('value')
+  ]);
+  parties = ps || []; traders = ts || [];
+  (gp || []).forEach(p => { prices[p.karat] = Number(p.price_per_gram); });
+  (cls || []).forEach(c => { if (opts[c.field_key]) opts[c.field_key].push(c.value); });
+  renderPartySelect();
+  document.getElementById('page-content').classList.remove('hidden');
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js').catch(() => {}); });
+}
+</script>
+</body></html>
