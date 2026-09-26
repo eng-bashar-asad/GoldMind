@@ -53,8 +53,15 @@
 سجّل هون الذهب يلي موجود عندك فعلياً (وزن إجمالي + مجموع مصنعية واحد) بدون تسجيل قطع مفردة ولا ربطه بتاجر. لما تبيع منها لاحقاً بفاتورة المبيعات (بيع من الرصيد بالجملة)، بتكتب مصنعية كل قطعة يدوياً وبتتخصم من نفس هالمجموع، مش بمعدل ثابت للغرام.
 </p>
 
+<!-- Barcoded pieces classified as opening stock (still individual pieces) -->
+<div id="op-pieces" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4">
+<h2 class="font-semibold text-[14px] mb-1">قطع أول المدة (بباركود)</h2>
+<p class="text-[11px] text-on-surface-variant mb-3">قطع مفردة مسجّلة كبضاعة أول المدة — المتبقي منها بالمخزن هلق.</p>
+<div id="op-pieces-body" class="text-[12px] font-data-mono flex flex-col gap-1"></div>
+</div>
+
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4">
-<h2 class="font-semibold text-[14px] mb-3">إضافة دفعة بضاعة أول المدة</h2>
+<h2 class="font-semibold text-[14px] mb-3">إضافة دفعة بضاعة أول المدة (وزن بالجملة)</h2>
 <div class="grid grid-cols-2 gap-3 mb-3">
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العيار</label>
@@ -164,6 +171,23 @@ async function submitOpeningStock() {
   load();
 }
 
+async function loadOpeningPieces() {
+  const { data } = await goldmindClient.from('pieces')
+    .select('karat, weight_grams, accounting_weight_grams, cost_fabrication_per_gram, batch:intake_batch_id!inner(source_type)')
+    .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'available').eq('batch.source_type', 'opening');
+  if (!data || !data.length) return;
+  const byK = {};
+  data.forEach(p => {
+    const aw = Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams) || 0;
+    const k = byK[p.karat] = byK[p.karat] || { n: 0, w: 0, aw: 0, fab: 0 };
+    k.n++; k.w += Number(p.weight_grams) || 0; k.aw += aw; k.fab += aw * (Number(p.cost_fabrication_per_gram) || 0);
+  });
+  document.getElementById('op-pieces-body').innerHTML = Object.keys(byK).sort().map(k => `
+    <div class="flex justify-between border-b border-outline-variant py-1"><span>عيار ${k} · ${byK[k].n} قطعة</span><span>${fmt(byK[k].w)}غ قائم · ${fmt(byK[k].aw)}غ محاسبي · مصنعية ${fmt(byK[k].fab)}</span></div>`).join('')
+    + `<div class="flex justify-between font-bold pt-1"><span>المجموع · ${data.length} قطعة</span><span>${fmt(Object.values(byK).reduce((s, x) => s + x.w, 0))}غ</span></div>`;
+  document.getElementById('op-pieces').classList.remove('hidden');
+}
+
 async function load() {
   // Must wait for the session first -- this used to fire without waiting
   // for __enforcePermission's requireGoldMindSession() call above, so on a
@@ -171,6 +195,7 @@ async function load() {
   // token was attached, silently getting zero rows back and showing "لا
   // توجد دفعات مسجّلة بعد" even when entries genuinely existed.
   await requireGoldMindSession('login-entry-ar.html');
+  loadOpeningPieces();
 
   const { data, error } = await goldmindClient
     .from('gold_stock_lots')

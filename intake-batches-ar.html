@@ -69,7 +69,7 @@
 
 </main>
 <script>
-    const SOURCE_LABELS = { manual: 'بضاعة مُدخلة يدوياً', production: 'إنتاج من دفعة ذهب' };
+    const SOURCE_LABELS = { manual: 'بضاعة مُدخلة يدوياً', production: 'إنتاج من دفعة ذهب', opening: 'بضاعة أول المدة (قطع بباركود)' };
 
     function gmEscapeHtml(s) {
         return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -85,7 +85,7 @@
         const date = new Date(b.created_at);
         const dateStr = date.toLocaleDateString('ar-AE', { year: 'numeric', month: 'short', day: 'numeric' });
         const timeStr = date.toLocaleTimeString('ar-AE', { hour: '2-digit', minute: '2-digit' });
-        const icon = b.source_type === 'production' ? 'precision_manufacturing' : 'inventory_2';
+        const icon = b.source_type === 'production' ? 'precision_manufacturing' : (b.source_type === 'opening' ? 'history' : 'inventory_2');
         return `
         <button onclick="openBatch('${b.id}')" class="flex items-center gap-3 border border-outline-variant rounded-lg p-3 bg-surface-container-lowest text-right active:scale-[0.99] transition-transform">
             <div class="w-10 h-10 rounded-lg bg-surface-container-low flex items-center justify-center shrink-0">
