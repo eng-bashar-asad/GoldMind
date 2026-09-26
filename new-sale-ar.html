@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=24"></script>
+<script src="supabase-config.js?v=25"></script>
 <script src="theme.js?v=25"></script>
 <script id="tailwind-config">
         tailwind.config = {
@@ -1526,7 +1526,6 @@
             payment_method: selectedPaymentMethod,
             cash_paid: selectedPaymentMethod === 'mixed' ? mixedCashAmt : null,
             bank_paid: selectedPaymentMethod === 'mixed' ? mixedBankAmt : null,
-            sold_at: new Date().toISOString(),
             items: cart.map(item => ({
                 mode: item.mode || 'manual',
                 piece_id: (item.piece && item.mode !== 'diamond') ? item.piece.id : null,
@@ -1562,10 +1561,9 @@
             return;
         }
         const invoiceRow = { id: result.id };
-        const stockConsumeWarning = '';
 
         clearDraftFromLocalStorage();
-        showMessage('تم حفظ الفاتورة بنجاح!' + stockConsumeWarning, stockConsumeWarning !== '');
+        showMessage('تم حفظ الفاتورة بنجاح!', false);
         setTimeout(() => {
             window.location.href = 'invoice-print-ar.html?id=' + invoiceRow.id;
         }, 800);

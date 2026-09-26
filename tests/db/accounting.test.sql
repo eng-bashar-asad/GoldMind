@@ -123,6 +123,19 @@ begin
     raise exception 'FAIL 13: new customer not created';
   end if;
 
+  -- 14) the same piece twice in one sale is refused
+  insert into pieces (store_id, barcode, weight_grams, accounting_weight_grams, karat, status) values (usd, 'T-P3', 5, 5, 18, 'available') returning id into p1;
+  begin
+    perform post_sale_invoice(jsonb_build_object('store_id', usd, 'customer_id', cust, 'payment_method', 'cash',
+      'items', jsonb_build_array(jsonb_build_object('piece_id', p1, 'price', 700), jsonb_build_object('piece_id', p1, 'price', 700))));
+    raise exception 'FAIL 14: same piece sold twice in one invoice';
+  exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+
+  -- 15) the same new customer on two offline sales is created once
+  r := post_sale_invoice(jsonb_build_object('store_id', usd, 'new_customer', jsonb_build_object('name', 'زبون جديد', 'phone', '050'),
+        'payment_method', 'cash', 'items', jsonb_build_array(jsonb_build_object('piece_id', p1, 'price', 700))));
+  if (select count(*) from customers where store_id = usd and name = 'زبون جديد') <> 1 then raise exception 'FAIL 15: duplicate new customer'; end if;
+
   raise notice 'ALL ACCOUNTING TESTS PASSED';
 end $$;
 rollback;

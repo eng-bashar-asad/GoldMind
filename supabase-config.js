@@ -314,11 +314,27 @@ const GM_SNAPSHOT_TABLES = {
 
 function gmQueue() { try { return JSON.parse(localStorage.getItem(GM_QUEUE_KEY)) || []; } catch (e) { return []; } }
 function gmSaveQueue(q) { localStorage.setItem(GM_QUEUE_KEY, JSON.stringify(q)); gmRenderOfflineBadge(); }
+// Change one queued sale (found by its client_ref) on a fresh read of the queue,
+// so a sale saved while a sync is running is never overwritten.
+function gmUpdateQueued(ref, fn) {
+    const q = gmQueue();
+    const i = q.findIndex(function (x) { return x.payload.client_ref === ref; });
+    if (i === -1) return;
+    const out = fn(q[i]);
+    if (out === null) q.splice(i, 1); else q[i] = out || q[i];
+    gmSaveQueue(q);
+}
 
 function gmFriendlyError(msg) {
     msg = String(msg || '');
     if (msg.indexOf('LOW_PRICE:') === 0) return 'في سطر سعره أقل من نص قيمة الذهب:' + msg.slice(10);
+    const map = { INSUFFICIENT_STOCK: 'رصيد الجملة ما بيكفي لهالوزن', LOT_NOT_FOUND: 'رصيد الجملة غير موجود', NOT_A_POOLED_LOT: 'رصيد الجملة مو من نوع المصنعية المجمّعة', NOT_AUTHORIZED: 'ما عندك صلاحية على هالمحل', INVALID_AMOUNT: 'كمية غير صحيحة' };
+    for (const k in map) if (msg.indexOf(k) !== -1) return map[k];
     return msg;
+}
+// Server busy / paused / login expired: try again later instead of giving up.
+function gmIsRetryable(error) {
+    return gmIsNetworkError(error) || /JWT|expired|5\d\d|timeout|Service Unavailable|Bad Gateway/i.test(String(error && (error.message || error.code || '')));
 }
 
 // Downloads the tables the sale screen searches, so it keeps working offline.
@@ -360,9 +376,13 @@ async function gmLocalLowPriceLines(payload) {
     const res = await (await caches.open(GM_DATA_CACHE)).match(GM_SNAPSHOT_URL + 'gold_prices');
     if (!res) return [];
     const gp = {}; (await res.json()).forEach(function (r) { gp[r.karat] = Number(r.price_per_gram); });
+    const snap = await (await caches.open(GM_DATA_CACHE)).match(GM_SNAPSHOT_URL + 'pieces');
+    const pieces = {}; (snap ? await snap.json() : []).forEach(function (r) { pieces[r.id] = r; });
     return payload.items.filter(function (it) {
-        const w = Number(it.accounting_weight || it.weight || 0);
-        return it.karat && gp[it.karat] && w > 0 && Number(it.price) < gp[it.karat] * w * 0.5;
+        const pc = it.piece_id && pieces[it.piece_id];
+        const karat = pc ? pc.karat : it.karat;
+        const w = Number(pc ? (pc.accounting_weight_grams != null ? pc.accounting_weight_grams : pc.weight_grams) : (it.accounting_weight || it.weight || 0));
+        return karat && gp[karat] && w > 0 && Number(it.price) < gp[karat] * w * 0.5;
     }).map(function (it) { return '\n• ' + (it.barcode || it.description || it.karat + 'K') + ': ' + it.price; });
 }
 
@@ -381,13 +401,14 @@ async function gmPostSale(payload, meta) {
         if (!error) return data;
         if (!gmIsNetworkError(error)) return { error: gmFriendlyError(error.message) };
     }
-    const low = await gmLocalLowPriceLines(payload);
+    const low = payload.confirm_low_price ? [] : await gmLocalLowPriceLines(payload);
     if (low.length) {
         if (!confirm('انتبه: في سطر سعره أقل من نص قيمة الذهب:' + low.join('') + '\n\nمتأكد بدك تكمل؟')) return { error: 'ما انحفظت الفاتورة — راجع الأسعار.' };
         payload.confirm_low_price = true;
     }
+    payload.sold_at = new Date().toISOString(); // the real time of an offline sale (online sales use server time)
     const q = gmQueue();
-    q.push({ payload: payload, meta: meta || {}, queued_at: new Date().toISOString(), status: 'pending' });
+    q.push({ payload: payload, meta: meta || {}, queued_at: payload.sold_at, status: 'pending' });
     gmSaveQueue(q);
     // this device must not sell the same piece twice while offline
     const sold = payload.items.map(function (i) { return i.piece_id; }).filter(Boolean);
@@ -404,23 +425,29 @@ async function gmPostSale(payload, meta) {
 let gmSyncing = false;
 async function gmSyncQueue() {
     if (gmSyncing || !navigator.onLine) return;
-    const q = gmQueue();
-    if (!q.some(function (x) { return x.status === 'pending'; })) return;
+    if (!gmQueue().some(function (x) { return x.status === 'pending'; })) return;
+    // one sync at a time, also across open tabs
+    if (navigator.locks) return navigator.locks.request('gm-sale-sync', { ifAvailable: true }, function (lock) { return lock ? gmRunSync() : null; });
+    return gmRunSync();
+}
+async function gmRunSync() {
     gmSyncing = true;
     let posted = 0;
     try {
         const { data: { session } } = await goldmindClient.auth.getSession();
         if (!session) return;
-        for (const item of q) {
-            if (item.status !== 'pending') continue;
+        const refs = gmQueue().filter(function (x) { return x.status === 'pending'; }).map(function (x) { return x.payload.client_ref; });
+        for (const ref of refs) {
+            const item = gmQueue().find(function (x) { return x.payload.client_ref === ref; });
+            if (!item || item.status !== 'pending') continue;
             const { data, error } = await goldmindClient.rpc('post_sale_invoice', { p: item.payload });
-            if (!error) { item.status = 'done'; item.invoice_number = data.invoice_number; posted++; }
-            else if (gmIsNetworkError(error)) break;
-            else { item.status = 'failed'; item.error = gmFriendlyError(error.message); }
+            if (!error) { gmUpdateQueued(ref, function () { return null; }); posted++; continue; }
+            if (gmIsRetryable(error)) break;
+            gmUpdateQueued(ref, function (x) { x.status = 'failed'; x.error = gmFriendlyError(error.message); return x; });
         }
     } finally {
         gmSyncing = false;
-        gmSaveQueue(q.filter(function (x) { return x.status !== 'done'; }));
+        gmRenderOfflineBadge();
     }
     if (posted) {
         gmToast('انرحّلت ' + posted + ' فاتورة كانت محفوظة على الجهاز ✓');
@@ -477,14 +504,14 @@ function gmShowQueue() {
     const esc = function (v) { return typeof gmEscapeHtml === 'function' ? gmEscapeHtml(String(v == null ? '' : v)) : String(v == null ? '' : v); };
     d.innerHTML = '<div style="padding:16px 16px 8px;font-weight:800;font-size:15px">فواتير محفوظة على الجهاز</div>' +
         '<div style="padding:0 16px 8px;font-size:12px;color:#555">بتترحّل لحالها لما يكون في إنترنت.</div>' +
-        q.map(function (x, i) {
+        q.map(function (x) {
             const total = x.payload.items.reduce(function (s, it) { return s + Number(it.price || 0); }, 0);
             return '<div style="border-top:1px solid #eee;padding:10px 16px;font-size:12.5px">' +
                 '<div style="display:flex;justify-content:space-between;gap:8px"><b>' + esc(x.meta.customerName || 'زبون') + '</b><span>' + total.toFixed(2) + '</span></div>' +
                 '<div style="color:#666">' + new Date(x.queued_at).toLocaleString('ar') + ' · ' + x.payload.items.length + ' قطعة</div>' +
                 (x.status === 'failed' ? '<div style="color:#B3261E;margin-top:4px">' + esc(x.error) + '</div>' +
-                  '<div style="display:flex;gap:8px;margin-top:6px"><button data-retry="' + i + '" style="padding:6px 10px;border-radius:8px;border:1px solid #ccc;background:#fff">إعادة المحاولة</button>' +
-                  '<button data-drop="' + i + '" style="padding:6px 10px;border-radius:8px;border:1px solid #F5C2BC;background:#FDECEA;color:#8A1C12">حذف من الجهاز</button></div>' : '') +
+                  '<div style="display:flex;gap:8px;margin-top:6px"><button data-retry="' + esc(x.payload.client_ref) + '" style="padding:6px 10px;border-radius:8px;border:1px solid #ccc;background:#fff">إعادة المحاولة</button>' +
+                  '<button data-drop="' + esc(x.payload.client_ref) + '" style="padding:6px 10px;border-radius:8px;border:1px solid #F5C2BC;background:#FDECEA;color:#8A1C12">حذف من الجهاز</button></div>' : '') +
                 '</div>';
         }).join('') +
         '<div style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid #eee"><button data-sync style="flex:1;padding:10px;border-radius:10px;border:0;background:#111;color:#fff;font-weight:700">رحّل هلق</button><button data-close style="padding:10px 14px;border-radius:10px;border:1px solid #ccc;background:#fff">إغلاق</button></div>';
@@ -494,15 +521,15 @@ function gmShowQueue() {
         if (t.dataset.close !== undefined) d.close();
         if (t.dataset.sync !== undefined) { d.close(); await gmSyncQueue(); }
         if (t.dataset.retry !== undefined) {
-            const all = gmQueue(), item = all[+t.dataset.retry];
-            if (item.error && item.error.indexOf('أقل من نص قيمة الذهب') !== -1) {
-                if (!confirm(item.error + '\n\nمتأكد بدك ترحّلها هيك؟')) return;
-                item.payload.confirm_low_price = true;
-            }
-            item.status = 'pending'; delete item.error; gmSaveQueue(all); d.close(); await gmSyncQueue();
+            const item = gmQueue().find(function (x) { return x.payload.client_ref === t.dataset.retry; });
+            if (!item) { d.close(); return; }
+            const low = item.error && item.error.indexOf('أقل من نص قيمة الذهب') !== -1;
+            if (low && !confirm(item.error + '\n\nمتأكد بدك ترحّلها هيك؟')) return;
+            gmUpdateQueued(t.dataset.retry, function (x) { if (low) x.payload.confirm_low_price = true; x.status = 'pending'; delete x.error; return x; });
+            d.close(); await gmSyncQueue();
         }
         if (t.dataset.drop !== undefined && confirm('أكيد بدك تحذف هالفاتورة من الجهاز؟ ما رح تنحفظ.')) {
-            const all = gmQueue(); all.splice(+t.dataset.drop, 1); gmSaveQueue(all); d.close();
+            gmUpdateQueued(t.dataset.drop, function () { return null; }); d.close();
         }
     });
     d.showModal();

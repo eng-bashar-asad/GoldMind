@@ -122,3 +122,26 @@ test('online low-price answer from the server asks, then resends confirmed', asy
   expect(r.invoice_number).toBe('INV-1');
   expect(seen).toEqual([false, true]);
 });
+
+test('a sale saved while an older one is still syncing is not lost', async ({ page, context }) => {
+  const posted = [];
+  await install(page, { db: db(), rpc: { post_sale_invoice: async ({ p }) => {
+    await new Promise(r => setTimeout(r, 800)); posted.push(p.client_ref);
+    return { body: { id: 'i-' + p.client_ref, invoice_number: 'N' } }; } } });
+  await page.goto('/tests/harness.html');
+  await page.evaluate(async () => { await requireGoldMindSession(); await gmRefreshSnapshots(); });
+  await goOffline(page, context);
+  await page.evaluate((S) => gmPostSale({ store_id: S, client_ref: 'A', customer_id: 'c1', payment_method: 'cash', items: [{ piece_id: 'p1', karat: 18, weight: 10, price: 1500 }] }, {}), STORE);
+  page.__gmNet.offline = false; await context.setOffline(false);
+  await page.waitForFunction(() => navigator.onLine);
+  await page.evaluate(() => { window.__sync = gmSyncQueue(); });           // A is being posted (slow)
+  await page.waitForTimeout(200);
+  page.__gmNet.offline = true; await context.setOffline(true);
+  await page.evaluate((S) => gmPostSale({ store_id: S, client_ref: 'B', customer_id: 'c1', payment_method: 'cash', items: [{ piece_id: 'p2', karat: 21, weight: 5, price: 900 }] }, {}), STORE);
+  await page.evaluate(() => window.__sync);
+  await expect.poll(() => posted.length).toBe(1);                         // the (auto or manual) sync of A finished
+  await page.waitForFunction(() => !gmSyncing);
+  const q = await page.evaluate(() => gmQueue().map(x => x.payload.client_ref + ':' + x.status));
+  expect(posted).toEqual(['A']);
+  expect(q).toEqual(['B:pending']);
+});
