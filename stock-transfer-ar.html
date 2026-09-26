@@ -129,6 +129,11 @@
 </div>
 </div>
 
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="px-4 py-3 border-b border-outline-variant"><h2 class="font-semibold text-[13px]">كل سندات الإخراج والإدخال</h2></div>
+<div id="all-vouchers" class="divide-y divide-outline-variant"></div>
+</div>
+
 </div>
 </main>
 
@@ -291,7 +296,7 @@ async function saveOut() {
   if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
   outCart = []; renderOut(); document.getElementById('out-notes').value = ''; document.getElementById('out-recipient').value = '';
   msg('save-success', current.kind === 'gift' ? 'طلعت الهدية وانسجلت كلفتها مصروف' : 'انحفظ سند الإخراج', false);
-  refreshParty();
+  refreshParty(); loadAllVouchers();
   if (vid && confirm('بدك تطبع السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
 }
 
@@ -347,8 +352,24 @@ async function saveIn() {
   if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
   document.getElementById('new-rows').innerHTML = ''; document.getElementById('in-notes').value = '';
   msg('save-success', 'انحفظ سند الإدخال' + (lines.length ? ' — القطع الجديدة انضافت للمخزن بباركود جديد (فيك تطبعلها ليبل من صفحة المخزن)' : ''), false);
-  refreshParty();
+  refreshParty(); loadAllVouchers();
   if (vid && confirm('بدك تطبع السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
+}
+
+async function loadAllVouchers() {
+  const { data } = await goldmindClient.from('stock_vouchers')
+    .select('id, voucher_number, direction, notes, created_at, party:party_id(name, kind), staff:created_by(full_name)')
+    .eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }).limit(100);
+  const rows = data || [];
+  document.getElementById('all-vouchers').innerHTML = rows.length ? rows.map(v => `
+    <a href="stock-voucher-print-ar.html?id=${v.id}" target="_blank" class="p-3 flex items-center gap-3 hover:bg-surface-container-low">
+      <span class="material-symbols-outlined ${v.direction === 'out' ? 'text-error' : 'text-success'}">${v.direction === 'out' ? 'upload' : 'download'}</span>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-[13px]"><span class="font-data-mono">${esc(v.voucher_number)}</span> · ${v.direction === 'out' ? 'إخراج إلى' : 'إدخال من'} ${esc(v.party ? v.party.name : '')} <span class="text-on-surface-variant font-normal text-[11px]">(${v.party ? KIND[v.party.kind] || '' : ''})</span></div>
+        <div class="text-[11px] text-on-surface-variant">${gmFormatDateTime(v.created_at)}${v.staff && v.staff.full_name ? ' · ' + esc(v.staff.full_name) : ''}${v.notes ? ' · ' + esc(v.notes) : ''}</div>
+      </div>
+      <span class="material-symbols-outlined text-primary">print</span>
+    </a>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">ما في سندات لسا — اختار جهة فوق واعمل أول سند.</p>';
 }
 
 (async function load() {
@@ -374,6 +395,7 @@ async function saveIn() {
   (cls || []).forEach(c => { if (opts[c.field_key]) opts[c.field_key].push(c.value); });
   renderPartySelect();
   document.getElementById('page-content').classList.remove('hidden');
+  loadAllVouchers();
 })();
 </script>
 <script>
