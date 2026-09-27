@@ -7,7 +7,8 @@ android {
         applicationId "com.goldmind.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 1
+        // Each CI build gets a higher number, so Android treats it as an update.
+        versionCode ((System.getenv("GITHUB_RUN_NUMBER") ?: "1") as Integer)
         versionName "1.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
@@ -16,8 +17,27 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    // Permanent signing key from GitHub secrets (see build-apk.yml). With the
+    // same key on every build, a new APK installs over the old app and keeps
+    // the login and fingerprint setup. Without the secrets, builds fall back to
+    // the default debug key (which changes on every CI run).
+    signingConfigs {
+        goldmind {
+            def ks = System.getenv("GM_KEYSTORE_PATH")
+            if (ks) {
+                storeFile file(ks)
+                storePassword System.getenv("GM_KEYSTORE_PASSWORD")
+                keyAlias "goldmind"
+                keyPassword System.getenv("GM_KEYSTORE_PASSWORD")
+            }
+        }
+    }
     buildTypes {
+        debug {
+            if (System.getenv("GM_KEYSTORE_PATH")) signingConfig signingConfigs.goldmind
+        }
         release {
+            if (System.getenv("GM_KEYSTORE_PATH")) signingConfig signingConfigs.goldmind
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
         }

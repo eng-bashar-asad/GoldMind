@@ -111,8 +111,24 @@ jobs:
         working-directory: app
         run: npx cap sync android
 
+      # Permanent signing key (repo secrets ANDROID_KEYSTORE_BASE64 +
+      # ANDROID_KEYSTORE_PASSWORD). Skipped when the secrets are not set.
+      - name: Restore signing key
+        env:
+          KS_B64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$KS_B64" ]; then
+            echo "$KS_B64" | base64 -d > "$RUNNER_TEMP/goldmind.p12"
+            echo "GM_KEYSTORE_PATH=$RUNNER_TEMP/goldmind.p12" >> "$GITHUB_ENV"
+            echo "Signing with the permanent GoldMind key"
+          else
+            echo "::warning::ANDROID_KEYSTORE_BASE64 not set - using a temporary debug key (updates will need a reinstall)"
+          fi
+
       - name: Build debug APK
         working-directory: app/android
+        env:
+          GM_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
         run: |
           chmod +x gradlew
           ./gradlew assembleDebug --no-daemon
