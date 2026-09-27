@@ -1048,6 +1048,14 @@ function gmMoney(v) {
 }
 console.assert(gmMoney(1234.5) === '1,234.50' && gmMoney(null) === '0.00');
 
+// GoldMind favicon on every page (the emblem), unless a page sets its own.
+(function () {
+  if (document.querySelector('link[rel~="icon"]')) return;
+  const l = document.createElement('link');
+  l.rel = 'icon'; l.type = 'image/png'; l.href = 'favicon.png';
+  (document.head || document.documentElement).appendChild(l);
+})();
+
 // ---------- UI polish (applies to every page) ----------
 // Built from the ui-ux-pro-max checklist (fonts stay as chosen: Times New Roman
 // + Arial, see "Twelfth shape" above): visible keyboard focus, steady-width numbers, reduced motion, no tap delay,

@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goldmind-shell-v13';
+const CACHE_NAME = 'goldmind-shell-v14';
 // Pages and files needed to keep selling with no internet. Each is cached on
 // its own so one missing file can't block the rest.
 const SHELL_ASSETS = [
@@ -6,12 +6,14 @@ const SHELL_ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './supabase-config.js?v=26',
-  './theme.js?v=27',
+  './theme.js?v=28',
   './index-ar.html',
   './new-sale-ar.html',
   './invoice-print-ar.html',
   './login-entry-ar.html',
-  './customer-add-ar.html'
+  './customer-add-ar.html',
+  './gm-logo.js?v=2',
+  './favicon.png'
 ];
 // Versioned libraries and fonts from these CDNs are safe to keep offline.
 // Supabase itself is NEVER cached here (live data must always be fresh; the
