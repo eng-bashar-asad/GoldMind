@@ -231,6 +231,14 @@
 <!-- Box/location boxes: only boxes that actually have pieces show up here -->
 <div id="box-boxes" class="hidden grid grid-cols-2 lg:grid-cols-4 gap-3 pb-8"></div>
 
+<!-- Gold held by weight (scrap bought from individuals, bulk lots) -->
+<section id="lots-section" class="hidden pb-8">
+<h2 class="font-bold text-[15px] mb-1">الذهب بالوزن</h2>
+<p class="text-[12px] text-on-surface-variant mb-3">الكسر والذهب غير المقطّع، مجمّعاً حسب الصندوق.</p>
+<div id="lot-boxes" class="grid grid-cols-2 lg:grid-cols-4 gap-3"></div>
+<div id="lot-detail" class="hidden mt-3 rounded-xl border border-outline-variant bg-surface-container-lowest overflow-hidden"></div>
+</section>
+
 <!-- Piece list for the selected karat -->
 <div id="piece-list-view" class="hidden">
 <button onclick="backFromPieceList()" class="flex items-center gap-1 text-primary font-semibold text-[13px] mb-3">
@@ -500,6 +508,7 @@
         document.getElementById('karat-boxes').classList.remove('grid');
         renderBoxBoxes();
         document.getElementById('box-boxes').classList.remove('hidden');
+        renderLots();
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة';
         renderTotals(ALL_PIECES);
@@ -544,7 +553,7 @@
         });
         const prefixes = Object.keys(byPrefix).sort((a, b) => a.localeCompare(b));
 
-        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('karat-boxes-back-label').textContent = 'العودة لكل الصناديق';
@@ -584,7 +593,7 @@
         document.getElementById('karat-boxes').classList.remove('grid');
         document.getElementById('karat-boxes-back').classList.add('hidden');
         document.getElementById('karat-boxes-back').classList.remove('flex');
-        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.remove('hidden');
         document.getElementById('piece-list-title').textContent = boxName + (prefix ? ' — ' + prefix : '');
@@ -601,7 +610,7 @@
         currentBoxScope = boxName;
         currentPrefixScope = null;
         const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName);
-        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('karat-boxes-back-label').textContent = 'العودة لكل الصناديق';
@@ -615,7 +624,7 @@
         currentBoxScope = boxName;
         currentPrefixScope = prefix;
         const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName && prefixOf(p.barcode) === prefix);
-        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('karat-boxes-back-label').textContent = 'العودة لدفعات ' + boxName;
@@ -643,7 +652,7 @@
         document.getElementById('karat-boxes').classList.remove('grid');
         document.getElementById('karat-boxes-back').classList.add('hidden');
         document.getElementById('karat-boxes-back').classList.remove('flex');
-        document.getElementById('box-boxes').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.remove('hidden');
         document.getElementById('piece-list-title').textContent =
@@ -701,6 +710,75 @@
             <div class="font-data-mono text-data-mono font-bold text-[19px]" style="color:${t.ink};">${totalWeight.toFixed(2)} غ</div>
             <div class="text-[11px] mt-1" style="color:${t.ink};opacity:.8;">${pieces.length} قطعة</div>
         </button>`;
+    }
+
+    // ---- Gold held by weight (gold_stock_lots with something left) ----
+    let ALL_LOTS = [];
+    let LOT_INVOICES = {};
+    let openLotBox = null;
+    const lotBoxName = (l) => (l.box_name || '').trim() || ('ذهب عيار ' + (l.karat || '—'));
+
+    async function loadLots() {
+        const { data, error } = await goldmindClient.from('gold_stock_lots')
+            .select('id, karat, weight_grams_total, weight_grams_remaining, box_name, source_invoice_id, notes, created_at')
+            .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0)
+            .order('created_at', { ascending: false });
+        if (error) { console.warn('lots', error); return; }
+        ALL_LOTS = data || [];
+        const ids = [...new Set(ALL_LOTS.map(l => l.source_invoice_id).filter(Boolean))];
+        if (ids.length) {
+            const { data: invs } = await goldmindClient.from('invoices').select('id, invoice_number').in('id', ids);
+            (invs || []).forEach(i => { LOT_INVOICES[i.id] = i.invoice_number; });
+        }
+        if (currentBoxScope === null) renderLots();
+    }
+
+    function renderLots() {
+        const section = document.getElementById('lots-section');
+        if (!ALL_LOTS.length) { section.classList.add('hidden'); return; }
+        const groups = {};
+        ALL_LOTS.forEach(l => { (groups[lotBoxName(l)] = groups[lotBoxName(l)] || []).push(l); });
+        const names = Object.keys(groups).sort((a, b) => a.localeCompare(b, 'ar'));
+        document.getElementById('lot-boxes').innerHTML = names.map(n => {
+            const lots = groups[n];
+            const w = lots.reduce((s, l) => s + Number(l.weight_grams_remaining || 0), 0);
+            const t = boxTintFor(n);
+            const sel = openLotBox === n;
+            return `<button type="button" data-lot-box="${gmEscapeHtml(n)}" aria-expanded="${sel}" class="text-right rounded-xl p-4 border active:scale-95 transition-transform" style="background:${t.bg};border-color:${sel ? t.ink : t.ring};${sel ? 'border-width:2px;' : ''}">
+                <div class="flex items-center justify-between mb-2">
+                    <span class="text-[13px] font-bold truncate" style="color:${t.ink};">${gmEscapeHtml(n)}</span>
+                    <span class="material-symbols-outlined text-[18px]" style="color:${t.ink};">${sel ? 'expand_less' : 'expand_more'}</span>
+                </div>
+                <div class="font-data-mono text-data-mono font-bold text-[19px]" style="color:${t.ink};">${w.toFixed(2)} غ</div>
+                <div class="text-[11px] mt-1" style="color:${t.ink};opacity:.8;">${lots.length} دفعة</div>
+            </button>`;
+        }).join('');
+        document.querySelectorAll('#lot-boxes [data-lot-box]').forEach(b => b.addEventListener('click', () => {
+            openLotBox = openLotBox === b.dataset.lotBox ? null : b.dataset.lotBox;
+            renderLots();
+        }));
+        const detail = document.getElementById('lot-detail');
+        if (openLotBox && groups[openLotBox]) {
+            detail.innerHTML = groups[openLotBox].map(l => {
+                const num = LOT_INVOICES[l.source_invoice_id];
+                const d = new Date(l.created_at).toLocaleDateString('ar-EG-u-nu-latn');
+                const partial = Number(l.weight_grams_remaining) < Number(l.weight_grams_total);
+                return `<div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-outline-variant last:border-0">
+                    <div class="min-w-0">
+                        <div class="text-[13px] font-semibold">عيار ${l.karat || '—'} · ${d}</div>
+                        ${num ? `<a class="text-[12px] text-primary underline" href="invoice-print-ar.html?id=${encodeURIComponent(l.source_invoice_id)}">${gmEscapeHtml(num)}</a>` : (l.notes ? `<div class="text-[12px] text-on-surface-variant truncate">${gmEscapeHtml(l.notes)}</div>` : '')}
+                    </div>
+                    <div class="text-left shrink-0">
+                        <div class="font-bold text-[14px]" dir="ltr">${Number(l.weight_grams_remaining).toFixed(2)} غ</div>
+                        ${partial ? `<div class="text-[11px] text-on-surface-variant">من أصل ${Number(l.weight_grams_total).toFixed(2)} غ</div>` : ''}
+                    </div>
+                </div>`;
+            }).join('');
+            detail.classList.remove('hidden');
+        } else {
+            detail.classList.add('hidden');
+        }
+        section.classList.remove('hidden');
     }
 
     function renderBoxBoxes() {
@@ -777,6 +855,7 @@
             ALL_PIECES = ALL_PIECES_RAW.filter(p => p.status === 'available');
             populateSearchTypeOptions();
 
+            loadLots();
             if (ALL_PIECES.length === 0) {
                 empty.classList.remove('hidden');
                 countLabel.textContent = '0 قطعة';
