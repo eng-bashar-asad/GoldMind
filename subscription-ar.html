@@ -95,7 +95,14 @@
 
 <!-- Plans comparison -->
 <section class="mb-6">
-<h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">الخطط المتاحة</h3>
+<div class="flex items-center justify-between gap-3 mb-3">
+<h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">الخطط المتاحة</h3>
+<div class="inline-flex rounded-full border border-outline-variant p-0.5 text-[12px] font-semibold" role="group" aria-label="عملة الأسعار">
+<button type="button" data-cur="AED" class="cur-btn px-3 h-8 rounded-full">درهم</button>
+<button type="button" data-cur="USD" class="cur-btn px-3 h-8 rounded-full">دولار</button>
+</div>
+</div>
+<p class="text-[11.5px] text-on-surface-variant mb-3 leading-5">الاشتراك سنوي. فيك تدفع السنة مرة وحدة (الأوفر) أو على 4 دفعات كل 3 شهور. جرّب أي خطة مجاناً 30 يوم.</p>
 <div id="plans-list" class="flex flex-col gap-3"></div>
 </section>
 
@@ -106,6 +113,7 @@
 <label class="block text-[11px] text-on-surface-variant mb-1">مدة التجديد (أشهر)</label>
 <select id="admin-months-select" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest">
 <option value="1">شهر واحد</option>
+<option value="3">3 أشهر (دفعة تقسيط)</option>
 <option value="12" selected>سنة كاملة</option>
 </select>
 </div>
@@ -162,6 +170,19 @@ function featureRow(label, on) {
   </div>`;
 }
 
+const CUR_SYMBOL = { AED: 'درهم', USD: '$' };
+function fmtPrice(v, cur) {
+  const n = Number(v).toLocaleString('en-US', { maximumFractionDigits: v % 1 ? 2 : 0 });
+  return cur === 'USD' ? '$' + n : n + ' ' + CUR_SYMBOL.AED;
+}
+let GM_PRICE_CUR = 'AED';
+function pickCurrency(storeCurrency) {
+  let saved = null;
+  try { saved = localStorage.getItem('gm_price_currency'); } catch (e) {}
+  if (saved === 'AED' || saved === 'USD') return saved;
+  return storeCurrency === 'USD' ? 'USD' : 'AED';
+}
+
 function renderPlans(plans, currentPlanId) {
   const featureLabels = {
     ai_photo_entry: 'إدخال بيانات بالصورة (AI)',
@@ -169,21 +190,51 @@ function renderPlans(plans, currentPlanId) {
     profit_report: 'تقرير الربح الداخلي',
     custom_tables: 'جداول مخصصة قابلة للتعديل'
   };
+  const cur = GM_PRICE_CUR;
+  document.querySelectorAll('.cur-btn').forEach(b => {
+    const on = b.dataset.cur === cur;
+    b.setAttribute('aria-pressed', on);
+    b.className = 'cur-btn px-3 h-8 rounded-full ' + (on ? 'gold-accent text-white' : 'text-on-surface-variant');
+  });
 
   document.getElementById('plans-list').innerHTML = plans.map(plan => {
     const isActive = plan.id === currentPlanId;
+    const isPro = plan.key === 'pro';
+    const pr = (plan.prices || {})[cur];
     const features = Object.entries(plan.features || {})
+      .filter(([k]) => k !== 'einvoice')
       .map(([k, v]) => featureRow(featureLabels[k] || k, v === true)).join('');
-    return `<div class="plan-card bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4 ${isActive ? 'active' : ''}">
-      <div class="flex items-center justify-between mb-2">
+    let einv;
+    if (plan.einvoice_monthly_quota) einv = `الفوترة الإلكترونية مشمولة عند إطلاقها — حتى ${plan.einvoice_monthly_quota.toLocaleString('en-US')} فاتورة بالشهر`;
+    else if (pr && pr.einvoice_addon_monthly) einv = `الفوترة الإلكترونية: إضافة بـ ${fmtPrice(pr.einvoice_addon_monthly, cur)} بالشهر عند إطلاقها`;
+    else if (plan.is_custom) einv = 'الفوترة الإلكترونية مشمولة (حسب الاتفاق)';
+    const einvRow = einv ? `<div class="flex items-start gap-2 text-[12px] text-on-surface"><span class="material-symbols-outlined text-secondary" style="font-size:15px;">receipt_long</span><span>${einv}</span></div>` : '';
+
+    let priceHtml;
+    if (plan.is_custom || !pr) {
+      priceHtml = '<p class="text-[13px] text-on-surface-variant mb-3">تسعير مخصص — تواصل معنا</p>';
+    } else {
+      const perMonth = Math.round(pr.yearly / 12);
+      priceHtml = `<div class="mb-3">
+        <p class="text-[22px] font-bold text-primary leading-tight">${fmtPrice(pr.yearly, cur)} <span class="text-[12px] font-normal text-on-surface-variant">/ سنة</span></p>
+        <p class="text-[11.5px] text-on-surface-variant">يعني حوالي ${fmtPrice(perMonth, cur)} بالشهر</p>
+        <p class="text-[11.5px] text-on-surface-variant mt-1">أو ${fmtPrice(pr.quarterly, cur)} كل 3 شهور (4 دفعات، التزام سنة)</p>
+      </div>`;
+    }
+    const overage = pr && pr.einvoice_overage ? `<p>فوق الحد: ${fmtPrice(pr.einvoice_overage, cur)} عن كل فاتورة إلكترونية</p>` : '';
+    return `<div class="plan-card bg-surface-container-lowest border ${isPro ? 'border-secondary' : 'border-outline-variant'} rounded-xl luxury-shadow p-4 ${isActive ? 'active' : ''}">
+      <div class="flex items-center justify-between mb-2 gap-2">
         <p class="font-headline-md text-[17px] font-bold text-primary">${plan.name_ar}</p>
-        ${isActive ? '<span class="text-[10px] font-bold text-secondary bg-secondary-container px-2 py-0.5 rounded-full">خطتك الحالية</span>' : ''}
+        <div class="flex gap-1">
+          ${isPro ? '<span class="text-[10px] font-bold text-white gold-accent px-2 py-0.5 rounded-full">الأنسب لأغلب المحلات</span>' : ''}
+          ${isActive ? '<span class="text-[10px] font-bold text-secondary bg-secondary-container px-2 py-0.5 rounded-full">خطتك الحالية</span>' : ''}
+        </div>
       </div>
-      <p class="text-[13px] text-on-surface-variant mb-3">${plan.is_custom ? 'تسعير مخصص' : '$' + plan.price_yearly + ' / سنوياً'}</p>
-      <div class="flex flex-col gap-1.5 pt-3 border-t border-outline-variant">${features}</div>
-      <div class="pt-3 mt-3 border-t border-outline-variant text-[11px] text-on-surface-variant">
+      ${priceHtml}
+      <div class="flex flex-col gap-1.5 pt-3 border-t border-outline-variant">${einvRow}${features}</div>
+      <div class="pt-3 mt-3 border-t border-outline-variant text-[11px] text-on-surface-variant flex flex-col gap-0.5">
         ${plan.is_custom ? '<p>عدد موظفين غير محدود (تواصل مع المبيعات)</p>' :
-          `<p>${plan.included_staff} موظفين ضمن الخطة${plan.extra_staff_price ? ` (+$${plan.extra_staff_price}/موظف إضافي)` : ''}</p>`}
+          `<p>${plan.included_staff} موظفين ضمن الخطة${pr && pr.extra_staff_yearly ? ` (+${fmtPrice(pr.extra_staff_yearly, cur)} سنوياً لكل موظف إضافي)` : ''}</p>${overage}`}
       </div>
     </div>`;
   }).join('');
@@ -201,7 +252,7 @@ function usageBar(barEl, textEl, noteEl, current, included, extraPrice, extraLab
   barEl.classList.toggle('bg-error', current > included);
   textEl.textContent = current + ' / ' + (included ?? '—');
   if (included != null && current > included && extraPrice != null) {
-    noteEl.textContent = `تجاوزت العدد المشمول بـ ${current - included} — تُحتسب ${extraPrice}$ ${extraLabel} إضافي حتى الترقية التلقائية`;
+    noteEl.textContent = `تجاوزت العدد المشمول بـ ${current - included} — تُحتسب ${extraPrice} ${extraLabel} إضافي حتى الترقية التلقائية`;
   } else {
     noteEl.textContent = '';
   }
@@ -246,9 +297,16 @@ async function load() {
   else if (sub.current_period_end) subText = 'التجديد القادم في ' + fmtDate(sub.current_period_end);
   document.getElementById('current-plan-sub').textContent = subText;
 
+  const { data: storeRow } = await goldmindClient.from('stores').select('organization_id, currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  GM_PRICE_CUR = pickCurrency(storeRow && storeRow.currency);
   renderPlans(plans, sub.plan_id);
+  document.querySelectorAll('.cur-btn').forEach(b => b.onclick = () => {
+    GM_PRICE_CUR = b.dataset.cur;
+    try { localStorage.setItem('gm_price_currency', GM_PRICE_CUR); } catch (e) {}
+    renderPlans(plans, sub.plan_id);
+    renderStaffUsage();
+  });
 
-  const { data: storeRow } = await goldmindClient.from('stores').select('organization_id').eq('id', GOLDMIND_STORE_ID).maybeSingle();
   if (storeRow && storeRow.organization_id) {
     const { data: branchCount } = await goldmindClient.rpc('get_branch_count', { p_organization_id: storeRow.organization_id });
     if (branchCount && branchCount > 1) {
@@ -262,12 +320,17 @@ async function load() {
   // Usage vs. plan limits
   const { data: staffLimit } = await goldmindClient.rpc('check_staff_limit', { p_store_id: GOLDMIND_STORE_ID });
   const sl = staffLimit && staffLimit[0];
-  if (sl) {
+  function renderStaffUsage() {
+    if (!sl) return;
+    const pr = sub.plans && sub.plans.prices && sub.plans.prices[GM_PRICE_CUR];
+    const extra = pr && pr.extra_staff_yearly != null ? fmtPrice(pr.extra_staff_yearly, GM_PRICE_CUR)
+      : (sl.extra_price != null ? fmtPrice(sl.extra_price, 'USD') : null);
     usageBar(
       document.getElementById('staff-usage-bar'), document.getElementById('staff-usage-text'),
-      document.getElementById('staff-usage-note'), sl.current_count, sl.included_count, sl.extra_price, 'شهرياً لكل موظف', false
+      document.getElementById('staff-usage-note'), sl.current_count, sl.included_count, extra, 'سنوياً لكل موظف', false
     );
   }
+  renderStaffUsage();
 
   if (isPlatformAdmin) {
     const panel = document.getElementById('admin-panel');
