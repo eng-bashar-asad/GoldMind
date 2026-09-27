@@ -370,32 +370,15 @@
         clone.style.width = '718px';
         clone.style.maxWidth = '718px';
 
-        const wrapper = document.createElement('div');
-        // The copy sits in an off-screen holder; the copy itself stays unpositioned,
-        // otherwise html2pdf captures it with zero height (a blank page).
-        const pdfHolder = document.createElement('div');
-        pdfHolder.style.cssText = 'position:fixed;top:0;left:-99999px;';
-        wrapper.appendChild(clone);
-        pdfHolder.appendChild(wrapper);
-        document.body.appendChild(pdfHolder);
-        if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
-        await new Promise(r => setTimeout(r, 50));
 
         const certNumber = (document.getElementById('cert-number')?.textContent || 'شهادة').trim();
 
         try {
-            await (window.gmSavePdf || ((w) => w.save()))(html2pdf().set({
-                margin: 8,
-                filename: `${certNumber}.pdf`,
-                image: { type: 'jpeg', quality: 0.98 },
-                html2canvas: { scale: 2, scrollX: 0, scrollY: 0, useCORS: true, letterRendering: true },
-                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-            }).from(wrapper), `${certNumber}.pdf`);
+            await gmPdfFromNodes([clone], `${certNumber}.pdf`);
         } catch (err) {
             console.error('PDF generation failed', err);
             alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
         } finally {
-            pdfHolder.remove();
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }

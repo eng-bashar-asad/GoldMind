@@ -5,7 +5,8 @@ const path = require('path');
 const { install, STORE, USER, STAFF } = require('./fake-backend');
 
 const LIB_PATH = path.join(__dirname, 'node_modules/html2pdf.js/dist/html2pdf.bundle.min.js');
-test.skip(!fs.existsSync(LIB_PATH), 'html2pdf.js not installed');
+const H2C_PATH = path.join(__dirname, 'node_modules/html2canvas/dist/html2canvas.min.js');
+test.skip(!fs.existsSync(LIB_PATH) || !fs.existsSync(H2C_PATH), 'PDF libraries not installed');
 
 test('invoice PDF is not blank (page scrolled down)', async ({ page }) => {
   const items = Array.from({ length: 7 }, (_, i) => ({ id: 'it' + i, invoice_id: 'inv-1', store_id: STORE, description: 'إسوارة', description_en: 'Bracelet', karat: 18, weight_grams: 25.5, price: 3300, piece_id: null }));
@@ -18,6 +19,7 @@ test('invoice PDF is not blank (page scrolled down)', async ({ page }) => {
     pieces: [], traders: [], gold_prices: [],
   } });
   await page.route(/html2pdf/, (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(LIB_PATH, 'utf8') }));
+  await page.route(/html2canvas/, (r) => r.fulfill({ contentType: 'text/javascript', body: fs.readFileSync(H2C_PATH, 'utf8') }));
   await page.setViewportSize({ width: 390, height: 800 });
   await page.goto('/invoice-print-ar.html?id=inv-1');
   await expect(page.locator('#inv-number')).toContainText('INV-2026-000001');
@@ -25,10 +27,11 @@ test('invoice PDF is not blank (page scrolled down)', async ({ page }) => {
   // Capture what would go into the PDF instead of downloading it.
   await page.evaluate(() => {
     window.gmSavePdf = async (worker) => {
-      const canvas = await worker.toCanvas().get('canvas');
+      const canvas = await worker.get('canvas');
       const d = canvas.getContext('2d').getImageData(0, 0, canvas.width, canvas.height).data;
-      let dark = 0; for (let i = 0; i < d.length; i += 4) if (d[i] < 120) dark++;
-      window.__pdf = { w: canvas.width, h: canvas.height, dark };
+      let dark = 0, rightDark = 0; const w = canvas.width;
+      for (let i = 0; i < d.length; i += 4) if (d[i] < 120) { dark++; if (((i / 4) % w) > w * 0.85) rightDark++; }
+      window.__pdf = { w: canvas.width, h: canvas.height, dark, rightDark };
     };
   });
   await page.click('#download-pdf-btn');
@@ -36,4 +39,5 @@ test('invoice PDF is not blank (page scrolled down)', async ({ page }) => {
   const pdf = await page.evaluate(() => window.__pdf);
   expect(pdf.h).toBeGreaterThan(500);
   expect(pdf.dark).toBeGreaterThan(5000); // real text and table lines, not a white page
+  expect(pdf.rightDark).toBeGreaterThan(500); // the Arabic (right) side is on the page, not cut off
 });

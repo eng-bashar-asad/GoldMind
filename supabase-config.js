@@ -571,3 +571,68 @@ async function gmSavePdf(worker, filename, title) {
         });
     };
 })();
+
+// Load a CDN script once (returns when window[globalName] exists).
+function gmLoadScript(src, globalName) {
+    if (window[globalName]) return Promise.resolve();
+    return new Promise(function (resolve, reject) {
+        var s = document.createElement('script');
+        s.src = src;
+        s.onload = function () { resolve(); };
+        s.onerror = function () { reject(new Error('تعذّر التحميل — تأكد من الاتصال بالإنترنت')); };
+        document.head.appendChild(s);
+    });
+}
+
+// Append a tall canvas to a jsPDF doc, one A4 page per slice (10mm margins).
+function gmAddCanvasPages(pdf, canvas, firstOnCurrentPage) {
+    var innerW = 190, innerH = 277;
+    var pxPerMm = canvas.width / innerW;
+    var pageH = Math.floor(innerH * pxPerMm);
+    for (var y = 0, first = true; y < canvas.height; y += pageH, first = false) {
+        var h = Math.min(pageH, canvas.height - y);
+        if (h < 4) break; // rounding leftovers
+        var slice = document.createElement('canvas');
+        slice.width = canvas.width; slice.height = h;
+        var ctx = slice.getContext('2d');
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, slice.width, h);
+        ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
+        if (!(first && firstOnCurrentPage)) pdf.addPage();
+        pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, innerW, h / pxPerMm);
+    }
+}
+
+// Build an A4 PDF from DOM nodes: each node starts on a new page and long
+// nodes continue onto more pages. The nodes are laid out at a fixed 718px
+// (A4 width minus margins) and captured one by one, so a phone's narrow
+// screen or scroll position can't shift or cut the page.
+async function gmPdfFromNodes(nodes, filename, title) {
+    await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
+    var W = 718;
+    var holder = document.createElement('div');
+    holder.style.cssText = 'position:absolute;left:0;top:0;width:' + W + 'px;z-index:-2147483000;background:#fff;pointer-events:none;';
+    holder.dir = document.documentElement.dir || 'rtl';
+    nodes.forEach(function (n) { n.style.width = W + 'px'; n.style.maxWidth = W + 'px'; n.style.margin = '0'; holder.appendChild(n); });
+    document.body.appendChild(holder);
+    var sx = window.scrollX, sy = window.scrollY;
+    window.scrollTo(0, 0);
+    try {
+        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        await new Promise(function (r) { setTimeout(r, 80); });
+        var canvases = [];
+        for (var i = 0; i < nodes.length; i++) {
+            canvases.push(await window.html2canvas(nodes[i], {
+                scale: 2, useCORS: true, backgroundColor: '#ffffff', letterRendering: true,
+                scrollX: 0, scrollY: 0, windowWidth: Math.max(W + 40, document.documentElement.clientWidth)
+            }));
+        }
+        var pdfOpts = { margin: 10, filename: filename, image: { type: 'jpeg', quality: 0.95 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
+        var worker = html2pdf().set(pdfOpts).from(canvases[0], 'canvas').toPdf();
+        var pdf = await worker.get('pdf');
+        for (var j = 1; j < canvases.length; j++) gmAddCanvasPages(pdf, canvases[j], false);
+        await gmSavePdf(worker, filename, title);
+    } finally {
+        holder.remove();
+        window.scrollTo(sx, sy);
+    }
+}
