@@ -34,7 +34,7 @@
 </header>
 
 <main class="max-w-md mx-auto px-4 py-5 flex flex-col gap-4">
-<p class="text-[12px]" style="color: var(--gm-on-surface-variant);">سجل مستقل لكل موظفين الشركة الفعليين — بغض النظر هل عندهم حساب دخول للبرنامج ولا لأ. مطلوب أساساً لتسجيل الإجازات وربطها بموظف حقيقي.</p>
+<p class="text-[12px]" style="color: var(--gm-on-surface-variant);">سجل مستقل لجميع موظفي الشركة الفعليين — بغض النظر عمّا إذا كان لديهم حساب دخول إلى البرنامج أم لا. مطلوب أساساً لتسجيل الإجازات وربطها بموظف حقيقي.</p>
 
 <button onclick="toggleAddForm()" class="w-full h-12 rounded-xl flex items-center justify-center gap-2 font-bold" style="background: var(--gm-secondary); color: var(--gm-on-secondary);">
 <span class="material-symbols-outlined">person_add</span> إضافة موظف جديد
@@ -178,7 +178,7 @@ function render() {
                 </div>
                 ${e.linked_staff_id ? `
                 <div class="flex items-center justify-between h-10 px-1">
-                    <span class="text-[12px]">مرتبط بحساب دخول (مثلاً: مو موظف حقيقي، متل محاسب خارجي؟ فُك الربط)</span>
+                    <span class="text-[12px]">مرتبط بحساب دخول (إذا لم يكن موظفاً حقيقياً، كمحاسب خارجي مثلاً، فألغِ الربط)</span>
                     <input type="checkbox" id="edit-unlink-${e.id}"/>
                 </div>` : ''}
                 <div class="flex gap-2">
@@ -215,8 +215,8 @@ async function saveEmployeeEdit(id) {
 async function deleteEmployee(id) {
     const emp = employees.find(e => e.id === id);
     const warning = emp && emp.linked_staff_id
-        ? 'هذا الموظف مرتبط بحساب دخول للبرنامج — حذفه من هنا ما بيلغي حساب الدخول، بس بيشيل سجله من الموارد البشرية (رصيد الإجازة والإحصائيات). متأكد؟'
-        : 'حذف هذا الموظف نهائياً؟ (رح ينحذف معه سجل إجازاته)';
+        ? 'هذا الموظف مرتبط بحساب دخول للبرنامج — حذفه من هنا لا يلغي حساب الدخول، وإنما يزيل سجله من الموارد البشرية (رصيد الإجازة والإحصائيات). هل أنت متأكد؟'
+        : 'حذف هذا الموظف نهائياً؟ (سيُحذف معه سجل إجازاته)';
     if (!confirm(warning)) return;
     await goldmindClient.from('hr_leave_requests').delete().eq('employee_id', id);
     const { error } = await goldmindClient.from('hr_employees').delete().eq('id', id);

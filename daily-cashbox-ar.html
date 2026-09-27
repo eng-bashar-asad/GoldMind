@@ -59,7 +59,7 @@
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
 
-<p class="text-[11px] text-outline">هاد دفتر يدوي بسيط لمتابعة كاش الدرج بس — مش جزء من الحسابات الرسمية (المبيعات/الديون/الضريبة موجودين بمكان تاني). الرصيد بيترحل تلقائياً كل يوم كقيد افتتاحي لليوم يلي بعده.</p>
+<p class="text-[11px] text-outline">هذا دفتر يدوي بسيط لمتابعة نقد الدرج فقط — وليس جزءاً من الحسابات الرسمية (المبيعات/الديون/الضريبة موجودة في مكان آخر). يُرحَّل الرصيد تلقائياً كل يوم كقيد افتتاحي لليوم التالي.</p>
 
 <div id="day-nav" class="hidden items-center justify-between bg-surface-container-lowest border border-outline-variant rounded-xl p-2">
 <button onclick="shiftDay(-1)" class="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-surface-container-low"><span class="material-symbols-outlined">chevron_right</span></button>
@@ -79,8 +79,8 @@
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="addFormDate" type="date"/>
 </div>
 <div class="flex gap-2 mb-3">
-<button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirInBtn" onclick="setDirection('in')">دخول كاش</button>
-<button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirOutBtn" onclick="setDirection('out')">خروج كاش</button>
+<button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirInBtn" onclick="setDirection('in')">دخول نقدي</button>
+<button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirOutBtn" onclick="setDirection('out')">خروج نقدي</button>
 </div>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" id="opTypeInput" placeholder="نوع العملية (مثال: بيع، شراء، شراء أثاث مكتب، دين عميل...)"/>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-sm mb-3 font-data-mono" id="amountInput" placeholder="المبلغ" type="number" step="0.01" dir="ltr"/>
@@ -98,7 +98,7 @@
 </button>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="notesInput" placeholder="ملاحظة / وصف إضافي (اختياري)"></textarea>
 <div class="mb-3">
-<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اربط بعملية موجودة (اختياري) — بتاخذوا نفس لون الخلفية بالجدول</label>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اربط بعملية موجودة (اختياري) — تأخذان لون الخلفية نفسه في الجدول</label>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="linkTargetSelect">
 <option value="">بدون ربط</option>
 </select>
@@ -183,8 +183,8 @@
 <button onclick="closeEditModal()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined">close</span></button>
 </div>
 <div class="flex gap-2 mb-3">
-<button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border" id="modalDirIn" onclick="setModalDirection('in')">دخول كاش</button>
-<button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border" id="modalDirOut" onclick="setModalDirection('out')">خروج كاش</button>
+<button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border" id="modalDirIn" onclick="setModalDirection('in')">دخول نقدي</button>
+<button class="flex-1 h-9 rounded-lg text-[12px] font-semibold border" id="modalDirOut" onclick="setModalDirection('out')">خروج نقدي</button>
 </div>
 <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2" id="modalOpType" placeholder="نوع العملية"/>
 <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2 font-data-mono" id="modalAmount" type="number" step="0.01" dir="ltr" placeholder="المبلغ"/>
@@ -357,7 +357,7 @@ async function submitEntry() {
     const amt = parseFloat(document.getElementById('extraAmount' + idx).value);
     const cur = document.getElementById('extraCurrency' + idx).value;
     const dir = rowEl.dataset.dir || 'in';
-    if (!amt || amt <= 0) { errEl.textContent = 'فيه سطر إضافي بدون مبلغ صحيح — عبّيه أو احذفه'; errEl.classList.remove('hidden'); return; }
+    if (!amt || amt <= 0) { errEl.textContent = 'يوجد سطر إضافي دون مبلغ صحيح — املأه أو احذفه'; errEl.classList.remove('hidden'); return; }
     rows.push({ direction: dir, amount: amt, currency: cur });
   }
 
@@ -709,7 +709,7 @@ async function saveModalEdit() {
 
 async function deleteModalEntry() {
   if (!modalEntryId) return;
-  if (!confirm('هل أنت متأكد من حذف هذه العملية نهائياً؟ الرصيد رح يتحدّث تلقائياً.')) return;
+  if (!confirm('هل أنت متأكد من حذف هذه العملية نهائياً؟ سيتم تحديث الرصيد تلقائياً.')) return;
 
   const { error } = await goldmindClient.from('daily_cash_log').delete().eq('id', modalEntryId);
   if (error) {
@@ -756,7 +756,7 @@ function openRangePrintView() {
     return;
   }
   if (from > to) {
-    errEl.textContent = 'تاريخ البداية لازم يكون قبل تاريخ النهاية';
+    errEl.textContent = 'يجب أن يكون تاريخ البداية قبل تاريخ النهاية';
     errEl.classList.remove('hidden');
     return;
   }
@@ -884,7 +884,7 @@ async function buildDailyReport() {
     `——————————\n` +
     `📎 الكشف التفصيلي القابل للطباعة:\n${printLink}`;
 
-  document.getElementById('reportPanelIntro').textContent = 'الجدول جاهز — اختر مين تبعتله:';
+  document.getElementById('reportPanelIntro').textContent = 'الجدول جاهز — اختر من تريد الإرسال إليه:';
 
   const { data: managers } = await goldmindClient
     .from('staff').select('id, full_name, whatsapp_phone')
@@ -893,7 +893,7 @@ async function buildDailyReport() {
 
   const listEl = document.getElementById('reportRecipients');
   if (!managers || managers.length === 0) {
-    listEl.innerHTML = '<p class="text-[12px] text-on-surface-variant">ما في مدراء فعّلوا رقم واتساب لاستلام التقارير بعد (من صفحة "الأمان وكلمة المرور").</p>';
+    listEl.innerHTML = '<p class="text-[12px] text-on-surface-variant">لا يوجد مدراء فعّلوا رقم واتساب لاستلام التقارير بعد (من صفحة "الأمان وكلمة المرور").</p>';
     return;
   }
 

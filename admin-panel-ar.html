@@ -137,8 +137,8 @@
 <div class="bg-surface-container-lowest rounded-xl p-5 w-full max-w-md">
 <h3 class="font-bold text-lg mb-1">إضافة شركة جديدة</h3>
 <div class="flex bg-surface-container-high rounded-lg p-1 mb-4">
-<button onclick="setAddStoreMode('email')" id="addStoreTabEmail" class="flex-1 h-9 rounded-md text-[12.5px] font-semibold">دعوة بالإيميل</button>
-<button onclick="setAddStoreMode('direct')" id="addStoreTabDirect" class="flex-1 h-9 rounded-md text-[12.5px] font-semibold">إنشاء مباشر (يوزر وباسورد)</button>
+<button onclick="setAddStoreMode('email')" id="addStoreTabEmail" class="flex-1 h-9 rounded-md text-[12.5px] font-semibold">دعوة عبر البريد الإلكتروني</button>
+<button onclick="setAddStoreMode('direct')" id="addStoreTabDirect" class="flex-1 h-9 rounded-md text-[12.5px] font-semibold">إنشاء مباشر (اسم مستخدم وكلمة مرور)</button>
 </div>
 
 <div id="addStoreEmailPane">
@@ -155,7 +155,7 @@
 </div>
 
 <div id="addStoreDirectPane" class="hidden">
-<p class="text-[12px] text-on-surface-variant mb-4">تُنشأ الشركة والمالك فوراً بدون أي إيميل حقيقي — بيوزرنيم وباسورد جاهزين تسلّمهم للعميل مباشرة (واتساب، أو شفهياً).</p>
+<p class="text-[12px] text-on-surface-variant mb-4">تُنشأ الشركة والمالك فوراً دون أي بريد إلكتروني حقيقي — باسم مستخدم وكلمة مرور جاهزين تسلّمهما للعميل مباشرةً (عبر واتساب أو شفهياً).</p>
 <div id="directFormFields">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اسم الشركة</label>
 <input id="directStoreName" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-3" placeholder="مثال: مجوهرات النور"/>
@@ -435,7 +435,7 @@ async function submitAddStore() {
     errEl.textContent = 'تعذّر الإنشاء: ' + error.message; errEl.classList.remove('hidden'); return;
   }
 
-  btn.textContent = 'جارِ إرسال إيميل الدعوة...';
+  btn.textContent = 'جارِ إرسال بريد الدعوة...';
   const { error: emailError } = await goldmindClient.functions.invoke('send-invite-email', {
     body: { store_id: newStoreId, invite_email: email }
   });
@@ -444,9 +444,9 @@ async function submitAddStore() {
   btn.textContent = 'إنشاء';
 
   if (emailError) {
-    showToast('تم إنشاء الشركة، لكن تعذّر إرسال إيميل الدعوة: ' + emailError.message, true);
+    showToast('تم إنشاء الشركة، لكن تعذّر إرسال بريد الدعوة: ' + emailError.message, true);
   } else {
-    showToast('تم إنشاء الشركة وإرسال دعوة المالك بالإيميل');
+    showToast('تم إنشاء الشركة وإرسال دعوة المالك عبر البريد الإلكتروني');
   }
   closeAddStoreModal();
   loadStores();
@@ -463,7 +463,7 @@ async function openStoreDetailModal(storeId) {
   document.getElementById('storeDetailNameRow').classList.remove('hidden');
   document.getElementById('storeRenameRow').classList.add('hidden');
   document.getElementById('storeDetailMeta').textContent =
-    `الخطة: ${store.plan_name || '—'} · تسجّلت: ${fmtDate(store.created_at)}`;
+    `الخطة: ${store.plan_name || '—'} · تاريخ التسجيل: ${fmtDate(store.created_at)}`;
   renderSubSummary(store);
   resetSubExtendForm();
   document.getElementById('storeStaffList').innerHTML = '<p class="text-[12px] text-on-surface-variant">جارِ التحميل...</p>';
@@ -663,7 +663,7 @@ async function sendMemberInvite() {
     return;
   }
 
-  btn.textContent = 'جارِ إرسال الإيميل...';
+  btn.textContent = 'جارِ إرسال البريد الإلكتروني...';
   const { error: emailError } = await goldmindClient.functions.invoke('send-invite-email', {
     body: { store_id: currentDetailStoreId, invite_email: email }
   });
@@ -672,9 +672,9 @@ async function sendMemberInvite() {
   btn.textContent = 'إرسال الدعوة';
 
   if (emailError) {
-    showToast('تم تسجيل الدعوة، لكن تعذّر إرسال إيميل التنبيه: ' + emailError.message, true);
+    showToast('تم تسجيل الدعوة، لكن تعذّر إرسال بريد التنبيه: ' + emailError.message, true);
   } else {
-    showToast('تم إرسال الدعوة والإيميل بنجاح');
+    showToast('تم إرسال الدعوة والبريد الإلكتروني بنجاح');
   }
 
   document.getElementById('inviteMemberEmail').value = '';
@@ -744,7 +744,7 @@ async function toggleAdminUsernames() {
   adminUsernamesLoaded = true;
   box.innerHTML = (data || []).map(a =>
     `<div class="flex items-center justify-between"><span dir="ltr">${gmEscapeHtml(a.email)}</span><span class="font-semibold">${gmEscapeHtml(a.username) || '— لم يُفعَّل بعد —'}</span></div>`
-  ).join('') || '<span class="text-on-surface-variant">لا يوجد حسابات</span>';
+  ).join('') || '<span class="text-on-surface-variant">لا توجد حسابات</span>';
 }
 
 async function load() {

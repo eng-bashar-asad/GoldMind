@@ -49,7 +49,7 @@ class Fail extends Error {
   constructor(status, message) { super(message); this.status = status; }
 }
 const NEED_LOGIN = () => new Fail(401, 'الجلسة غير صالحة، سجّل الدخول من جديد');
-const NOT_ALLOWED = () => new Fail(403, 'الدخول بالبصمة موقوف لحسابك من إعدادات الشركة. ادخل بكلمة السر.');
+const NOT_ALLOWED = () => new Fail(403, 'الدخول بالبصمة موقوف لحسابك من إعدادات الشركة. سجّل الدخول بكلمة السر.');
 
 async function finishLogin(ctx, userId) {
   if (!(await ctx.db.biometricAllowed(userId))) throw NOT_ALLOWED();
@@ -80,7 +80,7 @@ const actions = {
   async 'passkey-register-verify'(ctx, body) {
     if (!ctx.userId) throw NEED_LOGIN();
     const ch = await ctx.db.takeChallenge(body.challenge_id, 'register');
-    if (!ch || ch.user_id !== ctx.userId) throw new Fail(400, 'انتهت مهلة التفعيل، جرّب مرة تانية');
+    if (!ch || ch.user_id !== ctx.userId) throw new Fail(400, 'انتهت مهلة التفعيل، حاول مرة أخرى');
     let result;
     try {
       result = await ctx.swa.verifyRegistrationResponse({
@@ -118,10 +118,10 @@ const actions = {
 
   async 'passkey-login-verify'(ctx, body) {
     const ch = await ctx.db.takeChallenge(body.challenge_id, 'login');
-    if (!ch) throw new Fail(400, 'انتهت المهلة، جرّب مرة تانية');
+    if (!ch) throw new Fail(400, 'انتهت المهلة، حاول مرة أخرى');
     const credId = body.response && body.response.id;
     const pk = credId ? await ctx.db.getPasskey(credId) : null;
-    if (!pk) throw new Fail(400, 'هالبصمة مش مربوطة بأي حساب. ادخل بكلمة السر وفعّلها من جديد.');
+    if (!pk) throw new Fail(400, 'هذه البصمة غير مرتبطة بأي حساب. سجّل الدخول بكلمة السر ثم فعّلها من جديد.');
     let result;
     try {
       result = await ctx.swa.verifyAuthenticationResponse({
@@ -156,7 +156,7 @@ const actions = {
   async 'device-login'(ctx, body) {
     const key = body.key_id ? await ctx.db.getDeviceKey(String(body.key_id)) : null;
     if (!key || !safeEqual(key.secret_hash, await sha256Hex(String(body.secret || '')))) {
-      throw new Fail(401, 'البصمة على هالجهاز مش مفعّلة أو انشالت. ادخل بكلمة السر وفعّلها من جديد.');
+      throw new Fail(401, 'البصمة على هذا الجهاز غير مفعّلة أو أُزيلت. سجّل الدخول بكلمة السر ثم فعّلها من جديد.');
     }
     await ctx.db.touchDeviceKey(key.id);
     return finishLogin(ctx, key.user_id);

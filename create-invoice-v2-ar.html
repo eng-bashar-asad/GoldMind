@@ -116,7 +116,7 @@
 
 <button type="button" id="ocr-photo-btn" onclick="document.getElementById('ocr-photo-input').click()" class="w-full h-11 border border-dashed border-secondary rounded-lg flex items-center justify-center gap-2 text-secondary font-semibold text-[13px]">
 <span class="material-symbols-outlined" id="ocr-photo-icon">photo_camera</span>
-<span id="ocr-photo-label">صوّر فاتورة التاجر — تُعبّى الحقول تلقائياً</span>
+<span id="ocr-photo-label">صوّر فاتورة التاجر — تُملأ الحقول تلقائياً</span>
 </button>
 <input type="file" accept="image/*" capture="environment" class="hidden" id="ocr-photo-input" onchange="onOcrPhotoSelected(this)"/>
 <div class="hidden text-[11.5px] bg-surface-container-high rounded-lg p-2" id="ocr-result-note"></div>
@@ -244,7 +244,7 @@
 </div>
 </div>
 <div class="flex items-center justify-between border border-outline-variant rounded-lg px-3 h-12">
-<span class="font-label-md text-label-md font-semibold text-on-background text-[13px]">القطعة فيها جزء ذهب؟</span>
+<span class="font-label-md text-label-md font-semibold text-on-background text-[13px]">هل تحتوي القطعة على جزء ذهبي؟</span>
 <label class="gm-switch">
 <input id="diamond-has-gold-toggle" type="checkbox"/>
 <span class="gm-switch-track"></span>
@@ -287,7 +287,7 @@
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono bg-surface-container-low" id="manual-fabfee-vat" placeholder="0.00" readonly type="text"/>
 <label class="hidden items-center gap-2 mt-1.5 text-[11px] text-on-surface-variant" id="fab-fee-vat-toggle-wrap">
 <input checked="" id="fab-fee-vat-toggle" type="checkbox"/>
-تطبيق الضريبة على هالمصنعية (حسب نسبة الدولة المسجّلة بإعدادات المحل)
+تطبيق الضريبة على هذه المصنعية (حسب نسبة الدولة المسجّلة في إعدادات المحل)
 </label>
 </div>
 <button onclick="addManualToCart()" class="w-full h-12 bg-surface-container-high border border-outline-variant text-primary font-semibold rounded-lg active:scale-95 transition-all flex items-center justify-center gap-2">
@@ -331,7 +331,7 @@
 <!-- Bulk-lot photos (optional, buyTrader only) -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm p-4 space-y-3">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">صور البضاعة (اختياري)</h2>
-<p class="text-[11px] text-outline">عدة صور للبضاعة المستلمة — بتظهر بسند هالفاتورة بس، ومش مرتبطة بأي قطعة بالمخزون.</p>
+<p class="text-[11px] text-outline">عدة صور للبضاعة المستلمة — تظهر في سند هذه الفاتورة فقط، ولا ترتبط بأي قطعة في المخزون.</p>
 <input accept="image/*" class="hidden" id="bulk-photos-input" multiple type="file"/>
 <button onclick="document.getElementById('bulk-photos-input').click()" class="w-full h-12 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-on-surface-variant" type="button">
 <span class="material-symbols-outlined">add_photo_alternate</span> <span id="bulk-photos-label">اختر صور</span>
@@ -452,7 +452,7 @@
         if (!draft || !Array.isArray(draft.cart) || draft.cart.length === 0) return;
 
         const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
-        if (!confirm('في فاتورة شراء غير محفوظة (' + draft.cart.length + ' صنف) من ' + savedLabel + ' — بدك تسترجعها؟')) {
+        if (!confirm('توجد فاتورة شراء غير محفوظة (' + draft.cart.length + ' صنف) من ' + savedLabel + ' — هل تريد استرجاعها؟')) {
             clearDraftFromLocalStorage();
             return;
         }
@@ -745,7 +745,7 @@
             });
 
             if (error || !data || data.error) {
-                noteEl.textContent = 'تعذّرت قراءة الفاتورة تلقائياً -- عبّي الحقول يدوياً.';
+                noteEl.textContent = 'تعذّرت قراءة الفاتورة تلقائياً -- املأ الحقول يدوياً.';
                 noteEl.classList.remove('hidden');
                 return;
             }
@@ -768,17 +768,17 @@
             }
 
             let note = 'تمت القراءة -- راجع الحقول قبل الإضافة.';
-            if (ex.trader_name) note += ' التاجر المذكور بالفاتورة: ' + ex.trader_name + ' (اختره يدوياً أعلاه لو صحيح).';
+            if (ex.trader_name) note += ' التاجر المذكور بالفاتورة: ' + ex.trader_name + ' (اختره يدوياً أعلاه إن كان صحيحاً).';
             if (ex.confidence_note) note += ' ' + ex.confidence_note;
             noteEl.textContent = note;
             noteEl.classList.remove('hidden');
         } catch (e) {
-            noteEl.textContent = 'تعذّرت قراءة الفاتورة تلقائياً -- عبّي الحقول يدوياً.';
+            noteEl.textContent = 'تعذّرت قراءة الفاتورة تلقائياً -- املأ الحقول يدوياً.';
             noteEl.classList.remove('hidden');
         } finally {
             btn.disabled = false;
             icon.textContent = 'photo_camera';
-            label.textContent = 'صوّر فاتورة التاجر — تُعبّى الحقول تلقائياً';
+            label.textContent = 'صوّر فاتورة التاجر — تُملأ الحقول تلقائياً';
         }
     }
 
@@ -1099,7 +1099,7 @@
         }
 
         const confirmTotal = cart.reduce((sum, item) => sum + item.price, 0);
-        if (!confirm('هل أنت متأكد من ترحيل فاتورة الشراء هذه بقيمة ' + confirmTotal.toFixed(2) + '؟\nبعد الترحيل بتاخد رقم رسمي ثابت وما رح تقدر تعدّلها — بس تقدر تلغيها لاحقاً إذا احتجت.')) {
+        if (!confirm('هل أنت متأكد من ترحيل فاتورة الشراء هذه بقيمة ' + confirmTotal.toFixed(2) + '؟\nبعد الترحيل تحصل الفاتورة على رقم رسمي ثابت ولن تتمكن من تعديلها — لكن يمكنك إلغاؤها لاحقاً عند الحاجة.')) {
             return;
         }
 

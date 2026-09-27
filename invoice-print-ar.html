@@ -105,7 +105,7 @@
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="profit-panel">
 <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
 <div class="flex items-center justify-between mb-3">
-<h3 class="text-sm font-bold text-emerald-800">تفاصيل الربح (خاص — لا يظهر بفاتورة الزبون)</h3>
+<h3 class="text-sm font-bold text-emerald-800">تفاصيل الربح (خاص — لا يظهر في فاتورة الزبون)</h3>
 <button onclick="toggleProfitPanel()" class="text-emerald-700"><span class="material-symbols-outlined text-[18px]">close</span></button>
 </div>
 <div class="overflow-x-auto">
@@ -398,7 +398,7 @@
 
         if (storeError || invoiceError) {
             loading.classList.add('hidden');
-            errorState.textContent = 'خطأ بتحميل الفاتورة: ' + ((invoiceError || storeError).message);
+            errorState.textContent = 'خطأ في تحميل الفاتورة: ' + ((invoiceError || storeError).message);
             errorState.classList.remove('hidden');
             return;
         }
@@ -433,7 +433,7 @@
 
         if (itemsError) {
             loading.classList.add('hidden');
-            errorState.textContent = 'خطأ بتحميل عناصر الفاتورة: ' + itemsError.message;
+            errorState.textContent = 'خطأ في تحميل عناصر الفاتورة: ' + itemsError.message;
             errorState.classList.remove('hidden');
             return;
         }
@@ -515,7 +515,8 @@
         });
 
         const legalParts = [];
-        if (store.commercial_registration_number) legalParts.push('CR: ' + store.commercial_registration_number);
+        const regLabel = { TL: 'Trade Licence No.', CR: 'CR No.', FZ: 'Free Zone Licence No.', PASS: 'Passport No.' }[store.legal_registration_id_type] || 'Licence No.';
+        if (store.commercial_registration_number) legalParts.push(regLabel + ' ' + store.commercial_registration_number);
         if (store.tax_number) legalParts.push('TRN: ' + store.tax_number);
         document.getElementById('store-legal').textContent = legalParts.join(' | ');
 
@@ -689,7 +690,7 @@
                 <tr>
                     <td class="py-1"><div class="flex items-center gap-2">${(item.item_photo_url || piecePhotoById[item.piece_id]) ? `<img class="item-photo" src="${gmEscapeHtml(item.item_photo_url || piecePhotoById[item.piece_id])}" crossorigin="anonymous" alt=""/>` : ''}<div>${gmEscapeHtml(item.description) || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${gmEscapeHtml(item.description_en)}</span>` : ''}</div></div></td>
                     <td class="py-1 text-center">1</td>
-                    <td class="py-1 text-center">${item.karat}K</td>
+                    <td class="py-1 text-center">${item.karat ? item.karat + 'K' : '—'}</td>
                     <td class="py-1 text-center">${fmt(item.weight_grams)}</td>
                     <td class="py-1 text-left font-semibold">${fmt(full)}</td>
                 </tr>
@@ -979,7 +980,7 @@
     }
 
     async function cancelInvoiceFlow() {
-        if (!confirm('هل أنت متأكد من إلغاء هذه الفاتورة؟ رقمها يضل محفوظ بالسجل بشكل دائم ومعلَّم كملغاة (ما بينحذف نهائياً).')) return;
+        if (!confirm('هل أنت متأكد من إلغاء هذه الفاتورة؟ يبقى رقمها محفوظاً في السجل بشكل دائم ومعلَّماً كملغاة (لا يُحذف نهائياً).')) return;
         const reason = prompt('سبب الإلغاء (اختياري):') || null;
 
         const btn = document.getElementById('cancel-invoice-btn');
@@ -998,19 +999,19 @@
 
     async function deleteInvoiceFlow() {
         const num = window.__currentInvoiceNumber || '';
-        if (!confirm('حذف الفاتورة ' + num + ' نهائياً؟\n\n• القطع بترجع للمخزون\n• حركات الصندوق والديون تبعها بتنمسح\n• رقمها بيرجع للفاتورة الجاية\n\nما في تراجع بعد الحذف.')) return;
-        if (prompt('للتأكيد اكتب رقم الفاتورة: ' + num) !== num) { alert('ما تطابق الرقم — ما انحذفت.'); return; }
+        if (!confirm('حذف الفاتورة ' + num + ' نهائياً؟\n\n• ستعود القطع إلى المخزون\n• ستُحذف حركات الصندوق والديون التابعة لها\n• سيعود رقمها متاحاً للفاتورة التالية\n\nلا يمكن التراجع بعد الحذف.')) return;
+        if (prompt('للتأكيد اكتب رقم الفاتورة: ' + num) !== num) { alert('الرقم غير مطابق — لم تُحذف الفاتورة.'); return; }
         const btn = document.getElementById('delete-invoice-btn');
         btn.disabled = true;
         const { error } = await goldmindClient.rpc('delete_last_sale_invoice', { target_invoice_id: window.__currentInvoiceId });
         btn.disabled = false;
         if (error) { alert('تعذّر الحذف: ' + error.message); return; }
-        alert('انحذفت الفاتورة ' + num + '، ورقمها رجع متاح.');
+        alert('تم حذف الفاتورة ' + num + '، وأصبح رقمها متاحاً.');
         window.location.href = 'invoices-list-ar.html';
     }
 
     async function restoreInvoiceFlow() {
-        if (!confirm('هل أنت متأكد من استعادة هذه الفاتورة؟ رح ترجع فاتورة فعالة (نفس التأثير المحاسبي الأصلي)، وبعدها فيك تعدّل عليها عادي.')) return;
+        if (!confirm('هل أنت متأكد من استعادة هذه الفاتورة؟ ستعود فاتورة فعّالة (بنفس التأثير المحاسبي الأصلي)، ويمكنك بعدها تعديلها بشكل طبيعي.')) return;
 
         const btn = document.getElementById('restore-invoice-btn');
         btn.disabled = true;

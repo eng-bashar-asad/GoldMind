@@ -57,7 +57,7 @@
 <div id="page-content" class="hidden py-6 flex flex-col gap-6">
 
 <p class="text-[13px] text-on-surface-variant leading-relaxed">
-فعّل اسم مستخدم وكلمة سر عشان تقدر تدخل للتطبيق بسرعة من صفحة "دخول سريع" بدون انتظار رمز التحقق بالإيميل كل مرة. رمز التحقق بالإيميل بيضل شغّال دايماً كخيار بديل.
+فعّل اسم مستخدم وكلمة سر لتتمكن من الدخول إلى التطبيق بسرعة من صفحة "دخول سريع" دون انتظار رمز التحقق بالبريد الإلكتروني في كل مرة. يبقى رمز التحقق بالبريد الإلكتروني متاحاً دائماً كخيار بديل.
 </p>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
@@ -65,7 +65,7 @@
 <div class="relative mb-2">
 <input class="w-full h-12 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none" id="fullNameInput" placeholder="اسمك الكامل" type="text"/>
 </div>
-<p class="text-[11px] text-outline mb-3">هاد الاسم يلي بيظهر بسطر الترحيب أعلى الصفحة الرئيسية — منفصل عن اسم المستخدم فوق.</p>
+<p class="text-[11px] text-outline mb-3">هذا هو الاسم الذي يظهر في سطر الترحيب أعلى الصفحة الرئيسية — وهو منفصل عن اسم المستخدم أعلاه.</p>
 <button onclick="saveFullName()" id="fullNameSaveBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الاسم</button>
 <p class="text-error text-[12px] hidden mt-2" id="fullNameError"></p>
 <p class="text-success text-[12px] hidden mt-2" id="fullNameSuccess"></p>
@@ -93,7 +93,7 @@
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="bioSection">
 <h2 class="font-bold text-[14px] mb-1">الدخول بالبصمة / Face ID</h2>
-<p class="text-[11px] text-outline mb-3">البصمة بتضل على جهازك وما بتنبعت لأي مكان. البرنامج بيتأكد إنه الجهاز هو جهازك المسجّل.</p>
+<p class="text-[11px] text-outline mb-3">تبقى البصمة على جهازك ولا تُرسل إلى أي مكان. يتحقق البرنامج من أن الجهاز هو جهازك المسجّل.</p>
 <p id="bioHereStatus" class="text-[12.5px] mb-3"></p>
 <button id="bioToggleBtn" type="button" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold hidden"></button>
 <p class="text-error text-[12px] hidden mt-2" id="bioError" role="alert"></p>
@@ -104,7 +104,7 @@
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <h2 class="font-bold text-[14px] mb-3">رقم الواتساب لاستلام التقارير</h2>
-<p class="text-[11px] text-outline mb-3">إذا فعّلت هذا الرقم (وكان عندك صلاحية "عرض التقارير")، بيقدر يبعتلك زميلك بالمحل تقرير الحركة اليومية آخر كل يوم بضغطة زر.</p>
+<p class="text-[11px] text-outline mb-3">إذا فعّلت هذا الرقم (وكانت لديك صلاحية "عرض التقارير")، يستطيع زميلك في المحل أن يرسل إليك تقرير الحركة اليومية في نهاية كل يوم بضغطة زر.</p>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none mb-3" dir="ltr" id="whatsappInput" placeholder="971501234567 (بدون + أو أصفار البداية)" type="tel"/>
 <button onclick="saveWhatsapp()" id="whatsappSaveBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ رقم الواتساب</button>
 <p class="text-error text-[12px] hidden mt-2" id="whatsappError"></p>
@@ -151,11 +151,11 @@ async function loadBio(userId) {
   const av = window.GMBio ? await GMBio.available() : { ok: false };
   const on = av.ok && GMBio.enabledFor(userId);
   if (!av.ok) {
-    status.textContent = 'هالجهاز أو المتصفح ما بيدعم الدخول بالبصمة.';
+    status.textContent = 'هذا الجهاز أو المتصفح لا يدعم الدخول بالبصمة.';
     btn.classList.add('hidden');
   } else {
-    status.textContent = on ? ('مفعّل على هالجهاز ✓ (' + av.label + ')') : ('مش مفعّل على هالجهاز.');
-    btn.textContent = on ? 'إيقاف البصمة على هالجهاز' : ('تفعيل الدخول ' + GMBio.bi(av.label));
+    status.textContent = on ? ('مفعّل على هذا الجهاز ✓ (' + av.label + ')') : ('غير مفعّل على هذا الجهاز.');
+    btn.textContent = on ? 'إيقاف البصمة على هذا الجهاز' : ('تفعيل الدخول ' + GMBio.bi(av.label));
     btn.className = on
       ? 'w-full h-11 border border-error text-error rounded-lg text-sm font-semibold'
       : 'w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold';
@@ -170,7 +170,7 @@ async function loadBio(userId) {
     (dk.data || []).map(r => Object.assign({ kind: 'auth_device_keys' }, r))
   );
   const list = document.getElementById('bioDevices');
-  if (rows.length === 0) { list.innerHTML = '<p class="text-outline">ما في أجهزة مسجّلة.</p>'; return; }
+  if (rows.length === 0) { list.innerHTML = '<p class="text-outline">لا توجد أجهزة مسجّلة.</p>'; return; }
   list.innerHTML = '';
   rows.forEach(r => {
     const row = document.createElement('div');
@@ -181,7 +181,7 @@ async function loadBio(userId) {
     name.textContent = r.device_name || 'جهاز';
     const when = document.createElement('div');
     when.className = 'text-[11px] text-outline';
-    when.textContent = 'آخر استخدام: ' + (r.last_used_at ? new Date(r.last_used_at).toLocaleString('ar-AE') : 'لسا');
+    when.textContent = 'آخر استخدام: ' + (r.last_used_at ? new Date(r.last_used_at).toLocaleString('ar-AE') : 'لم يُستخدم بعد');
     info.append(name, when);
     const del = document.createElement('button');
     del.type = 'button';
@@ -189,7 +189,7 @@ async function loadBio(userId) {
     del.textContent = 'حذف';
     del.setAttribute('aria-label', 'حذف ' + (r.device_name || 'الجهاز'));
     del.onclick = async () => {
-      if (!confirm('بدك تشيل هالجهاز؟ ما عاد فيه يدخل بالبصمة لحتى تفعّلها عليه من جديد.')) return;
+      if (!confirm('هل تريد إزالة هذا الجهاز؟ لن يتمكن من الدخول بالبصمة حتى تفعّلها عليه من جديد.')) return;
       const { error } = await goldmindClient.from(r.kind).delete().eq('id', r.id);
       if (error) { alert('تعذّر الحذف: ' + error.message); return; }
       loadBio(userId);
@@ -209,10 +209,10 @@ async function toggleBio(userId, isOn) {
   try {
     if (isOn) {
       await GMBio.forgetHere(userId);
-      okEl.textContent = 'انوقفت البصمة على هالجهاز.';
+      okEl.textContent = 'تم إيقاف البصمة على هذا الجهاز.';
     } else {
       await GMBio.enable();
-      okEl.textContent = 'تم التفعيل ✓ — المرة الجاية بتدخل بالبصمة.';
+      okEl.textContent = 'تم التفعيل ✓ — ستدخل بالبصمة في المرة القادمة.';
     }
     okEl.classList.remove('hidden');
   } catch (e) {
@@ -315,7 +315,7 @@ async function saveUsername() {
   btn.textContent = 'حفظ اسم المستخدم';
 
   if (error) {
-    if (error.message && error.message.includes('duplicate')) errEl.textContent = 'اسم المستخدم هذا محجوز، جرّب اسم آخر';
+    if (error.message && error.message.includes('duplicate')) errEl.textContent = 'اسم المستخدم هذا محجوز، اختر اسماً آخر';
     else errEl.textContent = 'تعذّر الحفظ: ' + error.message;
     errEl.classList.remove('hidden');
     return;
@@ -361,7 +361,7 @@ async function savePassword() {
 
   document.getElementById('passwordInput').value = '';
   document.getElementById('passwordConfirmInput').value = '';
-  okEl.textContent = 'تم حفظ كلمة السر بنجاح — تقدر تدخل بيها من صفحة الدخول السريع';
+  okEl.textContent = 'تم حفظ كلمة السر بنجاح — يمكنك الدخول بها من صفحة الدخول السريع';
   okEl.classList.remove('hidden');
 }
 

@@ -102,7 +102,7 @@ test('website: a passkey the server no longer knows is refused', async ({ page }
   db.t.passkeys.length = 0; // removed from the security page on another device
   await page.goto('/login-entry-ar.html');
   await page.locator('#step-start [data-bio-accounts] button').click();
-  await expect(page.locator('#step-start [data-bio-error]')).toContainText('مش مربوطة');
+  await expect(page.locator('#step-start [data-bio-error]')).toContainText('غير مرتبطة');
   expect(minted).toEqual([]);
 });
 
@@ -152,7 +152,7 @@ test('android app: removed device key is refused and forgotten on the phone', as
   db.t.keys.length = 0;
   await page.goto('/login-entry-ar.html');
   await page.locator('#step-start [data-bio-accounts] button').click();
-  await expect(page.locator('#step-start [data-bio-error]')).toContainText('انشالت');
+  await expect(page.locator('#step-start [data-bio-error]')).toContainText('أُزيلت');
   expect(minted).toEqual([]);
   expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gm_bio_accounts') || '[]').length)).toBe(0);
 });

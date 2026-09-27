@@ -51,7 +51,7 @@
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4 py-6 flex flex-col gap-4">
-<p class="text-[12px] text-on-surface-variant leading-5">البرنامج بيراجع الأرقام لحاله: عملة سعر الذهب، مجموع كل فاتورة، المقبوض مقابل الصندوق، ديون الزبائن، القطع المباعة، ورصيد الجملة. أي شي مو مظبوط بيطلع هون.</p>
+<p class="text-[12px] text-on-surface-variant leading-5">يراجع البرنامج الأرقام تلقائياً: عملة سعر الذهب، ومجموع كل فاتورة، والمقبوض مقابل الصندوق، وديون الزبائن، والقطع المباعة، ورصيد الجملة. وأي خلل يظهر هنا.</p>
 <div id="state" class="py-10 text-center text-on-surface-variant text-sm">جارِ الفحص...</div>
 <div id="summary" class="hidden rounded-xl p-4 flex items-center gap-3"></div>
 <div id="list" class="flex flex-col gap-2"></div>
@@ -65,14 +65,14 @@ async function runCheck() {
   const state = document.getElementById('state'), sum = document.getElementById('summary'), list = document.getElementById('list');
   state.classList.remove('hidden'); state.textContent = 'جارِ الفحص...'; sum.classList.add('hidden'); list.innerHTML = '';
   const { data, error } = await goldmindClient.rpc('accounting_health_check', { sid: GOLDMIND_STORE_ID });
-  if (error) { state.textContent = error.code === '42501' ? 'هالصفحة بدها صلاحية التقارير.' : 'تعذّر الفحص: ' + error.message; return; }
+  if (error) { state.textContent = error.code === '42501' ? 'هذه الصفحة تتطلب صلاحية التقارير.' : 'تعذّر الفحص: ' + error.message; return; }
   state.classList.add('hidden');
   const rows = data || [];
   const errors = rows.filter(r => r.severity === 'error').length;
   sum.className = 'rounded-xl p-4 flex items-center gap-3 border ' + (rows.length === 0 ? 'bg-green-50 border-green-200 text-green-800' : errors ? 'bg-red-50 border-red-200 text-red-800' : 'bg-amber-50 border-amber-200 text-amber-800');
   sum.innerHTML = rows.length === 0
-    ? '<span class="material-symbols-outlined" style="font-size:28px">verified</span><div><div class="font-bold">كل الحسابات مظبوطة</div><div class="text-[12px]">ما لقينا ولا مشكلة.</div></div>'
-    : `<span class="material-symbols-outlined" style="font-size:28px">${errors ? 'error' : 'warning'}</span><div><div class="font-bold">${rows.length} ملاحظة</div><div class="text-[12px]">${errors} مشكلة لازم تنصلّح${rows.length - errors ? ' و' + (rows.length - errors) + ' تنبيه للمراجعة' : ''}.</div></div>`;
+    ? '<span class="material-symbols-outlined" style="font-size:28px">verified</span><div><div class="font-bold">جميع الحسابات سليمة</div><div class="text-[12px]">لم يُعثر على أي مشكلة.</div></div>'
+    : `<span class="material-symbols-outlined" style="font-size:28px">${errors ? 'error' : 'warning'}</span><div><div class="font-bold">${rows.length} ملاحظة</div><div class="text-[12px]">${errors} مشكلة يجب إصلاحها${rows.length - errors ? ' و' + (rows.length - errors) + ' تنبيه للمراجعة' : ''}.</div></div>`;
   sum.classList.remove('hidden');
   list.innerHTML = rows.map(r => {
     const kind = CODE_LINK[r.code];

@@ -64,7 +64,7 @@
 <div id="new-party" class="hidden flex flex-col gap-2 p-3 bg-surface-container-low rounded-lg">
 <input id="np-name" class="h-11 border border-outline-variant rounded-lg px-3 text-right" placeholder="الاسم — مثال: هدايا، أبو سمير (تعديل)"/>
 <select id="np-kind" class="h-11 border border-outline-variant rounded-lg px-3 text-right">
-<option value="gift">هدايا — القطعة بتطلع هدية وكلفتها مصروف فوراً</option>
+<option value="gift">هدايا — تُخرَج القطعة هديةً وتُسجَّل كلفتها مصروفاً فوراً</option>
 <option value="intermediary">وسيط تعديل (تفصيل، تصغير، تعديل...)</option>
 </select>
 <button type="button" onclick="createParty()" class="h-11 bg-primary text-white rounded-lg font-semibold text-[13px]">حفظ الجهة</button>
@@ -74,7 +74,7 @@
 
 <!-- trader: handled on the trader ledger -->
 <div id="trader-box" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
-<p class="text-[12px] text-on-surface-variant leading-5">إخراج وإدخال البضاعة مع التجار بينسجل على <b>حساب التاجر</b> (الوزن والمصنعية)، ومنها بتختار «إرجاع للتاجر» أو «بيع بالكلفة».</p>
+<p class="text-[12px] text-on-surface-variant leading-5">يُسجَّل إخراج البضاعة وإدخالها مع التجار على <b>حساب التاجر</b> (الوزن والمصنعية)، ومنه تختار «إرجاع للتاجر» أو «بيع بالكلفة».</p>
 <div class="grid grid-cols-2 gap-2">
 <button type="button" onclick="goTrader('give')" class="h-12 rounded-lg bg-primary text-white font-semibold text-[13px] flex items-center justify-center gap-1"><span class="material-symbols-outlined">upload</span>إخراج للتاجر</button>
 <button type="button" onclick="goTrader('receive')" class="h-12 rounded-lg border border-primary text-primary font-semibold text-[13px] flex items-center justify-center gap-1"><span class="material-symbols-outlined">download</span>إدخال من التاجر</button>
@@ -97,7 +97,7 @@
 <p class="text-error text-[12px] hidden" id="out-msg"></p>
 <div id="out-list" class="flex flex-col gap-2"></div>
 <div id="out-total" class="text-[12px] font-semibold"></div>
-<input id="out-recipient" class="hidden w-full h-12 border border-outline-variant rounded-lg px-3 text-right" placeholder="لمين الهدية؟ (اسم الشخص)"/>
+<input id="out-recipient" class="hidden w-full h-12 border border-outline-variant rounded-lg px-3 text-right" placeholder="لمن الهدية؟ (اسم الشخص)"/>
 <textarea id="out-notes" class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-right" placeholder="ملاحظة (اختياري) — مثال: تقسيم لقطعتين"></textarea>
 <button type="button" id="out-btn" onclick="saveOut()" class="w-full h-12 bg-secondary text-on-secondary rounded-lg font-bold">حفظ سند الإخراج</button>
 </div>
@@ -106,7 +106,7 @@
 <!-- IN -->
 <div id="tab-in" class="hidden flex flex-col gap-3">
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-2">
-<h3 class="font-semibold text-[13px]">قطع راجعة متل ما هي</h3>
+<h3 class="font-semibold text-[13px]">قطع مُعادة كما هي</h3>
 <div id="held-list" class="flex flex-col gap-1"></div>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3" id="new-pieces-box">
@@ -124,7 +124,7 @@
 <p class="text-success text-[12px] hidden text-center" id="save-success"></p>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-<div class="px-4 py-3 border-b border-outline-variant"><h2 class="font-semibold text-[13px]">سندات هالجهة</h2></div>
+<div class="px-4 py-3 border-b border-outline-variant"><h2 class="font-semibold text-[13px]">سندات هذه الجهة</h2></div>
 <div id="vouchers" class="divide-y divide-outline-variant"></div>
 </div>
 </div>
@@ -154,7 +154,7 @@ const costOf = p => { const w = Number(p.accounting_weight_grams != null ? p.acc
 
 function renderPartySelect(selected) {
   const sel = document.getElementById('party-select');
-  sel.innerHTML = '<option value="">— اختار الجهة —</option>'
+  sel.innerHTML = '<option value="">— اختر الجهة —</option>'
     + (parties.length ? '<optgroup label="هدايا ووسطاء التعديل">' + parties.map(p => `<option value="p:${p.id}">${esc(p.name)} — ${KIND[p.kind]}</option>`).join('') + '</optgroup>' : '')
     + (traders.length ? '<optgroup label="تجار الجملة">' + traders.map(t => `<option value="t:${t.id}">${esc(t.name)}</option>`).join('') + '</optgroup>' : '');
   if (selected) sel.value = selected;
@@ -164,7 +164,7 @@ async function createParty() {
   const name = document.getElementById('np-name').value.trim();
   if (!name) return;
   const { data, error } = await goldmindClient.from('stock_parties').insert({ store_id: GOLDMIND_STORE_ID, name, kind: document.getElementById('np-kind').value }).select().single();
-  if (error) { alert(error.code === '23505' ? 'في جهة بنفس الاسم' : 'تعذّر: ' + error.message); return; }
+  if (error) { alert(error.code === '23505' ? 'توجد جهة بالاسم نفسه' : 'تعذّر: ' + error.message); return; }
   parties.push(data);
   document.getElementById('np-name').value = '';
   document.getElementById('new-party').classList.add('hidden');
@@ -225,23 +225,23 @@ async function refreshParty() {
     L.forEach(l => { const s = l.direction === 'out' ? 1 : -1; const b = byK[l.karat] = byK[l.karat] || { w: 0, aw: 0, c: 0 }; b.w += s * l.weight_grams; b.aw += s * l.accounting_weight_grams; b.c += s * l.cost_value; });
     const ks = Object.keys(byK).filter(k => Math.abs(byK[k].w) > 0.0005 || Math.abs(byK[k].aw) > 0.0005);
     bal.innerHTML = ks.length
-      ? '<div class="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 space-y-1"><div class="font-bold">رصيد الوسيط (طالع − راجع)</div>'
+      ? '<div class="p-3 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 space-y-1"><div class="font-bold">رصيد الوسيط (الصادر − الوارد)</div>'
         + ks.map(k => `<div class="flex justify-between font-data-mono"><span>عيار ${k}</span><span>${n(byK[k].w, 3)}غ قائم · ${n(byK[k].aw, 3)}غ محاسبي · ${money(byK[k].c)}</span></div>`).join('')
-        + '<div class="text-[11px] opacity-80">موجب = عند الوسيط لإلنا · سالب = رجع أكتر من يلي طلع</div></div>'
-      : '<div class="text-on-surface-variant">ما في رصيد عند هالوسيط.</div>';
+        + '<div class="text-[11px] opacity-80">موجب = لنا لدى الوسيط · سالب = ما أُعيد أكثر مما أُخرج</div></div>'
+      : '<div class="text-on-surface-variant">لا يوجد رصيد لدى هذا الوسيط.</div>';
   } else if (current.kind === 'gift') {
     const outs = L.filter(l => l.direction === 'out');
-    bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">هدايا طلعت: <b>${outs.length}</b> قطعة · كلفتها (مصروف) <b class="font-data-mono">${money(outs.reduce((s, l) => s + Number(l.cost_value), 0))}</b> <a href="gifts-ar.html" class="text-primary underline mr-2">سجل الهدايا والترجيع</a></div>`;
+    bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">الهدايا المُخرَجة: <b>${outs.length}</b> قطعة · كلفتها (مصروف) <b class="font-data-mono">${money(outs.reduce((s, l) => s + Number(l.cost_value), 0))}</b> <a href="gifts-ar.html" class="text-primary underline mr-2">سجل الهدايا والإرجاع</a></div>`;
   } else {
     const w = held.reduce((s, p) => s + Number(p.weight_grams || 0), 0);
-    bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">بالصندوق هلق: <b>${held.length}</b> قطعة · <b class="font-data-mono">${n(w, 3)}غ</b> · كلفة <b class="font-data-mono">${money(held.reduce((s, p) => s + costOf(p), 0))}</b></div>`;
+    bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">في الصندوق حالياً: <b>${held.length}</b> قطعة · <b class="font-data-mono">${n(w, 3)}غ</b> · كلفة <b class="font-data-mono">${money(held.reduce((s, p) => s + costOf(p), 0))}</b></div>`;
   }
   // held pieces (for "in")
   document.getElementById('held-list').innerHTML = held.length ? held.map(p => `
     <label class="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-container-low cursor-pointer">
       <input type="checkbox" class="held-cb" value="${p.id}"/>
       <span class="font-data-mono text-[12px] flex-1">${esc(p.barcode)} · ${p.karat}K · ${n(p.weight_grams, 3)}غ ${p.description_ar ? '· ' + esc(p.description_ar) : ''}</span>
-    </label>`).join('') : '<p class="text-[12px] text-on-surface-variant">ما في قطع عند هالجهة.</p>';
+    </label>`).join('') : '<p class="text-[12px] text-on-surface-variant">لا توجد قطع لدى هذه الجهة.</p>';
   // vouchers
   const byV = {};
   L.forEach(l => { const v = byV[l.voucher_id] = byV[l.voucher_id] || { cnt: 0, w: 0, c: 0 }; v.cnt++; v.w += Number(l.weight_grams); v.c += Number(l.cost_value); });
@@ -254,7 +254,7 @@ async function refreshParty() {
       </div>
       <div class="text-left text-[12px] font-data-mono">${t.cnt} قطعة · ${n(t.w, 3)}غ<br/>${money(t.c)}</div>
       <a href="stock-voucher-print-ar.html?id=${v.id}" target="_blank" title="طباعة" class="text-primary"><span class="material-symbols-outlined">print</span></a>
-    </div>`; }).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">ما في سندات لسا.</p>';
+    </div>`; }).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد سندات بعد.</p>';
 }
 
 // ---- OUT ----
@@ -265,7 +265,7 @@ async function addOutPiece() {
   if (!code) return;
   if (outCart.some(p => p.barcode === code)) { msg('out-msg', 'القطعة مضافة من قبل'); return; }
   const { data: p } = await goldmindClient.from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).eq('barcode', code).in('status', current.kind === 'gift' ? ['available', 'in_box'] : ['available']).maybeSingle();
-  if (!p) { msg('out-msg', 'ما في قطعة متاحة بالمخزن بهالباركود'); return; }
+  if (!p) { msg('out-msg', 'لا توجد قطعة متاحة في المخزن بهذا الباركود'); return; }
   outCart.push(p); inp.value = ''; renderOut();
 }
 function removeOut(id) { outCart = outCart.filter(p => p.id !== id); renderOut(); }
@@ -286,18 +286,18 @@ async function saveOut() {
   msg('save-error', ''); msg('save-success', '');
   if (!outCart.length) { msg('save-error', 'أضف قطعة واحدة على الأقل', true); return; }
   const recipient = document.getElementById('out-recipient').value.trim();
-  if (current.kind === 'gift' && !recipient) { msg('save-error', 'اكتب لمين الهدية', true); return; }
+  if (current.kind === 'gift' && !recipient) { msg('save-error', 'اكتب اسم مستلم الهدية', true); return; }
   if (!confirm(current.kind === 'gift'
-      ? 'إخراج ' + outCart.length + ' قطعة هدية إلى ' + recipient + '؟ كلفتها بتنسجل مصروف هدايا.'
+      ? 'إخراج ' + outCart.length + ' قطعة هدية إلى ' + recipient + '؟ ستُسجَّل كلفتها مصروفَ هدايا.'
       : 'إخراج ' + outCart.length + ' قطعة إلى ' + current.name + '؟')) return;
   const btn = document.getElementById('out-btn'); btn.disabled = true;
   const { data: vid, error } = await goldmindClient.rpc('stock_out_to_party', { target_party_id: current.id, piece_ids: outCart.map(p => p.id), p_notes: document.getElementById('out-notes').value.trim() || null, p_recipient: recipient || null });
   btn.disabled = false;
   if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
   outCart = []; renderOut(); document.getElementById('out-notes').value = ''; document.getElementById('out-recipient').value = '';
-  msg('save-success', current.kind === 'gift' ? 'طلعت الهدية وانسجلت كلفتها مصروف' : 'انحفظ سند الإخراج', false);
+  msg('save-success', current.kind === 'gift' ? 'أُخرجت الهدية وسُجِّلت كلفتها مصروفاً' : 'حُفظ سند الإخراج', false);
   refreshParty(); loadAllVouchers();
-  if (vid && confirm('بدك تطبع السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
+  if (vid && confirm('هل تريد طباعة السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
 }
 
 // ---- IN ----
@@ -330,12 +330,12 @@ async function saveIn() {
     const g = f => r.querySelector(`[data-f="${f}"]`);
     const w = parseFloat(g('weight').value), aw = parseFloat(g('acc_weight').value), fab = parseFloat(g('fab_per_gram').value);
     if (!w || w <= 0) { msg('save-error', 'اكتب الوزن القائم لكل قطعة جديدة', true); return; }
-    if (isNaN(fab) || fab < 0) { msg('save-error', 'اكتب المصنعية لكل قطعة جديدة (ولو صفر)', true); return; }
+    if (isNaN(fab) || fab < 0) { msg('save-error', 'اكتب المصنعية لكل قطعة جديدة (ولو كانت صفراً)', true); return; }
     lines.push({ row: r, karat: +g('karat').value, weight: w, acc_weight: aw > 0 ? aw : w, fab_per_gram: fab,
       piece_type: g('piece_type').value, category1: g('category1').value, category2: g('category2').value,
       color: g('color').value, description_ar: g('description_ar').value.trim(), file: g('photo').files[0] || null });
   }
-  if (!back.length && !lines.length) { msg('save-error', 'اختار قطعة راجعة أو ضيف قطعة جديدة', true); return; }
+  if (!back.length && !lines.length) { msg('save-error', 'اختر قطعة مُعادة أو أضف قطعة جديدة', true); return; }
   if (!confirm('حفظ سند إدخال من ' + current.name + '؟')) return;
   const btn = document.getElementById('in-btn'); btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
   // photos are optional: a failed upload never blocks the voucher
@@ -351,9 +351,9 @@ async function saveIn() {
   btn.disabled = false; btn.textContent = 'حفظ سند الإدخال';
   if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
   document.getElementById('new-rows').innerHTML = ''; document.getElementById('in-notes').value = '';
-  msg('save-success', 'انحفظ سند الإدخال' + (lines.length ? ' — القطع الجديدة انضافت للمخزن بباركود جديد (فيك تطبعلها ليبل من صفحة المخزن)' : ''), false);
+  msg('save-success', 'حُفظ سند الإدخال' + (lines.length ? ' — أُضيفت القطع الجديدة إلى المخزن بباركود جديد (يمكنك طباعة ملصقات لها من صفحة المخزن)' : ''), false);
   refreshParty(); loadAllVouchers();
-  if (vid && confirm('بدك تطبع السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
+  if (vid && confirm('هل تريد طباعة السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
 }
 
 async function loadAllVouchers() {
@@ -369,7 +369,7 @@ async function loadAllVouchers() {
         <div class="text-[11px] text-on-surface-variant">${gmFormatDateTime(v.created_at)}${v.staff && v.staff.full_name ? ' · ' + esc(v.staff.full_name) : ''}${v.notes ? ' · ' + esc(v.notes) : ''}</div>
       </div>
       <span class="material-symbols-outlined text-primary">print</span>
-    </a>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">ما في سندات لسا — اختار جهة فوق واعمل أول سند.</p>';
+    </a>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد سندات بعد — اختر جهة من الأعلى وأنشئ أول سند.</p>';
 }
 
 (async function load() {

@@ -125,7 +125,7 @@ function gmInjectTimezonePicker() {
         <h3 class="font-bold text-[15px] text-on-surface">المنطقة الزمنية للعرض</h3>
         <button onclick="gmCloseTimezonePicker()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-high"><span class="material-symbols-outlined text-on-surface-variant">close</span></button>
       </div>
-      <p class="text-[11px] text-on-surface-variant mb-3">هاد بيغيّر بس كيف تنعرض الأوقات إلك على هالجهاز — مش وقت الحفظ الفعلي بقاعدة البيانات.</p>
+      <p class="text-[11px] text-on-surface-variant mb-3">يغيّر هذا الإعداد طريقة عرض الأوقات لك على هذا الجهاز فقط — ولا يغيّر وقت الحفظ الفعلي في قاعدة البيانات.</p>
       <div id="gmTzList" class="flex flex-col gap-1"></div>
     </div>`;
   document.body.appendChild(wrap);

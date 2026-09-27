@@ -144,7 +144,7 @@ function onEmployeeSelected() {
     const emp = employees.find(e => e.id === empId);
     const used = usedLeaveDaysThisYear(empId);
     const remaining = Number(emp.annual_leave_days || 0) - used;
-    hintEl.textContent = `رصيد ${gmEscapeHtml(emp.name)} المتبقي هالسنة: ${fmt(remaining)} من ${fmt(emp.annual_leave_days)} يوم`;
+    hintEl.textContent = `رصيد ${gmEscapeHtml(emp.name)} المتبقي لهذه السنة: ${fmt(remaining)} من ${fmt(emp.annual_leave_days)} يوم`;
     hintEl.classList.remove('hidden');
 }
 
@@ -154,7 +154,7 @@ function recomputeDays() {
     const previewEl = document.getElementById('days-preview');
     if (!start || !end) { previewEl.textContent = 'عدد الأيام: —'; return; }
     const days = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
-    if (days <= 0) { previewEl.textContent = 'تاريخ النهاية لازم يكون بعد تاريخ البداية'; return; }
+    if (days <= 0) { previewEl.textContent = 'يجب أن يكون تاريخ النهاية بعد تاريخ البداية'; return; }
     previewEl.textContent = 'عدد الأيام: ' + days + (days === 1 ? ' يوم' : ' أيام');
 }
 
@@ -168,7 +168,7 @@ async function addLeave() {
     if (!employeeId) { errEl.textContent = 'اختر الموظف.'; errEl.classList.remove('hidden'); return; }
     if (!start || !end) { errEl.textContent = 'حدد تاريخ البداية والنهاية.'; errEl.classList.remove('hidden'); return; }
     const days = Math.round((new Date(end) - new Date(start)) / 86400000) + 1;
-    if (days <= 0) { errEl.textContent = 'تاريخ النهاية لازم يكون بعد تاريخ البداية.'; errEl.classList.remove('hidden'); return; }
+    if (days <= 0) { errEl.textContent = 'يجب أن يكون تاريخ النهاية بعد تاريخ البداية.'; errEl.classList.remove('hidden'); return; }
 
     const btn = document.getElementById('add-btn');
     btn.disabled = true;
@@ -247,7 +247,7 @@ function render() {
                 <button onclick="setLeaveStatus('${l.id}', 'approved')" class="flex-1 h-9 rounded-lg text-[12px] font-semibold" style="background: var(--gm-primary); color: var(--gm-on-primary);">موافقة</button>
                 <button onclick="setLeaveStatus('${l.id}', 'rejected')" class="flex-1 h-9 rounded-lg border text-error text-[12px] font-semibold" style="border-color: var(--gm-outline-variant);">رفض</button>
                 ` : `
-                <button onclick="setLeaveStatus('${l.id}', 'pending')" class="flex-1 h-9 rounded-lg border text-[12px] font-semibold" style="border-color: var(--gm-outline-variant);">إعادة لقيد الانتظار</button>
+                <button onclick="setLeaveStatus('${l.id}', 'pending')" class="flex-1 h-9 rounded-lg border text-[12px] font-semibold" style="border-color: var(--gm-outline-variant);">إعادة إلى قيد الانتظار</button>
                 `}
                 <button onclick="deleteLeave('${l.id}')" class="h-9 w-9 flex items-center justify-center rounded-lg border text-error" style="border-color: var(--gm-outline-variant);">
                     <span class="material-symbols-outlined text-[16px]">delete</span>

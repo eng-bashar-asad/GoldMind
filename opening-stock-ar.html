@@ -50,13 +50,13 @@
 <main class="pb-32 max-w-md lg:max-w-2xl mx-auto px-4 lg:px-8">
 
 <p class="text-[12px] text-on-surface-variant leading-5 py-4">
-سجّل هون الذهب يلي موجود عندك فعلياً (وزن إجمالي + مجموع مصنعية واحد) بدون تسجيل قطع مفردة ولا ربطه بتاجر. لما تبيع منها لاحقاً بفاتورة المبيعات (بيع من الرصيد بالجملة)، بتكتب مصنعية كل قطعة يدوياً وبتتخصم من نفس هالمجموع، مش بمعدل ثابت للغرام.
+سجّل هنا الذهب الموجود لديك فعلياً (وزن إجمالي + مجموع مصنعية واحد) دون تسجيل قطع مفردة أو ربطه بتاجر. عند البيع منه لاحقاً بفاتورة المبيعات (بيع من الرصيد بالجملة)، تكتب مصنعية كل قطعة يدوياً وتُخصم من هذا المجموع نفسه، لا بمعدل ثابت للغرام.
 </p>
 
 <!-- Barcoded pieces classified as opening stock (still individual pieces) -->
 <div id="op-pieces" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4">
 <h2 class="font-semibold text-[14px] mb-1">قطع أول المدة (بباركود)</h2>
-<p class="text-[11px] text-on-surface-variant mb-3">قطع مفردة مسجّلة كبضاعة أول المدة — المتبقي منها بالمخزن هلق.</p>
+<p class="text-[11px] text-on-surface-variant mb-3">قطع مفردة مسجّلة كبضاعة أول المدة — المتبقي منها في المخزن حالياً.</p>
 <div id="op-pieces-body" class="text-[12px] font-data-mono flex flex-col gap-1"></div>
 </div>
 
@@ -242,7 +242,7 @@ async function load() {
           </div>
           <input id="os-edit-fab-${lot.id}" type="number" step="0.01" dir="ltr" placeholder="مجموع المصنعية" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${lot.fabrication_pool_total}"/>
           <input id="os-edit-notes-${lot.id}" type="text" placeholder="ملاحظة" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px]" value="${(lot.notes || '').replace(/"/g, '&quot;')}"/>
-          ${!untouched ? `<p class="text-[11px] text-on-surface-variant">تنبيه: جزء من هالدفعة استُهلك فعلاً (إنتاج قطع)، فتقليل الوزن/المصنعية بيتجاوب مع المتبقي بس، لن يقل عن الصفر.</p>` : ''}
+          ${!untouched ? `<p class="text-[11px] text-on-surface-variant">تنبيه: جزء من هذه الدفعة استُهلك فعلاً (إنتاج قطع)، لذا فإن تقليل الوزن/المصنعية يُطبَّق على المتبقي فقط، ولن يقل عن الصفر.</p>` : ''}
           <div class="flex gap-2">
             <button onclick="saveEditLot('${lot.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
             <button onclick="toggleEditLot('${lot.id}')" class="flex-1 h-9 border border-outline-variant text-on-surface rounded-lg text-[12px] font-semibold">إلغاء</button>
@@ -293,7 +293,7 @@ async function saveEditLot(lotId) {
   const newFabRemaining = Number(current.fabrication_pool_remaining) + fabDelta;
 
   if (newWeightRemaining < 0 || newFabRemaining < 0) {
-    errEl.textContent = 'التعديل بيخلي المتبقي أقل من صفر — قلّل مقدار التخفيض.';
+    errEl.textContent = 'هذا التعديل يجعل المتبقي أقل من الصفر — قلّل مقدار التخفيض.';
     errEl.classList.remove('hidden');
     return;
   }

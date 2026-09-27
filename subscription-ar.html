@@ -102,7 +102,7 @@
 <button type="button" data-cur="USD" class="cur-btn px-3 h-8 rounded-full">دولار</button>
 </div>
 </div>
-<p class="text-[11.5px] text-on-surface-variant mb-3 leading-5">الاشتراك سنوي. فيك تدفع السنة مرة وحدة (الأوفر) أو على 4 دفعات كل 3 شهور. جرّب أي خطة مجاناً 30 يوم.</p>
+<p class="text-[11.5px] text-on-surface-variant mb-3 leading-5">الاشتراك سنوي. يمكنك دفع قيمة السنة دفعة واحدة (الأوفر) أو على 4 دفعات كل 3 أشهر. جرّب أي خطة مجاناً لمدة 30 يوماً.</p>
 <div id="plans-list" class="flex flex-col gap-3"></div>
 </section>
 
@@ -205,8 +205,8 @@ function renderPlans(plans, currentPlanId) {
       .filter(([k]) => k !== 'einvoice')
       .map(([k, v]) => featureRow(featureLabels[k] || k, v === true)).join('');
     let einv;
-    if (plan.einvoice_monthly_quota) einv = `الفوترة الإلكترونية مشمولة عند إطلاقها — حتى ${plan.einvoice_monthly_quota.toLocaleString('en-US')} فاتورة بالشهر`;
-    else if (pr && pr.einvoice_addon_monthly) einv = `الفوترة الإلكترونية: إضافة بـ ${fmtPrice(pr.einvoice_addon_monthly, cur)} بالشهر عند إطلاقها`;
+    if (plan.einvoice_monthly_quota) einv = `الفوترة الإلكترونية مشمولة عند إطلاقها — حتى ${plan.einvoice_monthly_quota.toLocaleString('en-US')} فاتورة شهرياً`;
+    else if (pr && pr.einvoice_addon_monthly) einv = `الفوترة الإلكترونية: إضافة بـ ${fmtPrice(pr.einvoice_addon_monthly, cur)} شهرياً عند إطلاقها`;
     else if (plan.is_custom) einv = 'الفوترة الإلكترونية مشمولة (حسب الاتفاق)';
     const einvRow = einv ? `<div class="flex items-start gap-2 text-[12px] text-on-surface"><span class="material-symbols-outlined text-secondary" style="font-size:15px;">receipt_long</span><span>${einv}</span></div>` : '';
 
@@ -217,8 +217,8 @@ function renderPlans(plans, currentPlanId) {
       const perMonth = Math.round(pr.yearly / 12);
       priceHtml = `<div class="mb-3">
         <p class="text-[22px] font-bold text-primary leading-tight">${fmtPrice(pr.yearly, cur)} <span class="text-[12px] font-normal text-on-surface-variant">/ سنة</span></p>
-        <p class="text-[11.5px] text-on-surface-variant">يعني حوالي ${fmtPrice(perMonth, cur)} بالشهر</p>
-        <p class="text-[11.5px] text-on-surface-variant mt-1">أو ${fmtPrice(pr.quarterly, cur)} كل 3 شهور (4 دفعات، التزام سنة)</p>
+        <p class="text-[11.5px] text-on-surface-variant">أي ما يعادل نحو ${fmtPrice(perMonth, cur)} شهرياً</p>
+        <p class="text-[11.5px] text-on-surface-variant mt-1">أو ${fmtPrice(pr.quarterly, cur)} كل 3 أشهر (4 دفعات، التزام لمدة سنة)</p>
       </div>`;
     }
     const overage = pr && pr.einvoice_overage ? `<p>فوق الحد: ${fmtPrice(pr.einvoice_overage, cur)} عن كل فاتورة إلكترونية</p>` : '';

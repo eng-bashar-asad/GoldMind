@@ -81,7 +81,7 @@ test('offline sale is queued, piece hidden, then posted exactly once', async ({ 
 
 test('a sale the server refuses stays on the device with the reason', async ({ page, context }) => {
   await install(page, { db: db(), rpc: {
-    post_sale_invoice: () => ({ status: 400, body: { code: 'P0001', message: 'القطعة B-001 مو متاحة للبيع (حالتها: sold)' } }) } });
+    post_sale_invoice: () => ({ status: 400, body: { code: 'P0001', message: 'القطعة B-001 غير متاحة للبيع (حالتها: sold)' } }) } });
   await page.goto('/tests/harness.html');
   await page.evaluate(async () => { await requireGoldMindSession(); await gmRefreshSnapshots(); });
   await goOffline(page, context);
@@ -92,7 +92,7 @@ test('a sale the server refuses stays on the device with the reason', async ({ p
   const q = await page.evaluate(async () => { window.dispatchEvent(new Event('online')); await new Promise(r => setTimeout(r, 300)); await gmSyncQueue(); return gmQueue(); });
   expect(q).toHaveLength(1);
   expect(q[0].status).toBe('failed');
-  expect(q[0].error).toContain('مو متاحة');
+  expect(q[0].error).toContain('غير متاحة');
 });
 
 test('offline sale far below gold value asks first', async ({ page, context }) => {
@@ -104,7 +104,7 @@ test('offline sale far below gold value asks first', async ({ page, context }) =
   page.on('dialog', d => { asked = d.message(); d.dismiss(); });
   const r = await page.evaluate(async (S) => gmPostSale({ store_id: S, client_ref: 'ref-3', customer_id: 'c1', payment_method: 'cash',
     items: [{ piece_id: 'p1', karat: 18, weight: 10, price: 50 }] }, {}), STORE); // gold value ~1000
-  expect(asked).toContain('أقل من نص قيمة الذهب');
+  expect(asked).toContain('أقل من نصف قيمة الذهب');
   expect(r.error).toBeTruthy();
   expect(await page.evaluate(() => gmQueue().length)).toBe(0);
 });

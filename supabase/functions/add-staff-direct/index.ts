@@ -9,9 +9,9 @@
 //  - email only     -> a username is derived from the email (made unique)
 //  - both           -> both are used as given
 //
-// Security: an email that already belongs to an account elsewhere is NEVER
-// taken over (no password reset, no username change). Only an orphan account
-// (no company, no username — e.g. a half-finished earlier add) is reused.
+// Security: an email that already has an account is NEVER taken over (no
+// password reset, no username change): the caller is told to use the email
+// invite instead. A failed add removes the account it just created.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -58,12 +58,12 @@ serve(async (req) => {
     const givenUsername = rawUsername ? String(rawUsername).trim() : '';
     const givenEmail = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
 
-    if (!store_id || !full_name) return json({ error: 'اسم الموظف ومعرف المتجر مطلوبين' }, 400);
+    if (!store_id || !full_name) return json({ error: 'اسم الموظف ومعرف المتجر مطلوبان' }, 400);
     if (!givenUsername && !givenEmail) return json({ error: 'أدخل اسم مستخدم أو بريد إلكتروني للموظف' }, 400);
     if (givenUsername && !USERNAME_RE.test(givenUsername)) {
       return json({ error: 'اسم المستخدم يجب أن يكون 3-20 خانة (حروف إنجليزية/أرقام/_ فقط، بدون مسافات)' }, 400);
     }
-    if (givenEmail && !EMAIL_RE.test(givenEmail)) return json({ error: 'صيغة الإيميل غير صحيحة' }, 400);
+    if (givenEmail && !EMAIL_RE.test(givenEmail)) return json({ error: 'صيغة البريد الإلكتروني غير صحيحة' }, 400);
 
     const password = (chosenPassword && String(chosenPassword).length >= 6) ? String(chosenPassword) : (chosenPassword ? null : generatePassword());
     if (password === null) return json({ error: 'كلمة السر يجب أن تكون 6 أحرف على الأقل' }, 400);
@@ -107,29 +107,24 @@ serve(async (req) => {
     const { data: userList } = await admin.auth.admin.listUsers({ perPage: 1000 });
     const existingUser = userList.users.find((u) => (u.email || '').toLowerCase() === email);
 
-    let userId: string;
+    // An existing account is never modified here (no password reset): this
+    // endpoint is open to every company owner, so reusing accounts would let
+    // one company take over anyone else's login, including platform admins.
     if (existingUser) {
-      const [{ data: anyStaff }, { data: profile }] = await Promise.all([
-        admin.from('staff').select('id, store_id').eq('user_id', existingUser.id),
-        admin.from('user_profiles').select('username').eq('id', existingUser.id).maybeSingle(),
-      ]);
-      if ((anyStaff || []).some((s) => s.store_id === store_id)) {
-        return json({ error: 'هذا الحساب موظف بالفعل بهذا المتجر' }, 400);
-      }
-      if ((anyStaff || []).length > 0 || profile?.username) {
-        // Belongs to a real person already: never reset their password here.
-        return json({ error: 'هذا الإيميل عنده حساب GoldMind من قبل. استخدم "دعوة بالبريد الإلكتروني" تحت، والموظف بيدخل بحسابه نفسه.' }, 400);
-      }
-      userId = existingUser.id; // orphan from an earlier unfinished add
-      await admin.auth.admin.updateUserById(userId, { password, email_confirm: true });
-    } else {
-      const { data: newUser, error: createErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
-      if (createErr || !newUser) return json({ error: 'تعذّر إنشاء الحساب: ' + createErr?.message }, 400);
-      userId = newUser.user.id;
+      const { data: here } = await admin.from('staff').select('id').eq('user_id', existingUser.id).eq('store_id', store_id).maybeSingle();
+      if (here) return json({ error: 'هذا الحساب موظف بالفعل في هذا المتجر' }, 400);
+      return json({ error: 'هذا البريد الإلكتروني لديه حساب GoldMind مسبقاً. استخدم خيار "دعوة بالبريد الإلكتروني" في الأسفل، وسيدخل الموظف بحسابه نفسه.' }, 400);
     }
 
+    const { data: newUser, error: createErr } = await admin.auth.admin.createUser({ email, password, email_confirm: true });
+    if (createErr || !newUser) return json({ error: 'تعذّر إنشاء الحساب: ' + createErr?.message }, 400);
+    const userId = newUser.user.id;
+
     const { error: profileErr } = await admin.from('user_profiles').upsert({ id: userId, username });
-    if (profileErr) return json({ error: 'تعذّر حفظ اسم المستخدم: ' + profileErr.message }, 400);
+    if (profileErr) {
+      await admin.auth.admin.deleteUser(userId); // no half-created accounts left behind
+      return json({ error: 'تعذّر حفظ اسم المستخدم: ' + profileErr.message }, 400);
+    }
 
     const { error: staffErr } = await admin.from('staff').insert({
       store_id,
@@ -139,7 +134,10 @@ serve(async (req) => {
       permissions: permissions || {},
       whatsapp_phone: whatsapp_phone || null,
     });
-    if (staffErr) return json({ error: 'تعذّر حفظ بيانات الموظف: ' + staffErr.message }, 400);
+    if (staffErr) {
+      await admin.auth.admin.deleteUser(userId);
+      return json({ error: 'تعذّر حفظ بيانات الموظف: ' + staffErr.message }, 400);
+    }
 
     return json({ success: true, username, email, temp_password: password });
   } catch (e) {

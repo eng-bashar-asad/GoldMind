@@ -45,7 +45,7 @@ test('sale without internet is kept on the device and posted later', async ({ pa
   await context.setOffline(true);
   await fillSale(page, { open: false });
   await page.click('#save-invoice-btn');
-  await expect(page.locator('#save-message')).toContainText('انحفظت الفاتورة على الجهاز');
+  await expect(page.locator('#save-message')).toContainText('حُفظت الفاتورة على الجهاز');
   await expect(page.locator('#gm-offline-badge')).toContainText('1 فاتورة بانتظار الترحيل');
   expect(posted).toHaveLength(0);
 
@@ -72,7 +72,7 @@ test('offline: a brand-new customer can be added and goes with the sale', async 
   await page.click('button[onclick="addNewCustomer()"]');
   await expect(page.locator('#customer-selected-name')).toHaveText('سامر');
   await page.click('#save-invoice-btn');
-  await expect(page.locator('#save-message')).toContainText('انحفظت الفاتورة على الجهاز');
+  await expect(page.locator('#save-message')).toContainText('حُفظت الفاتورة على الجهاز');
   page.__gmNet.offline = false;
   await context.setOffline(false);
   await expect.poll(() => posted.length, { timeout: 10000 }).toBe(1);

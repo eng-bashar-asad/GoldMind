@@ -56,7 +56,7 @@
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-5">
 
-<p class="text-[12px] text-on-surface-variant leading-5">القطعة بتطلع من المخزن بدون فاتورة بيع. كلفتها (دهب بسعر اليوم + مصنعيتها) بتنسجّل <b>مصروف</b> تحت خانة «هدايا»، فما بتأثر على أرباح الفواتير ولا على مبيعات الضريبة ولا على الصندوق.</p>
+<p class="text-[12px] text-on-surface-variant leading-5">تخرج القطعة من المخزن دون فاتورة بيع. تُسجَّل كلفتها (الذهب بسعر اليوم + مصنعيتها) <b>مصروفاً</b> تحت بند «هدايا»، فلا تؤثر على أرباح الفواتير ولا على مبيعات الضريبة ولا على الصندوق.</p>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
 <h2 class="font-semibold text-[13px]">القطعة</h2>
@@ -68,7 +68,7 @@
 </div>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
-<h2 class="font-semibold text-[13px]">لمين الهدية؟</h2>
+<h2 class="font-semibold text-[13px]">لمن الهدية؟</h2>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="recipient-input" placeholder="اسم الشخص أو الجهة"/>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="reason-input" placeholder="المناسبة / السبب (اختياري) — مثال: عيد ميلاد، مسابقة، عميل مميز"/>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-right" id="notes-input" placeholder="ملاحظات (اختياري)"></textarea>
@@ -119,7 +119,7 @@ async function findPiece() {
     goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID)
   ]);
   if (error) { box.innerHTML = `<div class="text-error text-sm">خطأ: ${gmEscapeHtml(error.message)}</div>`; return; }
-  if (!p) { box.innerHTML = '<div class="text-error text-sm">ما في قطعة متاحة بالمخزن بهالباركود.</div>'; return; }
+  if (!p) { box.innerHTML = '<div class="text-error text-sm">لا توجد قطعة متاحة في المخزن بهذا الباركود.</div>'; return; }
   currentPiece = p;
   // same formula the server uses (shown here as a preview only)
   const gp = ((prices || []).find(x => x.karat === p.karat) || {}).price_per_gram || 0;
@@ -141,10 +141,10 @@ async function findPiece() {
       </div>
     </div>
     <div class="mt-2 p-3 rounded-lg bg-amber-50 border border-amber-200 text-[12px] text-amber-900 space-y-1">
-      <div class="flex justify-between"><span>قيمة الدهب (${n(w, 3)}غ × ${n(gp)})</span><b class="font-data-mono">${money(gold)}</b></div>
+      <div class="flex justify-between"><span>قيمة الذهب (${n(w, 3)}غ × ${n(gp)})</span><b class="font-data-mono">${money(gold)}</b></div>
       <div class="flex justify-between"><span>المصنعية</span><b class="font-data-mono">${money(fab)}</b></div>
       <div class="flex justify-between border-t border-amber-200 pt-1 text-[13px]"><span class="font-bold">كلفة الهدية (مصروف)</span><b class="font-data-mono">${money(gold + fab)}</b></div>
-      ${gp ? '' : '<div class="text-error">ما في سعر ذهب محفوظ لهالعيار — حدّث سعر الذهب أولاً.</div>'}
+      ${gp ? '' : '<div class="text-error">لا يوجد سعر ذهب محفوظ لهذا العيار — حدّث سعر الذهب أولاً.</div>'}
     </div>`;
 }
 
@@ -152,8 +152,8 @@ async function saveGift() {
   const err = document.getElementById('save-error'), ok = document.getElementById('save-success');
   err.classList.add('hidden'); ok.classList.add('hidden');
   const recipient = document.getElementById('recipient-input').value.trim();
-  if (!currentPiece) { err.textContent = 'اختار القطعة أولاً (امسح الباركود)'; err.classList.remove('hidden'); return; }
-  if (!recipient) { err.textContent = 'اكتب اسم الشخص يلي رح ياخد الهدية'; err.classList.remove('hidden'); return; }
+  if (!currentPiece) { err.textContent = 'اختر القطعة أولاً (امسح الباركود)'; err.classList.remove('hidden'); return; }
+  if (!recipient) { err.textContent = 'اكتب اسم الشخص الذي سيستلم الهدية'; err.classList.remove('hidden'); return; }
   if (!confirm('إخراج القطعة ' + currentPiece.barcode + ' كهدية إلى ' + recipient + '؟')) return;
   const btn = document.getElementById('save-btn');
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
@@ -164,7 +164,7 @@ async function saveGift() {
   });
   btn.disabled = false; btn.textContent = 'إخراج كهدية';
   if (error) { err.textContent = 'تعذّر الحفظ: ' + error.message; err.classList.remove('hidden'); return; }
-  ok.textContent = 'طلعت القطعة من المخزن وانسجلت كلفتها كمصروف هدايا.';
+  ok.textContent = 'أُخرجت القطعة من المخزن وسُجّلت كلفتها كمصروف هدايا.';
   ok.classList.remove('hidden');
   ['barcode-input', 'recipient-input', 'reason-input', 'notes-input'].forEach(id => { document.getElementById(id).value = ''; });
   document.getElementById('piece-box').innerHTML = '';
@@ -173,7 +173,7 @@ async function saveGift() {
 }
 
 async function revertGift(id, barcode) {
-  if (!confirm('ترجيع القطعة ' + barcode + ' للمخزن وإلغاء مصروفها؟')) return;
+  if (!confirm('هل تريد إرجاع القطعة ' + barcode + ' إلى المخزن وإلغاء مصروفها؟')) return;
   const { error } = await goldmindClient.rpc('revert_gift', { target_gift_id: id });
   if (error) { alert('تعذّر: ' + error.message); return; }
   loadGifts();
@@ -198,10 +198,10 @@ async function loadGifts() {
       <div class="text-left">
         <div class="font-bold font-data-mono text-[13px]">${money(g.total_cost)}</div>
         ${g.status === 'active'
-          ? `<button type="button" onclick="revertGift('${g.id}', '${gmEscapeHtml(g.barcode || '').replace(/'/g, '')}')" class="text-[11px] text-primary underline">رجوع للمخزن</button>`
-          : '<span class="text-[11px]">مرجّعة</span>'}
+          ? `<button type="button" onclick="revertGift('${g.id}', '${gmEscapeHtml(g.barcode || '').replace(/'/g, '')}')" class="text-[11px] text-primary underline">إرجاع إلى المخزن</button>`
+          : '<span class="text-[11px]">مُعادة</span>'}
       </div>
-    </div>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">ما في هدايا لسا.</p>';
+    </div>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد هدايا بعد.</p>';
 }
 
 (async function load() {

@@ -167,13 +167,13 @@ var GMZebra = (function () {
       switch (field.content_type) {
         case 'barcode_number': return values.barcode || '';
         case 'company_name': return values.storeName || '';
-        case 'weight': return 'W:' + (values.weight != null ? values.weight : '');
+        case 'weight': return 'W:' + (values.weight != null && values.weight !== '' ? values.weight + 'g' : '');
         // Di (small accent diamonds) automatically takes the karat's place
         // on the label when it's filled -- no need to redesign the label
         // per piece, the karat slot just becomes the diamond slot.
         case 'karat':
           if (values.diamondCarat != null && values.diamondCarat !== '') return 'Di:' + values.diamondCarat + 'ct';
-          return 'K' + (values.karat || '');
+          return values.karat ? values.karat + 'K' : '';
         case 'mc': return 'MC:' + (values.mc != null ? values.mc : '');
         // Cs (a single larger center stone) automatically takes the piece
         // type/description's place on the label when it's filled.

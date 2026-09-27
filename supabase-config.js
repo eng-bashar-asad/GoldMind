@@ -327,8 +327,8 @@ function gmUpdateQueued(ref, fn) {
 
 function gmFriendlyError(msg) {
     msg = String(msg || '');
-    if (msg.indexOf('LOW_PRICE:') === 0) return 'في سطر سعره أقل من نص قيمة الذهب:' + msg.slice(10);
-    const map = { INSUFFICIENT_STOCK: 'رصيد الجملة ما بيكفي لهالوزن', LOT_NOT_FOUND: 'رصيد الجملة غير موجود', NOT_A_POOLED_LOT: 'رصيد الجملة مو من نوع المصنعية المجمّعة', NOT_AUTHORIZED: 'ما عندك صلاحية على هالمحل', INVALID_AMOUNT: 'كمية غير صحيحة' };
+    if (msg.indexOf('LOW_PRICE:') === 0) return 'يوجد سطر سعره أقل من نصف قيمة الذهب:' + msg.slice(10);
+    const map = { INSUFFICIENT_STOCK: 'رصيد الجملة لا يكفي لهذا الوزن', LOT_NOT_FOUND: 'رصيد الجملة غير موجود', NOT_A_POOLED_LOT: 'رصيد الجملة ليس من نوع المصنعية المجمّعة', NOT_AUTHORIZED: 'ليست لديك صلاحية على هذا المحل', INVALID_AMOUNT: 'كمية غير صحيحة' };
     for (const k in map) if (msg.indexOf(k) !== -1) return map[k];
     return msg;
 }
@@ -392,8 +392,8 @@ async function gmPostSale(payload, meta) {
     if (navigator.onLine) {
         let { data, error } = await goldmindClient.rpc('post_sale_invoice', { p: payload });
         if (error && String(error.message).indexOf('LOW_PRICE:') === 0) {
-            if (!confirm('انتبه: ' + gmFriendlyError(error.message) + '\n\nممكن تكون غلطة بالعملة أو بالسعر. متأكد بدك تكمل؟')) {
-                return { error: 'ما انحفظت الفاتورة — راجع الأسعار.' };
+            if (!confirm('انتبه: ' + gmFriendlyError(error.message) + '\n\nقد يكون هناك خطأ في العملة أو السعر. هل أنت متأكد أنك تريد المتابعة؟')) {
+                return { error: 'لم تُحفظ الفاتورة — راجع الأسعار.' };
             }
             payload.confirm_low_price = true;
             ({ data, error } = await goldmindClient.rpc('post_sale_invoice', { p: payload }));
@@ -403,7 +403,7 @@ async function gmPostSale(payload, meta) {
     }
     const low = payload.confirm_low_price ? [] : await gmLocalLowPriceLines(payload);
     if (low.length) {
-        if (!confirm('انتبه: في سطر سعره أقل من نص قيمة الذهب:' + low.join('') + '\n\nمتأكد بدك تكمل؟')) return { error: 'ما انحفظت الفاتورة — راجع الأسعار.' };
+        if (!confirm('انتبه: يوجد سطر سعره أقل من نصف قيمة الذهب:' + low.join('') + '\n\nهل أنت متأكد أنك تريد المتابعة؟')) return { error: 'لم تُحفظ الفاتورة — راجع الأسعار.' };
         payload.confirm_low_price = true;
     }
     payload.sold_at = new Date().toISOString(); // the real time of an offline sale (online sales use server time)
@@ -450,7 +450,7 @@ async function gmRunSync() {
         gmRenderOfflineBadge();
     }
     if (posted) {
-        gmToast('انرحّلت ' + posted + ' فاتورة كانت محفوظة على الجهاز');
+        gmToast('تم ترحيل ' + posted + ' فاتورة كانت محفوظة على الجهاز');
         gmRefreshSnapshots().catch(function () {});
     }
 }
@@ -485,7 +485,7 @@ function gmRenderOfflineBadge() {
     const parts = [];
     if (offline) parts.push('بدون إنترنت');
     if (pending) parts.push(pending + ' فاتورة بانتظار الترحيل');
-    if (failed) parts.push(failed + ' ما انرحّلت');
+    if (failed) parts.push(failed + ' لم تُرحَّل');
     b.style.background = failed ? '#FDECEA' : offline ? '#FFF4E0' : '#E6F0FF';
     b.style.color = failed ? '#8A1C12' : offline ? '#7A4B00' : '#1D3F7A';
     b.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">' + (failed ? 'error' : offline ? 'cloud_off' : 'cloud_upload') + '</span><span></span>';
@@ -495,7 +495,7 @@ function gmRenderOfflineBadge() {
 
 function gmShowQueue() {
     const q = gmQueue();
-    if (!q.length) { alert(navigator.onLine ? 'ما في فواتير معلّقة.' : 'ما في إنترنت. فيك تكمّل بيع، والفواتير بتترحّل لحالها لما يرجع النت.'); return; }
+    if (!q.length) { alert(navigator.onLine ? 'لا توجد فواتير معلّقة.' : 'لا يوجد اتصال بالإنترنت. يمكنك متابعة البيع، وستُرحَّل الفواتير تلقائياً عند عودة الاتصال.'); return; }
     let d = document.getElementById('gm-queue-dialog');
     if (d) d.remove();
     d = document.createElement('dialog');
@@ -504,7 +504,7 @@ function gmShowQueue() {
     d.style.cssText = 'border:0;border-radius:16px;padding:0;max-width:440px;width:92vw;';
     const esc = function (v) { return typeof gmEscapeHtml === 'function' ? gmEscapeHtml(String(v == null ? '' : v)) : String(v == null ? '' : v); };
     d.innerHTML = '<div style="padding:16px 16px 8px;font-weight:800;font-size:15px">فواتير محفوظة على الجهاز</div>' +
-        '<div style="padding:0 16px 8px;font-size:12px;color:#555">بتترحّل لحالها لما يكون في إنترنت.</div>' +
+        '<div style="padding:0 16px 8px;font-size:12px;color:#555">ستُرحَّل تلقائياً عند توفر الاتصال بالإنترنت.</div>' +
         q.map(function (x) {
             const total = x.payload.items.reduce(function (s, it) { return s + Number(it.price || 0); }, 0);
             return '<div style="border-top:1px solid #eee;padding:10px 16px;font-size:12.5px">' +
@@ -515,7 +515,7 @@ function gmShowQueue() {
                   '<button data-drop="' + esc(x.payload.client_ref) + '" style="padding:6px 10px;border-radius:8px;border:1px solid #F5C2BC;background:#FDECEA;color:#8A1C12">حذف من الجهاز</button></div>' : '') +
                 '</div>';
         }).join('') +
-        '<div style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid #eee"><button data-sync style="flex:1;padding:10px;border-radius:10px;border:0;background:#111;color:#fff;font-weight:700">رحّل هلق</button><button data-close style="padding:10px 14px;border-radius:10px;border:1px solid #ccc;background:#fff">إغلاق</button></div>';
+        '<div style="display:flex;gap:8px;padding:12px 16px;border-top:1px solid #eee"><button data-sync style="flex:1;padding:10px;border-radius:10px;border:0;background:#111;color:#fff;font-weight:700">رحّل الآن</button><button data-close style="padding:10px 14px;border-radius:10px;border:1px solid #ccc;background:#fff">إغلاق</button></div>';
     document.body.appendChild(d);
     d.addEventListener('click', async function (e) {
         const t = e.target;
@@ -524,12 +524,12 @@ function gmShowQueue() {
         if (t.dataset.retry !== undefined) {
             const item = gmQueue().find(function (x) { return x.payload.client_ref === t.dataset.retry; });
             if (!item) { d.close(); return; }
-            const low = item.error && item.error.indexOf('أقل من نص قيمة الذهب') !== -1;
-            if (low && !confirm(item.error + '\n\nمتأكد بدك ترحّلها هيك؟')) return;
+            const low = item.error && /أقل من نصف? قيمة الذهب/.test(item.error);
+            if (low && !confirm(item.error + '\n\nهل أنت متأكد أنك تريد ترحيلها كما هي؟')) return;
             gmUpdateQueued(t.dataset.retry, function (x) { if (low) x.payload.confirm_low_price = true; x.status = 'pending'; delete x.error; return x; });
             d.close(); await gmSyncQueue();
         }
-        if (t.dataset.drop !== undefined && confirm('أكيد بدك تحذف هالفاتورة من الجهاز؟ ما رح تنحفظ.')) {
+        if (t.dataset.drop !== undefined && confirm('هل أنت متأكد أنك تريد حذف هذه الفاتورة من الجهاز؟ لن تُحفظ.')) {
             gmUpdateQueued(t.dataset.drop, function () { return null; }); d.close();
         }
     });

@@ -44,13 +44,13 @@
   async function call(body) {
     var res = await goldmindClient.functions.invoke('biometric-auth', { body: body });
     if (!res.error) return res.data;
-    var msg = 'صار خطأ، جرّب مرة تانية';
+    var msg = 'حدث خطأ، حاول مرة أخرى';
     var status = res.error.context && res.error.context.status;
     try {
       var j = await res.error.context.json();
       if (j && j.error) msg = j.error;
     } catch (e) {
-      if (!navigator.onLine) msg = 'الدخول بالبصمة بدو إنترنت';
+      if (!navigator.onLine) msg = 'يتطلب الدخول بالبصمة اتصالاً بالإنترنت';
     }
     var err = new Error(msg);
     err.status = status;
@@ -59,13 +59,13 @@
 
   function friendly(e) {
     var name = e && e.name;
-    if (name === 'NotAllowedError' || name === 'AbortError') return new Error('انلغت العملية');
-    if (name === 'InvalidStateError') return new Error('البصمة مفعّلة من قبل على هالجهاز');
+    if (name === 'NotAllowedError' || name === 'AbortError') return new Error('أُلغيت العملية');
+    if (name === 'InvalidStateError') return new Error('البصمة مفعّلة مسبقاً على هذا الجهاز');
     // Android plugin: 10 failed, 16 user cancel, 13/15 cancelled
     var code = e && (e.code || e.errorCode);
-    if (code == 16 || code == 15 || code == 13 || code == 11) return new Error('انلغت العملية');
-    if (code == 10) return new Error('ما تعرّف على البصمة، جرّب مرة تانية');
-    if (code == 2 || code == 4) return new Error('انقفلت البصمة مؤقتاً بسبب محاولات كتيرة. ادخل بكلمة السر.');
+    if (code == 16 || code == 15 || code == 13 || code == 11) return new Error('أُلغيت العملية');
+    if (code == 10) return new Error('لم يتم التعرّف على البصمة، حاول مرة أخرى');
+    if (code == 2 || code == 4) return new Error('أُقفلت البصمة مؤقتاً بسبب كثرة المحاولات. سجّل الدخول بكلمة السر.');
     return e instanceof Error ? e : new Error(String(e));
   }
 
@@ -76,7 +76,7 @@
 
   async function startSession(tok) {
     var r = await goldmindClient.auth.verifyOtp({ token_hash: tok.token_hash, type: tok.type || 'magiclink' });
-    if (r.error || !r.data || !r.data.user) throw new Error('تعذّر فتح الجلسة، جرّب مرة تانية');
+    if (r.error || !r.data || !r.data.user) throw new Error('تعذّر فتح الجلسة، حاول مرة أخرى');
     try { localStorage.setItem('goldmind_last_activity', String(Date.now())); } catch (e) { /* ignore */ }
     return r.data.user;
   }
@@ -115,7 +115,7 @@
     // Turn it on for the signed-in user on this device.
     enable: async function () {
       var user = await currentUser();
-      if (!user) throw new Error('سجّل الدخول أول');
+      if (!user) throw new Error('سجّل الدخول أولاً');
       try {
         if (isNative()) {
           var p = plugin();
@@ -142,7 +142,7 @@
         if (isNative()) {
           var p = plugin();
           var acc = GMBio.accounts().filter(function (a) { return a.user_id === userId; })[0] || GMBio.accounts()[0];
-          if (!acc) throw new Error('البصمة مش مفعّلة على هالجهاز');
+          if (!acc) throw new Error('البصمة غير مفعّلة على هذا الجهاز');
           await p.verifyIdentity({ reason: 'الدخول إلى GoldMind', title: 'تسجيل الدخول', subtitle: acc.label || '', negativeButtonText: 'إلغاء', maxAttempts: 5 });
           var cred = await p.getCredentials({ server: 'goldmind-' + acc.user_id });
           var tok;
@@ -208,11 +208,11 @@
     box.innerHTML =
       '<div style="display:flex;gap:10px;align-items:flex-start">' +
       '<span class="material-symbols-outlined" aria-hidden="true" style="color:#D4AF37;font-size:28px">fingerprint</span>' +
-      '<div style="flex:1"><div style="font-weight:700;margin-bottom:4px">ادخل المرة الجاية ' + bi(label) + '</div>' +
-      '<div style="opacity:.75;font-size:12.5px;line-height:1.6">بدون ما تكتب كلمة السر. البصمة بتضل على جهازك وما بتنبعت لأي مكان.</div></div></div>' +
+      '<div style="flex:1"><div style="font-weight:700;margin-bottom:4px">سجّل الدخول في المرة القادمة ' + bi(label) + '</div>' +
+      '<div style="opacity:.75;font-size:12.5px;line-height:1.6">دون الحاجة إلى كتابة كلمة السر. تبقى البصمة على جهازك ولا تُرسَل إلى أي مكان.</div></div></div>' +
       '<div style="display:flex;gap:8px;margin-top:12px">' +
       '<button type="button" id="gm-bio-yes" style="flex:1;min-height:44px;border-radius:10px;border:0;background:#D4AF37;color:#2E2113;font-weight:700">تفعيل</button>' +
-      '<button type="button" id="gm-bio-no" style="flex:1;min-height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff">مش هلق</button></div>' +
+      '<button type="button" id="gm-bio-no" style="flex:1;min-height:44px;border-radius:10px;border:1px solid rgba(255,255,255,.25);background:transparent;color:#fff">ليس الآن</button></div>' +
       '<p id="gm-bio-msg" role="status" style="margin:8px 0 0;font-size:12px;min-height:1em"></p>';
     document.body.appendChild(box);
     var msg = box.querySelector('#gm-bio-msg');
