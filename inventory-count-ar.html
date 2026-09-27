@@ -1125,7 +1125,51 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
   document.getElementById('report-wrap').classList.remove('hidden');
 });
 
-function openSubScreen(kind) {
+// Photo + details for the pieces in the missing / surplus lists, fetched once per report.
+const PIECE_STATUS_AR = { available: 'متاحة', sold: 'مباعة', gifted: 'مُهداة', reserved: 'محجوزة', at_party: 'لدى جهة', with_party: 'لدى جهة', melted: 'مُذوّبة', returned: 'مُرتجعة' };
+let reportPieceInfo = null; // { byId: {source:id -> row}, byValue: {scanned value -> row} }
+
+async function fetchInChunks(table, column, values, columns) {
+  const out = [];
+  for (let i = 0; i < values.length; i += 150) {
+    const { data } = await goldmindClient.from(table).select(columns)
+      .eq('store_id', GOLDMIND_STORE_ID).in(column, values.slice(i, i + 150));
+    (data || []).forEach(r => out.push(r));
+  }
+  return out;
+}
+
+async function loadReportPieceInfo() {
+  if (reportPieceInfo && reportPieceInfo.countId === currentCountId) return reportPieceInfo;
+  const info = { countId: currentCountId, byId: {}, byValue: {} };
+  const goldIds = missingListCache.filter(p => p.source !== 'diamond').map(p => p.id);
+  const diaIds = missingListCache.filter(p => p.source === 'diamond').map(p => p.id);
+  const values = surplusListCache.slice();
+  const cols = 'id, barcode, description_ar, photo_url, status';
+  const jobs = [];
+  if (goldIds.length) jobs.push(fetchInChunks('pieces', 'id', goldIds, cols).then(r => r.forEach(x => { info.byId['gold:' + x.id] = x; })));
+  if (diaIds.length) jobs.push(fetchInChunks('diamond_pieces', 'id', diaIds, cols).then(r => r.forEach(x => { info.byId['diamond:' + x.id] = x; })));
+  if (values.length) {
+    jobs.push(fetchInChunks('pieces', matchField === 'rfid_epc' ? 'rfid_epc' : 'barcode', values, cols + ', rfid_epc')
+      .then(r => r.forEach(x => { info.byValue[matchField === 'rfid_epc' ? x.rfid_epc : x.barcode] = x; })));
+    if (matchField !== 'rfid_epc') {
+      jobs.push(fetchInChunks('diamond_pieces', 'barcode', values, cols).then(r => r.forEach(x => { if (!info.byValue[x.barcode]) info.byValue[x.barcode] = x; })));
+    }
+  }
+  try { await Promise.all(jobs); } catch (e) { /* offline: list still shows without photos */ }
+  reportPieceInfo = info;
+  return info;
+}
+
+function pieceThumb(url) {
+  if (!url) {
+    return '<div class="w-14 h-14 shrink-0 rounded-lg bg-surface-container-high flex items-center justify-center text-outline"><span class="material-symbols-outlined" aria-hidden="true">image_not_supported</span></div>';
+  }
+  const safe = gmEscapeHtml(url);
+  return `<a href="${safe}" target="_blank" rel="noopener" class="shrink-0" aria-label="عرض صورة القطعة بحجم كامل"><img src="${safe}" alt="صورة القطعة" loading="lazy" class="w-14 h-14 rounded-lg object-cover border border-outline-variant"/></a>`;
+}
+
+async function openSubScreen(kind) {
   document.getElementById('report-wrap').classList.add('hidden');
   document.getElementById('subscreen-wrap').classList.remove('hidden');
   document.getElementById('header-title').textContent = kind === 'missing' ? 'القطع الناقصة' : 'القطع الزيادة';
@@ -1135,21 +1179,44 @@ function openSubScreen(kind) {
     ? 'قطع متوقعة بالمخزون ولم تُمسح خلال الجلسة'
     : 'باركودات مُسحت وليس لها قطعة متوفرة مطابقة';
 
-  if (kind === 'missing') {
-    list.innerHTML = missingListCache.length === 0
+  const empty = kind === 'missing' ? missingListCache.length === 0 : surplusListCache.length === 0;
+  if (empty) {
+    list.innerHTML = kind === 'missing'
       ? '<div class="text-[12px] text-on-surface-variant py-4 text-center"><span class="material-symbols-outlined text-green-700" style="font-size:16px;vertical-align:-3px" aria-hidden="true">task_alt</span> لا توجد قطع ناقصة — كل شيء مطابق</div>'
-      : missingListCache.map(p => `
-        <div class="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2 text-[12px]">
-          <span class="font-semibold text-red-700">${gmEscapeHtml(p.barcode || p.description_ar || p.id.slice(0,8))}</span>
-          <span class="text-on-surface-variant">${p.weight_grams != null ? (p.weight_grams + 'g') : ''} ${p.karat ? 'عيار ' + p.karat : ''}</span>
-        </div>`).join('');
+      : '<div class="text-[12px] text-on-surface-variant py-4 text-center">لا توجد مسوحات زيادة</div>';
+    return;
+  }
+  list.innerHTML = '<div class="text-[12px] text-on-surface-variant py-4 text-center">جارٍ تحميل الصور...</div>';
+  const info = await loadReportPieceInfo();
+
+  if (kind === 'missing') {
+    list.innerHTML = missingListCache.map(p => {
+      const row = info.byId[(p.source === 'diamond' ? 'diamond:' : 'gold:') + p.id] || {};
+      const desc = p.description_ar || row.description_ar || '';
+      return `
+        <div class="flex items-center gap-3 bg-red-50 rounded-lg p-2 text-[12px]">
+          ${pieceThumb(row.photo_url)}
+          <div class="min-w-0 flex-1">
+            <div class="font-semibold text-red-700">${gmEscapeHtml(p.barcode || row.barcode || p.id.slice(0, 8))}</div>
+            ${desc ? `<div class="text-on-surface-variant truncate">${gmEscapeHtml(desc)}</div>` : ''}
+          </div>
+          <span class="text-on-surface-variant shrink-0">${p.weight_grams != null ? (p.weight_grams + 'g') : ''} ${p.karat ? 'عيار ' + p.karat : ''}</span>
+        </div>`;
+    }).join('');
   } else {
-    list.innerHTML = surplusListCache.length === 0
-      ? '<div class="text-[12px] text-on-surface-variant py-4 text-center">لا توجد مسوحات زيادة</div>'
-      : surplusListCache.map(v => `
-        <div class="flex items-center justify-between bg-amber-50 rounded-lg px-3 py-2 text-[12px] font-data-mono">
-          <span>${gmEscapeHtml(v)}</span>
-        </div>`).join('');
+    list.innerHTML = surplusListCache.map(v => {
+      const row = info.byValue[v];
+      const status = row ? (PIECE_STATUS_AR[row.status] || row.status || '') : '';
+      return `
+        <div class="flex items-center gap-3 bg-amber-50 rounded-lg p-2 text-[12px]">
+          ${pieceThumb(row && row.photo_url)}
+          <div class="min-w-0 flex-1">
+            <div class="font-data-mono font-semibold">${gmEscapeHtml(v)}</div>
+            ${row && row.description_ar ? `<div class="text-on-surface-variant truncate">${gmEscapeHtml(row.description_ar)}</div>` : ''}
+            <div class="text-[11px] ${row ? 'text-amber-800' : 'text-outline'}">${row ? 'مسجّلة في النظام — حالتها: ' + gmEscapeHtml(status) : 'غير مسجّلة في النظام'}</div>
+          </div>
+        </div>`;
+    }).join('');
   }
 }
 
