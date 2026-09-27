@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=28"></script>
-<script src="theme.js?v=29"></script>
+<script src="theme.js?v=30"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -219,17 +219,15 @@
 
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-dob">تاريخ الميلاد</label>
-<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="ind-dob" type="date"/>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="ind-dob" type="text" data-gm-date/>
 </div>
 
 <div class="flex gap-3">
 <div class="relative flex-1">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-id-type">نوع المستند</label>
 <select class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-3 focus:ring-1 focus:ring-primary outline-none text-right text-on-background" id="ind-id-type">
-<option value="emirates_id">هوية إماراتية</option>
+<option value="emirates_id">هوية شخصية</option>
 <option value="passport">جواز سفر</option>
-<option value="residency">إقامة</option>
-<option value="other">أخرى</option>
 </select>
 </div>
 </div>
@@ -241,7 +239,7 @@
 
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider" for="ind-id-expiry">تاريخ انتهاء المستند</label>
-<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="ind-id-expiry" type="date"/>
+<input class="w-full h-14 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all font-data-mono text-right text-on-background" dir="ltr" id="ind-id-expiry" type="text" data-gm-date/>
 </div>
 
 <div class="relative">
@@ -422,10 +420,10 @@
         const signatoryId = document.getElementById('company-signatory-id').value.trim();
 
         const nationality = document.getElementById('ind-nationality').value.trim();
-        const dob = document.getElementById('ind-dob').value || null;
+        const dob = gmDateGet(document.getElementById('ind-dob'));
         const idType = document.getElementById('ind-id-type').value;
         const idNumber = document.getElementById('ind-id-number').value.trim();
-        const idExpiry = document.getElementById('ind-id-expiry').value || null;
+        const idExpiry = gmDateGet(document.getElementById('ind-id-expiry'));
         const indAddress = document.getElementById('ind-address').value.trim();
         const occupation = document.getElementById('ind-occupation').value.trim();
         const sourceOfFunds = document.getElementById('ind-source-funds').value.trim();
@@ -442,6 +440,14 @@
         }
         if (isCompany && !legalName) {
             showMessage('الرجاء إدخال اسم الشركة القانوني.', true);
+            return;
+        }
+        if (!isCompany && (dob === undefined || idExpiry === undefined)) {
+            showMessage('التاريخ غير صحيح، اكتبه بالشكل يوم/شهر/سنة، مثال: 26/09/1970', true);
+            return;
+        }
+        if (!isCompany && dob && dob > new Date().toISOString().slice(0, 10)) {
+            showMessage('تاريخ الميلاد غير صحيح.', true);
             return;
         }
         if (!declarationAccepted) {

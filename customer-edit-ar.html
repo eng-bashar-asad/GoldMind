@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=28"></script>
-<script src="theme.js?v=29"></script>
+<script src="theme.js?v=30"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
     html { font-size: 87.5%; }
@@ -76,7 +76,7 @@
 <h2 class="text-[13px] font-bold mt-2">البيانات الشخصية</h2>
 <div class="relative">
 <label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-dob">تاريخ الميلاد</label>
-<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-dob" type="date"/>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-dob" type="text" data-gm-date/>
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-nationality">الجنسية</label>
@@ -86,10 +86,8 @@
 <label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-id-type">نوع المستند</label>
 <select class="w-full h-14 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-id-type">
 <option value="">—</option>
-<option value="emirates_id">هوية إماراتية</option>
+<option value="emirates_id">هوية شخصية</option>
 <option value="passport">جواز سفر</option>
-<option value="residency">إقامة</option>
-<option value="other">أخرى</option>
 </select>
 </div>
 <div class="relative">
@@ -98,7 +96,7 @@
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-id-expiry">تاريخ انتهاء المستند</label>
-<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-id-expiry" type="date"/>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-id-expiry" type="text" data-gm-date/>
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-occupation">المهنة</label>
@@ -200,7 +198,14 @@ async function load() {
         code.add(new Option('+' + c.phone_country_code, c.phone_country_code));
     }
     code.value = c.phone_country_code || GOLDMIND_DEFAULT_PHONE_CODE;
-    for (const [id, col] of FIELD_MAP) document.getElementById(id).value = c[col] != null ? c[col] : '';
+    const idType = document.getElementById('f-id-type');
+    if (c.id_type && ![...idType.options].some(o => o.value === c.id_type)) {
+        idType.add(new Option({ residency: 'إقامة', other: 'مستند آخر' }[c.id_type] || c.id_type, c.id_type));
+    }
+    for (const [id, col] of FIELD_MAP) {
+        const el = document.getElementById(id);
+        if (el.hasAttribute('data-gm-date')) gmDateSet(el, c[col]); else el.value = c[col] != null ? c[col] : '';
+    }
 }
 
 // input id -> customers column, for the fields that are saved as-is
@@ -267,7 +272,19 @@ async function saveCustomer() {
     const cols = isCompany ? COMPANY_COLS : INDIVIDUAL_COLS;
     for (const [id, col] of FIELD_MAP) {
         if (!cols.includes(col)) continue;
-        const v = document.getElementById(id).value.trim();
+        const el = document.getElementById(id);
+        if (el.hasAttribute('data-gm-date')) {
+            const iso = gmDateGet(el);
+            if (iso === undefined) {
+                btn.disabled = false; btn.textContent = 'حفظ التعديلات';
+                showMessage('التاريخ غير صحيح، اكتبه بالشكل يوم/شهر/سنة، مثال: 26/09/1970', true);
+                el.focus();
+                return;
+            }
+            updatePayload[col] = iso;
+            continue;
+        }
+        const v = el.value.trim();
         updatePayload[col] = v === '' ? null : (col === 'ubo_ownership_percent' ? Number(v) : v);
     }
     if (isCompany) {

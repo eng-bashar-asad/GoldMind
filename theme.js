@@ -1063,6 +1063,10 @@ console.assert(gmMoney(1234.5) === '1,234.50' && gmMoney(null) === '0.00');
 (function gmUiPolish() {
   const css = `
   body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
+  /* dates read day/month/year left-to-right even on an Arabic phone
+     (an Arabic system locale otherwise jumbles the parts: "261970/09/") */
+  input[type=date],input[type=datetime-local],input[type=month]{direction:ltr;-webkit-locale:"en-GB";text-align:right;}
+  input[type=date]::-webkit-datetime-edit,input[type=datetime-local]::-webkit-datetime-edit,input[type=month]::-webkit-datetime-edit{direction:ltr;unicode-bidi:isolate;}
   /* money and weights line up in columns */
   .font-data-mono,td,th,input[type=number],[dir=ltr]{font-variant-numeric:tabular-nums;}
   /* keyboard focus is always visible (mouse/touch clicks stay clean) */
@@ -1184,4 +1188,45 @@ console.assert(gmMoney(1234.5) === '1,234.50' && gmMoney(null) === '0.00');
     if (window.__gmPreferGallery) { window.__gmPreferGallery = false; openInput(input, false); return; }
     showSheet(input);
   }, true);
+})();
+
+// ---------- Typed dates (day/month/year) ----------
+// Native date pickers on Arabic Android phones jumble the parts
+// ("261970/09/") and make old dates (birthdays) slow to reach. Inputs marked
+// data-gm-date become plain LTR text typed as DD/MM/YYYY; slashes are added
+// automatically and Arabic digits are accepted. Read/write with
+// gmDateGet(el) -> 'YYYY-MM-DD' | null (empty) | undefined (invalid) and
+// gmDateSet(el, 'YYYY-MM-DD').
+function gmDateNormalize(v) {
+  const d = String(v || '').replace(/[٠-٩]/g, (c) => String(c.charCodeAt(0) - 0x660)).replace(/\D/g, '').slice(0, 8);
+  return d.length > 4 ? d.slice(0, 2) + '/' + d.slice(2, 4) + '/' + d.slice(4)
+       : d.length > 2 ? d.slice(0, 2) + '/' + d.slice(2) : d;
+}
+function gmDateGet(el) {
+  const v = el.value.trim();
+  if (!v) return null;
+  const m = /^(\d{2})\/(\d{2})\/(\d{4})$/.exec(v);
+  if (!m) return undefined;
+  const iso = m[3] + '-' + m[2] + '-' + m[1];
+  const t = new Date(iso + 'T00:00:00Z');
+  return (!isNaN(t) && t.toISOString().slice(0, 10) === iso) ? iso : undefined;
+}
+function gmDateSet(el, iso) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso || '');
+  el.value = m ? m[3] + '/' + m[2] + '/' + m[1] : '';
+}
+function gmDateInit(el) {
+  if (el.__gmDate) return;
+  el.__gmDate = true;
+  el.type = 'text';
+  el.setAttribute('inputmode', 'numeric');
+  el.setAttribute('dir', 'ltr');
+  el.setAttribute('autocomplete', 'off');
+  el.setAttribute('maxlength', '10');
+  if (!el.placeholder) el.placeholder = 'DD/MM/YYYY';
+  el.addEventListener('input', () => { el.value = gmDateNormalize(el.value); });
+}
+(function () {
+  const run = () => document.querySelectorAll('input[data-gm-date]').forEach(gmDateInit);
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
 })();
