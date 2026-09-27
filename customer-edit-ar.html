@@ -41,10 +41,9 @@
 <div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
 
 <div class="hidden flex flex-col gap-4" id="form-wrap">
-<p class="text-[12px]" style="color: var(--gm-on-surface-variant);">تتيح لك هذه الصفحة تحويل عميل فرد إلى شركة (أو العكس) وإضافة/تعديل رقم التسجيل الضريبي (TRN) — وهو ضروري إذا كنت ستبيعه بفاتورة B2B (فوترة إلكترونية) مستقبلاً.</p>
 
 <div class="flex items-center justify-between border rounded-xl px-4 h-14" style="border-color: var(--gm-outline-variant);">
-<span class="font-semibold text-[14px]">عميل شركة (له TRN)</span>
+<span class="font-semibold text-[14px]">عميل شركة</span>
 <label class="gm-switch">
 <input id="isCompanyToggle" onchange="onIsCompanyToggle(this.checked)" type="checkbox"/>
 <span class="gm-switch-track"></span>
@@ -52,41 +51,106 @@
 </div>
 
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-name">الاسم</label>
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-name">الاسم</label>
 <input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-name" type="text"/>
+</div>
+
+<div>
+<label class="block text-[10px] font-semibold mb-1 px-1" style="color: var(--gm-on-surface-variant);" for="f-phone">رقم الهاتف</label>
+<div class="flex gap-2">
+<select class="h-14 border rounded-lg px-2 text-sm font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-phone-code" aria-label="رمز الدولة"></select>
+<input class="flex-1 min-w-0 h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-phone" type="tel"/>
+</div>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-email">البريد الإلكتروني</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-email" type="email"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-address">العنوان</label>
+<textarea class="w-full h-20 border rounded-lg px-4 py-3 resize-none" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-address"></textarea>
+</div>
+
+<!-- Individual-only fields -->
+<div class="flex flex-col gap-4" id="individual-fields">
+<h2 class="text-[13px] font-bold mt-2">البيانات الشخصية</h2>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-dob">تاريخ الميلاد</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-dob" type="date"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-nationality">الجنسية</label>
+<input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-nationality" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-id-type">نوع المستند</label>
+<select class="w-full h-14 border rounded-lg px-3" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-id-type">
+<option value="">—</option>
+<option value="emirates_id">هوية إماراتية</option>
+<option value="passport">جواز سفر</option>
+<option value="residency">إقامة</option>
+<option value="other">أخرى</option>
+</select>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-id-number">رقم المستند</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-id-number" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-id-expiry">تاريخ انتهاء المستند</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-id-expiry" type="date"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-occupation">المهنة</label>
+<input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-occupation" type="text"/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-source-funds">مصدر الأموال</label>
+<input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-source-funds" type="text" placeholder="مثال: راتب، تجارة، ادخار"/>
+</div>
 </div>
 
 <!-- Company-only fields -->
 <div class="hidden flex-col gap-4" id="company-fields">
+<h2 class="text-[13px] font-bold mt-2">بيانات الشركة</h2>
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-legal-name">الاسم القانوني للشركة</label>
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-legal-name">الاسم القانوني للشركة</label>
 <input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-legal-name" type="text"/>
 </div>
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-tax-number">الرقم الضريبي (TRN)</label>
-<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-tax-number" placeholder="100XXXXXXXXXXXX" type="text"/>
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-tax-number">الرقم الضريبي (TRN)</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-tax-number" type="text" placeholder="100XXXXXXXXXXXX"/>
 </div>
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-trade-license">رقم الرخصة/السجل التجاري</label>
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-trade-license">رقم الرخصة/السجل التجاري</label>
 <input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-trade-license" type="text"/>
 </div>
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-activity">نشاط الشركة</label>
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-activity">نشاط الشركة</label>
 <input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-activity" type="text"/>
 </div>
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-email">البريد الإلكتروني للشركة</label>
-<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-email" type="email"/>
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-ubo-name">اسم المستفيد الحقيقي</label>
+<input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-ubo-name" type="text"/>
 </div>
+<div class="flex gap-3">
+<div class="flex-1"><div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-ubo-id">رقم هوية المستفيد</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-ubo-id" type="text"/>
+</div></div>
+<div class="w-28"><div class="relative">
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-ubo-percent">نسبة الملكية %</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-ubo-percent" type="number"/>
+</div></div>
 </div>
-
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-phone">رقم الهاتف</label>
-<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-phone" type="tel"/>
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-signatory-name">اسم المفوّض بالتوقيع</label>
+<input class="w-full h-14 border rounded-lg px-4" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-signatory-name" type="text"/>
 </div>
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant);" for="f-address">العنوان</label>
-<textarea class="w-full h-20 border rounded-lg px-4 py-3 resize-none" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-address"></textarea>
+<label class="absolute -top-2 right-3 px-1 text-[10px] font-semibold" style="color: var(--gm-on-surface-variant); background: var(--gm-bg-elevated, #F3EEDF);" for="f-signatory-id">رقم هوية المفوّض</label>
+<input class="w-full h-14 border rounded-lg px-4 font-data-mono" dir="ltr" style="border-color: var(--gm-outline-variant); background: transparent;" id="f-signatory-id" type="text"/>
+</div>
 </div>
 
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
@@ -131,11 +195,35 @@ async function load() {
     document.getElementById('f-email').value = c.email || '';
     document.getElementById('f-phone').value = c.phone || '';
     document.getElementById('f-address').value = c.address || '';
+    const code = document.getElementById('f-phone-code');
+    if (c.phone_country_code && ![...code.options].some(o => o.value === c.phone_country_code)) {
+        code.add(new Option('+' + c.phone_country_code, c.phone_country_code));
+    }
+    code.value = c.phone_country_code || GOLDMIND_DEFAULT_PHONE_CODE;
+    for (const [id, col] of FIELD_MAP) document.getElementById(id).value = c[col] != null ? c[col] : '';
 }
+
+// input id -> customers column, for the fields that are saved as-is
+const FIELD_MAP = [
+    ['f-dob', 'date_of_birth'], ['f-nationality', 'nationality'], ['f-id-type', 'id_type'],
+    ['f-id-number', 'id_number'], ['f-id-expiry', 'id_expiry_date'], ['f-occupation', 'occupation'],
+    ['f-source-funds', 'source_of_funds'], ['f-ubo-name', 'ubo_name'], ['f-ubo-id', 'ubo_id_number'],
+    ['f-ubo-percent', 'ubo_ownership_percent'], ['f-signatory-name', 'authorized_signatory_name'],
+    ['f-signatory-id', 'authorized_signatory_id_number'],
+];
+const INDIVIDUAL_COLS = ['date_of_birth', 'nationality', 'id_type', 'id_number', 'id_expiry_date', 'occupation', 'source_of_funds'];
+const COMPANY_COLS = ['ubo_name', 'ubo_id_number', 'ubo_ownership_percent', 'authorized_signatory_name', 'authorized_signatory_id_number'];
+
+(function fillPhoneCodes() {
+    const sel = document.getElementById('f-phone-code');
+    Object.keys(GOLDMIND_COUNTRY_PHONE_MAP).forEach(cc => sel.add(new Option('+' + GOLDMIND_COUNTRY_PHONE_MAP[cc] + ' (' + cc + ')', GOLDMIND_COUNTRY_PHONE_MAP[cc])));
+    sel.value = GOLDMIND_DEFAULT_PHONE_CODE;
+})();
 
 function onIsCompanyToggle(checked) {
     document.getElementById('company-fields').classList.toggle('hidden', !checked);
     document.getElementById('company-fields').classList.toggle('flex', checked);
+    document.getElementById('individual-fields').classList.toggle('hidden', checked);
 }
 
 function showMessage(text, isError) {
@@ -165,18 +253,38 @@ async function saveCustomer() {
     btn.disabled = true;
     btn.textContent = 'جارِ الحفظ...';
 
+    const phone = document.getElementById('f-phone').value.trim();
     const updatePayload = {
         name: name,
         is_company: isCompany,
-        phone: document.getElementById('f-phone').value.trim() || null,
+        phone: phone || null,
+        phone_country_code: phone ? document.getElementById('f-phone-code').value : null,
+        email: document.getElementById('f-email').value.trim() || null,
         address: document.getElementById('f-address').value.trim() || null
     };
+    // Only the fields for the current kind are written; the other kind's
+    // saved values are left untouched in case the toggle was a mistake.
+    const cols = isCompany ? COMPANY_COLS : INDIVIDUAL_COLS;
+    for (const [id, col] of FIELD_MAP) {
+        if (!cols.includes(col)) continue;
+        const v = document.getElementById(id).value.trim();
+        updatePayload[col] = v === '' ? null : (col === 'ubo_ownership_percent' ? Number(v) : v);
+    }
     if (isCompany) {
         updatePayload.legal_name = document.getElementById('f-legal-name').value.trim() || null;
         updatePayload.tax_number = taxNumber || null;
         updatePayload.trade_license_number = document.getElementById('f-trade-license').value.trim() || null;
         updatePayload.business_activity = document.getElementById('f-activity').value.trim() || null;
-        updatePayload.email = document.getElementById('f-email').value.trim() || null;
+    }
+    const dob = updatePayload.date_of_birth;
+    if (dob && (dob > new Date().toISOString().slice(0, 10) || dob < '1900-01-01')) {
+        btn.disabled = false; btn.textContent = 'حفظ التعديلات'; showMessage('تاريخ الميلاد غير صحيح.', true);
+        return;
+    }
+    const pct = updatePayload.ubo_ownership_percent;
+    if (pct != null && !(pct >= 0 && pct <= 100)) {
+        btn.disabled = false; btn.textContent = 'حفظ التعديلات'; showMessage('نسبة الملكية يجب أن تكون بين 0 و100.', true);
+        return;
     }
 
     const { error } = await goldmindClient.from('customers').update(updatePayload).eq('id', customerId);
@@ -190,7 +298,7 @@ async function saveCustomer() {
     }
 
     showMessage('تم حفظ التعديلات بنجاح.', false);
-    setTimeout(() => { window.location.href = 'customer-debts-ar.html'; }, 900);
+    setTimeout(() => { gmSmartBack('customer-debts-ar.html'); }, 900);
 }
 
 load();
