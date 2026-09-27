@@ -54,48 +54,60 @@
 <body class="bg-gray-100 text-gray-900">
 
 <!-- Top bar (screen only) -->
-<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between px-4 h-14">
-<button onclick="gmSmartBack('index-ar.html')" class="flex items-center gap-2 text-gray-700">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
-<span class="text-sm font-semibold">الرئيسية</span>
+<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center gap-2 px-3 h-14">
+<button onclick="gmSmartBack('index-ar.html')" class="w-10 h-10 flex items-center justify-center rounded-full text-gray-700 hover:bg-gray-100" aria-label="رجوع">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 26px;">arrow_forward</span>
 </button>
-<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
-<span class="material-symbols-outlined">print</span>
-                طباعة
-            </button>
-<button onclick="downloadInvoicePdf()" id="download-pdf-btn" class="flex items-center gap-2 bg-white text-black border border-gray-300 px-4 py-2 rounded-lg text-sm font-semibold">
-<span class="material-symbols-outlined">download</span>
-                تحميل PDF
-            </button>
-<button class="hidden items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 py-2 rounded-lg text-sm font-semibold" id="whatsapp-invoice-btn" onclick="sendInvoiceWhatsApp()">
+<div class="flex-1"></div>
+<button onclick="window.print()" class="flex items-center gap-1.5 bg-black text-white px-3 h-10 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined text-[20px]">print</span>طباعة</button>
+<button onclick="downloadInvoicePdf()" id="download-pdf-btn" class="flex items-center gap-1.5 bg-white text-black border border-gray-300 px-3 h-10 rounded-lg text-sm font-semibold">
+<span class="material-symbols-outlined text-[20px]">download</span>PDF</button>
+<button class="hidden items-center gap-2 bg-green-50 text-green-700 border border-green-200 px-3 h-10 rounded-lg text-sm font-semibold" id="whatsapp-invoice-btn" onclick="sendInvoiceWhatsApp()">
 <span class="material-symbols-outlined">share</span>
-                واتساب
+<span class="tb-opt">واتساب</span>
             </button>
-<button class="hidden items-center gap-2 bg-red-600 text-white px-3 py-2 rounded-lg text-sm font-semibold" id="delete-invoice-btn" onclick="deleteInvoiceFlow()">
-<span class="material-symbols-outlined">delete_forever</span>
-                حذف نهائي
-            </button>
-<button class="hidden items-center gap-2 bg-red-50 text-red-700 border border-red-200 px-3 py-2 rounded-lg text-sm font-semibold" id="cancel-invoice-btn" onclick="cancelInvoiceFlow()">
-<span class="material-symbols-outlined">cancel</span>
-                إلغاء الفاتورة
-            </button>
-<button class="hidden items-center gap-2 bg-amber-50 text-amber-800 border border-amber-200 px-3 py-2 rounded-lg text-sm font-semibold" id="edit-invoice-btn">
+<div class="relative" id="more-wrap">
+<button id="more-btn" onclick="gmToggleMore(event)" class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-300 text-gray-700" aria-label="خيارات أخرى" aria-haspopup="true">
+<span class="material-symbols-outlined">more_vert</span>
+</button>
+<div id="more-menu" class="hidden absolute left-0 top-12 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1 overflow-hidden" role="menu">
+<button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-amber-800" id="edit-invoice-btn">
 <span class="material-symbols-outlined">edit</span>
                 تعديل
             </button>
-<button class="hidden items-center gap-2 bg-blue-50 text-blue-700 border border-blue-200 px-3 py-2 rounded-lg text-sm font-semibold" id="restore-invoice-btn" onclick="restoreInvoiceFlow()">
+<button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-red-700" id="cancel-invoice-btn" onclick="gmCloseMore();cancelInvoiceFlow()">
+<span class="material-symbols-outlined">cancel</span>
+                إلغاء الفاتورة
+            </button>
+<button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-blue-700" id="restore-invoice-btn" onclick="gmCloseMore();restoreInvoiceFlow()">
 <span class="material-symbols-outlined">restore</span>
                 استعادة الفاتورة
             </button>
-<button class="hidden items-center gap-2 bg-purple-50 text-purple-700 border border-purple-200 px-3 py-2 rounded-lg text-sm font-semibold" id="einvoice-btn" onclick="generateEinvoiceXml()">
+<button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-red-600" id="delete-invoice-btn" onclick="gmCloseMore();deleteInvoiceFlow()">
+<span class="material-symbols-outlined">delete_forever</span>
+                حذف نهائي
+            </button>
+<button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-purple-700" id="einvoice-btn" onclick="gmCloseMore();generateEinvoiceXml()">
 <span class="material-symbols-outlined">description</span>
                 XML إلكترونية
             </button>
-<button class="hidden items-center gap-2 bg-emerald-50 text-emerald-700 border border-emerald-200 px-3 py-2 rounded-lg text-sm font-semibold" id="show-profit-btn" onclick="toggleProfitPanel()">
+<button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-emerald-700" id="show-profit-btn" onclick="gmCloseMore();toggleProfitPanel()">
 <span class="material-symbols-outlined">payments</span>
                 عرض الربح
             </button>
 </div>
+</div>
+</div>
+<style>
+@media (max-width: 420px) { .tb-opt { display: none; } }
+#more-wrap:not(:has(#more-menu button:not(.hidden))) { display: none; }
+</style>
+<script>
+function gmToggleMore(e) { e.stopPropagation(); document.getElementById('more-menu').classList.toggle('hidden'); }
+function gmCloseMore() { document.getElementById('more-menu').classList.add('hidden'); }
+document.addEventListener('click', function (e) { if (!e.target.closest('#more-wrap')) gmCloseMore(); });
+</script>
 
 <div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
 <div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
@@ -184,10 +196,12 @@
 
 <!-- Print with / without piece photos — screen-only choice, remembered
      per device. When on, each item row shows its photo. -->
-<div class="no-print hidden items-center gap-2 mb-3 p-2 bg-gray-50 rounded-lg text-[12px]" id="piece-photo-controls">
-<span class="font-semibold text-gray-700">الطباعة:</span>
-<button type="button" data-photos="0" class="photo-mode-btn h-8 px-3 rounded-lg border border-gray-300">بدون صور</button>
-<button type="button" data-photos="1" class="photo-mode-btn h-8 px-3 rounded-lg border border-gray-300">مع صور القطع</button>
+<div class="no-print hidden items-center justify-between gap-3 mb-3 text-[12px]" id="piece-photo-controls">
+<span class="font-semibold text-gray-600">صور القطع في الفاتورة</span>
+<div class="inline-flex p-1 bg-gray-100 rounded-full" role="radiogroup" aria-label="صور القطع في الفاتورة">
+<button type="button" data-photos="0" role="radio" class="photo-mode-btn h-8 px-4 rounded-full font-semibold transition-colors">بدون صور</button>
+<button type="button" data-photos="1" role="radio" class="photo-mode-btn h-8 px-4 rounded-full font-semibold transition-colors">مع الصور</button>
+</div>
 </div>
 
 <!-- Items table (sale / return / buyRetail — no per-item VAT breakdown) -->
@@ -721,8 +735,10 @@
                 document.getElementById('items-table-generic').classList.toggle('with-photos', on);
                 controls.querySelectorAll('.photo-mode-btn').forEach(b => {
                     const sel = (b.dataset.photos === '1') === on;
-                    b.style.background = sel ? '#775a19' : '#fff';
-                    b.style.color = sel ? '#fff' : '#374151';
+                    b.style.background = sel ? '#fff' : 'transparent';
+                    b.style.color = sel ? '#775a19' : '#6b7280';
+                    b.style.boxShadow = sel ? '0 1px 3px rgba(0,0,0,.15)' : 'none';
+                    b.setAttribute('aria-checked', sel ? 'true' : 'false');
                 });
             };
             controls.querySelectorAll('.photo-mode-btn').forEach(b => b.addEventListener('click', () => {

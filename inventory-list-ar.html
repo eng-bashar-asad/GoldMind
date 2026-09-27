@@ -146,15 +146,19 @@
 <main class="pb-32 max-w-md lg:max-w-6xl mx-auto px-margin-mobile lg:px-8">
 
 <!-- Summary bar -->
-<div class="flex justify-between items-center py-4 text-on-surface-variant font-label-md text-label-md">
-<span id="piece-count">جارِ التحميل...</span>
-<div class="flex items-center gap-3">
-<span id="total-fab"></span>
-<span id="total-diamond-carat" class="hidden"></span>
-<span id="total-weight"></span>
-<span id="total-accounting-weight" class="hidden"></span>
+<div class="grid grid-cols-2 lg:grid-cols-5 gap-2 py-4" id="inv-summary">
+<div class="gm-stat"><span class="gm-stat-l">القطع المتوفرة</span><span class="gm-stat-v" id="piece-count">…</span></div>
+<div class="gm-stat"><span class="gm-stat-l">الوزن القائم</span><span class="gm-stat-v" id="total-weight"></span></div>
+<div class="gm-stat hidden" id="total-accounting-weight-box"><span class="gm-stat-l">الوزن المحاسبي</span><span class="gm-stat-v" id="total-accounting-weight"></span></div>
+<div class="gm-stat"><span class="gm-stat-l">قيمة المصنعية</span><span class="gm-stat-v" id="total-fab"></span></div>
+<div class="gm-stat hidden" id="total-diamond-carat-box"><span class="gm-stat-l">الماس</span><span class="gm-stat-v" id="total-diamond-carat" dir="ltr"></span></div>
 </div>
-</div>
+<style>
+.gm-stat{display:flex;flex-direction:column;gap:2px;padding:10px 12px;border:1px solid rgba(0,0,0,.08);border-radius:12px;background:rgba(255,255,255,.55);min-width:0}
+.gm-stat.hidden{display:none}
+.gm-stat-l{font-size:11px;opacity:.65}
+.gm-stat-v{font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+</style>
 
 <!-- Search / filter panel (hidden by default) -->
 <div class="hidden border border-outline-variant rounded-xl p-4 bg-surface-container-lowest mt-2 flex flex-col gap-3" id="search-panel">
@@ -402,8 +406,8 @@
 
     function renderTotals(pieces) {
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
-        document.getElementById('total-weight').textContent = 'القائم ' + totalWeight.toFixed(2) + ' غ';
-        document.getElementById('total-fab').textContent = 'مصنعية ' + gmFormatDualCurrency(totalFabValue(pieces), currentStore);
+        document.getElementById('total-weight').textContent = totalWeight.toFixed(2) + ' غ';
+        document.getElementById('total-fab').textContent = gmFormatDualCurrency(totalFabValue(pieces), currentStore);
 
         // Di (accent diamonds) + Cs (center stone) combined, across whatever
         // scope is currently shown -- so staff can see how much diamond
@@ -412,19 +416,19 @@
         const totalDiamondCarat = pieces.reduce((sum, p) =>
             sum + Number(p.accent_diamond_carat || 0) + Number(p.center_stone_carat || 0), 0);
         if (totalDiamondCarat > 0) {
-            diamondEl.textContent = 'ماس ' + totalDiamondCarat.toFixed(2) + 'ct';
-            diamondEl.classList.remove('hidden');
+            diamondEl.textContent = totalDiamondCarat.toFixed(2) + ' ct';
+            diamondEl.parentElement.classList.remove('hidden');
         } else {
-            diamondEl.classList.add('hidden');
+            diamondEl.parentElement.classList.add('hidden');
         }
 
         const accEl = document.getElementById('total-accounting-weight');
         if (canViewAccWeight) {
             const totalAcc = pieces.reduce((sum, p) => sum + Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : (p.weight_grams || 0)), 0);
-            accEl.textContent = 'المحاسبي ' + totalAcc.toFixed(2) + ' غ';
-            accEl.classList.remove('hidden');
+            accEl.textContent = totalAcc.toFixed(2) + ' غ';
+            accEl.parentElement.classList.remove('hidden');
         } else {
-            accEl.classList.add('hidden');
+            accEl.parentElement.classList.add('hidden');
         }
     }
 
@@ -467,7 +471,7 @@
         });
         const karats = Object.keys(byKarat).map(Number).sort((a, b) => b - a);
         boxesEl.innerHTML = karats.map(k => karatBoxHtml(k, byKarat[k])).join('');
-        document.getElementById('piece-count').textContent = pieces.length + ' قطعة متوفرة';
+        document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
         renderTotals(pieces);
         boxesEl.classList.remove('hidden');
         boxesEl.classList.add('grid');
@@ -497,7 +501,7 @@
         renderBoxBoxes();
         document.getElementById('box-boxes').classList.remove('hidden');
         document.getElementById('piece-list-view').classList.add('hidden');
-        document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة متوفرة';
+        document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة';
         renderTotals(ALL_PIECES);
     }
     // Kept as an alias -- older calls in this file still reference it.
@@ -550,7 +554,7 @@
 
         const boxesEl = document.getElementById('karat-boxes');
         boxesEl.innerHTML = prefixes.map(pre => prefixBoxHtml(boxName, pre, byPrefix[pre])).join('');
-        document.getElementById('piece-count').textContent = pieces.length + ' قطعة متوفرة';
+        document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
         renderTotals(pieces);
         boxesEl.classList.remove('hidden');
         boxesEl.classList.add('grid');
