@@ -1424,6 +1424,49 @@
         loadStockLots();
     }
 
+    // Change a line's price before the invoice is posted (tap the price).
+    function editCartPrice(cartId, btn) {
+        const item = cart.find(i => i.cartId === cartId);
+        if (!item) return;
+        const td = btn.parentElement;
+        td.innerHTML = '';
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.inputMode = 'decimal';
+        input.step = '0.01';
+        input.min = '0';
+        input.value = item.price;
+        input.setAttribute('aria-label', 'السعر الجديد');
+        input.className = 'w-24 h-10 border border-primary rounded px-2 text-left font-data-mono';
+        td.appendChild(input);
+        input.focus();
+        input.select();
+        let done = false;
+        const finish = (save, fromBlur) => {
+            if (done) return;
+            done = true;
+            if (save) {
+                const v = parseFloat(input.value);
+                if (!(v > 0) && fromBlur) {
+                    save = false; // left the field with an invalid price: keep the old one
+                } else if (!(v > 0)) {
+                    done = false;
+                    input.classList.add('border-error');
+                    input.focus();
+                    return;
+                }
+                if (save) item.price = Math.round(v * 100) / 100;
+            }
+            renderCart();
+            if (selectedPaymentMethod === 'mixed') onMixedAmountInput();
+        };
+        input.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') { e.preventDefault(); finish(true); }
+            if (e.key === 'Escape') { e.preventDefault(); finish(false); }
+        });
+        input.addEventListener('blur', () => finish(true, true));
+    }
+
     function renderCart() {
         const body = document.getElementById('cart-body');
         if (cart.length === 0) {
@@ -1442,7 +1485,11 @@
                 </td>
                 <td class="px-2 py-3 text-center">${item.mode === 'diamond' ? (item.karat ? item.karat + 'K' : 'ماس') : item.karat + 'K'}</td>
                 <td class="px-2 py-3 text-left">${item.mode === 'diamond' ? item.weight + ' ct' : item.weight}</td>
-                <td class="px-2 py-3 text-left font-semibold">${gmMoney(item.price)}</td>
+                <td class="px-2 py-3 text-left font-semibold">
+                    <button type="button" onclick="editCartPrice(${item.cartId}, this)" aria-label="تعديل سعر القطعة ${gmEscapeHtml(item.barcode || '')}" title="اضغط لتعديل السعر" class="inline-flex items-center gap-1 min-h-[40px] px-1 -mx-1 rounded hover:bg-surface-container-high underline decoration-dotted decoration-outline underline-offset-4">
+                        ${gmMoney(item.price)}<span class="material-symbols-outlined text-[14px] text-outline" aria-hidden="true">edit</span>
+                    </button>
+                </td>
                 <td class="px-2 py-3 text-left">
                     <button onclick="removeFromCart(${item.cartId})" aria-label="إزالة القطعة من الفاتورة" class="text-error w-10 h-10 -my-2 inline-flex items-center justify-center rounded-full hover:bg-red-50">
                         <span class="material-symbols-outlined text-[18px]">close</span>

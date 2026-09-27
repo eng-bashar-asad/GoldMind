@@ -79,3 +79,23 @@ test('offline: a brand-new customer can be added and goes with the sale', async 
   expect(posted[0].customer_id).toBeNull();
   expect(posted[0].new_customer).toEqual({ name: 'سامر', phone: '0509999999' });
 });
+
+test('price of a line can be changed before posting (tap the price)', async ({ page }) => {
+  const posted = [];
+  await install(page, { db: db(), rpc: { post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-9', invoice_number: 'INV-2026-000009' } }; } } });
+  page.on('dialog', d => d.accept());
+  await fillSale(page);
+  await page.click('#cart-body button[aria-label^="تعديل سعر القطعة"]');
+  const input = page.locator('#cart-body input[aria-label="السعر الجديد"]');
+  await input.fill('1800');
+  await input.press('Enter');
+  await expect(page.locator('#grand-total')).toContainText('1,800.00');
+  // invalid value on leaving the field keeps the previous price
+  await page.click('#cart-body button[aria-label^="تعديل سعر القطعة"]');
+  await input.fill('0');
+  await page.locator('#grand-total').click();
+  await expect(page.locator('#grand-total')).toContainText('1,800.00');
+  await page.click('#save-invoice-btn');
+  await page.waitForURL(/invoice-print-ar\.html\?id=inv-9/);
+  expect(posted[0].items[0].price).toBe(1800);
+});
