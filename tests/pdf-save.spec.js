@@ -32,3 +32,16 @@ test('android app: PDF is written to the app and the share sheet opens', async (
     ['share', 'file:///cache/INV-2026-000001.pdf'],
   ]);
 });
+
+test('android app: Print opens Android print service instead of doing nothing', async ({ page }) => {
+  await install(page, {});
+  await page.addInitScript(() => {
+    window.__printed = [];
+    window.Capacitor = { isNativePlatform: () => true, Plugins: {
+      GMPrint: { print: async (o) => { window.__printed.push(o.name); } },
+    } };
+  });
+  await page.goto('/tests/harness.html');
+  await page.evaluate(() => { document.title = 'فاتورة INV-1'; window.print(); });
+  await expect.poll(() => page.evaluate(() => window.__printed)).toEqual(['فاتورة INV-1']);
+});

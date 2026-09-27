@@ -556,3 +556,18 @@ async function gmSavePdf(worker, filename, title) {
     var res = await P.Filesystem.getUri({ path: safe, directory: 'CACHE' });
     await P.Share.share({ title: title || safe, url: res.uri, dialogTitle: 'حفظ الملف أو مشاركته' });
 }
+
+// Printing inside the Android app: the WebView ignores window.print(), so hand
+// the page to Android's print service (GMPrintPlugin.java). Browsers keep the
+// normal print dialog.
+(function () {
+    var browserPrint = window.print ? window.print.bind(window) : null;
+    window.print = function () {
+        var C = window.Capacitor;
+        var plugin = C && C.isNativePlatform && C.isNativePlatform() && C.Plugins && C.Plugins.GMPrint;
+        if (!plugin) return browserPrint && browserPrint();
+        plugin.print({ name: (document.title || 'GoldMind').trim() }).catch(function () {
+            alert('تعذّرت الطباعة. حدّث التطبيق إلى آخر نسخة ثم حاول مرة أخرى.');
+        });
+    };
+})();
