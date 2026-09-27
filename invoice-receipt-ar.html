@@ -249,12 +249,14 @@ async function downloadReceiptPdf() {
   if (cloneBtn) cloneBtn.remove();
 
   const wrapper = document.createElement('div');
-  wrapper.style.position = 'fixed';
-  wrapper.style.top = '0';
-  wrapper.style.left = '-99999px';
+  // The copy sits in an off-screen holder; the copy itself stays unpositioned,
+  // otherwise html2pdf captures it with zero height (a blank page).
+  const pdfHolder = document.createElement('div');
+  pdfHolder.style.cssText = 'position:fixed;top:0;left:-99999px;';
   wrapper.style.background = '#ffffff';
   wrapper.appendChild(clone);
-  document.body.appendChild(wrapper);
+  pdfHolder.appendChild(wrapper);
+  document.body.appendChild(pdfHolder);
   if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
   await new Promise(r => setTimeout(r, 50));
 
@@ -265,14 +267,14 @@ async function downloadReceiptPdf() {
       margin: 10,
       filename: `${invNumber}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff', letterRendering: true },
+      html2canvas: { scale: 2, scrollX: 0, scrollY: 0, useCORS: true, backgroundColor: '#ffffff', letterRendering: true },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).from(wrapper), `${invNumber}.pdf`);
   } catch (err) {
     console.error('PDF generation failed', err);
     alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
   } finally {
-    document.body.removeChild(wrapper);
+    pdfHolder.remove();
     btn.disabled = false;
     btn.innerHTML = originalHtml;
   }
