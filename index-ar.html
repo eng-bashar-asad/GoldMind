@@ -943,6 +943,7 @@
 <div class="px-1">
 <span class="block text-[13px] text-on-surface-variant text-right mb-1">فواتير اليوم</span>
 <div class="font-headline-md font-bold text-primary truncate text-right" style="font-size:26px; line-height:32px; visibility:hidden;" id="todayInvoiceCountEl">0</div>
+<div class="hidden text-[11px] text-on-surface-variant truncate text-right mt-0.5" id="todayInvoiceBreakdownEl"></div>
 </div>
 <div class="px-1">
 <span class="block text-[13px] text-on-surface-variant text-right mb-1">مبيعات اليوم</span>
@@ -1684,8 +1685,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Today's sales + invoice count (real invoice type is 'sale', not
                 // 'sell' — fixing a real bug that made this card always read 0.00)
                 goldmindClient
-                    .from('invoices').select('total_amount')
-                    .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
+                    .from('invoices').select('total_amount, type')
+                    .eq('store_id', GOLDMIND_STORE_ID).neq('status', 'cancelled')
                     .gte('created_at', todayStart.toISOString()),
                 goldmindClient
                     .from('gold_stock_lots').select('id')
@@ -1742,9 +1743,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (dskOtherCurrenciesEl) { dskOtherCurrenciesEl.textContent = otherCurrencyLine; dskOtherCurrenciesEl.classList.remove('hidden'); fitStatNumber(dskOtherCurrenciesEl); }
             }
 
-            const todaySales = (todayInvoices || []).reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
+            const todaySales = (todayInvoices || []).filter(i => i.type === 'sale').reduce((sum, i) => sum + Number(i.total_amount || 0), 0);
             document.getElementById('todaySalesEl').textContent = gmFormatDualCurrency(todaySales, store);
             document.getElementById('todayInvoiceCountEl').textContent = (todayInvoices || []).length;
+            {
+                const n = (t) => (todayInvoices || []).filter(i => t.includes(i.type)).length;
+                const parts = [['بيع', n(['sale'])], ['شراء', n(['buyTrader', 'buyRetail'])], ['مرتجع', n(['return'])]]
+                    .filter(([, c]) => c > 0).map(([l, c]) => l + ' ' + c);
+                const bd = document.getElementById('todayInvoiceBreakdownEl');
+                bd.textContent = parts.length > 1 ? parts.join(' · ') : '';
+                bd.classList.toggle('hidden', parts.length <= 1);
+            }
             fitStatNumber(document.getElementById('todaySalesEl'));
             fitStatNumber(document.getElementById('todayInvoiceCountEl'));
             const dskSalesEl = document.getElementById('dskTodaySalesEl');
