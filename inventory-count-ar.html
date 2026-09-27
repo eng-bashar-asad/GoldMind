@@ -201,7 +201,8 @@
 <div id="camera-error" class="hidden text-[12px] text-error bg-error-container rounded-lg p-3 text-center"></div>
 </div>
 
-<div id="last-scan-box" class="hidden text-center text-sm font-semibold py-3 rounded-lg"></div>
+<div id="last-scan-box" class="hidden text-center text-sm font-semibold py-3 rounded-lg" role="status" aria-live="polite"></div>
+<p id="scan-by-people" class="hidden text-center text-[11.5px] text-on-surface-variant"></p>
 
 <!-- Manual fallback + locate-in-checklist, always available regardless of method -->
 <div class="border-t border-outline-variant pt-3">
@@ -355,6 +356,13 @@ let countMethod = null;
 let matchField = null;
 let scannedValues = new Set();
 let stats = { expected: 0, scanned: 0, matched: 0, unexpected: 0 };
+// Several phones can scan one session together: scanBy maps value -> staff id,
+// pendingScans holds scans that couldn't be saved yet (retried by the sync).
+let scanBy = {};
+let pendingScans = [];
+let staffNames = {};
+let liveChannel = null;
+let liveTimer = null;
 let html5QrCode = null;
 let lastCameraValue = null;
 let lastCameraTime = 0;
@@ -396,6 +404,7 @@ function headerBack() {
   if (!document.getElementById('scan-wrap').classList.contains('hidden')) {
     if (!confirm('هل تريد الخروج من شاشة المسح؟ ما بينحذف شي — الجلسة رح تضل محفوظة وتقدر تكمّلها لاحقاً عبر "استئناف الجلسة".')) return;
     stopCameraScanner();
+    stopLiveSync();
     document.getElementById('scan-wrap').classList.add('hidden');
     document.getElementById('start-wrap').classList.remove('hidden');
     return;
@@ -438,6 +447,8 @@ async function init() {
   renderScopeBox('gold');
   renderScopeBox('diamond');
 
+  const { data: staffRows } = await goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID);
+  (staffRows || []).forEach(r => { staffNames[r.id] = r.full_name || 'موظف'; });
   await loadAllPieces();
   await checkInProgressSession();
 
@@ -487,17 +498,14 @@ async function resumeSession() {
 
   currentCountId = countId;
   scannedValues = new Set();
+  scanBy = {};
+  pendingScans = [];
   stats = { expected: expectedPool.length, scanned: 0, matched: 0, unexpected: 0 };
   document.getElementById('scan-log').innerHTML = '';
-  (scanRows || []).forEach(r => {
-    scannedValues.add(r.rfid_epc);
-    stats.scanned++;
-    if (r.match_status === 'matched') stats.matched++; else stats.unexpected++;
-    const label = r.match_status === 'matched' ? ('✓ ' + r.rfid_epc) : ('⚠ زيادة: ' + r.rfid_epc);
-    addLogRow(label, r.match_status === 'matched' ? 'matched' : 'unexpected');
-  });
-  updateStatsUI();
+  (scanRows || []).forEach(r => applyScanRow(r));
+  recalcStats();
   renderChecklist();
+  startLiveSync();
 
   document.getElementById('scope-wrap').classList.add('hidden');
   document.getElementById('start-wrap').classList.add('hidden');
@@ -736,9 +744,12 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   btn.textContent = 'بدء جلسة جرد جديدة';
 
   scannedValues = new Set();
+  scanBy = {};
+  pendingScans = [];
   stats = { expected: expectedPool.length, scanned: 0, matched: 0, unexpected: 0 };
-  updateStatsUI();
+  recalcStats();
   renderChecklist();
+  startLiveSync();
 
   document.getElementById('start-wrap').classList.add('hidden');
   document.getElementById('scan-wrap').classList.remove('hidden');
@@ -754,6 +765,108 @@ document.getElementById('start-btn').addEventListener('click', async () => {
     startCameraScanner();
   }
 });
+
+function staffName(id) {
+  if (!id) return '';
+  if (id === GOLDMIND_STAFF_ID) return 'أنت';
+  return staffNames[id] || 'موظف آخر';
+}
+
+// Counts always come from the set of distinct scanned values (from every
+// device), so the same piece can never be counted twice.
+function recalcStats() {
+  stats.scanned = scannedValues.size;
+  stats.matched = 0;
+  scannedValues.forEach(v => { if (expectedByField[v]) stats.matched++; });
+  stats.unexpected = stats.scanned - stats.matched;
+  updateStatsUI();
+  const per = {};
+  Object.values(scanBy).forEach(id => { per[id] = (per[id] || 0) + 1; });
+  const ids = Object.keys(per);
+  const el = document.getElementById('scan-by-people');
+  if (ids.length > 1 || (ids.length === 1 && ids[0] !== String(GOLDMIND_STAFF_ID))) {
+    el.textContent = 'مسح مشترك — ' + ids.map(id => staffName(id) + ': ' + per[id]).join(' · ');
+    el.classList.remove('hidden');
+  } else {
+    el.classList.add('hidden');
+  }
+}
+
+// Add one saved scan row (from resume, sync, or live update). Returns true if new.
+function applyScanRow(r) {
+  const v = r.rfid_epc;
+  if (!v || scannedValues.has(v)) { if (v && r.scanned_by) scanBy[v] = r.scanned_by; return false; }
+  scannedValues.add(v);
+  scanBy[v] = r.scanned_by || null;
+  const piece = expectedByField[v];
+  const who = r.scanned_by && r.scanned_by !== GOLDMIND_STAFF_ID ? ' — ' + staffName(r.scanned_by) : '';
+  const label = piece ? (piece.barcode || piece.description_ar || v) : v;
+  addLogRow((piece ? '✓ ' : '⚠ زيادة: ') + label + who, piece ? 'matched' : 'unexpected');
+  return true;
+}
+
+async function saveScan(row) {
+  const { error } = await goldmindClient.from('inventory_count_scans').insert(row);
+  if (!error) return 'ok';
+  if (error.code === '23505') return 'taken';
+  return 'retry';
+}
+
+// Pull what the other phones scanned, retry unsaved scans, and notice if
+// someone else finished or cancelled the session.
+async function syncScans() {
+  if (!currentCountId) return;
+  const countId = currentCountId;
+  if (pendingScans.length) {
+    const still = [];
+    for (const row of pendingScans) { if ((await saveScan(row)) === 'retry') still.push(row); }
+    pendingScans = still;
+  }
+  const [{ data: rows, error }, { data: cnt }] = await Promise.all([
+    goldmindClient.from('inventory_count_scans').select('rfid_epc, scanned_by, match_status').eq('count_id', countId),
+    goldmindClient.from('inventory_counts').select('status').eq('id', countId).maybeSingle()
+  ]);
+  if (countId !== currentCountId) return;
+  if (!error && rows) {
+    let changed = false;
+    rows.forEach(r => { if (applyScanRow(r)) changed = true; else if (r.scanned_by) scanBy[r.rfid_epc] = r.scanned_by; });
+    recalcStats();
+    if (changed) renderChecklist(document.getElementById('manual-input').value.trim());
+  }
+  const scanning = !document.getElementById('scan-wrap').classList.contains('hidden');
+  if (cnt && cnt.status !== 'in_progress' && scanning) {
+    stopLiveSync();
+    stopCameraScanner();
+    alert(cnt.status === 'cancelled'
+      ? 'تم إلغاء جلسة الجرد هذه من جهاز آخر.'
+      : 'تم إنهاء جلسة الجرد هذه من جهاز آخر. فيك تشوف تقريرها من "الجلسات السابقة".');
+    window.location.reload();
+  }
+}
+
+function startLiveSync() {
+  stopLiveSync();
+  const countId = currentCountId;
+  try {
+    liveChannel = goldmindClient.channel('count-' + countId)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inventory_count_scans', filter: 'count_id=eq.' + countId }, payload => {
+        if (countId !== currentCountId) return;
+        const r = payload.new || {};
+        if (applyScanRow(r)) {
+          recalcStats();
+          renderChecklist(document.getElementById('manual-input').value.trim());
+        }
+      })
+      .subscribe();
+  } catch (e) { liveChannel = null; }
+  // Fallback when live updates are unavailable, and the retry loop for unsaved scans.
+  liveTimer = setInterval(syncScans, 8000);
+}
+
+function stopLiveSync() {
+  if (liveTimer) { clearInterval(liveTimer); liveTimer = null; }
+  if (liveChannel) { try { goldmindClient.removeChannel(liveChannel); } catch (e) {} liveChannel = null; }
+}
 
 function updateStatsUI() {
   document.getElementById('stat-expected').textContent = stats.expected;
@@ -866,20 +979,23 @@ async function handleScan(value, method) {
   if (countMethod === 'rfid' && method === 'rfid') scanInput.focus();
 
   if (scannedValues.has(value)) {
-    showLastScan('تم مسح هذه القطعة مسبقاً بهذه الجلسة — لا يمكن تكرارها.', 'duplicate');
+    const by = scanBy[value];
+    const msg = by && by !== GOLDMIND_STAFF_ID
+      ? 'هذه القطعة مسحها ' + staffName(by) + ' — محسوبة مرة وحدة.'
+      : 'تم مسح هذه القطعة مسبقاً بهذه الجلسة — لا يمكن تكرارها.';
+    showLastScan(msg, 'duplicate');
     addLogRow('مكرر (مرفوض): ' + value, 'duplicate');
     playBeep('duplicate');
     vibrateDevice(30);
     return;
   }
   scannedValues.add(value);
+  scanBy[value] = GOLDMIND_STAFF_ID;
 
   const piece = expectedByField[value];
   const matchStatus = piece ? 'matched' : 'unexpected';
 
-  stats.scanned++;
-  if (piece) stats.matched++; else stats.unexpected++;
-  updateStatsUI();
+  recalcStats();
 
   const label = piece ? (piece.barcode || piece.description_ar || value) : value;
   if (piece) {
@@ -899,7 +1015,7 @@ async function handleScan(value, method) {
 
   renderChecklist(document.getElementById('manual-input').value.trim());
 
-  await goldmindClient.from('inventory_count_scans').insert({
+  const row = {
     store_id: GOLDMIND_STORE_ID,
     count_id: currentCountId,
     rfid_epc: value,
@@ -908,7 +1024,17 @@ async function handleScan(value, method) {
     match_status: matchStatus,
     scan_method: method,
     scanned_by: GOLDMIND_STAFF_ID
-  });
+  };
+  const result = await saveScan(row);
+  if (result === 'retry') {
+    pendingScans.push(row);
+  } else if (result === 'taken') {
+    // Another phone saved this piece a moment earlier: it stays counted once.
+    const { data: other } = await goldmindClient.from('inventory_count_scans')
+      .select('scanned_by').eq('count_id', row.count_id).eq('rfid_epc', value).maybeSingle();
+    if (other) scanBy[value] = other.scanned_by;
+    recalcStats();
+  }
 }
 
 function toggleChecklist() {
@@ -950,6 +1076,25 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.textContent = 'جارِ الإنهاء...';
 
+  // Collect every phone's scans first, so the report covers the whole team.
+  await syncScans();
+  if (pendingScans.length) {
+    btn.disabled = false;
+    btn.textContent = 'إنهاء الجلسة وعرض التقرير';
+    alert('في ' + pendingScans.length + ' قطعة ممسوحة لسا ما انحفظت. تأكد من الإنترنت وجرّب مرة تانية.');
+    return;
+  }
+  const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+  const { data: recentOthers } = await goldmindClient.from('inventory_count_scans')
+    .select('scanned_by').eq('count_id', currentCountId).neq('scanned_by', GOLDMIND_STAFF_ID).gte('scanned_at', since).limit(20);
+  const activeNames = [...new Set((recentOthers || []).map(r => staffName(r.scanned_by)))];
+  if (activeNames.length && !confirm('في موظف تاني لسا عم يمسح بهالجلسة (' + activeNames.join('، ') + '). أكيد بدك تنهي الجرد هلق؟')) {
+    btn.disabled = false;
+    btn.textContent = 'إنهاء الجلسة وعرض التقرير';
+    return;
+  }
+
+  stopLiveSync();
   stopCameraScanner();
 
   missingListCache = expectedPool.filter(p => !scannedValues.has(p[matchField]));
