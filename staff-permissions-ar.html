@@ -103,7 +103,7 @@
 <input id="direct-name" type="text" placeholder="مثال: أحمد محمد" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
 </div>
 <div class="mb-3">
-<label class="block text-[11px] text-on-surface-variant mb-1">اسم المستخدم (للدخول بكلمة سر — بدون بريد)</label>
+<label class="block text-[11px] text-on-surface-variant mb-1">اسم المستخدم (اختياري إذا كتبت البريد — منطلعه من البريد تلقائياً)</label>
 <input id="direct-username" type="text" dir="ltr" placeholder="ahmad_sales" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
 </div>
 <div class="mb-3">
@@ -111,7 +111,7 @@
 <input id="direct-password" type="text" dir="ltr" placeholder="6 أحرف على الأقل" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
 </div>
 <div class="mb-3">
-<label class="block text-[11px] text-on-surface-variant mb-1">البريد الإلكتروني (اختياري)</label>
+<label class="block text-[11px] text-on-surface-variant mb-1">البريد الإلكتروني (اختياري إذا كتبت اسم مستخدم)</label>
 <input id="direct-email" type="email" dir="ltr" placeholder="employee@example.com" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
 </div>
 <div class="mb-3">
@@ -610,7 +610,8 @@ async function submitDirectAdd() {
   errEl.classList.add('hidden');
 
   if (!name) { errEl.textContent = 'فضلاً أدخل اسم الموظف'; errEl.classList.remove('hidden'); return; }
-  if (!/^[a-zA-Z0-9_.]{3,20}$/.test(username)) { errEl.textContent = 'اسم المستخدم يجب أن يكون 3-20 خانة (حروف إنجليزية/أرقام/_ فقط، بدون مسافات)'; errEl.classList.remove('hidden'); return; }
+  if (!username && !email) { errEl.textContent = 'اكتب البريد الإلكتروني للموظف أو اسم مستخدم له'; errEl.classList.remove('hidden'); return; }
+  if (username && !/^[a-zA-Z0-9_.]{3,20}$/.test(username)) { errEl.textContent = 'اسم المستخدم يجب أن يكون 3-20 خانة (حروف إنجليزية/أرقام/_ فقط، بدون مسافات)'; errEl.classList.remove('hidden'); return; }
   if (password && password.length < 6) { errEl.textContent = 'كلمة السر يجب أن تكون 6 أحرف على الأقل'; errEl.classList.remove('hidden'); return; }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { errEl.textContent = 'فضلاً أدخل بريد إلكتروني صحيح، أو اتركه فاضياً'; errEl.classList.remove('hidden'); return; }
   if (!whatsapp) { errEl.textContent = 'فضلاً أدخل رقم واتساب الموظف'; errEl.classList.remove('hidden'); return; }
@@ -625,7 +626,7 @@ async function submitDirectAdd() {
   btn.textContent = 'جارِ الإضافة...';
 
   const { data, error } = await goldmindClient.functions.invoke('add-staff-direct', {
-    body: { store_id: GOLDMIND_STORE_ID, full_name: name, username, password: password || undefined, email: email || undefined, whatsapp_phone: whatsapp, permissions }
+    body: { store_id: GOLDMIND_STORE_ID, full_name: name, username: username || undefined, password: password || undefined, email: email || undefined, whatsapp_phone: whatsapp, permissions }
   });
 
   btn.disabled = false;
@@ -652,6 +653,7 @@ async function submitDirectAdd() {
     'تم إنشاء حسابك على GoldMind.\n\n' +
     'رابط الدخول: ' + loginUrl + '\n' +
     'اسم المستخدم: ' + data.username + '\n' +
+    (email ? 'البريد: ' + email + '\n' : '') +
     'كلمة السر: ' + data.temp_password + '\n\n' +
     '(تقدر تغيّرها لاحقاً من الإعدادات)';
 
