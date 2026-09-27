@@ -16,7 +16,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=26"></script>
-<script src="theme.js?v=26"></script>
+<script src="theme.js?v=27"></script>
 <script id="tailwind-config">
         tailwind.config = {
           darkMode: "class",
@@ -1486,6 +1486,7 @@
         }
 
         saveBtn.disabled = true;
+        saveBtn.setAttribute('aria-busy', 'true');
         saveBtn.textContent = 'جارِ الحفظ...';
 
         const { data: { session } } = await goldmindClient.auth.getSession();
@@ -1495,7 +1496,7 @@
         if (selectedPaymentMethod === 'mixed') {
             const m = getMixedAmounts();
             if (m.remaining < -0.01) {
-                saveBtn.disabled = false;
+                saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); saveBtn.removeAttribute('aria-busy');
                 saveBtn.textContent = 'حفظ الفاتورة';
                 showMessage('المبلغ المُدخل أكبر من إجمالي الفاتورة', true);
                 return;
@@ -1547,7 +1548,7 @@
         };
         const result = await gmPostSale(payload, { customerName: selectedCustomer.name });
         if (result.error) {
-            saveBtn.disabled = false;
+            saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); saveBtn.removeAttribute('aria-busy');
             saveBtn.textContent = 'حفظ الفاتورة';
             showMessage(result.error, true);
             return;
@@ -1557,7 +1558,7 @@
             cart.length = 0;
             clearDraftFromLocalStorage();
             renderCart();
-            saveBtn.disabled = false;
+            saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); saveBtn.removeAttribute('aria-busy');
             saveBtn.textContent = 'حفظ الفاتورة';
             showMessage('ما في إنترنت — انحفظت الفاتورة على الجهاز وبتترحّل لحالها أول ما يرجع النت.', false);
             return;

@@ -1063,6 +1063,7 @@ console.assert(gmMoney(1234.5) === '1,234.50' && gmMoney(null) === '0.00');
   /* no 300ms tap delay, no grey flash on Android */
   a,button,[role=button],label,summary,select{touch-action:manipulation;-webkit-tap-highlight-color:transparent;}
   button:disabled,[aria-disabled=true]{cursor:not-allowed;opacity:.55;}
+  [aria-busy=true]{cursor:progress;}
   /* small icon buttons keep their look but get a finger-sized (44px) tap area */
   .gm-hit{position:relative;}
   .gm-hit::before{content:'';position:absolute;left:50%;top:50%;width:max(100%,44px);height:max(100%,44px);transform:translate(-50%,-50%);}
