@@ -540,3 +540,19 @@ window.addEventListener('online', function () { gmRenderOfflineBadge(); gmSyncQu
 window.addEventListener('offline', gmRenderOfflineBadge);
 document.addEventListener('DOMContentLoaded', function () { gmRenderOfflineBadge(); setTimeout(gmSyncQueue, 1500); });
 setInterval(gmSyncQueue, 30000);
+
+// Save a finished html2pdf job. In the browser this downloads the file as
+// before; inside the Android app (a WebView that ignores browser downloads)
+// the PDF is written to the app cache and the system share sheet opens, so
+// the user can save it to Files, send it on WhatsApp, print it, etc.
+async function gmSavePdf(worker, filename, title) {
+    var P = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins;
+    if (!P || !P.Filesystem || !P.Share) return worker.save(filename);
+    var safe = String(filename || 'GoldMind.pdf').replace(/[\\/:*?"<>|]+/g, '-');
+    if (!/\.pdf$/i.test(safe)) safe += '.pdf';
+    var dataUri = await worker.outputPdf('datauristring');
+    var base64 = dataUri.slice(dataUri.indexOf(',') + 1);
+    await P.Filesystem.writeFile({ path: safe, data: base64, directory: 'CACHE' });
+    var res = await P.Filesystem.getUri({ path: safe, directory: 'CACHE' });
+    await P.Share.share({ title: title || safe, url: res.uri, dialogTitle: 'حفظ الملف أو مشاركته' });
+}
