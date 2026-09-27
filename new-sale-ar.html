@@ -15,8 +15,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=25"></script>
-<script src="theme.js?v=25"></script>
+<script src="supabase-config.js?v=26"></script>
+<script src="theme.js?v=26"></script>
 <script id="tailwind-config">
         tailwind.config = {
           darkMode: "class",
@@ -88,6 +88,7 @@
     .sale-tab[aria-selected="true"] { background: #775a19; color: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
     .sale-tab.hidden { display: none; }
     [data-sale-tab].tab-off { display: none !important; }
+      #save-invoice-btn:not([data-total]) { position: static; } /* sticks to the bottom only once there's something to save */
       #save-invoice-btn[data-total]::after { content: attr(data-total); padding-inline-start: 12px; border-inline-start: 1px solid rgba(255,255,255,.55); unicode-bidi: isolate; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
@@ -699,7 +700,7 @@
     function deleteDraft(id) {
         const d = readDrafts().find(x => x.id === id);
         if (!d) return openDraftsModal();
-        if (!confirm('حذف الفاتورة المعلّقة (' + d.cart.length + ' قطعة، ' + draftTotal(d).toFixed(2) + ' ' + CUR + ')؟\nما لها رقم بعد، فما رح تنحفظ بأي مكان.')) return;
+        if (!confirm('حذف الفاتورة المعلّقة (' + d.cart.length + ' قطعة، ' + gmMoney(draftTotal(d)) + ' ' + CUR + ')؟\nما لها رقم بعد، فما رح تنحفظ بأي مكان.')) return;
         writeDrafts(readDrafts().filter(x => x.id !== id));
         openDraftsModal();
     }
@@ -1001,6 +1002,7 @@
         bankBtn.className = mode === 'bank' ? active : inactive;
         mixedBtn.className = mode === 'mixed' ? active : inactive;
         creditBtn.className = mode === 'credit' ? active : inactive;
+        [['cash', cashBtn], ['bank', bankBtn], ['mixed', mixedBtn], ['credit', creditBtn]].forEach(([m, b]) => b.setAttribute('aria-pressed', String(mode === m)));
 
         const mixedFields = document.getElementById('mixed-payment-fields');
         mixedFields.classList.toggle('hidden', mode !== 'mixed');
@@ -1019,7 +1021,7 @@
     function onMixedAmountInput() {
         const { remaining } = getMixedAmounts();
         const paidNow = getMixedAmounts();
-        document.getElementById('mixed-paid-now').textContent = (paidNow.cashAmt + paidNow.bankAmt).toFixed(2) + ' ' + CUR;
+        document.getElementById('mixed-paid-now').textContent = gmMoney(paidNow.cashAmt + paidNow.bankAmt) + ' ' + CUR;
 
         const label = document.getElementById('mixed-remaining-label');
         const note = document.getElementById('mixed-remaining-note');
@@ -1029,7 +1031,7 @@
             note.className = 'text-[13px] font-bold font-data-mono text-success';
         } else if (remaining > 0) {
             label.textContent = 'المتبقي كدين على الزبون';
-            note.textContent = remaining.toFixed(2) + ' ' + CUR;
+            note.textContent = gmMoney(remaining) + ' ' + CUR;
             note.className = 'text-[13px] font-bold font-data-mono text-error';
         } else {
             label.textContent = 'تنبيه';
@@ -1440,7 +1442,7 @@
                 </td>
                 <td class="px-2 py-3 text-center">${item.mode === 'diamond' ? (item.karat ? item.karat + 'K' : 'ماس') : item.karat + 'K'}</td>
                 <td class="px-2 py-3 text-left">${item.mode === 'diamond' ? item.weight + ' ct' : item.weight}</td>
-                <td class="px-2 py-3 text-left font-semibold">${item.price.toFixed(2)}</td>
+                <td class="px-2 py-3 text-left font-semibold">${gmMoney(item.price)}</td>
                 <td class="px-2 py-3 text-left">
                     <button onclick="removeFromCart(${item.cartId})" aria-label="شيل القطعة من الفاتورة" class="text-error w-10 h-10 -my-2 inline-flex items-center justify-center rounded-full hover:bg-red-50">
                         <span class="material-symbols-outlined text-[18px]">close</span>
@@ -1450,8 +1452,8 @@
         `).join('');
 
         const total = cart.reduce((sum, item) => sum + item.price, 0);
-        document.getElementById('grand-total').textContent = total.toFixed(2) + ' ' + CUR;
-        document.getElementById('save-invoice-btn').setAttribute('data-total', total.toFixed(2) + ' ' + CUR); // total stays visible on the sticky save button
+        document.getElementById('grand-total').textContent = gmMoney(total) + ' ' + CUR;
+        document.getElementById('save-invoice-btn').setAttribute('data-total', gmMoney(total) + ' ' + CUR); // total stays visible on the sticky save button
         saveDraftToLocalStorage();
     }
 
@@ -1479,7 +1481,7 @@
         }
 
         const confirmTotal = cart.reduce((sum, item) => sum + item.price, 0);
-        if (!confirm('هل أنت متأكد من ترحيل هذه الفاتورة بقيمة ' + confirmTotal.toFixed(2) + '؟\nبعد الترحيل بتاخد رقم رسمي ثابت وما رح تقدر تعدّلها — بس تقدر تلغيها لاحقاً إذا احتجت.')) {
+        if (!confirm('هل أنت متأكد من ترحيل هذه الفاتورة بقيمة ' + gmMoney(confirmTotal) + '؟\nبعد الترحيل بتاخد رقم رسمي ثابت وما رح تقدر تعدّلها — بس تقدر تلغيها لاحقاً إذا احتجت.')) {
             return;
         }
 

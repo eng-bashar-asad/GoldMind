@@ -1042,6 +1042,12 @@ function gmSmartBack(fallbackHref) {
   }
 })();
 
+// Money for display: thousands separators, always 2 decimals (1,234.50).
+function gmMoney(v) {
+  return Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+console.assert(gmMoney(1234.5) === '1,234.50' && gmMoney(null) === '0.00');
+
 // ---------- UI polish (applies to every page) ----------
 // Built from the ui-ux-pro-max checklist (fonts stay as chosen: Times New Roman
 // + Arial, see "Twelfth shape" above): visible keyboard focus, steady-width numbers, reduced motion, no tap delay,
@@ -1094,6 +1100,8 @@ function gmSmartBack(fallbackHref) {
         if (r.width && r.width < 44 && r.height < 44 && getComputedStyle(b).position === 'static') b.classList.add('gm-hit');
       }
     });
+    root.querySelectorAll('input[type=number]:not([inputmode])').forEach(f => f.setAttribute('inputmode', 'decimal'));
+    root.querySelectorAll('input[type=tel]:not([inputmode])').forEach(f => f.setAttribute('inputmode', 'tel'));
     root.querySelectorAll('input:not([type=hidden]):not([aria-label]), select:not([aria-label]), textarea:not([aria-label])').forEach(f => {
       if (f.labels && f.labels.length) return;
       const name = f.getAttribute('placeholder') || f.getAttribute('title');

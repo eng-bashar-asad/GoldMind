@@ -11,8 +11,8 @@
 <title>الجرد | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=25"></script>
-<script src="theme.js?v=25"></script>
+<script src="supabase-config.js?v=26"></script>
+<script src="theme.js?v=26"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -664,7 +664,7 @@ async function loadPastSessions() {
     const row = document.createElement('button');
     row.className = 'w-full bg-surface-container-low rounded-lg p-3 flex items-center justify-between text-[12px] text-right';
     const dateStr = new Date(s.started_at).toLocaleDateString('ar-AE', { day: 'numeric', month: 'short', year: 'numeric' });
-    const methodLabel = s.method === 'camera' ? '📷' : (s.method === 'rfid' ? '📡' : '');
+    const methodLabel = s.method === 'camera' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">photo_camera</span>' : (s.method === 'rfid' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">sensors</span>' : '');
     const statusLabel = s.status === 'posted' ? 'مُرحّلة' : 'مكتملة';
     row.innerHTML = `<span class="font-semibold">${methodLabel} ${dateStr}</span>
       <span class="text-on-surface-variant">${statusLabel}</span>
@@ -992,7 +992,7 @@ function openSubScreen(kind) {
 
   if (kind === 'missing') {
     list.innerHTML = missingListCache.length === 0
-      ? '<div class="text-[12px] text-on-surface-variant py-4 text-center">لا توجد قطع ناقصة — كل شي مطابق 🎉</div>'
+      ? '<div class="text-[12px] text-on-surface-variant py-4 text-center"><span class="material-symbols-outlined text-green-700" style="font-size:16px;vertical-align:-3px" aria-hidden="true">task_alt</span> لا توجد قطع ناقصة — كل شي مطابق</div>'
       : missingListCache.map(p => `
         <div class="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2 text-[12px]">
           <span class="font-semibold text-red-700">${gmEscapeHtml(p.barcode || p.description_ar || p.id.slice(0,8))}</span>
@@ -1146,7 +1146,7 @@ async function openSessionDetail(countId) {
   sessionDetailScanRows = scanRows || [];
 
   const dateStr = new Date(countRow.started_at).toLocaleString('ar-AE');
-  const statusLabel = countRow.status === 'posted' ? 'مُرحّلة ✅' : 'مكتملة';
+  const statusLabel = countRow.status === 'posted' ? 'مُرحّلة <span class="material-symbols-outlined text-green-700" style="font-size:15px;vertical-align:-3px" aria-hidden="true">check_circle</span>' : 'مكتملة';
   document.getElementById('session-detail-meta').innerHTML =
     `<div class="font-bold mb-1">${dateStr}</div>
      <div class="text-on-surface-variant">الطريقة: ${countRow.method === 'camera' ? 'كاميرا' : 'RFID'} — النطاق: ${(countRow.scope || []).join(' + ')}</div>
@@ -1199,7 +1199,7 @@ function renderSessionScansList() {
   list.innerHTML = sessionDetailScanRows.map(r => {
     const isMatched = r.match_status === 'matched';
     const colorClass = isMatched ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700';
-    const methodIcon = r.scan_method === 'camera' ? '📷' : (r.scan_method === 'manual' ? '⌨️' : '📡');
+    const methodIcon = r.scan_method === 'camera' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">photo_camera</span>' : (r.scan_method === 'manual' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">keyboard</span>' : '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">sensors</span>');
     const trash = (sessionDetailStatus !== 'posted')
       ? `<button onclick="deleteScanRow('${r.id}')" class="text-error"><span class="material-symbols-outlined text-[18px]">delete</span></button>`
       : '';

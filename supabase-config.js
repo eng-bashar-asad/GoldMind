@@ -450,7 +450,7 @@ async function gmRunSync() {
         gmRenderOfflineBadge();
     }
     if (posted) {
-        gmToast('انرحّلت ' + posted + ' فاتورة كانت محفوظة على الجهاز ✓');
+        gmToast('انرحّلت ' + posted + ' فاتورة كانت محفوظة على الجهاز');
         gmRefreshSnapshots().catch(function () {});
     }
 }
@@ -488,7 +488,8 @@ function gmRenderOfflineBadge() {
     if (failed) parts.push(failed + ' ما انرحّلت');
     b.style.background = failed ? '#FDECEA' : offline ? '#FFF4E0' : '#E6F0FF';
     b.style.color = failed ? '#8A1C12' : offline ? '#7A4B00' : '#1D3F7A';
-    b.textContent = (failed ? '⚠ ' : offline ? '⦸ ' : '⏳ ') + parts.join(' · ');
+    b.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true" style="font-size:16px">' + (failed ? 'error' : offline ? 'cloud_off' : 'cloud_upload') + '</span><span></span>';
+    b.lastChild.textContent = parts.join(' · ');
     b.setAttribute('aria-label', parts.join('، '));
 }
 
