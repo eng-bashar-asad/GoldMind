@@ -100,6 +100,30 @@
 <div id="retail-block" class="hidden">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-2" for="retail-name">اسم البائع (اختياري)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="retail-name" placeholder="مثال: زبون، أو اسم البائع"/>
+<div class="mt-4 pt-3 border-t border-outline-variant space-y-3" id="seller-id-block">
+<p class="text-[12px] font-semibold text-on-surface-variant">هوية البائع (اختياري)</p>
+<div class="grid grid-cols-2 gap-3">
+<select aria-label="نوع مستند الهوية" class="h-12 border border-outline-variant rounded-lg px-3 text-right bg-surface-container-lowest" id="seller-id-type" onchange="onSellerIdTypeChange()">
+<option value="">نوع المستند</option>
+<option value="emirates_id">هوية إماراتية</option>
+<option value="passport">جواز سفر</option>
+<option value="other">هوية أخرى</option>
+</select>
+<input aria-label="رقم المستند" autocomplete="off" class="h-12 border border-outline-variant rounded-lg px-3 text-left font-data-mono" dir="ltr" id="seller-id-number" placeholder="رقم المستند"/>
+</div>
+<div class="grid grid-cols-2 gap-3">
+<label class="relative flex flex-col items-center justify-center gap-1 h-28 border-2 border-dashed border-outline-variant rounded-lg cursor-pointer text-[12px] text-on-surface-variant overflow-hidden" id="seller-id-front-box">
+<input accept="image/*" capture="environment" class="hidden" id="seller-id-front" onchange="onSellerIdPhoto('front')" type="file"/>
+<img alt="صورة الوجه الأمامي" class="hidden absolute inset-0 w-full h-full object-cover" id="seller-id-front-img"/>
+<span aria-hidden="true" class="material-symbols-outlined">badge</span><span id="seller-id-front-label">الوجه الأمامي</span>
+</label>
+<label class="relative flex flex-col items-center justify-center gap-1 h-28 border-2 border-dashed border-outline-variant rounded-lg cursor-pointer text-[12px] text-on-surface-variant overflow-hidden" id="seller-id-back-box">
+<input accept="image/*" capture="environment" class="hidden" id="seller-id-back" onchange="onSellerIdPhoto('back')" type="file"/>
+<img alt="صورة الوجه الخلفي" class="hidden absolute inset-0 w-full h-full object-cover" id="seller-id-back-img"/>
+<span aria-hidden="true" class="material-symbols-outlined">flip</span><span id="seller-id-back-label">الوجه الخلفي</span>
+</label>
+</div>
+</div>
 </div>
 </section>
 
@@ -277,6 +301,7 @@
 <div class="relative" id="manual-price-field">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-price">سعر الشراء</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-price" placeholder="السعر" step="0.01" type="number"/>
+<p class="hidden text-[11px] text-on-surface-variant mt-1 leading-5" id="scrap-ref" role="status"></p>
 </div>
 <div class="relative" id="fab-fee-field">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-fabfee">أجرة المصنعية (دين منفصل على التاجر، اختياري)</label>
@@ -488,7 +513,9 @@
         document.getElementById('itemModePiece').classList.toggle('active', mode === 'piece');
         document.getElementById('itemModeBulk').classList.toggle('active', mode === 'bulk');
         document.getElementById('itemModeDiamond').classList.toggle('active', mode === 'diamond');
-        document.getElementById('bulk-fab-per-gram-field').hidden = mode !== 'bulk';
+        const scrap = mode === 'bulk' && purchaseType === 'buyRetail';
+        document.getElementById('bulk-fab-per-gram-field').hidden = mode !== 'bulk' || scrap;
+        document.getElementById('itemModeBulk').textContent = purchaseType === 'buyRetail' ? 'ذهب كسر' : 'رصيد بالجملة';
         document.getElementById('weight-karat-grid').hidden = mode === 'diamond';
         document.getElementById('diamond-fields').classList.toggle('hidden', mode !== 'diamond');
         if (mode !== 'diamond') {
@@ -505,8 +532,10 @@
         // gold is exchanged/settled with the trader by weight (see
         // trader_movements), not priced per invoice line.
         document.getElementById('manual-desc-wrap').hidden = mode === 'bulk';
-        document.getElementById('manual-price-field').hidden = mode === 'bulk';
-        document.getElementById('itemModeHint').textContent = mode === 'bulk'
+        document.getElementById('manual-price-field').hidden = mode === 'bulk' && !scrap;
+        document.getElementById('itemModeHint').textContent = scrap
+            ? 'ذهب كسر يُحفظ بالوزن في مستودع «كسر ' + document.getElementById('manual-karat').value + '» حسب العيار.'
+            : mode === 'bulk'
             ? 'دفعة/لوت بوزن إجمالي واحد — تُباع لاحقاً بالوزن مباشرة من الرصيد، أو تُحوَّل لقطع مستقلة من صفحة "إنتاج القطع".'
             : (mode === 'diamond'
                 ? 'قطعة ألماس تُسجَّل مباشرة بمخزون الماس، مع إمكانية إضافة جزء ذهب اختياري بها.'
@@ -524,8 +553,86 @@
         document.getElementById('counterparty-label').textContent = type === 'buyTrader' ? 'معلومات التاجر' : 'معلومات البائع';
         document.getElementById('payment-options').classList.toggle('hidden', type !== 'buyTrader');
         if (type !== 'buyTrader') selectPayment('cash');
+        if (type === 'buyRetail' && itemMode === 'piece') setItemMode('bulk');
+        else setItemMode(itemMode);
         updateFabFeeVisibility();
+        updateScrapRef();
         renderCart();
+    }
+
+    // ---- Scrap gold from individuals: today's value as a guide, seller ID ----
+    let goldPricesByKarat = {};
+    let goldPricesLoading = false;
+    // Loaded on first use: the company (GOLDMIND_STORE_ID) is only known after the session check.
+    async function ensureGoldPrices() {
+        if (goldPricesLoading || typeof GOLDMIND_STORE_ID === 'undefined' || !GOLDMIND_STORE_ID) return;
+        goldPricesLoading = true;
+        const { data } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
+        (data || []).forEach(r => { goldPricesByKarat[r.karat] = Number(r.price_per_gram) || 0; });
+        updateScrapRef();
+    }
+
+    function updateScrapRef() {
+        ensureGoldPrices();
+        const el = document.getElementById('scrap-ref');
+        const karat = parseInt(document.getElementById('manual-karat').value, 10);
+        const weight = parseFloat(document.getElementById('manual-weight').value) || 0;
+        const price = parseFloat(document.getElementById('manual-price').value) || 0;
+        const perGram = goldPricesByKarat[karat] || (goldPricesByKarat[24] ? goldPricesByKarat[24] * karat / 24 : 0);
+        const show = itemMode === 'bulk' && purchaseType === 'buyRetail' && weight > 0 && perGram > 0;
+        el.classList.toggle('hidden', !show);
+        if (itemMode === 'bulk' && purchaseType === 'buyRetail') {
+            document.getElementById('itemModeHint').textContent = 'ذهب كسر يُحفظ بالوزن في مستودع «كسر ' + karat + '» حسب العيار.';
+        }
+        if (!show) return;
+        const ref = weight * perGram;
+        let txt = 'قيمته حسب سعر اليوم (عيار ' + karat + '): ' + gmMoney(ref);
+        if (price > 0) txt += ' — المبلغ المدفوع = ' + Math.round(price / ref * 100) + '% من هذه القيمة';
+        el.textContent = txt;
+    }
+    ['manual-karat', 'manual-weight', 'manual-price'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) { el.addEventListener('input', updateScrapRef); el.addEventListener('change', updateScrapRef); }
+    });
+
+    function onSellerIdTypeChange() {
+        const passport = document.getElementById('seller-id-type').value === 'passport';
+        document.getElementById('seller-id-front-label').textContent = passport ? 'صفحة البيانات' : 'الوجه الأمامي';
+        document.getElementById('seller-id-back-label').textContent = passport ? 'صفحة إضافية (اختياري)' : 'الوجه الخلفي';
+    }
+
+    function onSellerIdPhoto(side) {
+        const input = document.getElementById('seller-id-' + side);
+        const img = document.getElementById('seller-id-' + side + '-img');
+        const file = input.files && input.files[0];
+        if (!file) return;
+        img.src = URL.createObjectURL(file);
+        img.classList.remove('hidden');
+    }
+
+    function resetSellerId() {
+        ['seller-id-type', 'seller-id-number', 'seller-id-front', 'seller-id-back'].forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+        ['front', 'back'].forEach(side => { const img = document.getElementById('seller-id-' + side + '-img'); img.classList.add('hidden'); img.removeAttribute('src'); });
+        onSellerIdTypeChange();
+    }
+
+    async function uploadSellerIdFiles(invoiceId) {
+        const failed = [];
+        for (const side of ['front', 'back']) {
+            const input = document.getElementById('seller-id-' + side);
+            const file = input && input.files && input.files[0];
+            if (!file) continue;
+            const ext = (file.name.split('.').pop() || 'jpg').toLowerCase();
+            const path = GOLDMIND_STORE_ID + '/purchase-' + invoiceId + '/seller-id-' + side + '-' + Date.now() + '.' + ext;
+            const { error: upErr } = await goldmindClient.storage.from('company-kyc-documents').upload(path, file, { upsert: false });
+            if (upErr) { failed.push(upErr.message); continue; }
+            const { error: rowErr } = await goldmindClient.from('company_kyc_documents').insert({
+                store_id: GOLDMIND_STORE_ID, owner_type: 'invoice', owner_id: invoiceId,
+                document_category: 'seller_id_' + side, file_url: path, file_name: file.name, uploaded_by: GOLDMIND_STAFF_ID
+            });
+            if (rowErr) failed.push(rowErr.message);
+        }
+        return failed;
     }
 
     // Fabrication-fee field only makes sense for a gold piece/lot bought from a trader —
@@ -536,8 +643,9 @@
         document.getElementById('fab-fee-vat-field').hidden = !show;
 
         const priceLabel = document.querySelector('label[for="manual-price"]');
-        const priceOptional = itemMode === 'bulk' || (purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit');
-        if (priceLabel) priceLabel.textContent = priceOptional ? 'سعر الشراء (اختياري — مسوّى بالوزن مع التاجر)' : 'سعر الشراء';
+        const priceOptional = (itemMode === 'bulk' && purchaseType !== 'buyRetail') || (purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit');
+        if (priceLabel) priceLabel.textContent = (itemMode === 'bulk' && purchaseType === 'buyRetail') ? 'المبلغ المدفوع للبائع'
+            : priceOptional ? 'سعر الشراء (اختياري — مسوّى بالوزن مع التاجر)' : 'سعر الشراء';
     }
 
     // ---------- VAT on the fabrication fee (live preview) ----------
@@ -796,7 +904,7 @@
         // mandatory for buyRetail (an individual seller, no trader account
         // to fall back on) or a cash buyTrader purchase (no debt posted at
         // all, so price is the only record of what was paid).
-        const priceOptional = itemMode === 'bulk' || (purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit');
+        const priceOptional = (itemMode === 'bulk' && purchaseType !== 'buyRetail') || (purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit');
         const price = priceOptional ? (parseFloat(document.getElementById('manual-price').value) || 0) : parseFloat(document.getElementById('manual-price').value);
 
         const weightInput = document.getElementById('manual-weight');
@@ -822,7 +930,8 @@
             fabFeeVat: (purchaseType === 'buyTrader') ? currentFabFeeVat() : 0,
             vatApplied: vatApplied,
             fabPerGram: itemMode === 'bulk' ? (parseFloat(document.getElementById('bulk-fab-per-gram').value) || 0) : null,
-            description: document.getElementById('manual-desc').value.trim() || (itemMode === 'bulk' ? 'رصيد بالجملة' : null)
+            description: (itemMode === 'bulk' && purchaseType === 'buyRetail') ? 'ذهب كسر عيار ' + karat
+                : (document.getElementById('manual-desc').value.trim() || (itemMode === 'bulk' ? 'رصيد بالجملة' : null))
         });
 
         document.getElementById('manual-desc').value = '';
@@ -1169,6 +1278,8 @@
                 type: purchaseType,
                 trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
                 counterparty_name: purchaseType === 'buyRetail' ? (document.getElementById('retail-name').value.trim() || null) : null,
+                seller_id_type: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-type').value || null) : null,
+                seller_id_number: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-number').value.trim() || null) : null,
                 payment_method: selectedPaymentMethod === 'cash' ? 'cash' : 'credit',
                 fabrication_fees: fabFeeTotal,
                 vat_amount: vatAmount,
@@ -1235,6 +1346,7 @@
             trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
             source_invoice_id: invoiceRow.id,
             notes: item.description,
+            box_name: purchaseType === 'buyRetail' ? 'كسر ' + item.karat : null,
             created_by: GOLDMIND_STAFF_ID
         }));
 
@@ -1446,7 +1558,15 @@
             await goldmindClient.from('trader_movements').insert(movementsPayload);
         }
 
+        // Seller ID photos (optional). The purchase is already saved, so a failed
+        // upload only warns; the photos can be retaken from the invoice page.
+        const idFailed = purchaseType === 'buyRetail' ? await uploadSellerIdFiles(invoiceRow.id) : [];
         clearDraftFromLocalStorage();
+        if (idFailed.length) {
+            showMessage('تم حفظ فاتورة الشراء، لكن تعذّر رفع صورة الهوية: ' + idFailed[0], true);
+            setTimeout(() => { window.location.href = 'invoice-print-ar.html?id=' + invoiceRow.id; }, 2500);
+            return;
+        }
         showMessage('تم حفظ فاتورة الشراء وتحديث المخزون بنجاح!', false);
         setTimeout(() => { window.location.href = 'inventory-list-ar.html'; }, 900);
     });

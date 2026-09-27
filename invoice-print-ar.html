@@ -484,6 +484,7 @@
                 ? 'شراء من فرد — لا تُطبَّق ضريبة القيمة المضافة (الفرد غير مسجَّل ضريبياً).'
                 : 'شراء من تاجر — قيمة المعدن (الذهب) بهذه الصفقة تخضع لآلية الاحتساب العكسي وتُسوَّى بالوزن عبر حساب التاجر (لا تُسعَّر نقداً هنا)، والضريبة أعلاه على أجرة الصنعة فقط. الفاتورة الضريبية الرسمية لكامل الصفقة يجب أن يصدرها التاجر البائع، وليس هذا المستند.';
             relEl.classList.remove('hidden');
+            if (invoice.type === 'buyRetail') showSellerId(invoice, relEl);
         } else if (store.tax_number) {
             document.getElementById('doc-type-ar').textContent = 'فاتورة ضريبية';
             document.getElementById('doc-type-en').textContent = 'Tax Invoice';
@@ -867,6 +868,42 @@
             // message ready so the user can pick a contact themselves.
             window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
         }
+    }
+
+    // Purchase from an individual: seller's ID (number on the voucher, photos
+    // viewable on screen only; they stay in the private KYC bucket).
+    async function showSellerId(invoice, afterEl) {
+        const TYPES = { emirates_id: 'هوية إماراتية', passport: 'جواز سفر', other: 'هوية' };
+        const box = document.createElement('div');
+        box.className = 'text-[11.5px] text-gray-600 mt-1';
+        if (invoice.seller_id_type || invoice.seller_id_number) {
+            const line = document.createElement('div');
+            line.textContent = 'هوية البائع: ' + (TYPES[invoice.seller_id_type] || 'مستند') + (invoice.seller_id_number ? ' — ' + invoice.seller_id_number : '');
+            box.appendChild(line);
+        }
+        const { data: docs } = await goldmindClient.from('company_kyc_documents')
+            .select('file_url, document_category').eq('owner_type', 'invoice').eq('owner_id', invoice.id).order('created_at');
+        if (docs && docs.length) {
+            const row = document.createElement('div');
+            row.className = 'no-print flex flex-wrap gap-2 mt-1';
+            docs.forEach(d => {
+                const b = document.createElement('button');
+                b.type = 'button';
+                b.className = 'h-9 px-3 rounded-lg border border-gray-300 text-[12px] font-semibold';
+                const passport = invoice.seller_id_type === 'passport';
+                b.textContent = d.document_category === 'seller_id_back'
+                    ? (passport ? 'عرض الصفحة الإضافية' : 'عرض الوجه الخلفي')
+                    : (passport ? 'عرض صفحة البيانات' : 'عرض الوجه الأمامي');
+                b.onclick = async () => {
+                    const { data: signed, error } = await goldmindClient.storage.from('company-kyc-documents').createSignedUrl(d.file_url, 600);
+                    if (error || !signed) { alert('تعذّر فتح الصورة: ' + (error ? error.message : '')); return; }
+                    window.open(signed.signedUrl, '_blank');
+                };
+                row.appendChild(b);
+            });
+            box.appendChild(row);
+        }
+        if (box.childNodes.length) afterEl.insertAdjacentElement('afterend', box);
     }
 
     loadInvoice();
