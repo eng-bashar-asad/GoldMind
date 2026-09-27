@@ -177,3 +177,11 @@ test('server rejects a wrong device secret', async () => {
   expect((await core.handle(anon, { action: 'device-enroll' })).status).toBe(401);
   expect((await core.handle(anon, { action: 'passkey-register-options' })).status).toBe(401);
 });
+
+test('android app, not turned on yet: login screen explains how to turn it on', async ({ page }) => {
+  await setup(page);
+  await fakeAndroid(page);
+  await page.goto('/login-entry-ar.html');
+  await expect(page.locator('#step-start')).toContainText('سجّل الدخول مرة واحدة بكلمة السر');
+  await expect(page.locator('#step-start [data-bio-accounts] button')).toHaveCount(0);
+});

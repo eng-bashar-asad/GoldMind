@@ -477,7 +477,15 @@ async function gmAfterLogin(user, errEl) {
     const accounts = GMBio.accounts();
     // Android: only after it was turned on here. Website: the browser keeps
     // the list itself (it may sync from another device), so always offer it.
-    if (GMBio.isNative() && accounts.length === 0) return;
+    if (GMBio.isNative() && accounts.length === 0) {
+        // Not turned on for this phone yet: say how, instead of showing nothing.
+        const hint = document.createElement('p');
+        hint.className = 'text-[12px] text-white/60 text-center leading-relaxed mt-1';
+        hint.textContent = 'للدخول ' + GMBio.bi(av.label) + ' لاحقاً: سجّل الدخول مرة واحدة بكلمة السر، ثم اضغط «تفعيل» في الرسالة التي تظهر، أو فعّلها من صفحة «الأمان».';
+        const start = document.getElementById('step-start');
+        if (start) start.appendChild(hint);
+        return;
+    }
 
     document.querySelectorAll('[data-bio-login]').forEach(function (wrap) {
         const list = wrap.querySelector('[data-bio-accounts]');
