@@ -603,27 +603,52 @@ function gmAddCanvasPages(pdf, canvas, firstOnCurrentPage) {
 }
 
 // Build an A4 PDF from DOM nodes: each node starts on a new page and long
-// nodes continue onto more pages. The nodes are laid out at a fixed 718px
-// (A4 width minus margins) and captured one by one, so a phone's narrow
-// screen or scroll position can't shift or cut the page.
+// nodes continue onto more pages. The nodes are laid out inside a hidden
+// iframe that is always 738px wide (A4 width minus margins, plus a little
+// room), with the page's own styles copied in. The phone's screen width,
+// zoom or scroll position therefore can't shift or cut the page.
 async function gmPdfFromNodes(nodes, filename, title) {
     await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
-    var W = 718;
-    var holder = document.createElement('div');
-    holder.style.cssText = 'position:absolute;left:0;top:0;width:' + W + 'px;z-index:-2147483000;background:#fff;pointer-events:none;';
-    holder.dir = document.documentElement.dir || 'rtl';
-    nodes.forEach(function (n) { n.style.width = W + 'px'; n.style.maxWidth = W + 'px'; n.style.margin = '0'; holder.appendChild(n); });
-    document.body.appendChild(holder);
-    var sx = window.scrollX, sy = window.scrollY;
-    window.scrollTo(0, 0);
+    var W = 718, FRAME_W = W + 20;
+    var frame = document.createElement('iframe');
+    frame.setAttribute('aria-hidden', 'true');
+    frame.tabIndex = -1;
+    frame.style.cssText = 'position:fixed;left:-20000px;top:0;width:' + FRAME_W + 'px;height:1400px;border:0;pointer-events:none;';
+    document.body.appendChild(frame);
     try {
-        if (document.fonts && document.fonts.ready) await document.fonts.ready;
+        var doc = frame.contentDocument;
+        var styles = Array.prototype.map.call(document.querySelectorAll('head style, head link[rel="stylesheet"]'), function (e) { return e.outerHTML; }).join('');
+        doc.open();
+        doc.write('<!doctype html><html dir="' + (document.documentElement.dir || 'rtl') + '" lang="' + (document.documentElement.lang || 'ar') + '"><head><meta charset="utf-8">' +
+            styles + '<style>html,body{margin:0;padding:0;background:#fff;width:' + FRAME_W + 'px;min-width:' + FRAME_W + 'px;}</style></head>' +
+            '<body class="' + (document.body.className || '').replace(/"/g, '') + '"></body></html>');
+        doc.close();
+        var body = doc.body;
+        body.style.background = '#fff';
+        var placed = nodes.map(function (n) {
+            var el = doc.importNode(n, true);
+            el.style.width = W + 'px'; el.style.maxWidth = W + 'px'; el.style.margin = '0';
+            body.appendChild(el);
+            return el;
+        });
+        // wait for stylesheets, images and fonts inside the frame (never longer than ~4s)
+        var waits = [];
+        Array.prototype.forEach.call(doc.querySelectorAll('link[rel="stylesheet"]'), function (l) {
+            waits.push(new Promise(function (r) { if (l.sheet) r(); else { l.onload = l.onerror = r; } }));
+        });
+        Array.prototype.forEach.call(doc.images, function (img) {
+            waits.push(new Promise(function (r) { if (img.complete) r(); else { img.onload = img.onerror = r; } }));
+        });
+        await Promise.race([Promise.all(waits), new Promise(function (r) { setTimeout(r, 4000); })]);
+        if (doc.fonts && doc.fonts.ready) await Promise.race([doc.fonts.ready, new Promise(function (r) { setTimeout(r, 2000); })]);
         await new Promise(function (r) { setTimeout(r, 80); });
+        frame.style.height = Math.max(1400, doc.documentElement.scrollHeight) + 'px';
+
         var canvases = [];
-        for (var i = 0; i < nodes.length; i++) {
-            canvases.push(await window.html2canvas(nodes[i], {
+        for (var i = 0; i < placed.length; i++) {
+            canvases.push(await window.html2canvas(placed[i], {
                 scale: 2, useCORS: true, backgroundColor: '#ffffff', letterRendering: true,
-                scrollX: 0, scrollY: 0, windowWidth: Math.max(W + 40, document.documentElement.clientWidth)
+                scrollX: 0, scrollY: 0, windowWidth: FRAME_W, windowHeight: Math.max(1400, doc.documentElement.scrollHeight)
             }));
         }
         var pdfOpts = { margin: 10, filename: filename, image: { type: 'jpeg', quality: 0.95 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
@@ -632,7 +657,6 @@ async function gmPdfFromNodes(nodes, filename, title) {
         for (var j = 1; j < canvases.length; j++) gmAddCanvasPages(pdf, canvases[j], false);
         await gmSavePdf(worker, filename, title);
     } finally {
-        holder.remove();
-        window.scrollTo(sx, sy);
+        frame.remove();
     }
 }
