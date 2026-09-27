@@ -18,9 +18,9 @@
 <title>فاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=26"></script>
+<script src="supabase-config.js?v=27"></script>
 <script src="pint-ae.js"></script>
-<script src="theme.js?v=28"></script>
+<script src="theme.js?v=29"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -887,11 +887,12 @@
         // Clone into an isolated, fixed-width wrapper off-screen so the PDF
         // renders like a physical page instead of the narrow mobile layout.
         const clone = sheet.cloneNode(true);
+        clone.querySelectorAll('.no-print').forEach(el => el.remove());
         clone.classList.remove('hidden');
         clone.style.boxShadow = 'none';
         clone.style.margin = '0';
-        clone.style.width = '780px';
-        clone.style.maxWidth = '780px';
+        clone.style.width = '718px';
+        clone.style.maxWidth = '718px';
 
         const wrapper = document.createElement('div');
         // The copy sits in an off-screen holder; the copy itself stays unpositioned,
@@ -904,10 +905,11 @@
         const policy = document.getElementById('policy-page-wrap');
         if (policy) {
             const policyClone = policy.cloneNode(true);
+            policyClone.querySelectorAll('.no-print').forEach(el => el.remove());
             policyClone.classList.remove('hidden');
             policyClone.style.display = 'block';
             policyClone.style.pageBreakBefore = 'always';
-            policyClone.style.width = '780px';
+            policyClone.style.width = '718px';
             wrapper.appendChild(policyClone);
         }
 

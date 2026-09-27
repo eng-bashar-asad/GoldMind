@@ -1125,3 +1125,63 @@ console.assert(gmMoney(1234.5) === '1,234.50' && gmMoney(null) === '0.00');
       .observe(document.body, { childList: true, subtree: true });
   });
 })();
+
+// ---- Photo source chooser ----
+// Every <input type="file" capture> (take a photo) now asks first:
+// camera or a picture already on the device. Works for buttons that call
+// input.click() and for inputs tapped directly, on pages built later too.
+(function gmPhotoSourceChooser() {
+  if (window.__gmPhotoChooser) return;
+  window.__gmPhotoChooser = true;
+
+  function openInput(input, useCamera) {
+    var cap = input.getAttribute('capture');
+    if (!useCamera) input.removeAttribute('capture');
+    input.__gmBypass = true;
+    try { input.click(); } finally {
+      input.__gmBypass = false;
+      if (!useCamera && cap !== null) setTimeout(function () { input.setAttribute('capture', cap); }, 1500);
+    }
+  }
+
+  function showSheet(input) {
+    var old = document.getElementById('gm-photo-sheet');
+    if (old) old.remove();
+    var back = document.createElement('div');
+    back.id = 'gm-photo-sheet';
+    back.dir = 'rtl';
+    back.style.cssText = 'position:fixed;inset:0;z-index:2147483600;background:rgba(0,0,0,.45);display:flex;align-items:flex-end;justify-content:center;';
+    back.innerHTML =
+      '<div role="dialog" aria-label="اختيار مصدر الصورة" style="width:100%;max-width:480px;background:#fff;color:#1c1b1b;border-radius:18px 18px 0 0;padding:16px 16px calc(16px + env(safe-area-inset-bottom));display:flex;flex-direction:column;gap:10px;font-family:inherit;">' +
+      '<div style="font-weight:700;font-size:15px;text-align:center;margin-bottom:4px">إضافة صورة</div>' +
+      '<button type="button" data-src="camera" style="min-height:52px;border-radius:12px;border:0;background:#1c1b1b;color:#fff;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;"><span class="material-symbols-outlined" aria-hidden="true">photo_camera</span>التقاط صورة بالكاميرا</button>' +
+      '<button type="button" data-src="gallery" style="min-height:52px;border-radius:12px;border:1px solid #d6cfc0;background:#fff;color:#1c1b1b;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:8px;font-family:inherit;"><span class="material-symbols-outlined" aria-hidden="true">photo_library</span>اختيار صورة من الجهاز</button>' +
+      '<button type="button" data-src="cancel" style="min-height:44px;border:0;background:none;color:#6b6b6b;font-size:14px;font-family:inherit;">إلغاء</button>' +
+      '</div>';
+    document.body.appendChild(back);
+    function close() { back.remove(); document.removeEventListener('keydown', onKey, true); }
+    function onKey(e) { if (e.key === 'Escape') close(); }
+    document.addEventListener('keydown', onKey, true);
+    back.addEventListener('click', function (e) {
+      if (e.target === back) { close(); return; }
+      var b = e.target.closest && e.target.closest('button[data-src]');
+      if (!b) return;
+      var src = b.getAttribute('data-src');
+      close();
+      if (src !== 'cancel') openInput(input, src === 'camera');
+    });
+    var first = back.querySelector('button[data-src="camera"]');
+    if (first) first.focus();
+  }
+
+  document.addEventListener('click', function (e) {
+    var input = e.target;
+    if (!input || input.tagName !== 'INPUT' || input.type !== 'file' || !input.hasAttribute('capture')) return;
+    if (input.__gmBypass) return;
+    e.preventDefault();
+    e.stopPropagation();
+    // "Choose from files" in the desktop camera window (gm-camera.js) goes straight to the gallery.
+    if (window.__gmPreferGallery) { window.__gmPreferGallery = false; openInput(input, false); return; }
+    showSheet(input);
+  }, true);
+})();

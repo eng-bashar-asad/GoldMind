@@ -88,9 +88,9 @@ var GMCamera = (function () {
 
       var fallbackBtn = document.createElement('button');
       fallbackBtn.type = 'button';
-      fallbackBtn.textContent = 'اختيار من الملفات بدلاً من الكاميرا';
-      fallbackBtn.style.cssText = 'background:none;border:none;color:#cfcfd4;font-size:12px;' +
-        'text-decoration:underline;cursor:pointer;font-family:inherit;';
+      fallbackBtn.textContent = 'اختيار صورة من الجهاز';
+      fallbackBtn.style.cssText = 'min-height:44px;padding:0 18px;border-radius:999px;border:1px solid #ffffff55;background:#ffffff14;' +
+        'color:#fff;font-size:14px;cursor:pointer;font-family:inherit;';
 
       controls.appendChild(shutterBtn);
       controls.appendChild(cancelBtn);
@@ -100,7 +100,12 @@ var GMCamera = (function () {
       document.body.appendChild(overlay);
 
       cancelBtn.addEventListener('click', function () { finish(null); });
-      fallbackBtn.addEventListener('click', function () { finish(null); });
+      // The page then opens its file input; theme.js sends it straight to the gallery.
+      fallbackBtn.addEventListener('click', function () {
+        window.__gmPreferGallery = true;
+        setTimeout(function () { window.__gmPreferGallery = false; }, 3000);
+        finish(null);
+      });
       overlay.addEventListener('click', function (e) { if (e.target === overlay) finish(null); });
 
       shutterBtn.addEventListener('click', function () {
