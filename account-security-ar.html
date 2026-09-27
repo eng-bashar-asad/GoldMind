@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=26"></script>
 <script src="theme.js?v=28"></script>
+<script src="gm-biometric.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -90,6 +91,17 @@
 <p class="text-success text-[12px] hidden mt-2" id="passwordSuccess"></p>
 </div>
 
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="bioSection">
+<h2 class="font-bold text-[14px] mb-1">الدخول بالبصمة / Face ID</h2>
+<p class="text-[11px] text-outline mb-3">البصمة بتضل على جهازك وما بتنبعت لأي مكان. البرنامج بيتأكد إنه الجهاز هو جهازك المسجّل.</p>
+<p id="bioHereStatus" class="text-[12.5px] mb-3"></p>
+<button id="bioToggleBtn" type="button" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold hidden"></button>
+<p class="text-error text-[12px] hidden mt-2" id="bioError" role="alert"></p>
+<p class="text-success text-[12px] hidden mt-2" id="bioSuccess" role="status"></p>
+<h3 class="font-semibold text-[12.5px] mt-4 mb-2">الأجهزة المسجّلة على حسابك</h3>
+<div id="bioDevices" class="flex flex-col gap-2 text-[12.5px]"></div>
+</div>
+
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <h2 class="font-bold text-[14px] mb-3">رقم الواتساب لاستلام التقارير</h2>
 <p class="text-[11px] text-outline mb-3">إذا فعّلت هذا الرقم (وكان عندك صلاحية "عرض التقارير")، بيقدر يبعتلك زميلك بالمحل تقرير الحركة اليومية آخر كل يوم بضغطة زر.</p>
@@ -130,6 +142,85 @@ async function load() {
 
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
+  loadBio(session.user.id);
+}
+
+async function loadBio(userId) {
+  const status = document.getElementById('bioHereStatus');
+  const btn = document.getElementById('bioToggleBtn');
+  const av = window.GMBio ? await GMBio.available() : { ok: false };
+  const on = av.ok && GMBio.enabledFor(userId);
+  if (!av.ok) {
+    status.textContent = 'هالجهاز أو المتصفح ما بيدعم الدخول بالبصمة.';
+    btn.classList.add('hidden');
+  } else {
+    status.textContent = on ? ('مفعّل على هالجهاز ✓ (' + av.label + ')') : ('مش مفعّل على هالجهاز.');
+    btn.textContent = on ? 'إيقاف البصمة على هالجهاز' : ('تفعيل الدخول ' + GMBio.bi(av.label));
+    btn.className = on
+      ? 'w-full h-11 border border-error text-error rounded-lg text-sm font-semibold'
+      : 'w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold';
+    btn.onclick = () => toggleBio(userId, on);
+  }
+  const [pk, dk] = await Promise.all([
+    goldmindClient.from('auth_passkeys').select('id, device_name, created_at, last_used_at').order('created_at', { ascending: false }),
+    goldmindClient.from('auth_device_keys').select('id, device_name, created_at, last_used_at').order('created_at', { ascending: false })
+  ]);
+  const rows = [].concat(
+    (pk.data || []).map(r => Object.assign({ kind: 'auth_passkeys' }, r)),
+    (dk.data || []).map(r => Object.assign({ kind: 'auth_device_keys' }, r))
+  );
+  const list = document.getElementById('bioDevices');
+  if (rows.length === 0) { list.innerHTML = '<p class="text-outline">ما في أجهزة مسجّلة.</p>'; return; }
+  list.innerHTML = '';
+  rows.forEach(r => {
+    const row = document.createElement('div');
+    row.className = 'flex items-center justify-between gap-2 bg-surface-container-low rounded-lg px-3 py-2';
+    const info = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'font-semibold';
+    name.textContent = r.device_name || 'جهاز';
+    const when = document.createElement('div');
+    when.className = 'text-[11px] text-outline';
+    when.textContent = 'آخر استخدام: ' + (r.last_used_at ? new Date(r.last_used_at).toLocaleString('ar-AE') : 'لسا');
+    info.append(name, when);
+    const del = document.createElement('button');
+    del.type = 'button';
+    del.className = 'text-error text-[12px] font-semibold min-h-[44px] px-2';
+    del.textContent = 'حذف';
+    del.setAttribute('aria-label', 'حذف ' + (r.device_name || 'الجهاز'));
+    del.onclick = async () => {
+      if (!confirm('بدك تشيل هالجهاز؟ ما عاد فيه يدخل بالبصمة لحتى تفعّلها عليه من جديد.')) return;
+      const { error } = await goldmindClient.from(r.kind).delete().eq('id', r.id);
+      if (error) { alert('تعذّر الحذف: ' + error.message); return; }
+      loadBio(userId);
+    };
+    row.append(info, del);
+    list.appendChild(row);
+  });
+}
+
+async function toggleBio(userId, isOn) {
+  const btn = document.getElementById('bioToggleBtn');
+  const errEl = document.getElementById('bioError');
+  const okEl = document.getElementById('bioSuccess');
+  errEl.classList.add('hidden');
+  okEl.classList.add('hidden');
+  btn.disabled = true;
+  try {
+    if (isOn) {
+      await GMBio.forgetHere(userId);
+      okEl.textContent = 'انوقفت البصمة على هالجهاز.';
+    } else {
+      await GMBio.enable();
+      okEl.textContent = 'تم التفعيل ✓ — المرة الجاية بتدخل بالبصمة.';
+    }
+    okEl.classList.remove('hidden');
+  } catch (e) {
+    errEl.textContent = e.message;
+    errEl.classList.remove('hidden');
+  }
+  btn.disabled = false;
+  loadBio(userId);
 }
 
 async function saveFullName() {

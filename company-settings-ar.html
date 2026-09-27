@@ -453,6 +453,19 @@
 </div>
 
 </details>
+<details class="mt-2 group space-y-4">
+<summary class="flex items-center justify-between cursor-pointer list-none marker:content-none py-2.5 px-3 rounded-lg bg-surface-container-low">
+<h3 class="font-label-md text-label-md text-secondary font-bold">الدخول بالبصمة للموظفين</h3>
+<span class="material-symbols-outlined text-[20px] text-outline transition-transform duration-200 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="pt-4 flex flex-col gap-4">
+<p class="text-[11px] text-outline mb-3">البصمة بتفتح الحساب المحفوظ على الجهاز. إذا عندك موبايلات مشتركة بين كذا موظف، طفّيها منشان كل موظف يدخل بكلمة سره. صاحب الشركة بيقدر يستعمل البصمة دايماً.</p>
+<div class="flex gap-3">
+<button type="button" id="bio-off-btn" onclick="setBioAllowed(false)" class="flex-1 h-14 rounded-lg border font-semibold transition-all">موقوفة</button>
+<button type="button" id="bio-on-btn" onclick="setBioAllowed(true)" class="flex-1 h-14 rounded-lg border font-semibold transition-all">مسموحة</button>
+</div>
+</div>
+</details>
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
 <button id="save-btn" type="button" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md active:scale-[0.98] transition-all mt-2">
@@ -493,6 +506,17 @@
         const inactive = 'flex-1 h-14 rounded-lg border border-outline-variant bg-white text-on-surface-variant font-semibold transition-all';
         offBtn.className = value ? inactive : active;
         onBtn.className = value ? active : inactive;
+    }
+
+    let bioAllowed = true;
+    function setBioAllowed(value) {
+        bioAllowed = value;
+        const active = 'flex-1 h-14 rounded-lg border-2 border-primary bg-primary text-white font-semibold transition-all';
+        const inactive = 'flex-1 h-14 rounded-lg border border-outline-variant bg-white text-on-surface-variant font-semibold transition-all';
+        document.getElementById('bio-off-btn').className = value ? inactive : active;
+        document.getElementById('bio-on-btn').className = value ? active : inactive;
+        document.getElementById('bio-off-btn').setAttribute('aria-pressed', !value);
+        document.getElementById('bio-on-btn').setAttribute('aria-pressed', value);
     }
 
     let einvoiceDisabled = false;
@@ -566,6 +590,7 @@
     setShapeStyle(selectedShapeStyle);
     setDiamondsEnabled(diamondsEnabled);
     setRfidEnabled(rfidEnabled);
+    setBioAllowed(bioAllowed);
     setEinvoiceDisabled(einvoiceDisabled);
 
     const countryCurrencyMap = {
@@ -836,6 +861,7 @@
         setShapeStyle(data.invoice_print_shape || 'soft');
         setDiamondsEnabled(data.diamonds_enabled === true);
         setRfidEnabled(data.rfid_enabled === true);
+        setBioAllowed(data.allow_biometric_login !== false);
 
         renderNextInvoicePreview(data);
         renderNextPiecePreview(data);
@@ -1018,7 +1044,8 @@
                 invoice_print_frame: selectedFrameStyle,
                 invoice_print_shape: selectedShapeStyle,
                 diamonds_enabled: diamondsEnabled,
-                rfid_enabled: rfidEnabled
+                rfid_enabled: rfidEnabled,
+                allow_biometric_login: bioAllowed
             })
             .eq('id', GOLDMIND_STORE_ID);
 

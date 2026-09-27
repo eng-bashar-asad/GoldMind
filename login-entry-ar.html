@@ -108,6 +108,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="gm-particle-transition.js"></script>
 <script src="gm-logo.js?v=2" defer></script>
+<script src="gm-biometric.js?v=1"></script>
 </head>
 <body class="text-white min-h-screen flex flex-col items-center justify-center p-4">
 <main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
@@ -127,6 +128,13 @@
 <h2 class="text-lg font-bold text-white">أهلاً فيك</h2>
 <p class="text-sm text-white/70 mt-2">اختر كيف بدك تدخل</p>
 </div>
+<!-- Biometric login (shown only when this device supports it) -->
+<div class="hidden flex-col gap-2" data-bio-login>
+<div class="flex flex-col gap-2" data-bio-accounts></div>
+<p class="text-error text-sm text-center hidden" data-bio-error role="alert"></p>
+<div class="flex items-center gap-3 text-white/40 text-xs my-1"><span class="flex-1 h-px bg-white/15"></span>أو<span class="flex-1 h-px bg-white/15"></span></div>
+</div>
+
 <button class="w-full gold-gradient text-on-primary font-bold py-5 rounded-lg shadow-lg shadow-primary/20 hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" onclick="goToStep('method')" type="button">الدخول إلى شركتي</button>
 <button class="w-full border border-primary/30 text-white font-bold py-5 rounded-lg hover:scale-[1.02] active:scale-95 transition-all duration-200 text-lg" onclick="goToStep('new')" type="button">تسجيل شركة جديدة</button>
 <button class="text-white/70 text-sm underline underline-offset-4 mt-1 min-h-[44px] hover:text-white" onclick="goToStep('quick')" type="button">دخول سريع بكلمة سر (بدون رمز تحقق)</button>
@@ -149,6 +157,13 @@
 <h2 class="text-lg font-bold text-white">دخول سريع بكلمة السر</h2>
 <p class="text-xs text-primary/70 mt-2">ادخل باسم المستخدم أو بريدك الإلكتروني وكلمة السر — بدون رمز تحقق</p>
 </div>
+<!-- Biometric login (shown only when this device supports it) -->
+<div class="hidden flex-col gap-2" data-bio-login>
+<div class="flex flex-col gap-2" data-bio-accounts></div>
+<p class="text-error text-sm text-center hidden" data-bio-error role="alert"></p>
+<div class="flex items-center gap-3 text-white/40 text-xs my-1"><span class="flex-1 h-px bg-white/15"></span>أو<span class="flex-1 h-px bg-white/15"></span></div>
+</div>
+
 <form class="space-y-5" id="quickForm">
 <div>
 <label class="block text-sm font-semibold text-primary/80 mb-2" for="quickIdentifier">اسم المستخدم أو البريد الإلكتروني</label>
@@ -424,21 +439,26 @@ document.getElementById('quickForm').addEventListener('submit', async function (
         return;
     }
 
+    const ok = await gmAfterLogin(signInData.user, errEl);
+    if (!ok) { btn.disabled = false; btn.textContent = 'دخول'; }
+});
+
+// Shared by password and fingerprint/Face ID login: where to go once signed in.
+// Returns false (after showing why) when the account can't enter.
+async function gmAfterLogin(user, errEl) {
     const { data: memberships } = await goldmindClient
-        .from('staff').select('id').eq('user_id', signInData.user.id);
+        .from('staff').select('id').eq('user_id', user.id);
 
     if (!memberships || memberships.length === 0) {
         const { data: isAdmin } = await goldmindClient.rpc('is_platform_admin');
-        btn.disabled = false;
-        btn.textContent = 'دخول';
         if (isAdmin) {
             gmDissolveNavigate('admin-panel-ar.html');
-            return;
+            return true;
         }
         errEl.textContent = 'لا يوجد حساب شركة مرتبط بهذا المستخدم. تواصل مع مدير الشركة.';
         errEl.classList.remove('hidden');
         await goldmindClient.auth.signOut();
-        return;
+        return false;
     }
 
     // Accounts with more than one company must explicitly pick which one
@@ -451,7 +471,52 @@ document.getElementById('quickForm').addEventListener('submit', async function (
     }
 
     gmDissolveNavigate('index-ar.html');
-});
+    return true;
+}
+
+// ---- Fingerprint / Face ID login buttons ----
+(async function initBioLogin() {
+    if (!window.GMBio) return;
+    const av = await GMBio.available();
+    if (!av.ok) return;
+    const accounts = GMBio.accounts();
+    // Android: only after it was turned on here. Website: the browser keeps
+    // the list itself (it may sync from another device), so always offer it.
+    if (GMBio.isNative() && accounts.length === 0) return;
+
+    document.querySelectorAll('[data-bio-login]').forEach(function (wrap) {
+        const list = wrap.querySelector('[data-bio-accounts]');
+        const errEl = wrap.querySelector('[data-bio-error]');
+        const entries = GMBio.isNative() ? accounts : [{ user_id: null, label: '' }];
+        entries.forEach(function (acc) {
+            const b = document.createElement('button');
+            b.type = 'button';
+            b.className = 'w-full gold-gradient text-on-primary font-bold py-4 rounded-lg shadow-lg shadow-primary/20 active:scale-95 transition-all duration-200 text-lg flex items-center justify-center gap-2';
+            b.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">fingerprint</span><span></span>';
+            b.lastChild.textContent = 'دخول ' + GMBio.bi(av.label) + (GMBio.isNative() && accounts.length > 1 && acc.label ? ' — ' + acc.label : '');
+            b.addEventListener('click', async function () {
+                errEl.classList.add('hidden');
+                b.disabled = true;
+                try {
+                    const user = await GMBio.login(acc.user_id);
+                    const ok = await gmAfterLogin(user, errEl);
+                    if (!ok) b.disabled = false;
+                } catch (e) {
+                    b.disabled = false;
+                    let msg = e.message;
+                    if (!GMBio.isNative() && msg === 'انلغت العملية' && accounts.length === 0) {
+                        msg = 'إذا ما فعّلت البصمة قبل: ادخل بكلمة السر، وبعدها بيطلعلك خيار التفعيل.';
+                    }
+                    errEl.textContent = msg;
+                    errEl.classList.remove('hidden');
+                }
+            });
+            list.appendChild(b);
+        });
+        wrap.classList.remove('hidden');
+        wrap.classList.add('flex');
+    });
+})();
 </script>
 <script>
 if ('serviceWorker' in navigator) {
