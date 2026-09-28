@@ -819,7 +819,12 @@ goldmindLoadSavedFont();
       return AUTH_PAGES.indexOf(name) === -1;
     });
     if (AUTH_PAGES.indexOf(pageName) === -1 && !wasBack && stack[stack.length - 1] !== here) {
-      stack.push(here);
+      // Arriving at a page that's already further down (e.g. list → invoice →
+      // edit → save → same invoice): cut back to it instead of stacking a
+      // copy, otherwise "back" ping-pongs between the invoice and its edit page.
+      var seen = stack.lastIndexOf(here);
+      if (seen !== -1) stack = stack.slice(0, seen + 1);
+      else stack.push(here);
     }
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack.slice(-30)));
   } catch (e) { /* sessionStorage unavailable (private mode etc.) -- gmSmartBack falls back to fallbackHref every time */ }
