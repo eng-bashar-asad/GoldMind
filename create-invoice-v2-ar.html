@@ -1214,348 +1214,79 @@
         saveBtn.disabled = true;
         saveBtn.textContent = 'جارِ الحفظ...';
 
-        const total = cart.reduce((sum, item) => sum + item.price, 0);
+        // One id per attempt: the server posts each purchase once, so a retry
+        // after a dropped connection can't save it twice. Kept across retries
+        // of the same cart (cleared once the purchase is saved).
+        if (!window.__purchaseRef) window.__purchaseRef = crypto.randomUUID();
+        const purchaseRef = window.__purchaseRef;
+        const resetBtn = () => { saveBtn.disabled = false; saveBtn.textContent = 'حفظ فاتورة الشراء'; };
 
-        const { data: invoiceNumber, error: numError } = await goldmindClient.rpc('next_invoice_number', { target_store_id: GOLDMIND_STORE_ID, prefix: 'PINV' });
-        if (numError) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ فاتورة الشراء';
-            showMessage('تعذّر توليد رقم الفاتورة: ' + numError.message, true);
-            return;
-        }
-
-        // fabrication_fees/vat_amount: sum of the per-item fab fee (and its
-        // VAT) tracked in the cart. This used to be a blanket back-calc off
-        // the whole total (fabrication_fees was even hardcoded to 0) which
-        // didn't match what invoice-print-ar.html already assumed it would
-        // receive -- "0 for buyRetail; VAT-on-fabrication-fee-only for
-        // buyTrader" -- so this now actually produces that.
-        const fabFeeTotal = cart.reduce((sum, item) => sum + (item.fabFee || 0), 0);
-        const vatAmount = purchaseType === 'buyTrader' ? cart.reduce((sum, item) => sum + (item.fabFeeVat || 0), 0) : 0;
-
-        // Upload attachment first (if any) so we can attach its URL to the invoice
+        // Files go up first (named by the attempt id, since the invoice number
+        // is only issued by the server when the purchase is posted).
         let attachmentUrl = null;
         if (attachmentFile) {
             const ext = (attachmentFile.name.split('.').pop() || 'bin').toLowerCase();
-            const path = GOLDMIND_STORE_ID + '/' + invoiceNumber + '.' + ext;
+            const path = GOLDMIND_STORE_ID + '/purchase-' + purchaseRef + '.' + ext;
             const { error: uploadError } = await goldmindClient.storage
-                .from('invoice-attachments').upload(path, attachmentFile, { upsert: false });
-            if (uploadError) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'حفظ فاتورة الشراء';
-                showMessage('تعذّر رفع المرفق: ' + uploadError.message, true);
-                return;
-            }
+                .from('invoice-attachments').upload(path, attachmentFile, { upsert: true });
+            if (uploadError) { resetBtn(); showMessage('تعذّر رفع المرفق: ' + uploadError.message, true); return; }
             const { data: publicUrlData } = goldmindClient.storage.from('invoice-attachments').getPublicUrl(path);
             attachmentUrl = publicUrlData ? publicUrlData.publicUrl : null;
         }
 
-        // Upload the optional bulk-lot photos (0 or more) -- shown only on
-        // this invoice's own printed voucher, not attached to any piece.
-        let bulkPhotoUrls = [];
+        // Optional bulk-lot photos -- shown only on this invoice's printed voucher.
+        const bulkPhotoUrls = [];
         for (let i = 0; i < bulkPhotoFiles.length; i++) {
             const photoFile = bulkPhotoFiles[i];
             const ext = (photoFile.name.split('.').pop() || 'jpg').toLowerCase();
-            const path = GOLDMIND_STORE_ID + '/' + invoiceNumber + '-photo-' + (i + 1) + '.' + ext;
+            const path = GOLDMIND_STORE_ID + '/purchase-' + purchaseRef + '-photo-' + (i + 1) + '.' + ext;
             const { error: photoUploadError } = await goldmindClient.storage
-                .from('invoice-attachments').upload(path, photoFile, { upsert: false });
-            if (photoUploadError) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'حفظ فاتورة الشراء';
-                showMessage('تعذّر رفع إحدى الصور: ' + photoUploadError.message, true);
-                return;
-            }
+                .from('invoice-attachments').upload(path, photoFile, { upsert: true });
+            if (photoUploadError) { resetBtn(); showMessage('تعذّر رفع إحدى الصور: ' + photoUploadError.message, true); return; }
             const { data: photoUrlData } = goldmindClient.storage.from('invoice-attachments').getPublicUrl(path);
             if (photoUrlData) bulkPhotoUrls.push(photoUrlData.publicUrl);
         }
 
-        const { data: invoiceRow, error: invoiceError } = await goldmindClient
-            .from('invoices')
-            .insert({
-                store_id: GOLDMIND_STORE_ID,
-                invoice_number: invoiceNumber,
-                type: purchaseType,
-                trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
-                counterparty_name: purchaseType === 'buyRetail' ? (document.getElementById('retail-name').value.trim() || null) : null,
-                seller_id_type: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-type').value || null) : null,
-                seller_id_number: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-number').value.trim() || null) : null,
-                payment_method: selectedPaymentMethod === 'cash' ? 'cash' : 'credit',
-                fabrication_fees: fabFeeTotal,
-                vat_amount: vatAmount,
-                total_amount: total,
-                amount_paid: selectedPaymentMethod === 'cash' ? total : 0,
-                status: selectedPaymentMethod === 'cash' ? 'paid' : 'unpaid',
-                attachment_url: attachmentUrl,
-                bulk_photos: bulkPhotoUrls.length ? bulkPhotoUrls : null,
-                created_by: GOLDMIND_STAFF_ID
-            })
-            .select()
-            .single();
-
-        if (invoiceError) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ فاتورة الشراء';
-            showMessage('خطأ بحفظ الفاتورة: ' + invoiceError.message, true);
-            return;
-        }
-
-        // Individual-piece cart items become new inventory pieces immediately.
-        const pieceCartItems = cart.filter(item => item.mode === 'piece');
-        const piecesPayload = [];
-        for (const item of pieceCartItems) {
-            const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
-            if (bcError) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'حفظ فاتورة الشراء';
-                showMessage('تم حفظ الفاتورة لكن تعذّر توليد رقم قطعة: ' + bcError.message, true);
-                return;
-            }
-            piecesPayload.push({
-                store_id: GOLDMIND_STORE_ID,
-                barcode: barcode,
-                weight_grams: item.weight,
+        // Everything else (invoice, new pieces/lots, items, cash out, trader
+        // debt) is written by ONE database transaction: all of it or none.
+        const { data: posted, error: postError } = await goldmindClient.rpc('post_purchase_invoice', { p: {
+            store_id: GOLDMIND_STORE_ID,
+            client_ref: purchaseRef,
+            type: purchaseType,
+            trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
+            payment_method: selectedPaymentMethod === 'cash' ? 'cash' : 'credit',
+            counterparty_name: purchaseType === 'buyRetail' ? (document.getElementById('retail-name').value.trim() || null) : null,
+            seller_id_type: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-type').value || null) : null,
+            seller_id_number: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-number').value.trim() || null) : null,
+            attachment_url: attachmentUrl,
+            bulk_photos: bulkPhotoUrls,
+            items: cart.map(item => ({
+                mode: item.mode || 'piece',
+                price: item.price || 0,
                 karat: item.karat,
-                description_ar: item.description,
-                status: 'available',
-                created_by: GOLDMIND_STAFF_ID
-            });
-        }
-
-        const { data: newPieces, error: piecesError } = piecesPayload.length > 0
-            ? await goldmindClient.from('pieces').insert(piecesPayload).select()
-            : { data: [], error: null };
-
-        if (piecesError) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ فاتورة الشراء';
-            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة القطع للمخزون: ' + piecesError.message, true);
-            return;
-        }
-
-        // Bulk-lot cart items become gold_stock_lots rows instead of pieces —
-        // a running weight balance that gets sold from directly or later
-        // "produced" into discrete pieces from stock-production-ar.html.
-        const bulkCartItems = cart.filter(item => item.mode === 'bulk');
-        const lotsPayload = bulkCartItems.map(item => ({
-            store_id: GOLDMIND_STORE_ID,
-            karat: item.karat,
-            weight_grams_total: item.weight,
-            weight_grams_remaining: item.weight,
-            cost_fabrication_per_gram: item.fabPerGram || 0,
-            trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
-            source_invoice_id: invoiceRow.id,
-            notes: item.description,
-            box_name: purchaseType === 'buyRetail' ? 'كسر ' + item.karat : null,
-            created_by: GOLDMIND_STAFF_ID
-        }));
-
-        const { data: newLots, error: lotsError } = lotsPayload.length > 0
-            ? await goldmindClient.from('gold_stock_lots').insert(lotsPayload).select()
-            : { data: [], error: null };
-
-        if (lotsError) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ فاتورة الشراء';
-            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة رصيد الجملة: ' + lotsError.message, true);
-            return;
-        }
-
-        // Bulk diamond cart items become diamond_stock_lots rows — same idea
-        // as the gold bulk lots above, produced into individual diamond_pieces
-        // later from diamond-stock-production-ar.html.
-        const diamondBulkCartItems = cart.filter(item => item.mode === 'diamond_bulk');
-        const diamondLotsPayload = diamondBulkCartItems.map(item => ({
-            store_id: GOLDMIND_STORE_ID,
-            box_name: item.boxName,
-            total_carat: item.diamondCarat,
-            remaining_carat: item.diamondCarat,
-            price_per_carat: item.diamondPricePerCarat,
-            trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
-            source_invoice_id: invoiceRow.id,
-            notes: item.description,
-            created_by: GOLDMIND_STAFF_ID
-        }));
-
-        const { data: newDiamondLots, error: diamondLotsError } = diamondLotsPayload.length > 0
-            ? await goldmindClient.from('diamond_stock_lots').insert(diamondLotsPayload).select()
-            : { data: [], error: null };
-
-        if (diamondLotsError) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ فاتورة الشراء';
-            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة صندوق الماس بالجملة: ' + diamondLotsError.message, true);
-            return;
-        }
-
-        // Diamond cart items become new diamond_pieces rows — separate from the
-        // gold "pieces" inventory, linked to the invoice via invoice_items.diamond_piece_id.
-        const diamondCartItems = cart.filter(item => item.mode === 'diamond');
-        const diamondsPayload = [];
-        for (const item of diamondCartItems) {
-            const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'diamond' });
-            if (bcError) {
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'حفظ فاتورة الشراء';
-                showMessage('تم حفظ الفاتورة لكن تعذّر توليد رقم قطعة ألماس: ' + bcError.message, true);
-                return;
-            }
-            diamondsPayload.push({
-                store_id: GOLDMIND_STORE_ID,
-                barcode: barcode,
-                has_gold: item.hasGold,
-                gold_weight_grams: item.goldWeight,
-                gold_karat: item.goldKarat,
-                gold_cost_fabrication_per_gram: item.goldFabCost,
+                weight: item.weight,
+                fab_fee: item.fabFee || 0,
+                fab_fee_vat: item.fabFeeVat || 0,
+                fab_per_gram: item.fabPerGram || 0,
+                description: item.description,
+                box_name: item.boxName || null,
                 diamond_carat: item.diamondCarat,
                 diamond_price_per_carat: item.diamondPricePerCarat,
-                shape: item.shape,
-                clarity: item.clarity,
-                cut: item.cut,
-                color: item.color,
-                certificate_lab: item.certLab,
-                certificate_number: item.certNumber,
-                description_ar: item.description,
-                status: 'available',
-                created_by: GOLDMIND_STAFF_ID
-            });
-        }
-
-        const { data: newDiamonds, error: diamondsError } = diamondsPayload.length > 0
-            ? await goldmindClient.from('diamond_pieces').insert(diamondsPayload).select()
-            : { data: [], error: null };
-
-        if (diamondsError) {
-            saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ فاتورة الشراء';
-            showMessage('تم حفظ الفاتورة لكن حدث خطأ بإضافة قطعة/قطع الماس: ' + diamondsError.message, true);
+                has_gold: !!item.hasGold,
+                gold_weight: item.goldWeight,
+                gold_karat: item.goldKarat,
+                gold_fab_cost: item.goldFabCost,
+                shape: item.shape, clarity: item.clarity, cut: item.cut, color: item.color,
+                cert_lab: item.certLab, cert_number: item.certNumber
+            }))
+        } });
+        if (postError) {
+            resetBtn();
+            showMessage('لم تُحفظ فاتورة الشراء ولم يتغيّر شيء: ' + postError.message, true);
             return;
         }
-
-        let pieceIdx = 0, lotIdx = 0, diamondIdx = 0, diamondLotIdx = 0;
-        const itemsPayload = cart.map(item => {
-            if (item.mode === 'diamond_bulk') {
-                const dLot = newDiamondLots[diamondLotIdx++];
-                return {
-                    invoice_id: invoiceRow.id,
-                    piece_id: null,
-                    gold_stock_lot_id: null,
-                    diamond_piece_id: null,
-                    diamond_stock_lot_id: dLot ? dLot.id : null,
-                    barcode: null,
-                    karat: null,
-                    weight_grams: null,
-                    accounting_weight_grams: null,
-                    fabrication_fee: 0,
-                    line_total: item.price,
-                    description: item.description
-                };
-            }
-            if (item.mode === 'bulk') {
-                const lot = newLots[lotIdx++];
-                return {
-                    invoice_id: invoiceRow.id,
-                    piece_id: null,
-                    gold_stock_lot_id: lot ? lot.id : null,
-                    diamond_piece_id: null,
-                    barcode: null,
-                    karat: item.karat,
-                    weight_grams: item.weight,
-                    accounting_weight_grams: item.weight,
-                    fabrication_fee: item.fabFee || 0,
-                    fabrication_fee_vat: item.fabFeeVat || 0,
-                    line_total: item.price,
-                    description: item.description
-                };
-            }
-            if (item.mode === 'diamond') {
-                const diamond = newDiamonds[diamondIdx++];
-                return {
-                    invoice_id: invoiceRow.id,
-                    piece_id: null,
-                    gold_stock_lot_id: null,
-                    diamond_piece_id: diamond ? diamond.id : null,
-                    barcode: diamond ? diamond.barcode : null,
-                    karat: item.karat,
-                    weight_grams: item.weight,
-                    accounting_weight_grams: item.weight,
-                    fabrication_fee: 0,
-                    line_total: item.price,
-                    description: item.description
-                };
-            }
-            const piece = newPieces[pieceIdx++];
-            return {
-                invoice_id: invoiceRow.id,
-                piece_id: piece ? piece.id : null,
-                gold_stock_lot_id: null,
-                diamond_piece_id: null,
-                barcode: piece ? piece.barcode : null,
-                karat: item.karat,
-                weight_grams: item.weight,
-                accounting_weight_grams: item.weight,
-                fabrication_fee: item.fabFee || 0,
-                fabrication_fee_vat: item.fabFeeVat || 0,
-                line_total: item.price,
-                description: item.description
-            };
-        });
-
-        const { error: itemsError } = await goldmindClient.from('invoice_items').insert(itemsPayload);
-        if (itemsError) {
-            showMessage('تم حفظ الفاتورة والمخزون لكن حدث خطأ بربط عناصر الفاتورة: ' + itemsError.message, true);
-        }
-
-        // Cash paid immediately -> record as a cash-out movement in the daily cash box
-        if (selectedPaymentMethod === 'cash') {
-            await goldmindClient.from('cash_movements').insert({
-                store_id: GOLDMIND_STORE_ID,
-                box: 'main',
-                direction: 'out',
-                amount: total,
-                description: 'دفع فاتورة شراء ' + invoiceNumber,
-                created_by: GOLDMIND_STAFF_ID,
-                invoice_id: invoiceRow.id
-            });
-        }
-
-        // Credit purchase from a trader -> increases what we owe that trader.
-        // Gold weight and fabrication fee are tracked as two separate debts
-        // (24K gold equivalent vs. a plain cash fee amount) in the same row.
-        if (selectedPaymentMethod === 'credit' && purchaseType === 'buyTrader') {
-            const movementsPayload = cart.map(item => {
-                if (item.mode === 'diamond') {
-                    // Diamonds have no gold-equivalent debt of their own — the whole item
-                    // price is owed as a cash debt (fab_fee_amount doubles as the cash-debt
-                    // column, shown on the ledger as "دين نقدي (مصنعية/ألماس)"). If the piece
-                    // also carries a gold portion, that weight still posts its own gold debt.
-                    return {
-                        store_id: GOLDMIND_STORE_ID,
-                        trader_id: selectedTrader.id,
-                        invoice_id: invoiceRow.id,
-                        movement_type: 'debt_increase',
-                        weight_grams: item.hasGold ? item.goldWeight : null,
-                        karat: item.hasGold ? item.goldKarat : null,
-                        gold_24k_equivalent: item.hasGold ? +(item.goldWeight * (item.goldKarat / 24)).toFixed(3) : 0,
-                        fab_fee_amount: item.price,
-                        notes: item.description || ('فاتورة شراء ' + invoiceNumber)
-                    };
-                }
-                return {
-                    store_id: GOLDMIND_STORE_ID,
-                    trader_id: selectedTrader.id,
-                    invoice_id: invoiceRow.id,
-                    movement_type: 'debt_increase',
-                    weight_grams: item.weight,
-                    karat: item.karat,
-                    gold_24k_equivalent: +(item.weight * (item.karat / 24)).toFixed(3),
-                    // Includes the fab fee's VAT too -- this is what the trader
-                    // actually owes the shop in cash, not just the bare fee.
-                    fab_fee_amount: +((item.fabFee || 0) + (item.fabFeeVat || 0)).toFixed(2),
-                    notes: item.description || ('فاتورة شراء ' + invoiceNumber)
-                };
-            });
-            await goldmindClient.from('trader_movements').insert(movementsPayload);
-        }
+        window.__purchaseRef = null;
+        const invoiceRow = { id: posted.id, invoice_number: posted.invoice_number };
 
         // Seller ID photos (optional). The purchase is already saved, so a failed
         // upload only warns; the photos can be retaken from the invoice page.

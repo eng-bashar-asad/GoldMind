@@ -299,104 +299,27 @@ async function submitReturn() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { data: returnNumber, error: numError } = await goldmindClient.rpc('next_invoice_number', { target_store_id: GOLDMIND_STORE_ID, prefix: 'RET' });
-  if (numError) {
+  // One database transaction does it all (return invoice, items, stock back,
+  // refund or debt reduction): all of it or none. The id makes a retry after a
+  // dropped connection safe -- the server posts each return only once.
+  if (!window.__returnRef) window.__returnRef = crypto.randomUUID();
+  const { data: posted, error: postError } = await goldmindClient.rpc('post_sales_return', { p: {
+    store_id: GOLDMIND_STORE_ID,
+    client_ref: window.__returnRef,
+    original_invoice_id: originalInvoice.id,
+    refund_method: refundMethod,
+    reason: reason || null,
+    item_ids: itemsToReturn.map(it => it.id)
+  } });
+  if (postError) {
     btn.disabled = false; btn.textContent = 'تسجيل المرتجع';
-    errEl.textContent = 'تعذّر توليد رقم المرتجع: ' + numError.message;
+    errEl.textContent = 'لم يُسجَّل المرتجع ولم يتغيّر شيء: ' + postError.message;
     errEl.classList.remove('hidden');
     return;
   }
-
-  const { data: returnInvoice, error: invError } = await goldmindClient
-    .from('invoices').insert({
-      store_id: GOLDMIND_STORE_ID,
-      invoice_number: returnNumber,
-      type: 'return',
-      related_invoice_id: originalInvoice.id,
-      customer_id: originalInvoice.customer_id,
-      payment_method: refundMethod === 'debt_reduce' ? 'credit' : refundMethod,
-      total_amount: total,
-      amount_paid: total,
-      status: 'paid',
-      created_by: GOLDMIND_STAFF_ID
-    }).select().single();
-
-  if (invError) {
-    btn.disabled = false; btn.textContent = 'تسجيل المرتجع';
-    errEl.textContent = 'تعذّر حفظ المرتجع: ' + invError.message;
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  const itemsPayload = itemsToReturn.map(it => ({
-    invoice_id: returnInvoice.id,
-    piece_id: it.piece_id,
-    gold_stock_lot_id: it.gold_stock_lot_id,
-    diamond_piece_id: it.diamond_piece_id,
-    barcode: it.barcode,
-    karat: it.karat,
-    weight_grams: it.weight_grams,
-    accounting_weight_grams: it.accounting_weight_grams,
-    fabrication_fee: 0,
-    line_total: it.line_total,
-    description: it.description,
-    description_en: it.description_en,
-    gold_price_per_gram: it.gold_price_per_gram
-  }));
-  await goldmindClient.from('invoice_items').insert(itemsPayload);
-
-  // Returned individual pieces go back into available inventory
-  const pieceIds = itemsToReturn.filter(it => it.piece_id).map(it => it.piece_id);
-  if (pieceIds.length > 0) {
-    await goldmindClient.from('pieces').update({ status: 'available' }).in('id', pieceIds);
-  }
-
-  // Returned diamond pieces go back into available diamond inventory
-  const diamondIds = itemsToReturn.filter(it => it.diamond_piece_id).map(it => it.diamond_piece_id);
-  if (diamondIds.length > 0) {
-    await goldmindClient.from('diamond_pieces').update({ status: 'available' }).in('id', diamondIds);
-  }
-
-  // Returned bulk-lot weight goes back onto its gold_stock_lots balance
-  const bulkReturns = itemsToReturn.filter(it => it.gold_stock_lot_id && it.weight_grams);
-  if (bulkReturns.length > 0) {
-    const weightByLot = {};
-    bulkReturns.forEach(it => {
-      weightByLot[it.gold_stock_lot_id] = (weightByLot[it.gold_stock_lot_id] || 0) + Number(it.weight_grams);
-    });
-    for (const lotId of Object.keys(weightByLot)) {
-      const { data: lot } = await goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('id', lotId).maybeSingle();
-      if (lot) {
-        await goldmindClient.from('gold_stock_lots').update({
-          weight_grams_remaining: Number(lot.weight_grams_remaining) + weightByLot[lotId]
-        }).eq('id', lotId);
-      }
-    }
-  }
-
-  // Money/debt side of the return, dated today (the real event date)
-  if (refundMethod === 'debt_reduce') {
-    await goldmindClient.from('customer_debts').insert({
-      store_id: GOLDMIND_STORE_ID,
-      customer_id: originalInvoice.customer_id,
-      invoice_id: returnInvoice.id,
-      movement_type: 'debt_decrease',
-      cash_amount: total,
-      gold_grams_24k: 0,
-      notes: 'مرتجع ' + returnNumber + ' لفاتورة ' + originalInvoice.invoice_number + (reason ? ' — ' + reason : ''),
-      created_by: GOLDMIND_STAFF_ID
-    });
-  } else {
-    await goldmindClient.from('cash_movements').insert({
-      store_id: GOLDMIND_STORE_ID,
-      box: 'main',
-      direction: 'out',
-      amount: total,
-      description: 'رد مبلغ مرتجع ' + returnNumber + ' لفاتورة ' + originalInvoice.invoice_number + (reason ? ' — ' + reason : ''),
-      created_by: GOLDMIND_STAFF_ID,
-      invoice_id: returnInvoice.id
-    });
-  }
+  window.__returnRef = null;
+  const returnNumber = posted.invoice_number;
+  const returnInvoice = { id: posted.id };
 
   okEl.textContent = 'تم تسجيل المرتجع بنجاح برقم ' + returnNumber;
   okEl.classList.remove('hidden');

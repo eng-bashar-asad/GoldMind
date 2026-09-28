@@ -136,6 +136,107 @@ begin
         'payment_method', 'cash', 'items', jsonb_build_array(jsonb_build_object('piece_id', p1, 'price', 700))));
   if (select count(*) from customers where store_id = usd and name = 'زبون جديد') <> 1 then raise exception 'FAIL 15: duplicate new customer'; end if;
 
+  -- ===== purchases (post_purchase_invoice) =====
+  declare
+    tr uuid; tr_other uuid; ref2 uuid := gen_random_uuid(); pr jsonb; pr2 jsonb; inv uuid;
+    lot2 uuid; p4 uuid; s jsonb; ret jsonb; line_piece uuid; line_lot uuid; cnt int; nxt text;
+  begin
+    insert into traders (store_id, name) values (usd, 'تاجر تجربة') returning id into tr;
+    insert into traders (store_id, name) values (aed, 'تاجر محل آخر') returning id into tr_other;
+
+    -- 16) credit purchase from a trader: piece + bulk + diamond box, all in one go
+    pr := post_purchase_invoice(jsonb_build_object('store_id', usd, 'type', 'buyTrader', 'trader_id', tr,
+      'payment_method', 'credit', 'client_ref', ref2, 'items', jsonb_build_array(
+        jsonb_build_object('mode', 'piece', 'karat', 21, 'weight', 8, 'price', 0, 'fab_fee', 40, 'fab_fee_vat', 2, 'description', 'خاتم'),
+        jsonb_build_object('mode', 'bulk', 'karat', 18, 'weight', 12, 'price', 0, 'fab_fee', 60, 'fab_fee_vat', 3, 'fab_per_gram', 5),
+        jsonb_build_object('mode', 'diamond_bulk', 'diamond_carat', 2, 'diamond_price_per_carat', 500, 'price', 1000, 'box_name', 'صندوق ت'))));
+    inv := (pr->>'id')::uuid;
+    if (pr->>'invoice_number') not like 'PINV-%' then raise exception 'FAIL 16a: number %', pr->>'invoice_number'; end if;
+    if (select total_amount from invoices where id = inv) <> 1000 then raise exception 'FAIL 16b: total'; end if;
+    if (select count(*) from invoice_items where invoice_id = inv) <> 3 then raise exception 'FAIL 16c: items'; end if;
+    if (select count(*) from pieces p join invoice_items ii on ii.piece_id = p.id where ii.invoice_id = inv and p.status = 'available') <> 1 then raise exception 'FAIL 16d: piece'; end if;
+    if (select weight_grams_remaining from gold_stock_lots where source_invoice_id = inv) <> 12 then raise exception 'FAIL 16e: lot'; end if;
+    if (select remaining_carat from diamond_stock_lots where source_invoice_id = inv) <> 2 then raise exception 'FAIL 16f: diamond lot'; end if;
+    if (select count(*) from trader_movements where invoice_id = inv) <> 3 then raise exception 'FAIL 16g: trader debt rows'; end if;
+    if (select sum(gold_24k_equivalent) from trader_movements where invoice_id = inv) <> 16 then raise exception 'FAIL 16h: 24k equivalent (7 + 9)'; end if;
+    if (select sum(fab_fee_amount) from trader_movements where invoice_id = inv) <> 1105 then raise exception 'FAIL 16i: cash debt (42 + 63 + 1000)'; end if;
+    if exists (select 1 from cash_movements where invoice_id = inv) then raise exception 'FAIL 16j: credit purchase moved cash'; end if;
+    if (select vat_amount from invoices where id = inv) <> 5 then raise exception 'FAIL 16k: vat'; end if;
+
+    -- 17) same client_ref again does not double-post
+    pr2 := post_purchase_invoice(jsonb_build_object('store_id', usd, 'type', 'buyTrader', 'trader_id', tr,
+      'payment_method', 'credit', 'client_ref', ref2, 'items', jsonb_build_array(jsonb_build_object('mode', 'bulk', 'karat', 18, 'weight', 1))));
+    if not (pr2->>'duplicate')::boolean or pr2->>'id' <> pr->>'id' then raise exception 'FAIL 17: purchase retry double-posted'; end if;
+
+    -- 18) cash scrap purchase from a person: scrap box, cash out, seller ID kept
+    pr := post_purchase_invoice(jsonb_build_object('store_id', usd, 'type', 'buyRetail', 'payment_method', 'cash',
+      'counterparty_name', 'بائع', 'seller_id_type', 'passport', 'seller_id_number', 'N123',
+      'items', jsonb_build_array(jsonb_build_object('mode', 'bulk', 'karat', 21, 'weight', 5, 'price', 400))));
+    inv := (pr->>'id')::uuid;
+    if (select box_name from gold_stock_lots where source_invoice_id = inv) <> 'كسر 21' then raise exception 'FAIL 18a: scrap box'; end if;
+    if (select sum(amount) from cash_movements where invoice_id = inv and direction = 'out') <> 400 then raise exception 'FAIL 18b: cash out'; end if;
+    if (select seller_id_type || seller_id_number from invoices where id = inv) <> 'passportN123' then raise exception 'FAIL 18c: seller id'; end if;
+
+    -- 19) a bad purchase saves nothing and does not burn an invoice number
+    select count(*) into cnt from invoices where store_id = usd;
+    select next_seq into nxt from invoice_number_counters where store_id = usd and prefix = 'PINV';
+    begin
+      perform post_purchase_invoice(jsonb_build_object('store_id', usd, 'type', 'buyTrader', 'trader_id', tr_other,
+        'payment_method', 'credit', 'items', jsonb_build_array(jsonb_build_object('mode', 'bulk', 'karat', 18, 'weight', 1))));
+      raise exception 'FAIL 19a: trader of another store accepted';
+    exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+    begin
+      perform post_purchase_invoice(jsonb_build_object('store_id', usd, 'type', 'buyTrader', 'trader_id', tr, 'payment_method', 'credit',
+        'items', jsonb_build_array(jsonb_build_object('mode', 'bulk', 'karat', 18, 'weight', 3), jsonb_build_object('mode', 'piece', 'karat', 18, 'weight', 0))));
+      raise exception 'FAIL 19b: zero weight accepted';
+    exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+    if (select count(*) from invoices where store_id = usd) <> cnt then raise exception 'FAIL 19c: partial purchase saved'; end if;
+    if (select next_seq from invoice_number_counters where store_id = usd and prefix = 'PINV')::text <> nxt then raise exception 'FAIL 19d: number burned'; end if;
+
+    -- ===== returns (post_sales_return) =====
+    insert into pieces (store_id, barcode, weight_grams, accounting_weight_grams, karat, status) values (usd, 'T-P4', 6, 6, 18, 'available') returning id into p4;
+    insert into gold_stock_lots (store_id, karat, weight_grams_total, weight_grams_remaining) values (usd, 18, 20, 20) returning id into lot2;
+    s := post_sale_invoice(jsonb_build_object('store_id', usd, 'customer_id', cust, 'payment_method', 'cash',
+      'items', jsonb_build_array(jsonb_build_object('piece_id', p4, 'price', 800),
+                                 jsonb_build_object('mode', 'stock', 'lot_id', lot2, 'karat', 18, 'weight', 3, 'price', 400))));
+    select id into line_piece from invoice_items where invoice_id = (s->>'id')::uuid and piece_id = p4;
+    select id into line_lot from invoice_items where invoice_id = (s->>'id')::uuid and gold_stock_lot_id = lot2;
+
+    -- 20) returning both lines puts stock back and refunds cash, in one go
+    ret := post_sales_return(jsonb_build_object('store_id', usd, 'original_invoice_id', s->>'id', 'refund_method', 'cash',
+      'reason', 'مقاس', 'item_ids', jsonb_build_array(line_piece, line_lot)));
+    if (ret->>'invoice_number') not like 'RET-%' then raise exception 'FAIL 20a: number'; end if;
+    if (select status from pieces where id = p4) <> 'available' then raise exception 'FAIL 20b: piece not back'; end if;
+    if (select weight_grams_remaining from gold_stock_lots where id = lot2) <> 20 then raise exception 'FAIL 20c: lot not back'; end if;
+    if (select sum(amount) from cash_movements where invoice_id = (ret->>'id')::uuid and direction = 'out') <> 1200 then raise exception 'FAIL 20d: refund'; end if;
+    if not exists (select 1 from piece_movements where piece_id = p4 and event_type = 'returned') then raise exception 'FAIL 20e: movement log'; end if;
+
+    -- 21) the same lines cannot be returned twice (piece, then bulk weight)
+    begin
+      perform post_sales_return(jsonb_build_object('store_id', usd, 'original_invoice_id', s->>'id', 'refund_method', 'cash', 'item_ids', jsonb_build_array(line_piece)));
+      raise exception 'FAIL 21a: piece returned twice';
+    exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+    begin
+      perform post_sales_return(jsonb_build_object('store_id', usd, 'original_invoice_id', s->>'id', 'refund_method', 'cash', 'item_ids', jsonb_build_array(line_lot)));
+      raise exception 'FAIL 21b: bulk weight returned twice';
+    exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+    if (select weight_grams_remaining from gold_stock_lots where id = lot2) <> 20 then raise exception 'FAIL 21c: lot changed by a refused return'; end if;
+
+    -- 22) a line from another invoice is refused
+    begin
+      perform post_sales_return(jsonb_build_object('store_id', usd, 'original_invoice_id', r->>'id', 'refund_method', 'cash', 'item_ids', jsonb_build_array(line_piece)));
+      raise exception 'FAIL 22: foreign line accepted';
+    exception when others then if sqlerrm like 'FAIL%' then raise; end if; end;
+
+    -- 23) credit sale returned as debt reduction
+    s := post_sale_invoice(jsonb_build_object('store_id', usd, 'customer_id', cust, 'payment_method', 'credit',
+      'items', jsonb_build_array(jsonb_build_object('piece_id', p4, 'price', 900))));
+    select id into line_piece from invoice_items where invoice_id = (s->>'id')::uuid;
+    ret := post_sales_return(jsonb_build_object('store_id', usd, 'original_invoice_id', s->>'id', 'refund_method', 'debt_reduce', 'item_ids', jsonb_build_array(line_piece)));
+    if (select cash_amount from customer_debts where invoice_id = (ret->>'id')::uuid and movement_type = 'debt_decrease') <> 900 then raise exception 'FAIL 23a: debt not reduced'; end if;
+    if exists (select 1 from cash_movements where invoice_id = (ret->>'id')::uuid) then raise exception 'FAIL 23b: cash moved on debt reduction'; end if;
+  end;
+
   raise notice 'ALL ACCOUNTING TESTS PASSED';
 end $$;
 rollback;

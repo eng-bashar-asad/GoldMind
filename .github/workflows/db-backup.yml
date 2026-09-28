@@ -1,0 +1,112 @@
+# Nightly database safety net:
+#  1. schema snapshot -> supabase/schema.sql in the repo (tables, rules,
+#     functions are versioned and reviewable; a mistake can be diffed/rebuilt)
+#  2. full data backup (public + auth), ENCRYPTED with BACKUP_PASSPHRASE,
+#     kept as a workflow artifact for 30 days (the repo is public: the dump is
+#     never stored unencrypted)
+#  3. restore drill: the backup is restored into a throwaway Postgres and the
+#     row counts are compared with the live database -- a backup that has
+#     never been restored is only a hope.
+# Restore by hand: download the artifact, then
+#   gpg --batch --passphrase "$BACKUP_PASSPHRASE" -d goldmind.dump.gpg > goldmind.dump
+#   pg_restore --no-owner --no-privileges -d "$TARGET_DB_URL" goldmind.dump
+name: Database backup
+
+on:
+  schedule:
+    - cron: '17 23 * * *' # 03:17 Dubai time
+  workflow_dispatch:
+  push: # also run right after this file changes, to prove it works
+    branches: [main]
+    paths: ['.github/workflows/db-backup.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: db-backup
+  cancel-in-progress: false
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    services:
+      scratch:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: drill
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 20
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+      DRILL_URL: postgresql://postgres:drill@localhost:5432/postgres
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check secrets
+        run: |
+          if [ -z "$SUPABASE_DB_URL" ]; then echo "::error::SUPABASE_DB_URL secret is missing"; exit 1; fi
+          if [ -z "$BACKUP_PASSPHRASE" ]; then echo "::warning::BACKUP_PASSPHRASE secret is missing — schema snapshot only, no data backup"; fi
+
+      - name: Install Postgres 17 client
+        run: |
+          sudo install -d /usr/share/postgresql-common/pgdg
+          sudo curl -fsSo /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc https://www.postgresql.org/media/keys/ACCC4CF8.asc
+          echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" | sudo tee /etc/apt/sources.list.d/pgdg.list >/dev/null
+          sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client-17 >/dev/null
+          echo "/usr/lib/postgresql/17/bin" >> "$GITHUB_PATH"
+
+      - name: Schema snapshot
+        run: |
+          pg_dump "$SUPABASE_DB_URL" --schema-only --no-owner --schema=public --file=supabase/schema.sql
+          # the dump header carries the dump time; drop it so unchanged schema = no commit
+          sed -i '/^-- Dumped \(from\|by\)/d' supabase/schema.sql
+          if git diff --quiet -- supabase/schema.sql && git ls-files --error-unmatch supabase/schema.sql >/dev/null 2>&1; then
+            echo "schema unchanged"
+          else
+            git config user.name "goldmind-backup"
+            git config user.email "backup@users.noreply.github.com"
+            git add supabase/schema.sql
+            git commit -m "Schema snapshot $(date -u +%F)"
+            git pull --rebase -q && git push
+          fi
+
+      - name: Data backup (encrypted)
+        if: env.BACKUP_PASSPHRASE != ''
+        run: |
+          pg_dump "$SUPABASE_DB_URL" -Fc --no-owner --schema=public --schema=auth --file=goldmind.dump
+          # live row counts, to compare after the restore drill
+          psql "$SUPABASE_DB_URL" -At -c "select 'invoices', count(*) from public.invoices union all select 'invoice_items', count(*) from public.invoice_items union all select 'pieces', count(*) from public.pieces union all select 'cash_movements', count(*) from public.cash_movements union all select 'trader_movements', count(*) from public.trader_movements union all select 'customers', count(*) from public.customers order by 1" > live_counts.txt
+          gpg --batch --yes --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" --symmetric --cipher-algo AES256 -o goldmind.dump.gpg goldmind.dump
+          ls -lh goldmind.dump goldmind.dump.gpg
+
+      - name: Restore drill
+        if: env.BACKUP_PASSPHRASE != ''
+        run: |
+          # Supabase roles/extensions the dump refers to
+          psql "$DRILL_URL" -q -c "create role anon; create role authenticated; create role service_role; create role supabase_admin; create role supabase_auth_admin; create schema if not exists extensions; create extension if not exists pgcrypto with schema extensions; create extension if not exists \"uuid-ossp\" with schema extensions;"
+          # decrypt the ENCRYPTED file, exactly as a real restore would
+          gpg --batch --pinentry-mode loopback --passphrase "$BACKUP_PASSPHRASE" -d goldmind.dump.gpg > restored.dump
+          pg_restore --no-owner --no-privileges -d "$DRILL_URL" restored.dump 2> restore_errors.log || true
+          echo "restore warnings: $(grep -c ERROR restore_errors.log || true)"
+          psql "$DRILL_URL" -At -c "select 'invoices', count(*) from public.invoices union all select 'invoice_items', count(*) from public.invoice_items union all select 'pieces', count(*) from public.pieces union all select 'cash_movements', count(*) from public.cash_movements union all select 'trader_movements', count(*) from public.trader_movements union all select 'customers', count(*) from public.customers order by 1" > drill_counts.txt
+          echo "live:"; cat live_counts.txt; echo "restored:"; cat drill_counts.txt
+          # a few rows written between the two reads is fine; a missing table or big gap is not
+          python3 - <<'PY'
+          live = dict(l.split('|') for l in open('live_counts.txt').read().split())
+          got = dict(l.split('|') for l in open('drill_counts.txt').read().split())
+          bad = [t for t in live if t not in got or int(got[t]) < int(live[t]) - 5]
+          if bad:
+              raise SystemExit('RESTORE DRILL FAILED for: ' + ', '.join(bad))
+          print('restore drill OK')
+          PY
+
+      - name: Keep the encrypted backup
+        if: env.BACKUP_PASSPHRASE != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: goldmind-db-${{ github.run_number }}
+          path: goldmind.dump.gpg
+          retention-days: 30

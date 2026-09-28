@@ -13,7 +13,7 @@ test('scrap from an individual lands in the karat scrap box with seller ID', asy
       gold_prices: [{ store_id: STORE, karat: 21, price_per_gram: 300 }, { store_id: STORE, karat: 24, price_per_gram: 342.86 }],
       traders: [],
     },
-    rpc: { next_invoice_number: () => ({ body: 'PINV-2026-000009' }) },
+    rpc: { post_purchase_invoice: (args) => { posts.rpc = args; return { body: { id: 'inv-scrap', invoice_number: 'PINV-2026-000009' } }; } },
   });
   // record writes to the tables and storage this flow uses
   await page.route(/\.supabase\.co\/(rest\/v1\/(invoices|gold_stock_lots|company_kyc_documents|invoice_items)|storage\/v1\/object)/, async (r) => {
@@ -60,11 +60,13 @@ test('scrap from an individual lands in the karat scrap box with seller ID', asy
   await page.click('#save-invoice-btn');
   await expect.poll(() => (posts.company_kyc_documents || []).length, { timeout: 10000 }).toBe(2);
 
-  const inv = posts.invoices[0];
-  expect(inv).toMatchObject({ type: 'buyRetail', counterparty_name: 'زبون كسر', seller_id_type: 'passport', seller_id_number: 'N1234567', total_amount: 2700 });
-  const lots = posts.gold_stock_lots[0];
-  const lot = Array.isArray(lots) ? lots[0] : lots;
-  expect(lot).toMatchObject({ karat: 21, weight_grams_total: 10, box_name: 'كسر 21', source_invoice_id: 'inv-scrap' });
+  // the whole purchase goes to the server as ONE call (it names the scrap box)
+  const p = posts.rpc.p;
+  expect(p).toMatchObject({ type: 'buyRetail', payment_method: 'cash', counterparty_name: 'زبون كسر', seller_id_type: 'passport', seller_id_number: 'N1234567' });
+  expect(p.client_ref).toMatch(/^[0-9a-f-]{36}$/);
+  expect(p.items).toEqual([expect.objectContaining({ mode: 'bulk', karat: 21, weight: 10, price: 2700 })]);
+  expect(posts.invoices).toBeUndefined(); // no direct table writes any more
+  expect(posts.gold_stock_lots).toBeUndefined();
   expect(posts.storage.every(u => u.includes('company-kyc-documents') && u.includes('purchase-inv-scrap'))).toBe(true);
   const docs = posts.company_kyc_documents.map(d => (Array.isArray(d) ? d[0] : d));
   expect(docs.map(d => d.document_category).sort()).toEqual(['seller_id_back', 'seller_id_front']);
