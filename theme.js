@@ -1280,8 +1280,17 @@ else gmPrettyFileInputs();
 // Barcodes are often stored zero-padded ("000123"). Staff type "123" (or the
 // scanner drops the zeros) and the exact lookup found nothing. These give
 // every spelling of the same number, and a loose match for the inventory search.
+// Phone keyboards can send Arabic-Indic digits (٠١٢…) or slip invisible
+// direction marks in front of a number typed in an Arabic field.
+function gmCleanCode(v) {
+  return String(v || '')
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2066-\u2069\uFEFF]/g, '')
+    .replace(/[\u0660-\u0669]/g, function (d) { return String(d.charCodeAt(0) - 0x0660); })
+    .replace(/[\u06F0-\u06F9]/g, function (d) { return String(d.charCodeAt(0) - 0x06F0); })
+    .trim();
+}
 function gmBarcodeVariants(code) {
-  var c = String(code || '').trim();
+  var c = gmCleanCode(code);
   var v = [c, c.toUpperCase()];
   if (/^\d+$/.test(c)) {
     var n = c.replace(/^0+/, '') || '0';
@@ -1292,7 +1301,18 @@ function gmBarcodeVariants(code) {
 }
 function gmBarcodeMatches(barcode, query) {
   var norm = function (s) { return String(s || '').toLowerCase().replace(/\s+/g, '').replace(/^0+(?=\d)/, ''); };
-  var b = String(barcode || '').toLowerCase(), q = String(query || '').trim().toLowerCase();
+  var b = String(barcode || '').toLowerCase(), q = gmCleanCode(query).toLowerCase();
   if (!q) return true;
   return norm(b).startsWith(norm(q)) || b.replace(/\s+/g, '').includes(q.replace(/\s+/g, ''));
 }
+
+// iPhone Safari zooms the whole page in when a field with text under 16px is
+// tapped, and doesn't zoom back out -- the screen then looks cut off on both
+// sides. Capping the scale on iOS stops that auto-zoom; iOS still lets people
+// pinch-zoom (it ignores maximum-scale for pinch), and Android is untouched.
+(function () {
+  var ios = /iP(hone|ad|od)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+  if (!ios) return;
+  var m = document.querySelector('meta[name="viewport"]');
+  if (m && !/maximum-scale/.test(m.content)) m.content += ', maximum-scale=1';
+})();
