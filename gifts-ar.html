@@ -11,7 +11,7 @@
 <title>إخراج هدية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=28"></script>
+<script src="supabase-config.js?v=29"></script>
 <script src="theme.js?v=31"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -115,7 +115,7 @@ async function findPiece() {
   if (!code) return;
   box.innerHTML = '<div class="text-on-surface-variant text-sm">جارِ البحث...</div>';
   const [{ data: p, error }, { data: prices }] = await Promise.all([
-    goldmindClient.from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).eq('barcode', code).in('status', ['available', 'in_box']).maybeSingle(),
+    goldmindClient.from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).in('barcode', gmBarcodeVariants(code)).in('status', ['available', 'in_box']).limit(1).maybeSingle(),
     goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID)
   ]);
   if (error) { box.innerHTML = `<div class="text-error text-sm">خطأ: ${gmEscapeHtml(error.message)}</div>`; return; }

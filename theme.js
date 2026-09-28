@@ -1276,3 +1276,23 @@ function gmPrettyFileInputs(root) {
 }
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { gmPrettyFileInputs(); });
 else gmPrettyFileInputs();
+
+// Barcodes are often stored zero-padded ("000123"). Staff type "123" (or the
+// scanner drops the zeros) and the exact lookup found nothing. These give
+// every spelling of the same number, and a loose match for the inventory search.
+function gmBarcodeVariants(code) {
+  var c = String(code || '').trim();
+  var v = [c, c.toUpperCase()];
+  if (/^\d+$/.test(c)) {
+    var n = c.replace(/^0+/, '') || '0';
+    v.push(n);
+    for (var L = n.length + 1; L <= 12; L++) v.push(n.padStart(L, '0'));
+  }
+  return v.filter(function (x, i) { return x && v.indexOf(x) === i; });
+}
+function gmBarcodeMatches(barcode, query) {
+  var norm = function (s) { return String(s || '').toLowerCase().replace(/\s+/g, '').replace(/^0+(?=\d)/, ''); };
+  var b = String(barcode || '').toLowerCase(), q = String(query || '').trim().toLowerCase();
+  if (!q) return true;
+  return norm(b).startsWith(norm(q)) || b.replace(/\s+/g, '').includes(q.replace(/\s+/g, ''));
+}

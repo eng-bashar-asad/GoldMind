@@ -245,8 +245,23 @@ async function requireGoldMindSession(redirectTo) {
     }
     if (GOLDMIND_STORE_ID && GOLDMIND_STAFF_ID) {
         try { localStorage.setItem('gm_membership', JSON.stringify({ user: session.user.id, store: GOLDMIND_STORE_ID, staff: GOLDMIND_STAFF_ID })); } catch (e) { /* ignore */ }
+        gmStartHeartbeat();
     }
     return session;
+}
+
+// "Who is online" for the owner's home screen: while a page is open and
+// visible, tell the server this staff member is here (about once a minute).
+function gmStartHeartbeat() {
+    if (window.__gmHeartbeat || !GOLDMIND_STORE_ID) return;
+    const beat = function () {
+        if (document.hidden || !navigator.onLine || !GOLDMIND_STORE_ID) return;
+        const page = (window.location.pathname.split('/').pop() || 'index-ar.html');
+        goldmindClient.rpc('staff_heartbeat', { p_store: GOLDMIND_STORE_ID, p_page: page }).then(function () {}, function () {});
+    };
+    window.__gmHeartbeat = setInterval(beat, 60000);
+    document.addEventListener('visibilitychange', function () { if (!document.hidden) beat(); });
+    beat();
 }
 
 // Set the active branch for this account and reload into it.

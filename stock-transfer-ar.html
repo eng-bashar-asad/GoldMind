@@ -11,7 +11,7 @@
 <title>إخراج وإدخال بضاعة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=28"></script>
+<script src="supabase-config.js?v=29"></script>
 <script src="theme.js?v=31"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -264,8 +264,9 @@ async function addOutPiece() {
   msg('out-msg', '');
   if (!code) return;
   if (outCart.some(p => p.barcode === code)) { msg('out-msg', 'القطعة مضافة من قبل'); return; }
-  const { data: p } = await goldmindClient.from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).eq('barcode', code).in('status', current.kind === 'gift' ? ['available', 'in_box'] : ['available']).maybeSingle();
+  const { data: p } = await goldmindClient.from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).in('barcode', gmBarcodeVariants(code)).in('status', current.kind === 'gift' ? ['available', 'in_box'] : ['available']).limit(1).maybeSingle();
   if (!p) { msg('out-msg', 'لا توجد قطعة متاحة في المخزن بهذا الباركود'); return; }
+  if (outCart.some(x => x.id === p.id)) { msg('out-msg', 'القطعة مضافة من قبل'); return; }
   outCart.push(p); inp.value = ''; renderOut();
 }
 function removeOut(id) { outCart = outCart.filter(p => p.id !== id); renderOut(); }

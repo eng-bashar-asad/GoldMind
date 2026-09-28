@@ -486,7 +486,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=28"></script>
+<script src="supabase-config.js?v=29"></script>
 <script src="gm-logo.js?v=2" defer></script>
 <script src="gm-biometric.js?v=1"></script>
 <script>window.addEventListener('load', function () { setTimeout(function () { if (window.GMBio) GMBio.maybePrompt(); }, 2500); });</script>
@@ -977,6 +977,12 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <p class="font-body-md text-body-md text-on-primary opacity-70" id="welcomeEl">بوابة المسؤول • حساب بريميوم</p>
 </div>
 </div>
+<div class="flex items-center gap-2 shrink-0">
+<!-- Who is online (owner only): filled by the script at the end below. -->
+<button id="gmOnlineBtn" type="button" onclick="gmOpenOnline()" aria-label="الموظفون المتصلون" class="hidden w-16 h-16 rounded-2xl flex-col items-center justify-center gap-0.5 shrink-0 active:scale-95 transition-transform" style="background:#FFFDF8;border:1px solid #E3D6B4;color:#1F1A12;">
+<span class="flex items-center gap-1"><span id="gmOnlineDot" style="width:8px;height:8px;border-radius:50%;background:#B9AE97;display:inline-block;"></span><b id="gmOnlineCount" class="font-data-mono" style="font-size:16px;line-height:1;">0</b></span>
+<span style="font-size:10px;line-height:1.1;color:#6B6150;">متصل الآن</span>
+</button>
 <!-- Gold-price badge — shown only for the warm-ingot theme. Tapping it opens
      a small picker to switch which karat's price/gram it displays. -->
 <button id="hallmarkBadge" onclick="gmOpenKaratPicker()" class="hidden w-20 h-16 rounded-2xl border flex flex-col items-center justify-center gap-0.5 shrink-0 active:scale-95 transition-transform" style="border-color: var(--gm-accent); color: var(--gm-accent);">
@@ -984,6 +990,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <span class="font-data-mono font-bold" id="hallmarkPriceLabel" style="font-size:14px; line-height:1.15;">—</span>
 <span class="font-data-mono" id="hallmarkPriceUnit" style="font-size:10px; line-height:1; opacity:.8;">للغرام</span>
 </button>
+</div>
 </section>
 <!-- Today: one big card (sales OR cash -- each staff member picks), and a
      small card that always shows the OTHER number. The metric blocks keep
@@ -2037,7 +2044,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <div class="fixed inset-x-0 top-0 z-[301] translate-y-[-100%] transition-transform duration-200 bg-surface-container-lowest rounded-b-2xl shadow-2xl" dir="rtl" id="quickSearchPanel">
 <div class="p-4 flex items-center gap-2 border-b border-outline-variant">
 <span class="material-symbols-outlined text-on-surface-variant">search</span>
-<input id="quickSearchInput" oninput="renderQuickSearchResults()" placeholder="اكتب اسم الشاشة التي تريدها... (مثال: عميل، فاتورة، صندوق)" class="flex-1 h-10 bg-transparent border-none outline-none focus:ring-0 text-[14px] text-on-surface"/>
+<input id="quickSearchInput" oninput="renderQuickSearchResults()" placeholder="اسم شاشة (عميل، فاتورة…) أو رقم قطعة" class="flex-1 h-10 bg-transparent border-none outline-none focus:ring-0 text-[14px] text-on-surface"/>
 <button onclick="closeQuickSearch()" aria-label="إغلاق البحث" class="gm-hit w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant"><span class="material-symbols-outlined">close</span></button>
 </div>
 <div id="quickSearchResults" class="max-h-[70vh] overflow-y-auto py-2"></div>
@@ -2108,11 +2115,17 @@ document.addEventListener('DOMContentLoaded', function () {
             : GOLDMIND_SEARCH_INDEX;
 
         const container = document.getElementById('quickSearchResults');
+        // Typed something that could be a barcode -> offer to find the piece in stock.
+        const raw = (document.getElementById('quickSearchInput').value || '').trim();
+        const pieceLink = raw && /\d/.test(raw)
+            ? '<a href="inventory-list-ar.html?q=' + encodeURIComponent(raw) + '" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory_2</span><span class="font-label-md text-label-md">ابحث عن القطعة «' + gmEscapeHtml(raw) + '» في المخزن</span></a>'
+            : '';
+        if (results.length === 0 && pieceLink) { container.innerHTML = pieceLink; return; }
         if (results.length === 0) {
             container.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد نتائج مطابقة.</p>';
             return;
         }
-        container.innerHTML = results.map(function (item) {
+        container.innerHTML = pieceLink + results.map(function (item) {
             return '<a href="' + item.href + '" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors">' +
                 '<span class="material-symbols-outlined text-secondary">' + item.icon + '</span>' +
                 '<span class="font-label-md text-label-md">' + item.label + '</span></a>';
@@ -2469,6 +2482,72 @@ if ('serviceWorker' in navigator) {
     document.body.classList.remove('gm-drawer-open');
   };
   document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && d.classList.contains('gm-open')) window.closeNavDrawer(); });
+})();
+</script>
+<div id="gmOnlineSheet" class="hidden fixed inset-0 z-[300] items-end justify-center" style="background:rgba(12,10,7,.42);" onclick="if(event.target===this)gmCloseOnline()">
+<div class="w-full max-w-md rounded-t-[26px] p-5 pb-8" style="background:#FFFDF8;">
+<div class="flex items-center justify-between mb-3">
+<h3 style="margin:0;font-size:16px;font-weight:700;color:#1F1A12;">الموظفون</h3>
+<button type="button" onclick="gmCloseOnline()" aria-label="إغلاق" class="w-9 h-9 rounded-full flex items-center justify-center" style="background:#F3EEDF;"><span class="material-symbols-outlined text-[20px]">close</span></button>
+</div>
+<div id="gmOnlineList" class="flex flex-col gap-2"></div>
+<p style="font-size:11px;color:#6B6150;margin-top:12px;">"متصل الآن" = فاتح البرنامج خلال آخر دقيقتين.</p>
+</div>
+</div>
+<script>
+// Owner-only: who of the store's staff has the app open right now.
+(function () {
+  const ONLINE_MS = 2.5 * 60 * 1000;
+  const PAGE_NAMES = { 'index-ar.html': 'الشاشة الرئيسية', 'new-sale-ar.html': 'بيع جديد', 'inventory-list-ar.html': 'المخزن', 'inventory-count-ar.html': 'الجرد', 'daily-cashbox-ar.html': 'الصندوق اليومي', 'create-invoice-v2-ar.html': 'فاتورة شراء', 'invoices-list-ar.html': 'الفواتير', 'ledger-ar.html': 'حسابات التجار', 'piece-edit-ar.html': 'بيانات قطعة', 'inventory-add.html': 'إضافة قطعة', 'sales-return-ar.html': 'مرتجع مبيعات' };
+  let rows = [];
+  // Arabic counting: 1 دقيقة، 2 دقيقتين، 3-10 دقائق، 11+ دقيقة
+  function count(n, one, two, few) { return n === 1 ? one : n === 2 ? two : (n >= 3 && n <= 10 ? n + ' ' + few : n + ' ' + one); }
+  function ago(ms) {
+    const m = Math.max(1, Math.round(ms / 60000));
+    if (m < 60) return 'قبل ' + count(m, 'دقيقة', 'دقيقتين', 'دقائق');
+    const h = Math.round(m / 60);
+    if (h < 24) return 'قبل ' + count(h, 'ساعة', 'ساعتين', 'ساعات');
+    return 'قبل ' + count(Math.round(h / 24), 'يوم', 'يومين', 'أيام');
+  }
+  async function refresh() {
+    const [{ data: staff }, { data: pres }] = await Promise.all([
+      goldmindClient.from('staff').select('id, full_name, role').eq('store_id', GOLDMIND_STORE_ID),
+      goldmindClient.from('staff_presence').select('staff_id, last_seen_at, last_page').eq('store_id', GOLDMIND_STORE_ID)
+    ]);
+    const seen = {}; (pres || []).forEach(p => { seen[p.staff_id] = p; });
+    const now = Date.now();
+    rows = (staff || []).filter(s => s.id !== GOLDMIND_STAFF_ID).map(s => {
+      const p = seen[s.id], t = p ? new Date(p.last_seen_at).getTime() : 0;
+      return { name: s.full_name || 'موظف', online: t && now - t < ONLINE_MS, t, page: p && p.last_page };
+    }).sort((a, b) => (b.online - a.online) || (b.t - a.t));
+    const n = rows.filter(r => r.online).length;
+    document.getElementById('gmOnlineCount').textContent = n;
+    document.getElementById('gmOnlineDot').style.background = n ? '#2E9E57' : '#B9AE97';
+    if (!document.getElementById('gmOnlineSheet').classList.contains('hidden')) render();
+  }
+  function render() {
+    const now = Date.now();
+    document.getElementById('gmOnlineList').innerHTML = rows.length ? rows.map(r => `
+      <div class="flex items-center gap-3 p-3 rounded-2xl" style="background:#F3EEDF;">
+        <span style="width:10px;height:10px;border-radius:50%;background:${r.online ? '#2E9E57' : '#B9AE97'};flex-shrink:0;"></span>
+        <div class="min-w-0 flex-1">
+          <div style="font-weight:700;font-size:14px;color:#1F1A12;" class="truncate">${gmEscapeHtml(r.name)}</div>
+          <div style="font-size:12px;color:#6B6150;">${r.online ? 'متصل الآن' + (r.page ? ' — ' + gmEscapeHtml(PAGE_NAMES[r.page] || '') : '') : (r.t ? 'آخر ظهور ' + ago(now - r.t) : 'لم يظهر بعد')}</div>
+        </div>
+      </div>`).join('') : '<p style="font-size:13px;color:#6B6150;">لا يوجد موظفون آخرون في هذه الشركة.</p>';
+  }
+  window.gmOpenOnline = function () { render(); const el = document.getElementById('gmOnlineSheet'); el.classList.remove('hidden'); el.classList.add('flex'); refresh(); };
+  window.gmCloseOnline = function () { const el = document.getElementById('gmOnlineSheet'); el.classList.add('hidden'); el.classList.remove('flex'); };
+  (async function start() {
+    const session = await requireGoldMindSession();
+    if (!session || !GOLDMIND_STAFF_ID) return;
+    const { data: me } = await goldmindClient.from('staff').select('role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    if (!me || me.role !== 'owner') return;
+    const btn = document.getElementById('gmOnlineBtn');
+    btn.classList.remove('hidden'); btn.classList.add('flex');
+    refresh();
+    setInterval(() => { if (!document.hidden) refresh(); }, 45000);
+  })();
 })();
 </script>
 </body></html>

@@ -11,7 +11,7 @@
 <title>تعديل الفاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=28"></script>
+<script src="supabase-config.js?v=29"></script>
 <script src="theme.js?v=31"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -199,7 +199,7 @@ async function lookupPieceByBarcode() {
   if (!barcode) { msgEl.textContent = ''; msgEl.classList.add('hidden'); return; }
 
   const { data, error } = await goldmindClient
-    .from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).eq('barcode', barcode).eq('status', 'available').maybeSingle();
+    .from('pieces').select('*').eq('store_id', GOLDMIND_STORE_ID).in('barcode', gmBarcodeVariants(barcode)).eq('status', 'available').limit(1).maybeSingle();
 
   if (error || !data) {
     msgEl.textContent = 'لم يتم العثور على قطعة متاحة بهذا الباركود';

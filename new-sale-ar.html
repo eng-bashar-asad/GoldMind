@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=28"></script>
+<script src="supabase-config.js?v=29"></script>
 <script src="theme.js?v=31"></script>
 <script id="tailwind-config">
         tailwind.config = {
@@ -1141,9 +1141,9 @@
             .from('pieces')
             .select('*')
             .eq('store_id', GOLDMIND_STORE_ID)
-            .eq('barcode', code)
+            .in('barcode', gmBarcodeVariants(code))
             .eq('status', 'available')
-            .maybeSingle();
+            .limit(1).maybeSingle();
 
         if (error) {
             barcodeResult.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${gmEscapeHtml(error.message)}</div>`;
