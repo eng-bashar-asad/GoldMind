@@ -243,6 +243,11 @@
 </div>
 </div>
 
+<div id="report-balanced" class="hidden bg-green-50 border border-green-200 rounded-xl p-4 text-center text-green-800 font-bold text-[14px]">
+<span class="material-symbols-outlined align-middle">task_alt</span> الجرد متطابق تماماً — لا قطع ناقصة ولا زيادة
+</div>
+<p id="report-fix-hint" class="text-[11.5px] text-on-surface-variant -mb-2">قبل الترحيل: افتح القطع الناقصة لتضيف ما وجدته منها، أو القطع الزيادة لتحذف المسحات الخاطئة، حتى يتطابق الجرد.</p>
+
 <button onclick="openSubScreen('missing')" class="w-full p-4 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between">
 <div class="flex items-center gap-3">
 <span class="material-symbols-outlined text-red-700 text-2xl">remove_circle</span>
@@ -269,6 +274,10 @@
 <button onclick="exportCsv(missingListCache, surplusListCache, currentSessionMeta)" class="flex-1 h-11 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">table_view</span> Excel (CSV)</button>
 <button onclick="exportPdf('report-print-sheet','report-download-btn')" id="report-download-btn" class="flex-1 h-11 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> PDF</button>
 </div>
+
+<button id="continue-scan-btn" onclick="continueScanning()" class="w-full h-12 border-2 border-primary text-primary rounded-lg font-bold text-[13px] flex items-center justify-center gap-2">
+<span class="material-symbols-outlined">barcode_scanner</span> متابعة المسح (وجدت قطعاً ناقصة)
+</button>
 
 <button id="post-count-btn" onclick="postCount()" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2 flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">task_alt</span> ترحيل الجرد
@@ -1115,11 +1124,7 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
 
   currentSessionMeta = { date: new Date().toLocaleString('ar-AE'), method: countMethod };
 
-  document.getElementById('report-expected').textContent = stats.expected;
-  document.getElementById('report-matched').textContent = stats.matched;
-  document.getElementById('report-scanned').textContent = stats.scanned;
-  document.getElementById('report-missing-count').textContent = missingCount;
-  document.getElementById('report-surplus-count').textContent = surplusListCache.length;
+  renderReportCounts();
 
   document.getElementById('scan-wrap').classList.add('hidden');
   document.getElementById('report-wrap').classList.remove('hidden');
@@ -1189,8 +1194,9 @@ async function openSubScreen(kind) {
   list.innerHTML = '<div class="text-[12px] text-on-surface-variant py-4 text-center">جارٍ تحميل الصور...</div>';
   const info = await loadReportPieceInfo();
 
+  currentSubKind = kind;
   if (kind === 'missing') {
-    list.innerHTML = missingListCache.map(p => {
+    list.innerHTML = missingListCache.map((p, i) => {
       const row = info.byId[(p.source === 'diamond' ? 'diamond:' : 'gold:') + p.id] || {};
       const desc = p.description_ar || row.description_ar || '';
       return `
@@ -1200,11 +1206,14 @@ async function openSubScreen(kind) {
             <div class="font-semibold text-red-700">${gmEscapeHtml(p.barcode || row.barcode || p.id.slice(0, 8))}</div>
             ${desc ? `<div class="text-on-surface-variant truncate">${gmEscapeHtml(desc)}</div>` : ''}
           </div>
-          <span class="text-on-surface-variant shrink-0">${p.weight_grams != null ? (p.weight_grams + 'g') : ''} ${p.karat ? 'عيار ' + p.karat : ''}</span>
+          <div class="flex flex-col items-end gap-1 shrink-0">
+            <span class="text-on-surface-variant">${p.weight_grams != null ? (p.weight_grams + 'g') : ''} ${p.karat ? 'عيار ' + p.karat : ''}</span>
+            <button type="button" onclick="addMissingToCount(${i}, this)" class="h-8 px-3 rounded-lg bg-green-700 text-white text-[11.5px] font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">add</span>وُجدت — أضفها</button>
+          </div>
         </div>`;
     }).join('');
   } else {
-    list.innerHTML = surplusListCache.map(v => {
+    list.innerHTML = surplusListCache.map((v, i) => {
       const row = info.byValue[v];
       const status = row ? (PIECE_STATUS_AR[row.status] || row.status || '') : '';
       return `
@@ -1215,9 +1224,94 @@ async function openSubScreen(kind) {
             ${row && row.description_ar ? `<div class="text-on-surface-variant truncate">${gmEscapeHtml(row.description_ar)}</div>` : ''}
             <div class="text-[11px] ${row ? 'text-amber-800' : 'text-outline'}">${row ? 'مسجّلة في النظام — حالتها: ' + gmEscapeHtml(status) : 'غير مسجّلة في النظام'}</div>
           </div>
+          <button type="button" onclick="removeSurplusFromCount(${i}, this)" class="h-8 px-3 rounded-lg border border-error text-error text-[11.5px] font-bold flex items-center gap-1 shrink-0"><span class="material-symbols-outlined text-[16px]">delete</span>احذفها</button>
         </div>`;
     }).join('');
   }
+}
+
+// ---- Fix the difference before posting (2026-09-28) ----
+// Missing piece found on the shelf -> add it as a manual scan.
+// Wrong / extra scan -> delete it. Repeat until nothing is missing or extra.
+let currentSubKind = null;
+
+function renderReportCounts() {
+  const missing = missingListCache.length, surplus = surplusListCache.length;
+  document.getElementById('report-expected').textContent = stats.expected;
+  document.getElementById('report-matched').textContent = stats.matched;
+  document.getElementById('report-scanned').textContent = stats.scanned;
+  document.getElementById('report-missing-count').textContent = missing;
+  document.getElementById('report-surplus-count').textContent = surplus;
+  const balanced = missing === 0 && surplus === 0;
+  document.getElementById('report-balanced').classList.toggle('hidden', !balanced);
+  document.getElementById('report-fix-hint').classList.toggle('hidden', balanced);
+}
+
+async function saveReportCounts() {
+  await goldmindClient.from('inventory_counts').update({
+    scanned_piece_count: stats.scanned,
+    matched_count: stats.matched,
+    missing_count: missingListCache.length,
+    unexpected_count: stats.unexpected
+  }).eq('id', currentCountId);
+}
+
+async function addMissingToCount(i, btn) {
+  const p = missingListCache[i];
+  if (!p || !currentCountId) return;
+  const value = p[matchField] || p.barcode;
+  if (!value) { alert('لا يوجد رقم لهذه القطعة يمكن تسجيله.'); return; }
+  if (!confirm('تأكيد: القطعة ' + (p.barcode || value) + ' موجودة فعلاً بالمحل؟ ستُسجَّل كممسوحة يدوياً باسمك.')) return;
+  btn.disabled = true;
+  const res = await saveScan({
+    store_id: GOLDMIND_STORE_ID, count_id: currentCountId, rfid_epc: value,
+    piece_id: p.source === 'diamond' ? null : p.id, piece_source: p.source || null,
+    match_status: 'matched', scan_method: 'manual', scanned_by: GOLDMIND_STAFF_ID
+  });
+  if (res === 'retry') { btn.disabled = false; alert('تعذّر الحفظ. تأكد من الاتصال بالإنترنت وحاول مرة أخرى.'); return; }
+  scannedValues.add(value);
+  scanBy[value] = GOLDMIND_STAFF_ID;
+  missingListCache = missingListCache.filter(x => x !== p);
+  recalcStats();
+  await saveReportCounts();
+  renderReportCounts();
+  openSubScreen('missing');
+}
+
+async function removeSurplusFromCount(i, btn) {
+  const v = surplusListCache[i];
+  if (v == null || !currentCountId) return;
+  if (!confirm('حذف المسحة ' + v + ' من الجرد؟')) return;
+  btn.disabled = true;
+  const { error } = await goldmindClient.from('inventory_count_scans').delete()
+    .eq('count_id', currentCountId).eq('rfid_epc', v);
+  if (error) { btn.disabled = false; alert('تعذّر الحذف: ' + error.message); return; }
+  goldmindClient.from('audit_log').insert({
+    store_id: GOLDMIND_STORE_ID, action_type: 'inventory_count_scan_removed',
+    description: 'حذف مسحة زيادة من الجرد: ' + v
+  }).then(() => {});
+  scannedValues.delete(v);
+  delete scanBy[v];
+  surplusListCache = surplusListCache.filter(x => x !== v);
+  recalcStats();
+  await saveReportCounts();
+  renderReportCounts();
+  openSubScreen('surplus');
+}
+
+// Back to the scanner with the same session (e.g. the missing pieces were found in another drawer).
+async function continueScanning() {
+  if (!currentCountId) return;
+  const { error } = await goldmindClient.from('inventory_counts')
+    .update({ status: 'in_progress', completed_at: null }).eq('id', currentCountId);
+  if (error) { alert('تعذّر فتح الجلسة: ' + error.message); return; }
+  inProgressSession = {
+    id: currentCountId, method: countMethod,
+    scope: [scope.gold ? 'gold' : null, scope.diamond ? 'diamond' : null].filter(Boolean)
+  };
+  document.getElementById('report-wrap').classList.add('hidden');
+  document.getElementById('subscreen-wrap').classList.add('hidden');
+  await resumeSession();
 }
 
 function closeSubScreen() {
@@ -1376,9 +1470,21 @@ async function openSessionDetail(countId) {
     unpostBtn.onclick = () => unpostSession(countId);
     ownerActions.appendChild(unpostBtn);
     editHint.classList.add('hidden');
-  } else if (isOwner && countRow.status === 'completed') {
-    ownerActions.classList.add('hidden');
-    editHint.textContent = 'الجلسة غير مُرحّلة بعد — يمكنك حذف أي مسحة خاطئة مباشرة (أيقونة السلة)، وترحّلها لاحقاً من هنا.';
+  } else if (countRow.status === 'completed') {
+    ownerActions.classList.remove('hidden');
+    ownerActions.classList.add('flex');
+    const resumeBtn = document.createElement('button');
+    resumeBtn.className = 'flex-1 h-11 border-2 border-primary text-primary rounded-lg text-[12px] font-bold';
+    resumeBtn.textContent = 'متابعة هذه الجلسة (مسح / إضافة / حذف)';
+    resumeBtn.onclick = async () => {
+      const { error } = await goldmindClient.from('inventory_counts').update({ status: 'in_progress', completed_at: null }).eq('id', countId);
+      if (error) { alert('تعذّر فتح الجلسة: ' + error.message); return; }
+      inProgressSession = { id: countId, method: countRow.method, scope: countRow.scope || [] };
+      document.getElementById('session-detail-wrap').classList.add('hidden');
+      await resumeSession();
+    };
+    ownerActions.appendChild(resumeBtn);
+    editHint.textContent = 'الجلسة غير مُرحّلة بعد — يمكنك حذف أي مسحة خاطئة (أيقونة السلة)، أو متابعة الجلسة ثم "إنهاء الجلسة" لتعديل الناقص والزيادة قبل الترحيل.';
     editHint.classList.remove('hidden');
   } else {
     ownerActions.classList.add('hidden');
