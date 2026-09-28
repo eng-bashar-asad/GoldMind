@@ -108,7 +108,7 @@
 <nav class="flex flex-col gap-1 mt-8">
 <a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="index-ar.html">
 <span class="material-symbols-outlined">dashboard</span>
-<span class="font-label-md text-label-md text-[15px]">لوحة التحكم</span>
+<span class="font-label-md text-label-md text-[15px]">الشاشة الرئيسية</span>
 </a>
 <a class="flex items-center gap-4 px-4 py-3 rounded-lg text-on-surface-variant hover:bg-surface-container transition-all cursor-pointer" href="inventory-list-ar.html">
 <span class="material-symbols-outlined">inventory_2</span>
@@ -425,7 +425,7 @@
 <nav class="md:hidden fixed bottom-0 w-full flex justify-around items-center px-4 py-2 bg-surface-container-lowest border-t border-outline-variant shadow-sm z-50">
 <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="index-ar.html">
 <span class="material-symbols-outlined">dashboard</span>
-<span class="font-label-md text-label-md">لوحة التحكم</span>
+<span class="font-label-md text-label-md">الشاشة الرئيسية</span>
 </a>
 <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="inventory-list-ar.html">
 <span class="material-symbols-outlined">inventory_2</span>
@@ -717,9 +717,16 @@
 
         const wanted = new URLSearchParams(location.search).get('draft');
         const draft = wanted && readDrafts().find(d => d.id === wanted);
+        // Came from a piece page ("بيع القطعة"): start a fresh sale with that barcode looked up.
+        const fromPiece = new URLSearchParams(location.search).get('barcode');
         if (draft) loadDraft(draft);
-        else openDraftsModal();
+        else if (!fromPiece) openDraftsModal();
         refreshHeldButton();
+        if (fromPiece && !draft) {
+            showSaleTab('barcode', false);
+            document.getElementById('barcode-search-input').value = fromPiece;
+            setTimeout(searchByBarcode, 0);
+        }
     }
 
     // ---------- Add-item tabs ----------

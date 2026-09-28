@@ -49,15 +49,47 @@
         #page-main { padding-right: 64px; }
     }
 </style>
+<style id="gm-piece-v2">
+.gm-gold{background:linear-gradient(125deg,#7a5a16 0%,#c89a3c 18%,#f6e2a6 30%,#d4a64a 42%,#8a6a1f 58%,#e2bd67 76%,#fff0bf 88%,#b58a33 100%);background-size:220% 220%;animation:gmGoldShift 9s ease-in-out infinite alternate;color:#2A1F08}
+@keyframes gmGoldShift{from{background-position:0% 50%}to{background-position:100% 50%}}
+.gm-sweep{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+.gm-sweep::after{content:'';position:absolute;top:-40%;bottom:-40%;width:38%;left:-60%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.6) 45%,rgba(255,255,255,.08) 60%,transparent);transform:skewX(-18deg);animation:gmSweep 5.5s cubic-bezier(.65,0,.35,1) infinite}
+@keyframes gmSweep{0%,55%{left:-60%}85%,100%{left:130%}}
+.gm-back{width:42px;height:42px;border-radius:14px;background:#1F1A12;color:#F3EEDF;display:flex;align-items:center;justify-content:center;border:0}
+.gm-photo{position:relative;height:300px;border-radius:26px;overflow:hidden;background:radial-gradient(circle at 35% 30%,#FFF6D6,#E9D29A 55%,#B8913A);flex-shrink:0}
+.gm-photo img{width:100%;height:100%;object-fit:cover}
+.gm-photo .gm-cam{position:absolute;bottom:12px;right:12px;height:36px;padding:0 12px;border-radius:18px;background:rgba(23,20,15,.72);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;border:0}
+.gm-spec{background:#FFFDF8;border-radius:20px;padding:12px;text-align:center}
+.gm-spec b{display:block;font-size:19px;color:#1F1A12;font-family:inherit}
+.gm-spec span{font-size:11.5px;color:#6B6150}
+.gm-age{background:#1F1A12;color:#FFFDF8;border-radius:26px;padding:18px}
+.gm-age-bar{height:8px;border-radius:4px;background:#2E271B;overflow:hidden;margin:10px 0 6px}
+.gm-age-bar i{display:block;height:100%;border-radius:4px;transform-origin:right;animation:gmBar 1s cubic-bezier(.22,1,.36,1) both}
+@keyframes gmBar{from{transform:scaleX(0)}to{transform:scaleX(1)}}
+.gm-age dl{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.gm-age dt{font-size:11px;color:#CDBF9F}.gm-age dd{margin:0;font-size:14px;font-weight:700}
+.gm-chipst{display:inline-flex;align-items:center;height:26px;padding:0 10px;border-radius:13px;font-size:12px;font-weight:600}
+.gm-edit{background:#FFFDF8;border-radius:22px;padding:4px 16px;scroll-margin-top:76px}
+.gm-edit>summary{list-style:none;cursor:pointer;height:52px;display:flex;align-items:center;gap:8px;font-weight:700;color:#1F1A12}
+.gm-edit>summary::-webkit-details-marker{display:none}
+.gm-edit[open]>summary .ms-chev{transform:rotate(180deg)}
+.gm-edit>summary .ms-chev{margin-inline-start:auto;transition:transform .3s}
+.gm-tl{position:relative;padding-right:18px}
+.gm-tl:before{content:'';position:absolute;right:5px;top:6px;bottom:6px;width:2px;background:#E3D6B4}
+.gm-tl>div{position:relative;padding:8px 0}
+.gm-tl>div:before{content:'';position:absolute;right:-17px;top:13px;width:10px;height:10px;border-radius:50%;background:#D9B45A;box-shadow:0 0 0 3px #F3EEDF}
+.gm-bar{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(243,238,223,.94);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.gm-bar a,.gm-bar button{position:relative;height:52px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:14px;border:0}
+.gm-bar .sq{width:52px;background:#1F1A12;color:#F3EEDF;flex-shrink:0}
+@media (prefers-reduced-motion: reduce){.gm-gold,.gm-sweep::after,.gm-age-bar i{animation:none!important}}
+</style>
 </head>
-<body class="bg-background text-on-background font-body-md">
-<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<body class="bg-background text-on-background font-body-md" style="background:#F3EEDF;">
+<header class="z-50 sticky top-0" style="background:#F3EEDF;">
 <div class="flex justify-between items-center px-4 w-full h-16">
-<div class="flex items-center gap-4">
-<button onclick="gmSmartBack('inventory-list-ar.html')" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
-</button>
-<h1 class="font-headline-md text-headline-md font-bold">تعديل قطعة</h1>
+<div class="flex items-center gap-3">
+<button onclick="gmSmartBack('inventory-list-ar.html')" class="gm-back" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button>
+<h1 style="margin:0;font-size:18px;font-weight:700;color:#1F1A12;">بيانات القطعة</h1>
 </div>
 </div>
 </header>
@@ -68,10 +100,47 @@
 
 <div id="form-wrap" class="hidden py-6 flex flex-col gap-6">
 
-<div class="flex flex-wrap gap-6 lg:gap-10 items-stretch">
+<!-- Photo hero -->
+<input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
+<div class="gm-photo" onclick="triggerPhotoCapture()">
+<div class="w-full h-full flex flex-col items-center justify-center" id="photo-placeholder" style="color:#6B4F14;">
+<span class="material-symbols-outlined" style="font-size:64px;">diamond</span>
+<p class="text-[13px] font-semibold mt-1">اضغط لإضافة صورة</p>
+</div>
+<img alt="صورة القطعة" class="hidden" id="photo-preview"/>
+<button class="hidden absolute top-3 left-3 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" aria-label="إزالة الصورة" onclick="event.stopPropagation(); removePhoto();" type="button"><span class="material-symbols-outlined text-[18px]">close</span></button>
+<button type="button" class="gm-cam"><span class="material-symbols-outlined text-[18px]">photo_camera</span>تغيير الصورة</button>
+</div>
 
-<div class="flex-1 min-w-[300px] flex flex-col gap-4">
+<div class="flex items-start justify-between gap-3">
+<div class="min-w-0">
+<h2 id="gmPieceTitle" style="margin:0;font-size:22px;font-weight:700;color:#1F1A12;">قطعة</h2>
+<div id="gmPieceBarcode" dir="ltr" class="font-data-mono text-[13px] text-right" style="color:#6B6150;"></div>
+</div>
+<span id="gmPieceStatus" class="gm-chipst"></span>
+</div>
 
+<div class="grid grid-cols-3 gap-2.5">
+<div class="gm-spec"><b id="gmSpecKarat">—</b><span>العيار</span></div>
+<div class="gm-spec"><b id="gmSpecWeight" class="font-data-mono">—</b><span>الوزن القائم (غ)</span></div>
+<div class="gm-spec"><b id="gmSpecAcc" class="font-data-mono">—</b><span>وزن المحاسبة (غ)</span></div>
+</div>
+
+<div class="gm-age">
+<div class="flex items-center justify-between"><span style="font-size:13px;color:#CDBF9F;">مدة البقاء في المخزن</span><span class="material-symbols-outlined" style="color:#D9B45A;">hourglass_top</span></div>
+<div id="gmAgeText" style="font-size:22px;font-weight:700;margin-top:4px;">—</div>
+<div class="gm-age-bar"><i id="gmAgeBar" style="width:0"></i></div>
+<div id="gmAgeHint" style="font-size:11.5px;color:#CDBF9F;"></div>
+<dl>
+<div><dt>المصنعية / غرام</dt><dd id="gmAgeFab" class="font-data-mono">—</dd></div>
+<div><dt>اللون</dt><dd id="gmAgeColor">—</dd></div>
+<div><dt>الصندوق</dt><dd id="gmAgeBox" class="truncate">—</dd></div>
+</dl>
+</div>
+
+<details class="gm-edit" id="gmEditBox">
+<summary><span class="material-symbols-outlined" style="color:#8A6A1C;">edit</span>تعديل البيانات<span class="material-symbols-outlined ms-chev">expand_more</span></summary>
+<div class="flex flex-col gap-4 pb-4 pt-2">
 <!-- Barcode -->
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="barcode-id">الباركود</label>
@@ -181,45 +250,29 @@
 
 </div>
 
-<!-- Photo -->
-<div class="flex-1 min-w-[260px]">
-<input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
-<div class="relative cursor-pointer active:scale-[0.98] transition-transform h-full max-h-[560px] min-h-[220px]" onclick="triggerPhotoCapture()">
-<div class="h-full max-h-[560px] min-h-[220px] rounded-xl border-2 border-dashed border-outline-variant bg-surface-container-low flex flex-col items-center justify-center overflow-hidden" id="photo-placeholder">
-<span class="material-symbols-outlined text-outline text-5xl mb-3">photo_camera</span>
-<p class="font-label-md text-label-md text-on-surface-variant font-semibold">اضغط لتغيير الصورة</p>
-</div>
-<img alt="" class="hidden h-full max-h-[560px] w-full rounded-xl object-contain bg-surface-container-low border border-outline-variant" id="photo-preview"/>
-<button class="hidden absolute top-2 left-2 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" onclick="event.stopPropagation(); removePhoto();" type="button">
-<span class="material-symbols-outlined text-[18px]">close</span>
-</button>
-</div>
-</div>
-</div>
-
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
-<!-- Compact action buttons, stacked: print -> save -> delete -->
-<div class="flex flex-col items-center gap-3">
-<button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="h-11 px-8 border border-secondary text-secondary rounded-lg font-bold text-[13px] active:scale-[0.98] transition-all flex items-center justify-center gap-2">
-<span class="material-symbols-outlined text-[18px]">print</span> طباعة ملصق القطعة
-</button>
-
-<button id="save-btn" class="h-11 px-10 bg-primary text-on-primary rounded-lg font-bold text-[13px] active:scale-[0.98] transition-all">حفظ التعديلات</button>
-<button id="delete-btn" class="hidden h-11 px-10 border-2 border-error text-error rounded-lg font-bold text-[13px] active:scale-[0.98] transition-all">حذف القطعة</button>
+<div class="flex flex-col gap-3" id="gmEditActions">
+<button id="save-btn" class="gm-gold h-12 rounded-2xl font-bold text-[14px] active:scale-[0.98] transition-all" style="position:relative;">حفظ التعديلات</button>
+<button id="delete-btn" class="hidden h-11 rounded-2xl border-2 border-error text-error font-bold text-[13px] active:scale-[0.98] transition-all">حذف القطعة</button>
 </div>
-
+</details>
 
 <!-- Per-piece movement/audit log -->
 <div class="mt-2">
-<h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-2">سجل حركات القطعة</h2>
-<div id="piece-log-list" class="bg-surface-container-lowest border border-outline-variant rounded-xl divide-y divide-outline-variant overflow-hidden">
+<h2 style="margin:0 0 8px;font-size:15px;font-weight:700;color:#1F1A12;">سجل القطعة</h2>
+<div id="piece-log-list" class="gm-card gm-tl" style="background:transparent;">
 <div class="p-4 text-center text-[12px] text-on-surface-variant">جارِ التحميل...</div>
 </div>
 </div>
 
 </div>
 </main>
+<div class="gm-bar hidden" id="gmBar">
+<a id="gmSellBtn" href="new-sale-ar.html" data-permission="create_invoice" class="gm-gold flex-1"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined" style="position:relative;">sell</span><span style="position:relative;">بيع القطعة</span></a>
+<button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="sq" aria-label="طباعة ملصق القطعة" title="طباعة ملصق القطعة"><span class="material-symbols-outlined">print</span></button>
+<button type="button" class="sq" aria-label="تعديل البيانات" title="تعديل البيانات" onclick="gmOpenEdit()"><span class="material-symbols-outlined">edit</span></button>
+</div>
 
 <script>
 let currentPiece = null;
@@ -486,6 +539,7 @@ async function load() {
   }
 
   if (canDelete) document.getElementById('delete-btn').classList.remove('hidden');
+  gmRenderPieceView();
   document.getElementById('form-wrap').classList.remove('hidden');
 
   loadPieceLog();
@@ -500,11 +554,11 @@ async function loadPieceLog() {
     .from('piece_movements').select('*, staff:created_by(full_name)')
     .eq('piece_id', pieceId).order('created_at', { ascending: false }).limit(50);
   if (error || !logs || !logs.length) {
-    el.innerHTML = '<div class="p-4 text-center text-[12px] text-on-surface-variant">لا توجد حركات مسجّلة لهذه القطعة</div>';
+    el.innerHTML = '<div class="text-[12px] text-on-surface-variant">لا توجد حركات مسجّلة لهذه القطعة</div>';
     return;
   }
   el.innerHTML = logs.map(l => `
-    <div class="p-3">
+    <div>
       <div class="flex items-center justify-between mb-0.5">
         <span class="text-[12px] font-bold text-on-surface">${EVENT_LABELS[l.event_type] || l.event_type}</span>
         <span class="text-[10.5px] text-on-surface-variant">${fmtLogDate(l.created_at)}</span>
@@ -621,6 +675,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   photoRemoved = false;
 
   showMessage('تم حفظ التعديلات بنجاح!', false);
+  gmRenderPieceView();
   loadPieceLog();
 });
 
@@ -641,6 +696,46 @@ document.getElementById('delete-btn').addEventListener('click', async () => {
 
   window.location.href = 'inventory-list-ar.html';
 });
+
+// ---- Piece view (chosen design 2026-09-28): read-only summary above the edit form ----
+const GM_STATUS = { available: ['متوفرة', '#E3F1E6', '#2E7D46'], reserved: ['محجوزة', '#FFF1D6', '#8A6A1C'], sold: ['مباعة', '#EDE7DA', '#6B6150'], given_to_trader: ['عند تاجر', '#E6ECF5', '#34568B'] };
+const GM_COLORS = { Gold: 'ذهبي', White: 'أبيض', Rose: 'وردي' };
+function gmN(v) { return v == null || v === '' || isNaN(Number(v)) ? '—' : Number(v).toFixed(2); }
+function gmRenderPieceView() {
+  const p = currentPiece; if (!p) return;
+  document.getElementById('gmPieceTitle').textContent = [p.piece_type, p.category1].filter(Boolean).join(' · ') || 'قطعة';
+  document.getElementById('gmPieceBarcode').textContent = p.barcode || '';
+  const st = GM_STATUS[p.status] || [p.status, '#EDE7DA', '#6B6150'];
+  const chip = document.getElementById('gmPieceStatus');
+  chip.textContent = st[0]; chip.style.background = st[1]; chip.style.color = st[2];
+  document.getElementById('gmSpecKarat').textContent = p.karat ? p.karat + 'K' : '—';
+  document.getElementById('gmSpecWeight').textContent = gmN(p.weight_grams);
+  document.getElementById('gmSpecAcc').textContent = gmN(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams);
+  const days = p.created_at ? Math.max(0, Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000)) : null;
+  const ageText = document.getElementById('gmAgeText'), bar = document.getElementById('gmAgeBar'), hint = document.getElementById('gmAgeHint');
+  if (p.status === 'sold') {
+    ageText.textContent = 'بيعت هذه القطعة'; bar.style.width = '0'; hint.textContent = '';
+  } else if (days == null) {
+    ageText.textContent = '—'; bar.style.width = '0'; hint.textContent = '';
+  } else {
+    ageText.textContent = days === 0 ? 'دخلت المخزن اليوم' : days === 1 ? 'بالمخزن منذ يوم واحد' : days === 2 ? 'بالمخزن منذ يومين' : 'بالمخزن منذ ' + days + (days <= 10 ? ' أيام' : ' يوماً');
+    const pct = Math.min(100, days / 90 * 100);
+    bar.style.width = pct + '%';
+    bar.style.background = days >= 90 ? 'linear-gradient(90deg,#B24A34,#F2A99C)' : 'linear-gradient(90deg,#8A6A1F,#F6E2A6)';
+    hint.textContent = days >= 90 ? 'تجاوزت 90 يوماً — تُعدّ بضاعة راكدة' : 'بقي ' + (90 - days) + ' يوماً قبل أن تُعدّ راكدة (90 يوماً)';
+  }
+  document.getElementById('gmAgeFab').textContent = gmN(p.cost_fabrication_per_gram);
+  document.getElementById('gmAgeColor').textContent = GM_COLORS[p.color] || p.color || '—';
+  document.getElementById('gmAgeBox').textContent = p.box_name || '—';
+  const sell = document.getElementById('gmSellBtn');
+  sell.href = 'new-sale-ar.html' + (p.barcode ? '?barcode=' + encodeURIComponent(p.barcode) : '');
+  sell.classList.toggle('hidden', p.status !== 'available');
+  document.getElementById('gmBar').classList.remove('hidden');
+}
+function gmOpenEdit() {
+  const d = document.getElementById('gmEditBox'); d.open = true;
+  d.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
 
 load();
 </script>
