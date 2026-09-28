@@ -1230,3 +1230,49 @@ function gmDateInit(el) {
   const run = () => document.querySelectorAll('input[data-gm-date]').forEach(gmDateInit);
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run); else run();
 })();
+
+// Pages without their own Tailwind colour config (trader-edit, hr-leaves,
+// company-register, …) still use bg-background / bg-primary etc. Those
+// classes then did nothing: floating field labels had no background (the
+// input border ran through the text) and dark buttons were invisible.
+// :where() keeps these at zero specificity, so any page that does define
+// the colours keeps its own values.
+(function () {
+  const style = document.createElement('style');
+  style.textContent = `
+    :where(.bg-background){background-color:var(--gm-bg-elevated,#F3EEDF)}
+    :where(.bg-surface-container-lowest){background-color:var(--gm-surface-lowest,#fff)}
+    :where(.bg-surface-container-low){background-color:var(--gm-surface-low,#EFE7D2)}
+    :where(.bg-primary){background-color:var(--gm-primary,#1C1A16)}
+    :where(.text-on-primary){color:var(--gm-on-primary,#fff)}
+    :where(.border-outline-variant){border-color:var(--gm-outline-variant,#CBBF9E)}
+  `;
+  document.head.appendChild(style);
+})();
+
+// Visible file pickers (ID photos, licences) showed the browser's own
+// "Choose File / No file chosen" — English on many phones. Replace the look
+// with an Arabic button + file name; the real <input> stays in place (just
+// invisible) so every page's existing .files / change handlers still work.
+function gmPrettyFileInputs(root) {
+  (root || document).querySelectorAll('input[type="file"].border-dashed:not([data-gm-file])').forEach(function (inp) {
+    inp.setAttribute('data-gm-file', '1');
+    if (!inp.id) inp.id = 'gmf' + Math.random().toString(36).slice(2, 8);
+    var lab = document.createElement('label');
+    lab.htmlFor = inp.id;
+    lab.className = inp.className + ' flex items-center gap-2 cursor-pointer';
+    lab.innerHTML = '<span class="material-symbols-outlined" style="font-size:18px;">upload_file</span>'
+      + '<span style="font-weight:600;">اختر ملفاً</span>'
+      + '<span data-gm-fname style="opacity:.7;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;">لم يُختر أي ملف</span>';
+    inp.style.cssText += ';position:absolute;width:1px;height:1px;opacity:0;overflow:hidden;';
+    inp.parentNode.insertBefore(lab, inp.nextSibling);
+    var sync = function () {
+      var f = inp.files && inp.files[0];
+      lab.querySelector('[data-gm-fname]').textContent = f ? f.name : 'لم يُختر أي ملف';
+    };
+    inp.addEventListener('change', sync);
+    inp.addEventListener('input', sync);
+  });
+}
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', function () { gmPrettyFileInputs(); });
+else gmPrettyFileInputs();

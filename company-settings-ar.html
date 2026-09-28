@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=28"></script>
-<script src="theme.js?v=30"></script>
+<script src="theme.js?v=31"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -98,7 +98,7 @@
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-secondary-currency" placeholder="USD" type="text"/>
 </div>
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-secondary-rate">سعر الصرف (1 [عملة أساسية] = ؟ [عملة ثانوية])</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-secondary-rate" id="store-secondary-rate-label">سعر الصرف</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-secondary-rate" placeholder="0.27" step="0.0001" type="number"/>
 </div>
 <p class="text-[11px] text-outline px-1" id="secondary-rate-updated-label"></p>
@@ -829,6 +829,8 @@
         document.getElementById('store-secondary-currency').value = data.secondary_currency || '';
         document.getElementById('store-secondary-rate').value = data.secondary_currency_rate != null ? data.secondary_currency_rate : '';
         renderSecondaryRateUpdatedLabel(data.secondary_currency_rate_updated_at);
+        gmRateLabel();
+        ['store-currency', 'store-secondary-currency'].forEach(id => document.getElementById(id).addEventListener('input', gmRateLabel));
         document.getElementById('store-address').value = data.address || '';
         document.getElementById('store-address-en').value = data.address_en || '';
         document.getElementById('store-phone').value = data.phone || '';
@@ -900,7 +902,7 @@
                 <h4 class="text-[12px] font-bold text-secondary mb-2">${FIELD_KEY_LABELS[key]}</h4>
                 <div class="flex flex-col gap-2">
                     ${groups[key].map(row => `
-                        <div class="grid grid-cols-2 gap-2 items-center">
+                        <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 items-center">
                             <input type="text" value="${gmEscapeHtml(row.value)}"
                                 class="h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-semibold"
                                 onchange="updateClassificationValue('${row.id}', this.value)"/>
@@ -910,12 +912,12 @@
                         </div>`).join('')}
                     ${groups[key].length === 0 ? '<p class="text-[11px] text-on-surface-variant">لا توجد قيم مضافة بعد.</p>' : ''}
                 </div>
-                <div class="grid grid-cols-2 gap-2 items-center mt-2 pt-2 border-t border-dashed border-outline-variant">
+                <div class="grid grid-cols-[minmax(0,1fr)_minmax(0,1fr)] gap-2 items-center mt-2 pt-2 border-t border-dashed border-outline-variant">
                     <input type="text" placeholder="قيمة عربية جديدة" id="new-classification-ar-${key}"
                         class="h-10 border border-outline-variant rounded-lg px-3 text-[13px]"/>
-                    <div class="flex gap-2">
+                    <div class="flex gap-2 min-w-0">
                         <input type="text" dir="ltr" placeholder="English" id="new-classification-en-${key}"
-                            class="flex-1 h-10 border border-outline-variant rounded-lg px-3 text-[12px]"/>
+                            class="flex-1 min-w-0 w-full h-10 border border-outline-variant rounded-lg px-3 text-[12px]"/>
                         <button type="button" onclick="addClassificationOption('${key}')"
                             class="h-10 w-10 shrink-0 rounded-lg bg-secondary text-on-secondary flex items-center justify-center">
                             <span class="material-symbols-outlined text-[18px]">add</span>
@@ -923,6 +925,14 @@
                     </div>
                 </div>
             </div>`).join('');
+    }
+
+    // "سعر الصرف (1 USD = ؟ SYP)" built from the two currency fields.
+    function gmRateLabel() {
+        const a = (document.getElementById('store-currency').value || '').trim().toUpperCase();
+        const b = (document.getElementById('store-secondary-currency').value || '').trim().toUpperCase();
+        document.getElementById('store-secondary-rate-label').textContent =
+            a && b ? 'سعر الصرف (1 ' + a + ' = ؟ ' + b + ')' : 'سعر الصرف (كم تساوي وحدة العملة الأساسية بالعملة الثانوية)';
     }
 
     async function updateClassificationEn(id, valueEn) {
