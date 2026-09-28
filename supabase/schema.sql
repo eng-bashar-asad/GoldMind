@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict aMC22eeeSYxJseIYwg7btHvAVcfbpIi7zbvijwCy03z1lPNd8meHGsxMebdIUgv
+\restrict gL5ebu57qjylqHT6JungssdOeWNb8Vxee8o6BBXpC9DxSUbeExmGhumUqqoyOXY
 
 
 SET statement_timeout = 0;
@@ -1471,6 +1471,7 @@ CREATE FUNCTION public.next_invoice_number(target_store_id uuid, prefix text) RE
     SET search_path TO 'public'
     AS $_$
 declare
+  pfx text := $2;  -- the parameter name clashes with invoice_number_counters.prefix
   seq integer;
   yr integer := extract(year from now())::integer;
   stored_year integer;
@@ -1478,12 +1479,11 @@ begin
   if not public.is_store_member(target_store_id) then
     raise exception 'NOT_AUTHORIZED';
   end if;
-  if prefix is null or prefix !~ '^[A-Z]{2,6}$' then
+  if pfx is null or pfx !~ '^[A-Z]{2,6}$' then
     raise exception 'INVALID_PREFIX';
   end if;
 
-  if prefix = 'INV' then
-    -- sales keep the store counter (used by delete_last_sale_invoice / reset_invoice_sequence)
+  if pfx = 'INV' then
     select next_invoice_seq_year into stored_year from public.stores where id = target_store_id for update;
     if stored_year is null or stored_year <> yr then
       update public.stores set next_invoice_seq = 2, next_invoice_seq_year = yr where id = target_store_id;
@@ -1493,18 +1493,17 @@ begin
        where id = target_store_id returning next_invoice_seq - 1 into seq;
     end if;
   else
-    -- every other kind (purchases PINV, returns RET, ...) has its own sequence
     insert into public.invoice_number_counters as c (store_id, prefix, year, next_seq)
-    values (target_store_id, prefix, yr,
+    values (target_store_id, pfx, yr,
             coalesce((select max(nullif(split_part(i.invoice_number, '-', 3), '')::integer)
                         from public.invoices i
                        where i.store_id = target_store_id
-                         and i.invoice_number ~ ('^' || prefix || '-' || yr || '-[0-9]+$')), 0) + 2)
-    on conflict (store_id, prefix, year) do update set next_seq = c.next_seq + 1
-    returning next_seq - 1 into seq;
+                         and i.invoice_number ~ ('^' || pfx || '-' || yr || '-[0-9]+$')), 0) + 2)
+    on conflict on constraint invoice_number_counters_pkey do update set next_seq = c.next_seq + 1
+    returning c.next_seq - 1 into seq;
   end if;
 
-  return prefix || '-' || yr::text || '-' || lpad(seq::text, 6, '0');
+  return pfx || '-' || yr::text || '-' || lpad(seq::text, 6, '0');
 end;
 $_$;
 
@@ -7974,5 +7973,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aMC22eeeSYxJseIYwg7btHvAVcfbpIi7zbvijwCy03z1lPNd8meHGsxMebdIUgv
+\unrestrict gL5ebu57qjylqHT6JungssdOeWNb8Vxee8o6BBXpC9DxSUbeExmGhumUqqoyOXY
 
