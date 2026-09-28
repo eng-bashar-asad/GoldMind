@@ -65,7 +65,7 @@ test('new sale: barcode "123" adds piece 000123', async ({ page }) => {
 test('inventory search copes with phone keyboards (Arabic digits, hidden marks)', async ({ page }) => {
   await install(page, { db: db('staff') });
   await page.goto('/inventory-list-ar.html');
-  await page.waitForFunction(() => document.getElementById('piece-count') && typeof runSearch === 'function');
+  await page.waitForFunction(() => typeof ALL_PIECES_RAW !== 'undefined' && ALL_PIECES_RAW.length > 0);
   for (const q of ['‏000123', '١٢٣', '000123']) {
     await page.evaluate(v => { document.getElementById('search-barcode').value = v; runSearch(); }, q);
     await expect(page.locator('#search-results-list')).toContainText('000123');
