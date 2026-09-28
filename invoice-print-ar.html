@@ -123,7 +123,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 <div class="overflow-x-auto">
 <table class="w-full text-right text-[12px]">
 <thead class="text-emerald-800"><tr>
-<th class="px-2 py-1">القطعة</th><th class="px-2 py-1">البيع</th><th class="px-2 py-1">تكلفة الذهب</th><th class="px-2 py-1">الأجرة</th><th class="px-2 py-1">الربح</th>
+<th class="px-2 py-1">القطعة</th><th class="px-2 py-1">البيع</th><th class="px-2 py-1">تكلفة الذهب</th><th class="px-2 py-1">المصنعية والماس</th><th class="px-2 py-1">الربح</th>
 </tr></thead>
 <tbody id="profit-tbody"></tbody>
 </table>
@@ -417,7 +417,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         }
 
         const [{ data: items, error: itemsError }, { data: customer }, { data: trader }, { data: creator }] = await Promise.all([
-            goldmindClient.from('invoice_items').select('*, piece:piece_id(cost_fabrication_per_gram), lot:gold_stock_lot_id(cost_fabrication_per_gram), diamond:diamond_piece_id(diamond_carat, diamond_price_per_carat, has_gold, gold_cost_fabrication_per_gram)').eq('invoice_id', invoiceId).order('id', { ascending: true }),
+            goldmindClient.from('invoice_items').select('*, piece:piece_id(cost_fabrication_per_gram, accent_diamond_carat, accent_diamond_price_per_carat), lot:gold_stock_lot_id(cost_fabrication_per_gram), diamond:diamond_piece_id(diamond_carat, diamond_price_per_carat, has_gold, gold_cost_fabrication_per_gram)').eq('invoice_id', invoiceId).order('id', { ascending: true }),
             invoice.customer_id
                 ? goldmindClient.from('customers').select('*').eq('id', invoice.customer_id).single()
                 : Promise.resolve({ data: null }),
@@ -831,9 +831,11 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
                         ? sign * Number(it.fabrication_fee)
                         : sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || ((it.diamond && it.diamond.has_gold && it.diamond.gold_cost_fabrication_per_gram) || 0)));
                     const diamondCost = it.diamond ? sign * (Number(it.diamond.diamond_carat || 0) * Number(it.diamond.diamond_price_per_carat || 0)) : 0;
-                    const profit = revenue - goldValue - vatPart - fabCost - diamondCost;
+                    // Small accent diamonds (Di) recorded on the piece itself -- same as profit-report-ar.html.
+                    const accentDiamondCost = it.piece ? sign * (Number(it.piece.accent_diamond_carat || 0) * Number(it.piece.accent_diamond_price_per_carat || 0)) : 0;
+                    const profit = revenue - goldValue - vatPart - fabCost - diamondCost - accentDiamondCost;
                     totalProfit += profit;
-                    return { desc: it.description || it.barcode || 'قطعة', revenue, goldValue, fabCost: fabCost + diamondCost, profit };
+                    return { desc: it.description || it.barcode || 'قطعة', revenue, goldValue, fabCost: fabCost + diamondCost + accentDiamondCost, profit };
                 });
 
                 document.getElementById('profit-tbody').innerHTML = profitRows.map(r => `
