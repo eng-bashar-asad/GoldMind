@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict gL5ebu57qjylqHT6JungssdOeWNb8Vxee8o6BBXpC9DxSUbeExmGhumUqqoyOXY
+\restrict nDXAO9WC4aHjVmansDqb05FxplfvXIVFmulZgup18HHCi9YFHOOcBOStcqd5ERT
 
 
 SET statement_timeout = 0;
@@ -2446,6 +2446,23 @@ $$;
 
 
 --
+-- Name: staff_heartbeat(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.staff_heartbeat(p_store uuid, p_page text DEFAULT NULL::text) RETURNS void
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  insert into public.staff_presence (staff_id, store_id, last_seen_at, last_page)
+  select s.id, s.store_id, now(), left(p_page, 80)
+  from public.staff s
+  where s.user_id = auth.uid() and s.store_id = p_store
+  on conflict (staff_id) do update
+    set last_seen_at = excluded.last_seen_at, last_page = excluded.last_page;
+$$;
+
+
+--
 -- Name: stock_in_from_party(uuid, uuid[], jsonb, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3609,6 +3626,18 @@ COMMENT ON COLUMN public.staff.whatsapp_phone IS 'Optional WhatsApp number (with
 
 
 --
+-- Name: staff_presence; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.staff_presence (
+    staff_id uuid NOT NULL,
+    store_id uuid NOT NULL,
+    last_seen_at timestamp with time zone DEFAULT now() NOT NULL,
+    last_page text
+);
+
+
+--
 -- Name: staff_salaries; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4371,6 +4400,14 @@ ALTER TABLE ONLY public.staff
 
 
 --
+-- Name: staff_presence staff_presence_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_presence
+    ADD CONSTRAINT staff_presence_pkey PRIMARY KEY (staff_id);
+
+
+--
 -- Name: staff_salaries staff_salaries_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -4664,6 +4701,13 @@ CREATE INDEX pieces_intake_batch_idx ON public.pieces USING btree (intake_batch_
 --
 
 CREATE UNIQUE INDEX pieces_rfid_epc_unique ON public.pieces USING btree (rfid_epc) WHERE (rfid_epc IS NOT NULL);
+
+
+--
+-- Name: staff_presence_store_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX staff_presence_store_idx ON public.staff_presence USING btree (store_id);
 
 
 --
@@ -5484,6 +5528,22 @@ ALTER TABLE ONLY public.repair_tickets
 
 ALTER TABLE ONLY public.repair_tickets
     ADD CONSTRAINT repair_tickets_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: staff_presence staff_presence_staff_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_presence
+    ADD CONSTRAINT staff_presence_staff_id_fkey FOREIGN KEY (staff_id) REFERENCES public.staff(id) ON DELETE CASCADE;
+
+
+--
+-- Name: staff_presence staff_presence_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.staff_presence
+    ADD CONSTRAINT staff_presence_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -6487,6 +6547,19 @@ CREATE POLICY "staff can view own store" ON public.stores FOR SELECT USING (publ
 
 
 --
+-- Name: staff_presence; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.staff_presence ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: staff_presence staff_presence_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY staff_presence_select ON public.staff_presence FOR SELECT USING (public.is_store_member(store_id));
+
+
+--
 -- Name: staff_salaries; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -7305,6 +7378,15 @@ GRANT ALL ON FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce nu
 
 
 --
+-- Name: FUNCTION staff_heartbeat(p_store uuid, p_page text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.staff_heartbeat(p_store uuid, p_page text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.staff_heartbeat(p_store uuid, p_page text) TO authenticated;
+GRANT ALL ON FUNCTION public.staff_heartbeat(p_store uuid, p_page text) TO service_role;
+
+
+--
 -- Name: FUNCTION stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -7802,6 +7884,14 @@ GRANT ALL ON TABLE public.staff TO service_role;
 
 
 --
+-- Name: TABLE staff_presence; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.staff_presence TO authenticated;
+GRANT ALL ON TABLE public.staff_presence TO service_role;
+
+
+--
 -- Name: TABLE staff_salaries; Type: ACL; Schema: public; Owner: -
 --
 
@@ -7973,5 +8063,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict gL5ebu57qjylqHT6JungssdOeWNb8Vxee8o6BBXpC9DxSUbeExmGhumUqqoyOXY
+\unrestrict nDXAO9WC4aHjVmansDqb05FxplfvXIVFmulZgup18HHCi9YFHOOcBOStcqd5ERT
 
