@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=39"></script>
+<script src="theme.js?v=40"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -161,14 +161,14 @@ async function loadEntries() {
         ? (isIn ? '+' : '-') + gmFormatDualCurrency(m.amount, store)
         : (isIn ? '+' : '-') + fmt(m.amount) + ' ' + cur;
       return `
-        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
+        <${m.invoice_id ? `a href="invoice-print-ar.html?id=${m.invoice_id}"` : 'div'} class="block bg-surface-container-lowest border border-outline-variant rounded-xl p-3 ${m.invoice_id ? 'hover:border-primary active:opacity-70' : ''}">
           <div class="flex items-center justify-between mb-1">
             <span class="font-bold text-[14px] font-data-mono ${isIn?'text-success':'text-error'}">${amountLabel}</span>
             <span class="text-[11px] text-on-surface-variant">${date}</span>
           </div>
           <p class="text-[12px]">${gmEscapeHtml(m.description) || '—'}</p>
-          <p class="text-[11px] text-on-surface-variant mt-1">${gmEscapeHtml((m.staff && m.staff.full_name) || '')}${m.invoice_id ? ' · مرتبطة بفاتورة' : ''}</p>
-        </div>`;
+          <p class="text-[11px] text-on-surface-variant mt-1">${gmEscapeHtml((m.staff && m.staff.full_name) || '')}${m.invoice_id ? ' · <span class="text-primary font-semibold underline">فتح الفاتورة ←</span>' : ''}</p>
+        </${m.invoice_id ? 'a' : 'div'}>`;
     }).join('');
   }
 }
@@ -177,8 +177,8 @@ async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
 
-  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-  const canView = staffRow && staffRow.permissions && staffRow.permissions.view_profit_report;
+  const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canView = staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.view_profit_report));
 
   document.getElementById('loading-state').classList.add('hidden');
   if (!canView) {

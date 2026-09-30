@@ -20,7 +20,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
 <script src="pint-ae.js"></script>
-<script src="theme.js?v=39"></script>
+<script src="theme.js?v=40"></script>
 <script src="gm-profit.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -640,7 +640,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         if (Array.isArray(invoice.bulk_photos) && invoice.bulk_photos.length) {
             document.getElementById('bulk-photos-section').classList.remove('hidden');
             document.getElementById('bulk-photos-grid').innerHTML = invoice.bulk_photos
-                .map(url => `<img src="${url}" class="w-20 h-20 object-cover rounded border border-gray-300"/>`).join('');
+                .map(url => `<img src="${gmEscapeHtml(url)}" alt="صورة البضاعة" onclick="gmPhotoViewer(this.src)" style="cursor:zoom-in" class="w-20 h-20 object-cover rounded border border-gray-300"/>`).join('');
         }
 
         let sumBeforeTax = 0;
@@ -703,7 +703,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 
             return `
                 <tr>
-                    <td class="py-1"><div class="flex items-center gap-2">${(item.item_photo_url || piecePhotoById[item.piece_id]) ? `<img class="item-photo" src="${gmEscapeHtml(item.item_photo_url || piecePhotoById[item.piece_id])}" crossorigin="anonymous" alt=""/>` : ''}<div>${gmEscapeHtml(item.description) || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${gmEscapeHtml(item.description_en)}</span>` : ''}</div></div></td>
+                    <td class="py-1"><div class="flex items-center gap-2">${(item.item_photo_url || piecePhotoById[item.piece_id]) ? `<img class="item-photo" src="${gmEscapeHtml(item.item_photo_url || piecePhotoById[item.piece_id])}" crossorigin="anonymous" alt="صورة القطعة" onclick="gmPhotoViewer(this.src)" style="cursor:zoom-in"/>` : ''}<div>${gmEscapeHtml(item.description) || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${gmEscapeHtml(item.description_en)}</span>` : ''}</div></div></td>
                     <td class="py-1 text-center">${item.karat ? item.karat + 'K' : '—'}</td>
                     <td class="py-1 text-center">${fmt(item.weight_grams)}</td>
                     <td class="py-1 text-left font-semibold">${fmt(full)}</td>

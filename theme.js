@@ -1273,3 +1273,33 @@ function gmBarcodeMatches(barcode, query) {
   var m = document.querySelector('meta[name="viewport"]');
   if (m && !/maximum-scale/.test(m.content)) m.content += ', maximum-scale=1';
 })();
+
+// ---- Photo viewer (any page): gmPhotoViewer(url) shows the photo large over
+// the page; ✕, a tap outside it or Esc closes it and you carry on where you were.
+// "فتح بصفحة مستقلة" opens it on its own page (from there it can be saved).
+function gmPhotoViewer(url) {
+  if (!url) return;
+  let box = document.getElementById('gm-photo-viewer');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'gm-photo-viewer';
+    box.className = 'no-print';
+    box.setAttribute('role', 'dialog');
+    box.setAttribute('aria-label', 'عرض الصورة');
+    box.style.cssText = 'position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.88);display:none;flex-direction:column;align-items:center;justify-content:center;padding:56px 12px 16px';
+    box.innerHTML =
+      '<button type="button" data-close aria-label="إغلاق" style="position:absolute;top:10px;left:10px;width:44px;height:44px;border-radius:50%;border:0;background:#fff;color:#111;font-size:24px;line-height:44px;cursor:pointer">✕</button>' +
+      '<a data-open target="_blank" rel="noopener" style="position:absolute;top:14px;right:12px;height:36px;padding:0 14px;border-radius:18px;background:rgba(255,255,255,.15);color:#fff;font:600 13px system-ui;display:flex;align-items:center;text-decoration:none">فتح بصفحة مستقلة</a>' +
+      '<img alt="صورة" style="max-width:100%;max-height:100%;object-fit:contain;border-radius:10px;background:#fff">';
+    box.addEventListener('click', e => { if (e.target === box || e.target.closest('[data-close]')) gmClosePhotoViewer(); });
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') gmClosePhotoViewer(); });
+    document.body.appendChild(box);
+  }
+  box.querySelector('img').src = url;
+  box.querySelector('[data-open]').href = url;
+  box.style.display = 'flex';
+}
+function gmClosePhotoViewer() {
+  const box = document.getElementById('gm-photo-viewer');
+  if (box) box.style.display = 'none';
+}
