@@ -1325,7 +1325,7 @@ function gmClosePhotoViewer() {
     o.className = 'gm-date-overlay';
     o.setAttribute('aria-hidden', 'true');
     o.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;pointer-events:none;direction:ltr;unicode-bidi:isolate;' +
-      'justify-content:flex-end;padding:0 ' + cs.paddingRight + ' 0 ' + (parseFloat(cs.paddingLeft) + 26) + 'px;font:inherit;font-size:' + cs.fontSize + ';color:inherit;white-space:nowrap;overflow:hidden';
+      'justify-content:center;padding:0 26px;font:inherit;font-size:' + cs.fontSize + ';color:inherit;white-space:nowrap;overflow:hidden';
     wrap.appendChild(o);
     el.__gmDateOverlay = o;
     el.classList.add('gm-date-native');

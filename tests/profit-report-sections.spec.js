@@ -40,6 +40,22 @@ test('profit report sections and Excel', async ({ page }) => {
   await page.fill('#date-from', '2026-09-01');
   await page.fill('#date-to', '2026-09-30');
   await page.click('#apply-filters-btn');
+  // brief report (default): one table with weights and amounts
+  const br = page.locator('#pr-brief');
+  await expect(br).not.toHaveClass(/hidden/);
+  const brow = t => br.locator('tr', { hasText: t }).first();
+  await expect(brow('مبيعات الزبائن')).toContainText('10.000');
+  await expect(brow('مبيعات الزبائن')).toContainText('9.500');
+  await expect(brow('مبيعات الزبائن')).toContainText('3300.00');
+  await expect(brow('ربح مبيعات الزبائن')).toContainText('1831.00');
+  await expect(brow('مشتريات الكسر')).toContainText('1600.00');
+  await expect(brow('إدخال بضاعة من التجار')).toContainText('48.000');
+  await expect(brow('إخراج بضاعة للتجار')).toContainText('105.000');
+  await expect(brow('إخراج بضاعة للتجار')).toContainText('1100.00');
+  await expect(brow('مجموع أرباح المحل')).toContainText('2891.00');
+  await page.click('.pr-view[data-view="full"]');
+  await expect(page.locator('#pr-full')).not.toHaveClass(/hidden/);
+  await expect(br).toHaveClass(/hidden/);
   const sec = page.locator('#pr-sections');
   // retail: 1300−950−19 = 331 ; diamond 2000−500 = 1500 → 1831
   await expect(sec.locator('tr', { hasText: 'مبيعات الزبائن' })).toContainText('1831.00');
@@ -62,7 +78,7 @@ test('profit report sections and Excel', async ({ page }) => {
   await page.click('#pr-xlsx-btn');
   await page.waitForFunction(() => window.__wb);
   const wb = await page.evaluate(() => window.__wb);
-  expect(wb.sheets).toEqual(['الملخص', 'مبيعات المفرق', 'الجملة', 'الموظفون', 'مشتريات الكسر', 'وارد من التجار']);
+  expect(wb.sheets).toEqual(['المختصر', 'الملخص', 'مبيعات المفرق', 'الجملة', 'الموظفون', 'مشتريات الكسر', 'وارد من التجار']);
   expect(wb.f.f).toBe('SUM(G2:G3)');
   expect(wb.sum[0]).toContain('الموظف');
   expect(errs).toEqual([]);

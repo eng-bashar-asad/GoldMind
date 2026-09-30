@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=31"></script>
-<script src="theme.js?v=43"></script>
+<script src="theme.js?v=44"></script>
 <script src="gm-profit.js?v=1"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -81,7 +81,7 @@
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
 <div class="gm-print-only" style="border-bottom:2px solid #1F1A12;padding-bottom:8px;margin-bottom:4px;">
 <div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
-<div><div id="pr-store" style="font-size:16px;font-weight:700;"></div><div style="font-size:20px;font-weight:700;">تقرير الأرباح</div></div>
+<div><div id="pr-store" style="font-size:16px;font-weight:700;"></div><div style="font-size:20px;font-weight:700;">تقرير الأرباح<span id="pr-title-kind"></span></div></div>
 <div style="font-size:11px;text-align:left;line-height:1.6;"><div id="pr-period"></div><div id="pr-box"></div><div id="pr-printed"></div></div>
 </div>
 </div>
@@ -113,6 +113,12 @@
 </div>
 </div>
 
+<div class="no-print flex gap-2" role="group" aria-label="نوع التقرير">
+<button type="button" data-view="brief" class="pr-view h-10 px-5 rounded-full border border-outline-variant font-bold text-[13px]">تقرير مختصر</button>
+<button type="button" data-view="full" class="pr-view h-10 px-5 rounded-full border border-outline-variant font-bold text-[13px]">تقرير شامل</button>
+</div>
+<div id="pr-brief" class="hidden"></div>
+<div id="pr-full" class="flex flex-col gap-4">
 <div id="pr-sections" class="flex flex-col gap-4 lg:grid lg:grid-cols-2"></div>
 <h2 class="font-bold text-[14px] mt-2">تفاصيل مبيعات المفرق</h2>
 <div class="grid grid-cols-2 gap-3 no-print">
@@ -144,6 +150,7 @@
 <tbody id="items-tbody"></tbody>
 </table>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد مبيعات بعد.</p>
+</div>
 </div>
 
 </div>
@@ -243,14 +250,18 @@ async function applyFilters() {
   document.getElementById('pr-sections').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-6">جارِ الحساب...</p>';
   document.getElementById('items-tbody').innerHTML = '';
 
-  const [invRes, tmRes, staffRes] = await Promise.all([
+  const [invRes, tmRes, staffRes, expRes, stockRes, lotsRes] = await Promise.all([
     gmFetchAllRows(() => goldmindClient.from('invoices').select('id, invoice_number, created_at, type, created_by, total_amount')
       .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return', 'buyRetail', 'buyTrader']).neq('status', 'cancelled')
       .gte('created_at', range.from).lt('created_at', range.to).order('created_at', { ascending: false })),
     gmFetchAllRows(() => goldmindClient.from('trader_movements').select('id, source, invoice_id, weight_grams, accounting_weight_grams, karat, gold_24k_equivalent, fab_fee_per_gram, fab_fee_amount, cost_fab_per_gram, created_at, trader:trader_id(name), piece:piece_id(cost_fabrication_per_gram)')
       .eq('store_id', GOLDMIND_STORE_ID).in('source', ['stock_given', 'stock_received'])
       .gte('created_at', range.from).lt('created_at', range.to)),
-    goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID)
+    goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID),
+    gmFetchAllRows(() => goldmindClient.from('expense_entries').select('amount').eq('store_id', GOLDMIND_STORE_ID)
+      .gte('created_at', range.from).lt('created_at', range.to)),
+    gmFetchAllRows(() => goldmindClient.from('pieces').select('weight_grams, accounting_weight_grams').eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved'])),
+    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('store_id', GOLDMIND_STORE_ID)
   ]);
   const err = invRes.error || tmRes.error;
   if (err) { document.getElementById('pr-sections').innerHTML = `<p class="text-error text-sm">تعذّر التحميل: ${escH(err.message)}</p>`; return; }
@@ -328,7 +339,34 @@ async function applyFilters() {
   const staffRows = Object.keys(byStaff).map(id => { const s = byStaff[id]; return { name: staffName[id] || 'غير معروف', n: s.invoices.size, revenue: s.revenue, profit: s.profit, gross: s.gross, avgMaking: s.makingAcc ? s.makingSold / s.makingAcc : 0 }; })
     .sort((a, b) => b.revenue - a.revenue);
 
-  REPORT = { fromDate, toDate: toDate || today, rows, retail, ws, wholesale, W, scrap, fromTraders, scrapPaid, staffRows };
+  // ---- brief: one table, gross weight / accounting weight / amount per line
+  const kTot = map => Object.values(map).reduce((a, r) => ({ gross: a.gross + r.gross, acc: a.acc + r.acc }), { gross: 0, acc: 0 });
+  const expensesTotal = (expRes.data || []).reduce((a, e) => a + (Number(e.amount) || 0), 0);
+  const inFee = moves.filter(m => m.source === 'stock_received').reduce((a, m) => a + (Number(m.fab_fee_amount) || 0), 0)
+    + invoices.filter(i => i.type === 'buyTrader' && !movedInvoices.has(i.id)).reduce((a, i) => a + (Number(i.total_amount) || 0), 0);
+  const stock = (stockRes.data || []).reduce((a, p) => ({ gross: a.gross + (Number(p.weight_grams) || 0), acc: a.acc + (Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams) || 0) }), { gross: 0, acc: 0 });
+  ((lotsRes && lotsRes.data) || []).forEach(l => { const w = Number(l.weight_grams_remaining) || 0; stock.gross += w; stock.acc += w; });
+  const scrapT = kTot(scrap), inT = kTot(fromTraders);
+  const brief = [
+    ['مبيعات الزبائن', W.gross, W.acc, retail.revenue],
+    ['ربح مبيعات الزبائن', null, null, retail.profit],
+    ['مشتريات الكسر', scrapT.gross, scrapT.acc, scrapPaid],
+    ['المصاريف', null, null, expensesTotal],
+    ['إدخال بضاعة من التجار', inT.gross, inT.acc, inFee],
+    ['إخراج بضاعة للتجار', ws.gross, ws.acc, ws.fee],
+    ['مجموع وزن البضاعة بالمحل (الآن)', stock.gross, stock.acc, null],
+    ['مجموع أرباح المحل', null, null, retail.profit + ws.profit - expensesTotal]
+  ];
+  const cell = (v, d) => v == null ? '<span class="text-outline">—</span>' : (d === 3 ? f3(v) : f2(v));
+  document.getElementById('pr-brief').innerHTML = `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-x-auto gm-keep">
+    <table class="w-full text-right text-[13px]"><thead><tr class="bg-surface-container-low">
+      <th class="px-3 py-2">البند</th><th class="px-3 py-2">الوزن القائم (غ)</th><th class="px-3 py-2">الوزن المحاسبي (غ)</th><th class="px-3 py-2">المبلغ</th></tr></thead>
+    <tbody>${brief.map((r, i) => `<tr class="border-t border-outline-variant ${i === brief.length - 1 ? 'font-bold' : ''}" ${i === brief.length - 1 ? 'style="background:#F3EEDF"' : ''}>
+      <td class="px-3 py-2 font-semibold">${r[0]}</td><td class="px-3 py-2 font-data-mono">${cell(r[1], 3)}</td><td class="px-3 py-2 font-data-mono">${cell(r[2], 3)}</td>
+      <td class="px-3 py-2 font-data-mono ${i === 1 || i === brief.length - 1 ? (r[3] >= 0 ? 'text-success' : 'text-error') : ''}">${cell(r[3], 2)}</td></tr>`).join('')}</tbody></table>
+    <p class="px-3 py-2 text-[11px] text-on-surface-variant">مجموع أرباح المحل = ربح مبيعات الزبائن + ربح الجملة (${f2(ws.profit)}) − المصاريف. المشتريات لا تُخصم من الربح. وزن البضاعة بالمحل هو الرصيد الحالي وليس في نهاية الفترة. إدخال البضاعة من التجار: مبلغ المصنعية المستحقة لهم.</p></div>`;
+
+  REPORT = { fromDate, toDate: toDate || today, rows, retail, ws, wholesale, W, scrap, fromTraders, scrapPaid, staffRows, brief };
 
   const avgMaking = W.makingAcc ? W.makingSold / W.makingAcc : 0, avgCost = W.makingAcc ? W.fabCost / W.makingAcc : 0;
   document.getElementById('pr-sections').innerHTML =
@@ -375,6 +413,20 @@ async function applyFilters() {
     </tr>`; })();
 }
 
+// brief / full report (remembered on this device)
+function setReportView(v) {
+  try { localStorage.setItem('gm_pr_view', v); } catch (e) { /* ignore */ }
+  document.getElementById('pr-brief').classList.toggle('hidden', v !== 'brief');
+  document.getElementById('pr-full').classList.toggle('hidden', v === 'brief');
+  document.querySelectorAll('.pr-view').forEach(b => {
+    const on = b.dataset.view === v;
+    b.style.background = on ? 'var(--gm-primary)' : ''; b.style.color = on ? 'var(--gm-on-primary)' : '';
+  });
+  const t = document.getElementById('pr-title-kind'); if (t) t.textContent = v === 'brief' ? ' (مختصر)' : ' (شامل)';
+}
+document.querySelectorAll('.pr-view').forEach(b => b.addEventListener('click', () => setReportView(b.dataset.view)));
+setReportView((() => { try { return localStorage.getItem('gm_pr_view') || 'brief'; } catch (e) { return 'brief'; } })());
+
 async function exportExcel(btn) {
   if (!REPORT) return;
   const R = REPORT, r2 = v => Math.round((Number(v) || 0) * 100) / 100, r3 = v => Math.round((Number(v) || 0) * 1000) / 1000;
@@ -384,6 +436,8 @@ async function exportExcel(btn) {
   const old = btn.innerHTML; btn.disabled = true;
   try {
     await gmExportXlsx([
+      { name: 'المختصر', header: ['البند', 'الوزن القائم (غ)', 'الوزن المحاسبي (غ)', 'المبلغ'],
+        rows: R.brief.map(b => [b[0], b[1] == null ? '' : r3(b[1]), b[2] == null ? '' : r3(b[2]), b[3] == null ? '' : r2(b[3])]) },
       { name: 'الملخص', header: ['البند', 'القيمة'], rows: [
         ['الفترة', R.fromDate + ' — ' + R.toDate],
         ['مبيعات الزبائن (مفرق)', r2(R.retail.revenue)], ['ربح المفرق', r2(R.retail.profit)],
