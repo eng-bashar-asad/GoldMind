@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=38"></script>
+<script src="theme.js?v=39"></script>
 <script src="gm-report.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -40,6 +40,12 @@
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
     body { min-height: max(884px, 100dvh); }
 </style>
+<style>
+@media (min-width:1024px){
+  #scope-wrap > *:not(#past-sessions-wrap){grid-column:1}
+  #scope-wrap > #past-sessions-wrap{grid-column:2;grid-row:1 / span 20;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow:auto}
+}
+</style>
 </head>
 <body class="bg-background text-on-background font-body-md">
 <header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
@@ -52,7 +58,7 @@
 </div>
 </div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
+<main class="pb-32 max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">لا تملك صلاحية إجراء الجرد.</div>
@@ -73,7 +79,7 @@
 </div>
 
 <!-- Step 1: warehouse/scope selection -->
-<div id="scope-wrap" class="hidden py-6 flex flex-col gap-5">
+<div id="scope-wrap" class="hidden py-6 flex flex-col gap-5 lg:grid lg:grid-cols-2 lg:gap-x-10 lg:items-start">
 <div id="past-sessions-wrap">
 <h3 class="text-[13px] font-bold mb-2">جلسات الجرد السابقة — اضغط على جلسة لعرض النواقص والزيادات ومتابعتها</h3>
 <div id="past-sessions-list" class="flex flex-col gap-2"></div>
@@ -1201,9 +1207,10 @@ async function renderMissingLive() {
   w.innerHTML = `
     <p class="text-[12px] font-bold text-red-700">ناقصة فعلاً: ${real.length} قطعة</p>
     ${real.length ? gmMissingSheetButtons() : ''}
+    <div class="flex flex-col gap-2 lg:grid lg:grid-cols-3 xl:grid-cols-4 lg:gap-3">
     ${real.map(({ p, r }) => `
-      <div class="flex gap-3 bg-surface-container-lowest border border-red-200 rounded-xl p-2">
-        ${r && r.photo_url ? `<button type="button" onclick="gmCountPhoto('${esc(r.photo_url)}')" aria-label="تكبير الصورة" class="shrink-0"><img src="${esc(r.photo_url)}" alt="صورة القطعة" loading="lazy" class="w-24 h-24 rounded-lg object-cover"></button>` : '<div class="w-24 h-24 rounded-lg bg-surface-container-low flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-outline">image_not_supported</span></div>'}
+      <div class="flex gap-3 bg-surface-container-lowest border border-red-200 rounded-xl p-2 lg:flex-col">
+        ${r && r.photo_url ? `<button type="button" onclick="gmCountPhoto('${esc(r.photo_url)}')" aria-label="تكبير الصورة" class="shrink-0 lg:w-full"><img src="${esc(r.photo_url)}" alt="صورة القطعة" loading="lazy" class="w-24 h-24 lg:w-full lg:h-56 rounded-lg object-cover lg:object-contain lg:bg-white"></button>` : '<div class="w-24 h-24 lg:w-full lg:h-56 rounded-lg bg-surface-container-low flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-outline">image_not_supported</span></div>'}
         <div class="min-w-0 flex-1 flex flex-col gap-0.5 text-[12px]">
           <div class="font-bold font-data-mono text-[14px]" dir="ltr" style="text-align:right;">${esc(p.barcode || p[matchField])}</div>
           <div>${esc([r && r.piece_type, p.karat ? 'عيار ' + p.karat : '', r && COLORS[r.color]].filter(Boolean).join(' · '))}</div>
@@ -1213,6 +1220,7 @@ async function renderMissingLive() {
           <button type="button" data-v="${esc(p[matchField])}" onclick="markFoundLive(this)" class="self-start mt-1 h-8 px-3 rounded-lg bg-green-700 text-white text-[12px] font-bold">وُجدت — سجّلها</button>
         </div>
       </div>`).join('')}
+    </div>
     ${left.length ? `<p class="text-[12px] font-bold mt-2">ليست ناقصة — خرجت من المخزن بعد بدء الجرد: ${left.length}</p>
       ${left.map(({ p, r }) => `<div class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 py-2 text-[12px]"><span class="font-data-mono" dir="ltr">${esc(p.barcode || p[matchField])}</span><span class="font-semibold">${ML_LEFT[r ? r.status : 'deleted'] || esc(r.status)}</span></div>`).join('')}` : ''}`;
 }
@@ -1776,7 +1784,7 @@ async function renderSessionReview() {
   const editable = sessionDetailStatus !== 'posted';
   const f2 = v => (Number(v) || 0).toFixed(2);
   const esc = v => gmEscapeHtml(v == null ? '' : String(v));
-  const thumb = url => url ? `<button type="button" onclick="gmCountPhoto('${esc(url)}')" aria-label="تكبير الصورة" class="shrink-0"><img src="${esc(url)}" alt="" class="w-14 h-14 rounded-lg object-cover"></button>` : '<div class="w-14 h-14 rounded-lg bg-surface-container-low shrink-0"></div>';
+  const thumb = url => url ? `<button type="button" onclick="gmCountPhoto('${esc(url)}')" aria-label="فتح الصورة" class="shrink-0 lg:w-full"><img src="${esc(url)}" alt="" loading="lazy" class="w-14 h-14 lg:w-full lg:h-56 rounded-lg object-cover lg:object-contain lg:bg-white"></button>` : '<div class="w-14 h-14 lg:w-full lg:h-56 rounded-lg bg-surface-container-low shrink-0"></div>';
   const pieceLink = p => p ? `<a href="piece-edit-ar.html?id=${esc(p.id)}" class="text-[11.5px] font-semibold text-primary underline">فتح القطعة</a>` : '';
   const statusLabel = st => SD_LEFT_LABEL[st] || (st === 'available' ? 'متوفرة' : st === 'reserved' ? 'محجوزة' : esc(st));
 
@@ -1796,22 +1804,22 @@ async function renderSessionReview() {
     <h3 class="text-[13px] font-bold text-red-700 mb-1">ناقصة فعلاً (${realMissing.length}) — ما زالت بالمخزن في النظام ولم تُمسح</h3>
     ${realMissing.length ? gmMissingSheetButtons() : ''}
     <p class="text-[11px] text-on-surface-variant mb-2">ابحث عنها بالمحل. إن وجدتها اضغط "وُجدت"، وإن كانت قد خرجت فعلاً (بيع أو تاجر أو صندوق آخر) افتح القطعة وصحّح حالتها.</p>
-    <div class="flex flex-col gap-2">${realMissing.map(({ e, p }) => `
-      <div class="flex items-center gap-3 bg-red-50 rounded-xl p-2 text-[12px]">
+    <div class="flex flex-col gap-2 lg:grid lg:grid-cols-3 xl:grid-cols-4 lg:gap-3">${realMissing.map(({ e, p }) => `
+      <div class="flex items-center gap-3 bg-red-50 rounded-xl p-2 text-[12px] lg:flex-col lg:items-stretch lg:text-[13px]">
         ${thumb(p && p.photo_url)}
         <div class="min-w-0 flex-1">
           <div class="font-bold font-data-mono" dir="ltr" style="text-align:right;">${esc(e.barcode || e.match_value)}</div>
           <div class="text-on-surface-variant truncate">${esc([p && p.piece_type, e.karat ? 'عيار ' + e.karat : '', e.weight_grams != null ? f2(e.weight_grams) + ' غ' : '', p && p.box_name, p && p.status === 'reserved' ? 'محجوزة' : ''].filter(Boolean).join(' · '))}</div>
           ${pieceLink(p)}
         </div>
-        ${editable ? `<button type="button" onclick="sdMarkFound('${esc(e.piece_id)}', '${esc(e.piece_source || '')}', this)" data-v="${esc(e.match_value)}" class="h-8 px-3 rounded-lg bg-green-700 text-white text-[11.5px] font-bold shrink-0">وُجدت</button>` : ''}
+        ${editable ? `<button type="button" onclick="sdMarkFound('${esc(e.piece_id)}', '${esc(e.piece_source || '')}', this)" data-v="${esc(e.match_value)}" class="h-8 lg:h-10 px-3 rounded-lg bg-green-700 text-white text-[11.5px] lg:text-[13px] font-bold shrink-0">وُجدت</button>` : ''}
       </div>`).join('') || '<div class="text-[12px] text-green-700">لا توجد قطع ناقصة فعلاً ✓</div>'}</div>
   </div>
 
   ${leftStock.length ? `<div>
     <h3 class="text-[13px] font-bold mb-1">ليست ناقصة — خرجت من المخزن بعد بدء الجرد (${leftStock.length})</h3>
     <p class="text-[11px] text-on-surface-variant mb-2">ظهرت هذه القطع ضمن الناقص لأنها كانت بالمخزن لحظة بدء الجرد. إن كانت حالتها خاطئة افتحها وصحّحها.</p>
-    <div class="flex flex-col gap-1">${leftStock.map(({ e, p }) => `
+    <div class="flex flex-col gap-1 lg:grid lg:grid-cols-3 xl:grid-cols-4 lg:gap-2">${leftStock.map(({ e, p }) => `
       <div class="flex items-center justify-between gap-2 bg-surface-container-low rounded-lg px-3 py-2 text-[12px]">
         <span class="font-data-mono" dir="ltr">${esc(e.barcode || e.match_value)}</span>
         <span class="font-semibold">${statusLabel(p ? p.status : 'deleted')}</span>
@@ -1823,7 +1831,7 @@ async function renderSessionReview() {
     <h3 class="text-[13px] font-bold text-amber-700 mb-1">زيادة (${surplus.length})</h3>
     ${unknownSurplus.length ? `<p class="text-[11px] text-on-surface-variant mb-2">${unknownSurplus.length} منها رموز غير موجودة في النظام، وغالباً هي قراءات خاطئة من الكاميرا.</p>
       ${editable ? `<button type="button" onclick="sdDeleteUnknown(this)" class="h-9 px-3 mb-2 rounded-lg border border-error text-error text-[12px] font-bold">حذف كل الرموز غير الموجودة في النظام (${unknownSurplus.length})</button>` : ''}` : ''}
-    <div class="flex flex-col gap-1">${surplus.filter(r => known[r.rfid_epc]).map(r => { const p = known[r.rfid_epc]; return `
+    <div class="flex flex-col gap-1 lg:grid lg:grid-cols-3 xl:grid-cols-4 lg:gap-2">${surplus.filter(r => known[r.rfid_epc]).map(r => { const p = known[r.rfid_epc]; return `
       <div class="flex items-center justify-between gap-2 bg-amber-50 rounded-lg px-3 py-2 text-[12px]">
         <span class="font-data-mono" dir="ltr">${esc(r.rfid_epc)}</span>
         <span>مسجّلة — ${statusLabel(p.status)}</span>

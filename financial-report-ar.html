@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=38"></script>
+<script src="theme.js?v=39"></script>
 <script src="gm-profit.js?v=1"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -45,6 +45,13 @@
     .fr-sec, .fr-card { border: 1px solid #ccc; }
   }
 </style>
+<style>
+/* computer: report sections side by side; tiles and the invoice list full width */
+@media screen and (min-width:1024px){
+  #fr-body{display:grid !important;grid-template-columns:1fr 1fr;align-items:start}
+  #fr-body > :not(.fr-sec), #fr-body > .fr-sec:has(.fr-wide){grid-column:1 / -1}
+}
+</style>
 </head>
 <body>
 <header class="sticky top-0 z-50" style="background:#F3EEDF;">
@@ -54,7 +61,7 @@
 </div>
 </header>
 
-<main class="max-w-2xl lg:max-w-4xl mx-auto px-4 pb-24">
+<main class="max-w-2xl lg:max-w-7xl mx-auto px-4 lg:px-8 pb-24">
 <div id="fr-loading" class="py-16 text-center text-sm" style="color:#6B6150;">جارِ التحميل...</div>
 <div id="fr-noaccess" class="hidden py-16 text-center text-sm" style="color:#b3261e;">ليس لديك صلاحية عرض التقارير.</div>
 
@@ -322,7 +329,7 @@ async function build(from, to) {
   </table>` : '<p class="fr-note">لا توجد حركة ذهب.</p>', 'الأوزان بالغرام. عمود "بالمخزن الآن" هو الرصيد الحالي، وليس في تاريخ نهاية الفترة.');
 
   if (document.getElementById('fr-show-list').checked && invoices.length) {
-    h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<table class="fr-t">
+    h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<div class="fr-wide"></div><table class="fr-t">
       <tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>الدفع</th><th class="n">المبلغ</th></tr>
       ${invoices.map(i => `<tr style="font-size:11.5px;"><td dir="ltr" style="text-align:right;white-space:nowrap;">${esc(String(i.invoice_number || '').replace(/-20\d\d-0*/, '-'))}</td><td>${TYPE[i.type] || esc(i.type)}</td><td style="white-space:nowrap;" dir="ltr">${gmFormatDateTime(i.created_at, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td><td>${PAY[i.payment_method] || esc(i.payment_method || '')}</td><td class="n">${n2((i.type === 'return' ? -1 : 1) * Number(i.total_amount || 0))}</td></tr>`).join('')}
     </table>`);

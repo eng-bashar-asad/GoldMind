@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=38"></script>
+<script src="theme.js?v=39"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -39,6 +39,14 @@
     .settle-tab-btn:not(.active) { color: #45464d; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
+<style>
+/* computer: trader card and forms on the right, the movements fill the rest */
+@media (min-width:1024px){
+  #trader-detail-view:not(.hidden){display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);column-gap:28px;align-items:start}
+  #trader-detail-view > *:not(#gm-moves-col){grid-column:1}
+  #trader-detail-view > #gm-moves-col{grid-column:2;grid-row:1 / span 40}
+}
+</style>
 </head>
 <body class="bg-background text-on-background font-body-md">
 <header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
@@ -54,7 +62,7 @@
 </button>
 </div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-4xl mx-auto px-4 lg:px-8">
+<main class="pb-32 max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
@@ -219,7 +227,7 @@
 <p class="text-error text-[12px] hidden mt-2" id="newTraderError"></p>
 </div>
 
-<div id="traders-list" class="flex flex-col gap-3 lg:grid lg:grid-cols-2 lg:gap-4"></div>
+<div id="traders-list" class="flex flex-col gap-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4"></div>
 </div>
 
 <!-- Trader detail -->
@@ -470,9 +478,11 @@ function goToStatementPrint() {
 <p class="text-error text-[12px] hidden mt-2" id="settle-error"></p>
 </div>
 
+<div id="gm-moves-col" class="flex flex-col gap-2">
 <h3 class="font-semibold text-[13px] mt-2">سجل الحركات</h3>
 <div id="movements-list" class="flex flex-col gap-2"></div>
 <p id="empty-movements" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات مسجّلة بعد.</p>
+</div>
 
 </div>
 </main>

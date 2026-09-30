@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=38"></script>
+<script src="theme.js?v=39"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
     html { font-size: 87.5%; }
@@ -22,6 +22,14 @@
     .arch-row { border-bottom: 1px solid var(--gm-outline-variant); }
     .arch-row:last-child { border-bottom: none; }
     .type-pill { font-size: 10.5px; font-weight: 700; padding: 2px 8px; border-radius: 999px; display: inline-block; }
+</style>
+<style>
+/* computer: filters in a side column, totals and results use the rest */
+@media (min-width:1024px){
+  #page-content:not(.hidden){display:grid;grid-template-columns:minmax(0,340px) minmax(0,1fr);column-gap:24px;align-items:start}
+  #page-content > *{grid-column:2}
+  #page-content > .arch-card:first-child, #page-content > :first-child{grid-column:1;grid-row:1 / span 10;position:sticky;top:80px}
+}
 </style>
 </head>
 <body>
@@ -36,7 +44,7 @@
 </div>
 </header>
 
-<main class="max-w-md lg:max-w-4xl mx-auto px-4 py-5">
+<main class="max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8 py-5">
 <div id="loading-state" class="py-16 text-center text-sm" style="color: var(--gm-on-surface-variant);">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-sm text-red-600">ليس لديك صلاحية الوصول لهذه الشاشة.</div>
 
@@ -70,7 +78,7 @@
 </div>
 
 <!-- Summary cards -->
-<div class="grid grid-cols-2 gap-2 mb-4" id="summaryCards"></div>
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4" id="summaryCards"></div>
 
 <!-- Results -->
 <div class="arch-card overflow-hidden" id="resultsList"></div>

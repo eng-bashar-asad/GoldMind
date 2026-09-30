@@ -139,13 +139,6 @@ function gmFormatDateTime(dateInput, opts) {
   return out.join(' ');
 }
 
-// Date boxes (<input type="date">) show their value left to right; inside
-// right-to-left pages the browser used to scramble it (e.g. "302026/09/").
-(function () {
-  const st = document.createElement('style');
-  st.textContent = 'input[type=date],input[type=datetime-local],input[type=month],input[type=time]{direction:ltr;text-align:right}';
-  (document.head || document.documentElement).appendChild(st);
-})();
 
 // Renders the small timezone-picker popover. Call gmOpenTimezonePicker()
 // from an icon button; expects a #gmTzModal container to exist on the
@@ -619,11 +612,21 @@ goldmindLoadSavedFont();
 (function () {
   const style = document.createElement('style');
   style.textContent = `
-    input:not(.bg-transparent):not(.text-on-background),
+    input:not([type=checkbox]):not([type=radio]):not(.bg-transparent):not(.text-on-background),
     select:not(.bg-transparent):not(.text-on-background),
     textarea:not(.bg-transparent):not(.text-on-background) {
       color: var(--gm-on-surface, #191c1e);
       background-color: var(--gm-surface-lowest, #ffffff);
+    }
+    /* checkboxes/radios: a visible frame, and the tick shows when checked
+       (the white background above used to hide both) */
+    input[type=checkbox], input[type=radio] {
+      border: 1.5px solid var(--gm-outline, #76777d);
+      accent-color: var(--gm-primary, #1F1A12);
+    }
+    input[type=checkbox]:checked, input[type=radio]:checked {
+      background-color: var(--gm-primary, #1F1A12);
+      border-color: var(--gm-primary, #1F1A12);
     }
   `;
   document.head.appendChild(style);
@@ -1016,8 +1019,11 @@ console.assert(gmMoney(1234.5) === '1,234.50' && gmMoney(null) === '0.00');
   body{-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;}
   /* dates read day/month/year left-to-right even on an Arabic phone
      (an Arabic system locale otherwise jumbles the parts: "261970/09/") */
-  input[type=date],input[type=datetime-local],input[type=month]{direction:ltr;-webkit-locale:"en-GB";text-align:right;}
-  input[type=date]::-webkit-datetime-edit,input[type=datetime-local]::-webkit-datetime-edit,input[type=month]::-webkit-datetime-edit{direction:ltr;unicode-bidi:isolate;}
+  /* An Arabic phone writes the date with invisible right-to-left marks between
+     the parts ("30‏/09‏/2026"); bidi-override shows the characters in their
+     real order, so it reads 30/09/2026 instead of "302026/09/". */
+  input[type=date],input[type=datetime-local],input[type=month],input[type=time]{direction:ltr;unicode-bidi:bidi-override;-webkit-locale:"en-GB";text-align:right;}
+  input[type=date]::-webkit-datetime-edit,input[type=datetime-local]::-webkit-datetime-edit,input[type=month]::-webkit-datetime-edit{direction:ltr;unicode-bidi:bidi-override;}
   /* money and weights line up in columns */
   .font-data-mono,td,th,input[type=number],[dir=ltr]{font-variant-numeric:tabular-nums;}
   /* keyboard focus is always visible (mouse/touch clicks stay clean) */

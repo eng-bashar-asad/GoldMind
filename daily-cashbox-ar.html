@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=38"></script>
+<script src="theme.js?v=39"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -37,6 +37,14 @@
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
+<style>
+/* computer: controls on the right, the day's operations fill the rest */
+@media (min-width:1024px){
+  #page-content:not(.hidden){display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);column-gap:28px;align-items:start}
+  #page-content > *:not(#gm-entries-col){grid-column:1}
+  #page-content > #gm-entries-col{grid-column:2;grid-row:1 / span 40}
+}
+</style>
 </head>
 <body class="bg-background text-on-background font-body-md">
 <header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
@@ -52,7 +60,7 @@
 </button>
 </div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-4xl mx-auto px-4 lg:px-8">
+<main class="pb-32 max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية الوصول للصندوق اليومي.</div>
@@ -157,6 +165,7 @@
 <div id="reportRecipients" class="flex flex-col gap-2"></div>
 </div>
 
+<div id="gm-entries-col" class="flex flex-col gap-3">
 <div class="flex items-center justify-between mt-2">
 <h2 class="font-semibold text-[13px]" id="entries-heading">عمليات اليوم</h2>
 <button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold" id="fullHistoryToggle">عرض كل العمليات</button>
@@ -173,6 +182,7 @@
 </table>
 </div>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد عمليات مسجّلة اليوم بعد.</p>
+</div>
 
 <!-- Single reusable edit modal (instead of a per-row hidden panel — keeps
      each table row compact like the Excel sheet this replaces) -->
