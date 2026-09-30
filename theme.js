@@ -212,16 +212,12 @@ function gmFormatNumber(value) {
 // assumed to already be in the store's base currency.
 // Falls back gracefully to a single-currency string when no secondary
 // currency/rate is configured, or when store is missing.
+// An amount is shown only in the currency it was taken in — no converted
+// figure next to it (the owner asked for that). The second currency and its
+// exchange rate stay saved in company settings for when a conversion is needed.
 function gmFormatDualCurrency(amount, store) {
   const base = (store && store.currency) || '';
-  const baseStr = gmFormatNumber(amount) + (base ? ' ' + base : '');
-  if (!store || !store.secondary_currency || !store.secondary_currency_rate) {
-    return baseStr;
-  }
-  const rate = Number(store.secondary_currency_rate);
-  if (!isFinite(rate) || rate <= 0) return baseStr;
-  const converted = Number(amount) * rate;
-  return baseStr + ' (' + gmFormatNumber(converted) + ' ' + store.secondary_currency + ')';
+  return gmFormatNumber(amount) + (base ? ' ' + base : '');
 }
 
 const GOLDMIND_THEMES = {
