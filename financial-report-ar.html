@@ -171,19 +171,20 @@ async function build(from, to) {
   const S = GOLDMIND_STORE_ID, q = () => goldmindClient;
   const inPeriod = (t) => t.gte('created_at', from).lt('created_at', to);
 
-  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR] = await Promise.all([
+  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR] = await Promise.all([
     gmFetchAllRows(() => inPeriod(q().from('invoices').select('id, invoice_number, type, payment_method, total_amount, amount_paid, cash_paid_amount, bank_paid_amount, created_at, counterparty_name').eq('store_id', S).neq('status', 'cancelled')).order('created_at')),
     inPeriod(q().from('invoices').select('id', { count: 'exact', head: true }).eq('store_id', S).eq('status', 'cancelled')),
     gmFetchAllRows(() => inPeriod(q().from('expense_entries').select('amount, description, category:category_id(name)').eq('store_id', S))),
     gmFetchAllRows(() => inPeriod(q().from('daily_cash_log').select('direction, amount, currency').eq('store_id', S))),
     gmFetchAllRows(() => q().from('daily_cash_log').select('direction, amount, currency').eq('store_id', S).lt('created_at', from)),
-    gmFetchAllRows(() => inPeriod(q().from('customer_debts').select('movement_type, cash_amount, gold_grams_24k').eq('store_id', S))),
-    gmFetchAllRows(() => q().from('customer_debts').select('movement_type, cash_amount, gold_grams_24k').eq('store_id', S).lt('created_at', to)),
+    gmFetchAllRows(() => inPeriod(q().from('customer_debts').select('movement_type, cash_amount, gold_grams_24k, source').eq('store_id', S))),
+    gmFetchAllRows(() => q().from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, source').eq('store_id', S).lt('created_at', to)),
     gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('movement_type, gold_24k_equivalent, fab_fee_amount').eq('store_id', S))),
     gmFetchAllRows(() => q().from('trader_movements').select('movement_type, gold_24k_equivalent').eq('store_id', S).lt('created_at', to)),
     gmFetchAllRows(() => q().from('pieces').select('weight_grams, accounting_weight_grams, karat').eq('store_id', S).eq('status', 'available')),
     q().from('gold_stock_lots').select('weight_grams_remaining, karat').eq('store_id', S),
-    q().from('gold_prices').select('karat, price_per_gram').eq('store_id', S)
+    q().from('gold_prices').select('karat, price_per_gram').eq('store_id', S),
+    gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer:customer_id(name)').eq('store_id', S).lt('created_at', to).order('created_at'))
   ]);
   for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR]) if (x.error) throw x.error;
 
@@ -246,9 +247,22 @@ async function build(from, to) {
   addCash(cashBeforeR.data, 'open'); addCash(cashR.data, 'period');
 
   // ---- debts
-  const cdIn = sum(cdebtR.data.filter(m => m.movement_type === 'debt_increase'), 'cash_amount');
-  const cdOut = sum(cdebtR.data.filter(m => m.movement_type !== 'debt_increase'), 'cash_amount');
-  const cdBal = cdebtAllR.data.reduce((a, m) => a + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0), 0);
+  // customer money. "allocation" rows only move a payment onto its invoice (a
+  // zero-sum pair) and are left out; deposits are shown on their own.
+  const realMoves = cdebtR.data.filter(m => m.source !== 'allocation');
+  // a sale invoice edited down lowers "new debts", it isn't a payment
+  const cdIn = sum(realMoves.filter(m => m.movement_type === 'debt_increase' && m.source !== 'deposit_refund'), 'cash_amount')
+    - sum(realMoves.filter(m => m.movement_type !== 'debt_increase' && m.source === 'invoice_edit'), 'cash_amount');
+  const cdOut = sum(realMoves.filter(m => m.movement_type !== 'debt_increase' && m.source !== 'deposit' && m.source !== 'invoice_edit'), 'cash_amount');
+  const perCust = {};
+  cdebtAllR.data.forEach(m => { perCust[m.customer_id] = (perCust[m.customer_id] || 0) + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0); });
+  const deposits = (depR && depR.data) || [];
+  const depOpen = deposits.filter(d => d.status === 'active' || (d.refunded_at && d.refunded_at >= to));
+  const depOpenTotal = sum(depOpen, 'amount');
+  const depInPeriod = deposits.filter(d => d.created_at >= from);
+  const owedToUs = Object.values(perCust).reduce((a, b) => a + (b > 0.005 ? b : 0), 0);
+  const creditTotal = Object.values(perCust).reduce((a, b) => a + (b < -0.005 ? -b : 0), 0);
+  const weOwe = Math.max(0, creditTotal - depOpenTotal); // customers' credit that isn't a deposit
   const tIncr = sum(tmR.data.filter(m => m.movement_type === 'debt_increase'), 'gold_24k_equivalent');
   const tDecr = sum(tmR.data.filter(m => m.movement_type !== 'debt_increase'), 'gold_24k_equivalent');
   // same sign as ledger-ar.html: positive = traders owe the shop gold
@@ -311,10 +325,14 @@ async function build(from, to) {
   </table>` : '<p class="fr-note">لا توجد حركات صندوق.</p>', 'من نفس سجل صفحة "الحركة اليومية" — يشمل قبض المبيعات ودفع المشتريات والمصاريف وكل الإدخالات اليدوية.');
 
   h += sec('handshake', 'الديون', `<table class="fr-t">
-    <tr><th colspan="2">الزبائن (نقدي)</th></tr>
-    ${row('ديون جديدة على الزبائن بالفترة', money(cdIn))}
+    <tr><th colspan="2">الزبائن — آخر الفترة</th></tr>
+    ${row('ديون لنا على الزبائن', money(owedToUs), ' class="tot"')}
+    ${row('ديون علينا للزبائن', money(weOwe))}
+    ${row('عربون قائم (' + depOpen.length + ' إيصال)', money(depOpenTotal))}
+    <tr><th colspan="2">الزبائن — خلال الفترة</th></tr>
+    ${row('ديون جديدة على الزبائن', money(cdIn))}
     ${row('دفعات استلمناها من الزبائن', money(cdOut))}
-    ${row('رصيد ديون الزبائن لنا (آخر الفترة)', money(cdBal), ' class="tot"')}
+    ${row('عربون استلمناه (' + depInPeriod.length + ' إيصال)', money(sum(depInPeriod, 'amount')))}
     <tr><th colspan="2">التجار (ذهب بعيار 24)</th></tr>
     ${row('ذهب أصبح علينا للتجار خلال الفترة', g2(tIncr))}
     ${row('ذهب أصبح لنا أو سدّدناه للتجار خلال الفترة', g2(tDecr))}
@@ -322,6 +340,13 @@ async function build(from, to) {
   </table>`);
 
   const karats = Array.from(new Set([...Object.keys(soldByKarat), ...Object.keys(boughtByKarat), ...Object.keys(stockByKarat)])).filter(k => k && k !== 'null').sort((a, b) => b - a);
+  if (depOpen.length || depInPeriod.length) {
+    const shown = deposits.filter(d => depOpen.includes(d) || depInPeriod.includes(d));
+    h += sec('bookmark_added', 'إيصالات العربون', `<table class="fr-t">
+      <tr><th>الإيصال</th><th>العميل</th><th>القطع</th><th>الحالة</th><th class="n">المبلغ</th></tr>
+      ${shown.map(d => `<tr><td dir="ltr" style="text-align:right">${esc(d.deposit_number)}</td><td>${esc(d.customer && d.customer.name)}</td><td>${esc((d.items || []).map(i => i.description || i.barcode).join('، '))}</td><td>${d.status === 'active' ? 'قائم' : 'مُسترجَع'}</td><td class="n">${money(d.amount)}</td></tr>`).join('')}
+    </table>`, 'العربون القائم مبلغ دفعه العميل لحجز قطعة، ويُخصم من فاتورته عند الشراء.');
+  }
   h += sec('diamond', 'الذهب بالوزن', karats.length ? `<table class="fr-t">
     <tr><th>العيار</th><th class="n">مباع (قائم)</th><th class="n">مشترى (قائم)</th><th class="n">بالمخزن الآن</th></tr>
     ${karats.map(k => `<tr><td>${esc(k)}</td><td class="n">${n2((soldByKarat[k] || {}).g)}</td><td class="n">${n2((boughtByKarat[k] || {}).g)}</td><td class="n">${n2(stockByKarat[k])}</td></tr>`).join('')}

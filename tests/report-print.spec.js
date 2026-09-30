@@ -75,3 +75,28 @@ test('financial report: today, numbers, PDF', async ({ page }) => {
   expect(pdf.bytes).toBeGreaterThan(20000);
   expect(errs).toEqual([]);
 });
+
+test('financial report: debts owed to us, owed by us, deposits and their receipts', async ({ page }) => {
+  const errs = await setup(page);
+  const now = new Date().toISOString();
+  const D = (cust, type, amt, source, inv) => ({ store_id: STORE, customer_id: cust, movement_type: type, cash_amount: amt, gold_grams_24k: 0, source, invoice_id: inv || null, created_at: now });
+  db.customer_debts = [
+    D('rima', 'debt_increase', 3900, null, 'i5'), D('rima', 'debt_decrease', 3900, 'payment'),
+    D('rima', 'debt_decrease', 3900, 'allocation', 'i5'), D('rima', 'debt_increase', 3900, 'allocation'),
+    D('x', 'debt_increase', 900, null, 'i7'), D('x', 'debt_decrease', 100, 'invoice_edit', 'i7'),
+    D('hala', 'debt_decrease', 200, 'deposit'),
+    D('y', 'debt_decrease', 50, 'payment') ];
+  db.customer_deposits = [{ store_id: STORE, deposit_number: 'DEP-000001', amount: 200, status: 'active', created_at: now, items: [{ description: 'طقم ديور' }], customer: { name: 'هلا الهفل' } }];
+  await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
+  await page.goto('/financial-report-ar.html');
+  await expect(page.locator('#fr-body')).toContainText('ديون لنا على الزبائن');
+  const row = t => page.locator('#fr-body tr', { hasText: t }).first();
+  await expect(row('ديون لنا على الزبائن')).toContainText('800.00');
+  await expect(row('ديون علينا للزبائن')).toContainText('50.00');
+  await expect(row('عربون قائم (1 إيصال)')).toContainText('200.00');
+  await expect(row('ديون جديدة على الزبائن')).toContainText('4,700.00');
+  await expect(row('دفعات استلمناها من الزبائن')).toContainText('3,950.00');
+  await expect(page.locator('#fr-body')).toContainText('إيصالات العربون');
+  await expect(row('DEP-000001')).toContainText('طقم ديور');
+  expect(errs).toEqual([]);
+});
