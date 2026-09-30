@@ -1299,3 +1299,60 @@ function gmClosePhotoViewer() {
   const box = document.getElementById('gm-photo-viewer');
   if (box) box.style.display = 'none';
 }
+
+// ---- Date boxes: our own DD/MM/YYYY display on top of the phone's date box.
+// The native picker still opens on tap, but the text inside the box is drawn by
+// us from the box's value (always YYYY-MM-DD), so an Arabic phone can no longer
+// jumble it ("302026/09/"). Works for values typed, picked or set by the page.
+(function gmDateBoxes() {
+  if (window.__gmDateBoxes) return; window.__gmDateBoxes = true;
+  const fmt = v => { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; };
+  function sync(el) {
+    const o = el.__gmDateOverlay; if (!o) return;
+    const t = fmt(el.value);
+    o.textContent = t || 'يوم/شهر/سنة';
+    o.style.color = t ? '' : '#9a9a9a';
+  }
+  function setup(el) {
+    if (el.__gmDateOverlay || el.type !== 'date' || el.hasAttribute('data-gm-date')) return;
+    const cs = getComputedStyle(el);
+    const wrap = document.createElement('span');
+    wrap.style.cssText = 'position:relative;display:' + (cs.display === 'inline' || cs.display === 'inline-block' ? 'inline-block' : 'block') + ';' +
+      (el.classList.contains('w-full') || cs.display === 'block' ? 'width:100%;' : '');
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(el);
+    const o = document.createElement('span');
+    o.className = 'gm-date-overlay';
+    o.setAttribute('aria-hidden', 'true');
+    o.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;pointer-events:none;direction:ltr;unicode-bidi:isolate;' +
+      'justify-content:flex-end;padding:0 ' + cs.paddingRight + ' 0 ' + (parseFloat(cs.paddingLeft) + 26) + 'px;font:inherit;font-size:' + cs.fontSize + ';color:inherit;white-space:nowrap;overflow:hidden';
+    wrap.appendChild(o);
+    el.__gmDateOverlay = o;
+    el.classList.add('gm-date-native');
+    el.addEventListener('input', () => sync(el));
+    el.addEventListener('change', () => sync(el));
+    el.addEventListener('click', () => { try { el.showPicker && el.showPicker(); } catch (e) { /* not allowed here */ } });
+    sync(el);
+  }
+  // values set by page code (el.value = '2026-09-30') update the display too
+  const desc = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  Object.defineProperty(HTMLInputElement.prototype, 'value', {
+    configurable: true, enumerable: desc.enumerable,
+    get() { return desc.get.call(this); },
+    set(v) { desc.set.call(this, v); if (this.__gmDateOverlay) sync(this); }
+  });
+  const st = document.createElement('style');
+  st.textContent = 'input.gm-date-native{color:transparent !important;caret-color:transparent}' +
+    'input.gm-date-native::-webkit-datetime-edit{color:transparent !important}' +
+    'input.gm-date-native::-webkit-calendar-picker-indicator{opacity:.7;cursor:pointer}';
+  (document.head || document.documentElement).appendChild(st);
+  const scan = root => (root.querySelectorAll ? root.querySelectorAll('input[type=date]') : []).forEach(setup);
+  const start = () => {
+    scan(document);
+    new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => {
+      if (n.nodeType !== 1) return;
+      if (n.matches && n.matches('input[type=date]')) setup(n); else scan(n);
+    }))).observe(document.body, { childList: true, subtree: true });
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();

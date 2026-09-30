@@ -650,21 +650,40 @@ function gmLoadScript(src, globalName) {
 }
 
 // Append a tall canvas to a jsPDF doc, one A4 page per slice (10mm margins).
-function gmAddCanvasPages(pdf, canvas, firstOnCurrentPage) {
-    var innerW = 190, innerH = 277;
-    var pxPerMm = canvas.width / innerW;
-    var pageH = Math.floor(innerH * pxPerMm);
-    for (var y = 0, first = true; y < canvas.height; y += pageH, first = false) {
-        var h = Math.min(pageH, canvas.height - y);
-        if (h < 4) break; // rounding leftovers
+// Cut a tall canvas into A4 page slices (10mm margins). Cuts go at a "safe"
+// line — the bottom of a section, card or table row (breaksPx, canvas pixels) —
+// so a table or a number is never sliced in half across two pages.
+function gmSliceCanvas(canvas, breaksPx) {
+    var pxPerMm = canvas.width / 190;
+    var pageH = Math.floor(277 * pxPerMm);
+    var breaks = (breaksPx || []).slice().sort(function (a, b) { return a - b; });
+    var out = [];
+    for (var y = 0; y < canvas.height - 4;) {
+        var end = Math.min(y + pageH, canvas.height);
+        if (end < canvas.height) {
+            var best = 0;
+            for (var k = 0; k < breaks.length; k++) {
+                if (breaks[k] > y + pageH * 0.3 && breaks[k] <= end) best = breaks[k];
+            }
+            if (best) end = best;
+        }
         var slice = document.createElement('canvas');
-        slice.width = canvas.width; slice.height = h;
+        slice.width = canvas.width; slice.height = end - y;
         var ctx = slice.getContext('2d');
-        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, slice.width, h);
-        ctx.drawImage(canvas, 0, y, canvas.width, h, 0, 0, canvas.width, h);
-        if (!(first && firstOnCurrentPage)) pdf.addPage();
-        pdf.addImage(slice.toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, innerW, h / pxPerMm);
+        ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, slice.width, slice.height);
+        ctx.drawImage(canvas, 0, y, canvas.width, end - y, 0, 0, canvas.width, end - y);
+        out.push(slice);
+        y = end;
     }
+    return out;
+}
+// kept for older callers: append a whole canvas as pages
+function gmAddCanvasPages(pdf, canvas, firstOnCurrentPage, breaksPx) {
+    var pxPerMm = canvas.width / 190;
+    gmSliceCanvas(canvas, breaksPx).forEach(function (sl, i) {
+        if (!(i === 0 && firstOnCurrentPage)) pdf.addPage();
+        pdf.addImage(sl.toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, 190, sl.height / pxPerMm);
+    });
 }
 
 // Build an A4 PDF from DOM nodes: each node starts on a new page and long
@@ -710,17 +729,29 @@ async function gmPdfFromNodes(nodes, filename, title, shareText) {
         await new Promise(function (r) { setTimeout(r, 80); });
         frame.style.height = Math.max(1400, doc.documentElement.scrollHeight) + 'px';
 
-        var canvases = [];
+        var slices = [];
         for (var i = 0; i < placed.length; i++) {
-            canvases.push(await window.html2canvas(placed[i], {
+            var node = placed[i];
+            // safe cut lines: bottoms of blocks up to 3 levels deep and of table rows
+            var top = node.getBoundingClientRect().top;
+            var cssBreaks = Array.prototype.map.call(
+                node.querySelectorAll(':scope > *, :scope > * > *, :scope > * > * > *, tr, .gm-keep'),
+                function (e) { return e.getBoundingClientRect().bottom - top; });
+            var canvas = await window.html2canvas(node, {
                 scale: 2, useCORS: true, backgroundColor: '#ffffff', letterRendering: true,
                 scrollX: 0, scrollY: 0, windowWidth: FRAME_W, windowHeight: Math.max(1400, doc.documentElement.scrollHeight)
-            }));
+            });
+            var ratio = canvas.height / Math.max(1, node.getBoundingClientRect().height);
+            // every node starts on a new page
+            slices = slices.concat(gmSliceCanvas(canvas, cssBreaks.map(function (b) { return Math.round(b * ratio); })));
         }
         var pdfOpts = { margin: 10, filename: filename, image: { type: 'jpeg', quality: 0.95 }, jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' } };
-        var worker = html2pdf().set(pdfOpts).from(canvases[0], 'canvas').toPdf();
+        var worker = html2pdf().set(pdfOpts).from(slices[0], 'canvas').toPdf();
         var pdf = await worker.get('pdf');
-        for (var j = 1; j < canvases.length; j++) gmAddCanvasPages(pdf, canvases[j], false);
+        for (var j = 1; j < slices.length; j++) {
+            pdf.addPage();
+            pdf.addImage(slices[j].toDataURL('image/jpeg', 0.95), 'JPEG', 10, 10, 190, slices[j].height / (slices[j].width / 190));
+        }
         return await gmSavePdf(worker, filename, title, shareText);
     } finally {
         frame.remove();
