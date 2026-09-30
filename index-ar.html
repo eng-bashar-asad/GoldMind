@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=33"></script>
+<script src="theme.js?v=34"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -649,6 +649,9 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
           <span class="dsk-gt-sep">·</span>
           <span class="dsk-gt-karat" id="dskHallmarkKaratLabel">عيار 21</span>
           <b><span id="dskHallmarkPriceLabel">—</span><span class="dsk-gt-unit" id="dskGoldUnit">د.إ / غرام</span></b>
+        </button>
+        <button type="button" id="gmOnlineBtnDsk" onclick="gmOpenOnline()" class="hidden items-center gap-2" title="الموظفون المتصلون" style="height:38px;padding:0 14px;border-radius:19px;border:1px solid #E3D6B4;background:#FFFDF8;color:#1F1A12;font-size:13px;font-weight:600;">
+          <span id="gmOnlineDotDsk" style="width:8px;height:8px;border-radius:50%;background:#B9AE97;display:inline-block;"></span><b id="gmOnlineCountDsk">0</b> متصل الآن
         </button>
         <button type="button" class="dsk-icon-btn" onclick="toggleCurrency()" title="تبديل العملة" id="dskCurrencyBtn">د.إ</button>
         <div class="dsk-account-trigger" onclick="location.href='account-security-ar.html'" title="حسابي">
@@ -1974,73 +1977,7 @@ document.addEventListener('DOMContentLoaded', function () {
     </script>
 
 <!-- Site Navigation Drawer -->
-<div class="fixed inset-0 bg-black/40 z-[200] hidden" id="navDrawerOverlay" onclick="closeNavDrawer()"></div>
-<div class="fixed top-0 right-0 h-full w-72 max-w-[80vw] bg-surface-container-lowest z-[201] shadow-2xl translate-x-full transition-transform duration-300 flex flex-col" dir="rtl" id="navDrawer">
-<div class="flex items-center justify-between px-5 h-16 border-b border-outline-variant">
-<span class="text-primary"><span data-gm-logo="header" data-gm-size="32" data-gm-static></span></span>
-<button class="gm-hit w-10 h-10 flex items-center justify-center rounded-full text-on-surface-variant" aria-label="إغلاق القائمة" onclick="closeNavDrawer()"><span class="material-symbols-outlined">close</span></button>
-</div>
-<nav class="flex-1 overflow-y-auto py-2">
-<p class="px-5 pt-2 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">الرئيسية</p>
-<a href="index-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">dashboard</span><span class="font-label-md text-label-md">الشاشة الرئيسية</span></a>
-<a href="inventory-add.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory_2</span><span class="font-label-md text-label-md">إضافة قطعة للمخزون</span></a>
-<a href="new-sale-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt_long</span><span class="font-label-md text-label-md">بيع جديد / فاتورة</span></a>
-
-<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">السجلات</p>
-<a href="invoices-list-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">list_alt</span><span class="font-label-md text-label-md">كل الفواتير</span></a>
-<a href="invoices-archive-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory</span><span class="font-label-md text-label-md">الأرشيف الشامل (مبيعات/مشتريات زبائن وتجار)</span></a>
-<a href="sales-return-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">keyboard_return</span><span class="font-label-md text-label-md">مرتجع مبيعات</span></a>
-
-<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">المستودعات</p>
-<a href="inventory-list-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">inventory_2</span><span class="font-label-md text-label-md">المخزن</span></a>
-<a href="inventory-add.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">add_box</span><span class="font-label-md text-label-md">إضافة قطعة للمخزون</span></a>
-<a href="stock-production-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">precision_manufacturing</span><span class="font-label-md text-label-md">إنتاج القطع من رصيد الجملة</span></a>
-<a href="diamond-stock-production-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">diamond</span><span class="font-label-md text-label-md">إنتاج قطع الماس من الصندوق</span></a>
-<a href="opening-stock-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">warehouse</span><span class="font-label-md text-label-md">بضاعة أول المدة</span></a>
-<a href="stock-transfer-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">swap_vert</span><span class="font-label-md text-label-md">إخراج/إدخال بالكلفة (هدايا، تعديل)</span></a>
-<a href="inventory-count-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">checklist</span><span class="font-label-md text-label-md">الجرد</span></a>
-<a href="diamond-inventory-add.html" class="diamond-feature hidden items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">diamond</span><span class="font-label-md text-label-md">إضافة ألماسة</span></a>
-<a href="diamond-inventory-list-ar.html" class="diamond-feature hidden items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">diamond</span><span class="font-label-md text-label-md">مخزون الألماس</span></a>
-
-<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">المالية</p>
-<a href="expense-entry-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt</span><span class="font-label-md text-label-md">مصروف جديد</span></a>
-<a href="daily-cashbox-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">point_of_sale</span><span class="font-label-md text-label-md">الصندوق اليومي</span></a>
-<a href="main-cashbox-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">account_balance</span><span class="font-label-md text-label-md">الصندوق الرئيسي</span></a>
-<a href="ledger-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">account_balance_wallet</span><span class="font-label-md text-label-md">سجل حركات التاجر</span></a>
-<a href="company-balances-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">account_balance</span><span class="font-label-md text-label-md">أرصدة الشركة</span></a>
-<a href="customer-debts-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">groups</span><span class="font-label-md text-label-md">ديون العملاء</span></a>
-
-<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">التوثيق (KYC)</p>
-<a href="kyc-screening-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">fact_check</span><span class="font-label-md text-label-md">فحص القوائم الرسمية (EOCN)</span></a>
-<a href="kyc-companies-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">domain_verification</span><span class="font-label-md text-label-md">مستندات KYC — الشركات</span></a>
-<a href="kyc-individuals-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">badge</span><span class="font-label-md text-label-md">مستندات الهوية — الأفراد</span></a>
-
-<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">الإدارة والتقارير</p>
-<a href="reports-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">bar_chart</span><span class="font-label-md text-label-md">التقارير والتحليلات</span></a>
-<a href="accounting-check-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">fact_check</span><span class="font-label-md text-label-md">فحص الحسابات</span></a>
-<a href="tax-report-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">receipt_long</span><span class="font-label-md text-label-md">كشف الضريبة</span></a>
-<a href="audit-log-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">history</span><span class="font-label-md text-label-md">سجل النشاط</span></a>
-<a href="staff-permissions-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">badge</span><span class="font-label-md text-label-md">الموظفون والصلاحيات</span></a>
-<a href="payroll-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">payments</span><span class="font-label-md text-label-md">الرواتب والموارد البشرية</span></a>
-<a href="hr-employees-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">badge</span><span class="font-label-md text-label-md">سجل الموظفين والإجازات</span></a>
-<a href="repairs-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">build</span><span class="font-label-md text-label-md">الصيانة والتصليح</span></a>
-<a href="gold-price-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">payments</span><span class="font-label-md text-label-md">سعر الذهب</span></a>
-<a href="profit-report-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">trending_up</span><span class="font-label-md text-label-md">تقرير الأرباح</span></a>
-<a href="financial-report-ar.html" data-permission="view_reports" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">summarize</span><span class="font-label-md text-label-md">التقرير المالي الشامل</span></a>
-
-<p class="px-5 pt-3 pb-1.5 mb-1 text-[10px] font-bold text-on-surface-variant/60 uppercase tracking-wider border-b-2 border-secondary/50">الإعدادات</p>
-<a href="settings-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">settings</span><span class="font-label-md text-label-md">الإعدادات</span></a>
-<a href="theme-picker-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">palette</span><span class="font-label-md text-label-md">مظهر التطبيق</span></a>
-<a href="fiscal-year-close-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">event_repeat</span><span class="font-label-md text-label-md">إغلاق السنة المالية</span></a>
-<a href="account-security-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">lock</span><span class="font-label-md text-label-md">الأمان وكلمة المرور</span></a>
-<a href="dashboard-advanced-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">grid_view</span><span class="font-label-md text-label-md">اللوحة المتقدمة (تصميم بديل)</span></a>
-<a href="support-contact-ar.html" class="flex items-center gap-3 px-5 py-3 text-on-surface hover:bg-surface-container-high transition-colors"><span class="material-symbols-outlined text-secondary">support_agent</span><span class="font-label-md text-label-md">تواصل مع الدعم</span></a>
-</nav>
-<div class="border-t border-outline-variant">
-<button onclick="goldMindSignOut()" class="w-full flex items-center gap-3 px-5 py-4 text-error hover:bg-error-container/30 transition-colors"><span class="material-symbols-outlined">logout</span><span class="font-label-md text-label-md font-semibold">تسجيل الخروج</span></button>
-</div>
-</div>
-
+<!-- Side menu: shared gm-nav.js (same menu on every page) -->
 <!-- Quick Search (command palette) -->
 <div class="fixed inset-0 bg-black/40 z-[300] hidden" id="quickSearchOverlay" onclick="closeQuickSearch()"></div>
 <div class="fixed inset-x-0 top-0 z-[301] translate-y-[-100%] transition-transform duration-200 bg-surface-container-lowest rounded-b-2xl shadow-2xl" dir="rtl" id="quickSearchPanel">
@@ -2269,16 +2206,6 @@ document.addEventListener('DOMContentLoaded', function () {
         })();
     })();
 
-    function openNavDrawer() {
-        document.getElementById('navDrawerOverlay').classList.remove('hidden');
-        const d = document.getElementById('navDrawer');
-        d.classList.remove('translate-x-full');
-    }
-    function closeNavDrawer() {
-        document.getElementById('navDrawerOverlay').classList.add('hidden');
-        const d = document.getElementById('navDrawer');
-        d.classList.add('translate-x-full');
-    }
 </script>
 
 <script>
@@ -2436,55 +2363,21 @@ if ('serviceWorker' in navigator) {
 })();
 
 /* ===== Dark drawer: groups that open/close, page steps back ===== */
-(function gmDarkDrawer() {
-  var d = document.getElementById('navDrawer');
-  if (!d) return;
-  d.classList.add('gm-dark');
-  var nav = d.querySelector('nav');
-  var here = location.pathname.split('/').pop() || 'index-ar.html';
-  var ICONS = { 'الرئيسية': 'home', 'السجلات': 'receipt_long', 'المستودعات': 'inventory_2', 'المالية': 'account_balance_wallet', 'التوثيق (KYC)': 'verified_user', 'الإدارة والتقارير': 'bar_chart', 'الإعدادات': 'settings' };
-  var heads = Array.prototype.slice.call(nav.querySelectorAll(':scope > p'));
-  heads.forEach(function (p, gi) {
-    var grp = document.createElement('div'); grp.className = 'gm-grp gm-rise'; grp.style.animationDelay = (120 + gi * 45) + 'ms';
-    var title = p.textContent.trim();
-    var btn = document.createElement('button'); btn.type = 'button'; btn.className = 'gm-grp-h'; btn.setAttribute('aria-expanded', 'false');
-    btn.innerHTML = '<span class="material-symbols-outlined">' + (ICONS[title] || 'folder') + '</span><span></span><span class="material-symbols-outlined ms-chev">expand_more</span>';
-    btn.children[1].textContent = title;
-    var body = document.createElement('div'); body.className = 'gm-grp-b';
-    var inner = document.createElement('div'); body.appendChild(inner);
-    var n = p.nextElementSibling;
-    while (n && n.tagName !== 'P') { var next = n.nextElementSibling; inner.appendChild(n); n = next; }
-    grp.appendChild(btn); grp.appendChild(body);
-    p.replaceWith(grp);
-    var hasHere = false;
-    inner.querySelectorAll('a[href]').forEach(function (a) { if (a.getAttribute('href') === here) { a.classList.add('gm-here'); hasHere = true; } });
-    if (hasHere) { grp.classList.add('open'); btn.setAttribute('aria-expanded', 'true'); }
-    btn.addEventListener('click', function () {
-      var open = !grp.classList.contains('open');
-      nav.querySelectorAll('.gm-grp.open').forEach(function (g) { if (g !== grp) { g.classList.remove('open'); g.querySelector('.gm-grp-h').setAttribute('aria-expanded', 'false'); } });
-      grp.classList.toggle('open', open); btn.setAttribute('aria-expanded', open ? 'true' : 'false');
-    });
-  });
-  // the time-zone picker moved here from the top bar
-  var settingsInner = nav.querySelector('.gm-grp:last-child .gm-grp-b > div');
-  if (settingsInner && typeof gmOpenTimezonePicker === 'function') {
-    var tz = document.createElement('a'); tz.href = '#';
-    tz.className = 'flex items-center gap-3 px-5 py-3 text-on-surface transition-colors';
-    tz.innerHTML = '<span class="material-symbols-outlined text-secondary">schedule</span><span class="font-label-md text-label-md">المنطقة الزمنية للعرض</span>';
-    tz.addEventListener('click', function (e) { e.preventDefault(); closeNavDrawer(); gmOpenTimezonePicker(); });
-    settingsInner.appendChild(tz);
+// Laptop sidebar: same groups and links as the shared side menu (gm-nav.js)
+(function gmDesktopNav() {
+  function render() {
+    var G = window.GM_NAV_GROUPS, nav = document.querySelector('.dsk-nav-scroll');
+    if (!nav) return;
+    if (!G) return setTimeout(render, 150);
+    var here = location.pathname.split('/').pop() || 'index-ar.html';
+    nav.innerHTML = G.map(function (g) {
+      return '<div class="dsk-nav-group"><div class="dsk-nav-group-label">' + g.t + '</div><div class="dsk-nav">' +
+        g.l.filter(function (x) { return x[0] !== '#tz'; }).map(function (x) {
+          return '<a class="dsk-nav-link' + (x[0] === here ? ' active' : '') + '" href="' + x[0] + '"' + (x[3] ? ' data-nav-perm="' + x[3] + '"' : '') + '><span class="material-symbols-outlined dsk-ic">' + x[1] + '</span>' + x[2] + '</a>';
+        }).join('') + '</div></div>';
+    }).join('');
   }
-  window.openNavDrawer = function () {
-    document.getElementById('navDrawerOverlay').classList.remove('hidden');
-    d.classList.remove('translate-x-full'); d.classList.add('gm-open');
-    document.body.classList.add('gm-drawer-open');
-  };
-  window.closeNavDrawer = function () {
-    document.getElementById('navDrawerOverlay').classList.add('hidden');
-    d.classList.add('translate-x-full'); d.classList.remove('gm-open');
-    document.body.classList.remove('gm-drawer-open');
-  };
-  document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && d.classList.contains('gm-open')) window.closeNavDrawer(); });
+  render();
 })();
 </script>
 <div id="gmOnlineSheet" class="hidden fixed inset-0 z-[300] items-end justify-center" style="background:rgba(12,10,7,.42);" onclick="if(event.target===this)gmCloseOnline()">
@@ -2526,6 +2419,8 @@ if ('serviceWorker' in navigator) {
     const n = rows.filter(r => r.online).length;
     document.getElementById('gmOnlineCount').textContent = n;
     document.getElementById('gmOnlineDot').style.background = n ? '#2E9E57' : '#B9AE97';
+    document.getElementById('gmOnlineCountDsk').textContent = n;
+    document.getElementById('gmOnlineDotDsk').style.background = n ? '#2E9E57' : '#B9AE97';
     if (!document.getElementById('gmOnlineSheet').classList.contains('hidden')) render();
   }
   function render() {
@@ -2548,6 +2443,8 @@ if ('serviceWorker' in navigator) {
     if (!me || me.role !== 'owner') return;
     const btn = document.getElementById('gmOnlineBtn');
     btn.classList.remove('hidden'); btn.classList.add('flex');
+    const dsk = document.getElementById('gmOnlineBtnDsk');
+    dsk.classList.remove('hidden'); dsk.classList.add('flex');
     refresh();
     setInterval(() => { if (!document.hidden) refresh(); }, 45000);
   })();

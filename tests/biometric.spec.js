@@ -79,6 +79,7 @@ test('website: turn on Face ID/fingerprint, then log in with it', async ({ page 
 
   await page.goto('/account-security-ar.html');
   await expect(page.locator('#bioToggleBtn')).toContainText('تفعيل');
+  await expect(page.locator('#bioToggleBtn')).toContainText(/تفعيل|إيقاف/);
   await page.click('#bioToggleBtn');
   await expect(page.locator('#bioSuccess')).toContainText('تم التفعيل');
   expect(db.t.passkeys).toHaveLength(1);
@@ -97,6 +98,7 @@ test('website: a passkey the server no longer knows is refused', async ({ page }
   const { db, minted } = await setup(page);
   await virtualFingerprint(page);
   await page.goto('/account-security-ar.html');
+  await expect(page.locator('#bioToggleBtn')).toContainText(/تفعيل|إيقاف/);
   await page.click('#bioToggleBtn');
   await expect(page.locator('#bioSuccess')).toContainText('تم التفعيل');
   db.t.passkeys.length = 0; // removed from the security page on another device
@@ -130,6 +132,7 @@ test('android app: turn on fingerprint, then log in with it', async ({ page }) =
   const { db, minted } = await setup(page);
   await fakeAndroid(page);
   await page.goto('/account-security-ar.html');
+  await expect(page.locator('#bioToggleBtn')).toContainText(/تفعيل|إيقاف/);
   await page.click('#bioToggleBtn');
   await expect(page.locator('#bioSuccess')).toContainText('تم التفعيل');
   expect(db.t.keys).toHaveLength(1);
@@ -147,6 +150,7 @@ test('android app: removed device key is refused and forgotten on the phone', as
   const { db, minted } = await setup(page);
   await fakeAndroid(page);
   await page.goto('/account-security-ar.html');
+  await expect(page.locator('#bioToggleBtn')).toContainText(/تفعيل|إيقاف/);
   await page.click('#bioToggleBtn');
   await expect(page.locator('#bioSuccess')).toContainText('تم التفعيل');
   db.t.keys.length = 0;
@@ -161,6 +165,7 @@ test('company switched it off: turning it on is refused with a clear message', a
   await setup(page, { allow: false });
   await fakeAndroid(page);
   await page.goto('/account-security-ar.html');
+  await expect(page.locator('#bioToggleBtn')).toContainText(/تفعيل|إيقاف/);
   await page.click('#bioToggleBtn');
   await expect(page.locator('#bioError')).toContainText('موقوف');
 });
