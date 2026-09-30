@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=29"></script>
-<script src="theme.js?v=34"></script>
+<script src="theme.js?v=35"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -307,6 +307,21 @@ async function saveEdit() {
     total_amount: newTotal,
     amount_paid: (newPaymentMethod === 'credit') ? 0 : newTotal
   };
+  // Sale invoices: money already received stays received. Only a fully paid
+  // invoice settles the difference in cash; otherwise the difference goes to
+  // the customer's debt on this invoice (and a total below what was paid is
+  // refunded). Before this, editing a part-paid invoice marked it fully paid
+  // and booked the whole total into the cashbox a second time.
+  let saleMoney = null;
+  if (invoice.type === 'sale') {
+    const oldPaid = Number(invoice.amount_paid || 0);
+    const oldRem = oldTotal - oldPaid;
+    const newPaid = newPaymentMethod === 'credit' ? 0 : oldRem <= 0.009 ? newTotal : Math.min(oldPaid, newTotal);
+    saleMoney = { cashDelta: newPaid - oldPaid, debtDelta: (newTotal - newPaid) - oldRem };
+    updatePayload.amount_paid = newPaid;
+    updatePayload.status = newTotal - newPaid > 0.009 ? 'unpaid' : 'paid';
+    if (oldRem > 0.009 && newPaymentMethod !== 'credit') updatePayload.payment_method = invoice.payment_method;
+  }
   if (invoice.type === 'sale' || invoice.type === 'return') {
     // customer editing left as-is (rare case) — only re-linkable via cancel+reissue
   } else if (invoice.type === 'buyRetail') {
@@ -389,11 +404,28 @@ async function saveEdit() {
   // Post the money/debt effect as TWO explicit dated entries — a full
   // removal of the old invoice value, then a full addition of the new
   // value — instead of one net delta. Never touches the original entry.
-  if (oldTotal > 0) {
+  if (saleMoney) {
+    const r2 = v => Math.round(v * 100) / 100;
+    if (Math.abs(saleMoney.cashDelta) > 0.009) {
+      await goldmindClient.from('cash_movements').insert({
+        store_id: GOLDMIND_STORE_ID, box: 'main', direction: saleMoney.cashDelta > 0 ? 'in' : 'out', amount: r2(Math.abs(saleMoney.cashDelta)),
+        description: (saleMoney.cashDelta > 0 ? 'تحصيل فرق تعديل فاتورة ' : 'رد فرق تعديل فاتورة ') + invoice.invoice_number,
+        created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id
+      });
+    }
+    if (Math.abs(saleMoney.debtDelta) > 0.009 && invoice.customer_id) {
+      await goldmindClient.from('customer_debts').insert({
+        store_id: GOLDMIND_STORE_ID, customer_id: invoice.customer_id, invoice_id: invoice.id,
+        movement_type: saleMoney.debtDelta > 0 ? 'debt_increase' : 'debt_decrease',
+        cash_amount: r2(Math.abs(saleMoney.debtDelta)), gold_grams_24k: 0, source: 'invoice_edit',
+        notes: 'تعديل فاتورة ' + invoice.invoice_number, created_by: GOLDMIND_STAFF_ID
+      });
+    }
+  } else if (oldTotal > 0) {
     await postLedgerEntry(invoice.type, invoice.payment_method, oldTotal, 'remove',
       'حذف قيمة فاتورة ' + invoice.invoice_number + ' (قبل التعديل)');
   }
-  if (newTotal > 0) {
+  if (!saleMoney && newTotal > 0) {
     await postLedgerEntry(invoice.type, newPaymentMethod, newTotal, 'add',
       'إضافة قيمة فاتورة ' + invoice.invoice_number + ' (بعد التعديل)');
   }

@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=29"></script>
-<script src="theme.js?v=34"></script>
+<script src="theme.js?v=35"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -145,6 +145,9 @@
 <button onclick="toggleOpeningBalanceForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
 <span class="material-symbols-outlined text-[19px]">history</span> رصيد سابق
 </button>
+<a id="depositLink" href="deposits-ar.html" class="col-span-2 h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[12px]">
+<span class="material-symbols-outlined text-[19px]">bookmark_added</span> سند عربون لحجز قطعة
+</a>
 </div>
 <a id="printStatementLink" href="#" target="_blank" class="w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">print</span> طباعة كشف حساب
@@ -156,6 +159,12 @@
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form">
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ المدفوع</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="settle-amount" step="0.01" type="number"/>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="settle-method">طريقة الدفع</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 mb-3 text-[13px]" id="settle-method">
+<option value="cash">نقداً — تدخل الصندوق اليومي</option>
+<option value="bank">تحويل بنكي / بطاقة</option>
+</select>
+<p class="text-[11px] text-on-surface-variant mb-3">تُخصم الدفعة من فواتير العميل غير المدفوعة، الأقدم أولاً.</p>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="settle-notes" placeholder="ملاحظة (اختياري)"></textarea>
 <button onclick="submitSettlement()" id="settle-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الدفعة</button>
 <p class="text-error text-[12px] hidden mt-2" id="settle-error"></p>
@@ -230,6 +239,8 @@ const MOVEMENT_LABELS = { debt_increase: 'فاتورة بيع بالدين', deb
 
 function movementLabel(m) {
   if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
+  if (m.source === 'deposit') return 'عربون';
+  if (m.source === 'deposit_refund') return 'استرجاع عربون';
   return MOVEMENT_LABELS[m.movement_type] || m.movement_type;
 }
 
@@ -244,7 +255,7 @@ async function load() {
 
   const [{ data: customerRows, error: cErr }, { data: moveRows, error: mErr }] = await Promise.all([
     goldmindClient.from('customers').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
-    goldmindClient.from('customer_debts').select('*, invoice:invoice_id(invoice_number)').eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false })
+    goldmindClient.from('customer_debts').select('*, invoice:invoice_id(invoice_number)').eq('store_id', GOLDMIND_STORE_ID).or('source.is.null,source.neq.allocation').order('created_at', { ascending: false })
   ]);
 
   document.getElementById('loading-state').classList.add('hidden');
@@ -342,6 +353,7 @@ function showCustomerDetail(customerId) {
   document.getElementById('opening-balance-form').classList.add('hidden');
   document.getElementById('printStatementLink').href = 'customer-debts-print-ar.html?id=' + customerId;
   document.getElementById('editCustomerLink').href = 'customer-edit-ar.html?id=' + customerId;
+  document.getElementById('depositLink').href = 'deposits-ar.html?customer=' + customerId;
 
   document.getElementById('detail-customer-name').textContent = customer.name;
   document.getElementById('detail-customer-phone').textContent = customer.phone || '';
@@ -521,27 +533,10 @@ async function submitSettlement() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.from('customer_debts').insert({
-    store_id: GOLDMIND_STORE_ID,
-    customer_id: currentCustomerId,
-    movement_type: 'debt_decrease',
-    cash_amount: amount,
-    gold_grams_24k: 0,
-    notes: notes || 'دفعة يدوية',
-    created_by: GOLDMIND_STAFF_ID
+  const { error } = await goldmindClient.rpc('record_customer_payment', {
+    p_customer: currentCustomerId, p_amount: amount,
+    p_method: document.getElementById('settle-method').value, p_notes: notes || null
   });
-
-  if (!error) {
-    // Payment collected -> also reflect in the daily cash box
-    await goldmindClient.from('cash_movements').insert({
-      store_id: GOLDMIND_STORE_ID,
-      box: 'main',
-      direction: 'in',
-      amount: amount,
-      description: 'تحصيل دين عميل',
-      created_by: GOLDMIND_STAFF_ID
-    });
-  }
 
   btn.disabled = false;
   btn.textContent = 'حفظ الدفعة';

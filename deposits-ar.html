@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>سندات العربون | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=29"></script>
+<script src="theme.js?v=35"></script>
+<script src="gm-report.js?v=1"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    #voucher { background: #fff; color: #111; }
+    #voucher table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    #voucher th, #voucher td { border: 1px solid #ccc; padding: 6px; text-align: right; }
+    @media print {
+      body > *:not(#voucher-modal) { display: none !important; }
+      #voucher-modal { position: static !important; background: none !important; display: block !important; padding: 0 !important; }
+      #voucher-modal .no-print { display: none !important; }
+      #voucher { box-shadow: none !important; max-width: none !important; }
+      @page { size: A5; margin: 10mm; }
+    }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('customer-debts-ar.html')" aria-label="رجوع" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">سندات العربون</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية تسجيل العربون.</div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-5">
+<p class="text-[12px] text-on-surface-variant leading-5">العربون مبلغ يدفعه العميل لحجز قطعة. يدخل المبلغ إلى الصندوق اليومي ويُسجَّل رصيداً للعميل، ويُخصم تلقائياً من فاتورته عند الشراء. يستلم العميل سنداً مطبوعاً يضمن حقه.</p>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
+<h2 class="font-semibold text-[13px]">سند عربون جديد</h2>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="customer-input">العميل</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="customer-input" list="customers-dl" placeholder="اكتب اسم العميل أو رقم هاتفه" autocomplete="off"/>
+<datalist id="customers-dl"></datalist>
+<p class="text-[11px] text-on-surface-variant mt-1">إن لم يكن العميل مسجّلاً <a href="customer-add-ar.html" class="text-primary underline">أضفه أولاً</a>.</p>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="amount-input">مبلغ العربون</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 font-data-mono text-right" dir="ltr" id="amount-input" placeholder="0.00" step="0.01" type="number" inputmode="decimal"/>
+</div>
+<div>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="method-input">طريقة الدفع</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-[13px]" id="method-input">
+<option value="cash">نقداً</option>
+<option value="bank">تحويل / بطاقة</option>
+</select>
+</div>
+</div>
+
+<div>
+<div class="flex items-center justify-between mb-1">
+<span class="text-[11px] font-semibold text-on-surface-variant">القطع المحجوزة</span>
+<button type="button" onclick="addItemRow()" class="text-[12px] text-primary font-semibold flex items-center gap-1"><span class="material-symbols-outlined">add</span>إضافة قطعة</button>
+</div>
+<div id="items" class="flex flex-col gap-2"></div>
+</div>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-right text-[13px]" id="notes-input" placeholder="ملاحظات للعميل (اختياري) — مثال: موعد الاستلام، شروط الحجز"></textarea>
+<button onclick="saveDeposit()" id="save-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md" type="button">حفظ العربون وطباعة السند</button>
+<p class="text-error text-[12px] hidden text-center" id="save-error"></p>
+</div>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="px-4 py-3 border-b border-outline-variant flex items-center justify-between">
+<h2 class="font-semibold text-[13px]">السندات</h2>
+<span class="text-[12px] text-on-surface-variant" id="list-total"></span>
+</div>
+<div id="list" class="divide-y divide-outline-variant"></div>
+</div>
+</div>
+</main>
+
+<div id="voucher-modal" class="hidden fixed inset-0 z-[70] bg-black/60 overflow-y-auto p-4">
+<div class="max-w-md mx-auto flex flex-col gap-3">
+<div class="no-print flex gap-2">
+<button type="button" onclick="window.print()" class="flex-1 h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined">print</span>طباعة</button>
+<button type="button" id="pdf-btn" onclick="voucherPdf(this)" class="flex-1 h-11 bg-white text-primary border border-primary rounded-lg text-sm font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined">picture_as_pdf</span>PDF / مشاركة</button>
+<button type="button" onclick="closeVoucher()" aria-label="إغلاق" class="w-11 h-11 bg-white rounded-lg flex items-center justify-center"><span class="material-symbols-outlined">close</span></button>
+</div>
+<div id="voucher" class="rounded-xl shadow-lg p-5 text-[13px] leading-6"></div>
+</div>
+</div>
+
+<script>
+let STORE = {}, CUSTOMERS = [], DEPOSITS = [], CUR = '', OPEN = null;
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+const money = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CUR;
+const custLabel = c => c.name + (c.phone ? ' — ' + c.phone : '');
+
+function addItemRow(it) {
+  it = it || {};
+  const row = document.createElement('div');
+  row.className = 'item-row grid grid-cols-6 gap-1 p-2 rounded-lg bg-surface-container-low';
+  row.innerHTML = `
+    <input class="col-span-6 h-10 border border-outline-variant rounded-lg px-2 text-right text-[13px]" data-f="description" placeholder="وصف القطعة — مثال: طقم ألماس، سوار حرف س" value="${esc(it.description)}"/>
+    <input class="col-span-2 h-10 border border-outline-variant rounded-lg px-2 font-data-mono text-[12px]" dir="ltr" data-f="barcode" placeholder="الباركود" value="${esc(it.barcode)}"/>
+    <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="karat" placeholder="عيار" type="number" value="${esc(it.karat)}"/>
+    <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="weight" placeholder="غرام" type="number" step="0.01" value="${esc(it.weight)}"/>
+    <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="price" placeholder="السعر" type="number" step="0.01" value="${esc(it.price)}"/>
+    <button type="button" aria-label="حذف القطعة" onclick="this.parentElement.remove()" class="col-span-1 h-10 text-error flex items-center justify-center"><span class="material-symbols-outlined">delete</span></button>`;
+  document.getElementById('items').appendChild(row);
+}
+
+function readItems() {
+  return Array.from(document.querySelectorAll('.item-row')).map(r => {
+    const o = {};
+    r.querySelectorAll('[data-f]').forEach(i => { const v = i.value.trim(); if (v !== '') o[i.dataset.f] = ['karat', 'weight', 'price'].includes(i.dataset.f) ? Number(v) : v; });
+    return o;
+  }).filter(o => o.description || o.barcode);
+}
+
+function findCustomer(text) {
+  const t = (text || '').trim();
+  return CUSTOMERS.find(c => custLabel(c) === t) || CUSTOMERS.find(c => c.name === t) || null;
+}
+
+async function saveDeposit() {
+  const err = document.getElementById('save-error');
+  err.classList.add('hidden');
+  const fail = m => { err.textContent = m; err.classList.remove('hidden'); };
+  const cust = findCustomer(document.getElementById('customer-input').value);
+  const amount = parseFloat(document.getElementById('amount-input').value);
+  const items = readItems();
+  if (!cust) return fail('اختر العميل من القائمة');
+  if (!(amount > 0)) return fail('أدخل مبلغ العربون');
+  if (!items.length) return fail('اكتب وصف القطعة المحجوزة على الأقل');
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  const { data, error } = await goldmindClient.rpc('create_customer_deposit', { p: {
+    customer_id: cust.id, amount, method: document.getElementById('method-input').value, items,
+    notes: document.getElementById('notes-input').value.trim()
+  } });
+  btn.disabled = false; btn.textContent = 'حفظ العربون وطباعة السند';
+  if (error) return fail('تعذّر الحفظ: ' + error.message);
+  document.getElementById('amount-input').value = '';
+  document.getElementById('notes-input').value = '';
+  document.getElementById('items').innerHTML = '';
+  addItemRow();
+  await loadDeposits();
+  showVoucher(data.id);
+}
+
+async function loadDeposits() {
+  const { data, error } = await goldmindClient.from('customer_deposits')
+    .select('*, customer:customer_id(name, phone), staff:created_by(full_name)')
+    .eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }).limit(200);
+  const list = document.getElementById('list');
+  if (error) { list.innerHTML = `<p class="p-4 text-error text-sm">${esc(error.message)}</p>`; return; }
+  DEPOSITS = data || [];
+  const active = DEPOSITS.filter(d => d.status === 'active');
+  document.getElementById('list-total').textContent = active.length ? 'قائمة: ' + money(active.reduce((s, d) => s + Number(d.amount), 0)) : '';
+  list.innerHTML = DEPOSITS.length ? DEPOSITS.map(d => `
+    <button type="button" onclick="showVoucher('${d.id}')" class="w-full text-right p-3 flex items-center gap-3 ${d.status === 'refunded' ? 'opacity-50' : ''}">
+      <span class="material-symbols-outlined text-secondary">bookmark_added</span>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-[13px]">${esc(d.customer && d.customer.name)} <span class="font-data-mono text-on-surface-variant font-normal" dir="ltr">${esc(d.deposit_number)}</span></div>
+        <div class="text-[11px] text-on-surface-variant truncate">${esc((d.items || []).map(i => i.description || i.barcode).join('، '))} · ${gmFormatDateTime(d.created_at)}</div>
+      </div>
+      <div class="text-left">
+        <div class="font-bold font-data-mono text-[13px]">${money(d.amount)}</div>
+        <div class="text-[11px]">${d.status === 'refunded' ? 'مُسترجَع' : 'قائم'}</div>
+      </div>
+    </button>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد سندات عربون بعد.</p>';
+}
+
+function showVoucher(id) {
+  const d = DEPOSITS.find(x => x.id === id);
+  if (!d) return;
+  OPEN = d;
+  const items = d.items || [];
+  const priced = items.reduce((s, i) => s + (Number(i.price) || 0), 0);
+  document.getElementById('voucher').innerHTML = `
+    <div class="flex items-center justify-between gap-3 border-b pb-3 mb-3">
+      <div>
+        <div class="font-bold text-[16px]">${esc(STORE.name)}</div>
+        ${STORE.address ? `<div class="text-[11px]">${esc(STORE.address)}</div>` : ''}
+        ${STORE.phone ? `<div class="text-[11px]" dir="ltr" style="text-align:right">${esc(STORE.phone)}</div>` : ''}
+      </div>
+      ${STORE.logo_url ? `<img src="${esc(STORE.logo_url)}" alt="" style="max-height:56px;max-width:110px" crossorigin="anonymous"/>` : ''}
+    </div>
+    <div class="text-center font-bold text-[17px] mb-1">سند قبض عربون</div>
+    <div class="flex justify-between text-[12px] mb-3"><span>رقم السند: <b dir="ltr">${esc(d.deposit_number)}</b></span><span>التاريخ: <bdi dir="ltr">${gmFormatDateTime(d.created_at)}</bdi></span></div>
+    ${d.status === 'refunded' ? '<div class="text-center font-bold text-red-700 border border-red-700 rounded mb-3">مُسترجَع — أُعيد المبلغ للعميل</div>' : ''}
+    <div class="mb-3">استلمنا من السيد/السيدة: <b>${esc(d.customer && d.customer.name)}</b>${d.customer && d.customer.phone ? ` — <bdi dir="ltr">${esc(d.customer.phone)}</bdi>` : ''}</div>
+    <div class="mb-3 p-2 rounded border text-center">مبلغ وقدره <b class="text-[16px]">${money(d.amount)}</b> ${d.method === 'bank' ? '(تحويل / بطاقة)' : '(نقداً)'}<br/>عربوناً لحجز القطع التالية:</div>
+    <table class="mb-3"><thead><tr><th>#</th><th>القطعة</th><th>الباركود</th><th>العيار</th><th>الوزن</th><th>السعر المتفق عليه</th></tr></thead><tbody>
+      ${items.map((i, n) => `<tr><td>${n + 1}</td><td>${esc(i.description)}</td><td dir="ltr">${esc(i.barcode)}</td><td>${i.karat ? esc(i.karat) : ''}</td><td>${i.weight ? esc(i.weight) + ' غ' : ''}</td><td>${i.price ? money(i.price) : ''}</td></tr>`).join('')}
+    </tbody></table>
+    ${priced > 0 ? `<div class="flex justify-between mb-1"><span>السعر الإجمالي المتفق عليه</span><b>${money(priced)}</b></div>
+      <div class="flex justify-between mb-1"><span>العربون المدفوع</span><b>${money(d.amount)}</b></div>
+      <div class="flex justify-between mb-3 border-t pt-1"><span>المتبقي عند الاستلام</span><b>${money(priced - Number(d.amount))}</b></div>` : ''}
+    ${d.notes ? `<div class="mb-3 text-[12px]">ملاحظات: ${esc(d.notes)}</div>` : ''}
+    <div class="text-[11px] text-gray-600 mb-6">يُخصم هذا العربون من قيمة الفاتورة عند استلام القطع. يُرجى الاحتفاظ بهذا السند.</div>
+    <div class="flex justify-between text-[12px]"><span>المستلم: ${esc(d.staff && d.staff.full_name)}</span><span>توقيع العميل: ..................</span></div>
+    ${d.status === 'active' ? `<button type="button" onclick="refundDeposit()" class="no-print mt-5 w-full h-10 border border-error text-error rounded-lg text-[12px] font-semibold">استرجاع العربون للعميل (يخرج المبلغ من الصندوق)</button>` : ''}`;
+  const m = document.getElementById('voucher-modal');
+  m.classList.remove('hidden');
+}
+function closeVoucher() { document.getElementById('voucher-modal').classList.add('hidden'); OPEN = null; }
+
+async function voucherPdf(btn) {
+  if (!OPEN) return;
+  await gmReportPdf(document.getElementById('voucher'), 'عربون-' + OPEN.deposit_number + '.pdf', btn);
+}
+
+async function refundDeposit() {
+  if (!OPEN || !confirm('استرجاع العربون ' + OPEN.deposit_number + ' بقيمة ' + money(OPEN.amount) + ' للعميل؟ سيخرج المبلغ من الصندوق.')) return;
+  const { error } = await goldmindClient.rpc('refund_customer_deposit', { p_deposit: OPEN.id });
+  if (error) { alert('تعذّر: ' + error.message); return; }
+  const id = OPEN.id;
+  await loadDeposits();
+  showVoucher(id);
+}
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const [{ data: me }, { data: store }, custRes] = await Promise.all([
+    goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+    goldmindClient.from('stores').select('name, address, phone, logo_url, currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone').eq('store_id', GOLDMIND_STORE_ID).order('name'))
+  ]);
+  document.getElementById('loading-state').classList.add('hidden');
+  const perms = (me && me.permissions) || {};
+  const owner = me && me.role === 'owner';
+  if (!(owner || perms.edit_customers === true || perms.manage_daily_cashbox === true)) {
+    document.getElementById('no-access').classList.remove('hidden');
+    return;
+  }
+  STORE = store || {};
+  const code = (STORE.currency || 'AED').toUpperCase();
+  CUR = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س' })[code] || code;
+  CUSTOMERS = custRes.data || [];
+  document.getElementById('customers-dl').innerHTML = CUSTOMERS.map(c => `<option value="${esc(custLabel(c))}"></option>`).join('');
+  const pre = new URLSearchParams(location.search).get('customer');
+  const c = pre && CUSTOMERS.find(x => x.id === pre);
+  if (c) document.getElementById('customer-input').value = custLabel(c);
+  addItemRow();
+  document.getElementById('page-content').classList.remove('hidden');
+  loadDeposits();
+})();
+</script>
+</body></html>

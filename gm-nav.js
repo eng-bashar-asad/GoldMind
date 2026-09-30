@@ -21,6 +21,7 @@
       ['invoices-archive-ar.html', 'inventory', 'الأرشيف الشامل', 'view_invoices'],
       ['customer-add-ar.html', 'person_add', 'إضافة عميل', 'add_customers'],
       ['customer-debts-ar.html', 'groups', 'العملاء — الديون وكشف الحساب', 'view_customers'],
+      ['deposits-ar.html', 'bookmark_added', 'سندات العربون', 'edit_customers|manage_daily_cashbox'],
       ['repairs-ar.html', 'build', 'الصيانة والتصليح', 'view_repairs'] ] },
     { t: 'المستودعات', i: 'inventory_2', l: [
       ['inventory-list-ar.html', 'inventory_2', 'المخزن', 'view_inventory'],
@@ -34,8 +35,8 @@
       ['diamond-stock-production-ar.html', 'diamond', 'إنتاج قطع الألماس', 'add_piece'] ] },
     { t: 'المالية', i: 'account_balance_wallet', l: [
       ['daily-cashbox-ar.html', 'point_of_sale', 'الصندوق اليومي', 'manage_daily_cashbox'],
-      ['expense-entry-ar.html', 'receipt', 'المصاريف', 'manage_daily_cashbox'],
-      ['gifts-ar.html', 'redeem', 'إخراج هدايا', 'give_gifts'],
+      ['expense-entry-ar.html', 'receipt', 'المصاريف', 'manage_daily_cashbox|view_profit_report|give_gifts'],
+      ['expense-entry-ar.html?type=gifts', 'redeem', 'إخراج هدايا', 'give_gifts'],
       ['main-cashbox-ar.html', 'account_balance', 'الصندوق الرئيسي', 'manage_daily_cashbox'],
       ['ledger-ar.html', 'handshake', 'حسابات التجار', 'view_traders'],
       ['company-balances-ar.html', 'account_balance', 'أرصدة الشركة', 'view_reports'],
@@ -194,7 +195,7 @@
       }
       if (me.role === 'owner') return;
       var perms = me.permissions || {};
-      document.querySelectorAll('[data-nav-perm]').forEach(function (a) { if (!perms[a.getAttribute('data-nav-perm')]) a.style.display = 'none'; });
+      document.querySelectorAll('[data-nav-perm]').forEach(function (a) { if (!a.getAttribute('data-nav-perm').split('|').some(function (k) { return perms[k]; })) a.style.display = 'none'; });
     } catch (e) { /* menu stays complete */ }
   }
 

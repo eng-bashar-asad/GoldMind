@@ -8,11 +8,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>مصروف جديد | GoldMind</title>
+<title>المصاريف | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=29"></script>
-<script src="theme.js?v=34"></script>
+<script src="theme.js?v=35"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -35,189 +35,315 @@
 <style>
     html { font-size: 87.5%; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .cat-chip { height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--gm-outline-variant); font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .cat-chip.on { background: var(--gm-primary); color: var(--gm-on-primary); border-color: var(--gm-primary); }
 </style>
-<style> body { min-height: max(884px, 100dvh); } </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
 <header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
 <div class="flex justify-between items-center px-4 w-full h-16">
 <div class="flex items-center gap-4">
-<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<button onclick="gmSmartBack('index-ar.html')" aria-label="رجوع" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
 </button>
-<h1 class="font-headline-md text-headline-md font-bold">مصروف جديد</h1>
+<h1 class="font-headline-md text-headline-md font-bold">المصاريف</h1>
 </div>
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية تسجيل المصاريف.</div>
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-5">
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-<label class="block text-[12px] font-semibold text-on-surface-variant mb-2" for="category-select">خانة المصروف</label>
-<div class="flex gap-2 mb-2">
-<select class="flex-1 h-12 border border-outline-variant rounded-lg px-3 text-right" id="category-select">
-<option value="">— اختر خانة —</option>
-</select>
-<button onclick="toggleNewCategoryForm()" class="w-12 h-12 border border-primary text-primary rounded-lg flex items-center justify-center" type="button">
-<span class="material-symbols-outlined">add</span>
-</button>
+<div class="flex items-center justify-between mb-2">
+<h2 class="text-[12px] font-semibold text-on-surface-variant">نوع المصروف</h2>
+<button type="button" onclick="toggleManage()" class="text-[12px] text-primary font-semibold" id="manage-btn">إدارة الأنواع</button>
 </div>
-<div class="hidden flex gap-2" id="new-category-form">
-<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-right" id="new-category-name" placeholder="اسم خانة جديدة"/>
-<button onclick="saveNewCategory()" class="h-11 px-4 bg-primary text-white rounded-lg text-[13px] font-semibold" type="button">حفظ</button>
+<div id="cats" class="flex flex-wrap gap-2"></div>
+<div class="hidden flex gap-2 mt-3" id="new-cat-form">
+<input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-right" id="new-cat-name" placeholder="اسم نوع جديد — مثال: إيجار، كهرباء، ضيافة"/>
+<button onclick="saveCategory()" class="h-11 px-4 bg-primary text-on-primary rounded-lg text-[13px] font-semibold" type="button">إضافة</button>
 </div>
+<div class="hidden mt-3 flex flex-col gap-2" id="manage-list"></div>
 </div>
 
+<!-- ordinary expense -->
+<div id="money-form" class="hidden flex flex-col gap-4">
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-2" for="amount-input">المبلغ</label>
-<input class="w-full h-12 border border-outline-variant rounded-lg px-3 font-data-mono text-right mb-4" dir="ltr" id="amount-input" placeholder="0.00" step="0.01" type="number"/>
-<label class="block text-[12px] font-semibold text-on-surface-variant mb-2" for="desc-input">الوصف / السبب</label>
-<textarea class="w-full h-20 border border-outline-variant rounded-lg px-3 py-2 text-right" id="desc-input" placeholder="مثال: فاتورة كهرباء شهر أغسطس"></textarea>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 font-data-mono text-right mb-4" dir="ltr" id="amount-input" placeholder="0.00" step="0.01" type="number" inputmode="decimal"/>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-2" for="desc-input">الوصف (اختياري)</label>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-right" id="desc-input" placeholder="مثال: فاتورة كهرباء شهر أيلول"></textarea>
+<label class="flex items-center gap-2 mt-3 text-[13px]"><input type="checkbox" id="from-cashbox" checked class="w-5 h-5 rounded"/> دُفع من الصندوق اليومي (يُخصم من الصندوق)</label>
 </div>
-
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <h2 class="font-semibold text-[13px] mb-2">إرفاق مستند (اختياري)</h2>
-<p class="text-[11px] text-outline mb-2">صورة أو PDF للفاتورة أو الإيصال — لتوثيق المصروف قانونياً.</p>
 <input accept="image/*,application/pdf" class="hidden" id="attachment-input" type="file"/>
 <button onclick="document.getElementById('attachment-input').click()" class="w-full h-12 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-on-surface-variant" type="button">
 <span class="material-symbols-outlined">attach_file</span> <span id="attachment-label">اختر ملف</span>
 </button>
 </div>
+<button onclick="saveExpense()" id="save-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md" type="button">حفظ المصروف</button>
+</div>
 
-<button onclick="saveExpense()" id="save-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md">حفظ المصروف</button>
+<!-- gifts: pieces leave stock, their cost is the expense -->
+<div id="gift-form" class="hidden flex flex-col gap-4">
+<p class="text-[12px] text-on-surface-variant leading-5">القطع تخرج من المخزن دون فاتورة بيع، وتُسجَّل كلفتها (الذهب بسعر اليوم على الوزن المحاسبي + المصنعية) مصروفاً من نوع «هدايا». لا تؤثر على أرباح الفواتير ولا على الصندوق.</p>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
+<h2 class="font-semibold text-[13px]">القطع</h2>
+<div class="flex gap-2">
+<input class="flex-1 h-12 px-4 border border-outline-variant rounded-lg font-data-mono text-right" dir="ltr" id="barcode-input" placeholder="امسح أو اكتب الباركود" type="text"/>
+<button onclick="addGiftPiece()" aria-label="إضافة القطعة" class="w-12 h-12 bg-primary text-on-primary rounded-lg flex items-center justify-center" type="button"><span class="material-symbols-outlined">add</span></button>
+</div>
+<p class="text-error text-[12px] hidden" id="piece-error"></p>
+<div id="basket" class="flex flex-col gap-2"></div>
+<div id="basket-total" class="hidden p-3 rounded-lg bg-amber-50 border border-amber-200 text-[13px] text-amber-900 flex justify-between"></div>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
+<h2 class="font-semibold text-[13px]">لمن الهدية؟</h2>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="recipient-input" placeholder="اسم الشخص أو الجهة"/>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="reason-input" placeholder="المناسبة / السبب (اختياري)"/>
+</div>
+<button onclick="saveGifts()" id="gift-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md" type="button">إخراج كهدية</button>
+</div>
+
 <p class="text-error text-[12px] hidden text-center" id="save-error"></p>
 <p class="text-success text-[12px] hidden text-center" id="save-success"></p>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="px-4 py-3 border-b border-outline-variant flex items-center justify-between gap-2">
+<h2 class="font-semibold text-[13px]">مصاريف آخر 30 يوماً</h2>
+<span class="text-[12px] font-bold" id="list-total"></span>
+</div>
+<div id="list" class="divide-y divide-outline-variant"></div>
+</div>
 
 </div>
 </main>
 
 <script>
-let attachmentFile = null;
+const GIFT = 'هدايا';
+let CATS = [], selected = null, basket = [], PRICES = {}, CUR = '', canExpense = false, canGift = false, attachmentFile = null;
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+const n = (v, d = 2) => Number(v || 0).toFixed(d);
+const money = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CUR;
+const $ = id => document.getElementById(id);
+function msg(id, text) { ['save-error', 'save-success'].forEach(x => $(x).classList.add('hidden')); if (text) { $(id).textContent = text; $(id).classList.remove('hidden'); } }
 
-document.getElementById('attachment-input').addEventListener('change', (e) => {
-  const file = e.target.files && e.target.files[0];
-  attachmentFile = file || null;
-  document.getElementById('attachment-label').textContent = file ? file.name : 'اختر ملف';
+$('attachment-input').addEventListener('change', e => {
+  attachmentFile = (e.target.files && e.target.files[0]) || null;
+  $('attachment-label').textContent = attachmentFile ? attachmentFile.name : 'اختر ملف';
 });
-
-function toggleNewCategoryForm() {
-  document.getElementById('new-category-form').classList.toggle('hidden');
-}
+$('barcode-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGiftPiece(); });
 
 async function loadCategories() {
-  const { data, error } = await goldmindClient
-    .from('expense_categories').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name');
-
-  const select = document.getElementById('category-select');
-  select.innerHTML = '<option value="">— اختر خانة —</option>' +
-    (data || []).map(c => `<option value="${c.id}">${gmEscapeHtml(c.name)}</option>`).join('');
+  const { data } = await goldmindClient.from('expense_categories').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name');
+  CATS = (data || []).filter(c => c.name !== GIFT || canGift);
+  if (canGift && !CATS.some(c => c.name === GIFT)) CATS.unshift({ id: 'gift', name: GIFT });
+  if (!canExpense) CATS = CATS.filter(c => c.name === GIFT);
+  CATS.sort((a, b) => (a.name === GIFT) - (b.name === GIFT));
+  renderCats();
 }
 
-async function saveNewCategory() {
-  const name = document.getElementById('new-category-name').value.trim();
-  if (!name) { alert('فضلاً أدخل اسم الخانة'); return; }
+function renderCats() {
+  $('cats').innerHTML = CATS.map(c => `<button type="button" class="cat-chip ${selected && selected.id === c.id ? 'on' : ''}" onclick="pickCat('${c.id}')">${c.name === GIFT ? '🎁 ' : ''}${esc(c.name)}</button>`).join('') +
+    (canExpense ? '<button type="button" class="cat-chip" onclick="$(\'new-cat-form\').classList.toggle(\'hidden\')">+ نوع جديد</button>' : '');
+  $('manage-btn').classList.toggle('hidden', !canExpense);
+  $('manage-list').innerHTML = CATS.filter(c => c.name !== GIFT).map(c => `
+    <div class="flex gap-2 items-center">
+      <input class="flex-1 h-10 border border-outline-variant rounded-lg px-3 text-right text-[13px]" value="${esc(c.name)}" data-id="${c.id}"/>
+      <button type="button" onclick="renameCategory('${c.id}', this)" class="h-10 px-3 rounded-lg border border-primary text-primary text-[12px] font-semibold">حفظ</button>
+      <button type="button" onclick="deleteCategory('${c.id}')" aria-label="حذف ${esc(c.name)}" class="h-10 w-10 rounded-lg text-error flex items-center justify-center"><span class="material-symbols-outlined">delete</span></button>
+    </div>`).join('') || '<p class="text-[12px] text-on-surface-variant">لا توجد أنواع بعد.</p>';
+}
 
-  const { data, error } = await goldmindClient
-    .from('expense_categories').insert({ store_id: GOLDMIND_STORE_ID, name }).select().single();
+function pickCat(id) {
+  selected = CATS.find(c => c.id === id) || null;
+  msg();
+  renderCats();
+  const gift = selected && selected.name === GIFT;
+  $('money-form').classList.toggle('hidden', !selected || gift);
+  $('gift-form').classList.toggle('hidden', !gift);
+  if (gift) setTimeout(() => $('barcode-input').focus(), 50);
+}
 
+function toggleManage() { $('manage-list').classList.toggle('hidden'); }
+
+async function saveCategory() {
+  const name = $('new-cat-name').value.trim();
+  if (!name) return;
+  const { data, error } = await goldmindClient.rpc('save_expense_category', { p_store: GOLDMIND_STORE_ID, p_name: name });
   if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
-
+  $('new-cat-name').value = '';
+  $('new-cat-form').classList.add('hidden');
   await loadCategories();
-  document.getElementById('category-select').value = data.id;
-  document.getElementById('new-category-form').classList.add('hidden');
-  document.getElementById('new-category-name').value = '';
+  pickCat(data);
+}
+async function renameCategory(id, btn) {
+  const name = btn.parentElement.querySelector('input').value.trim();
+  const { error } = await goldmindClient.rpc('save_expense_category', { p_store: GOLDMIND_STORE_ID, p_name: name, p_id: id });
+  if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+  await loadCategories(); loadList();
+}
+async function deleteCategory(id) {
+  const c = CATS.find(x => x.id === id);
+  if (!c || !confirm('حذف نوع المصروف «' + c.name + '»؟')) return;
+  const { error } = await goldmindClient.rpc('delete_expense_category', { p_id: id });
+  if (error) { alert(error.message); return; }
+  if (selected && selected.id === id) selected = null;
+  await loadCategories(); pickCat(selected && selected.id);
 }
 
 async function saveExpense() {
-  const categoryId = document.getElementById('category-select').value;
-  const amount = parseFloat(document.getElementById('amount-input').value);
-  const desc = document.getElementById('desc-input').value.trim();
-  const errEl = document.getElementById('save-error');
-  const okEl = document.getElementById('save-success');
-  errEl.classList.add('hidden');
-  okEl.classList.add('hidden');
-
-  if (!categoryId) { errEl.textContent = 'فضلاً اختر خانة المصروف'; errEl.classList.remove('hidden'); return; }
-  if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
-  if (!desc) { errEl.textContent = 'فضلاً اكتب وصفاً للمصروف'; errEl.classList.remove('hidden'); return; }
-
-  const btn = document.getElementById('save-btn');
-  btn.disabled = true;
-  btn.textContent = 'جارِ الحفظ...';
-
+  const amount = parseFloat($('amount-input').value);
+  if (!selected) return msg('save-error', 'اختر نوع المصروف');
+  if (!(amount > 0)) return msg('save-error', 'أدخل مبلغاً صحيحاً');
+  const btn = $('save-btn');
+  btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
   let attachmentUrl = null;
   if (attachmentFile) {
     const ext = (attachmentFile.name.split('.').pop() || 'bin').toLowerCase();
     const path = GOLDMIND_STORE_ID + '/expense-' + Date.now() + '.' + ext;
-    const { error: uploadError } = await goldmindClient.storage
-      .from('invoice-attachments').upload(path, attachmentFile, { upsert: false });
-    if (uploadError) {
-      btn.disabled = false;
-      btn.textContent = 'حفظ المصروف';
-      errEl.textContent = 'تعذّر رفع المرفق: ' + uploadError.message;
-      errEl.classList.remove('hidden');
-      return;
-    }
-    const { data: publicUrlData } = goldmindClient.storage.from('invoice-attachments').getPublicUrl(path);
-    attachmentUrl = publicUrlData ? publicUrlData.publicUrl : null;
+    const { error: upErr } = await goldmindClient.storage.from('invoice-attachments').upload(path, attachmentFile, { upsert: false });
+    if (upErr) { btn.disabled = false; btn.textContent = 'حفظ المصروف'; return msg('save-error', 'تعذّر رفع المرفق: ' + upErr.message); }
+    attachmentUrl = goldmindClient.storage.from('invoice-attachments').getPublicUrl(path).data.publicUrl;
   }
-
-  const { error } = await goldmindClient.from('expense_entries').insert({
-    store_id: GOLDMIND_STORE_ID,
-    category_id: categoryId,
-    amount: amount,
-    description: desc,
-    attachment_url: attachmentUrl,
-    created_by: GOLDMIND_STAFF_ID
-  });
-
-  if (error) {
-    btn.disabled = false;
-    btn.textContent = 'حفظ المصروف';
-    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
-    errEl.classList.remove('hidden');
-    return;
-  }
-
-  // Also record as a cash-out movement so the daily cash box reflects it
-  await goldmindClient.from('cash_movements').insert({
-    store_id: GOLDMIND_STORE_ID,
-    box: 'main',
-    direction: 'out',
-    amount: amount,
-    description: 'مصروف: ' + desc,
-    created_by: GOLDMIND_STAFF_ID
-  });
-
-  okEl.textContent = 'تم حفظ المصروف بنجاح';
-  okEl.classList.remove('hidden');
-  document.getElementById('amount-input').value = '';
-  document.getElementById('desc-input').value = '';
-  attachmentFile = null;
-  document.getElementById('attachment-label').textContent = 'اختر ملف';
-  btn.disabled = false;
-  btn.textContent = 'حفظ المصروف';
+  const { error } = await goldmindClient.rpc('record_expense', { p: {
+    store_id: GOLDMIND_STORE_ID, category_id: selected.id, amount, description: $('desc-input').value.trim(),
+    attachment_url: attachmentUrl, from_daily_cashbox: $('from-cashbox').checked
+  } });
+  btn.disabled = false; btn.textContent = 'حفظ المصروف';
+  if (error) return msg('save-error', 'تعذّر الحفظ: ' + error.message);
+  msg('save-success', 'تم حفظ المصروف' + ($('from-cashbox').checked ? ' وخُصم من الصندوق اليومي.' : '.'));
+  $('amount-input').value = ''; $('desc-input').value = '';
+  attachmentFile = null; $('attachment-label').textContent = 'اختر ملف';
+  loadList();
 }
 
-async function load() {
+// ---- gifts ----
+function giftCost(p) {
+  const w = Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams) || 0;
+  const gp = Number(PRICES[p.karat]) || 0;
+  return { w, gp, cost: w * gp + w * (Number(p.cost_fabrication_per_gram) || 0) };
+}
+async function addGiftPiece() {
+  const code = $('barcode-input').value.trim();
+  const err = $('piece-error');
+  err.classList.add('hidden');
+  if (!code) return;
+  const { data: p, error } = await goldmindClient.from('pieces')
+    .select('id, barcode, karat, weight_grams, accounting_weight_grams, cost_fabrication_per_gram, piece_type, photo_url, status')
+    .eq('store_id', GOLDMIND_STORE_ID).in('barcode', gmBarcodeVariants(code)).in('status', ['available', 'in_box']).limit(1).maybeSingle();
+  if (error || !p) { err.textContent = error ? error.message : 'لا توجد قطعة متاحة في المخزن بهذا الباركود.'; err.classList.remove('hidden'); return; }
+  if (basket.some(b => b.id === p.id)) { err.textContent = 'القطعة مضافة مسبقاً.'; err.classList.remove('hidden'); return; }
+  basket.push(p);
+  $('barcode-input').value = '';
+  $('barcode-input').focus();
+  renderBasket();
+}
+function removeGiftPiece(id) { basket = basket.filter(b => b.id !== id); renderBasket(); }
+function renderBasket() {
+  let total = 0, missingPrice = false;
+  $('basket').innerHTML = basket.map(p => {
+    const c = giftCost(p); total += c.cost; if (!c.gp) missingPrice = true;
+    return `<div class="flex items-center gap-3 p-2 bg-surface-container-low rounded-lg text-[12px]">
+      ${p.photo_url ? `<img src="${esc(p.photo_url)}" alt="" class="w-12 h-12 rounded-lg object-cover"/>` : '<div class="w-12 h-12 rounded-lg bg-surface-container-lowest"></div>'}
+      <div class="flex-1 min-w-0"><div class="font-bold font-data-mono" dir="ltr" style="text-align:right">${esc(p.barcode)}</div>
+      <div class="text-on-surface-variant">${esc([p.piece_type, p.karat + 'K', n(c.w, 3) + ' غ محاسبي'].filter(Boolean).join(' · '))}</div></div>
+      <b class="font-data-mono">${money(c.cost)}</b>
+      <button type="button" onclick="removeGiftPiece('${p.id}')" aria-label="إزالة" class="text-error"><span class="material-symbols-outlined">close</span></button>
+    </div>`;
+  }).join('');
+  $('basket-total').classList.toggle('hidden', !basket.length);
+  $('basket-total').innerHTML = `<span class="font-bold">كلفة الهدايا (${basket.length} قطعة)</span><b class="font-data-mono">${money(total)}</b>` +
+    (missingPrice ? '<span class="text-error text-[11px] w-full">لا يوجد سعر ذهب لأحد العيارات — حدّث سعر الذهب أولاً.</span>' : '');
+  $('gift-btn').textContent = basket.length > 1 ? 'إخراج ' + basket.length + ' قطع كهدية' : 'إخراج كهدية';
+}
+async function saveGifts() {
+  const recipient = $('recipient-input').value.trim();
+  if (!basket.length) return msg('save-error', 'أضف قطعة واحدة على الأقل (امسح الباركود)');
+  if (!recipient) return msg('save-error', 'اكتب اسم الشخص الذي سيستلم الهدية');
+  if (!confirm('إخراج ' + basket.length + ' قطعة كهدية إلى ' + recipient + '؟')) return;
+  const btn = $('gift-btn');
+  btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  const failed = [];
+  for (const p of basket.slice()) {
+    const { error } = await goldmindClient.rpc('gift_out_piece', {
+      target_piece_id: p.id, p_recipient: recipient, p_reason: $('reason-input').value.trim() || null, p_notes: null
+    });
+    if (error) failed.push(p.barcode + ': ' + error.message);
+    else basket = basket.filter(b => b.id !== p.id);
+  }
+  btn.disabled = false;
+  renderBasket();
+  if (failed.length) msg('save-error', 'لم تُخرج بعض القطع — ' + failed.join(' | '));
+  else { msg('save-success', 'أُخرجت القطع من المخزن وسُجّلت كلفتها مصروفاً من نوع هدايا.'); $('recipient-input').value = ''; $('reason-input').value = ''; }
+  await loadCategories();
+  pickCat((CATS.find(c => c.name === GIFT) || {}).id);
+  loadList();
+}
+async function revertGift(id, barcode) {
+  if (!confirm('إرجاع القطعة ' + barcode + ' إلى المخزن وإلغاء مصروفها؟')) return;
+  const { error } = await goldmindClient.rpc('revert_gift', { target_gift_id: id });
+  if (error) { alert('تعذّر: ' + error.message); return; }
+  loadList();
+}
+
+// ---- list of the last 30 days: expenses + gifts (gift rows get a "return to stock" button) ----
+async function loadList() {
+  const since = new Date(Date.now() - 30 * 864e5).toISOString();
+  const [ex, gf] = await Promise.all([
+    canExpense ? goldmindClient.from('expense_entries').select('id, amount, description, created_at, category:category_id(name), staff:created_by(full_name)')
+      .eq('store_id', GOLDMIND_STORE_ID).gte('created_at', since).order('created_at', { ascending: false }) : { data: [] },
+    canGift ? goldmindClient.from('inventory_gifts').select('id, barcode, recipient, total_cost, status, expense_entry_id, created_at')
+      .eq('store_id', GOLDMIND_STORE_ID).gte('created_at', since) : { data: [] }
+  ]);
+  const gifts = gf.data || [];
+  const giftByExp = {}; gifts.forEach(g => { if (g.expense_entry_id) giftByExp[g.expense_entry_id] = g; });
+  let rows = (ex.data || []).map(e => ({ at: e.created_at, cat: e.category && e.category.name, desc: e.description, amount: Number(e.amount), who: e.staff && e.staff.full_name, gift: giftByExp[e.id] }));
+  if (!canExpense) rows = gifts.map(g => ({ at: g.created_at, cat: GIFT, desc: 'هدية: ' + g.barcode + ' — إلى ' + g.recipient, amount: Number(g.total_cost), gift: g }));
+  // a reverted gift's expense is removed on the server; keep only live rows
+  rows = rows.filter(r => !r.gift || r.gift.status === 'active');
+  $('list-total').textContent = rows.length ? 'المجموع: ' + money(rows.reduce((s, r) => s + r.amount, 0)) : '';
+  $('list').innerHTML = rows.length ? rows.map(r => `
+    <div class="p-3 flex items-center gap-3">
+      <span class="material-symbols-outlined text-secondary">${r.cat === GIFT ? 'redeem' : 'receipt'}</span>
+      <div class="flex-1 min-w-0">
+        <div class="font-semibold text-[13px]">${esc(r.cat)}</div>
+        <div class="text-[11px] text-on-surface-variant">${esc(r.desc)} · ${gmFormatDateTime(r.at)}${r.who ? ' · ' + esc(r.who) : ''}</div>
+      </div>
+      <div class="text-left">
+        <div class="font-bold font-data-mono text-[13px]">${money(r.amount)}</div>
+        ${r.gift && canGift ? `<button type="button" onclick="revertGift('${r.gift.id}', '${esc(r.gift.barcode || '').replace(/'/g, '')}')" class="text-[11px] text-primary underline">إرجاع إلى المخزن</button>` : ''}
+      </div>
+    </div>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد مصاريف في آخر 30 يوماً.</p>';
+}
+
+(async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
-
+  const [{ data: me }, { data: store }, { data: prices }] = await Promise.all([
+    goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+    goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID)
+  ]);
+  $('loading-state').classList.add('hidden');
+  const perms = (me && me.permissions) || {};
+  const owner = me && me.role === 'owner';
+  canExpense = owner || perms.manage_daily_cashbox === true || perms.view_profit_report === true;
+  canGift = owner || perms.give_gifts === true;
+  if (!canExpense && !canGift) { $('no-access').classList.remove('hidden'); return; }
+  const code = (store && store.currency || 'AED').toUpperCase();
+  CUR = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س' })[code] || code;
+  (prices || []).forEach(p => { PRICES[p.karat] = p.price_per_gram; });
   await loadCategories();
-  document.getElementById('loading-state').classList.add('hidden');
-  document.getElementById('page-content').classList.remove('hidden');
-}
-
-load();
-</script>
-<script>
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('service-worker.js').catch(() => {});
-  });
-}
+  const want = new URLSearchParams(location.search).get('type');
+  if (want === 'gifts' || !canExpense) pickCat((CATS.find(c => c.name === GIFT) || {}).id);
+  $('page-content').classList.remove('hidden');
+  loadList();
+})();
 </script>
 </body></html>

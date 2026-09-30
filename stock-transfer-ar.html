@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=29"></script>
-<script src="theme.js?v=34"></script>
+<script src="theme.js?v=35"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -231,7 +231,7 @@ async function refreshParty() {
       : '<div class="text-on-surface-variant">لا يوجد رصيد لدى هذا الوسيط.</div>';
   } else if (current.kind === 'gift') {
     const outs = L.filter(l => l.direction === 'out');
-    bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">الهدايا المُخرَجة: <b>${outs.length}</b> قطعة · كلفتها (مصروف) <b class="font-data-mono">${money(outs.reduce((s, l) => s + Number(l.cost_value), 0))}</b> <a href="gifts-ar.html" class="text-primary underline mr-2">سجل الهدايا والإرجاع</a></div>`;
+    bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">الهدايا المُخرَجة: <b>${outs.length}</b> قطعة · كلفتها (مصروف) <b class="font-data-mono">${money(outs.reduce((s, l) => s + Number(l.cost_value), 0))}</b> <a href="expense-entry-ar.html?type=gifts" class="text-primary underline mr-2">سجل الهدايا والإرجاع</a></div>`;
   } else {
     const w = held.reduce((s, p) => s + Number(p.weight_grams || 0), 0);
     bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">في الصندوق حالياً: <b>${held.length}</b> قطعة · <b class="font-data-mono">${n(w, 3)}غ</b> · كلفة <b class="font-data-mono">${money(held.reduce((s, p) => s + costOf(p), 0))}</b></div>`;
