@@ -1109,6 +1109,21 @@ function toggleMissingLive() {
   w.classList.toggle('hidden', !missingLiveOpen); w.classList.toggle('flex', missingLiveOpen);
   if (missingLiveOpen) renderMissingLive();
 }
+// big photo on top of the page (a new tab doesn't open inside the Android app)
+function gmCountPhoto(url) {
+  let box = document.getElementById('count-photo-box');
+  if (!box) {
+    box = document.createElement('div');
+    box.id = 'count-photo-box';
+    box.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px';
+    box.innerHTML = '<img alt="صورة القطعة" style="max-width:100%;max-height:100%;border-radius:12px;object-fit:contain">';
+    box.onclick = () => { box.style.display = 'none'; };
+    document.body.appendChild(box);
+  }
+  box.querySelector('img').src = url;
+  box.style.display = 'flex';
+}
+
 async function renderMissingLive() {
   const w = document.getElementById('missing-live-wrap');
   if (!missingLiveOpen) return;
@@ -1135,7 +1150,7 @@ async function renderMissingLive() {
     <p class="text-[12px] font-bold text-red-700">ناقصة فعلاً: ${real.length} قطعة</p>
     ${real.map(({ p, r }) => `
       <div class="flex gap-3 bg-surface-container-lowest border border-red-200 rounded-xl p-2">
-        ${r && r.photo_url ? `<a href="${esc(r.photo_url)}" target="_blank" rel="noopener" class="shrink-0"><img src="${esc(r.photo_url)}" alt="صورة القطعة" loading="lazy" class="w-24 h-24 rounded-lg object-cover"></a>` : '<div class="w-24 h-24 rounded-lg bg-surface-container-low flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-outline">image_not_supported</span></div>'}
+        ${r && r.photo_url ? `<button type="button" onclick="gmCountPhoto('${esc(r.photo_url)}')" aria-label="تكبير الصورة" class="shrink-0"><img src="${esc(r.photo_url)}" alt="صورة القطعة" loading="lazy" class="w-24 h-24 rounded-lg object-cover"></button>` : '<div class="w-24 h-24 rounded-lg bg-surface-container-low flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-outline">image_not_supported</span></div>'}
         <div class="min-w-0 flex-1 flex flex-col gap-0.5 text-[12px]">
           <div class="font-bold font-data-mono text-[14px]" dir="ltr" style="text-align:right;">${esc(p.barcode || p[matchField])}</div>
           <div>${esc([r && r.piece_type, p.karat ? 'عيار ' + p.karat : '', r && COLORS[r.color]].filter(Boolean).join(' · '))}</div>
@@ -1708,7 +1723,7 @@ async function renderSessionReview() {
   const editable = sessionDetailStatus !== 'posted';
   const f2 = v => (Number(v) || 0).toFixed(2);
   const esc = v => gmEscapeHtml(v == null ? '' : String(v));
-  const thumb = url => url ? `<img src="${esc(url)}" alt="" class="w-11 h-11 rounded-lg object-cover shrink-0">` : '<div class="w-11 h-11 rounded-lg bg-surface-container-low shrink-0"></div>';
+  const thumb = url => url ? `<button type="button" onclick="gmCountPhoto('${esc(url)}')" aria-label="تكبير الصورة" class="shrink-0"><img src="${esc(url)}" alt="" class="w-14 h-14 rounded-lg object-cover"></button>` : '<div class="w-14 h-14 rounded-lg bg-surface-container-low shrink-0"></div>';
   const pieceLink = p => p ? `<a href="piece-edit-ar.html?id=${esc(p.id)}" class="text-[11.5px] font-semibold text-primary underline">فتح القطعة</a>` : '';
   const statusLabel = st => SD_LEFT_LABEL[st] || (st === 'available' ? 'متوفرة' : st === 'reserved' ? 'محجوزة' : esc(st));
 

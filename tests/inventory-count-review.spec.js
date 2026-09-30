@@ -52,3 +52,12 @@ test('past count review: real missing, left stock, misreads, totals', async ({ p
   expect(calls.some(c => c.method === 'DELETE' && c.name === 'inventory_count_scans' && /s3/.test(c.url) && /s4/.test(c.url))).toBe(true);
   expect(errs).toEqual([]);
 });
+
+test('count photos open large on tap', async ({ page }) => {
+  await page.setContent('<div id="x"></div>');
+  await page.addScriptTag({ content: require('fs').readFileSync(require('path').join(__dirname, '..', 'inventory-count-ar.html'), 'utf8').match(/function gmCountPhoto[\s\S]*?\n}\n/)[0] });
+  await page.evaluate(() => gmCountPhoto('data:image/gif;base64,R0lGODlhAQABAAAAACw='));
+  await expect(page.locator('#count-photo-box')).toBeVisible();
+  await page.click('#count-photo-box');
+  await expect(page.locator('#count-photo-box')).toBeHidden();
+});
