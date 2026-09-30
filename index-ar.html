@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=37"></script>
+<script src="theme.js?v=38"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -1907,7 +1907,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const today = new Date(); today.setHours(0,0,0,0);
             const d = new Date(date); d.setHours(0,0,0,0);
             if (d.getTime() === today.getTime()) return 'اليوم';
-            return d.toLocaleDateString('ar-u-nu-latn', { day: 'numeric', month: 'short' });
+            return gmFormatDateTime(d, { day: 'numeric', month: 'short' });
         }
 
         async function shiftMovementsDay(deltaDays) {
@@ -1945,7 +1945,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 const SHOWN = 3; // dashboard shows the latest few; the rest via "عرض الكل"
                 container.innerHTML = recent.slice(0, SHOWN).map(m => {
                     const isIn = m.direction === 'in';
-                    const dateStr = new Date(m.created_at).toLocaleString('ar-u-nu-latn', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+                    const dateStr = gmFormatDateTime(m.created_at, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
                     const clickable = !!m.invoice_id;
                     const cur = m.currency || baseCurrency;
                     const amountLabel = cur === baseCurrency

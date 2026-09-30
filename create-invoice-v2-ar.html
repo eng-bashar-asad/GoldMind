@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=37"></script>
+<script src="theme.js?v=38"></script>
 <script id="tailwind-config">
         tailwind.config = { darkMode: "class", theme: { extend: {
           "colors": {
@@ -475,7 +475,7 @@
         try { draft = JSON.parse(localStorage.getItem(DRAFT_KEY) || 'null'); } catch (e) { draft = null; }
         if (!draft || !Array.isArray(draft.cart) || draft.cart.length === 0) return;
 
-        const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+        const savedLabel = draft.savedAt ? gmFormatDateTime(draft.savedAt, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
         if (!confirm('توجد فاتورة شراء غير محفوظة (' + draft.cart.length + ' صنف) من ' + savedLabel + ' — هل تريد استرجاعها؟')) {
             clearDraftFromLocalStorage();
             return;

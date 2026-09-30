@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=37"></script>
+<script src="theme.js?v=38"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -83,8 +83,8 @@
 
     function batchRowHtml(b) {
         const date = new Date(b.created_at);
-        const dateStr = date.toLocaleDateString('ar-AE', { year: 'numeric', month: 'short', day: 'numeric' });
-        const timeStr = date.toLocaleTimeString('ar-AE', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = gmFormatDateTime(date, { year: 'numeric', month: 'short', day: 'numeric' });
+        const timeStr = gmFormatDateTime(date, { hour: '2-digit', minute: '2-digit' });
         const icon = b.source_type === 'production' ? 'precision_manufacturing' : (b.source_type === 'opening' ? 'history' : 'inventory_2');
         return `
         <button onclick="openBatch('${b.id}')" class="flex items-center gap-3 border border-outline-variant rounded-lg p-3 bg-surface-container-lowest text-right active:scale-[0.99] transition-transform">
@@ -167,7 +167,7 @@
         const date = new Date(batch.created_at);
         document.getElementById('batch-summary').innerHTML = `
             <div class="text-[14px] font-bold mb-1">${SOURCE_LABELS[batch.source_type] || batch.source_type}</div>
-            <div class="text-[12px] text-on-surface-variant">${date.toLocaleDateString('ar-AE', { year: 'numeric', month: 'long', day: 'numeric' })} — ${date.toLocaleTimeString('ar-AE', { hour: '2-digit', minute: '2-digit' })}</div>
+            <div class="text-[12px] text-on-surface-variant">${gmFormatDateTime(date, { year: 'numeric', month: 'long', day: 'numeric' })} — ${gmFormatDateTime(date, { hour: '2-digit', minute: '2-digit' })}</div>
             <div class="flex gap-4 mt-2 text-[13px] font-data-mono font-bold">
                 <span>${(pieces || []).length} قطعة</span>
                 <span>${totalWeight.toFixed(2)} غ</span>

@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=37"></script>
+<script src="theme.js?v=38"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
     html { font-size: 87.5%; }
@@ -175,7 +175,7 @@ function render() {
             <div class="hidden mt-3 pt-3 border-t flex-col gap-1.5" style="border-color: var(--gm-outline-variant);" id="history-${s.type}-${s.id}">
                 ${s.history.map(h => `
                     <div class="text-[11px] flex justify-between">
-                        <span>${new Date(h.screened_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' })}${h.notes ? ' — ' + gmEscapeHtml(h.notes) : ''}</span>
+                        <span>${gmFormatDateTime(h.screened_at, { day: 'numeric', month: 'short', year: 'numeric' })}${h.notes ? ' — ' + gmEscapeHtml(h.notes) : ''}</span>
                         <span class="${h.result === 'match_found' ? 'text-error font-bold' : ''}">${h.result === 'clear' ? 'نظيف' : (h.result === 'match_found' ? 'تطابق' : 'غير حاسم')}</span>
                     </div>`).join('')}
             </div>

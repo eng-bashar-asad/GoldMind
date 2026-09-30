@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=37"></script>
+<script src="theme.js?v=38"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -251,7 +251,7 @@ function isToday(d) {
 
 function updateDayNav() {
   const label = document.getElementById('day-nav-label');
-  label.textContent = isToday(selectedDate) ? 'اليوم' : selectedDate.toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  label.textContent = isToday(selectedDate) ? 'اليوم' : gmFormatDateTime(selectedDate, { day: '2-digit', month: '2-digit', year: 'numeric' });
   document.getElementById('day-nav-next').classList.toggle('invisible', isToday(selectedDate));
   document.getElementById('entries-heading').textContent = isToday(selectedDate) ? 'عمليات اليوم' : 'عمليات يوم ' + label.textContent;
   document.getElementById('empty-state').textContent = isToday(selectedDate) ? 'لا توجد عمليات مسجّلة اليوم بعد.' : 'لا توجد عمليات مسجّلة بهذا اليوم.';
@@ -824,7 +824,7 @@ async function runCashboxSearch() {
   resultsEl.innerHTML = '<p class="text-[11px] text-on-surface-variant mb-1">' + data.length + (data.length === 200 ? '+' : '') + ' نتيجة</p>' +
     data.map(e => {
       const dateStr = localDateStr(new Date(e.created_at));
-      const dayLabel = new Date(e.created_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' });
+      const dayLabel = gmFormatDateTime(e.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
       return `<a href="daily-cashbox-ar.html?date=${dateStr}" class="block bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
         <div class="flex items-center justify-between gap-2">
           <span class="text-[13px] font-semibold truncate">${gmEscapeHtml(e.operation_type)}</span>
@@ -862,7 +862,7 @@ function toggleReportPanel() {
 
 async function buildDailyReport() {
   const todayStart = selectedDate;
-  const dateLabel = todayStart.toLocaleDateString('ar-EG-u-nu-latn', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const dateLabel = gmFormatDateTime(todayStart, { day: '2-digit', month: '2-digit', year: 'numeric' });
 
   const { data: store } = await goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
 

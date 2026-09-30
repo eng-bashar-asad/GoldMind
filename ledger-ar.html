@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=37"></script>
+<script src="theme.js?v=38"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -1678,7 +1678,7 @@ function openReceiveStockForm() {
   let draft;
   try { draft = JSON.parse(localStorage.getItem(receiveStockDraftKey()) || 'null'); } catch (e) { draft = null; }
   if (draft && Array.isArray(draft.receiveStockLines) && draft.receiveStockLines.some(l => l.grossWeight > 0)) {
-    const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+    const savedLabel = draft.savedAt ? gmFormatDateTime(draft.savedAt, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
     if (confirm('يوجد سند استلام بضاعة غير محفوظ (' + draft.receiveStockLines.length + ' سطر) من ' + savedLabel + ' — هل تريد استرجاعه؟')) {
       receiveStockLines = draft.receiveStockLines;
       receiveStockLineCounter = draft.receiveStockLineCounter || draft.receiveStockLines.length;
@@ -1891,7 +1891,7 @@ function openGiveStockForm() {
   let draft;
   try { draft = JSON.parse(localStorage.getItem(giveStockDraftKey()) || 'null'); } catch (e) { draft = null; }
   if (draft && Array.isArray(draft.giveStockCart) && draft.giveStockCart.length > 0) {
-    const savedLabel = draft.savedAt ? new Date(draft.savedAt).toLocaleString('ar-EG', { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
+    const savedLabel = draft.savedAt ? gmFormatDateTime(draft.savedAt, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
     if (confirm('يوجد سند إخراج بضاعة غير محفوظ (' + draft.giveStockCart.length + ' قطعة) من ' + savedLabel + ' — هل تريد استرجاعه؟')) {
       giveStockCart = draft.giveStockCart;
       giveStockCartCounter = draft.giveStockCartCounter || draft.giveStockCart.length;

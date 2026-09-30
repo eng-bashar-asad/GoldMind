@@ -113,9 +113,39 @@ function gmSetDisplayTimeZone(tz) {
 // Drop-in replacement for `new Date(x).toLocaleDateString(...)` /
 // `toLocaleTimeString(...)` that always converts into the chosen display
 // timezone instead of whatever timezone the device happens to be set to.
+// One date format for the whole app: 27/09/2026 01:16 م (day/month/year,
+// Latin digits). The numeric form is wrapped in a left-to-right isolate so
+// Arabic text around it can't flip the parts (it used to show "2026/9/27"
+// or "302026/09/"). Pass only date parts ({day, month, year}) for a date,
+// only {hour, minute} for a time; no arguments = now.
 function gmFormatDateTime(dateInput, opts) {
-  return new Date(dateInput).toLocaleString('ar-EG-u-nu-latn', { ...opts, timeZone: gmGetDisplayTimeZone() });
+  opts = opts || {};
+  const d = dateInput == null ? new Date() : dateInput instanceof Date ? dateInput : new Date(dateInput);
+  if (isNaN(d)) return '';
+  const tz = (typeof gmGetDisplayTimeZone === 'function') ? gmGetDisplayTimeZone() : undefined;
+  if (opts.weekday) return d.toLocaleString('ar-EG-u-nu-latn', { ...opts, timeZone: tz });
+  const none = !Object.keys(opts).length;
+  const wantDate = none || opts.day || opts.month || opts.year;
+  const wantTime = none || opts.hour || opts.minute;
+  const p = {};
+  new Intl.DateTimeFormat('en-GB', { timeZone: tz, day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: true })
+    .formatToParts(d).forEach(x => { p[x.type] = x.value; });
+  // each number group is isolated left-to-right; read right to left the
+  // result is: date, time, ص/م
+  const iso = t => '\u2066' + t + '\u2069';
+  const out = [];
+  if (wantDate) out.push(iso(p.day + '/' + p.month + '/' + p.year));
+  if (wantTime) out.push(iso(p.hour + ':' + p.minute) + ' ' + (String(p.dayPeriod).toLowerCase().startsWith('p') ? 'م' : 'ص'));
+  return out.join(' ');
 }
+
+// Date boxes (<input type="date">) show their value left to right; inside
+// right-to-left pages the browser used to scramble it (e.g. "302026/09/").
+(function () {
+  const st = document.createElement('style');
+  st.textContent = 'input[type=date],input[type=datetime-local],input[type=month],input[type=time]{direction:ltr;text-align:right}';
+  (document.head || document.documentElement).appendChild(st);
+})();
 
 // Renders the small timezone-picker popover. Call gmOpenTimezonePicker()
 // from an icon button; expects a #gmTzModal container to exist on the

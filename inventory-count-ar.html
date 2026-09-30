@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=37"></script>
+<script src="theme.js?v=38"></script>
 <script src="gm-report.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -472,7 +472,7 @@ async function init() {
 
   if (inProgressSession) {
     document.getElementById('resume-details').textContent =
-      'بدأت بتاريخ ' + new Date(inProgressSession.started_at).toLocaleString('ar-AE') +
+      'بدأت بتاريخ ' + gmFormatDateTime(inProgressSession.started_at) +
       ' — ' + (inProgressSession.method === 'camera' ? 'كاميرا' : 'RFID') + ' — ' +
       (inProgressSession.scope || []).map(x => ({ gold: 'قطع ذهبية', diamond: 'ألماس' }[x] || x)).join(' + ');
     document.getElementById('resume-banner').classList.remove('hidden');
@@ -689,7 +689,7 @@ async function loadPastSessions() {
   (data || []).forEach(s => {
     const row = document.createElement('button');
     row.className = 'w-full bg-surface-container-low rounded-lg p-3 flex items-center justify-between text-[12px] text-right';
-    const dateStr = new Date(s.started_at).toLocaleDateString('ar-AE', { day: 'numeric', month: 'short', year: 'numeric' });
+    const dateStr = gmFormatDateTime(s.started_at, { day: 'numeric', month: 'short', year: 'numeric' });
     const methodLabel = s.method === 'camera' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">photo_camera</span>' : (s.method === 'rfid' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">sensors</span>' : '');
     const statusLabel = s.status === 'posted' ? 'مُرحّلة' : 'مكتملة';
     row.innerHTML = `<span class="font-semibold">${methodLabel} ${dateStr}</span>
@@ -1109,6 +1109,69 @@ function toggleMissingLive() {
   w.classList.toggle('hidden', !missingLiveOpen); w.classList.toggle('flex', missingLiveOpen);
   if (missingLiveOpen) renderMissingLive();
 }
+// ---- Missing pieces sheet: big photo, then barcode / gross weight / karat.
+// 6 pieces per A4 page (2 × 3), each page its own block so a card is never cut.
+let gmMissingSheetItems = [];
+function gmMissingSheetPages(items, title) {
+  const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+  const pages = [];
+  for (let i = 0; i < items.length; i += 6) {
+    const page = document.createElement('div');
+    page.className = 'gm-ms-page';
+    page.style.cssText = 'background:#fff;color:#111;padding:6px;font-family:Inter,sans-serif;direction:rtl';
+    page.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:12px;border-bottom:2px solid #111;padding-bottom:4px;margin-bottom:8px">
+        <b>${esc(title)}</b><span>${i / 6 + 1} / ${Math.ceil(items.length / 6)}</span></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">` +
+      items.slice(i, i + 6).map(it => `<div style="border:1px solid #bbb;border-radius:10px;padding:6px;text-align:center;break-inside:avoid">
+        ${it.photo ? `<img src="${esc(it.photo)}" crossorigin="anonymous" alt="" style="width:100%;height:270px;object-fit:contain;border-radius:6px;background:#f4f4f4">`
+                   : '<div style="height:270px;display:flex;align-items:center;justify-content:center;background:#f4f4f4;border-radius:6px;color:#888">لا توجد صورة</div>'}
+        <div dir="ltr" style="font-size:22px;font-weight:800;margin-top:6px">${esc(it.barcode)}</div>
+        <div style="font-size:15px;font-weight:600">الوزن القائم: <bdi dir="ltr">${it.weight != null ? Number(it.weight).toFixed(2) : '—'}</bdi> غ · عيار ${esc(it.karat || '—')}</div>
+        ${it.type ? `<div style="font-size:12px;color:#555">${esc(it.type)}</div>` : ''}
+      </div>`).join('') + '</div>';
+    pages.push(page);
+  }
+  return pages;
+}
+function gmMissingSheetTitle() { return 'القطع الناقصة بالجرد (' + gmMissingSheetItems.length + ' قطعة) — ' + gmFormatDateTime(); }
+async function gmMissingSheetPdf(btn, share) {
+  if (!gmMissingSheetItems.length) return;
+  const old = btn.innerHTML; btn.disabled = true;
+  btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span>';
+  try {
+    const pages = gmMissingSheetPages(gmMissingSheetItems, gmMissingSheetTitle());
+    const name = 'القطع-الناقصة-' + gmDateStrInTz(Date.now()) + '.pdf';
+    if (share) await gmWhatsAppPdf(pages, name, 'القطع الناقصة', 'القطع الناقصة بالجرد (' + gmMissingSheetItems.length + ' قطعة)', '', '');
+    else await gmPdfFromNodes(pages, name, 'القطع الناقصة');
+  } catch (e) { alert('تعذّر إنشاء ملف PDF: ' + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+function gmMissingSheetPrint() {
+  if (!gmMissingSheetItems.length) return;
+  let box = document.getElementById('gm-ms-print');
+  if (!box) {
+    box = document.createElement('div'); box.id = 'gm-ms-print';
+    const st = document.createElement('style');
+    st.textContent = '#gm-ms-print{display:none}@media print{body.gm-ms-printing>*:not(#gm-ms-print){display:none!important}body.gm-ms-printing #gm-ms-print{display:block}#gm-ms-print .gm-ms-page{break-after:page}@page{size:A4;margin:8mm}}';
+    document.head.appendChild(st); document.body.appendChild(box);
+  }
+  box.innerHTML = '';
+  gmMissingSheetPages(gmMissingSheetItems, gmMissingSheetTitle()).forEach(pg => box.appendChild(pg));
+  document.body.classList.add('gm-ms-printing');
+  const done = () => { document.body.classList.remove('gm-ms-printing'); window.removeEventListener('afterprint', done); };
+  window.addEventListener('afterprint', done);
+  const imgs = Array.from(box.querySelectorAll('img'));
+  Promise.race([Promise.all(imgs.map(im => im.complete ? 0 : new Promise(r => { im.onload = im.onerror = r; }))), new Promise(r => setTimeout(r, 5000))])
+    .then(() => { window.print(); setTimeout(done, 1500); });
+}
+function gmMissingSheetButtons() {
+  return `<div class="flex flex-wrap gap-2 my-2">
+    <button type="button" onclick="gmMissingSheetPrint()" class="h-10 px-3 rounded-lg bg-black text-white text-[12px] font-bold flex items-center gap-1"><span class="material-symbols-outlined">print</span>طباعة الناقص بالصور</button>
+    <button type="button" onclick="gmMissingSheetPdf(this)" class="h-10 px-3 rounded-lg border border-outline-variant text-[12px] font-bold flex items-center gap-1"><span class="material-symbols-outlined">picture_as_pdf</span>PDF</button>
+    <button type="button" onclick="gmMissingSheetPdf(this, true)" class="h-10 px-3 rounded-lg bg-green-50 text-green-700 border border-green-200 text-[12px] font-bold flex items-center gap-1"><span class="material-symbols-outlined">chat</span>إرسال واتساب</button>
+  </div>`;
+}
+
 // big photo on top of the page (a new tab doesn't open inside the Android app)
 function gmCountPhoto(url) {
   let box = document.getElementById('count-photo-box');
@@ -1146,8 +1209,10 @@ async function renderMissingLive() {
   const real = [], left = [];
   missing.forEach(p => { const r = info[(p.source === 'diamond' ? 'diamond:' : 'gold:') + p.id]; (r && (r.status === 'available' || r.status === 'reserved') ? real : left).push({ p, r }); });
   const COLORS = { Gold: 'ذهبي', White: 'أبيض', Rose: 'وردي' };
+  gmMissingSheetItems = real.map(({ p, r }) => ({ barcode: p.barcode || p[matchField], photo: r && r.photo_url, weight: r && r.weight_grams != null ? r.weight_grams : p.weight_grams, karat: p.karat || (r && r.karat), type: r && r.piece_type }));
   w.innerHTML = `
     <p class="text-[12px] font-bold text-red-700">ناقصة فعلاً: ${real.length} قطعة</p>
+    ${real.length ? gmMissingSheetButtons() : ''}
     ${real.map(({ p, r }) => `
       <div class="flex gap-3 bg-surface-container-lowest border border-red-200 rounded-xl p-2">
         ${r && r.photo_url ? `<button type="button" onclick="gmCountPhoto('${esc(r.photo_url)}')" aria-label="تكبير الصورة" class="shrink-0"><img src="${esc(r.photo_url)}" alt="صورة القطعة" loading="lazy" class="w-24 h-24 rounded-lg object-cover"></button>` : '<div class="w-24 h-24 rounded-lg bg-surface-container-low flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-outline">image_not_supported</span></div>'}
@@ -1229,7 +1294,7 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
   btn.disabled = false;
   btn.textContent = 'إنهاء الجلسة وعرض التقرير';
 
-  currentSessionMeta = { date: new Date().toLocaleString('ar-AE'), method: countMethod };
+  currentSessionMeta = { date: gmFormatDateTime(), method: countMethod };
 
   renderReportCounts();
 
@@ -1452,7 +1517,7 @@ async function exportPdf(sheetId, btnId) {
   btn.disabled = true;
   btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span>';
 
-  document.getElementById('print-meta').textContent = new Date().toLocaleString('ar-AE') + ' — طريقة: ' + (countMethod === 'camera' ? 'كاميرا' : 'RFID/يدوي');
+  document.getElementById('print-meta').textContent = gmFormatDateTime() + ' — طريقة: ' + (countMethod === 'camera' ? 'كاميرا' : 'RFID/يدوي');
   document.getElementById('print-expected').textContent = document.getElementById('report-expected').textContent;
   document.getElementById('print-matched').textContent = document.getElementById('report-matched').textContent;
   document.getElementById('print-scanned').textContent = document.getElementById('report-scanned').textContent;
@@ -1560,7 +1625,7 @@ async function openSessionDetail(countId) {
   sessionDetailExpectedRows = expectedRows || [];
   sessionDetailScanRows = scanRows || [];
 
-  const dateStr = new Date(countRow.started_at).toLocaleString('ar-AE');
+  const dateStr = gmFormatDateTime(countRow.started_at);
   const statusLabel = countRow.status === 'posted' ? 'مُرحّلة <span class="material-symbols-outlined text-green-700" style="font-size:15px;vertical-align:-3px" aria-hidden="true">check_circle</span>' : 'مكتملة';
   document.getElementById('session-detail-meta').innerHTML =
     `<div class="font-bold mb-1">${dateStr}</div>
@@ -1727,6 +1792,7 @@ async function renderSessionReview() {
   const pieceLink = p => p ? `<a href="piece-edit-ar.html?id=${esc(p.id)}" class="text-[11.5px] font-semibold text-primary underline">فتح القطعة</a>` : '';
   const statusLabel = st => SD_LEFT_LABEL[st] || (st === 'available' ? 'متوفرة' : st === 'reserved' ? 'محجوزة' : esc(st));
 
+  gmMissingSheetItems = realMissing.map(({ e, p }) => ({ barcode: e.barcode || e.match_value, photo: p && p.photo_url, weight: p && p.weight_grams != null ? p.weight_grams : e.weight_grams, karat: e.karat || (p && p.karat), type: p && p.piece_type }));
   box.innerHTML = `
   <div class="bg-surface-container-low rounded-xl p-3">
     <div class="text-[12px] font-bold mb-2">ذهب القطع التي وُجدت بالجرد (${t.n} قطعة)</div>
@@ -1740,6 +1806,7 @@ async function renderSessionReview() {
 
   <div>
     <h3 class="text-[13px] font-bold text-red-700 mb-1">ناقصة فعلاً (${realMissing.length}) — ما زالت بالمخزن في النظام ولم تُمسح</h3>
+    ${realMissing.length ? gmMissingSheetButtons() : ''}
     <p class="text-[11px] text-on-surface-variant mb-2">ابحث عنها بالمحل. إن وجدتها اضغط "وُجدت"، وإن كانت قد خرجت فعلاً (بيع أو تاجر أو صندوق آخر) افتح القطعة وصحّح حالتها.</p>
     <div class="flex flex-col gap-2">${realMissing.map(({ e, p }) => `
       <div class="flex items-center gap-3 bg-red-50 rounded-xl p-2 text-[12px]">
