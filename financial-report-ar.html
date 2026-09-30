@@ -276,13 +276,15 @@ async function build(from, to) {
   // ---- render
   const netProfit = P.profit - expTotal;
   let h = '';
-  const tiles = [
-    ['صافي المبيعات', money(netSales), ''],
-    ['المشتريات', money(buysTotal), ''],
-    ['المصاريف', money(expTotal), ''],
-  ];
-  if (FR.canProfit) { tiles.push(['ربح المبيعات', money(P.profit), cls(P.profit)]); tiles.push(['صافي الربح بعد المصاريف', money(netProfit), cls(netProfit)]); }
-  h += `<div class="grid grid-cols-2 gap-2">${tiles.map(t => `<div class="fr-card"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div></div>`).join('')}</div>`;
+  // profit line: sales → profit − expenses = net. Purchases are their own item
+  // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
+  const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px]" style="color:#6B6150;">${t[4]}</div>` : ''}</div>`;
+  const tiles = FR.canProfit
+    ? [['صافي المبيعات', money(netSales), ''], ['ربح المبيعات', money(P.profit), cls(P.profit)],
+       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات − المصاريف', money(netProfit), cls(netProfit)]]
+    : [['صافي المبيعات', money(netSales), ''], ['المصاريف', money(expTotal), '']];
+  tiles.push(['المشتريات', money(buysTotal), '', 'col-span-2', 'بند مستقل — لا تُخصم من الربح (شراء ذهب يدخل المخزن)']);
+  h += `<div class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
 
   h += sec('point_of_sale', 'المبيعات', `<table class="fr-t">
     ${row('عدد فواتير البيع', sales.length)}
