@@ -330,7 +330,7 @@
 
 <div class="grid grid-cols-3 gap-2">
 <div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-matched" class="text-lg font-bold text-green-700">0</div><div class="text-[10px]">مطابقة</div></div>
-<div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-missing" class="text-lg font-bold text-red-700">0</div><div class="text-[10px]">ناقصة</div></div>
+<div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-missing" class="text-lg font-bold text-red-700">0</div><div class="text-[10px]">لم تُمسح</div><div id="sd-missing-real" class="text-[10px] text-red-700"></div></div>
 <div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-surplus" class="text-lg font-bold text-amber-700">0</div><div class="text-[10px]">زيادة</div></div>
 </div>
 
@@ -1761,6 +1761,8 @@ async function renderSessionReview() {
       </div>`; }).join('')}</div>
   </div>`;
   window.__sdUnknownIds = unknownSurplus.map(r => r.id);
+  const realEl = document.getElementById('sd-missing-real');
+  if (realEl) realEl.textContent = leftStock.length ? 'منها ' + realMissing.length + ' ناقصة فعلاً' : '';
 }
 
 async function sdMarkFound(pieceId, source, btn) {
