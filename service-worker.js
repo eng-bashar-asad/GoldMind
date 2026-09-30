@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goldmind-shell-v39';
+const CACHE_NAME = 'goldmind-shell-v40';
 // Pages and files needed to keep selling with no internet. Each is cached on
 // its own so one missing file can't block the rest.
 const SHELL_ASSETS = [
@@ -16,7 +16,7 @@ const SHELL_ASSETS = [
   './favicon.png',
   './gm-biometric.js?v=1',
   './gm-profit.js?v=1',
-  './gm-report.js?v=2',
+  './gm-report.js?v=3',
   './gm-nav.js?v=3'
 ];
 // Versioned libraries and fonts from these CDNs are safe to keep offline.

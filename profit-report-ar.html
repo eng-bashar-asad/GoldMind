@@ -14,7 +14,7 @@
 <script src="supabase-config.js?v=30"></script>
 <script src="theme.js?v=36"></script>
 <script src="gm-profit.js?v=1"></script>
-<script src="gm-report.js?v=2"></script>
+<script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -100,12 +100,15 @@
 </select>
 </div>
 <button id="apply-filters-btn" class="w-full h-10 bg-primary text-on-primary rounded-lg font-semibold text-[13px]">تطبيق الفلتر</button>
-<div class="grid grid-cols-2 gap-2">
+<div class="grid grid-cols-3 gap-2">
 <button type="button" onclick="window.print()" class="h-10 rounded-lg font-semibold text-[13px] flex items-center justify-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined">print</span>طباعة</button>
 <button type="button" id="pr-pdf-btn" onclick="gmReportPdf(document.getElementById('page-content'), 'تقرير-الأرباح.pdf', this)" class="h-10 rounded-lg font-semibold text-[13px] border border-outline-variant flex items-center justify-center gap-1"><span class="material-symbols-outlined">picture_as_pdf</span>PDF</button>
+<button type="button" id="pr-xlsx-btn" onclick="exportExcel(this)" class="h-10 rounded-lg font-semibold text-[13px] border border-green-700 text-green-800 flex items-center justify-center gap-1"><span class="material-symbols-outlined">table_view</span>Excel</button>
 </div>
 </div>
 
+<div id="pr-sections" class="flex flex-col gap-4"></div>
+<h2 class="font-bold text-[14px] mt-2">تفاصيل مبيعات المفرق</h2>
 <div class="grid grid-cols-2 gap-3">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl text-center">
 <span class="text-[11px] text-on-surface-variant block mb-1">إجمالي المبيعات</span>
@@ -193,102 +196,167 @@ async function loadBoxFilterOptions() {
   });
 }
 
+const f2 = v => (Number(v) || 0).toFixed(2), f3 = v => (Number(v) || 0).toFixed(3);
+const escH = v => gmEscapeHtml(v == null ? '' : String(v));
+let REPORT = null;
+
+async function fetchByIds(ids, make) {
+  let out = [];
+  for (let i = 0; i < ids.length; i += 150) {
+    const r = await gmFetchAllRows(() => make(ids.slice(i, i + 150)));
+    if (r.error) return r;
+    out = out.concat(r.data);
+  }
+  return { data: out, error: null };
+}
+
+function table(title, head, rows, note) {
+  return `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-x-auto">
+    <div class="px-3 py-2 font-bold text-[13px] bg-surface-container-low">${title}</div>
+    <table class="w-full text-right text-[12px]"><thead><tr>${head.map(h => `<th class="px-3 py-2 text-on-surface-variant font-semibold">${h}</th>`).join('')}</tr></thead>
+    <tbody>${rows.map((r, i) => `<tr class="border-t border-outline-variant ${r.total ? 'font-bold' : ''}" ${r.total ? 'style="background:#F3EEDF"' : ''}>${r.cells.map(c => `<td class="px-3 py-2 font-data-mono">${c}</td>`).join('')}</tr>`).join('') || `<tr><td class="px-3 py-3 text-on-surface-variant" colspan="${head.length}">لا يوجد</td></tr>`}</tbody></table>
+    ${note ? `<p class="px-3 py-2 text-[11px] text-on-surface-variant">${note}</p>` : ''}</div>`;
+}
+
 async function applyFilters() {
-  const fromDate = document.getElementById('date-from').value;
-  const toDate = document.getElementById('date-to').value;
+  let fromDate = document.getElementById('date-from').value;
+  let toDate = document.getElementById('date-to').value;
   const boxFilter = document.getElementById('box-filter').value;
+  const today = gmDateStrInTz(Date.now());
+  if (!fromDate && !toDate) {           // default: this month
+    fromDate = today.slice(0, 8) + '01'; toDate = today;
+    document.getElementById('date-from').value = fromDate;
+    document.getElementById('date-to').value = toDate;
+  }
+  const range = gmRangeISO(fromDate || '2000-01-01', toDate || today);
 
   document.getElementById('empty-state').classList.add('hidden');
-  document.getElementById('pr-period').innerHTML = 'الفترة: ' + (fromDate || toDate ? 'من <bdi dir="ltr">' + gmEscapeHtml(fromDate || '…') + '</bdi> إلى <bdi dir="ltr">' + gmEscapeHtml(toDate || '…') + '</bdi>' : 'آخر 200 فاتورة');
+  document.getElementById('pr-period').innerHTML = 'الفترة: من <bdi dir="ltr">' + escH(fromDate || '…') + '</bdi> إلى <bdi dir="ltr">' + escH(toDate || today) + '</bdi>';
   document.getElementById('pr-box').textContent = boxFilter ? 'الصندوق: ' + boxFilter : '';
   document.getElementById('pr-printed').textContent = 'تاريخ الطباعة: ' + gmFormatDateTime(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  document.getElementById('pr-sections').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-6">جارِ الحساب...</p>';
+  document.getElementById('items-tbody').innerHTML = '';
 
-  let invoiceQuery = goldmindClient
-    .from('invoices').select('id, invoice_number, created_at, type')
-    .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return']).neq('status', 'cancelled')
-    .order('created_at', { ascending: false });
-  // day boundaries in the shop's timezone (gm-report.js), not UTC
-  if (fromDate) invoiceQuery = invoiceQuery.gte('created_at', gmDayStartISO(fromDate));
-  if (toDate) invoiceQuery = invoiceQuery.lt('created_at', gmDayStartISO(gmAddDays(toDate, 1)));
-  // With no date range given, keep the previous safety cap; a bounded
-  // range is presumably deliberate and shouldn't be silently truncated.
-  if (!fromDate && !toDate) invoiceQuery = invoiceQuery.limit(200);
+  const [invRes, tmRes, staffRes] = await Promise.all([
+    gmFetchAllRows(() => goldmindClient.from('invoices').select('id, invoice_number, created_at, type, created_by, total_amount')
+      .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return', 'buyRetail', 'buyTrader']).neq('status', 'cancelled')
+      .gte('created_at', range.from).lt('created_at', range.to).order('created_at', { ascending: false })),
+    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('id, source, invoice_id, weight_grams, accounting_weight_grams, karat, gold_24k_equivalent, fab_fee_per_gram, fab_fee_amount, created_at, trader:trader_id(name), piece:piece_id(cost_fabrication_per_gram)')
+      .eq('store_id', GOLDMIND_STORE_ID).in('source', ['stock_given', 'stock_received'])
+      .gte('created_at', range.from).lt('created_at', range.to)),
+    goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID)
+  ]);
+  const err = invRes.error || tmRes.error;
+  if (err) { document.getElementById('pr-sections').innerHTML = `<p class="text-error text-sm">تعذّر التحميل: ${escH(err.message)}</p>`; return; }
+  const invoices = invRes.data, moves = tmRes.data;
+  const staffName = {}; (staffRes.data || []).forEach(s => { staffName[s.id] = s.full_name; });
+  const invoiceMap = {}; invoices.forEach(i => { invoiceMap[i.id] = i; });
 
-  const { data: invoices } = await invoiceQuery;
+  const itemsRes = await fetchByIds(invoices.map(i => i.id), ids => goldmindClient.from('invoice_items').select(GM_PROFIT_ITEM_SELECT).in('invoice_id', ids));
+  if (itemsRes.error) { document.getElementById('pr-sections').innerHTML = `<p class="text-error text-sm">تعذّر التحميل: ${escH(itemsRes.error.message)}</p>`; return; }
+  const allItems = itemsRes.data;
 
-  const invoiceMap = {};
-  (invoices || []).forEach(i => invoiceMap[i.id] = i);
-  const invoiceIds = (invoices || []).map(i => i.id);
-
-  document.getElementById('page-content').classList.remove('hidden');
-
-  if (invoiceIds.length === 0) {
-    document.getElementById('empty-state').classList.remove('hidden');
+  // ---- retail sales (customer invoices) ----
+  const saleItems = allItems.filter(it => { const t = (invoiceMap[it.invoice_id] || {}).type; return t === 'sale' || t === 'return'; });
+  if (Object.keys(livePriceMap).length === 0 && saleItems.length && !saleItems.some(it => it.gold_price_per_gram != null)) {
+    document.getElementById('no-prices').classList.remove('hidden');
+    document.getElementById('page-content').classList.add('hidden');
     return;
   }
-
-  const { data: items, error } = await goldmindClient
-    .from('invoice_items')
-    .select(GM_PROFIT_ITEM_SELECT)
-    .in('invoice_id', invoiceIds);
-
-  if (error) {
-    document.getElementById('items-tbody').innerHTML = `<tr><td colspan="9" class="text-center text-error text-sm py-8">تعذّر التحميل: ${error.message}</td></tr>`;
-    return;
-  }
-
-  if (Object.keys(livePriceMap).length === 0) {
-    const hasAnySnapshot = (items || []).some(it => it.gold_price_per_gram != null);
-    if (!hasAnySnapshot) {
-      document.getElementById('no-prices').classList.remove('hidden');
-      document.getElementById('page-content').classList.add('hidden');
-      return;
-    }
-  }
-
-  // A box can live on either side (a plain gold piece, or a diamond
-  // piece) -- match whichever one this line actually is.
   const filteredItems = boxFilter
-    ? (items || []).filter(it => (it.piece && it.piece.box_name === boxFilter) || (it.diamond && it.diamond.box_name === boxFilter))
-    : (items || []);
-
-  let totalRevenue = 0, totalVat = 0, totalGold = 0, totalProfit = 0;
+    ? saleItems.filter(it => (it.piece && it.piece.box_name === boxFilter) || (it.diamond && it.diamond.box_name === boxFilter))
+    : saleItems;
+  const W = { gross: 0, acc: 0, carats: 0, makingSold: 0, makingAcc: 0, fabCost: 0 };
+  const byStaff = {};
   const rows = filteredItems.map(it => {
     const inv = invoiceMap[it.invoice_id];
-    const isReturn = inv && inv.type === 'return';
-    const p = gmLineProfit(it, isReturn, vatMultiplier, livePriceMap); // shared formula (gm-profit.js)
-    const { revenue, goldValue, vat, fabCost, profit, weight, goldPrice, isEstimated } = p;
-    const displayWeight = p.grossWeight;
-    totalRevenue += revenue;
-    totalVat += vat;
-    totalGold += goldValue;
-    totalProfit += profit;
-
-    return { it, inv, isReturn, weight, displayWeight, revenue, goldValue, vat, fabCost, diamondCost: p.diamondCost, profit, goldPrice, isEstimated };
+    const isReturn = inv.type === 'return';
+    const p = gmLineProfit(it, isReturn, vatMultiplier, livePriceMap);
+    const sign = isReturn ? -1 : 1;
+    const pureDiamond = it.diamond && !it.diamond.has_gold;
+    const carats = sign * ((it.diamond ? Number(it.diamond.diamond_carat) || 0 : 0) + (it.piece ? Number(it.piece.accent_diamond_carat) || 0 : 0));
+    const gross = pureDiamond ? 0 : sign * p.grossWeight, acc = pureDiamond ? 0 : sign * p.weight;
+    W.gross += gross; W.acc += acc; W.carats += carats;
+    // making the customer paid = price without VAT − gold value (plain gold lines only)
+    if (!it.diamond && !(it.piece && Number(it.piece.accent_diamond_carat))) { W.makingSold += p.revenue - p.vat - p.goldValue; W.makingAcc += acc; W.fabCost += p.fabCost; }
+    const st = byStaff[inv.created_by] || (byStaff[inv.created_by] = { invoices: new Set(), revenue: 0, profit: 0, gross: 0, acc: 0, makingSold: 0, makingAcc: 0 });
+    st.invoices.add(inv.id); st.revenue += p.revenue; st.profit += p.profit; st.gross += gross; st.acc += acc;
+    if (!it.diamond && !(it.piece && Number(it.piece.accent_diamond_carat))) { st.makingSold += p.revenue - p.vat - p.goldValue; st.makingAcc += acc; }
+    return { it, inv, isReturn, weight: p.weight, displayWeight: p.grossWeight, revenue: p.revenue, goldValue: p.goldValue, vat: p.vat, fabCost: p.fabCost, diamondCost: p.diamondCost, profit: p.profit, isEstimated: p.isEstimated, carats };
   });
-
   const sum = k => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
-  window.__prTotals = { revenue: sum('revenue'), goldValue: sum('goldValue'), vat: sum('vat'), fabCost: sum('fabCost'), diamondCost: sum('diamondCost'), profit: sum('profit') };
-  document.getElementById('stat-revenue').textContent = totalRevenue.toFixed(2);
-  document.getElementById('stat-profit').textContent = totalProfit.toFixed(2);
+  const retail = { revenue: sum('revenue'), goldValue: sum('goldValue'), vat: sum('vat'), fabCost: sum('fabCost'), diamondCost: sum('diamondCost'), profit: sum('profit') };
+  window.__prTotals = retail;
 
-  if (rows.length === 0) {
-    document.getElementById('empty-state').classList.remove('hidden');
-    return;
-  }
+  // ---- wholesale: goods given to traders; profit = making charged (before VAT) − our making cost ----
+  const given = moves.filter(m => m.source === 'stock_given');
+  let unknownCost = 0;
+  const wholesale = given.map(m => {
+    const acc = Number(m.accounting_weight_grams != null ? m.accounting_weight_grams : m.weight_grams) || 0;
+    const fee = acc * (Number(m.fab_fee_per_gram) || 0);
+    const hasCost = m.piece && m.piece.cost_fabrication_per_gram != null;
+    if (!hasCost) unknownCost++;
+    const cost = hasCost ? acc * Number(m.piece.cost_fabrication_per_gram) : 0;
+    return { m, acc, gross: Number(m.weight_grams) || 0, fee, cost, profit: fee - cost };
+  });
+  const ws = wholesale.reduce((a, r) => ({ gross: a.gross + r.gross, acc: a.acc + r.acc, fee: a.fee + r.fee, cost: a.cost + r.cost, profit: a.profit + r.profit }), { gross: 0, acc: 0, fee: 0, cost: 0, profit: 0 });
+
+  // ---- purchases: scrap from customers (weight + karat, no barcode) and goods in from traders ----
+  const byKarat = () => ({});
+  const addK = (map, k, g, a) => { const r = map[k] || (map[k] = { gross: 0, acc: 0, pure: 0 }); r.gross += g; r.acc += a; r.pure += a * (Number(k) || 0) / 24; };
+  const scrap = byKarat(), fromTraders = byKarat();
+  let scrapPaid = 0;
+  const movedInvoices = new Set(moves.filter(m => m.source === 'stock_received' && m.invoice_id).map(m => m.invoice_id));
+  allItems.forEach(it => {
+    const inv = invoiceMap[it.invoice_id];
+    const g = Number(it.weight_grams) || 0, a = Number(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams) || 0;
+    if (inv.type === 'buyRetail') { addK(scrap, it.karat, g, a); scrapPaid += Number(it.line_total) || 0; }
+    else if (inv.type === 'buyTrader' && !movedInvoices.has(inv.id)) addK(fromTraders, it.karat, g, a);
+  });
+  moves.filter(m => m.source === 'stock_received').forEach(m => addK(fromTraders, m.karat, Number(m.weight_grams) || 0, Number(m.accounting_weight_grams != null ? m.accounting_weight_grams : m.weight_grams) || 0));
+  const kRows = map => { const ks = Object.keys(map).sort((a, b) => b - a); const t = { gross: 0, acc: 0, pure: 0 };
+    const out = ks.map(k => { const r = map[k]; t.gross += r.gross; t.acc += r.acc; t.pure += r.pure; return { cells: [k === 'null' || k === 'undefined' ? '—' : k, f3(r.gross), f3(r.acc), f3(r.pure)] }; });
+    if (ks.length > 1) out.push({ total: true, cells: ['المجموع', f3(t.gross), f3(t.acc), f3(t.pure)] }); return out; };
+
+  const staffRows = Object.keys(byStaff).map(id => { const s = byStaff[id]; return { name: staffName[id] || 'غير معروف', n: s.invoices.size, revenue: s.revenue, profit: s.profit, gross: s.gross, avgMaking: s.makingAcc ? s.makingSold / s.makingAcc : 0 }; })
+    .sort((a, b) => b.revenue - a.revenue);
+
+  REPORT = { fromDate, toDate: toDate || today, rows, retail, ws, wholesale, W, scrap, fromTraders, scrapPaid, staffRows };
+
+  const avgMaking = W.makingAcc ? W.makingSold / W.makingAcc : 0, avgCost = W.makingAcc ? W.fabCost / W.makingAcc : 0;
+  document.getElementById('pr-sections').innerHTML =
+    table('ملخص الأرباح', ['البند', 'المبيعات', 'الربح'], [
+      { cells: ['مبيعات الزبائن (مفرق)', f2(retail.revenue), f2(retail.profit)] },
+      { cells: ['تجار الجملة (مصنعية البضاعة المُسلّمة)', f2(ws.fee), f2(ws.profit)] },
+      { total: true, cells: ['المجموع', f2(retail.revenue + ws.fee), f2(retail.profit + ws.profit)] }
+    ], 'ربح الجملة = المصنعية المفروضة على التاجر (قبل الضريبة) − كلفة مصنعيتنا للقطع.' + (unknownCost ? ` ${unknownCost} تسليم بالوزن بدون باركود لا توجد له كلفة مسجّلة، فحُسبت مصنعيته كاملة ربحاً.` : '')) +
+    table('المبيع بالوزن (مفرق)', ['الوزن القائم المباع', 'الوزن المحاسبي المباع', 'قيراط الألماس المباع', 'متوسط المصنعية المباعة / غ', 'متوسط كلفة المصنعية / غ'], [
+      { cells: [f3(W.gross) + ' غ', f3(W.acc) + ' غ', f2(W.carats) + ' ct', f2(avgMaking), f2(avgCost)] }
+    ], 'متوسط المصنعية المباعة = (سعر البيع بدون ضريبة − قيمة الذهب) ÷ الوزن المحاسبي، لقطع الذهب بدون ألماس.') +
+    table('بضاعة مُسلّمة لتجار الجملة', ['التاجر', 'التاريخ', 'الوزن القائم', 'الوزن المحاسبي', 'المصنعية/غ', 'المصنعية', 'الربح'],
+      wholesale.map(r => ({ cells: [escH(r.m.trader && r.m.trader.name), `<bdi dir="ltr">${gmFormatDateTime(r.m.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' })}</bdi>`, f3(r.gross), f3(r.acc), f2(r.m.fab_fee_per_gram), f2(r.fee), f2(r.profit)] }))
+        .concat(wholesale.length > 1 ? [{ total: true, cells: ['المجموع', '', f3(ws.gross), f3(ws.acc), '', f2(ws.fee), f2(ws.profit)] }] : [])) +
+    table('مشتريات الكسر من الزبائن (بالوزن والعيار)', ['العيار', 'الوزن القائم', 'الوزن المحاسبي', 'ما يعادل عيار 24'], kRows(scrap), scrapPaid ? 'المبلغ المدفوع للكسر: ' + f2(scrapPaid) : '') +
+    table('بضاعة داخلة من التجار', ['العيار', 'الوزن القائم', 'الوزن المحاسبي', 'ما يعادل عيار 24'], kRows(fromTraders)) +
+    table('مبيعات كل موظف', ['الموظف', 'عدد الفواتير', 'مجموع الفواتير', 'مجموع الربح', 'الوزن القائم المباع', 'متوسط المصنعية / غ'],
+      staffRows.map(r => ({ cells: [escH(r.name), r.n, f2(r.revenue), f2(r.profit), f3(r.gross), f2(r.avgMaking)] })));
+
+  document.getElementById('stat-revenue').textContent = retail.revenue.toFixed(2);
+  document.getElementById('stat-profit').textContent = retail.profit.toFixed(2);
+  if (rows.length === 0) { document.getElementById('empty-state').classList.remove('hidden'); return; }
 
   document.getElementById('items-tbody').innerHTML = rows.map(r => `
     <tr class="border-t border-outline-variant ${r.isReturn ? 'bg-error-container/20' : ''}">
-      <td class="px-3 py-2">${(r.inv && r.inv.invoice_number) || '—'}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">(مرتجع)</span>' : ''}</td>
-      <td class="px-3 py-2">${gmEscapeHtml(r.it.barcode || r.it.description || '—')}</td>
+      <td class="px-3 py-2">${escH((r.inv && r.inv.invoice_number) || '—')}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">(مرتجع)</span>' : ''}</td>
+      <td class="px-3 py-2">${escH(r.it.barcode || r.it.description || '—')}</td>
       <td class="px-3 py-2 font-data-mono">${r.it.diamond ? (Number(r.it.diamond.diamond_carat).toFixed(2) + ' ct' + (r.it.diamond.has_gold ? ` + ${r.displayWeight}غ/ع${r.it.karat}` : '')) : `${r.displayWeight}غ / ع${r.it.karat}${r.displayWeight !== r.weight ? ` <span class="text-outline">(محاسبة: ${r.weight}غ)</span>` : ''}`}</td>
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>
-      <td class="px-3 py-2 font-data-mono">${r.goldValue.toFixed(2)}${r.isEstimated ? ' <span class=\"text-outline\">(تقديري)</span>' : ''}</td>
+      <td class="px-3 py-2 font-data-mono">${r.goldValue.toFixed(2)}${r.isEstimated ? ' <span class="text-outline">(تقديري)</span>' : ''}</td>
       <td class="px-3 py-2 font-data-mono">${r.vat.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono">${r.fabCost.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono">${r.diamondCost ? r.diamondCost.toFixed(2) : '—'}</td>
       <td class="px-3 py-2 font-data-mono font-bold ${r.profit >= 0 ? 'text-success' : 'text-error'}">${r.profit.toFixed(2)}</td>
-    </tr>`).join('') + (() => { const t = window.__prTotals; return `
+    </tr>`).join('') + (() => { const t = retail; return `
     <tr class="border-t-2 border-outline-variant font-bold" style="background:#F3EEDF;">
       <td class="px-3 py-2" colspan="3">المجموع (${rows.length} سطر)</td>
       <td class="px-3 py-2 font-data-mono">${t.revenue.toFixed(2)}</td>
@@ -298,6 +366,36 @@ async function applyFilters() {
       <td class="px-3 py-2 font-data-mono">${t.diamondCost ? t.diamondCost.toFixed(2) : '—'}</td>
       <td class="px-3 py-2 font-data-mono ${t.profit >= 0 ? 'text-success' : 'text-error'}">${t.profit.toFixed(2)}</td>
     </tr>`; })();
+}
+
+async function exportExcel(btn) {
+  if (!REPORT) return;
+  const R = REPORT, r2 = v => Math.round((Number(v) || 0) * 100) / 100, r3 = v => Math.round((Number(v) || 0) * 1000) / 1000;
+  const kSheet = (name, map) => ({ name, header: ['العيار', 'الوزن القائم (غ)', 'الوزن المحاسبي (غ)', 'ما يعادل عيار 24 (غ)'], sumCols: [1, 2, 3],
+    rows: Object.keys(map).sort((a, b) => b - a).map(k => [Number(k) || k, r3(map[k].gross), r3(map[k].acc), r3(map[k].pure)]) });
+  const avg = R.W.makingAcc ? R.W.makingSold / R.W.makingAcc : 0;
+  const old = btn.innerHTML; btn.disabled = true;
+  try {
+    await gmExportXlsx([
+      { name: 'الملخص', header: ['البند', 'القيمة'], rows: [
+        ['الفترة', R.fromDate + ' — ' + R.toDate],
+        ['مبيعات الزبائن (مفرق)', r2(R.retail.revenue)], ['ربح المفرق', r2(R.retail.profit)],
+        ['مصنعية الجملة', r2(R.ws.fee)], ['ربح الجملة', r2(R.ws.profit)], ['مجموع الربح', r2(R.retail.profit + R.ws.profit)],
+        ['الوزن القائم المباع (غ)', r3(R.W.gross)], ['الوزن المحاسبي المباع (غ)', r3(R.W.acc)], ['قيراط الألماس المباع', r2(R.W.carats)],
+        ['متوسط المصنعية المباعة للغرام', r2(avg)] ] },
+      { name: 'مبيعات المفرق', header: ['التاريخ', 'الفاتورة', 'مرتجع', 'القطعة', 'العيار', 'الوزن القائم', 'الوزن المحاسبي', 'قيراط', 'سعر البيع', 'قيمة الذهب', 'الضريبة', 'كلفة المصنعية', 'كلفة الماس', 'الربح'],
+        sumCols: [5, 6, 7, 8, 9, 10, 11, 12, 13],
+        rows: R.rows.map(r => [gmDateStrInTz(r.inv.created_at), r.inv.invoice_number, r.isReturn ? 'نعم' : '', r.it.barcode || r.it.description || '', r.it.karat || '',
+          r3(r.isReturn ? -r.displayWeight : r.displayWeight), r3(r.isReturn ? -r.weight : r.weight), r2(r.carats), r2(r.revenue), r2(r.goldValue), r2(r.vat), r2(r.fabCost), r2(r.diamondCost), r2(r.profit)]) },
+      { name: 'الجملة', header: ['التاريخ', 'التاجر', 'العيار', 'الوزن القائم', 'الوزن المحاسبي', 'المصنعية للغرام', 'المصنعية', 'كلفتنا', 'الربح'], sumCols: [3, 4, 6, 7, 8],
+        rows: R.wholesale.map(w => [gmDateStrInTz(w.m.created_at), (w.m.trader && w.m.trader.name) || '', w.m.karat, r3(w.gross), r3(w.acc), r2(w.m.fab_fee_per_gram), r2(w.fee), r2(w.cost), r2(w.profit)]) },
+      { name: 'الموظفون', header: ['الموظف', 'عدد الفواتير', 'مجموع الفواتير', 'مجموع الربح', 'الوزن القائم المباع', 'متوسط المصنعية للغرام'], sumCols: [1, 2, 3, 4],
+        rows: R.staffRows.map(s => [s.name, s.n, r2(s.revenue), r2(s.profit), r3(s.gross), r2(s.avgMaking)]) },
+      kSheet('مشتريات الكسر', R.scrap),
+      kSheet('وارد من التجار', R.fromTraders)
+    ], 'تقرير-الأرباح-' + R.fromDate + '-' + R.toDate + '.xlsx');
+  } catch (e) { alert('تعذّر إنشاء ملف Excel: ' + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
 }
 
 init();

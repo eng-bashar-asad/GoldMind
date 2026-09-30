@@ -60,6 +60,7 @@ test('expenses: staff can add their own expense type', async ({ page }) => {
   await page.click('.cat-chip:has-text("+ نوع جديد")');
   await page.fill('#new-cat-name', 'إيجار');
   await page.click('button:has-text("إضافة")');
+  await expect.poll(() => calls.some(c => c.name === 'save_expense_category')).toBe(true);
   expect(JSON.parse(calls.find(c => c.name === 'save_expense_category').body)).toMatchObject({ p_name: 'إيجار' });
 });
 

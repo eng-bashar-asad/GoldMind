@@ -69,3 +69,42 @@ async function gmReportPdf(sheetEl, filename, btn) {
     if (btn) { btn.disabled = false; btn.innerHTML = old; }
   }
 }
+
+// ---- Excel export (SheetJS) ----
+// sheets: [{ name, header: [...], rows: [[...]], sumCols: [colIndex...] }]
+// A totals row with SUM formulas is added under each table (so the sheet
+// recalculates if someone edits a number). In the Android app the file goes
+// to the share sheet like the PDFs do.
+async function gmExportXlsx(sheets, filename) {
+  await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js', 'XLSX');
+  var X = window.XLSX, wb = X.utils.book_new();
+  sheets.forEach(function (s) {
+    var aoa = [s.header].concat(s.rows);
+    var ws = X.utils.aoa_to_sheet(aoa);
+    if (s.sumCols && s.sumCols.length && s.rows.length) {
+      var r = aoa.length; // 0-based index of the totals row
+      X.utils.sheet_add_aoa(ws, [['المجموع']], { origin: { r: r, c: 0 } });
+      s.sumCols.forEach(function (c) {
+        var col = X.utils.encode_col(c);
+        ws[col + (r + 1)] = { t: 'n', f: 'SUM(' + col + '2:' + col + r + ')' };
+      });
+      ws['!ref'] = X.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: r, c: s.header.length - 1 } });
+    }
+    ws['!cols'] = s.header.map(function (h, c) {
+      var w = String(h).length;
+      s.rows.forEach(function (row) { w = Math.max(w, String(row[c] == null ? '' : row[c]).length); });
+      return { wch: Math.min(40, w + 2) };
+    });
+    X.utils.book_append_sheet(wb, ws, String(s.name).slice(0, 31));
+  });
+  wb.Workbook = { Views: [{ RTL: true }] };
+  var P = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins;
+  if (P && P.Filesystem && P.Share) {
+    var safe = String(filename).replace(/[\\/:*?"<>|]+/g, '-');
+    await P.Filesystem.writeFile({ path: safe, data: X.write(wb, { type: 'base64', bookType: 'xlsx' }), directory: 'CACHE' });
+    var res = await P.Filesystem.getUri({ path: safe, directory: 'CACHE' });
+    await P.Share.share({ title: safe, url: res.uri, dialogTitle: 'حفظ الملف أو مشاركته' });
+    return;
+  }
+  X.writeFile(wb, filename);
+}
