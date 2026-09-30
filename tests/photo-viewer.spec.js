@@ -30,3 +30,17 @@ test('main cashbox: a movement linked to an invoice opens it', async ({ page }) 
   await expect(page.locator('a[href="invoice-print-ar.html?id=inv9"]')).toContainText('فتح الفاتورة');
   expect(errs).toEqual([]);
 });
+
+test('invoice payment line: part payment names only what was used', async ({ page }) => {
+  await install(page, { generic: true, db: { stores: [{ id: STORE, name: 'x' }], staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {} }], user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }] } });
+  await page.goto('/invoice-print-ar.html');
+  await page.waitForFunction(() => typeof gmPaymentLabel === 'function');
+  const r = await page.evaluate(() => {
+    const st = { currency: 'USD' };
+    return [gmPaymentLabel({ payment_method: 'mixed', cash_paid_amount: 3000, bank_paid_amount: 0 }, st),
+            gmPaymentLabel({ payment_method: 'mixed', cash_paid_amount: 0, bank_paid_amount: 500 }, st),
+            gmPaymentLabel({ payment_method: 'mixed', cash_paid_amount: 100, bank_paid_amount: 50 }, st),
+            gmPaymentLabel({ payment_method: 'cash' }, st)];
+  });
+  expect(r).toEqual(['جزئي — نقداً 3,000 USD', 'جزئي — فيزا / بنك 500 USD', 'جزئي — نقداً 100 USD + فيزا / بنك 50 USD', 'نقداً']);
+});

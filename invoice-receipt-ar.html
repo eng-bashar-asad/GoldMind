@@ -143,7 +143,9 @@ async function load() {
   document.getElementById('typeLabel').textContent = TYPE_LABELS[row.invoice_type] || 'فاتورة';
   document.getElementById('invNumber').textContent = row.invoice_number || '—';
   document.getElementById('invDate').textContent = fmtDate(row.created_at);
-  document.getElementById('invPayment').textContent = PAYMENT_LABELS[row.payment_method] || row.payment_method || '—';
+  document.getElementById('invPayment').textContent = row.payment_method === 'mixed'
+    ? 'جزئي' + ([Number(row.cash_paid_amount) > 0 ? 'نقداً' : '', Number(row.bank_paid_amount) > 0 ? 'فيزا / بنك' : ''].filter(Boolean).map((x, i) => (i ? ' + ' : ' — ') + x).join(''))
+    : (PAYMENT_LABELS[row.payment_method] || row.payment_method || '—');
   document.getElementById('statusBadge').textContent = STATUS_LABELS[row.status] || row.status || '';
   document.getElementById('statusBadge').className = 'text-[11px] font-bold px-3 py-1 rounded-full ' + (STATUS_COLORS[row.status] || 'bg-gray-100 text-gray-600');
 

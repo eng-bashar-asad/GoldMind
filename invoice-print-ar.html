@@ -167,7 +167,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 <div class="flex justify-between text-[11.5px] text-gray-600 mb-2">
 <div>
 <div>رقم الفاتورة: <span class="font-bold text-gray-900" id="inv-number"></span></div>
-<div>التاريخ: <span id="inv-date"></span></div>
+<div style="white-space:nowrap">التاريخ: <span id="inv-date"></span></div>
 </div>
 <div class="text-left">
 <div>طريقة الدفع: <span id="inv-payment"></span></div>
@@ -538,11 +538,8 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         // ---- Invoice meta ----
         document.getElementById('inv-number').textContent = invoice.invoice_number || invoice.id;
         document.getElementById('inv-date').textContent = gmFormatDateTime(invoice.created_at);
-        const paymentLabels = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'جزئي (نقدي + فيزا)' };
-        document.getElementById('inv-payment').textContent = paymentLabels[invoice.payment_method] || invoice.payment_method || '';
-        if (invoice.payment_method === 'mixed' && (invoice.cash_paid_amount != null || invoice.bank_paid_amount != null)) {
-            document.getElementById('inv-payment').textContent += ` (نقدي ${gmFormatDualCurrency(invoice.cash_paid_amount || 0, store)} + فيزا/بنك ${gmFormatDualCurrency(invoice.bank_paid_amount || 0, store)})`;
-        }
+        document.getElementById('inv-date').style.whiteSpace = 'nowrap'; // date and time on one line
+        document.getElementById('inv-payment').textContent = gmPaymentLabel(invoice, store);
         document.getElementById('inv-creator').textContent = creator && creator.full_name ? creator.full_name : '—';
 
         if (invoice.status === 'cancelled') {
@@ -850,6 +847,18 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 
         loading.classList.add('hidden');
         sheet.classList.remove('hidden');
+    }
+
+    // Payment line: a part payment names only what was actually used —
+    // "جزئي — نقداً 3,000 USD", "جزئي — فيزا / بنك 500 USD", or both when both.
+    function gmPaymentLabel(invoice, store) {
+        const labels = { cash: 'نقداً', bank: 'فيزا / بنك', credit: 'دين' };
+        if (invoice.payment_method !== 'mixed') return labels[invoice.payment_method] || invoice.payment_method || '';
+        const cash = Number(invoice.cash_paid_amount || 0), bank = Number(invoice.bank_paid_amount || 0);
+        const parts = [];
+        if (cash > 0) parts.push('نقداً ' + gmFormatDualCurrency(cash, store));
+        if (bank > 0) parts.push('فيزا / بنك ' + gmFormatDualCurrency(bank, store));
+        return 'جزئي' + (parts.length ? ' — ' + parts.join(' + ') : '');
     }
 
     // WhatsApp: the invoice PDF itself goes to the customer, with a short
