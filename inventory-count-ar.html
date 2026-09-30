@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=29"></script>
 <script src="theme.js?v=33"></script>
+<script src="gm-report.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -73,6 +74,10 @@
 
 <!-- Step 1: warehouse/scope selection -->
 <div id="scope-wrap" class="hidden py-6 flex flex-col gap-5">
+<div id="past-sessions-wrap">
+<h3 class="text-[13px] font-bold mb-2">جلسات الجرد السابقة — اضغط على جلسة لعرض النواقص والزيادات ومتابعتها</h3>
+<div id="past-sessions-list" class="flex flex-col gap-2"></div>
+</div>
 <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4">
 <p class="text-[13px] text-on-surface-variant leading-relaxed">اختر المستودعات التي تريد جردها في هذه الجلسة.</p>
 </div>
@@ -163,10 +168,6 @@
 </div>
 <button id="start-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all" disabled>اختر طريقة الجرد أولاً</button>
 
-<div id="past-sessions-wrap" class="mt-4">
-<h3 class="text-[12px] font-bold text-on-surface-variant mb-2">جلسات سابقة (اضغط لعرض التفاصيل والتعديل)</h3>
-<div id="past-sessions-list" class="flex flex-col gap-2"></div>
-</div>
 </div>
 
 <!-- Step 3: live scan -->
@@ -329,8 +330,12 @@
 <div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-surplus" class="text-lg font-bold text-amber-700">0</div><div class="text-[10px]">زيادة</div></div>
 </div>
 
-<h3 class="text-[12px] font-bold text-on-surface-variant mt-2">كل المسوحات المسجّلة بهذه الجلسة</h3>
-<div id="session-scans-list" class="flex flex-col gap-1 max-h-96 overflow-y-auto"></div>
+<div id="sd-review" class="flex flex-col gap-4"></div>
+
+<details class="bg-surface-container-low rounded-xl p-3">
+<summary class="text-[12px] font-bold text-on-surface-variant cursor-pointer">كل المسوحات المسجّلة بهذه الجلسة</summary>
+<div id="session-scans-list" class="flex flex-col gap-1 max-h-96 overflow-y-auto mt-2"></div>
+</details>
 </div>
 
 </main>
@@ -465,11 +470,12 @@ async function init() {
     document.getElementById('resume-details').textContent =
       'بدأت بتاريخ ' + new Date(inProgressSession.started_at).toLocaleString('ar-AE') +
       ' — ' + (inProgressSession.method === 'camera' ? 'كاميرا' : 'RFID') + ' — ' +
-      (inProgressSession.scope || []).join(' + ');
+      (inProgressSession.scope || []).map(x => ({ gold: 'قطع ذهبية', diamond: 'ألماس' }[x] || x)).join(' + ');
     document.getElementById('resume-banner').classList.remove('hidden');
   } else {
     document.getElementById('scope-wrap').classList.remove('hidden');
   }
+  loadPastSessions();
 }
 
 async function checkInProgressSession() {
@@ -628,7 +634,6 @@ document.getElementById('scope-continue-btn').addEventListener('click', () => {
 
   document.getElementById('scope-wrap').classList.add('hidden');
   document.getElementById('start-wrap').classList.remove('hidden');
-  loadPastSessions();
 });
 
 function currentScopePool() {
@@ -685,7 +690,7 @@ async function loadPastSessions() {
     const statusLabel = s.status === 'posted' ? 'مُرحّلة' : 'مكتملة';
     row.innerHTML = `<span class="font-semibold">${methodLabel} ${dateStr}</span>
       <span class="text-on-surface-variant">${statusLabel}</span>
-      <span>${s.matched_count || 0}/${s.expected_piece_count || 0} مطابقة</span>
+      <span>${s.matched_count || 0}/${s.expected_piece_count || 0} مطابقة · <b class="text-red-700">${s.missing_count || 0}</b> ناقصة</span>
       <span class="material-symbols-outlined text-[16px] text-outline">chevron_left</span>`;
     row.onclick = () => openSessionDetail(s.id);
     list.appendChild(row);
@@ -1438,13 +1443,15 @@ let sessionDetailExpectedRows = [];
 async function openSessionDetail(countId) {
   sessionDetailId = countId;
   document.getElementById('start-wrap').classList.add('hidden');
+  document.getElementById('scope-wrap').classList.add('hidden');
   document.getElementById('session-detail-wrap').classList.remove('hidden');
   document.getElementById('header-title').textContent = 'تفاصيل الجلسة';
+  document.getElementById('sd-review').innerHTML = '<div class="text-center text-[12px] text-on-surface-variant py-6">جارِ التحميل...</div>';
 
   const [{ data: countRow }, { data: expectedRows }, { data: scanRows }] = await Promise.all([
     goldmindClient.from('inventory_counts').select('*').eq('id', countId).single(),
-    goldmindClient.from('inventory_count_expected').select('*').eq('count_id', countId),
-    goldmindClient.from('inventory_count_scans').select('*').eq('count_id', countId).order('scanned_at', { ascending: false })
+    gmFetchAllRows(() => goldmindClient.from('inventory_count_expected').select('*').eq('count_id', countId).order('match_value')),
+    gmFetchAllRows(() => goldmindClient.from('inventory_count_scans').select('*').eq('count_id', countId).order('scanned_at', { ascending: false }))
   ]);
 
   sessionDetailStatus = countRow.status;
@@ -1455,7 +1462,7 @@ async function openSessionDetail(countId) {
   const statusLabel = countRow.status === 'posted' ? 'مُرحّلة <span class="material-symbols-outlined text-green-700" style="font-size:15px;vertical-align:-3px" aria-hidden="true">check_circle</span>' : 'مكتملة';
   document.getElementById('session-detail-meta').innerHTML =
     `<div class="font-bold mb-1">${dateStr}</div>
-     <div class="text-on-surface-variant">الطريقة: ${countRow.method === 'camera' ? 'كاميرا' : 'RFID'} — النطاق: ${(countRow.scope || []).join(' + ')}</div>
+     <div class="text-on-surface-variant">الطريقة: ${countRow.method === 'camera' ? 'كاميرا' : 'RFID'} — النطاق: ${(countRow.scope || []).map(x => ({ gold: 'قطع ذهبية', diamond: 'ألماس' }[x] || x)).join(' + ')}</div>
      <div class="mt-1">الحالة: <span class="font-bold">${statusLabel}</span></div>`;
 
   const ownerActions = document.getElementById('session-owner-actions');
@@ -1494,6 +1501,7 @@ async function openSessionDetail(countId) {
 
   renderSessionDetailCounts();
   renderSessionScansList();
+  renderSessionReview();
 }
 
 function renderSessionDetailCounts() {
@@ -1538,6 +1546,7 @@ async function deleteScanRow(scanRowId) {
   await recomputeSessionCounts(sessionDetailId);
   renderSessionDetailCounts();
   renderSessionScansList();
+  renderSessionReview();
 }
 
 async function recomputeSessionCounts(countId) {
@@ -1566,9 +1575,140 @@ async function unpostSession(countId) {
   openSessionDetail(countId);
 }
 
+// ---- Past session review (2026-09-30): what is really missing, what left stock, extra scans, gold totals ----
+const SD_LEFT_LABEL = { sold: 'مباعة', gifted: 'هدية', given_to_trader: 'عند تاجر', deleted: 'محذوفة من البرنامج' };
+async function renderSessionReview() {
+  const box = document.getElementById('sd-review');
+  const scanned = new Set(sessionDetailScanRows.map(r => r.rfid_epc));
+  const missingRows = sessionDetailExpectedRows.filter(e => !scanned.has(e.match_value));
+  const goldIds = sessionDetailExpectedRows.filter(e => e.piece_source !== 'diamond').map(e => e.piece_id);
+  const diaIds = sessionDetailExpectedRows.filter(e => e.piece_source === 'diamond').map(e => e.piece_id);
+  const pieceInfo = {};
+  const chunks = async (ids, table, cols) => {
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data } = await goldmindClient.from(table).select(cols).in('id', ids.slice(i, i + 150));
+      (data || []).forEach(p => { pieceInfo[(table === 'pieces' ? 'gold:' : 'diamond:') + p.id] = p; });
+    }
+  };
+  await Promise.all([
+    chunks(goldIds, 'pieces', 'id, barcode, status, weight_grams, accounting_weight_grams, cost_fabrication_per_gram, karat, box_name, photo_url, piece_type'),
+    diaIds.length ? chunks(diaIds, 'diamond_pieces', 'id, barcode, status, photo_url') : null
+  ]);
+  const info = e => pieceInfo[(e.piece_source === 'diamond' ? 'diamond:' : 'gold:') + e.piece_id];
+  // reserved pieces are still physically in the shop, so they count as missing if not scanned
+  const stillHere = st => st === 'available' || st === 'reserved';
+  const realMissing = [], leftStock = [];
+  missingRows.forEach(e => { const p = info(e); (p && stillHere(p.status) ? realMissing : leftStock).push({ e, p }); });
+
+  // gold totals of the pieces found in the count
+  const t = { n: 0, w: 0, a: 0, fab: 0 }, mt = { w: 0, a: 0 };
+  sessionDetailExpectedRows.forEach(e => {
+    const p = info(e); if (!p || e.piece_source === 'diamond') return;
+    const w = Number(p.weight_grams) || 0, a = Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams) || 0;
+    if (scanned.has(e.match_value)) { t.n++; t.w += w; t.a += a; t.fab += a * (Number(p.cost_fabrication_per_gram) || 0); }
+    else if (stillHere(p.status)) { mt.w += w; mt.a += a; }
+  });
+
+  // extra scans: a registered piece (show its status) or an unknown / misread code
+  const surplus = sessionDetailScanRows.filter(r => r.match_status !== 'matched');
+  const lookup = surplus.map(r => r.rfid_epc).filter(v => /^[\w .-]+$/.test(v || ''));
+  const known = {};
+  for (let i = 0; i < lookup.length; i += 100) {
+    const { data } = await goldmindClient.from('pieces').select('id, barcode, status').eq('store_id', GOLDMIND_STORE_ID).in('barcode', lookup.slice(i, i + 100));
+    (data || []).forEach(p => { known[p.barcode] = p; });
+  }
+  const unknownSurplus = surplus.filter(r => !known[r.rfid_epc]);
+  const editable = sessionDetailStatus !== 'posted';
+  const f2 = v => (Number(v) || 0).toFixed(2);
+  const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+  const thumb = url => url ? `<img src="${esc(url)}" alt="" class="w-11 h-11 rounded-lg object-cover shrink-0">` : '<div class="w-11 h-11 rounded-lg bg-surface-container-low shrink-0"></div>';
+  const pieceLink = p => p ? `<a href="piece-edit-ar.html?id=${esc(p.id)}" class="text-[11.5px] font-semibold text-primary underline">فتح القطعة</a>` : '';
+  const statusLabel = st => SD_LEFT_LABEL[st] || (st === 'available' ? 'متوفرة' : st === 'reserved' ? 'محجوزة' : esc(st));
+
+  box.innerHTML = `
+  <div class="bg-surface-container-low rounded-xl p-3">
+    <div class="text-[12px] font-bold mb-2">ذهب القطع التي وُجدت بالجرد (${t.n} قطعة)</div>
+    <div class="grid grid-cols-3 gap-2 text-center">
+      <div><div class="font-bold font-data-mono">${f2(t.w)}</div><div class="text-[10px] text-on-surface-variant">الوزن القائم (غ)</div></div>
+      <div><div class="font-bold font-data-mono">${f2(t.a)}</div><div class="text-[10px] text-on-surface-variant">وزن المحاسبة (غ)</div></div>
+      <div><div class="font-bold font-data-mono">${f2(t.fab)}</div><div class="text-[10px] text-on-surface-variant">مجموع المصنعيات</div></div>
+    </div>
+    ${realMissing.length ? `<div class="text-[11px] text-red-700 mt-2">وزن الناقص فعلاً: ${f2(mt.w)} غ قائم / ${f2(mt.a)} غ محاسبة</div>` : ''}
+  </div>
+
+  <div>
+    <h3 class="text-[13px] font-bold text-red-700 mb-1">ناقصة فعلاً (${realMissing.length}) — ما زالت بالمخزن في النظام ولم تُمسح</h3>
+    <p class="text-[11px] text-on-surface-variant mb-2">ابحث عنها بالمحل. إن وجدتها اضغط "وُجدت"، وإن كانت قد خرجت فعلاً (بيع أو تاجر أو صندوق آخر) افتح القطعة وصحّح حالتها.</p>
+    <div class="flex flex-col gap-2">${realMissing.map(({ e, p }) => `
+      <div class="flex items-center gap-3 bg-red-50 rounded-xl p-2 text-[12px]">
+        ${thumb(p && p.photo_url)}
+        <div class="min-w-0 flex-1">
+          <div class="font-bold font-data-mono" dir="ltr" style="text-align:right;">${esc(e.barcode || e.match_value)}</div>
+          <div class="text-on-surface-variant truncate">${esc([p && p.piece_type, e.karat ? 'عيار ' + e.karat : '', e.weight_grams != null ? f2(e.weight_grams) + ' غ' : '', p && p.box_name, p && p.status === 'reserved' ? 'محجوزة' : ''].filter(Boolean).join(' · '))}</div>
+          ${pieceLink(p)}
+        </div>
+        ${editable ? `<button type="button" onclick="sdMarkFound('${esc(e.piece_id)}', '${esc(e.piece_source || '')}', this)" data-v="${esc(e.match_value)}" class="h-8 px-3 rounded-lg bg-green-700 text-white text-[11.5px] font-bold shrink-0">وُجدت</button>` : ''}
+      </div>`).join('') || '<div class="text-[12px] text-green-700">لا توجد قطع ناقصة فعلاً ✓</div>'}</div>
+  </div>
+
+  ${leftStock.length ? `<div>
+    <h3 class="text-[13px] font-bold mb-1">ليست ناقصة — خرجت من المخزن بعد بدء الجرد (${leftStock.length})</h3>
+    <p class="text-[11px] text-on-surface-variant mb-2">ظهرت هذه القطع ضمن الناقص لأنها كانت بالمخزن لحظة بدء الجرد. إن كانت حالتها خاطئة افتحها وصحّحها.</p>
+    <div class="flex flex-col gap-1">${leftStock.map(({ e, p }) => `
+      <div class="flex items-center justify-between gap-2 bg-surface-container-low rounded-lg px-3 py-2 text-[12px]">
+        <span class="font-data-mono" dir="ltr">${esc(e.barcode || e.match_value)}</span>
+        <span class="font-semibold">${statusLabel(p ? p.status : 'deleted')}</span>
+        ${pieceLink(p) || '<span></span>'}
+      </div>`).join('')}</div>
+  </div>` : ''}
+
+  <div>
+    <h3 class="text-[13px] font-bold text-amber-700 mb-1">زيادة (${surplus.length})</h3>
+    ${unknownSurplus.length ? `<p class="text-[11px] text-on-surface-variant mb-2">${unknownSurplus.length} منها رموز غير موجودة في النظام، وغالباً هي قراءات خاطئة من الكاميرا.</p>
+      ${editable ? `<button type="button" onclick="sdDeleteUnknown(this)" class="h-9 px-3 mb-2 rounded-lg border border-error text-error text-[12px] font-bold">حذف كل الرموز غير الموجودة في النظام (${unknownSurplus.length})</button>` : ''}` : ''}
+    <div class="flex flex-col gap-1">${surplus.filter(r => known[r.rfid_epc]).map(r => { const p = known[r.rfid_epc]; return `
+      <div class="flex items-center justify-between gap-2 bg-amber-50 rounded-lg px-3 py-2 text-[12px]">
+        <span class="font-data-mono" dir="ltr">${esc(r.rfid_epc)}</span>
+        <span>مسجّلة — ${statusLabel(p.status)}</span>
+        <a href="piece-edit-ar.html?id=${esc(p.id)}" class="text-[11.5px] font-semibold text-primary underline">فتح</a>
+      </div>`; }).join('')}</div>
+  </div>`;
+  window.__sdUnknownIds = unknownSurplus.map(r => r.id);
+}
+
+async function sdMarkFound(pieceId, source, btn) {
+  const value = btn.dataset.v;
+  if (!confirm('تأكيد: القطعة ' + value + ' موجودة فعلاً بالمحل؟ ستُسجَّل كممسوحة يدوياً باسمك.')) return;
+  btn.disabled = true;
+  const { data, error } = await goldmindClient.from('inventory_count_scans').insert({
+    store_id: GOLDMIND_STORE_ID, count_id: sessionDetailId, rfid_epc: value,
+    piece_id: source === 'diamond' ? null : pieceId, piece_source: source || null,
+    match_status: 'matched', scan_method: 'manual', scanned_by: GOLDMIND_STAFF_ID
+  }).select('id').maybeSingle();
+  if (error && error.code !== '23505') { btn.disabled = false; alert('تعذّر الحفظ: ' + error.message); return; }
+  sessionDetailScanRows.unshift({ id: (data && data.id) || ('new-' + Date.now()), rfid_epc: value, match_status: 'matched', scan_method: 'manual' });
+  await recomputeSessionCounts(sessionDetailId);
+  renderSessionDetailCounts(); renderSessionScansList(); renderSessionReview();
+}
+
+async function sdDeleteUnknown(btn) {
+  const ids = (window.__sdUnknownIds || []).filter(id => !String(id).startsWith('new-'));
+  if (!ids.length || !confirm('حذف ' + ids.length + ' مسحة لرموز غير موجودة في النظام من هذه الجلسة؟')) return;
+  btn.disabled = true;
+  for (let i = 0; i < ids.length; i += 100) {
+    const { error } = await goldmindClient.from('inventory_count_scans').delete().in('id', ids.slice(i, i + 100));
+    if (error) { btn.disabled = false; alert('تعذّر الحذف: ' + error.message); return; }
+  }
+  goldmindClient.from('audit_log').insert({ store_id: GOLDMIND_STORE_ID, action_type: 'inventory_count_scan_removed', description: 'حذف ' + ids.length + ' مسحة غير موجودة في النظام من جلسة جرد' }).then(() => {});
+  const gone = new Set(ids);
+  sessionDetailScanRows = sessionDetailScanRows.filter(r => !gone.has(r.id));
+  await recomputeSessionCounts(sessionDetailId);
+  renderSessionDetailCounts(); renderSessionScansList(); renderSessionReview();
+}
+
 function closeSessionDetail() {
   document.getElementById('session-detail-wrap').classList.add('hidden');
-  document.getElementById('start-wrap').classList.remove('hidden');
+  document.getElementById('scope-wrap').classList.remove('hidden');
   document.getElementById('header-title').textContent = 'الجرد';
   loadPastSessions();
 }
