@@ -70,7 +70,7 @@ test('missing pieces sheet: big photos, barcode, weight, karat; PDF', async ({ p
   const html = await page.evaluate(() => gmMissingSheetPages(gmMissingSheetItems, 't').map(p => p.innerHTML).join(''));
   expect(html).toContain('000002');
   expect(html).toContain('الوزن القائم: <bdi dir="ltr">12.50</bdi> غ · عيار 18');
-  expect(html).toContain('height:270px');
+  expect(html).toContain('repeat(4,1fr)');
   await page.route(/html2pdf/, r => r.fulfill({ contentType: 'text/javascript', body: require('fs').readFileSync(require('path').join(__dirname, 'node_modules/html2pdf.js/dist/html2pdf.bundle.min.js'), 'utf8') }));
   await page.route(/html2canvas/, r => r.fulfill({ contentType: 'text/javascript', body: require('fs').readFileSync(require('path').join(__dirname, 'node_modules/html2canvas/dist/html2canvas.min.js'), 'utf8') }));
   await page.evaluate(() => { window.gmSavePdf = async (w, name) => { const pdf = await w.get('pdf'); window.__pdf = { name, pages: pdf.internal.getNumberOfPages() }; }; });

@@ -53,11 +53,9 @@ test('past count review: real missing, left stock, misreads, totals', async ({ p
   expect(errs).toEqual([]);
 });
 
-test('count photos open large on tap', async ({ page }) => {
-  await page.setContent('<div id="x"></div>');
-  await page.addScriptTag({ content: require('fs').readFileSync(require('path').join(__dirname, '..', 'inventory-count-ar.html'), 'utf8').match(/function gmCountPhoto[\s\S]*?\n}\n/)[0] });
-  await page.evaluate(() => gmCountPhoto('data:image/gif;base64,R0lGODlhAQABAAAAACw='));
-  await expect(page.locator('#count-photo-box')).toBeVisible();
-  await page.click('#count-photo-box');
-  await expect(page.locator('#count-photo-box')).toBeHidden();
+test('count photo opens in its own page', async ({ page }) => {
+  await page.setContent('<div></div>');
+  await page.addScriptTag({ content: require('fs').readFileSync(require('path').join(__dirname, '..', 'inventory-count-ar.html'), 'utf8').match(/function gmCountPhoto[^\n]*\n/)[0] });
+  const args = await page.evaluate(() => { let a; window.open = (...x) => { a = x; }; gmCountPhoto('https://x.test/p.jpg'); return a; });
+  expect(args.slice(0, 2)).toEqual(['https://x.test/p.jpg', '_blank']);
 });

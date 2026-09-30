@@ -1110,24 +1110,24 @@ function toggleMissingLive() {
   if (missingLiveOpen) renderMissingLive();
 }
 // ---- Missing pieces sheet: big photo, then barcode / gross weight / karat.
-// 6 pieces per A4 page (2 × 3), each page its own block so a card is never cut.
+// 16 pieces per A4 page (4 × 4), each page its own block so a card is never cut.
 let gmMissingSheetItems = [];
 function gmMissingSheetPages(items, title) {
   const esc = v => gmEscapeHtml(v == null ? '' : String(v));
   const pages = [];
-  for (let i = 0; i < items.length; i += 6) {
+  for (let i = 0; i < items.length; i += 16) {
     const page = document.createElement('div');
     page.className = 'gm-ms-page';
     page.style.cssText = 'background:#fff;color:#111;padding:6px;font-family:Inter,sans-serif;direction:rtl';
     page.innerHTML = `<div style="display:flex;justify-content:space-between;font-size:12px;border-bottom:2px solid #111;padding-bottom:4px;margin-bottom:8px">
-        <b>${esc(title)}</b><span>${i / 6 + 1} / ${Math.ceil(items.length / 6)}</span></div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">` +
-      items.slice(i, i + 6).map(it => `<div style="border:1px solid #bbb;border-radius:10px;padding:6px;text-align:center;break-inside:avoid">
-        ${it.photo ? `<img src="${esc(it.photo)}" crossorigin="anonymous" alt="" style="width:100%;height:270px;object-fit:contain;border-radius:6px;background:#f4f4f4">`
-                   : '<div style="height:270px;display:flex;align-items:center;justify-content:center;background:#f4f4f4;border-radius:6px;color:#888">لا توجد صورة</div>'}
-        <div dir="ltr" style="font-size:22px;font-weight:800;margin-top:6px">${esc(it.barcode)}</div>
-        <div style="font-size:15px;font-weight:600">الوزن القائم: <bdi dir="ltr">${it.weight != null ? Number(it.weight).toFixed(2) : '—'}</bdi> غ · عيار ${esc(it.karat || '—')}</div>
-        ${it.type ? `<div style="font-size:12px;color:#555">${esc(it.type)}</div>` : ''}
+        <b>${esc(title)}</b><span>${i / 16 + 1} / ${Math.ceil(items.length / 16)}</span></div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px">` +
+      items.slice(i, i + 16).map(it => `<div style="border:1px solid #bbb;border-radius:8px;padding:4px;text-align:center;break-inside:avoid">
+        ${it.photo ? `<img src="${esc(it.photo)}" crossorigin="anonymous" alt="" style="width:100%;height:150px;object-fit:contain;border-radius:5px;background:#f4f4f4">`
+                   : '<div style="height:150px;display:flex;align-items:center;justify-content:center;background:#f4f4f4;border-radius:5px;color:#888;font-size:11px">لا توجد صورة</div>'}
+        <div dir="ltr" style="font-size:15px;font-weight:800;margin-top:3px">${esc(it.barcode)}</div>
+        <div style="font-size:11px;font-weight:600">الوزن القائم: <bdi dir="ltr">${it.weight != null ? Number(it.weight).toFixed(2) : '—'}</bdi> غ · عيار ${esc(it.karat || '—')}</div>
+        ${it.type ? `<div style="font-size:10px;color:#555">${esc(it.type)}</div>` : ''}
       </div>`).join('') + '</div>';
     pages.push(page);
   }
@@ -1172,20 +1172,8 @@ function gmMissingSheetButtons() {
   </div>`;
 }
 
-// big photo on top of the page (a new tab doesn't open inside the Android app)
-function gmCountPhoto(url) {
-  let box = document.getElementById('count-photo-box');
-  if (!box) {
-    box = document.createElement('div');
-    box.id = 'count-photo-box';
-    box.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.85);display:flex;align-items:center;justify-content:center;padding:16px';
-    box.innerHTML = '<img alt="صورة القطعة" style="max-width:100%;max-height:100%;border-radius:12px;object-fit:contain">';
-    box.onclick = () => { box.style.display = 'none'; };
-    document.body.appendChild(box);
-  }
-  box.querySelector('img').src = url;
-  box.style.display = 'flex';
-}
+// open the photo in its own page (from there it can be saved to the device)
+function gmCountPhoto(url) { window.open(url, '_blank', 'noopener'); }
 
 async function renderMissingLive() {
   const w = document.getElementById('missing-live-wrap');
