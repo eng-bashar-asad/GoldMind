@@ -6,7 +6,7 @@
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=30"></script>
-<script src="theme.js?v=40"></script>
+<script src="theme.js?v=41"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -234,7 +234,7 @@ async function statementWhatsApp(btn) {
   if (inv.error || debts.error) return fail('تعذّر تحميل الحركات: ' + (inv.error || debts.error).message);
   STORE = store || {}; CUSTOMER = customer; INVOICES = inv.data; DEBTS = debts.data;
   const code = (STORE.currency || 'AED').toUpperCase();
-  CUR = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س' })[code] || code;
+  CUR = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س', SYP: 'ل.س' })[code] || code;
   document.getElementById('store-name').textContent = STORE.name || 'GoldMind';
   document.getElementById('store-info').textContent = [STORE.address, STORE.phone].filter(Boolean).join(' · ');
   if (STORE.logo_url) { const l = document.getElementById('store-logo'); l.src = STORE.logo_url; l.classList.remove('hidden'); }

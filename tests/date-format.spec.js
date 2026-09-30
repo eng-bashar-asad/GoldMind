@@ -26,4 +26,7 @@ test('dates: one clear format and date boxes read left to right', async ({ page 
   expect(r.now).toBe(true);
   await page.evaluate(() => { const i = document.createElement('input'); i.type = 'date'; i.id = 'dd'; document.body.appendChild(i); });
   expect(await page.$eval('#dd', el => getComputedStyle(el).direction)).toBe('ltr');
+  // Syrian pound as the second currency (1 USD = 13000 SYP)
+  expect(await page.evaluate(() => gmFormatDualCurrency(4500, { currency: 'USD', secondary_currency: 'SYP', secondary_currency_rate: 13000 })))
+    .toBe('4,500 USD (58,500,000 SYP)');
 });
