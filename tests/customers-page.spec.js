@@ -12,7 +12,7 @@ test('customers page: retail list, search, edit, menu entry', async ({ page }) =
       { id: 'c1', store_id: STORE, name: 'ريما شالاتي', phone: '0944123456', is_company: false },
       { id: 'c2', store_id: STORE, name: 'هلا الهفل', phone: '0955000111', is_company: false },
       { id: 'c3', store_id: STORE, name: 'شركة النور', phone: '', is_company: true } ],
-    customer_debts: [{ store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', cash_amount: 500 }],
+    customer_debts: [{ store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', cash_amount: 500 }, { store_id: STORE, customer_id: 'c2', movement_type: 'debt_decrease', cash_amount: 200 }],
   } });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/customers-ar.html');
@@ -24,6 +24,13 @@ test('customers page: retail list, search, edit, menu entry', async ({ page }) =
   await page.fill('#q', '');
   await page.click('.kind[data-k="company"]');
   await expect(page.locator('#list')).toContainText('شركة النور');
+  await page.click('.kind[data-k="debt"]');
+  await expect(page.locator('#count')).toHaveText('1 زبون');
+  await page.click('.kind[data-k="credit"]');
+  await expect(page.locator('#count')).toHaveText('1 زبون');
+  await expect(page.locator('#list')).toContainText('له 200.00 $');
+  await page.click('.kind[data-k="open"]');
+  await expect(page.locator('#count')).toHaveText('2 زبون');
   await page.waitForSelector('#gmNav a[href="customers-ar.html"]', { state: 'attached' });
   expect(await page.locator('#gmNav a[href="customers-ar.html"]').textContent()).toContain('الزبائن');
   expect(errs).toEqual([]);

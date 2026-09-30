@@ -60,11 +60,13 @@
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
 <input id="q" oninput="render()" placeholder="ابحث بالاسم أو رقم الهاتف" class="w-full h-12 border border-outline-variant rounded-lg pr-10 pl-3 text-[14px] bg-surface-container-lowest"/>
 </div>
-<div class="flex gap-2 text-[13px]" id="kinds">
+<div class="flex flex-wrap gap-2 text-[13px]" id="kinds">
 <button type="button" data-k="person" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">أفراد (مفرق)</button>
 <button type="button" data-k="company" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">شركات</button>
 <button type="button" data-k="all" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">الكل</button>
 <button type="button" data-k="debt" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">عليهم دين</button>
+<button type="button" data-k="credit" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">لهم رصيد</button>
+<button type="button" data-k="open" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">لهم أو عليهم</button>
 </div>
 <div class="text-[12px] text-on-surface-variant" id="count"></div>
 <div id="list" class="flex flex-col gap-2 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3"></div>
@@ -78,6 +80,16 @@ const digits = v => String(v || '').replace(/[^0-9]/g, '');
 
 document.querySelectorAll('.kind').forEach(b => b.addEventListener('click', () => { KIND = b.dataset.k; render(); }));
 
+// which customers each filter chip keeps (balance > 0 = owes the shop, < 0 = the shop owes them)
+const KIND_OK = {
+  all: () => true,
+  person: c => !c.is_company,
+  company: c => c.is_company,
+  debt: (c, b) => b > 0.005,
+  credit: (c, b) => b < -0.005,
+  open: (c, b) => Math.abs(b) > 0.005
+};
+
 function render() {
   document.querySelectorAll('.kind').forEach(b => {
     const on = b.dataset.k === KIND;
@@ -86,7 +98,7 @@ function render() {
   });
   const q = document.getElementById('q').value.trim().toLowerCase(), qd = digits(q);
   const list = CUSTOMERS.filter(c =>
-    (KIND === 'all' || (KIND === 'company' ? c.is_company : KIND === 'person' ? !c.is_company : (BAL[c.id] || 0) > 0.005)) &&
+    (KIND_OK[KIND] || KIND_OK.all)(c, BAL[c.id] || 0) &&
     (!q || (c.name || '').toLowerCase().includes(q) || (qd.length >= 3 && digits(c.phone).includes(qd))));
   document.getElementById('count').textContent = list.length + ' زبون';
   document.getElementById('list').innerHTML = list.slice(0, 300).map(c => {
