@@ -27,13 +27,19 @@ if (!history.state) {
     .then(r => r.ok ? r.json() : null)
     .then(buildInfo => {
       if (!buildInfo || !buildInfo.sha) return;
-      return fetch('https://api.github.com/repos/eng-bashar-asad/GoldMind/commits/main', { cache: 'no-store' })
+      // Compare with the commit the downloadable APK was actually built from
+      // (written in the release notes), not the newest commit on main: a new
+      // commit is on main minutes before its APK is ready, and downloading
+      // during that gap installed the old APK again — so the banner never went away.
+      return fetch('https://api.github.com/repos/eng-bashar-asad/GoldMind/releases/tags/app-latest', { cache: 'no-store' })
         .then(r => r.ok ? r.json() : null)
-        .then(latest => {
-          if (!latest || !latest.sha) return;
-          if (latest.sha === buildInfo.sha) return; // already up to date
-          if (localStorage.getItem(DISMISS_KEY) === latest.sha) return; // user already dismissed this exact version
-          gmShowUpdateBanner(APK_URL, latest.sha);
+        .then(rel => {
+          const m = rel && String(rel.body || '').match(/commit ([0-9a-f]{40})/);
+          if (!m) return;
+          const releaseSha = m[1];
+          if (releaseSha === buildInfo.sha) return; // this phone already has the newest APK
+          if (localStorage.getItem(DISMISS_KEY) === releaseSha) return; // user already dismissed this exact version
+          gmShowUpdateBanner(APK_URL, releaseSha);
         });
     })
     .catch(() => {}); // silent — a failed version check should never block using the app
