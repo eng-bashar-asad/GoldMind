@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>التقرير المالي الشامل | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=29"></script>
+<script src="theme.js?v=33"></script>
+<script src="gm-profit.js?v=1"></script>
+<script src="gm-report.js?v=1"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+  html { font-size: 87.5%; }
+  body { background: #F3EEDF; color: #1F1A12; min-height: 100dvh; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; vertical-align: middle; }
+  .fr-chip { height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid #C9B98F; background: #FFFDF8; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .fr-chip[aria-pressed="true"] { background: #1F1A12; color: #F3EEDF; border-color: #1F1A12; }
+  .fr-card { background: #FFFDF8; border-radius: 18px; padding: 14px; }
+  .fr-sec { background: #FFFDF8; border-radius: 18px; padding: 14px 14px 6px; break-inside: avoid; }
+  .fr-sec h2 { font-size: 15px; font-weight: 700; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+  .fr-sec h2 .material-symbols-outlined { color: #8A6A1C; }
+  .fr-t { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .fr-t td, .fr-t th { padding: 7px 4px; border-top: 1px solid #EDE4CC; text-align: right; }
+  .fr-t th { font-size: 11.5px; color: #6B6150; font-weight: 600; border-top: 0; }
+  .fr-t td.n, .fr-t th.n { text-align: left; font-variant-numeric: tabular-nums; direction: ltr; white-space: nowrap; }
+  .fr-t tr.tot td { font-weight: 700; border-top: 2px solid #C9B98F; }
+  .fr-note { font-size: 11px; color: #6B6150; margin: 4px 0 8px; }
+  .pos { color: #1e7d32; } .neg { color: #b3261e; }
+  .gm-print-only { display: none; }
+  .gm-pdf { background: #fff; color: #111; padding: 6px; }
+  .gm-pdf .fr-sec, .gm-pdf .fr-card { border: 1px solid #ddd; }
+  @media print {
+    @page { size: A4 portrait; margin: 10mm; }
+    header, .no-print, #gm-offline-badge { display: none !important; }
+    .gm-print-only { display: block !important; }
+    body { background: #fff !important; }
+    main { max-width: none !important; padding: 0 !important; }
+    .fr-sec, .fr-card { border: 1px solid #ccc; }
+  }
+</style>
+</head>
+<body>
+<header class="sticky top-0 z-50" style="background:#F3EEDF;">
+<div class="flex items-center gap-3 px-4 h-16">
+<button onclick="gmSmartBack('reports-ar.html')" aria-label="رجوع" class="w-11 h-11 rounded-2xl flex items-center justify-center" style="background:#1F1A12;color:#F3E3B5;"><span class="material-symbols-outlined" style="font-size:24px;">arrow_forward</span></button>
+<h1 style="margin:0;font-size:19px;font-weight:700;">التقرير المالي الشامل</h1>
+</div>
+</header>
+
+<main class="max-w-2xl lg:max-w-4xl mx-auto px-4 pb-24">
+<div id="fr-loading" class="py-16 text-center text-sm" style="color:#6B6150;">جارِ التحميل...</div>
+<div id="fr-noaccess" class="hidden py-16 text-center text-sm" style="color:#b3261e;">ليس لديك صلاحية عرض التقارير.</div>
+
+<div id="fr-controls" class="no-print hidden flex flex-col gap-3 py-3">
+<div class="flex gap-2 overflow-x-auto pb-1" id="fr-periods" role="group" aria-label="الفترة">
+<button type="button" class="fr-chip" data-p="today">اليوم</button>
+<button type="button" class="fr-chip" data-p="yesterday">أمس</button>
+<button type="button" class="fr-chip" data-p="week">آخر 7 أيام</button>
+<button type="button" class="fr-chip" data-p="month">هذا الشهر</button>
+<button type="button" class="fr-chip" data-p="lastmonth">الشهر الماضي</button>
+<button type="button" class="fr-chip" data-p="custom">فترة محددة</button>
+</div>
+<div id="fr-custom" class="hidden fr-card grid grid-cols-2 gap-2">
+<label class="text-[12px]" style="color:#6B6150;">من تاريخ<input id="fr-from" type="date" class="w-full h-10 mt-1 rounded-lg border px-2 text-[13px]" style="border-color:#C9B98F;"/></label>
+<label class="text-[12px]" style="color:#6B6150;">إلى تاريخ<input id="fr-to" type="date" class="w-full h-10 mt-1 rounded-lg border px-2 text-[13px]" style="border-color:#C9B98F;"/></label>
+<button type="button" id="fr-apply" class="col-span-2 h-10 rounded-lg font-bold text-[13px]" style="background:#1F1A12;color:#fff;">عرض التقرير</button>
+</div>
+<label class="flex items-center gap-2 text-[13px]"><input type="checkbox" id="fr-show-list" checked class="rounded"/> إظهار قائمة الفواتير بالتفصيل</label>
+<div class="grid grid-cols-2 gap-2">
+<button type="button" onclick="window.print()" class="h-11 rounded-xl font-bold text-[14px] flex items-center justify-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined">print</span>طباعة</button>
+<button type="button" onclick="gmReportPdf(document.getElementById('fr-sheet'), 'التقرير-المالي-' + (window.__frRange ? window.__frRange.fromStr + '_' + window.__frRange.toStr : '') + '.pdf', this)" class="h-11 rounded-xl font-bold text-[14px] border flex items-center justify-center gap-1" style="border-color:#C9B98F;background:#FFFDF8;"><span class="material-symbols-outlined">picture_as_pdf</span>PDF</button>
+</div>
+</div>
+
+<div id="fr-sheet" class="hidden flex flex-col gap-3 py-2">
+<div class="gm-print-only" style="border-bottom:2px solid #1F1A12;padding-bottom:8px;">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+<div><div id="fr-store" style="font-size:16px;font-weight:700;"></div><div style="font-size:20px;font-weight:700;">التقرير المالي الشامل</div></div>
+<div style="font-size:11px;text-align:left;line-height:1.6;"><div id="fr-period-p"></div><div id="fr-printed"></div></div>
+</div>
+</div>
+<p id="fr-period" class="text-[13px] font-semibold no-print" style="color:#6B6150;"></p>
+<div id="fr-body" class="flex flex-col gap-3"></div>
+</div>
+</main>
+
+<script>
+// Comprehensive financial report for a day / week / month / any range.
+// Everything is summed server-data-side here from the same tables the rest of
+// the app uses; profit comes from the shared formula in gm-profit.js and the
+// cash section from the daily cashbox ("الحركة اليومية").
+let FR = { canProfit: false, store: null, cur: '' };
+
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+const n2 = v => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const g2 = v => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' غ';
+const money = v => n2(v) + (FR.cur ? ' ' + FR.cur : '');
+const cls = v => (Number(v) || 0) < 0 ? 'neg' : 'pos';
+const row = (label, val, extra) => `<tr${extra || ''}><td>${label}</td><td class="n">${val}</td></tr>`;
+const sec = (icon, title, inner, note) => `<section class="fr-sec"><h2><span class="material-symbols-outlined">${icon}</span>${title}</h2>${note ? `<p class="fr-note">${note}</p>` : ''}${inner}</section>`;
+const PAY = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'جزئي (نقدي + بنك + دين)' };
+const TYPE = { sale: 'بيع', return: 'مرتجع', buyTrader: 'شراء من تاجر', buyRetail: 'شراء من فرد' };
+
+function rangeFor(p) {
+  const tz = gmGetDisplayTimeZone();
+  const today = gmDateStrInTz(Date.now(), tz);
+  if (p === 'today') return { fromStr: today, toStr: today, label: 'اليوم ' + today };
+  if (p === 'yesterday') { const y = gmAddDays(today, -1); return { fromStr: y, toStr: y, label: 'أمس ' + y }; }
+  if (p === 'week') return { fromStr: gmAddDays(today, -6), toStr: today, label: 'آخر 7 أيام' };
+  const [Y, M] = today.split('-').map(Number);
+  if (p === 'month') return { fromStr: `${Y}-${String(M).padStart(2, '0')}-01`, toStr: today, label: 'هذا الشهر' };
+  if (p === 'lastmonth') {
+    const py = M === 1 ? Y - 1 : Y, pm = M === 1 ? 12 : M - 1;
+    const last = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+    return { fromStr: `${py}-${String(pm).padStart(2, '0')}-01`, toStr: `${py}-${String(pm).padStart(2, '0')}-${last}`, label: 'الشهر الماضي' };
+  }
+  const f = document.getElementById('fr-from').value, t = document.getElementById('fr-to').value;
+  if (!f || !t) return null;
+  return f <= t ? { fromStr: f, toStr: t, label: 'فترة محددة' } : { fromStr: t, toStr: f, label: 'فترة محددة' };
+}
+
+function setPeriod(p) {
+  document.querySelectorAll('#fr-periods .fr-chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.p === p)));
+  document.getElementById('fr-custom').classList.toggle('hidden', p !== 'custom');
+  try { localStorage.setItem('gm_fr_period', p); } catch (e) { /* ignore */ }
+  if (p === 'custom' && !rangeFor('custom')) return;
+  load(rangeFor(p));
+}
+
+async function inChunks(ids, fn) {
+  const out = [];
+  for (let i = 0; i < ids.length; i += 150) {
+    const { data, error } = await fn(ids.slice(i, i + 150));
+    if (error) throw error;
+    out.push(...(data || []));
+  }
+  return out;
+}
+
+async function load(r) {
+  if (!r) return;
+  window.__frRange = r;
+  const { from, to } = gmRangeISO(r.fromStr, r.toStr);
+  document.getElementById('fr-period').innerHTML = `${esc(r.label)} — من <bdi dir="ltr">${esc(r.fromStr)}</bdi> إلى <bdi dir="ltr">${esc(r.toStr)}</bdi>`;
+  document.getElementById('fr-period-p').innerHTML = 'الفترة: من <bdi dir="ltr">' + esc(r.fromStr) + '</bdi> إلى <bdi dir="ltr">' + esc(r.toStr) + '</bdi>';
+  document.getElementById('fr-printed').textContent = 'تاريخ الطباعة: ' + gmFormatDateTime(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  const body = document.getElementById('fr-body');
+  body.innerHTML = '<div class="py-10 text-center text-sm" style="color:#6B6150;">جارِ تجهيز التقرير...</div>';
+  try {
+    body.innerHTML = await build(from, to);
+  } catch (e) {
+    body.innerHTML = `<div class="fr-card text-sm" style="color:#b3261e;">تعذّر تجهيز التقرير: ${esc(e.message || e)}</div>`;
+  }
+}
+
+async function build(from, to) {
+  const S = GOLDMIND_STORE_ID, q = () => goldmindClient;
+  const inPeriod = (t) => t.gte('created_at', from).lt('created_at', to);
+
+  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR] = await Promise.all([
+    gmFetchAllRows(() => inPeriod(q().from('invoices').select('id, invoice_number, type, payment_method, total_amount, amount_paid, cash_paid_amount, bank_paid_amount, created_at, counterparty_name').eq('store_id', S).neq('status', 'cancelled')).order('created_at')),
+    inPeriod(q().from('invoices').select('id', { count: 'exact', head: true }).eq('store_id', S).eq('status', 'cancelled')),
+    gmFetchAllRows(() => inPeriod(q().from('expense_entries').select('amount, description, category:category_id(name)').eq('store_id', S))),
+    gmFetchAllRows(() => inPeriod(q().from('daily_cash_log').select('direction, amount, currency').eq('store_id', S))),
+    gmFetchAllRows(() => q().from('daily_cash_log').select('direction, amount, currency').eq('store_id', S).lt('created_at', from)),
+    gmFetchAllRows(() => inPeriod(q().from('customer_debts').select('movement_type, cash_amount, gold_grams_24k').eq('store_id', S))),
+    gmFetchAllRows(() => q().from('customer_debts').select('movement_type, cash_amount, gold_grams_24k').eq('store_id', S).lt('created_at', to)),
+    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('movement_type, gold_24k_equivalent, fab_fee_amount').eq('store_id', S))),
+    gmFetchAllRows(() => q().from('trader_movements').select('movement_type, gold_24k_equivalent').eq('store_id', S).lt('created_at', to)),
+    gmFetchAllRows(() => q().from('pieces').select('weight_grams, accounting_weight_grams, karat').eq('store_id', S).eq('status', 'available')),
+    q().from('gold_stock_lots').select('weight_grams_remaining, karat').eq('store_id', S),
+    q().from('gold_prices').select('karat, price_per_gram').eq('store_id', S)
+  ]);
+  for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR]) if (x.error) throw x.error;
+
+  const invoices = invR.data;
+  const byType = t => invoices.filter(i => i.type === t);
+  const sales = byType('sale'), returns = byType('return');
+  const buys = invoices.filter(i => i.type === 'buyTrader' || i.type === 'buyRetail');
+  const sum = (arr, f) => arr.reduce((a, x) => a + (Number(typeof f === 'function' ? f(x) : x[f]) || 0), 0);
+  const priceMap = {}; (pricesR.data || []).forEach(p => priceMap[p.karat] = Number(p.price_per_gram));
+  const vatMul = 1 + Number((FR.store && FR.store.vat_rate) || 0) / 100;
+
+  // ---- lines (profit + weights)
+  const saleIds = sales.concat(returns).map(i => i.id), buyIds = buys.map(i => i.id);
+  const items = saleIds.length ? await inChunks(saleIds, ids => q().from('invoice_items').select(GM_PROFIT_ITEM_SELECT).in('invoice_id', ids)) : [];
+  const buyItems = buyIds.length ? await inChunks(buyIds, ids => q().from('invoice_items').select('invoice_id, weight_grams, accounting_weight_grams, karat, line_total').in('invoice_id', ids)) : [];
+  const invType = {}; invoices.forEach(i => invType[i.id] = i.type);
+  const P = { revenue: 0, goldValue: 0, vat: 0, fabCost: 0, diamondCost: 0, profit: 0, estimated: 0 };
+  const soldByKarat = {};
+  items.forEach(it => {
+    const ret = invType[it.invoice_id] === 'return';
+    const p = gmLineProfit(it, ret, vatMul, priceMap);
+    ['revenue', 'goldValue', 'vat', 'fabCost', 'diamondCost', 'profit'].forEach(k => P[k] += p[k]);
+    if (p.isEstimated) P.estimated++;
+    if (it.karat) {
+      const k = soldByKarat[it.karat] || (soldByKarat[it.karat] = { g: 0, a: 0 });
+      k.g += (ret ? -1 : 1) * p.grossWeight; k.a += (ret ? -1 : 1) * Math.abs(p.weight);
+    }
+  });
+  const boughtByKarat = {};
+  buyItems.forEach(it => {
+    if (!it.karat) return;
+    const k = boughtByKarat[it.karat] || (boughtByKarat[it.karat] = { g: 0, a: 0 });
+    k.g += Number(it.weight_grams) || 0;
+    k.a += Number(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams) || 0;
+  });
+
+  // ---- sales figures
+  const salesTotal = sum(sales, 'total_amount'), returnsTotal = sum(returns, 'total_amount');
+  const netSales = salesTotal - returnsTotal;
+  const collected = sum(sales, 'amount_paid');
+  const payTotals = {};
+  sales.forEach(i => { payTotals[i.payment_method] = (payTotals[i.payment_method] || 0) + Number(i.total_amount || 0); });
+  const buysTrader = buys.filter(i => i.type === 'buyTrader'), buysRetail = buys.filter(i => i.type === 'buyRetail');
+  const buysTotal = sum(buys, 'total_amount');
+  const buysUnpaid = sum(buys, i => Number(i.total_amount || 0) - Number(i.amount_paid || 0));
+
+  // ---- expenses
+  const expByCat = {};
+  expR.data.forEach(e => { const c = (e.category && e.category.name) || 'غير مصنّف'; expByCat[c] = (expByCat[c] || 0) + Number(e.amount || 0); });
+  const expTotal = sum(expR.data, 'amount');
+
+  // ---- cashbox per currency
+  const cashCur = {};
+  const addCash = (rows, key) => rows.forEach(c => {
+    const cur = c.currency || FR.store.currency || '';
+    const o = cashCur[cur] || (cashCur[cur] = { open: 0, inn: 0, out: 0 });
+    const a = Number(c.amount || 0);
+    if (key === 'open') o.open += c.direction === 'in' ? a : -a; else if (c.direction === 'in') o.inn += a; else o.out += a;
+  });
+  addCash(cashBeforeR.data, 'open'); addCash(cashR.data, 'period');
+
+  // ---- debts
+  const cdIn = sum(cdebtR.data.filter(m => m.movement_type === 'debt_increase'), 'cash_amount');
+  const cdOut = sum(cdebtR.data.filter(m => m.movement_type !== 'debt_increase'), 'cash_amount');
+  const cdBal = cdebtAllR.data.reduce((a, m) => a + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0), 0);
+  const tIncr = sum(tmR.data.filter(m => m.movement_type === 'debt_increase'), 'gold_24k_equivalent');
+  const tDecr = sum(tmR.data.filter(m => m.movement_type !== 'debt_increase'), 'gold_24k_equivalent');
+  // same sign as ledger-ar.html: positive = traders owe the shop gold
+  const tBal = tmAllR.data.reduce((a, m) => a + (m.movement_type === 'debt_increase' ? -1 : 1) * Number(m.gold_24k_equivalent || 0), 0);
+
+  // ---- stock now
+  let stock24 = 0; const stockByKarat = {};
+  piecesR.data.forEach(p => { const w = Number(p.weight_grams) || 0; stock24 += w * (Number(p.karat) || 0) / 24; stockByKarat[p.karat] = (stockByKarat[p.karat] || 0) + w; });
+  (lotsR.data || []).forEach(l => { const w = Number(l.weight_grams_remaining) || 0; stock24 += w * (Number(l.karat) || 0) / 24; stockByKarat[l.karat] = (stockByKarat[l.karat] || 0) + w; });
+
+  // ---- render
+  const netProfit = P.profit - expTotal;
+  let h = '';
+  const tiles = [
+    ['صافي المبيعات', money(netSales), ''],
+    ['المشتريات', money(buysTotal), ''],
+    ['المصاريف', money(expTotal), ''],
+  ];
+  if (FR.canProfit) { tiles.push(['ربح المبيعات', money(P.profit), cls(P.profit)]); tiles.push(['صافي الربح بعد المصاريف', money(netProfit), cls(netProfit)]); }
+  h += `<div class="grid grid-cols-2 gap-2">${tiles.map(t => `<div class="fr-card"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div></div>`).join('')}</div>`;
+
+  h += sec('point_of_sale', 'المبيعات', `<table class="fr-t">
+    ${row('عدد فواتير البيع', sales.length)}
+    ${row('إجمالي المبيعات', money(salesTotal))}
+    ${row('المرتجعات (' + returns.length + ')', money(-returnsTotal))}
+    ${row('صافي المبيعات', money(netSales), ' class="tot"')}
+    ${Object.keys(payTotals).map(k => row('— ' + (PAY[k] || k), money(payTotals[k]))).join('')}
+    ${row('المحصّل فعلاً من فواتير البيع', money(collected))}
+    ${row('بقي ديناً على الزبائن من فواتير الفترة', money(salesTotal - collected))}
+    ${cancR.count ? row('فواتير ملغاة (غير محسوبة)', cancR.count) : ''}
+  </table>`);
+
+  if (FR.canProfit) {
+    h += sec('trending_up', 'الأرباح', `<table class="fr-t">
+      ${row('صافي قيمة المبيعات', money(P.revenue))}
+      ${row('قيمة الذهب (بسعر يوم البيع × الوزن المحاسبي)', money(-P.goldValue))}
+      ${row('الضريبة', money(-P.vat))}
+      ${row('كلفة المصنعية', money(-P.fabCost))}
+      ${P.diamondCost ? row('كلفة الماس', money(-P.diamondCost)) : ''}
+      ${row('ربح المبيعات', `<span class="${cls(P.profit)}">${money(P.profit)}</span>`, ' class="tot"')}
+      ${row('المصاريف', money(-expTotal))}
+      ${row('صافي الربح', `<span class="${cls(netProfit)}">${money(netProfit)}</span>`, ' class="tot"')}
+    </table>`, P.estimated ? `تنبيه: ${P.estimated} سطر قديم بلا سعر ذهب محفوظ — حُسب بسعر اليوم تقديرياً.` : 'نفس طريقة تقرير الأرباح بالضبط.');
+  }
+
+  h += sec('shopping_bag', 'المشتريات', `<table class="fr-t">
+    ${row('من التجار (' + buysTrader.length + ' فاتورة)', money(sum(buysTrader, 'total_amount')))}
+    ${row('من الأفراد (' + buysRetail.length + ' فاتورة)', money(sum(buysRetail, 'total_amount')))}
+    ${row('إجمالي المشتريات', money(buysTotal), ' class="tot"')}
+    ${buysUnpaid > 0.005 ? row('غير مدفوع منها (دين علينا)', money(buysUnpaid)) : ''}
+  </table>`);
+
+  const cats = Object.keys(expByCat).sort((a, b) => expByCat[b] - expByCat[a]);
+  h += sec('receipt_long', 'المصاريف', cats.length ? `<table class="fr-t">${cats.map(c => row(esc(c), money(expByCat[c]))).join('')}${row('إجمالي المصاريف', money(expTotal), ' class="tot"')}</table>` : '<p class="fr-note">لا توجد مصاريف مسجّلة بهذه الفترة.</p>');
+
+  const curs = Object.keys(cashCur);
+  h += sec('account_balance_wallet', 'الصندوق (الحركة اليومية)', curs.length ? `<table class="fr-t">
+    <tr><th>العملة</th><th class="n">أول الفترة</th><th class="n">داخل</th><th class="n">خارج</th><th class="n">آخر الفترة</th></tr>
+    ${curs.map(c => { const o = cashCur[c], end = o.open + o.inn - o.out; return `<tr><td>${esc(c)}</td><td class="n">${n2(o.open)}</td><td class="n pos">${n2(o.inn)}</td><td class="n neg">${n2(o.out)}</td><td class="n" style="font-weight:700;">${n2(end)}</td></tr>`; }).join('')}
+  </table>` : '<p class="fr-note">لا توجد حركات صندوق.</p>', 'من نفس سجل صفحة "الحركة اليومية" — يشمل قبض المبيعات ودفع المشتريات والمصاريف وكل الإدخالات اليدوية.');
+
+  h += sec('handshake', 'الديون', `<table class="fr-t">
+    <tr><th colspan="2">الزبائن (نقدي)</th></tr>
+    ${row('ديون جديدة على الزبائن بالفترة', money(cdIn))}
+    ${row('دفعات استلمناها من الزبائن', money(cdOut))}
+    ${row('رصيد ديون الزبائن لنا (آخر الفترة)', money(cdBal), ' class="tot"')}
+    <tr><th colspan="2">التجار (ذهب بعيار 24)</th></tr>
+    ${row('ذهب أصبح علينا للتجار خلال الفترة', g2(tIncr))}
+    ${row('ذهب أصبح لنا أو سدّدناه للتجار خلال الفترة', g2(tDecr))}
+    ${row(tBal >= 0 ? 'صافي: لنا عند التجار (آخر الفترة)' : 'صافي: علينا للتجار (آخر الفترة)', g2(Math.abs(tBal)), ' class="tot"')}
+  </table>`);
+
+  const karats = Array.from(new Set([...Object.keys(soldByKarat), ...Object.keys(boughtByKarat), ...Object.keys(stockByKarat)])).filter(k => k && k !== 'null').sort((a, b) => b - a);
+  h += sec('diamond', 'الذهب بالوزن', karats.length ? `<table class="fr-t">
+    <tr><th>العيار</th><th class="n">مباع (قائم)</th><th class="n">مشترى (قائم)</th><th class="n">بالمخزن الآن</th></tr>
+    ${karats.map(k => `<tr><td>${esc(k)}</td><td class="n">${n2((soldByKarat[k] || {}).g)}</td><td class="n">${n2((boughtByKarat[k] || {}).g)}</td><td class="n">${n2(stockByKarat[k])}</td></tr>`).join('')}
+    <tr class="tot"><td>المخزن الآن بعيار 24</td><td></td><td></td><td class="n">${n2(stock24)}</td></tr>
+  </table>` : '<p class="fr-note">لا توجد حركة ذهب.</p>', 'الأوزان بالغرام. عمود "بالمخزن الآن" هو الرصيد الحالي، وليس في تاريخ نهاية الفترة.');
+
+  if (document.getElementById('fr-show-list').checked && invoices.length) {
+    h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<table class="fr-t">
+      <tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>الدفع</th><th class="n">المبلغ</th></tr>
+      ${invoices.map(i => `<tr style="font-size:11.5px;"><td dir="ltr" style="text-align:right;white-space:nowrap;">${esc(String(i.invoice_number || '').replace(/-20\d\d-0*/, '-'))}</td><td>${TYPE[i.type] || esc(i.type)}</td><td style="white-space:nowrap;" dir="ltr">${gmFormatDateTime(i.created_at, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td><td>${PAY[i.payment_method] || esc(i.payment_method || '')}</td><td class="n">${n2((i.type === 'return' ? -1 : 1) * Number(i.total_amount || 0))}</td></tr>`).join('')}
+    </table>`);
+  }
+  return h;
+}
+
+(async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const [{ data: me }, { data: store }] = await Promise.all([
+    goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+    goldmindClient.from('stores').select('name, currency, vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+  ]);
+  document.getElementById('fr-loading').classList.add('hidden');
+  const owner = me && me.role === 'owner', perm = (me && me.permissions) || {};
+  if (!owner && !perm.view_reports) { document.getElementById('fr-noaccess').classList.remove('hidden'); return; }
+  FR.canProfit = owner || !!perm.view_profit_report;
+  FR.store = store || {};
+  FR.cur = FR.store.currency || '';
+  document.getElementById('fr-store').textContent = FR.store.name || '';
+  document.getElementById('fr-controls').classList.remove('hidden');
+  document.getElementById('fr-sheet').classList.remove('hidden');
+  document.querySelectorAll('#fr-periods .fr-chip').forEach(b => b.addEventListener('click', () => setPeriod(b.dataset.p)));
+  document.getElementById('fr-apply').addEventListener('click', () => { const r = rangeFor('custom'); if (!r) { alert('اختر تاريخ البداية والنهاية'); return; } load(r); });
+  document.getElementById('fr-show-list').addEventListener('change', () => load(window.__frRange));
+  let p = 'today'; try { p = localStorage.getItem('gm_fr_period') || 'today'; } catch (e) { /* ignore */ }
+  if (p === 'custom') p = 'today';
+  setPeriod(p);
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js').catch(() => {}); });
+}
+</script>
+</body></html>

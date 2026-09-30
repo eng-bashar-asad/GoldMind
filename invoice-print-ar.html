@@ -21,6 +21,7 @@
 <script src="supabase-config.js?v=29"></script>
 <script src="pint-ae.js"></script>
 <script src="theme.js?v=33"></script>
+<script src="gm-profit.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -417,7 +418,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         }
 
         const [{ data: items, error: itemsError }, { data: customer }, { data: trader }, { data: creator }] = await Promise.all([
-            goldmindClient.from('invoice_items').select('*, piece:piece_id(cost_fabrication_per_gram, accent_diamond_carat, accent_diamond_price_per_carat), lot:gold_stock_lot_id(cost_fabrication_per_gram), diamond:diamond_piece_id(diamond_carat, diamond_price_per_carat, has_gold, gold_cost_fabrication_per_gram)').eq('invoice_id', invoiceId).order('id', { ascending: true }),
+            goldmindClient.from('invoice_items').select(GM_PROFIT_ITEM_SELECT).eq('invoice_id', invoiceId).order('id', { ascending: true }),
             invoice.customer_id
                 ? goldmindClient.from('customers').select('*').eq('id', invoice.customer_id).single()
                 : Promise.resolve({ data: null }),
@@ -821,21 +822,9 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
                 const sign = invoice.type === 'return' ? -1 : 1;
                 let totalProfit = 0;
                 const profitRows = (items || []).map(it => {
-                    const goldPrice = it.gold_price_per_gram != null ? Number(it.gold_price_per_gram) : (livePriceMap[it.karat] || 0);
-                    const weight = Number(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams) || 0;
-                    const revenue = sign * (Number(it.line_total) || 0);
-                    const goldValue = sign * (weight * goldPrice);
-                    const beforeTax = revenue / vatMultiplier;
-                    const vatPart = revenue - beforeTax;
-                    const fabCost = it.lot && it.fabrication_fee
-                        ? sign * Number(it.fabrication_fee)
-                        : sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || ((it.diamond && it.diamond.has_gold && it.diamond.gold_cost_fabrication_per_gram) || 0)));
-                    const diamondCost = it.diamond ? sign * (Number(it.diamond.diamond_carat || 0) * Number(it.diamond.diamond_price_per_carat || 0)) : 0;
-                    // Small accent diamonds (Di) recorded on the piece itself -- same as profit-report-ar.html.
-                    const accentDiamondCost = it.piece ? sign * (Number(it.piece.accent_diamond_carat || 0) * Number(it.piece.accent_diamond_price_per_carat || 0)) : 0;
-                    const profit = revenue - goldValue - vatPart - fabCost - diamondCost - accentDiamondCost;
-                    totalProfit += profit;
-                    return { desc: it.description || it.barcode || 'قطعة', revenue, goldValue, fabCost: fabCost + diamondCost + accentDiamondCost, profit };
+                    const p = gmLineProfit(it, invoice.type === 'return', vatMultiplier, livePriceMap); // shared formula (gm-profit.js)
+                    totalProfit += p.profit;
+                    return { desc: it.description || it.barcode || 'قطعة', revenue: p.revenue, goldValue: p.goldValue, fabCost: p.fabCost + p.diamondCost, profit: p.profit };
                 });
 
                 document.getElementById('profit-tbody').innerHTML = profitRows.map(r => `

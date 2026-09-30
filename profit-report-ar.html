@@ -13,6 +13,8 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=29"></script>
 <script src="theme.js?v=33"></script>
+<script src="gm-profit.js?v=1"></script>
+<script src="gm-report.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -37,6 +39,21 @@
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
+<style>
+  .gm-print-only{display:none}
+  .gm-pdf{background:#fff;color:#111;padding:8px}
+  .gm-pdf table{font-size:10px}
+  @media print {
+    @page { size: A4 landscape; margin: 10mm; }
+    header, .no-print, #gm-offline-badge { display: none !important; }
+    .gm-print-only { display: block !important; }
+    body { background: #fff !important; min-height: 0 !important; }
+    main { max-width: none !important; padding: 0 !important; }
+    table { font-size: 10px !important; }
+    tr { break-inside: avoid; }
+    .overflow-x-auto, .overflow-hidden { overflow: visible !important; }
+  }
+</style>
 </head>
 <body class="bg-background text-on-background font-body-md">
 <header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
@@ -56,10 +73,16 @@
 <div id="no-prices" class="hidden py-16 text-center text-on-surface-variant text-sm">لم يتم تحديد سعر الذهب بعد — <a class="text-secondary font-semibold" href="gold-price-ar.html">حدّده من هنا</a> أولاً.</div>
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
+<div class="gm-print-only" style="border-bottom:2px solid #1F1A12;padding-bottom:8px;margin-bottom:4px;">
+<div style="display:flex;justify-content:space-between;align-items:flex-end;gap:12px;">
+<div><div id="pr-store" style="font-size:16px;font-weight:700;"></div><div style="font-size:20px;font-weight:700;">تقرير الأرباح</div></div>
+<div style="font-size:11px;text-align:left;line-height:1.6;"><div id="pr-period"></div><div id="pr-box"></div><div id="pr-printed"></div></div>
+</div>
+</div>
 
 <p class="text-[11px] text-outline">الربح = سعر البيع − قيمة الذهب (بسعر السوق وقت البيع نفسه) − الضريبة − كلفة المصنعية المسجّلة على القطعة (وزن القطعة × كلفة المصنعية للغرام). هذا هو صافي ربح المصنعية الفعلي — سعر الذهب نفسه لا يُحتسب ربحاً لأنك تشتري بديله بسعر السوق.</p>
 
-<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex flex-col gap-3">
+<div class="no-print bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex flex-col gap-3">
 <div class="grid grid-cols-2 gap-2">
 <div>
 <label class="text-[10px] text-outline block mb-1">من تاريخ</label>
@@ -77,6 +100,10 @@
 </select>
 </div>
 <button id="apply-filters-btn" class="w-full h-10 bg-primary text-on-primary rounded-lg font-semibold text-[13px]">تطبيق الفلتر</button>
+<div class="grid grid-cols-2 gap-2">
+<button type="button" onclick="window.print()" class="h-10 rounded-lg font-semibold text-[13px] flex items-center justify-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined">print</span>طباعة</button>
+<button type="button" id="pr-pdf-btn" onclick="gmReportPdf(document.getElementById('page-content'), 'تقرير-الأرباح.pdf', this)" class="h-10 rounded-lg font-semibold text-[13px] border border-outline-variant flex items-center justify-center gap-1"><span class="material-symbols-outlined">picture_as_pdf</span>PDF</button>
+</div>
 </div>
 
 <div class="grid grid-cols-2 gap-3">
@@ -90,7 +117,7 @@
 </div>
 </div>
 
-<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-x-auto">
 <table class="w-full text-right text-[12px]">
 <thead>
 <tr class="bg-surface-container-low">
@@ -121,8 +148,8 @@ async function init() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
 
-  const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-  const canView = staffRow && staffRow.permissions && staffRow.permissions.view_profit_report;
+  const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const canView = staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.view_profit_report));
 
   document.getElementById('loading-state').classList.add('hidden');
 
@@ -136,7 +163,8 @@ async function init() {
   const { data: prices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
   (prices || []).forEach(p => livePriceMap[p.karat] = Number(p.price_per_gram));
 
-  const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate, name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  document.getElementById('pr-store').textContent = (storeRow && storeRow.name) || '';
   const vatRate = Number((storeRow && storeRow.vat_rate) || 0);
   vatMultiplier = 1 + (vatRate / 100);
 
@@ -171,13 +199,17 @@ async function applyFilters() {
   const boxFilter = document.getElementById('box-filter').value;
 
   document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('pr-period').innerHTML = 'الفترة: ' + (fromDate || toDate ? 'من <bdi dir="ltr">' + gmEscapeHtml(fromDate || '…') + '</bdi> إلى <bdi dir="ltr">' + gmEscapeHtml(toDate || '…') + '</bdi>' : 'آخر 200 فاتورة');
+  document.getElementById('pr-box').textContent = boxFilter ? 'الصندوق: ' + boxFilter : '';
+  document.getElementById('pr-printed').textContent = 'تاريخ الطباعة: ' + gmFormatDateTime(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
 
   let invoiceQuery = goldmindClient
     .from('invoices').select('id, invoice_number, created_at, type')
     .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return']).neq('status', 'cancelled')
     .order('created_at', { ascending: false });
-  if (fromDate) invoiceQuery = invoiceQuery.gte('created_at', fromDate + 'T00:00:00');
-  if (toDate) invoiceQuery = invoiceQuery.lte('created_at', toDate + 'T23:59:59');
+  // day boundaries in the shop's timezone (gm-report.js), not UTC
+  if (fromDate) invoiceQuery = invoiceQuery.gte('created_at', gmDayStartISO(fromDate));
+  if (toDate) invoiceQuery = invoiceQuery.lt('created_at', gmDayStartISO(gmAddDays(toDate, 1)));
   // With no date range given, keep the previous safety cap; a bounded
   // range is presumably deliberate and shouldn't be silently truncated.
   if (!fromDate && !toDate) invoiceQuery = invoiceQuery.limit(200);
@@ -197,7 +229,7 @@ async function applyFilters() {
 
   const { data: items, error } = await goldmindClient
     .from('invoice_items')
-    .select('*, piece:piece_id(cost_fabrication_per_gram, accent_diamond_carat, accent_diamond_price_per_carat, box_name), lot:gold_stock_lot_id(cost_fabrication_per_gram), diamond:diamond_piece_id(diamond_carat, diamond_price_per_carat, has_gold, gold_cost_fabrication_per_gram, box_name)')
+    .select(GM_PROFIT_ITEM_SELECT)
     .in('invoice_id', invoiceIds);
 
   if (error) {
@@ -222,43 +254,21 @@ async function applyFilters() {
 
   let totalRevenue = 0, totalVat = 0, totalGold = 0, totalProfit = 0;
   const rows = filteredItems.map(it => {
-    // Prefer the price snapshotted at the moment of THIS sale; only fall
-    // back to today's live price for older sales made before snapshotting existed.
-    const goldPrice = it.gold_price_per_gram != null ? Number(it.gold_price_per_gram) : (livePriceMap[it.karat] || 0);
-    const isEstimated = it.gold_price_per_gram == null;
-    const weight = Number(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams) || 0;
-    const displayWeight = Number(it.weight_grams) || 0;
     const inv = invoiceMap[it.invoice_id];
-    // A returned item reverses its original sale: revenue, gold value, VAT,
-    // fabrication cost, and profit all flow the opposite direction.
     const isReturn = inv && inv.type === 'return';
-    const sign = isReturn ? -1 : 1;
-    const revenue = sign * (Number(it.line_total) || 0);
-    const goldValue = sign * (weight * goldPrice);
-    const beforeTax = revenue / vatMultiplier;
-    const vat = revenue - beforeTax;
-    // Pooled opening-stock lots carry a manually entered fee per piece
-    // (stored directly on the invoice_item) instead of a fixed per-gram
-    // rate — prefer that stored amount when present, over the lot/piece rate.
-    const fabCost = it.lot && it.fabrication_fee
-      ? sign * Number(it.fabrication_fee)
-      : sign * (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) || ((it.diamond && it.diamond.has_gold && it.diamond.gold_cost_fabrication_per_gram) || 0)));
-    // Diamond-sourced lines carry their own acquisition cost (carat × price/carat),
-    // separate from any gold portion already priced above.
-    const diamondCost = it.diamond ? sign * (Number(it.diamond.diamond_carat || 0) * Number(it.diamond.diamond_price_per_carat || 0)) : 0;
-    // A gold piece can also carry small accent diamonds (carat × price/carat)
-    // recorded directly on the piece itself, separate from a full diamond_pieces record.
-    const accentDiamondCost = it.piece ? sign * (Number(it.piece.accent_diamond_carat || 0) * Number(it.piece.accent_diamond_price_per_carat || 0)) : 0;
-    const profit = revenue - goldValue - vat - fabCost - diamondCost - accentDiamondCost;
-
+    const p = gmLineProfit(it, isReturn, vatMultiplier, livePriceMap); // shared formula (gm-profit.js)
+    const { revenue, goldValue, vat, fabCost, profit, weight, goldPrice, isEstimated } = p;
+    const displayWeight = p.grossWeight;
     totalRevenue += revenue;
     totalVat += vat;
     totalGold += goldValue;
     totalProfit += profit;
 
-    return { it, inv, isReturn, weight, displayWeight, revenue, goldValue, vat, fabCost, diamondCost: diamondCost + accentDiamondCost, profit, goldPrice, isEstimated };
+    return { it, inv, isReturn, weight, displayWeight, revenue, goldValue, vat, fabCost, diamondCost: p.diamondCost, profit, goldPrice, isEstimated };
   });
 
+  const sum = k => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
+  window.__prTotals = { revenue: sum('revenue'), goldValue: sum('goldValue'), vat: sum('vat'), fabCost: sum('fabCost'), diamondCost: sum('diamondCost'), profit: sum('profit') };
   document.getElementById('stat-revenue').textContent = totalRevenue.toFixed(2);
   document.getElementById('stat-profit').textContent = totalProfit.toFixed(2);
 
@@ -278,7 +288,16 @@ async function applyFilters() {
       <td class="px-3 py-2 font-data-mono">${r.fabCost.toFixed(2)}</td>
       <td class="px-3 py-2 font-data-mono">${r.diamondCost ? r.diamondCost.toFixed(2) : '—'}</td>
       <td class="px-3 py-2 font-data-mono font-bold ${r.profit >= 0 ? 'text-success' : 'text-error'}">${r.profit.toFixed(2)}</td>
-    </tr>`).join('');
+    </tr>`).join('') + (() => { const t = window.__prTotals; return `
+    <tr class="border-t-2 border-outline-variant font-bold" style="background:#F3EEDF;">
+      <td class="px-3 py-2" colspan="3">المجموع (${rows.length} سطر)</td>
+      <td class="px-3 py-2 font-data-mono">${t.revenue.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono">${t.goldValue.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono">${t.vat.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono">${t.fabCost.toFixed(2)}</td>
+      <td class="px-3 py-2 font-data-mono">${t.diamondCost ? t.diamondCost.toFixed(2) : '—'}</td>
+      <td class="px-3 py-2 font-data-mono ${t.profit >= 0 ? 'text-success' : 'text-error'}">${t.profit.toFixed(2)}</td>
+    </tr>`; })();
 }
 
 init();

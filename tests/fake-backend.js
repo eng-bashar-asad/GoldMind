@@ -16,10 +16,12 @@ function fakeSession() {
 function matches(row, key, expr) {
   const m = /^(eq|neq|gt|gte|lt|lte|in|is|ilike)\.(.*)$/.exec(expr); if (!m) return true;
   const v = row[key], raw = m[2];
+  // numbers compare as numbers, timestamps ("2026-09-28T17:45:14Z") as instants
+  const val = x => { const n = Number(x); return isNaN(n) ? Date.parse(x) : n; };
   switch (m[1]) {
     case 'eq': return String(v) === raw; case 'neq': return String(v) !== raw;
-    case 'gt': return Number(v) > Number(raw); case 'gte': return Number(v) >= Number(raw);
-    case 'lt': return Number(v) < Number(raw); case 'lte': return Number(v) <= Number(raw);
+    case 'gt': return val(v) > val(raw); case 'gte': return val(v) >= val(raw);
+    case 'lt': return val(v) < val(raw); case 'lte': return val(v) <= val(raw);
     case 'in': return raw.replace(/[()"]/g, '').split(',').includes(String(v));
     case 'is': return raw === 'null' ? v == null : String(v) === raw;
     default: return v != null && String(v).toLowerCase().includes(raw.replace(/[*%]/g, '').toLowerCase());

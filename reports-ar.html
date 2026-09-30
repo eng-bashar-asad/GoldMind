@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=29"></script>
 <script src="theme.js?v=33"></script>
+<script src="gm-profit.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
       tailwind.config = { darkMode: "class", theme: { extend: {
@@ -70,6 +71,7 @@
 </div>
 <div id="invoiceSearchResult" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4"></div>
 
+<a href="financial-report-ar.html" class="flex items-center justify-between gap-2 px-4 h-12 rounded-xl font-bold text-[14px]" style="background:#1F1A12;color:#F3EEDF;"><span class="flex items-center gap-2"><span class="material-symbols-outlined">summarize</span>التقرير المالي الشامل — للطباعة</span><span class="material-symbols-outlined">chevron_left</span></a>
 <!-- Period tabs -->
 <div class="flex gap-1 p-1 bg-surface-container-low rounded-lg overflow-x-auto">
 <button class="period-tab active px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="today" onclick="setPeriod('today')">اليوم</button>
@@ -284,22 +286,14 @@ async function loadReport() {
   if (salesInvoices.length > 0) {
     const invIds = salesInvoices.map(i => i.id);
     const { data: items } = await goldmindClient
-      .from('invoice_items').select('*, piece:piece_id(cost_fabrication_per_gram)').in('invoice_id', invIds);
+      .from('invoice_items').select(GM_PROFIT_ITEM_SELECT).in('invoice_id', invIds);
     const { data: prices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
     const priceMap = {};
     (prices || []).forEach(p => priceMap[p.karat] = Number(p.price_per_gram));
 
     (items || []).forEach(it => {
       totalWeight += Number(it.weight_grams) || 0;
-      const goldPrice = it.gold_price_per_gram != null ? Number(it.gold_price_per_gram) : (priceMap[it.karat] || 0);
-      const weight = Number(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams) || 0;
-      const revenue = Number(it.line_total) || 0;
-      const goldValue = weight * goldPrice;
-      const vat = revenue - (revenue / vatMultiplier);
-      // Pooled opening-stock lots store a manually entered fee directly on
-      // the invoice_item (see profit-report-ar.html for the fuller version).
-      const fabCost = it.fabrication_fee ? Number(it.fabrication_fee) : (weight * ((it.piece && it.piece.cost_fabrication_per_gram) || 0));
-      totalProfit += revenue - goldValue - vat - fabCost;
+      totalProfit += gmLineProfit(it, false, vatMultiplier, priceMap).profit; // shared formula (gm-profit.js)
     });
   }
 
