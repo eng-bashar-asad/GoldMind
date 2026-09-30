@@ -5,133 +5,246 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=29"></script>
-<script src="theme.js?v=35"></script>
+<script src="supabase-config.js?v=30"></script>
+<script src="theme.js?v=36"></script>
+<script src="gm-report.js?v=2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
     body { font-family: 'Inter', sans-serif; }
     .font-data-mono { font-family: 'IBM Plex Sans', sans-serif; }
-    @media print { .no-print { display: none !important; } body { padding: 0; } }
-</style>
-<style>
-/* Printing: no top/bottom page margin = no room for the browser's own
-   header/footer (site title, date/time, URL), so they never print. The white
-   margin is kept by padding that repeats on every printed page. */
-@media print {
-  @page { margin: 0 10mm; }
-  body { margin: 0 !important; padding-top: 10mm !important; padding-bottom: 10mm !important; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
-}
+    #st-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    #st-table th, #st-table td { padding: 6px 4px; border-bottom: 1px solid #eee; text-align: right; vertical-align: top; }
+    #st-table th { color: #666; font-weight: 600; background: #fafafa; }
+    #st-table td.num, #st-table th.num { text-align: left; font-family: 'IBM Plex Sans', sans-serif; white-space: nowrap; }
+    tr.inv-row { cursor: pointer; }
+    tr.inv-row:hover td { background: #fffbeb; }
+    tr.items-row td { background: #fafafa; padding: 4px 8px 8px; }
+    .items-table { width: 100%; font-size: 11px; border-collapse: collapse; }
+    .items-table td, .items-table th { border-bottom: 1px dashed #e5e5e5; padding: 3px 4px; }
+    @media print { .no-print { display: none !important; } body { padding: 0; background: #fff !important; } #statement { box-shadow: none !important; margin: 0 !important; max-width: none !important; } }
+    @media print {
+      @page { margin: 0 10mm; }
+      body { margin: 0 !important; padding-top: 10mm !important; padding-bottom: 10mm !important; box-decoration-break: clone; -webkit-box-decoration-break: clone; }
+    }
 </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
-<div class="no-print sticky top-0 bg-white border-b px-4 py-3 flex items-center justify-between z-10">
-<button onclick="history.back()" class="flex items-center gap-2 text-sm font-semibold">
+<div class="no-print sticky top-0 bg-white border-b px-4 py-3 flex flex-wrap items-center justify-between gap-2 z-10">
+<button onclick="gmSmartBack('customer-debts-ar.html')" aria-label="رجوع" class="flex items-center gap-2 text-sm font-semibold">
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span> رجوع
 </button>
-<button onclick="window.print()" class="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-sm font-semibold">
-<span class="material-symbols-outlined">print</span> طباعة
-</button>
+<div class="flex gap-2">
+<button onclick="window.print()" class="flex items-center gap-1 bg-black text-white px-3 h-10 rounded-lg text-sm font-semibold"><span class="material-symbols-outlined">print</span>طباعة</button>
+<button onclick="statementPdf(this)" class="flex items-center gap-1 bg-white border border-gray-300 px-3 h-10 rounded-lg text-sm font-semibold"><span class="material-symbols-outlined">picture_as_pdf</span>PDF</button>
+<button onclick="statementWhatsApp(this)" id="wa-btn" class="flex items-center gap-1 bg-green-50 text-green-700 border border-green-200 px-3 h-10 rounded-lg text-sm font-semibold"><span class="material-symbols-outlined">chat</span>واتساب</button>
+</div>
+</div>
+
+<div class="no-print max-w-md lg:max-w-3xl mx-auto mt-4 px-4 flex flex-wrap items-end gap-2 text-[13px]">
+<label class="flex flex-col gap-1">من<input type="date" id="from" class="h-10 border border-gray-300 rounded-lg px-2"/></label>
+<label class="flex flex-col gap-1">إلى<input type="date" id="to" class="h-10 border border-gray-300 rounded-lg px-2"/></label>
+<button onclick="render()" class="h-10 px-4 rounded-lg bg-black text-white font-semibold">عرض</button>
+<button onclick="document.getElementById('from').value='';document.getElementById('to').value='';render()" class="h-10 px-3 rounded-lg border border-gray-300">كل الفترة</button>
+<label class="flex items-center gap-2 h-10"><input type="checkbox" id="all-items" onchange="toggleAllItems()" class="w-5 h-5"/> إظهار قطع كل الفواتير</label>
 </div>
 
 <div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
 <div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
 
-<div id="statement" class="hidden max-w-md lg:max-w-3xl mx-auto bg-white my-4 p-6 rounded-xl shadow-sm">
-<div class="text-center mb-6 pb-4 border-b">
+<div id="statement" class="hidden max-w-md lg:max-w-3xl mx-auto bg-white my-4 p-5 rounded-xl shadow-sm">
+<div class="flex items-center justify-between gap-3 mb-4 pb-3 border-b">
+<div>
 <h1 class="font-bold text-lg" id="store-name"></h1>
-<p class="text-xs text-gray-500 mt-1">كشف حساب عميل</p>
-<p class="text-xs text-gray-400 mt-1" id="print-date"></p>
+<p class="text-[11px] text-gray-500" id="store-info"></p>
+</div>
+<img id="store-logo" alt="" class="hidden" style="max-height:56px;max-width:120px" crossorigin="anonymous"/>
+</div>
+<div class="text-center mb-4">
+<div class="font-bold text-[16px]">كشف حساب عميل</div>
+<div class="text-[11px] text-gray-500" id="period-label"></div>
+</div>
+<div class="flex flex-wrap justify-between gap-2 mb-4 text-[13px]">
+<div><span class="text-gray-500">العميل:</span> <b id="customer-name"></b> <bdi dir="ltr" class="text-gray-500 font-data-mono" id="customer-phone"></bdi></div>
+<div class="text-[11px] text-gray-500" id="print-date"></div>
 </div>
 
-<div class="mb-5">
-<p class="text-sm font-bold" id="customer-name"></p>
-<p class="text-xs text-gray-500 font-data-mono" dir="ltr" id="customer-phone"></p>
+<div class="grid grid-cols-3 gap-2 mb-4 text-center">
+<div class="bg-gray-50 rounded-lg p-2"><div class="text-[11px] text-gray-500">مجموع المشتريات</div><div class="font-bold font-data-mono" id="sum-debit"></div></div>
+<div class="bg-gray-50 rounded-lg p-2"><div class="text-[11px] text-gray-500">مجموع المدفوع</div><div class="font-bold font-data-mono" id="sum-credit"></div></div>
+<div class="rounded-lg p-2 border" id="bal-box"><div class="text-[11px]" id="bal-label"></div><div class="font-bold font-data-mono text-[16px]" id="bal-value"></div></div>
 </div>
+<div id="gold-line" class="hidden mb-3 text-[12px] p-2 rounded-lg bg-amber-50"></div>
 
-<div class="bg-gray-50 rounded-lg p-4 mb-5 text-center">
-<p class="text-xs text-gray-500 mb-1">الرصيد الحالي</p>
-<p class="font-bold text-2xl font-data-mono" id="current-balance">0.00</p>
-<p class="text-[11px] text-gray-400 mt-1" id="balance-label"></p>
-</div>
-
-<table class="w-full text-xs mb-2">
-<thead><tr class="border-b text-gray-500">
-<th class="py-2 text-right">التاريخ</th><th class="py-2 text-right">البيان</th><th class="py-2 text-left">المبلغ</th>
-</tr></thead>
-<tbody id="movements-tbody"></tbody>
+<p class="no-print text-[11px] text-gray-500 mb-2">اضغط على أي فاتورة لعرض القطع التي اشتراها العميل فيها.</p>
+<div class="overflow-x-auto">
+<table id="st-table">
+<thead><tr><th>التاريخ</th><th>البيان</th><th class="num">عليه (مدين)</th><th class="num">له (دائن)</th><th class="num">الرصيد</th></tr></thead>
+<tbody id="rows"></tbody>
 </table>
-<p id="empty-movements" class="hidden text-center text-gray-400 text-sm py-8">لا توجد حركات مسجّلة.</p>
-
-<div class="text-center text-[10px] text-gray-400 mt-6 pt-4 border-t">تم إصدار هذا الكشف عبر GoldMind</div>
+</div>
+<p id="empty" class="hidden text-center text-gray-400 text-sm py-8">لا توجد حركات في هذه الفترة.</p>
+<div class="text-center text-[10px] text-gray-400 mt-6 pt-3 border-t">الرصيد الموجب = مبلغ مستحق على العميل للمحل · الرصيد السالب = رصيد للعميل لدى المحل</div>
 </div>
 
 <script>
-function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+let STORE = {}, CUSTOMER = null, INVOICES = [], DEBTS = [], ITEMS = {}, CUR = '';
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+const fmt = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const day = t => gmFormatDateTime(t, { day: '2-digit', month: '2-digit', year: 'numeric' });
+const signed = v => Math.abs(v) < 0.005 ? '0.00' : (v < 0 ? '-' : '') + fmt(Math.abs(v));
+const DEBT_LABEL = m => {
+  if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
+  if (m.source === 'deposit') return m.notes || 'عربون';
+  if (m.source === 'deposit_refund') return m.notes || 'استرجاع عربون';
+  if (m.movement_type === 'debt_decrease') return 'دفعة من العميل' + (m.notes && m.notes !== 'دفعة يدوية' && m.notes !== 'دفعة من العميل' ? ' — ' + m.notes : '');
+  return 'دين نقدي' + (m.notes ? ' — ' + m.notes : '');
+};
 
-async function load() {
-  const session = await requireGoldMindSession('login-entry-ar.html');
-  if (!session) return;
-
-  const params = new URLSearchParams(window.location.search);
-  const customerId = params.get('id');
-  const loading = document.getElementById('loading-state');
-  const errorEl = document.getElementById('error-state');
-
-  if (!customerId) {
-    loading.classList.add('hidden');
-    errorEl.textContent = 'لم يتم تحديد عميل.';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  const [{ data: store }, { data: customer, error: custError }, { data: movements }] = await Promise.all([
-    goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
-    goldmindClient.from('customers').select('*').eq('id', customerId).maybeSingle(),
-    goldmindClient.from('customer_debts').select('*, invoice:invoice_id(invoice_number)').eq('customer_id', customerId).order('created_at', { ascending: true })
-  ]);
-
-  loading.classList.add('hidden');
-
-  if (custError || !customer) {
-    errorEl.textContent = 'تعذّر تحميل بيانات العميل.';
-    errorEl.classList.remove('hidden');
-    return;
-  }
-
-  document.getElementById('store-name').textContent = store ? store.name : 'GoldMind';
-  document.getElementById('print-date').textContent = 'تاريخ الإصدار: ' + gmFormatDateTime(new Date());
-  document.getElementById('customer-name').textContent = customer.name;
-  document.getElementById('customer-phone').textContent = customer.phone || '';
-
-  const MOVEMENT_LABELS = { debt_increase: 'فاتورة بيع بالدين', debt_decrease: 'دفعة مسدَّدة' };
-  const moves = movements || [];
-
-  const balance = moves.reduce((s, m) => s + (m.movement_type === 'debt_increase' ? Number(m.cash_amount) : -Number(m.cash_amount)), 0);
-  const balEl = document.getElementById('current-balance');
-  balEl.textContent = fmt(Math.abs(balance));
-  balEl.className = 'font-bold text-2xl font-data-mono ' + (balance > 0 ? 'text-red-600' : 'text-green-700');
-  document.getElementById('balance-label').textContent = balance > 0 ? 'دين على العميل لصالح المحل' : (balance < 0 ? 'رصيد زائد لصالح العميل' : 'الحساب متوازن');
-
-  const tbody = document.getElementById('movements-tbody');
-  if (moves.length === 0) {
-    document.getElementById('empty-movements').classList.remove('hidden');
-  } else {
-    tbody.innerHTML = moves.map(m => {
-      const isIncrease = m.movement_type === 'debt_increase';
-      const date = gmFormatDateTime(m.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' });
-      const label = (MOVEMENT_LABELS[m.movement_type] || m.movement_type) + (m.invoice && m.invoice.invoice_number ? ' (' + m.invoice.invoice_number + ')' : '');
-      return `
-        <tr class="border-b border-gray-100">
-          <td class="py-2 font-data-mono text-gray-500">${date}</td>
-          <td class="py-2">${label}</td>
-          <td class="py-2 font-data-mono font-bold text-left ${isIncrease ? 'text-red-600' : 'text-green-700'}">${isIncrease ? '+' : '-'}${fmt(m.cash_amount)}</td>
-        </tr>`;
-    }).join('');
-  }
-
-  document.getElementById('statement').classList.remove('hidden');
+// One ledger for the customer. Every row's effect on the balance comes from the
+// customer's debt records, so the final balance always equals the account:
+//  - an invoice shows its full value; what was paid at the counter is its "paid" side,
+//    what was left on account is the difference (its linked debt records)
+//  - payments, deposits, opening balances and cash debts are their own rows
+//  - allocation records (a payment moved onto an invoice) cancel out and are hidden
+function buildRows() {
+  const linkedNet = {}, linkedGold = {};
+  DEBTS.forEach(m => {
+    if (!m.invoice_id || m.source === 'allocation') return;
+    const s = m.movement_type === 'debt_increase' ? 1 : -1;
+    linkedNet[m.invoice_id] = (linkedNet[m.invoice_id] || 0) + s * Number(m.cash_amount || 0);
+  });
+  const rows = [];
+  INVOICES.forEach(i => {
+    const net = linkedNet[i.id] || 0;
+    const live = i.status !== 'cancelled';
+    const total = live ? Number(i.total_amount || 0) : 0;
+    if (i.type === 'return') rows.push({ at: i.created_at, inv: i, debit: total + net, credit: total, label: 'مرتجع ' + i.invoice_number });
+    else rows.push({ at: i.created_at, inv: i, debit: total, credit: total - net, label: 'فاتورة بيع ' + i.invoice_number + (live ? '' : ' (ملغاة)') });
+    delete linkedNet[i.id];
+  });
+  DEBTS.forEach(m => {
+    if (m.source === 'allocation' || (m.invoice_id && !(m.invoice_id in linkedNet))) return;
+    const a = Number(m.cash_amount || 0);
+    if (!a && !Number(m.gold_grams_24k || 0)) return;
+    const inc = m.movement_type === 'debt_increase';
+    rows.push({ at: m.created_at, debit: inc ? a : 0, credit: inc ? 0 : a, label: DEBT_LABEL(m), gold: (inc ? 1 : -1) * Number(m.gold_grams_24k || 0) });
+  });
+  rows.sort((a, b) => new Date(a.at) - new Date(b.at));
+  return rows;
 }
 
-load();
+function render() {
+  const from = document.getElementById('from').value, to = document.getElementById('to').value;
+  const range = from || to ? gmRangeISO(from || '1970-01-01', to || gmDateStrInTz(Date.now())) : null;
+  const all = buildRows();
+  let bal = 0, opening = 0, gold = 0, sumD = 0, sumC = 0;
+  const shown = [];
+  all.forEach(r => {
+    const t = new Date(r.at).getTime();
+    gold += r.gold || 0;
+    if (range && t < Date.parse(range.from)) { opening += r.debit - r.credit; return; }
+    if (range && t >= Date.parse(range.to)) return;
+    shown.push(r);
+  });
+  bal = opening;
+  const tbody = document.getElementById('rows');
+  let html = range && Math.abs(opening) > 0.005 ? `<tr><td></td><td><b>رصيد سابق حتى بداية الفترة</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${signed(opening)}</b></td></tr>` : '';
+  shown.forEach(r => {
+    bal += r.debit - r.credit; sumD += r.debit; sumC += r.credit;
+    const inv = r.inv;
+    html += `<tr class="${inv ? 'inv-row' : ''}" ${inv ? `onclick="toggleItems('${inv.id}')"` : ''}>
+      <td class="font-data-mono text-gray-500"><bdi dir="ltr">${day(r.at)}</bdi></td>
+      <td>${inv ? `<span class="no-print material-symbols-outlined align-middle text-[16px] text-amber-600">expand_more</span>` : ''}${esc(r.label)}</td>
+      <td class="num">${r.debit ? fmt(r.debit) : ''}</td>
+      <td class="num text-green-700">${r.credit ? fmt(r.credit) : ''}</td>
+      <td class="num font-bold">${signed(bal)}</td></tr>`;
+    if (inv) html += `<tr class="items-row hidden" id="items-${inv.id}"><td colspan="5"></td></tr>`;
+  });
+  tbody.innerHTML = html;
+  document.getElementById('empty').classList.toggle('hidden', shown.length > 0);
+  document.getElementById('sum-debit').textContent = fmt(sumD) + ' ' + CUR;
+  document.getElementById('sum-credit').textContent = fmt(sumC) + ' ' + CUR;
+  const balBox = document.getElementById('bal-box');
+  document.getElementById('bal-value').textContent = fmt(Math.abs(bal)) + ' ' + CUR;
+  document.getElementById('bal-label').textContent = bal > 0.005 ? 'المستحق على العميل' : bal < -0.005 ? 'رصيد للعميل لدى المحل' : 'الحساب مسدَّد';
+  balBox.className = 'rounded-lg p-2 border ' + (bal > 0.005 ? 'border-red-300 bg-red-50 text-red-700' : 'border-green-300 bg-green-50 text-green-800');
+  const g = document.getElementById('gold-line');
+  g.classList.toggle('hidden', Math.abs(gold) < 0.0005);
+  g.textContent = gold > 0 ? 'ذهب مستحق على العميل: ' + gold.toFixed(3) + ' غ (عيار 24)' : 'ذهب للعميل لدى المحل: ' + Math.abs(gold).toFixed(3) + ' غ (عيار 24)';
+  document.getElementById('period-label').innerHTML = range
+    ? `الفترة: <bdi dir="ltr">${esc(from || '…')}</bdi> — <bdi dir="ltr">${esc(to || gmDateStrInTz(Date.now()))}</bdi>` : 'كل الحركات';
+  if (document.getElementById('all-items').checked) toggleAllItems();
+}
+
+async function loadItems(ids) {
+  const need = ids.filter(id => !ITEMS[id]);
+  for (let i = 0; i < need.length; i += 100) {
+    const { data } = await goldmindClient.from('invoice_items').select('invoice_id, description, barcode, karat, weight_grams, line_total').in('invoice_id', need.slice(i, i + 100));
+    need.slice(i, i + 100).forEach(id => { ITEMS[id] = []; });
+    (data || []).forEach(it => ITEMS[it.invoice_id].push(it));
+  }
+}
+function fillItems(id) {
+  const row = document.getElementById('items-' + id);
+  if (!row) return;
+  const its = ITEMS[id] || [];
+  row.firstElementChild.innerHTML = `<table class="items-table"><thead><tr><th>القطعة</th><th>الباركود</th><th>العيار</th><th>الوزن</th><th class="num">السعر</th></tr></thead><tbody>
+    ${its.map(it => `<tr><td>${esc(it.description)}</td><td class="font-data-mono" dir="ltr" style="text-align:right">${esc(it.barcode)}</td><td>${it.karat ? esc(it.karat) : ''}</td><td>${it.weight_grams != null ? Number(it.weight_grams).toFixed(2) + ' غ' : ''}</td><td class="num">${fmt(it.line_total)}</td></tr>`).join('') || '<tr><td colspan="5">لا توجد قطع.</td></tr>'}
+    </tbody></table><a class="no-print text-[11px] text-blue-700 underline" href="invoice-print-ar.html?id=${id}">فتح الفاتورة</a>`;
+}
+async function toggleItems(id) {
+  const row = document.getElementById('items-' + id);
+  if (!row) return;
+  if (!row.classList.contains('hidden')) { row.classList.add('hidden'); return; }
+  await loadItems([id]);
+  fillItems(id);
+  row.classList.remove('hidden');
+}
+async function toggleAllItems() {
+  const on = document.getElementById('all-items').checked;
+  const ids = Array.from(document.querySelectorAll('tr.items-row')).map(r => r.id.slice(6));
+  if (on) { await loadItems(ids); ids.forEach(fillItems); }
+  document.querySelectorAll('tr.items-row').forEach(r => r.classList.toggle('hidden', !on));
+}
+
+const pdfName = () => 'كشف حساب ' + (CUSTOMER ? CUSTOMER.name : '') + '.pdf';
+async function statementPdf(btn) { await gmReportPdf(document.getElementById('statement'), pdfName(), btn); }
+async function statementWhatsApp(btn) {
+  const text = `مرحباً ${CUSTOMER.name}،\nيسعدنا في ${STORE.name || 'المحل'} إرسال كشف حسابكم.\n\nشكراً لتعاملكم معنا.`;
+  const old = btn.innerHTML;
+  btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span>';
+  try { await gmWhatsAppPdf([gmReportNode(document.getElementById('statement'))], pdfName(), 'كشف حساب', text, CUSTOMER.phone, STORE.country); }
+  catch (e) { alert('تعذّر تجهيز ملف PDF: ' + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const id = new URLSearchParams(location.search).get('id');
+  const fail = t => { document.getElementById('loading-state').classList.add('hidden'); const e = document.getElementById('error-state'); e.textContent = t; e.classList.remove('hidden'); };
+  if (!id) return fail('لم يتم تحديد عميل.');
+  const [{ data: store }, { data: customer }, inv, debts] = await Promise.all([
+    goldmindClient.from('stores').select('name, address, phone, logo_url, currency, country').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('customers').select('id, name, phone').eq('id', id).maybeSingle(),
+    gmFetchAllRows(() => goldmindClient.from('invoices').select('id, invoice_number, type, total_amount, amount_paid, status, created_at').eq('customer_id', id).in('type', ['sale', 'return']).order('created_at')),
+    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_at').eq('customer_id', id).order('created_at'))
+  ]);
+  if (!customer) return fail('تعذّر تحميل بيانات العميل.');
+  if (inv.error || debts.error) return fail('تعذّر تحميل الحركات: ' + (inv.error || debts.error).message);
+  STORE = store || {}; CUSTOMER = customer; INVOICES = inv.data; DEBTS = debts.data;
+  const code = (STORE.currency || 'AED').toUpperCase();
+  CUR = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س' })[code] || code;
+  document.getElementById('store-name').textContent = STORE.name || 'GoldMind';
+  document.getElementById('store-info').textContent = [STORE.address, STORE.phone].filter(Boolean).join(' · ');
+  if (STORE.logo_url) { const l = document.getElementById('store-logo'); l.src = STORE.logo_url; l.classList.remove('hidden'); }
+  document.getElementById('customer-name').textContent = customer.name;
+  document.getElementById('customer-phone').textContent = customer.phone || '';
+  document.getElementById('print-date').textContent = 'تاريخ الإصدار: ' + gmFormatDateTime(new Date());
+  document.title = 'كشف حساب ' + customer.name;
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('statement').classList.remove('hidden');
+  render();
+})();
 </script>
 </body></html>

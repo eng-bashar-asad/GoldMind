@@ -19,6 +19,7 @@
     { t: 'الفواتير والعملاء', i: 'receipt_long', l: [
       ['invoices-list-ar.html', 'list_alt', 'كل الفواتير', 'view_invoices'],
       ['invoices-archive-ar.html', 'inventory', 'الأرشيف الشامل', 'view_invoices'],
+      ['customers-ar.html', 'person', 'الزبائن', 'view_customers'],
       ['customer-add-ar.html', 'person_add', 'إضافة عميل', 'add_customers'],
       ['customer-debts-ar.html', 'groups', 'العملاء — الديون وكشف الحساب', 'view_customers'],
       ['deposits-ar.html', 'bookmark_added', 'سندات العربون', 'edit_customers|manage_daily_cashbox'],

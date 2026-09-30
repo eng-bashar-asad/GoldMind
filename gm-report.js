@@ -47,19 +47,22 @@ async function gmFetchAllRows(makeQuery) {
 // Copies the sheet, drops on-screen-only controls (.no-print), shows the
 // print-only header (.gm-print-only) and hands it to gmPdfFromNodes
 // (supabase-config.js), which also covers the Android app's share sheet.
+function gmReportNode(sheetEl) {
+  var copy = sheetEl.cloneNode(true);
+  copy.removeAttribute('id');
+  copy.classList.remove('hidden');
+  Array.prototype.forEach.call(copy.querySelectorAll('.no-print'), function (e) { e.remove(); });
+  Array.prototype.forEach.call(copy.querySelectorAll('.gm-print-only'), function (e) { e.classList.remove('hidden'); e.style.display = 'block'; });
+  Array.prototype.forEach.call(copy.querySelectorAll('.overflow-x-auto,.overflow-hidden'), function (e) { e.style.overflow = 'visible'; });
+  copy.classList.add('gm-pdf');
+  return copy;
+}
 async function gmReportPdf(sheetEl, filename, btn) {
   var old = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span>'; }
   try {
     await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js', 'html2pdf');
-    var copy = sheetEl.cloneNode(true);
-    copy.removeAttribute('id');
-    copy.classList.remove('hidden');
-    Array.prototype.forEach.call(copy.querySelectorAll('.no-print'), function (e) { e.remove(); });
-    Array.prototype.forEach.call(copy.querySelectorAll('.gm-print-only'), function (e) { e.classList.remove('hidden'); e.style.display = 'block'; });
-    Array.prototype.forEach.call(copy.querySelectorAll('.overflow-x-auto,.overflow-hidden'), function (e) { e.style.overflow = 'visible'; });
-    copy.classList.add('gm-pdf');
-    await gmPdfFromNodes([copy], filename, filename);
+    await gmPdfFromNodes([gmReportNode(sheetEl)], filename, filename);
   } catch (e) {
     alert('تعذّر إنشاء ملف PDF: ' + (e && e.message ? e.message : e));
   } finally {

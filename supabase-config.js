@@ -560,16 +560,66 @@ setInterval(gmSyncQueue, 30000);
 // before; inside the Android app (a WebView that ignores browser downloads)
 // the PDF is written to the app cache and the system share sheet opens, so
 // the user can save it to Files, send it on WhatsApp, print it, etc.
-async function gmSavePdf(worker, filename, title) {
+// shareText (optional): share the file itself (e.g. to WhatsApp) with this
+// text as its caption. Returns 'shared' when the phone's share sheet opened,
+// or 'downloaded' when the browser can't share files (desktop) and the file
+// was downloaded instead.
+async function gmSavePdf(worker, filename, title, shareText) {
     var P = window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform() && window.Capacitor.Plugins;
-    if (!P || !P.Filesystem || !P.Share) return worker.save(filename);
     var safe = String(filename || 'GoldMind.pdf').replace(/[\\/:*?"<>|]+/g, '-');
     if (!/\.pdf$/i.test(safe)) safe += '.pdf';
-    var dataUri = await worker.outputPdf('datauristring');
-    var base64 = dataUri.slice(dataUri.indexOf(',') + 1);
-    await P.Filesystem.writeFile({ path: safe, data: base64, directory: 'CACHE' });
-    var res = await P.Filesystem.getUri({ path: safe, directory: 'CACHE' });
-    await P.Share.share({ title: title || safe, url: res.uri, dialogTitle: 'حفظ الملف أو مشاركته' });
+    if (P && P.Filesystem && P.Share) {
+        var dataUri = await worker.outputPdf('datauristring');
+        var base64 = dataUri.slice(dataUri.indexOf(',') + 1);
+        await P.Filesystem.writeFile({ path: safe, data: base64, directory: 'CACHE' });
+        var res = await P.Filesystem.getUri({ path: safe, directory: 'CACHE' });
+        var opts = { title: title || safe, url: res.uri, dialogTitle: shareText != null ? 'إرسال الملف' : 'حفظ الملف أو مشاركته' };
+        if (shareText != null) opts.text = shareText;
+        await P.Share.share(opts);
+        return 'shared';
+    }
+    if (shareText != null && navigator.canShare) {
+        var file = new File([await worker.outputPdf('blob')], safe, { type: 'application/pdf' });
+        if (navigator.canShare({ files: [file] })) {
+            var data = { files: [file], text: shareText, title: title || safe };
+            try { await navigator.share(data); return 'shared'; } catch (e) {
+                if (e && e.name === 'AbortError') return 'cancelled';
+                if (!(e && e.name === 'NotAllowedError')) throw e;
+            }
+            // building the PDF took too long for the browser to still count the
+            // tap — ask for one more tap to open the share sheet
+            return await new Promise(function (resolve) {
+                var b = document.createElement('button');
+                b.type = 'button';
+                b.textContent = 'الملف جاهز — اضغط هنا لإرساله';
+                b.style.cssText = 'position:fixed;left:16px;right:16px;bottom:24px;z-index:9999;height:56px;border:0;border-radius:14px;background:#128C7E;color:#fff;font:700 16px system-ui;box-shadow:0 6px 20px rgba(0,0,0,.3)';
+                b.onclick = function () { b.remove(); navigator.share(data).then(function () { resolve('shared'); }, function () { resolve('cancelled'); }); };
+                document.body.appendChild(b);
+            });
+        }
+    }
+    await worker.save(safe);
+    return 'downloaded';
+}
+
+// wa.me link to a customer's phone (store country code added), or to any chat
+function gmWhatsAppUrl(phone, country, text) {
+    var digits = String(phone || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
+    var code = GOLDMIND_COUNTRY_PHONE_MAP[country] || GOLDMIND_DEFAULT_PHONE_CODE;
+    if (digits && code && digits.indexOf(code) === 0 && digits.length > 10) code = '';
+    return 'https://wa.me/' + (digits ? code + digits : '') + '?text=' + encodeURIComponent(text || '');
+}
+
+// Send a PDF to a customer on WhatsApp: on phones the file itself goes out with
+// the welcome/thanks text as its caption; on a computer the PDF is downloaded
+// and WhatsApp opens with the text, so the file can be attached.
+async function gmWhatsAppPdf(nodes, filename, title, text, phone, country) {
+    var r = await gmPdfFromNodes(nodes, filename, title, text);
+    if (r === 'downloaded') {
+        window.open(gmWhatsAppUrl(phone, country, text), '_blank');
+        alert('تم حفظ ملف PDF على الجهاز. أرفقه في محادثة واتساب التي فُتحت.');
+    }
+    return r;
 }
 
 // Printing inside the Android app: the WebView ignores window.print(), so hand
@@ -622,8 +672,9 @@ function gmAddCanvasPages(pdf, canvas, firstOnCurrentPage) {
 // iframe that is always 738px wide (A4 width minus margins, plus a little
 // room), with the page's own styles copied in. The phone's screen width,
 // zoom or scroll position therefore can't shift or cut the page.
-async function gmPdfFromNodes(nodes, filename, title) {
+async function gmPdfFromNodes(nodes, filename, title, shareText) {
     await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
+    await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js', 'html2pdf');
     var W = 718, FRAME_W = W + 20;
     var frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
@@ -670,7 +721,7 @@ async function gmPdfFromNodes(nodes, filename, title) {
         var worker = html2pdf().set(pdfOpts).from(canvases[0], 'canvas').toPdf();
         var pdf = await worker.get('pdf');
         for (var j = 1; j < canvases.length; j++) gmAddCanvasPages(pdf, canvases[j], false);
-        await gmSavePdf(worker, filename, title);
+        return await gmSavePdf(worker, filename, title, shareText);
     } finally {
         frame.remove();
     }

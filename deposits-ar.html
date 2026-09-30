@@ -11,9 +11,9 @@
 <title>سندات العربون | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=29"></script>
-<script src="theme.js?v=35"></script>
-<script src="gm-report.js?v=1"></script>
+<script src="supabase-config.js?v=30"></script>
+<script src="theme.js?v=36"></script>
+<script src="gm-report.js?v=2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -115,6 +115,7 @@
 <div class="no-print flex gap-2">
 <button type="button" onclick="window.print()" class="flex-1 h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined">print</span>طباعة</button>
 <button type="button" id="pdf-btn" onclick="voucherPdf(this)" class="flex-1 h-11 bg-white text-primary border border-primary rounded-lg text-sm font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined">picture_as_pdf</span>PDF / مشاركة</button>
+<button type="button" onclick="voucherWhatsApp(this)" aria-label="إرسال واتساب" class="w-11 h-11 bg-green-50 text-green-700 border border-green-200 rounded-lg flex items-center justify-center"><span class="material-symbols-outlined">chat</span></button>
 <button type="button" onclick="closeVoucher()" aria-label="إغلاق" class="w-11 h-11 bg-white rounded-lg flex items-center justify-center"><span class="material-symbols-outlined">close</span></button>
 </div>
 <div id="voucher" class="rounded-xl shadow-lg p-5 text-[13px] leading-6"></div>
@@ -243,6 +244,16 @@ async function voucherPdf(btn) {
   await gmReportPdf(document.getElementById('voucher'), 'عربون-' + OPEN.deposit_number + '.pdf', btn);
 }
 
+async function voucherWhatsApp(btn) {
+  if (!OPEN) return;
+  const c = OPEN.customer || {};
+  const text = `مرحباً ${c.name || ''}،\nيسعدنا في ${STORE.name || 'المحل'} إرسال سند العربون رقم ${OPEN.deposit_number}.\n\nشكراً لتعاملكم معنا.`;
+  btn.disabled = true;
+  try { await gmWhatsAppPdf([gmReportNode(document.getElementById('voucher'))], 'عربون-' + OPEN.deposit_number + '.pdf', 'سند عربون', text, c.phone, STORE.country); }
+  catch (e) { alert('تعذّر تجهيز ملف PDF: ' + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; }
+}
+
 async function refundDeposit() {
   if (!OPEN || !confirm('استرجاع العربون ' + OPEN.deposit_number + ' بقيمة ' + money(OPEN.amount) + ' للعميل؟ سيخرج المبلغ من الصندوق.')) return;
   const { error } = await goldmindClient.rpc('refund_customer_deposit', { p_deposit: OPEN.id });
@@ -257,7 +268,7 @@ async function refundDeposit() {
   if (!session) return;
   const [{ data: me }, { data: store }, custRes] = await Promise.all([
     goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
-    goldmindClient.from('stores').select('name, address, phone, logo_url, currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('stores').select('name, address, phone, logo_url, currency, country').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
     gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone').eq('store_id', GOLDMIND_STORE_ID).order('name'))
   ]);
   document.getElementById('loading-state').classList.add('hidden');

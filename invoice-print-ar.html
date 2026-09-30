@@ -18,9 +18,9 @@
 <title>فاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=29"></script>
+<script src="supabase-config.js?v=30"></script>
 <script src="pint-ae.js"></script>
-<script src="theme.js?v=35"></script>
+<script src="theme.js?v=36"></script>
 <script src="gm-profit.js?v=1"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -852,26 +852,28 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         sheet.classList.remove('hidden');
     }
 
-    function sendInvoiceWhatsApp() {
+    // WhatsApp: the invoice PDF itself goes to the customer, with a short
+    // welcome before it and a thank-you after it in the caption.
+    async function sendInvoiceWhatsApp() {
         const d = window.__waInvoiceData;
         if (!d) return;
-
         const invNumber = d.invoice.invoice_number || d.invoice.id;
         const customerName = d.customer ? d.customer.name : '';
-        const receiptUrl = `${window.location.origin}${window.location.pathname.replace('invoice-print-ar.html', '')}invoice-receipt-ar.html?id=${d.invoice.id}`;
-
-        let msg = customerName ? `مرحباً ${customerName}،\n` : 'مرحباً،\n';
-        msg += `${d.store.name || 'المحل'}\nنسخة من فاتورتكم رقم ${invNumber}\n\n${receiptUrl}\n\nشكراً لتعاملكم معنا.`;
-
-        const rawPhone = d.customer ? (d.customer.phone || '') : '';
-        if (rawPhone) {
-            const code = GOLDMIND_COUNTRY_PHONE_MAP[d.store.country] || GOLDMIND_DEFAULT_PHONE_CODE;
-            const digits = rawPhone.replace(/[^0-9]/g, '').replace(/^0+/, '');
-            window.open(`https://wa.me/${code}${digits}?text=${encodeURIComponent(msg)}`, '_blank');
-        } else {
-            // No saved phone for this customer — open WhatsApp with the
-            // message ready so the user can pick a contact themselves.
-            window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+        const text = (customerName ? `مرحباً ${customerName}،` : 'مرحباً،') +
+            `\nيسعدنا في ${d.store.name || 'المحل'} إرسال نسخة من فاتورتكم رقم ${invNumber}.\n\nشكراً لتعاملكم معنا.`;
+        const btn = document.getElementById('whatsapp-invoice-btn');
+        const old = btn.innerHTML;
+        btn.disabled = true;
+        btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span><span>...جارِ التجهيز</span>';
+        try {
+            await gmWhatsAppPdf(invoicePdfNodes(), `${invNumber}.pdf`, 'فاتورة ' + invNumber, text,
+                d.customer ? d.customer.phone : '', d.store.country);
+        } catch (err) {
+            console.error('WhatsApp PDF failed', err);
+            alert('تعذّر تجهيز ملف PDF، حاول مرة أخرى');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = old;
         }
     }
 
@@ -925,7 +927,22 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         const originalHtml = btn.innerHTML;
         btn.disabled = true;
         btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span><span>...جارِ التجهيز</span>';
+        const nodes = invoicePdfNodes();
+        const invNumber = (document.getElementById('inv-number')?.textContent || 'فاتورة').trim();
 
+        try {
+            await gmPdfFromNodes(nodes, `${invNumber}.pdf`, 'فاتورة ' + invNumber);
+        } catch (err) {
+            console.error('PDF generation failed', err);
+            alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
+        } finally {
+            btn.disabled = false;
+            btn.innerHTML = originalHtml;
+        }
+    }
+
+    function invoicePdfNodes() {
+        const sheet = document.getElementById('invoice-sheet');
         // Clone into an isolated, fixed-width wrapper off-screen so the PDF
         // renders like a physical page instead of the narrow mobile layout.
         const clone = sheet.cloneNode(true);
@@ -945,18 +962,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             policyClone.style.display = 'block';
             nodes.push(policyClone); // its own page
         }
-
-        const invNumber = (document.getElementById('inv-number')?.textContent || 'فاتورة').trim();
-
-        try {
-            await gmPdfFromNodes(nodes, `${invNumber}.pdf`, 'فاتورة ' + invNumber);
-        } catch (err) {
-            console.error('PDF generation failed', err);
-            alert('تعذّر توليد ملف PDF، حاول مرة أخرى');
-        } finally {
-            btn.disabled = false;
-            btn.innerHTML = originalHtml;
-        }
+        return nodes;
     }
 
     async function generateEinvoiceXml() {

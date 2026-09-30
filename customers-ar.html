@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الزبائن | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=30"></script>
+<script src="theme.js?v=36"></script>
+<script src="gm-report.js?v=2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .cat-chip { height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--gm-outline-variant); font-size: 13px; font-weight: 600; white-space: nowrap; }
+    .cat-chip.on { background: var(--gm-primary); color: var(--gm-on-primary); border-color: var(--gm-primary); }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" aria-label="رجوع" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">الزبائن</h1>
+</div>
+<a href="customer-add-ar.html" id="add-btn" class="hidden h-10 px-3 rounded-lg bg-primary text-on-primary text-[13px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined">person_add</span>زبون جديد</a>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4 py-4 flex flex-col gap-3">
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية عرض الزبائن.</div>
+<div id="page-content" class="hidden flex flex-col gap-3">
+<div class="relative">
+<span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
+<input id="q" oninput="render()" placeholder="ابحث بالاسم أو رقم الهاتف" class="w-full h-12 border border-outline-variant rounded-lg pr-10 pl-3 text-[14px] bg-surface-container-lowest"/>
+</div>
+<div class="flex gap-2 text-[13px]" id="kinds">
+<button type="button" data-k="person" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">أفراد (مفرق)</button>
+<button type="button" data-k="company" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">شركات</button>
+<button type="button" data-k="all" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">الكل</button>
+<button type="button" data-k="debt" class="kind h-9 px-4 rounded-full border border-outline-variant font-semibold">عليهم دين</button>
+</div>
+<div class="text-[12px] text-on-surface-variant" id="count"></div>
+<div id="list" class="flex flex-col gap-2"></div>
+</div>
+</main>
+<script>
+let CUSTOMERS = [], BAL = {}, KIND = 'person', CAN_EDIT = false, CUR = '';
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+const fmt = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const digits = v => String(v || '').replace(/[^0-9]/g, '');
+
+document.querySelectorAll('.kind').forEach(b => b.addEventListener('click', () => { KIND = b.dataset.k; render(); }));
+
+function render() {
+  document.querySelectorAll('.kind').forEach(b => {
+    const on = b.dataset.k === KIND;
+    b.style.background = on ? 'var(--gm-primary)' : '';
+    b.style.color = on ? 'var(--gm-on-primary)' : '';
+  });
+  const q = document.getElementById('q').value.trim().toLowerCase(), qd = digits(q);
+  const list = CUSTOMERS.filter(c =>
+    (KIND === 'all' || (KIND === 'company' ? c.is_company : KIND === 'person' ? !c.is_company : (BAL[c.id] || 0) > 0.005)) &&
+    (!q || (c.name || '').toLowerCase().includes(q) || (qd.length >= 3 && digits(c.phone).includes(qd))));
+  document.getElementById('count').textContent = list.length + ' زبون';
+  document.getElementById('list').innerHTML = list.slice(0, 300).map(c => {
+    const b = BAL[c.id] || 0;
+    return `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex items-center gap-3">
+      <a href="customer-debts-ar.html?open=${c.id}" class="flex-1 min-w-0">
+        <div class="font-bold text-[14px] truncate">${esc(c.name)}${c.is_company ? ' <span class="text-[11px] text-on-surface-variant font-normal">(شركة)</span>' : ''}</div>
+        <div class="text-[12px] text-on-surface-variant font-data-mono" dir="ltr" style="text-align:right">${esc(c.phone || '')}</div>
+        ${Math.abs(b) > 0.005 ? `<div class="text-[12px] font-semibold ${b > 0 ? 'text-error' : 'text-success'}">${b > 0 ? 'عليه' : 'له'} ${fmt(Math.abs(b))} ${CUR}</div>` : ''}
+      </a>
+      <a href="customer-debts-print-ar.html?id=${c.id}" aria-label="كشف حساب ${esc(c.name)}" class="w-10 h-10 rounded-lg border border-outline-variant flex items-center justify-center"><span class="material-symbols-outlined">receipt_long</span></a>
+      ${CAN_EDIT ? `<a href="customer-edit-ar.html?id=${c.id}" class="h-10 px-3 rounded-lg border border-primary text-primary text-[13px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined">edit</span>تعديل</a>` : ''}
+    </div>`;
+  }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد زبائن مطابقون.</p>';
+}
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const [{ data: me }, { data: store }, cust, debts] = await Promise.all([
+    goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+    goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone, is_company').eq('store_id', GOLDMIND_STORE_ID).order('name')),
+    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount').eq('store_id', GOLDMIND_STORE_ID))
+  ]);
+  document.getElementById('loading-state').classList.add('hidden');
+  const perms = (me && me.permissions) || {}, owner = me && me.role === 'owner';
+  if (!(owner || perms.view_customers === true)) { document.getElementById('no-access').classList.remove('hidden'); return; }
+  CAN_EDIT = owner || perms.edit_customers === true;
+  if (owner || perms.add_customers === true) document.getElementById('add-btn').classList.remove('hidden');
+  const code = ((store && store.currency) || 'AED').toUpperCase();
+  CUR = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س' })[code] || code;
+  CUSTOMERS = cust.data || [];
+  (debts.data || []).forEach(m => { BAL[m.customer_id] = (BAL[m.customer_id] || 0) + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0); });
+  document.getElementById('page-content').classList.remove('hidden');
+  render();
+})();
+</script>
+</body></html>
