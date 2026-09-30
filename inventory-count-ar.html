@@ -842,7 +842,7 @@ async function syncScans() {
     pendingScans = still;
   }
   const [{ data: rows, error }, { data: cnt }] = await Promise.all([
-    goldmindClient.from('inventory_count_scans').select('rfid_epc, scanned_by, match_status').eq('count_id', countId),
+    gmFetchAllRows(() => goldmindClient.from('inventory_count_scans').select('rfid_epc, scanned_by, match_status').eq('count_id', countId).order('rfid_epc')),
     goldmindClient.from('inventory_counts').select('status').eq('id', countId).maybeSingle()
   ]);
   if (countId !== currentCountId) return;
@@ -967,7 +967,13 @@ function stopCameraScanner() {
   if (!html5QrCode) return;
   const instance = html5QrCode;
   html5QrCode = null;
-  instance.stop().then(() => instance.clear()).catch(() => {});
+  // stop() THROWS (not rejects) when the camera isn't actually running — e.g. camera
+  // permission denied on iPhone. That used to kill "finish" and leave it on "جارِ الإنهاء...".
+  try {
+    Promise.resolve(instance.stop()).then(() => instance.clear()).catch(() => {});
+  } catch (e) {
+    try { instance.clear(); } catch (e2) { /* ignore */ }
+  }
 }
 
 function onCameraScanSuccess(decodedText) {
@@ -1149,47 +1155,61 @@ async function markFoundLive(btn) {
   renderMissingLive();
 }
 
+// Every network step of "finish" gets a time limit: on a slow or dropped connection the
+// button used to stay on "جارِ الإنهاء..." forever. Scans are already saved, so trying again is safe.
+function gmWithTimeout(promise, ms, what) {
+  return Promise.race([promise, new Promise((_, rej) => setTimeout(() => rej(new Error('TIMEOUT:' + what)), ms))]);
+}
 document.getElementById('finish-btn').addEventListener('click', async () => {
   if (!currentCountId) return;
   if (!confirm('هل تريد إنهاء جلسة الجرد وعرض تقرير الفرق؟')) return;
 
   const btn = document.getElementById('finish-btn');
+  const resetBtn = () => { btn.disabled = false; btn.textContent = 'إنهاء الجلسة وعرض التقرير'; };
   btn.disabled = true;
   btn.textContent = 'جارِ الإنهاء...';
+  stopLiveSync(); // no background sync racing the finish
+  try {
+    // Collect every phone's scans first, so the report covers the whole team.
+    btn.textContent = 'جارِ جمع المسحات...';
+    await gmWithTimeout(syncScans(), 25000, 'sync');
+    if (pendingScans.length) {
+      resetBtn(); startLiveSync();
+      alert('يوجد ' + pendingScans.length + ' قطعة ممسوحة لم تُحفظ بعد. تأكد من الاتصال بالإنترنت وحاول مرة أخرى.');
+      return;
+    }
+    const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const { data: recentOthers } = await gmWithTimeout(goldmindClient.from('inventory_count_scans')
+      .select('scanned_by').eq('count_id', currentCountId).neq('scanned_by', GOLDMIND_STAFF_ID).gte('scanned_at', since).limit(20), 15000, 'others');
+    const activeNames = [...new Set((recentOthers || []).map(r => staffName(r.scanned_by)))];
+    if (activeNames.length && !confirm('يوجد موظف آخر لا يزال يمسح في هذه الجلسة (' + activeNames.join('، ') + '). هل أنت متأكد أنك تريد إنهاء الجرد الآن؟')) {
+      resetBtn(); startLiveSync();
+      return;
+    }
 
-  // Collect every phone's scans first, so the report covers the whole team.
-  await syncScans();
-  if (pendingScans.length) {
-    btn.disabled = false;
-    btn.textContent = 'إنهاء الجلسة وعرض التقرير';
-    alert('يوجد ' + pendingScans.length + ' قطعة ممسوحة لم تُحفظ بعد. تأكد من الاتصال بالإنترنت وحاول مرة أخرى.');
+    stopCameraScanner();
+
+    missingListCache = expectedPool.filter(p => !scannedValues.has(p[matchField]));
+    surplusListCache = Array.from(scannedValues).filter(v => !expectedByField[v]);
+    const missingCount = missingListCache.length;
+
+    btn.textContent = 'جارِ حفظ النتيجة...';
+    const { error: finErr } = await gmWithTimeout(goldmindClient.from('inventory_counts').update({
+      status: 'completed',
+      completed_at: new Date().toISOString(),
+      scanned_piece_count: stats.scanned,
+      matched_count: stats.matched,
+      missing_count: missingCount,
+      unexpected_count: stats.unexpected
+    }).eq('id', currentCountId), 20000, 'save');
+    if (finErr) throw finErr;
+  } catch (e) {
+    resetBtn(); startLiveSync();
+    const slow = String(e && e.message || '').startsWith('TIMEOUT');
+    alert(slow ? 'الاتصال بطيء جداً ولم يكتمل الإنهاء. مسحاتك محفوظة — تأكد من الإنترنت ثم اضغط "إنهاء الجلسة" مرة أخرى.'
+               : 'تعذّر إنهاء الجلسة: ' + (e && e.message ? e.message : e));
     return;
   }
-  const since = new Date(Date.now() - 2 * 60 * 1000).toISOString();
-  const { data: recentOthers } = await goldmindClient.from('inventory_count_scans')
-    .select('scanned_by').eq('count_id', currentCountId).neq('scanned_by', GOLDMIND_STAFF_ID).gte('scanned_at', since).limit(20);
-  const activeNames = [...new Set((recentOthers || []).map(r => staffName(r.scanned_by)))];
-  if (activeNames.length && !confirm('يوجد موظف آخر لا يزال يمسح في هذه الجلسة (' + activeNames.join('، ') + '). هل أنت متأكد أنك تريد إنهاء الجرد الآن؟')) {
-    btn.disabled = false;
-    btn.textContent = 'إنهاء الجلسة وعرض التقرير';
-    return;
-  }
-
-  stopLiveSync();
-  stopCameraScanner();
-
-  missingListCache = expectedPool.filter(p => !scannedValues.has(p[matchField]));
-  surplusListCache = Array.from(scannedValues).filter(v => !expectedByField[v]);
-  const missingCount = missingListCache.length;
-
-  await goldmindClient.from('inventory_counts').update({
-    status: 'completed',
-    completed_at: new Date().toISOString(),
-    scanned_piece_count: stats.scanned,
-    matched_count: stats.matched,
-    missing_count: missingCount,
-    unexpected_count: stats.unexpected
-  }).eq('id', currentCountId);
 
   btn.disabled = false;
   btn.textContent = 'إنهاء الجلسة وعرض التقرير';
