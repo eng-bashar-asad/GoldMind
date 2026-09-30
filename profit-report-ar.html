@@ -241,7 +241,7 @@ async function applyFilters() {
     gmFetchAllRows(() => goldmindClient.from('invoices').select('id, invoice_number, created_at, type, created_by, total_amount')
       .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return', 'buyRetail', 'buyTrader']).neq('status', 'cancelled')
       .gte('created_at', range.from).lt('created_at', range.to).order('created_at', { ascending: false })),
-    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('id, source, invoice_id, weight_grams, accounting_weight_grams, karat, gold_24k_equivalent, fab_fee_per_gram, fab_fee_amount, created_at, trader:trader_id(name), piece:piece_id(cost_fabrication_per_gram)')
+    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('id, source, invoice_id, weight_grams, accounting_weight_grams, karat, gold_24k_equivalent, fab_fee_per_gram, fab_fee_amount, cost_fab_per_gram, created_at, trader:trader_id(name), piece:piece_id(cost_fabrication_per_gram)')
       .eq('store_id', GOLDMIND_STORE_ID).in('source', ['stock_given', 'stock_received'])
       .gte('created_at', range.from).lt('created_at', range.to)),
     goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID)
@@ -294,9 +294,9 @@ async function applyFilters() {
   const wholesale = given.map(m => {
     const acc = Number(m.accounting_weight_grams != null ? m.accounting_weight_grams : m.weight_grams) || 0;
     const fee = acc * (Number(m.fab_fee_per_gram) || 0);
-    const hasCost = m.piece && m.piece.cost_fabrication_per_gram != null;
-    if (!hasCost) unknownCost++;
-    const cost = hasCost ? acc * Number(m.piece.cost_fabrication_per_gram) : 0;
+    const perGram = m.piece && m.piece.cost_fabrication_per_gram != null ? m.piece.cost_fabrication_per_gram : m.cost_fab_per_gram;
+    if (perGram == null) unknownCost++;
+    const cost = acc * (Number(perGram) || 0);
     return { m, acc, gross: Number(m.weight_grams) || 0, fee, cost, profit: fee - cost };
   });
   const ws = wholesale.reduce((a, r) => ({ gross: a.gross + r.gross, acc: a.acc + r.acc, fee: a.fee + r.fee, cost: a.cost + r.cost, profit: a.profit + r.profit }), { gross: 0, acc: 0, fee: 0, cost: 0, profit: 0 });

@@ -420,6 +420,12 @@ function goToStatementPrint() {
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-fab">مصنعية الغرام</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gsb-fab" oninput="renderGiveStockBulkPreview()" step="0.01" type="number"/>
 </div>
+<div class="relative mb-3">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-cost">كلفة مصنعيتنا للغرام (اختياري — لحساب ربح الجملة)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gsb-cost" step="0.01" type="number"/>
+</div>
+<button type="button" onclick="addGiveStockBulkLine()" class="w-full h-10 mb-3 border border-primary text-primary rounded-lg text-[13px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined">add</span>إضافة السطر للسند وإدخال صنف آخر</button>
+<div id="gsb-lines" class="flex flex-col gap-2 mb-3"></div>
 <div class="bg-surface-container-low rounded-lg p-3 mb-3 text-[12px] flex flex-col gap-1" id="gsb-preview">
 <div class="flex justify-between"><span class="text-on-surface-variant">دين الذهب (مكافئ ٢٤)</span><span class="font-data-mono font-semibold" id="gsb-preview-gold">0.00 غ</span></div>
 <div class="flex justify-between"><span class="text-on-surface-variant" id="gsb-preview-fee-label">إجمالي المصنعية قبل الضريبة</span><span class="font-data-mono font-semibold" id="gsb-preview-fee">0.00</span></div>
@@ -1247,7 +1253,11 @@ async function saveEditStockMovement(id) {
 async function deleteStockMovement(movementId) {
   if (!confirm('هل تريد حذف هذه الحركة؟ هذا الإجراء نهائي.')) return;
 
+  // a piece handed over in this movement goes back to stock
+  const { data: gone } = await goldmindClient.from('trader_movements').select('piece_id, source').eq('id', movementId).not('piece_id', 'is', null);
+  const back = (gone || []).filter(m => m.source === 'stock_given').map(m => m.piece_id);
   const { error } = await goldmindClient.from('trader_movements').delete().eq('id', movementId);
+  if (!error && back.length) await goldmindClient.from('pieces').update({ status: 'available' }).in('id', back).eq('status', 'given_to_trader');
   if (error) {
     alert('تعذّر الحذف: ' + error.message);
     return;
@@ -1261,7 +1271,11 @@ async function deleteStockMovement(movementId) {
 async function deleteStockMovementBatch(batchId) {
   if (!confirm('هل تريد حذف هذا السند بالكامل (كل أسطره)؟ هذا الإجراء نهائي.')) return;
 
+  // pieces handed over in this movement go back to stock
+  const { data: gone } = await goldmindClient.from('trader_movements').select('piece_id, source').eq('batch_id', batchId).not('piece_id', 'is', null);
+  const back = (gone || []).filter(m => m.source === 'stock_given').map(m => m.piece_id);
   const { error } = await goldmindClient.from('trader_movements').delete().eq('batch_id', batchId);
+  if (!error && back.length) await goldmindClient.from('pieces').update({ status: 'available' }).in('id', back).eq('status', 'given_to_trader');
   if (error) {
     alert('تعذّر الحذف: ' + error.message);
     return;
@@ -2037,9 +2051,11 @@ async function submitGiveStock() {
 
   const gsVatRate = parseFloat(document.getElementById('gs-vat-rate').value) || 0;
 
+  const gsBatchId = giveStockCart.length > 1 && crypto.randomUUID ? crypto.randomUUID() : null;
   const movements = giveStockCart.map(it => {
     const feeBeforeVat = it.accountingWeight * it.fabPerGram;
     return {
+      batch_id: gsBatchId,
       store_id: GOLDMIND_STORE_ID,
       trader_id: currentTraderId,
       piece_id: it.pieceId,
@@ -2102,7 +2118,47 @@ function setGiveStockMode(mode) {
   document.getElementById('gs-bulk-mode').classList.toggle('flex', mode === 'bulk');
 }
 
+// Several lines (different karat / weight / making) in ONE voucher, like the
+// receive-stock cart. The fields above are the line being typed; "إضافة السطر"
+// moves it into the list. Saving also takes the line still in the fields.
+let gsbLines = [];
+function readGiveStockBulkLine() {
+  const gross = parseFloat(document.getElementById('gsb-weight').value);
+  if (!(gross > 0)) return null;
+  const accIn = parseFloat(document.getElementById('gsb-accweight').value);
+  const cost = parseFloat(document.getElementById('gsb-cost').value);
+  return { gross, acc: accIn > 0 ? accIn : gross, karat: parseInt(document.getElementById('gsb-karat').value, 10) || 0,
+    fab: parseFloat(document.getElementById('gsb-fab').value) || 0, cost: cost >= 0 ? cost : null };
+}
+function addGiveStockBulkLine() {
+  const errEl = document.getElementById('gsb-error');
+  const l = readGiveStockBulkLine();
+  if (!l) { errEl.textContent = 'أدخل وزناً قائماً صحيحاً.'; errEl.classList.remove('hidden'); return; }
+  errEl.classList.add('hidden');
+  gsbLines.push(l);
+  ['gsb-weight', 'gsb-accweight', 'gsb-fab', 'gsb-cost'].forEach(id => { document.getElementById(id).value = ''; });
+  renderGiveStockBulkPreview();
+  document.getElementById('gsb-weight').focus();
+}
+function removeGiveStockBulkLine(i) { gsbLines.splice(i, 1); renderGiveStockBulkPreview(); }
 function renderGiveStockBulkPreview() {
+  document.getElementById('gsb-lines').innerHTML = gsbLines.map((l, i) => `
+    <div class="flex items-center justify-between gap-2 bg-surface-container-low rounded-lg px-3 py-2 text-[12px]">
+      <span class="font-data-mono">${i + 1}. ${fmt(l.gross)} غ${l.acc !== l.gross ? ' (محاسبي ' + fmt(l.acc) + ')' : ''} · عيار ${l.karat} · مصنعية ${fmt(l.fab)}/غ${l.cost != null ? ' · كلفتنا ' + fmt(l.cost) : ''}</span>
+      <button type="button" onclick="removeGiveStockBulkLine(${i})" aria-label="حذف السطر" class="text-error"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+    </div>`).join('');
+  const all = gsbLines.concat(readGiveStockBulkLine() || []);
+  const vatRate0 = parseFloat(document.getElementById('gsb-vat-rate').value) || 0;
+  const g24 = all.reduce((a, l) => a + l.acc * (l.karat / 24), 0), fee0 = all.reduce((a, l) => a + l.acc * l.fab, 0);
+  if (gsbLines.length) {
+    document.getElementById('gsb-preview-gold').textContent = fmt(g24) + ' غ';
+    document.getElementById('gsb-preview-fee').textContent = fmtMoney(fee0);
+    document.getElementById('gsb-preview-vat').textContent = fmtMoney(fee0 * vatRate0 / 100);
+    document.getElementById('gsb-preview-fee-total').textContent = fmtMoney(fee0 * (1 + vatRate0 / 100));
+    document.getElementById('gsb-preview-fee-label').textContent = 'إجمالي المصنعية قبل الضريبة (' + all.length + ' سطر)';
+    return;
+  }
+  document.getElementById('gsb-preview-fee-label').textContent = 'إجمالي المصنعية قبل الضريبة';
   const grossWeight = parseFloat(document.getElementById('gsb-weight').value) || 0;
   const accWeightInput = parseFloat(document.getElementById('gsb-accweight').value);
   const accWeight = accWeightInput > 0 ? accWeightInput : grossWeight;
@@ -2125,16 +2181,12 @@ function renderGiveStockBulkPreview() {
 async function submitGiveStockBulk() {
   const errEl = document.getElementById('gsb-error');
   errEl.classList.add('hidden');
-
-  const grossWeight = parseFloat(document.getElementById('gsb-weight').value);
-  const accWeightInput = parseFloat(document.getElementById('gsb-accweight').value);
-  const accWeight = accWeightInput > 0 ? accWeightInput : grossWeight;
-  const karat = parseInt(document.getElementById('gsb-karat').value, 10);
-  const fab = parseFloat(document.getElementById('gsb-fab').value) || 0;
+  const current = readGiveStockBulkLine();
+  const lines = gsbLines.concat(current ? [current] : []);
   const vatRate = parseFloat(document.getElementById('gsb-vat-rate').value) || 0;
   const notes = document.getElementById('gsb-notes').value.trim();
 
-  if (!grossWeight || grossWeight <= 0) {
+  if (!lines.length) {
     errEl.textContent = 'أدخل وزناً قائماً صحيحاً.';
     errEl.classList.remove('hidden');
     return;
@@ -2144,21 +2196,23 @@ async function submitGiveStockBulk() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const feeBeforeVat = accWeight * fab;
-  const { error } = await goldmindClient.from('trader_movements').insert({
+  const batchId = lines.length > 1 ? (crypto.randomUUID ? crypto.randomUUID() : null) : null;
+  const { error } = await goldmindClient.from('trader_movements').insert(lines.map(l => ({
     store_id: GOLDMIND_STORE_ID,
     trader_id: currentTraderId,
     piece_id: null,
     movement_type: 'debt_decrease',
-    weight_grams: grossWeight,
-    karat: karat,
-    accounting_weight_grams: accWeight,
-    gold_24k_equivalent: +(accWeight * (karat / 24)).toFixed(3),
-    fab_fee_per_gram: fab,
-    fab_fee_amount: +(feeBeforeVat * (1 + vatRate / 100)).toFixed(2),
+    weight_grams: l.gross,
+    karat: l.karat,
+    accounting_weight_grams: l.acc,
+    gold_24k_equivalent: +(l.acc * (l.karat / 24)).toFixed(3),
+    fab_fee_per_gram: l.fab,
+    fab_fee_amount: +(l.acc * l.fab * (1 + vatRate / 100)).toFixed(2),
+    cost_fab_per_gram: l.cost,
     source: 'stock_given',
+    batch_id: batchId,
     notes: (notes ? notes + ' — ' : '') + 'وزن بالجملة (بدون باركود)'
-  });
+  })));
 
   btn.disabled = false;
   btn.textContent = 'حفظ التسليم';
@@ -2169,6 +2223,8 @@ async function submitGiveStockBulk() {
     return;
   }
 
+  gsbLines = [];
+  document.getElementById('gsb-cost').value = '';
   document.getElementById('gsb-weight').value = '';
   document.getElementById('gsb-accweight').value = '';
   document.getElementById('gsb-fab').value = '';
