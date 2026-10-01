@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 7hh1eUeEzLru6EocmC4ovLBHW4sbhK21lIlT1zosHCvl59cDFthrBRGGP4uI5OG
+\restrict 4GTtP5HrHYmHRfgrssqvdLHufSiUpgUa5E7qPCjr3GYwQmYEGR2SAUzEishRZ1J
 
 
 SET statement_timeout = 0;
@@ -46,19 +46,16 @@ begin
   end if;
   select upper(coalesce(nullif(currency,''),'AED')) into scur from stores where id = sid;
 
-  -- 1) gold prices that don't fit the store currency (the AED/USD mix-up)
   return query
   select 'error', 'gold_price_currency', 'سعر الذهب لا يتناسب مع عملة المحل',
          gold_price_problem(sid, g.karat, g.price_per_gram), null::uuid, g.karat || 'K'
   from gold_prices g where g.store_id = sid and gold_price_problem(sid, g.karat, g.price_per_gram) is not null;
 
-  -- 2) invoices in a currency other than the store's
   return query
   select 'warning', 'invoice_currency', 'فاتورة بعملة غير عملة المحل',
          format('الفاتورة بـ %s والمحل بـ %s', i.currency, scur), i.id, i.invoice_number
   from invoices i where i.store_id = sid and i.currency is not null and upper(i.currency) <> scur and i.status <> 'cancelled';
 
-  -- 3) sale invoices whose lines don't add up to the total (or have no lines)
   return query
   select 'error', 'invoice_lines_total', 'مجموع سطور الفاتورة ≠ الإجمالي',
          format('السطور %s — الإجمالي %s', coalesce(x.s, 0), i.total_amount), i.id, i.invoice_number
@@ -66,39 +63,36 @@ begin
   where i.store_id = sid and i.type = 'sale' and i.status <> 'cancelled'
     and (x.n = 0 or abs(coalesce(x.s, 0) - i.total_amount) > 0.01);
 
-  -- 4) paid amount vs cash actually booked for the invoice
   return query
-  select 'warning', 'invoice_cash_mismatch', 'المقبوض بالفاتورة ≠ المسجّل بالصندوق',
-         format('مدفوع %s — بالصندوق %s', i.amount_paid, coalesce(c.s, 0)), i.id, i.invoice_number
-  from invoices i left join lateral (
-      select sum(case when direction = 'in' then amount else -amount end) s from cash_movements where invoice_id = i.id) c on true
+  select 'warning', 'invoice_cash_mismatch', 'المقبوض بالفاتورة ≠ المسجّل بالصندوق والدفعات',
+         format('مدفوع %s — بالصندوق %s — دفعات لاحقة %s', i.amount_paid, coalesce(c.s, 0), coalesce(al.s, 0)), i.id, i.invoice_number
+  from invoices i
+  left join lateral (select sum(case when direction = 'in' then amount else -amount end) s from cash_movements where invoice_id = i.id) c on true
+  left join lateral (select sum(cash_amount) s from customer_debts where invoice_id = i.id and source = 'allocation') al on true
   where i.store_id = sid and i.type = 'sale' and i.status <> 'cancelled' and i.payment_method in ('cash','bank','mixed')
-    and abs(coalesce(c.s, 0) - coalesce(i.amount_paid, 0)) > 0.01;
+    and abs(coalesce(c.s, 0) + coalesce(al.s, 0) - coalesce(i.amount_paid, 0)) > 0.01;
 
-  -- 5) unpaid part not recorded as customer debt
   return query
   select 'warning', 'invoice_debt_mismatch', 'المبلغ المتبقي على العميل غير مسجّل كدين',
          format('متبقي %s — مسجّل دين %s', i.total_amount - coalesce(i.amount_paid,0), coalesce(d.s, 0)), i.id, i.invoice_number
   from invoices i left join lateral (
-      select sum(cash_amount) s from customer_debts where invoice_id = i.id and movement_type = 'debt_increase') d on true
+      select sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end) s
+        from customer_debts where invoice_id = i.id) d on true
   where i.store_id = sid and i.type = 'sale' and i.status <> 'cancelled'
     and abs((i.total_amount - coalesce(i.amount_paid,0)) - coalesce(d.s, 0)) > 0.01;
 
-  -- 6) invoice-linked cash booked in another currency
   return query
   select 'error', 'cash_currency', 'حركة صندوق لفاتورة بعملة غلط',
          format('%s %s — عملة المحل %s', cm.amount, cm.currency, scur), cm.invoice_id, i.invoice_number
   from cash_movements cm join invoices i on i.id = cm.invoice_id
   where cm.store_id = sid and cm.currency is not null and upper(cm.currency) <> upper(coalesce(i.currency, scur));
 
-  -- 7) a piece on a live sale invoice that is still "available" (could be sold twice)
   return query
   select 'error', 'piece_still_available', 'قطعة مباعة لكنها ما زالت تظهر متاحة',
          format('القطعة %s بالفاتورة %s', p.barcode, i.invoice_number), p.id, p.barcode
   from invoice_items ii join invoices i on i.id = ii.invoice_id join pieces p on p.id = ii.piece_id
   where i.store_id = sid and i.type = 'sale' and i.status <> 'cancelled' and p.status = 'available';
 
-  -- 8) negative bulk stock
   return query
   select 'error', 'negative_stock', 'رصيد جملة سالب',
          format('عيار %s: %s غ', l.karat, l.weight_grams_remaining), l.id, l.karat || 'K'
@@ -769,6 +763,46 @@ $$;
 
 
 --
+-- Name: create_customer_deposit(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.create_customer_deposit(p jsonb) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare c record; me uuid; amt numeric := round(coalesce(nullif(p->>'amount', '')::numeric, 0), 2);
+        meth text := coalesce(nullif(p->>'method', ''), 'cash'); num text; dep_id uuid; cm uuid;
+begin
+  select id, store_id, name into c from customers where id = (p->>'customer_id')::uuid;
+  if c is null then raise exception 'اختر العميل'; end if;
+  if not (has_permission('edit_customers', c.store_id) or has_permission('manage_daily_cashbox', c.store_id)) then
+    raise exception 'ليس لديك صلاحية تسجيل العربون' using errcode = '42501';
+  end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  if meth not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
+
+  perform pg_advisory_xact_lock(hashtext('deposit:' || c.store_id));
+  select 'DEP-' || lpad((coalesce(max(nullif(regexp_replace(deposit_number, '\D', '', 'g'), '')::int), 0) + 1)::text, 6, '0')
+    into num from customer_deposits where store_id = c.store_id;
+
+  insert into customer_deposits (store_id, deposit_number, customer_id, amount, method, items, notes, created_by)
+    values (c.store_id, num, c.id, amt, meth, coalesce(p->'items', '[]'::jsonb), nullif(trim(p->>'notes'), ''), me)
+    returning id into dep_id;
+  insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (c.store_id, case when meth = 'bank' then 'bank' else 'main' end, 'in', amt, 'عربون ' || num || ' من ' || c.name, me)
+    returning id into cm;
+  if meth = 'cash' then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+      values (c.store_id, 'عربون', 'in', amt, 'عربون ' || num || ' — ' || c.name, me, cm);
+  end if;
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+    values (c.store_id, c.id, 'debt_decrease', amt, 0, 'عربون ' || num, 'deposit', me);
+  return jsonb_build_object('id', dep_id, 'deposit_number', num);
+end $$;
+
+
+--
 -- Name: currency_usd_peg(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -791,6 +825,27 @@ CREATE FUNCTION public.current_store_id() RETURNS uuid
     AS $$
   select store_id from public.staff where user_id = auth.uid() limit 1;
 $$;
+
+
+--
+-- Name: delete_expense_category(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.delete_expense_category(p_id uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare c record;
+begin
+  select * into c from expense_categories where id = p_id;
+  if c is null then return; end if;
+  if not gm_can_expense(c.store_id) then raise exception 'ليس لديك صلاحية' using errcode = '42501'; end if;
+  if c.name = 'هدايا' then raise exception 'لا يمكن حذف نوع الهدايا'; end if;
+  if exists (select 1 from expense_entries where category_id = p_id) then
+    raise exception 'لا يمكن حذف نوع عليه مصاريف مسجّلة — يمكنك تغيير اسمه';
+  end if;
+  delete from expense_categories where id = p_id;
+end $$;
 
 
 --
@@ -1099,6 +1154,55 @@ begin
   values (pc.store_id, pc.id, 'gifted', 'إخراج كهدية إلى ' || trim(p_recipient), actor);
   return gift_id;
 end;
+$$;
+
+
+--
+-- Name: gm_allocate_customer_credit(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare owed numeric; open_rem numeric; credit numeric; r record; a numeric; me uuid;
+begin
+  if cust is null then return; end if;
+  select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)
+    into owed from customer_debts where store_id = sid and customer_id = cust;
+  select coalesce(sum(total_amount - coalesce(amount_paid, 0)), 0) into open_rem
+    from invoices where store_id = sid and customer_id = cust and type = 'sale' and status <> 'cancelled'
+     and total_amount - coalesce(amount_paid, 0) > 0.009;
+  credit := round(open_rem - owed, 2);
+  if credit <= 0.009 then return; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+  for r in select id, invoice_number, total_amount - coalesce(amount_paid, 0) rem
+             from invoices where store_id = sid and customer_id = cust and type = 'sale' and status <> 'cancelled'
+              and total_amount - coalesce(amount_paid, 0) > 0.009
+            order by created_at, invoice_number for update
+  loop
+    exit when credit <= 0.009;
+    a := least(credit, r.rem);
+    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
+      (sid, cust, r.id, 'debt_decrease', a, 0, 'دفعة مخصّصة للفاتورة ' || r.invoice_number, 'allocation', me),
+      (sid, cust, null, 'debt_increase', a, 0, 'تخصيص دفعة للفاتورة ' || r.invoice_number, 'allocation', me);
+    update invoices set amount_paid = coalesce(amount_paid, 0) + a,
+                        status = case when total_amount - coalesce(amount_paid, 0) - a <= 0.009 then 'paid' else status end
+     where id = r.id;
+    credit := credit - a;
+  end loop;
+end $$;
+
+
+--
+-- Name: gm_can_expense(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_can_expense(sid uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select has_permission('manage_daily_cashbox', sid) or has_permission('view_profit_report', sid)
 $$;
 
 
@@ -1892,7 +1996,7 @@ begin
   if paid > 0 then
     insert into cash_movements (store_id, box, direction, amount, description, created_by, invoice_id, created_at)
     values (sid, 'main', 'in', paid,
-      case when pm = 'mixed' then format('تحصيل جزئي لفاتورة بيع %s (%s نقدي + %s فيزا/بنك)', inv_no, cash_amt, bank_amt)
+      case when pm = 'mixed' then format('تحصيل جزئي لفاتورة بيع %s (%s)', inv_no, concat_ws(' + ', case when cash_amt > 0 then cash_amt || ' نقداً' end, case when bank_amt > 0 then bank_amt || ' فيزا/بنك' end))
            else 'تحصيل فاتورة بيع ' || inv_no end, me, inv_id, sold_at);
   end if;
   if remaining > 0.01 then
@@ -2023,6 +2127,68 @@ end $$;
 
 
 --
+-- Name: record_customer_payment(uuid, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text DEFAULT 'cash'::text, p_notes text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare c record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text;
+begin
+  select id, store_id, name into c from customers where id = p_customer;
+  if c is null then raise exception 'العميل غير موجود'; end if;
+  if not (has_permission('edit_customers', c.store_id) or has_permission('manage_daily_cashbox', c.store_id)) then
+    raise exception 'ليس لديك صلاحية تسجيل دفعات العملاء' using errcode = '42501';
+  end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
+  note := coalesce(nullif(trim(p_notes), ''), 'دفعة من العميل');
+
+  insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (c.store_id, case when p_method = 'bank' then 'bank' else 'main' end, 'in', amt,
+            'دفعة من العميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
+    returning id into cm;
+  if coalesce(p_method, 'cash') = 'cash' then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+      values (c.store_id, 'دفعة من عميل', 'in', amt, c.name || ' — ' || note, me, cm);
+  end if;
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+    values (c.store_id, c.id, 'debt_decrease', amt, 0, note, 'payment', me);
+  return jsonb_build_object('ok', true);
+end $$;
+
+
+--
+-- Name: record_expense(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_expense(p jsonb) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare sid uuid := (p->>'store_id')::uuid; me uuid; cat record; amt numeric := round(coalesce(nullif(p->>'amount', '')::numeric, 0), 2);
+        eid uuid; cm uuid; descr text := nullif(trim(p->>'description'), '');
+begin
+  if not gm_can_expense(sid) or not is_store_member(sid) then raise exception 'ليس لديك صلاحية تسجيل المصاريف' using errcode = '42501'; end if;
+  select id, name into cat from expense_categories where id = (p->>'category_id')::uuid and store_id = sid;
+  if cat is null then raise exception 'اختر نوع المصروف'; end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+  insert into expense_entries (store_id, category_id, amount, description, attachment_url, created_by)
+    values (sid, cat.id, amt, coalesce(descr, cat.name), nullif(p->>'attachment_url', ''), me) returning id into eid;
+  insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (sid, 'main', 'out', amt, 'مصروف ' || cat.name || coalesce(': ' || descr, ''), me) returning id into cm;
+  if coalesce((p->>'from_daily_cashbox')::boolean, true) then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+      values (sid, 'مصروف: ' || cat.name, 'out', amt, descr, me, cm);
+  end if;
+  return eid;
+end $$;
+
+
+--
 -- Name: record_subscription_payment(uuid, integer, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2055,6 +2221,36 @@ begin
   values (p_store_id, 'subscription_payment_recorded', 'تسجيل دفعة اشتراك يدوياً: ' || p_months || ' شهر' || coalesce(' - مرجع: ' || p_payment_ref, ''));
 end;
 $$;
+
+
+--
+-- Name: refund_customer_deposit(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.refund_customer_deposit(p_deposit uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare d record; me uuid; cm uuid;
+begin
+  select dp.*, cu.name cname into d from customer_deposits dp join customers cu on cu.id = dp.customer_id where dp.id = p_deposit for update of dp;
+  if d is null then raise exception 'العربون غير موجود'; end if;
+  if not (has_permission('edit_customers', d.store_id) or has_permission('manage_daily_cashbox', d.store_id)) then
+    raise exception 'ليس لديك صلاحية' using errcode = '42501';
+  end if;
+  if d.status <> 'active' then raise exception 'هذا العربون مُسترجَع مسبقاً'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = d.store_id limit 1;
+  update customer_deposits set status = 'refunded', refunded_at = now() where id = d.id;
+  insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (d.store_id, case when d.method = 'bank' then 'bank' else 'main' end, 'out', d.amount, 'استرجاع عربون ' || d.deposit_number || ' إلى ' || d.cname, me)
+    returning id into cm;
+  if d.method = 'cash' then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+      values (d.store_id, 'استرجاع عربون', 'out', d.amount, d.deposit_number || ' — ' || d.cname, me, cm);
+  end if;
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+    values (d.store_id, d.customer_id, 'debt_increase', d.amount, 0, 'استرجاع عربون ' || d.deposit_number, 'deposit_refund', me);
+end $$;
 
 
 --
@@ -2391,6 +2587,31 @@ $$;
 
 
 --
+-- Name: save_expense_category(uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.save_expense_category(p_store uuid, p_name text, p_id uuid DEFAULT NULL::uuid) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare nm text := nullif(trim(p_name), ''); rid uuid;
+begin
+  if not gm_can_expense(p_store) or not is_store_member(p_store) then raise exception 'ليس لديك صلاحية' using errcode = '42501'; end if;
+  if nm is null then raise exception 'اكتب اسم نوع المصروف'; end if;
+  if exists (select 1 from expense_categories where store_id = p_store and name = nm and id is distinct from p_id) then
+    raise exception 'هذا النوع موجود مسبقاً';
+  end if;
+  if p_id is null then
+    insert into expense_categories (store_id, name) values (p_store, nm) returning id into rid;
+  else
+    if (select name from expense_categories where id = p_id and store_id = p_store) = 'هدايا' then raise exception 'لا يمكن تغيير اسم نوع الهدايا'; end if;
+    update expense_categories set name = nm where id = p_id and store_id = p_store returning id into rid;
+  end if;
+  return rid;
+end $$;
+
+
+--
 -- Name: seed_default_zebra_label_fields(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2640,6 +2861,82 @@ end;
 $$;
 
 
+--
+-- Name: trader_cash_move(uuid, text, numeric, text, boolean); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text DEFAULT NULL::text, p_daily boolean DEFAULT true) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare t record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); mid uuid; cm uuid; note text;
+begin
+  select id, store_id, name into t from traders where id = p_trader;
+  if t is null then raise exception 'التاجر غير موجود'; end if;
+  if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+  if p_direction not in ('out', 'in') then raise exception 'اتجاه غير معروف'; end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = t.store_id limit 1;
+  note := coalesce(nullif(trim(p_notes), ''), case when p_direction = 'out' then 'صرف كاش للتاجر' else 'قبض كاش من التاجر' end);
+
+  insert into trader_movements (store_id, trader_id, movement_type, weight_grams, karat, gold_24k_equivalent, fab_fee_amount, source, notes, created_by)
+    values (t.store_id, t.id, case when p_direction = 'out' then 'debt_decrease' else 'debt_increase' end, 0, null, 0, amt,
+            case when p_direction = 'out' then 'cash_out' else 'cash_in' end, note, me)
+    returning id into mid;
+  insert into cash_movements (store_id, box, direction, amount, description, created_by, trader_movement_id)
+    values (t.store_id, 'main', p_direction, amt,
+            case when p_direction = 'out' then 'صرف كاش للتاجر ' else 'قبض كاش من التاجر ' end || t.name, me, mid)
+    returning id into cm;
+  if coalesce(p_daily, true) then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+      values (t.store_id, case when p_direction = 'out' then 'صرف كاش لتاجر' else 'قبض كاش من تاجر' end, p_direction, amt, t.name || ' — ' || note, me, cm);
+  end if;
+  return mid;
+end $$;
+
+
+--
+-- Name: trader_gold_to_cash(uuid, numeric, integer, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text DEFAULT NULL::text) RETURNS numeric
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare t record; me uuid; w numeric := round(coalesce(p_weight, 0), 3); pr numeric := coalesce(p_price, 0);
+        k int := coalesce(p_karat, 24); g24 numeric; cash numeric; note text; ref text := gen_random_uuid()::text;
+begin
+  select id, store_id, name into t from traders where id = p_trader;
+  if t is null then raise exception 'التاجر غير موجود'; end if;
+  if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+  if p_direction not in ('we_owe_gold', 'they_owe_gold') then raise exception 'اتجاه غير معروف'; end if;
+  if w <= 0 or pr <= 0 then raise exception 'أدخل الوزن وسعر الغرام'; end if;
+  if k not in (18, 21, 22, 24) then raise exception 'عيار غير معروف'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = t.store_id limit 1;
+  g24 := round(w * k / 24.0, 3);
+  cash := round(w * pr, 2);
+  note := format('تسكير عملات: %s غ عيار %s × %s = %s', w, k, pr, cash) || coalesce(' — ' || nullif(trim(p_notes), ''), '');
+  insert into trader_movements (store_id, trader_id, movement_type, weight_grams, karat, gold_24k_equivalent, fab_fee_amount, source, notes, batch_ref, created_by) values
+    (t.store_id, t.id, case when p_direction = 'we_owe_gold' then 'debt_decrease' else 'debt_increase' end, w, k, g24, 0, 'gold_to_cash', note, ref, me),
+    (t.store_id, t.id, case when p_direction = 'we_owe_gold' then 'debt_increase' else 'debt_decrease' end, 0, null, 0, cash, 'gold_to_cash', note, ref, me);
+  return cash;
+end $$;
+
+
+--
+-- Name: trg_customer_debts_allocate(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_customer_debts_allocate() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  perform gm_allocate_customer_credit(new.store_id, new.customer_id);
+  return null;
+end $$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -2821,6 +3118,29 @@ CREATE TABLE public.customer_debts (
 --
 
 COMMENT ON COLUMN public.customer_debts.movement_type IS 'debt_increase (credit sale) or debt_decrease (customer payment/settlement), mirroring trader_movements design.';
+
+
+--
+-- Name: customer_deposits; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.customer_deposits (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    store_id uuid NOT NULL,
+    deposit_number text NOT NULL,
+    customer_id uuid NOT NULL,
+    amount numeric NOT NULL,
+    currency text,
+    method text DEFAULT 'cash'::text NOT NULL,
+    items jsonb DEFAULT '[]'::jsonb NOT NULL,
+    notes text,
+    status text DEFAULT 'active'::text NOT NULL,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    refunded_at timestamp with time zone,
+    CONSTRAINT customer_deposits_amount_check CHECK ((amount > (0)::numeric)),
+    CONSTRAINT customer_deposits_status_check CHECK ((status = ANY (ARRAY['active'::text, 'refunded'::text])))
+);
 
 
 --
@@ -3933,6 +4253,7 @@ CREATE TABLE public.trader_movements (
     piece_id uuid,
     batch_id uuid,
     batch_ref text,
+    cost_fab_per_gram numeric,
     CONSTRAINT trader_movements_source_check CHECK ((source = ANY (ARRAY['settlement'::text, 'stock_given'::text, 'stock_received'::text, 'opening_balance'::text])))
 );
 
@@ -3977,6 +4298,13 @@ COMMENT ON COLUMN public.trader_movements.batch_id IS 'Groups multiple trader_mo
 --
 
 COMMENT ON COLUMN public.trader_movements.batch_ref IS 'Optional free-text reference for a batch (e.g. the trader''s own invoice number), shown as the batch card header.';
+
+
+--
+-- Name: COLUMN trader_movements.cost_fab_per_gram; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.trader_movements.cost_fab_per_gram IS 'Our own making cost per gram for goods given to a trader by weight (no piece) — used for wholesale profit';
 
 
 --
@@ -4109,6 +4437,22 @@ ALTER TABLE ONLY public.company_search_attempts
 
 ALTER TABLE ONLY public.customer_debts
     ADD CONSTRAINT customer_debts_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: customer_deposits customer_deposits_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_deposits
+    ADD CONSTRAINT customer_deposits_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: customer_deposits customer_deposits_store_id_deposit_number_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_deposits
+    ADD CONSTRAINT customer_deposits_store_id_deposit_number_key UNIQUE (store_id, deposit_number);
 
 
 --
@@ -4550,6 +4894,13 @@ CREATE INDEX auth_passkeys_user_idx ON public.auth_passkeys USING btree (user_id
 
 
 --
+-- Name: customer_deposits_store_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_deposits_store_idx ON public.customer_deposits USING btree (store_id, created_at DESC);
+
+
+--
 -- Name: daily_cash_log_cash_movement_uidx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -4788,10 +5139,24 @@ CREATE TRIGGER trg_cash_movements_currency BEFORE INSERT ON public.cash_movement
 
 
 --
+-- Name: customer_debts trg_customer_debts_allocate; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_customer_debts_allocate AFTER INSERT ON public.customer_debts FOR EACH ROW WHEN ((new.source IS DISTINCT FROM 'allocation'::text)) EXECUTE FUNCTION public.trg_customer_debts_allocate();
+
+
+--
 -- Name: customer_debts trg_customer_debts_currency; Type: TRIGGER; Schema: public; Owner: -
 --
 
 CREATE TRIGGER trg_customer_debts_currency BEFORE INSERT ON public.customer_debts FOR EACH ROW EXECUTE FUNCTION public.fill_currency_from_store();
+
+
+--
+-- Name: customer_deposits trg_customer_deposits_currency; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_customer_deposits_currency BEFORE INSERT ON public.customer_deposits FOR EACH ROW EXECUTE FUNCTION public.fill_currency_from_store();
 
 
 --
@@ -4968,6 +5333,30 @@ ALTER TABLE ONLY public.customer_debts
 
 ALTER TABLE ONLY public.customer_debts
     ADD CONSTRAINT customer_debts_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: customer_deposits customer_deposits_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_deposits
+    ADD CONSTRAINT customer_deposits_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.staff(id) ON DELETE SET NULL;
+
+
+--
+-- Name: customer_deposits customer_deposits_customer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_deposits
+    ADD CONSTRAINT customer_deposits_customer_id_fkey FOREIGN KEY (customer_id) REFERENCES public.customers(id);
+
+
+--
+-- Name: customer_deposits customer_deposits_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_deposits
+    ADD CONSTRAINT customer_deposits_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -5890,6 +6279,19 @@ CREATE POLICY customer_debts_write ON public.customer_debts USING ((public.is_st
 
 
 --
+-- Name: customer_deposits; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.customer_deposits ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: customer_deposits customer_deposits_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customer_deposits_select ON public.customer_deposits FOR SELECT USING ((public.is_store_member(store_id) AND (public.has_permission('view_customers'::text, store_id) OR public.has_permission('manage_daily_cashbox'::text, store_id))));
+
+
+--
 -- Name: customer_phones; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -6061,7 +6463,7 @@ ALTER TABLE public.expense_entries ENABLE ROW LEVEL SECURITY;
 -- Name: expense_entries expense_entries_select; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expense_entries_select ON public.expense_entries FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
+CREATE POLICY expense_entries_select ON public.expense_entries FOR SELECT USING ((public.is_store_member(store_id) AND public.gm_can_expense(store_id)));
 
 
 --
@@ -7001,6 +7403,15 @@ GRANT ALL ON FUNCTION public.consume_gold_stock_lot_pooled(target_lot_id uuid, w
 
 
 --
+-- Name: FUNCTION create_customer_deposit(p jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.create_customer_deposit(p jsonb) TO anon;
+GRANT ALL ON FUNCTION public.create_customer_deposit(p jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.create_customer_deposit(p jsonb) TO service_role;
+
+
+--
 -- Name: FUNCTION currency_usd_peg(cur text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -7016,6 +7427,15 @@ GRANT ALL ON FUNCTION public.currency_usd_peg(cur text) TO service_role;
 GRANT ALL ON FUNCTION public.current_store_id() TO anon;
 GRANT ALL ON FUNCTION public.current_store_id() TO authenticated;
 GRANT ALL ON FUNCTION public.current_store_id() TO service_role;
+
+
+--
+-- Name: FUNCTION delete_expense_category(p_id uuid); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.delete_expense_category(p_id uuid) TO anon;
+GRANT ALL ON FUNCTION public.delete_expense_category(p_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.delete_expense_category(p_id uuid) TO service_role;
 
 
 --
@@ -7096,6 +7516,24 @@ GRANT ALL ON FUNCTION public.get_subscription_status(p_store_id uuid) TO service
 REVOKE ALL ON FUNCTION public.gift_out_piece(target_piece_id uuid, p_recipient text, p_reason text, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gift_out_piece(target_piece_id uuid, p_recipient text, p_reason text, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.gift_out_piece(target_piece_id uuid, p_recipient text, p_reason text, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_allocate_customer_credit(sid uuid, cust uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_can_expense(sid uuid); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO anon;
+GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO service_role;
 
 
 --
@@ -7279,12 +7717,39 @@ GRANT ALL ON FUNCTION public.post_sales_return(p jsonb) TO service_role;
 
 
 --
+-- Name: FUNCTION record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO anon;
+GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION record_expense(p jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO anon;
+GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO service_role;
+
+
+--
 -- Name: FUNCTION record_subscription_payment(p_store_id uuid, p_months integer, p_payment_ref text, p_plan_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
 REVOKE ALL ON FUNCTION public.record_subscription_payment(p_store_id uuid, p_months integer, p_payment_ref text, p_plan_id uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.record_subscription_payment(p_store_id uuid, p_months integer, p_payment_ref text, p_plan_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.record_subscription_payment(p_store_id uuid, p_months integer, p_payment_ref text, p_plan_id uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION refund_customer_deposit(p_deposit uuid); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.refund_customer_deposit(p_deposit uuid) TO anon;
+GRANT ALL ON FUNCTION public.refund_customer_deposit(p_deposit uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.refund_customer_deposit(p_deposit uuid) TO service_role;
 
 
 --
@@ -7360,6 +7825,15 @@ GRANT ALL ON FUNCTION public.revert_gift(target_gift_id uuid) TO service_role;
 
 
 --
+-- Name: FUNCTION save_expense_category(p_store uuid, p_name text, p_id uuid); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_id uuid) TO anon;
+GRANT ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_id uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION seed_default_zebra_label_fields(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -7428,6 +7902,33 @@ GRANT ALL ON FUNCTION public.stores_currency_usd_reprice() TO service_role;
 GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO anon;
 GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO authenticated;
 GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO service_role;
+
+
+--
+-- Name: FUNCTION trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean) TO anon;
+GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean) TO service_role;
+
+
+--
+-- Name: FUNCTION trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO anon;
+GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION trg_customer_debts_allocate(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO anon;
+GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO service_role;
 
 
 --
@@ -7593,6 +8094,15 @@ GRANT ALL ON SEQUENCE public.company_search_attempts_id_seq TO service_role;
 GRANT ALL ON TABLE public.customer_debts TO anon;
 GRANT ALL ON TABLE public.customer_debts TO authenticated;
 GRANT ALL ON TABLE public.customer_debts TO service_role;
+
+
+--
+-- Name: TABLE customer_deposits; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.customer_deposits TO anon;
+GRANT ALL ON TABLE public.customer_deposits TO authenticated;
+GRANT ALL ON TABLE public.customer_deposits TO service_role;
 
 
 --
@@ -8063,5 +8573,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 7hh1eUeEzLru6EocmC4ovLBHW4sbhK21lIlT1zosHCvl59cDFthrBRGGP4uI5OG
+\unrestrict 4GTtP5HrHYmHRfgrssqvdLHufSiUpgUa5E7qPCjr3GYwQmYEGR2SAUzEishRZ1J
 
