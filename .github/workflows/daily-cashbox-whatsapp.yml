@@ -34,13 +34,25 @@ jobs:
               ('store_id', 'eq.' + os.environ['STORE_ID']),
               ('created_at', 'gte.' + today_start.isoformat()),
               ('created_at', 'lt.' + tomorrow_start.isoformat()),
-              ('select', 'direction,amount,currency,operation_type,notes'),
+              ('select', 'direction,amount,currency,operation_type,notes,cm:cash_movement_id(invoice_id)'),
           ])
           req = urllib.request.Request(base_url + '?' + query, headers={
               'apikey': os.environ['SUPABASE_SERVICE_ROLE_KEY'],
               'Authorization': 'Bearer ' + os.environ['SUPABASE_SERVICE_ROLE_KEY'],
           })
-          rows = json.loads(urllib.request.urlopen(req).read())
+          raw = json.loads(urllib.request.urlopen(req).read())
+          # One row per invoice: an edited invoice's first posting, reversal and
+          # new posting count as their net (same rule as the cashbox page).
+          rows, nets = [], {}
+          for r in raw:
+              inv = (r.get('cm') or {}).get('invoice_id')
+              if not inv:
+                  rows.append(r); continue
+              k = (inv, r.get('currency'))
+              nets[k] = nets.get(k, 0.0) + (1 if r['direction'] == 'in' else -1) * float(r.get('amount') or 0)
+          for (inv, cur), net in nets.items():
+              if abs(net) >= 0.005:
+                  rows.append({'currency': cur, 'direction': 'in' if net > 0 else 'out', 'amount': abs(net)})
 
           totals = {}
           for r in rows:

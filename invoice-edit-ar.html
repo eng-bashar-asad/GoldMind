@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=31"></script>
-<script src="theme.js?v=44"></script>
+<script src="theme.js?v=45"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -421,12 +421,21 @@ async function saveEdit() {
         notes: 'تعديل فاتورة ' + invoice.invoice_number, created_by: GOLDMIND_STAFF_ID
       });
     }
-  } else if (oldTotal > 0) {
-    await postLedgerEntry(invoice.type, invoice.payment_method, oldTotal, 'remove',
+  } else if (invoice.payment_method === newPaymentMethod) {
+    // Same way of paying: post only the difference (nothing when the amount
+    // didn't change, e.g. a fixed customer name), so the cashbox shows the
+    // invoice once with its final value.
+    const delta = Math.round((newTotal - oldTotal) * 100) / 100;
+    if (Math.abs(delta) > 0.009) {
+      await postLedgerEntry(invoice.type, newPaymentMethod, Math.abs(delta), delta > 0 ? 'add' : 'remove',
+        (delta > 0 ? 'زيادة' : 'نقص') + ' قيمة فاتورة ' + invoice.invoice_number + ' بعد التعديل');
+    }
+  } else {
+    // Payment way changed (e.g. cash → on the trader's account): undo it in
+    // the old place and post it in the new one.
+    if (oldTotal > 0) await postLedgerEntry(invoice.type, invoice.payment_method, oldTotal, 'remove',
       'حذف قيمة فاتورة ' + invoice.invoice_number + ' (قبل التعديل)');
-  }
-  if (!saleMoney && newTotal > 0) {
-    await postLedgerEntry(invoice.type, newPaymentMethod, newTotal, 'add',
+    if (newTotal > 0) await postLedgerEntry(invoice.type, newPaymentMethod, newTotal, 'add',
       'إضافة قيمة فاتورة ' + invoice.invoice_number + ' (بعد التعديل)');
   }
 

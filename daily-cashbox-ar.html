@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=31"></script>
-<script src="theme.js?v=44"></script>
+<script src="theme.js?v=45"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -532,7 +532,7 @@ function renderAll() {
 
   const bodyEl = document.getElementById('cashbox-table-body');
   const emptyEl = document.getElementById('empty-state');
-  const entriesToShow = showFullHistory ? allEntries : todayEntries;
+  const entriesToShow = gmCollapseInvoiceRows(showFullHistory ? allEntries : todayEntries);
   if (showFullHistory) {
     document.getElementById('entries-heading').textContent = 'كل العمليات';
     emptyEl.textContent = 'لا توجد عمليات مسجّلة بعد.';
@@ -812,7 +812,7 @@ async function runCashboxSearch() {
     return;
   }
 
-  let query = goldmindClient.from('daily_cash_log').select('*')
+  let query = goldmindClient.from('daily_cash_log').select('*, cm:cash_movement_id(invoice_id)')
     .eq('store_id', GOLDMIND_STORE_ID)
     .or(`notes.ilike.%${keyword}%,operation_type.ilike.%${keyword}%`)
     .order('created_at', { ascending: false })
@@ -824,7 +824,8 @@ async function runCashboxSearch() {
   }
 
   resultsEl.innerHTML = '<p class="text-[12px] text-on-surface-variant text-center py-3">جارِ البحث...</p>';
-  const { data, error } = await query;
+  const { data: rawData, error } = await query;
+  const data = rawData ? gmCollapseInvoiceRows(rawData) : rawData;
 
   if (error) {
     errEl.textContent = 'تعذّر البحث: ' + error.message;

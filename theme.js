@@ -215,6 +215,34 @@ function gmFormatNumber(value) {
 // An amount is shown only in the currency it was taken in — no converted
 // figure next to it (the owner asked for that). The second currency and its
 // exchange rate stay saved in company settings for when a conversion is needed.
+// Daily cashbox: an invoice edited or re-posted the same day leaves several
+// mirrored rows (first posting, reversal, new posting). Show one row per
+// invoice per day with the net amount — its final effect; rows that cancel out
+// disappear. Totals are unchanged. Rows need e.cm.invoice_id.
+function gmCollapseInvoiceRows(entries) {
+  const groups = new Map(), out = [];
+  for (const e of entries) {
+    const inv = e.cm && e.cm.invoice_id;
+    if (!inv) { out.push(e); continue; }
+    const key = inv + '|' + e.currency + '|' + gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' });
+    if (!groups.has(key)) { groups.set(key, []); out.push(key); }
+    groups.get(key).push(e);
+  }
+  return out.flatMap(x => {
+    if (typeof x !== 'string') return [x];
+    const rows = groups.get(x);
+    if (rows.length === 1) return rows;
+    const net = rows.reduce((s, e) => s + (e.direction === 'in' ? 1 : -1) * Number(e.amount || 0), 0);
+    if (Math.abs(net) < 0.005) return [];
+    const last = rows[rows.length - 1];
+    return [{ ...rows[0], id: last.id, created_at: last.created_at, direction: net > 0 ? 'in' : 'out', amount: Math.round(Math.abs(net) * 100) / 100, merged: rows.length }];
+  });
+}
+// ponytail: quick self-check of the netting rule
+console.assert(gmCollapseInvoiceRows([{ id: 1, cm: { invoice_id: 'a' }, currency: 'USD', created_at: '2026-10-01T10:00:00Z', direction: 'out', amount: 1500 },
+  { id: 2, cm: { invoice_id: 'a' }, currency: 'USD', created_at: '2026-10-01T10:05:00Z', direction: 'in', amount: 1500 },
+  { id: 3, cm: { invoice_id: 'a' }, currency: 'USD', created_at: '2026-10-01T10:05:00Z', direction: 'out', amount: 1700 }]).map(e => e.direction + e.amount).join() === 'out1700', 'gmCollapseInvoiceRows');
+
 function gmFormatDualCurrency(amount, store) {
   const base = (store && store.currency) || '';
   return gmFormatNumber(amount) + (base ? ' ' + base : '');
