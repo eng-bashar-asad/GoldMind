@@ -74,6 +74,22 @@ var GMZebra = (function () {
     return raw.slice(0, 24); // stays within a 96-bit tag's usable ASCII length
   }
 
+  // The EPC actually written to the chip: exactly 96 bits (24 hex), the size
+  // every common UHF tag holds. The old form (ASCII of "store-barcode") was
+  // 128+ bits and could be rejected by 96-bit tags.
+  // = first 8 hex of the shop id + the barcode digits padded to 16
+  //   (a non-numeric barcode uses the hex of its first 8 characters).
+  function buildEpcHex(barcode, storeId) {
+    var shop = String(storeId || '').replace(/[^0-9a-f]/gi, '').slice(0, 8);
+    while (shop.length < 8) shop = '0' + shop;
+    var b = String(barcode || '');
+    var body = /^[0-9]{1,16}$/.test(b) ? b : asciiToHex(b).slice(0, 16);
+    while (body.length < 16) body = '0' + body;
+    return (shop + body).toUpperCase();
+  }
+  // ponytail: tiny self-check of the 96-bit layout
+  console.assert(buildEpcHex('000805', 'a15f496a-a4b5') === 'A15F496A0000000000000805', 'buildEpcHex');
+
   // ---- ZPL builders --------------------------------------------------
   // Barcode-only label (no RFID programming) — used when rfid_enabled is
   // off for the store, or as a plain reprint. widthDots/heightDots (Zebra
@@ -303,6 +319,7 @@ var GMZebra = (function () {
     hexToAscii: hexToAscii,
     padEvenBytes: padEvenBytes,
     buildEpcSource: buildEpcSource,
+    buildEpcHex: buildEpcHex,
     buildBarcodeZPL: buildBarcodeZPL,
     buildBarcodeZPLFromFields: buildBarcodeZPLFromFields,
     buildRfidEncodeZPL: buildRfidEncodeZPL,

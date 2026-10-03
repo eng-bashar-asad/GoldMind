@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 <script src="supabase-config.js?v=32"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
-<script src="zebra-rfid.js"></script>
+<script src="zebra-rfid.js?v=2"></script>
 <script src="theme.js?v=46"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -245,8 +245,7 @@
 
         try {
             const barcodeValue = currentPiece.barcode || currentPiece.id.slice(0, 12).toUpperCase();
-            const epcSource = GMZebra.buildEpcSource(barcodeValue, GOLDMIND_STORE_ID.slice(0, 8));
-            const epcHex = GMZebra.asciiToHex(epcSource);
+            const epcHex = GMZebra.buildEpcHex(barcodeValue, GOLDMIND_STORE_ID);
 
             const dpi = (currentStore && currentStore.zebra_label_dpi) || 203;
             const widthDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_width_mm) || 50, dpi);
