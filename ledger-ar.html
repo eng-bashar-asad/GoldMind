@@ -377,7 +377,7 @@ function goToStatementPrint() {
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="receive-stock-form">
-<p class="text-[12px] text-on-surface-variant mb-3">استلام بضاعة من التاجر — أضف سطراً لكل وزن/مصنعية مختلفة في فاتورة التاجر نفسها (مثل فاتورة المشتريات الورقية). الذهب يُسجَّل ديناً على المحل تجاه التاجر، والمصنعية تُسجَّل ديناً نقدياً منفصلاً تماماً — لا يوجد سعر شراء نقدي هنا.</p>
+<p class="text-[12px] text-on-surface-variant mb-3">استلام بضاعة من التاجر — سطر لكل قطعة أو لكل وزن بالجملة. الذهب يُسجَّل ديناً على المحل تجاه التاجر، والمصنعية ديناً نقدياً منفصلاً، <b>والبضاعة تدخل المخزن مباشرة</b>: القطعة بباركود جديد في الصندوق الذي تختاره، والوزن بالجملة يدخل «الذهب بالوزن» لتحوّله إلى قطع لاحقاً من «إنتاج القطع من رصيد الجملة».</p>
 <div class="relative mb-3">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="rs-batch-ref">مرجع فاتورة التاجر (اختياري)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="rs-batch-ref" oninput="saveReceiveStockDraft()" placeholder="مثلاً SAL NO: HO-260602"/>
@@ -1286,6 +1286,12 @@ function toggleEditStockMovement(id) {
 async function saveEditStockMovement(id) {
   const errEl = document.getElementById('edit-sm-error-' + id);
   errEl.classList.add('hidden');
+  {
+    // a receipt that put stock in can't be re-weighed here (the stock would not follow)
+    const { data: linked } = await goldmindClient.from('trader_movements').select('id').eq('id', id).eq('source', 'stock_received')
+      .or('piece_id.not.is.null,gold_stock_lot_id.not.is.null').limit(1);
+    if (linked && linked.length) { errEl.textContent = 'هذا الاستلام أدخل بضاعة للمخزن، فلا يُعدَّل هنا. لتصحيحه احذفه وأعد إدخاله.'; errEl.classList.remove('hidden'); return; }
+  }
 
   const weight = parseFloat(document.getElementById('edit-sm-weight-' + id).value);
   const karat = parseInt(document.getElementById('edit-sm-karat-' + id).value, 10);
@@ -1326,14 +1332,38 @@ async function saveEditStockMovement(id) {
   showTraderDetail(traderIdToReopen);
 }
 
+// Goods received from a trader also put stock in (a piece or a bulk lot): the
+// receipt can only be removed while that stock is untouched, and removing it
+// takes the stock out again.
+async function gmReceivedStockGuard(filterCol, filterVal) {
+  const { data: rows } = await goldmindClient.from('trader_movements').select('piece_id, gold_stock_lot_id, source').eq(filterCol, filterVal).eq('source', 'stock_received');
+  const pieceIds = (rows || []).map(r => r.piece_id).filter(Boolean), lotIds = (rows || []).map(r => r.gold_stock_lot_id).filter(Boolean);
+  if (pieceIds.length) {
+    const { data: ps } = await goldmindClient.from('pieces').select('barcode, status').in('id', pieceIds);
+    const used = (ps || []).filter(x => x.status !== 'available');
+    if (used.length) { alert('لا يمكن الحذف: القطعة ' + used.map(x => x.barcode).join('، ') + ' لم تعد متوفرة (بيعت أو خرجت). عدّل الحساب بتسوية بدلاً من ذلك.'); return null; }
+  }
+  if (lotIds.length) {
+    const { data: ls } = await goldmindClient.from('gold_stock_lots').select('weight_grams_total, weight_grams_remaining').in('id', lotIds);
+    if ((ls || []).some(x => Number(x.weight_grams_remaining) !== Number(x.weight_grams_total))) { alert('لا يمكن الحذف: الوزن بالجملة استُعمل (بيع أو إنتاج). عدّل الحساب بتسوية بدلاً من ذلك.'); return null; }
+  }
+  return async () => {
+    if (pieceIds.length) await goldmindClient.from('pieces').update({ status: 'cancelled' }).in('id', pieceIds).eq('status', 'available');
+    if (lotIds.length) await goldmindClient.from('gold_stock_lots').update({ weight_grams_remaining: 0, notes: 'أُلغي بحذف استلام التاجر' }).in('id', lotIds);
+  };
+}
+
 async function deleteStockMovement(movementId) {
   if (!confirm('هل تريد حذف هذه الحركة؟ هذا الإجراء نهائي.')) return;
 
   // a piece handed over in this movement goes back to stock
+  const undoStock = await gmReceivedStockGuard('id', movementId);
+  if (!undoStock) return;
   const { data: gone } = await goldmindClient.from('trader_movements').select('piece_id, source').eq('id', movementId).not('piece_id', 'is', null);
   const back = (gone || []).filter(m => m.source === 'stock_given').map(m => m.piece_id);
   const { error } = await goldmindClient.from('trader_movements').delete().eq('id', movementId);
   if (!error && back.length) await goldmindClient.from('pieces').update({ status: 'available' }).in('id', back).eq('status', 'given_to_trader');
+  if (!error) await undoStock();
   if (error) {
     alert('تعذّر الحذف: ' + error.message);
     return;
@@ -1348,10 +1378,13 @@ async function deleteStockMovementBatch(batchId) {
   if (!confirm('هل تريد حذف هذا السند بالكامل (كل أسطره)؟ هذا الإجراء نهائي.')) return;
 
   // pieces handed over in this movement go back to stock
+  const undoStock = await gmReceivedStockGuard('batch_id', batchId);
+  if (!undoStock) return;
   const { data: gone } = await goldmindClient.from('trader_movements').select('piece_id, source').eq('batch_id', batchId).not('piece_id', 'is', null);
   const back = (gone || []).filter(m => m.source === 'stock_given').map(m => m.piece_id);
   const { error } = await goldmindClient.from('trader_movements').delete().eq('batch_id', batchId);
   if (!error && back.length) await goldmindClient.from('pieces').update({ status: 'available' }).in('id', back).eq('status', 'given_to_trader');
+  if (!error) await undoStock();
   if (error) {
     alert('تعذّر الحذف: ' + error.message);
     return;
@@ -1371,6 +1404,12 @@ function toggleEditStockBatch(batchId) {
 async function saveEditStockBatch(batchId, rowCount) {
   const errEl = document.getElementById('edit-batch-error-' + batchId);
   errEl.classList.add('hidden');
+  {
+    // a receipt that put stock in can't be re-weighed here (the stock would not follow)
+    const { data: linked } = await goldmindClient.from('trader_movements').select('id').eq('batch_id', batchId).eq('source', 'stock_received')
+      .or('piece_id.not.is.null,gold_stock_lot_id.not.is.null').limit(1);
+    if (linked && linked.length) { errEl.textContent = 'هذا الاستلام أدخل بضاعة للمخزن، فلا يُعدَّل هنا. لتصحيحه احذفه وأعد إدخاله.'; errEl.classList.remove('hidden'); return; }
+  }
 
   const notes = document.getElementById('edit-batch-notes-' + batchId).value.trim();
   const updates = [];
@@ -1883,9 +1922,20 @@ function resetReceiveStockLines() {
   addReceiveStockLine();
 }
 
+let rsBoxes = null;
+async function rsLoadBoxes() {
+  const { data } = await goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null);
+  rsBoxes = [...new Set((data || []).map(r => r.box_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar'));
+  renderReceiveStockLines();
+}
 function addReceiveStockLine() {
+  if (rsBoxes === null) { rsBoxes = []; rsLoadBoxes(); }
+  const prev = receiveStockLines[receiveStockLines.length - 1];
   receiveStockLines.push({
     lineId: ++receiveStockLineCounter,
+    kind: prev ? prev.kind : 'piece',
+    boxName: prev ? prev.boxName : '',
+    description: '',
     karat: 18,
     grossWeight: 0,
     accountingWeight: 0,
@@ -1902,8 +1952,9 @@ function removeReceiveStockLine(lineId) {
 function updateReceiveStockLine(lineId, field, value) {
   const line = receiveStockLines.find(l => l.lineId === lineId);
   if (!line) return;
-  line[field] = field === 'karat' ? (parseInt(value, 10) || 0) : (parseFloat(value) || 0);
-  renderReceiveStockLines(field !== 'karat'); // karat is a <select>, safe to re-render; number inputs skip re-render to keep focus
+  const text = field === 'kind' || field === 'boxName' || field === 'description';
+  line[field] = text ? value : field === 'karat' ? (parseInt(value, 10) || 0) : (parseFloat(value) || 0);
+  renderReceiveStockLines(field !== 'karat' && field !== 'kind'); // selects are safe to re-render; typed inputs skip re-render to keep focus
 }
 
 function receiveStockEffectiveAcc(l) {
@@ -1948,6 +1999,22 @@ function renderReceiveStockLines(previewOnly) {
       </div>
       <div class="grid grid-cols-2 gap-2">
         <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">النوع</label>
+          <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="updateReceiveStockLine(${l.lineId}, 'kind', this.value)">
+            <option value="piece" ${l.kind !== 'bulk' ? 'selected' : ''}>قطعة بباركود</option>
+            <option value="bulk" ${l.kind === 'bulk' ? 'selected' : ''}>وزن بالجملة (للإنتاج لاحقاً)</option>
+          </select>
+        </div>
+        <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">${l.kind === 'bulk' ? 'الصندوق (اختياري)' : 'الصندوق *'}</label>
+          <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="updateReceiveStockLine(${l.lineId}, 'boxName', this.value)">
+            <option value="">— اختر —</option>${(rsBoxes || []).map(b => `<option ${b === l.boxName ? 'selected' : ''}>${gmEscapeHtml(b)}</option>`).join('')}
+          </select>
+        </div>
+      </div>
+      ${l.kind !== 'bulk' ? `<input class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" placeholder="وصف القطعة (اختياري)" value="${gmEscapeHtml(l.description || '')}" oninput="updateReceiveStockLine(${l.lineId}, 'description', this.value)"/>` : ''}
+      <div class="grid grid-cols-2 gap-2">
+        <div>
           <label class="block text-[10px] text-on-surface-variant mb-0.5">العيار</label>
           <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="updateReceiveStockLine(${l.lineId}, 'karat', this.value)">
             <option value="18" ${l.karat == 18 ? 'selected' : ''}>18</option>
@@ -1977,59 +2044,31 @@ function renderReceiveStockLines(previewOnly) {
 async function submitReceiveStock() {
   const errEl = document.getElementById('rs-error');
   errEl.classList.add('hidden');
+  const fail = t => { errEl.textContent = t; errEl.classList.remove('hidden'); };
 
   const validLines = receiveStockLines.filter(l => l.grossWeight > 0);
-  if (validLines.length === 0) {
-    errEl.textContent = 'أضف سطراً واحداً على الأقل بوزن قائم صحيح';
-    errEl.classList.remove('hidden');
-    return;
-  }
+  if (validLines.length === 0) return fail('أضف سطراً واحداً على الأقل بوزن قائم صحيح');
+  if (validLines.some(l => l.kind !== 'bulk' && !l.boxName)) return fail('اختر الصندوق لكل قطعة');
 
-  const batchRef = document.getElementById('rs-batch-ref').value.trim();
-  const notes = document.getElementById('rs-notes').value.trim();
-  const batchId = (crypto.randomUUID ? crypto.randomUUID() : (Date.now() + '-' + Math.random()));
-  const rsVatRate = parseFloat(document.getElementById('rs-vat-rate').value) || 0;
-
-  const movements = validLines.map(l => {
-    const accW = receiveStockEffectiveAcc(l);
-    const feeBeforeVat = accW * l.fabPerGram;
-    return {
-      store_id: GOLDMIND_STORE_ID,
-      trader_id: currentTraderId,
-      movement_type: 'debt_increase',
-      weight_grams: l.grossWeight,
-      karat: l.karat,
-      // Billed on the accounting (billable) weight, not the physical gross
-      // weight — see comment in renderReceiveStockLines above.
-      gold_24k_equivalent: +(accW * ((l.karat || 0) / 24)).toFixed(3),
-      accounting_weight_grams: accW,
-      fab_fee_per_gram: l.fabPerGram,
-      // Includes VAT on the fab fee too, at the rate the user set for this
-      // voucher — matches trader_movements.fab_fee_amount's role everywhere
-      // else (the cash debt actually owed), same as the purchase-invoice fix.
-      fab_fee_amount: +(feeBeforeVat * (1 + rsVatRate / 100)).toFixed(2),
-      source: 'stock_received',
-      batch_id: validLines.length > 1 ? batchId : null,
-      batch_ref: batchRef || null,
-      notes: notes || 'استلام بضاعة من التاجر'
-    };
-  });
-
+  const lines = validLines.map(l => ({
+    kind: l.kind === 'bulk' ? 'bulk' : 'piece', karat: l.karat, weight: l.grossWeight, acc_weight: receiveStockEffectiveAcc(l),
+    fab_per_gram: l.fabPerGram, box_name: l.boxName || null, description_ar: l.kind === 'bulk' ? null : (l.description || '').trim() || null
+  }));
   const btn = document.getElementById('rs-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
-
-  const { error } = await goldmindClient.from('trader_movements').insert(movements);
-
+  // one transaction: the trader's account (gold + making incl. VAT) and the stock (pieces / bulk lots)
+  const { data, error } = await goldmindClient.rpc('trader_receive_stock', {
+    p_trader: currentTraderId, p_lines: lines, p_vat_rate: parseFloat(document.getElementById('rs-vat-rate').value) || 0,
+    p_batch_ref: document.getElementById('rs-batch-ref').value.trim() || null, p_notes: document.getElementById('rs-notes').value.trim() || null
+  });
   btn.disabled = false;
   btn.textContent = 'حفظ الاستلام';
+  if (error) return fail('تعذّر الحفظ: ' + error.message);
 
-  if (error) {
-    errEl.textContent = 'تعذّر الحفظ: ' + error.message;
-    errEl.classList.remove('hidden');
-    return;
-  }
-
+  const codes = (data && data.barcodes) || [];
+  alert('تم الاستلام' + (codes.length ? '\nالقطع الجديدة: ' + codes.join('، ') + '\nاطبع ملصقاتها من صفحة المخزن.' : '')
+    + (lines.some(l => l.kind === 'bulk') ? '\nالوزن بالجملة في «الذهب بالوزن» — حوّله إلى قطع من «إنتاج القطع من رصيد الجملة».' : ''));
   clearReceiveStockDraft();
   resetReceiveStockLines();
   document.getElementById('receive-stock-form').classList.add('hidden');

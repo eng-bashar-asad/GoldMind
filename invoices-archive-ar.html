@@ -103,7 +103,7 @@ async function loadArchive() {
     if (!session) return;
 
     const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-    const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['view_reports'] === true));
+    const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && (staffPerm.permissions['view_reports'] === true || staffPerm.permissions['view_invoices'] === true)));
     if (!allowed) {
         document.getElementById('loading-state').classList.add('hidden');
         document.getElementById('no-access').classList.remove('hidden');

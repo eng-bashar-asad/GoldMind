@@ -178,7 +178,7 @@ async function load() {
   if (!session) return;
 
   const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-  const canView = staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.view_profit_report));
+  const canView = staffRow && (staffRow.role === 'owner' || (staffRow.permissions && (staffRow.permissions.view_profit_report || staffRow.permissions.manage_daily_cashbox)));
 
   document.getElementById('loading-state').classList.add('hidden');
   if (!canView) {
