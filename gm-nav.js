@@ -68,6 +68,7 @@
       ['support-contact-ar.html', 'support_agent', 'تواصل مع الدعم'],
       ['#tz', 'schedule', 'المنطقة الزمنية للعرض'] ] },
     { t: 'الأدلة والشروحات', i: 'menu_book', l: [
+      ['guides-ar.html', 'menu_book', 'كل الأدلة'],
       ['rfid-guide-ar.html', 'nfc', 'دليل RFID: البرمجة والجرد'] ] }
   ];
   window.GM_NAV_GROUPS = GROUPS;
