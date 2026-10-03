@@ -450,6 +450,14 @@
 <button type="button" id="rfid-off-btn" onclick="setRfidEnabled(false)" class="flex-1 h-14 rounded-lg border font-semibold transition-all">غير مفعّل</button>
 <button type="button" id="rfid-on-btn" onclick="setRfidEnabled(true)" class="flex-1 h-14 rounded-lg border font-semibold transition-all">مفعّل</button>
 </div>
+<div class="rounded-lg border border-outline-variant p-3 flex flex-col gap-2">
+<p class="font-semibold text-sm">جهاز برمجة الشرائح (Chainway C72)</p>
+<p class="text-[11px] text-outline">يوضع الجهاز على الطاولة، وعند الضغط على زر الشريحة في صفحة القطعة يبرمج الملصقة الموضوعة عليه. أدخل رمز الربط مرة واحدة في تطبيق GoldMind على الجهاز.</p>
+<div class="flex items-center gap-2">
+<span id="rfid-device-key" class="font-mono text-lg tracking-widest select-all" dir="ltr">—</span>
+<button type="button" onclick="gmResetRfidKey()" class="ms-auto h-10 px-3 rounded-lg border text-sm font-semibold">رمز ربط جديد</button>
+</div>
+</div>
 </div>
 
 </details>
@@ -497,6 +505,14 @@
         onBtn.className = value ? active : inactive;
     }
 
+    // a new key unlinks any handheld that used the old one
+    async function gmResetRfidKey() {
+        if (document.getElementById('rfid-device-key').textContent !== '—'
+            && !confirm('سيتوقف الجهاز المربوط حالياً حتى تُدخل الرمز الجديد فيه. متابعة؟')) return;
+        const { data, error } = await goldmindClient.rpc('rfid_device_key_reset', { p_store: GOLDMIND_STORE_ID });
+        if (error) { alert(error.message); return; }
+        document.getElementById('rfid-device-key').textContent = data;
+    }
     let rfidEnabled = false;
     function setRfidEnabled(value) {
         rfidEnabled = value;
@@ -870,6 +886,7 @@
         setShapeStyle(data.invoice_print_shape || 'soft');
         setDiamondsEnabled(data.diamonds_enabled === true);
         setRfidEnabled(data.rfid_enabled === true);
+        document.getElementById('rfid-device-key').textContent = data.rfid_device_key || '—';
         setBioAllowed(data.allow_biometric_login !== false);
 
         renderNextInvoicePreview(data);

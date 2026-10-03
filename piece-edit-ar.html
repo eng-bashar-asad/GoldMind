@@ -500,7 +500,7 @@ async function load() {
 
   const [{ data: piece, error }, { data: storeData }, { data: fieldsData }] = await Promise.all([
     goldmindClient.from('pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).single(),
-    goldmindClient.from('stores').select('name, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_label_y_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness, zebra_field_spacing_mm, zebra_barcode_module_width').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('stores').select('name, rfid_enabled, rfid_device_key, label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_label_y_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness, zebra_field_spacing_mm, zebra_barcode_module_width').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
     goldmindClient.from('zebra_label_fields').select('*').eq('store_id', GOLDMIND_STORE_ID).order('column_num').order('row_order')
   ]);
   currentStore = storeData;
@@ -515,6 +515,8 @@ async function load() {
   }
 
   currentPiece = piece;
+  // chip button: on a Chainway handheld itself, or anywhere once a desk handheld is linked
+  if (storeData && storeData.rfid_enabled && storeData.rfid_device_key) document.getElementById('gmRfidBtn').classList.remove('hidden');
   document.getElementById('barcode-id').value = piece.barcode || '';
   document.getElementById('weight').value = piece.weight_grams;
   document.getElementById('karat').value = piece.karat;
@@ -724,17 +726,44 @@ function gmRenderPieceView() {
 GMUhf.available().then(ok => { if (ok) document.getElementById('gmRfidBtn').classList.remove('hidden'); });
 async function gmWriteRfid(btn) {
   const p = currentPiece; if (!p || !p.barcode) return;
-  if (!confirm('قرّب ملصقة القطعة ' + p.barcode + ' من ظهر الجهاز (بعيداً عن الملصقات الأخرى) ثم اضغط موافق.')) return;
+  const local = await GMUhf.available();
+  if (!confirm(local
+    ? 'قرّب ملصقة القطعة ' + p.barcode + ' من ظهر الجهاز (بعيداً عن الملصقات الأخرى) ثم اضغط موافق.'
+    : 'ضع ملصقة القطعة ' + p.barcode + ' على ظهر جهاز البرمجة (بعيداً عن الملصقات الأخرى) ثم اضغط موافق.')) return;
   btn.disabled = true;
+  const epc = GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID);
   try {
-    const epc = GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID);
-    await GMUhf.writeEpc(epc);
-    const { error } = await goldmindClient.from('pieces').update({ rfid_epc: epc, rfid_encoded_at: new Date().toISOString() }).eq('id', p.id);
-    if (error) throw new Error('كُتبت الشريحة لكن تعذّر حفظها: ' + error.message);
+    if (local) {
+      await GMUhf.writeEpc(epc);
+      const { error } = await goldmindClient.from('pieces').update({ rfid_epc: epc, rfid_encoded_at: new Date().toISOString() }).eq('id', p.id);
+      if (error) throw new Error('كُتبت الشريحة لكن تعذّر حفظها: ' + error.message);
+    } else {
+      await gmRfidViaDesk(p, epc);
+    }
     p.rfid_epc = epc;
     alert('تمت برمجة الشريحة للقطعة ' + p.barcode);
   } catch (e) { alert(e.message || e); }
   finally { btn.disabled = false; }
+}
+// Queue the write for the linked desk handheld (rfid_write_jobs) and wait for its answer;
+// the handheld saves rfid_epc on the piece itself when it succeeds.
+async function gmRfidViaDesk(p, epc) {
+  const { data: job, error } = await goldmindClient.from('rfid_write_jobs')
+    .insert({ store_id: GOLDMIND_STORE_ID, piece_id: p.id, barcode: p.barcode, epc }).select('id').single();
+  if (error) throw new Error('تعذّر إرسال الأمر: ' + error.message);
+  const until = Date.now() + 60000;
+  let seen = false;
+  while (Date.now() < until) {
+    await new Promise(r => setTimeout(r, 1500));
+    const { data: j } = await goldmindClient.from('rfid_write_jobs').select('status, message').eq('id', job.id).maybeSingle();
+    if (!j) continue;
+    if (j.status === 'done') return;
+    if (j.status === 'failed' || j.status === 'cancelled') throw new Error('لم تتم البرمجة: ' + (j.message || ''));
+    if (j.status === 'working' && !seen) { seen = true; gmToast('جهاز البرمجة يكتب الشريحة…'); }
+  }
+  await goldmindClient.from('rfid_write_jobs').update({ status: 'cancelled', message: 'انتهت المهلة' }).eq('id', job.id).in('status', ['pending', 'working']);
+  throw new Error(seen ? 'لم يرد جهاز البرمجة — تأكد أن الملصقة على ظهره وأعد المحاولة.'
+                       : 'جهاز البرمجة لا يستجيب — تأكد أن تطبيق GoldMind مفتوح عليه ومتصل بالإنترنت.');
 }
 function gmOpenEdit() {
   const d = document.getElementById('gmEditBox'); d.open = true;
