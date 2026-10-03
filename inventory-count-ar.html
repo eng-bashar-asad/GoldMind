@@ -1009,6 +1009,10 @@ document.getElementById('manual-input').addEventListener('input', () => {
 
 async function handleScan(value, method) {
   if (countMethod === 'rfid' && method === 'rfid') scanInput.focus();
+  // RFID readers (e.g. Chainway keyboard emulator) may type the EPC in lower case
+  // or with spaces; chips are saved as upper-case hex.
+  if (matchField === 'rfid_epc') value = String(value).replace(/[^0-9a-f]/gi, '').toUpperCase();
+  if (!value) return;
 
   if (scannedValues.has(value)) {
     const by = scanBy[value];
