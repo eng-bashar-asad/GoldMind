@@ -14,6 +14,7 @@
 <script src="supabase-config.js?v=32"></script>
 <script src="theme.js?v=46"></script>
 <script src="gm-report.js?v=3"></script>
+<script src="gm-uhf.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -201,6 +202,8 @@
 <div id="rfid-input-wrap" class="hidden relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="scan-input">حقل المسح — وجّه القارئ إلى هنا وامسح</label>
 <input autocomplete="off" autofocus class="w-full h-16 border-2 border-primary rounded-lg px-4 focus:ring-2 focus:ring-primary outline-none text-center font-data-mono text-lg tracking-widest" dir="ltr" id="scan-input" placeholder="بانتظار المسح..." type="text"/>
+<button type="button" id="uhf-toggle" onclick="gmUhfToggle()" class="hidden w-full h-14 mt-3 rounded-lg bg-primary text-on-primary font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined">sensors</span><span id="uhf-toggle-text">ابدأ القراءة بالجهاز</span></button>
+<p id="uhf-hint" class="hidden text-[11px] text-on-surface-variant text-center mt-1">أو اضغط زناد الجهاز مطوّلاً — يقرأ كل الشرايح القريبة ويتوقف عند تركه.</p>
 </div>
 
 <div id="camera-wrap" class="hidden flex-col gap-2">
@@ -1006,6 +1009,31 @@ document.getElementById('manual-input').addEventListener('input', () => {
     renderChecklist(document.getElementById('manual-input').value.trim());
   }
 });
+
+// RFID handheld (Chainway C72...) inside the app: read straight from the device,
+// many tags per second; the trigger starts/stops. Repeated reads are skipped quietly.
+let uhfOn = false;
+const uhfSeen = new Set();
+window.addEventListener('pagehide', () => { if (uhfOn) GMUhf.stop(); });
+GMUhf.available().then(ok => {
+  if (!ok) return;
+  ['uhf-toggle', 'uhf-hint'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+  GMUhf.onTrigger(down => { if (countMethod === 'rfid' && currentCountId && down !== uhfOn) gmUhfToggle(); });
+});
+async function gmUhfToggle() {
+  if (!currentCountId) return;
+  const t = document.getElementById('uhf-toggle-text');
+  if (uhfOn) { uhfOn = false; t.textContent = 'ابدأ القراءة بالجهاز'; await GMUhf.stop(); return; }
+  uhfOn = true; t.textContent = 'جارِ القراءة… اضغط للإيقاف';
+  try {
+    await GMUhf.start(epc => {
+      const v = String(epc).replace(/[^0-9a-f]/gi, '').toUpperCase();
+      if (!v || uhfSeen.has(v)) return;
+      uhfSeen.add(v);
+      handleScan(v, 'rfid');
+    });
+  } catch (e) { uhfOn = false; t.textContent = 'ابدأ القراءة بالجهاز'; alert(e.message || e); }
+}
 
 async function handleScan(value, method) {
   if (countMethod === 'rfid' && method === 'rfid') scanInput.focus();

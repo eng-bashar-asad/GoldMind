@@ -102,6 +102,22 @@ jobs:
         working-directory: app
         run: node build-tools/localize-cdn.js
 
+      # RFID on Chainway handhelds (C72...): Chainway's DeviceAPI SDK is fetched from
+      # their official download page at build time and never committed (public repo).
+      # The app is built to work without it (GMUhfPlugin uses reflection), so a
+      # failed download only means no RFID support in this build.
+      - name: Chainway RFID SDK
+        continue-on-error: true
+        run: |
+          mkdir -p /tmp/cw app/android/app/libs
+          curl -fsSL --retry 3 -o /tmp/cw/api.rar "https://www.chainway.net/download/SDKs-Android/API_Ver20251103.rar"
+          cd /tmp/cw
+          if ! (command -v unrar >/dev/null && unrar x -o+ api.rar >/dev/null) && ! 7z x -y api.rar >/dev/null; then
+            sudo apt-get install -y -qq unrar-free >/dev/null && unrar-free -x api.rar
+          fi
+          cp /tmp/cw/*.aar "$GITHUB_WORKSPACE/app/android/app/libs/"
+          ls -la "$GITHUB_WORKSPACE/app/android/app/libs/"
+
       - name: Sync Capacitor Android project
         working-directory: app
         run: npx cap sync android
