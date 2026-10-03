@@ -108,6 +108,8 @@
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-2">
 <h3 class="font-semibold text-[13px]">قطع مُعادة كما هي</h3>
 <div id="held-list" class="flex flex-col gap-1"></div>
+<label class="flex flex-col gap-1 text-[12px] pt-1">صندوق القطع المُعادة
+<select id="return-box" class="h-10 border border-outline-variant rounded px-2"></select></label>
 </div>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3" id="new-pieces-box">
 <div class="flex items-center justify-between">
@@ -144,6 +146,7 @@
 <script>
 let parties = [], traders = [], prices = {}, CUR = '', current = null, outCart = [], newRowSeq = 0;
 const opts = { type: [], category1: [], category2: [] };
+let boxes = [], lastBox = '';
 const n = (v, d = 2) => Number(v || 0).toFixed(d);
 const money = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CUR;
 const KIND = { intermediary: 'وسيط تعديل', gift: 'هدايا' };
@@ -303,6 +306,11 @@ async function saveOut() {
 
 // ---- IN ----
 function optionList(key) { return '<option value="">—</option>' + opts[key].map(v => `<option>${esc(v)}</option>`).join(''); }
+// Boxes are the names already given to pieces (created from «إضافة قطعة للمخزون»)
+function boxOptions(sel) { return '<option value="">— اختر الصندوق —</option>' + boxes.map(b => `<option${b === sel ? ' selected' : ''}>${esc(b)}</option>`).join(''); }
+function renderReturnBox() {
+  document.getElementById('return-box').innerHTML = '<option value="">نفس صندوقها</option>' + boxes.map(b => `<option>${esc(b)}</option>`).join('');
+}
 function addNewRow() {
   const i = ++newRowSeq;
   const div = document.createElement('div');
@@ -317,6 +325,7 @@ function addNewRow() {
     <label class="flex flex-col gap-1">تصنيف ١<select class="h-10 border border-outline-variant rounded px-2" data-f="category1">${optionList('category1')}</select></label>
     <label class="flex flex-col gap-1">تصنيف ٢<select class="h-10 border border-outline-variant rounded px-2" data-f="category2">${optionList('category2')}</select></label>
     <label class="flex flex-col gap-1">اللون<select class="h-10 border border-outline-variant rounded px-2" data-f="color"><option value="Gold">ذهبي</option><option value="White">أبيض</option><option value="Rose">وردي</option></select></label>
+    <label class="flex flex-col gap-1 col-span-2">الصندوق *<select class="h-10 border border-outline-variant rounded px-2" data-f="box_name" onchange="lastBox = this.value">${boxOptions(lastBox)}</select></label>
     <label class="flex flex-col gap-1 col-span-2">الوصف<input class="h-10 border border-outline-variant rounded px-2" data-f="description_ar"/></label>
     <label class="flex flex-col gap-1">صورة<input type="file" accept="image/*" capture="environment" class="text-[11px]" data-f="photo"/></label>
     <button type="button" onclick="this.closest('.new-row').remove()" class="self-end h-10 rounded border border-error text-error">حذف</button>`;
@@ -332,9 +341,10 @@ async function saveIn() {
     const w = parseFloat(g('weight').value), aw = parseFloat(g('acc_weight').value), fab = parseFloat(g('fab_per_gram').value);
     if (!w || w <= 0) { msg('save-error', 'اكتب الوزن القائم لكل قطعة جديدة', true); return; }
     if (isNaN(fab) || fab < 0) { msg('save-error', 'اكتب المصنعية لكل قطعة جديدة (ولو كانت صفراً)', true); return; }
+    if (!g('box_name').value) { msg('save-error', 'اختر الصندوق لكل قطعة جديدة', true); return; }
     lines.push({ row: r, karat: +g('karat').value, weight: w, acc_weight: aw > 0 ? aw : w, fab_per_gram: fab,
       piece_type: g('piece_type').value, category1: g('category1').value, category2: g('category2').value,
-      color: g('color').value, description_ar: g('description_ar').value.trim(), file: g('photo').files[0] || null });
+      color: g('color').value, box_name: g('box_name').value, description_ar: g('description_ar').value.trim(), file: g('photo').files[0] || null });
   }
   if (!back.length && !lines.length) { msg('save-error', 'اختر قطعة مُعادة أو أضف قطعة جديدة', true); return; }
   if (!confirm('حفظ سند إدخال من ' + current.name + '؟')) return;
@@ -348,10 +358,10 @@ async function saveIn() {
     if (!error) { const { data } = goldmindClient.storage.from('piece-photos').getPublicUrl(path); l.photo_url = data ? data.publicUrl : null; }
   }
   const payload = lines.map(({ row, file, ...rest }) => rest);
-  const { data: vid, error } = await goldmindClient.rpc('stock_in_from_party', { target_party_id: current.id, return_piece_ids: back, new_lines: payload, p_notes: document.getElementById('in-notes').value.trim() || null });
+  const { data: vid, error } = await goldmindClient.rpc('stock_in_from_party', { target_party_id: current.id, return_piece_ids: back, new_lines: payload, p_notes: document.getElementById('in-notes').value.trim() || null, p_return_box: document.getElementById('return-box').value || null });
   btn.disabled = false; btn.textContent = 'حفظ سند الإدخال';
   if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
-  document.getElementById('new-rows').innerHTML = ''; document.getElementById('in-notes').value = '';
+  document.getElementById('new-rows').innerHTML = ''; document.getElementById('in-notes').value = ''; document.getElementById('return-box').value = '';
   msg('save-success', 'حُفظ سند الإدخال' + (lines.length ? ' — أُضيفت القطع الجديدة إلى المخزن بباركود جديد (يمكنك طباعة ملصقات لها من صفحة المخزن)' : ''), false);
   refreshParty(); loadAllVouchers();
   if (vid && confirm('هل تريد طباعة السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
@@ -391,6 +401,12 @@ async function loadAllVouchers() {
     goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID),
     goldmindClient.from('piece_classification_options').select('field_key, value').eq('store_id', GOLDMIND_STORE_ID).order('value')
   ]);
+  const [{ data: bx }, { data: dbx }] = await Promise.all([
+    goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null),
+    goldmindClient.from('diamond_pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null)
+  ]);
+  boxes = [...new Set((bx || []).concat(dbx || []).map(r => r.box_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar'));
+  renderReturnBox();
   parties = ps || []; traders = ts || [];
   (gp || []).forEach(p => { prices[p.karat] = Number(p.price_per_gram); });
   (cls || []).forEach(c => { if (opts[c.field_key]) opts[c.field_key].push(c.value); });

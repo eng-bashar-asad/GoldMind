@@ -1,0 +1,5 @@
+-- Goods-in voucher (stock-transfer-ar.html): new pieces get the box chosen on
+-- their line (new_lines[].box_name, required), and returned pieces can be put
+-- in a chosen box (p_return_box; null keeps their own box).
+-- Added as a 5-argument overload (no default, so calls are never ambiguous);
+-- the page always sends p_return_box. The old 4-argument version is unused.
