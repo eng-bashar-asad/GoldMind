@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>دليل RFID | GoldMind</title>
+
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=32"></script>
+<script src="theme.js?v=47"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; } body { min-height: max(884px, 100dvh); } </style>
+<style>
+.gd h2{font-size:18px;font-weight:700;margin:28px 0 10px;display:flex;align-items:center;gap:8px;color:var(--gm-primary)}
+.gd h3{font-size:15px;font-weight:700;margin:18px 0 6px}
+.gd p,.gd li{font-size:14.5px;line-height:1.9}
+.gd ol,.gd ul{padding-inline-start:22px;margin:6px 0}
+.gd ol{list-style:decimal}.gd ul{list-style:disc}
+.gd .card{border:1px solid var(--gm-outline-variant);border-radius:12px;padding:14px 16px;margin:10px 0;background:var(--gm-surface-lowest)}
+.gd .note{border-inline-start:4px solid #d97706;background:rgba(217,119,6,.08);border-radius:8px;padding:10px 12px;margin:10px 0}
+.gd .ok{border-inline-start:4px solid #1e7d32;background:rgba(30,125,50,.08);border-radius:8px;padding:10px 12px;margin:10px 0}
+.gd code{font-family:monospace;background:rgba(127,127,127,.15);padding:1px 6px;border-radius:5px;direction:ltr;unicode-bidi:embed}
+.gd table{width:100%;border-collapse:collapse;font-size:13.5px;margin:8px 0}
+.gd th,.gd td{border:1px solid var(--gm-outline-variant);padding:8px;text-align:right;vertical-align:top}
+.gd th{background:var(--gm-surface-low)}
+.gd .toc a{color:var(--gm-primary);text-decoration:underline}
+@media print{main.gd{max-width:none!important;padding-top:0!important}body{background:#fff!important}header,.no-print,#gmNav,#gmNavOverlay{display:none!important}body{min-height:0}.gd h2{break-after:avoid}.gd .card{break-inside:avoid}}
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center" aria-label="رجوع">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">دليل RFID</h1>
+</div>
+<button onclick="window.print()" class="no-print h-10 px-3 rounded-lg border border-outline-variant flex items-center gap-1 text-sm font-semibold" title="طباعة أو حفظ PDF">
+<span class="material-symbols-outlined text-[18px]">print</span> طباعة / PDF
+</button>
+</div>
+</header>
+<main class="gd pb-32 max-w-md lg:max-w-3xl mx-auto px-4 py-6 text-on-surface">
+
+<p class="text-xl font-bold mb-1">برمجة شرائح RFID والجرد بجهاز Chainway C72</p>
+<p class="text-on-surface-variant">دليل خطوة بخطوة: تفعيل الميزة، تجهيز جهاز الجرد، برمجة ملصقات القطع، والجرد، مع خيار الطابعات التي تبرمج الملصقة أثناء الطباعة.</p>
+
+<div class="card toc">
+<p class="font-bold">المحتويات</p>
+<ol>
+<li><a href="#how">كيف يعمل النظام</a></li>
+<li><a href="#need">ما تحتاجه</a></li>
+<li><a href="#enable">تفعيل الميزة في البرنامج</a></li>
+<li><a href="#install">تثبيت التطبيق على جهاز الجرد</a></li>
+<li><a href="#link">ربط الجهاز بالمحل</a></li>
+<li><a href="#program">برمجة شريحة قطعة</a></li>
+<li><a href="#count">الجرد</a></li>
+<li><a href="#printer">خيار: طابعة تبرمج الملصقة مباشرة</a></li>
+<li><a href="#trouble">حل المشاكل</a></li>
+</ol>
+</div>
+
+<h2 id="how"><span class="material-symbols-outlined">info</span>١. كيف يعمل النظام</h2>
+<p>كل ملصقة RFID فيها شريحة صغيرة تُكتب عليها مرة واحدة هوية القطعة. الرقم المكتوب يتكوّن من <b>رمز المحل (8 خانات)</b> ثم <b>باركود القطعة</b>، مثلاً القطعة <code>000805</code> تصبح <code>A15F496A0000000000000805</code>.</p>
+<p>عند الجرد يقرأ الجهاز عشرات الشرائح في الثانية من مسافة، والبرنامج يعرف القطعة من رقم شريحتها مباشرة، ثم يعرض لك القطع الناقصة مع صورها ووزنها وعيارها.</p>
+<ul>
+<li><b>البرمجة</b> تحتاج جهازاً فيه هوائي RFID يكتب على الشريحة: جهاز الجرد C72، أو طابعة Zebra من نوع RFID.</li>
+<li>الموبايل والكمبيوتر العاديان <b>لا يكتبان</b> على الشرائح، لكن يمكن إعطاء أمر البرمجة منهما (القسم ٦).</li>
+</ul>
+
+<h2 id="need"><span class="material-symbols-outlined">inventory</span>٢. ما تحتاجه</h2>
+<table>
+<tr><th>الشيء</th><th>ملاحظات</th></tr>
+<tr><td>ملصقات RFID من نوع UHF</td><td>ملصقات مجوهرات (ذيل رفيع) فيها شريحة. تُطبع عليها الباركود والبيانات كالمعتاد.</td></tr>
+<tr><td>جهاز الجرد Chainway C72</td><td>للبرمجة وللجرد. يعمل مع البرنامج على أي إصدار أندرويد (الإصدار 6 له طريقة خاصة موضّحة أدناه).</td></tr>
+<tr><td>طابعة الباركود</td><td>طابعة Zebra العادية (مثل ZD421) تطبع فقط. طابعات Zebra من نوع RFID تطبع وتبرمج معاً (القسم ٨).</td></tr>
+<tr><td>إنترنت</td><td>على الكمبيوتر وعلى جهاز الجرد. لا يلزم أن يكونا على نفس شبكة الواي فاي.</td></tr>
+</table>
+
+<h2 id="enable"><span class="material-symbols-outlined">toggle_on</span>٣. تفعيل الميزة في البرنامج</h2>
+<ol>
+<li>افتح <b>الإعدادات ← إعدادات الشركة</b>.</li>
+<li>افتح قسم <b>الجرد بـ RFID</b> واختر <b>مفعّل</b>.</li>
+<li>في نفس القسم، تحت «جهاز برمجة الشرائح»، اضغط <b>رمز ربط جديد</b>. يظهر رمز من 12 خانة؛ ستدخله في جهاز الجرد مرة واحدة.</li>
+<li>احفظ الإعدادات.</li>
+</ol>
+<div class="note">الضغط على «رمز ربط جديد» مرة أخرى يُلغي الرمز القديم، فيتوقف الجهاز المربوط حتى تُدخل فيه الرمز الجديد.</div>
+
+<h2 id="install"><span class="material-symbols-outlined">install_mobile</span>٤. تثبيت التطبيق على جهاز الجرد</h2>
+<h3>أ. السماح بتثبيت التطبيقات من خارج المتجر</h3>
+<p>على الجهاز: <b>الإعدادات (Settings) ← الأمان (Security) ← مصادر غير معروفة (Unknown sources)</b> وفعّلها.</p>
+<h3>ب. تنزيل ملف التطبيق ونقله</h3>
+<ol>
+<li>على الكمبيوتر نزّل الملف من الرابط:<br><code>https://github.com/eng-bashar-asad/GoldMind/releases/download/app-latest/GoldMind.apk</code></li>
+<li>وصّل الجهاز بالكمبيوتر بكبل USB، ومن إشعار USB على الجهاز اختر <b>نقل الملفات (MTP)</b>.</li>
+<li>من «This PC» افتح الجهاز ثم مجلد <b>Download</b> وانسخ الملف إليه.</li>
+<li>على الجهاز افتح تطبيق <b>الملفات</b> ← Download ← اضغط على الملف ← <b>تثبيت</b>.</li>
+</ol>
+<p>للتحديث لاحقاً: كرّر نفس الخطوات بالملف الجديد، والبيانات تبقى كما هي.</p>
+<h3>ج. إعداد Keyboard Emulator</h3>
+<p>تطبيق Keyboard Emulator المثبّت من الشركة يستخدم قارئ RFID أيضاً، ولا يمكن أن يستخدمه تطبيقان معاً:</p>
+<ul>
+<li><b>أثناء البرمجة بتطبيق GoldMind:</b> Keyboard Emulator ← Function ← <b>Enable Scanner = OFF</b>.</li>
+<li><b>أثناء الجرد من متصفح Chrome</b> (أجهزة أندرويد 6): <b>Enable Scanner = ON</b>، لأنه هو الذي يقرأ الشرائح ويكتبها في الصفحة.</li>
+</ul>
+
+<h2 id="link"><span class="material-symbols-outlined">link</span>٥. ربط الجهاز بالمحل</h2>
+<ol>
+<li>افتح تطبيق GoldMind على جهاز الجرد.</li>
+<li>على الأجهزة القديمة (أندرويد 6) تظهر مباشرة شاشة <b>«جهاز برمجة الشرائح»</b>، لأن متصفح النظام فيها قديم ولا يشغّل صفحات البرنامج.</li>
+<li>اكتب <b>رمز الربط</b> من القسم ٣ واضغط <b>ربط الجهاز</b>.</li>
+<li>يظهر باللون الأخضر: «مربوط بمحل: …» ثم «بانتظار أمر برمجة…».</li>
+</ol>
+
+<h2 id="program"><span class="material-symbols-outlined">nfc</span>٦. برمجة شريحة قطعة</h2>
+<h3>الطريقة الأولى (المعتمدة): من الكمبيوتر أو الموبايل، والجهاز على الطاولة</h3>
+<div class="card">
+<ol>
+<li>أدخل القطعة في البرنامج كالمعتاد، واطبع ملصقتها.</li>
+<li>اترك جهاز الجرد على الطاولة وشاشة GoldMind مفتوحة عليه («بانتظار أمر برمجة…»).</li>
+<li>من الكمبيوتر أو الموبايل افتح صفحة القطعة واضغط <b>زر الشريحة</b> <span class="material-symbols-outlined" style="vertical-align:-4px">nfc</span> بجانب زر الطباعة، ثم موافق.</li>
+<li>ضع الملصقة على <b>ظهر</b> جهاز الجرد، بعيداً عن الملصقات الأخرى. الجهاز ينتظرها حتى 40 ثانية.</li>
+<li>يكتب الجهاز الشريحة ويصدر صوتاً، وتظهر في البرنامج رسالة «تمت برمجة الشريحة».</li>
+</ol>
+</div>
+<h3>الطريقة الثانية: يدوياً على جهاز الجرد</h3>
+<ol>
+<li>في شاشة GoldMind على الجهاز، اكتب الباركود في خانة «برمجة يدوية بالباركود».</li>
+<li>ضع الملصقة على ظهر الجهاز واضغط <b>برمجة يدوية</b> أو زر المسح.</li>
+</ol>
+<div class="ok">الجهاز يكتب بقوة منخفضة عمداً، حتى لا يكتب على ملصقة أخرى قريبة. اترك مسافة 20 سم على الأقل بين الملصقة المبرمجة وباقي الملصقات.</div>
+<p>على أجهزة Chainway الأحدث (أندرويد 8 فما فوق) يفتح التطبيق صفحات البرنامج كاملة، وزر الشريحة في صفحة القطعة يبرمج من الجهاز نفسه مباشرة.</p>
+
+<h2 id="count"><span class="material-symbols-outlined">checklist</span>٧. الجرد</h2>
+<h3>على جهاز أندرويد 6 (مثل C72 الحالي)</h3>
+<ol>
+<li>ثبّت متصفح <b>Chrome الإصدار 106</b> على الجهاز (آخر إصدار يعمل على أندرويد 6): ابحث في موقع APKMirror عن «Chrome 106 armeabi-v7a» على الكمبيوتر وانقله بنفس طريقة القسم ٤.</li>
+<li>Keyboard Emulator: <b>Enable Scanner = ON</b>.</li>
+<li>من شاشة GoldMind على الجهاز اضغط <b>فتح GoldMind في المتصفح</b>، أو افتح موقع البرنامج في Chrome وسجّل الدخول.</li>
+<li>القائمة ← <b>الجرد</b> ← اختر النطاق ← <b>قارئ RFID</b> ← ابدأ الجلسة.</li>
+<li>اضغط زر المسح ومرّر الجهاز فوق القطع. كل قطعة تُحسب مرة واحدة، والقراءات المكررة تُتجاهل بهدوء.</li>
+</ol>
+<h3>على أجهزة Chainway الأحدث</h3>
+<p>داخل تطبيق GoldMind: الجرد ← قارئ RFID ← <b>ابدأ القراءة بالجهاز</b>، أو اضغط الزناد مطوّلاً، ويتوقف عند تركه.</p>
+<h3>بعد الجرد</h3>
+<ul>
+<li>تظهر <b>القطع الناقصة</b> مع صورها ووزنها وعيارها للبحث عنها، ويمكن طباعتها.</li>
+<li>القطع التي لم تُبرمج شريحتها بعد تظهر ناقصة في جرد RFID، فبرمج ملصقات كل القطع قبل أول جرد، أو اجردها بالكاميرا أو يدوياً.</li>
+<li>قطع الألماس ليس لها شرائح، لذلك لا يظهر خيار RFID عندما يكون الألماس ضمن نطاق الجرد.</li>
+</ul>
+
+<h2 id="printer"><span class="material-symbols-outlined">print</span>٨. خيار: طابعة تبرمج الملصقة مباشرة</h2>
+<p>طابعات Zebra من نوع <b>RFID</b> فيها وحدة كتابة داخلية: تطبع الملصقة وتبرمج شريحتها في نفس اللحظة، فلا تحتاج جهاز الجرد للبرمجة أبداً. البرنامج يدعمها حالياً.</p>
+<table>
+<tr><th>الطابعة</th><th>ملاحظات</th></tr>
+<tr><td>Zebra ZD621R</td><td>مكتبية، الأنسب لمحل مجوهرات.</td></tr>
+<tr><td>Zebra ZD500R</td><td>مكتبية، طراز أقدم (متوفر مستعملاً).</td></tr>
+<tr><td>Zebra ZT411 RFID</td><td>صناعية، للكميات الكبيرة.</td></tr>
+</table>
+<p>تأكد عند الشراء أن رقم الطراز ينتهي بـ <b>R</b> أو مكتوب فيه RFID. الطابعة الحالية ZD421 (ZD4A042-30EE00EZ) <b>لا تبرمج</b>.</p>
+<h3>طريقة الاستخدام مع طابعة RFID</h3>
+<ol>
+<li>الجرد بـ RFID مفعّل في إعدادات الشركة (القسم ٣).</li>
+<li>Zebra Browser Print مثبّت على الكمبيوتر المتصل بالطابعة، كما في الطباعة العادية.</li>
+<li>افتح صفحة القطعة واضغط زر <b>طباعة وبرمجة بطابعة RFID</b> <span class="material-symbols-outlined" style="vertical-align:-4px">wifi_tethering</span>، ثم في صفحة الملصق اضغط <b>طباعة + برمجة RFID</b>.</li>
+<li>الطابعة تطبع وتكتب الشريحة، ويُحفظ رقمها على القطعة تلقائياً. بعدها يُجرد بجهاز الجرد كالمعتاد.</li>
+</ol>
+
+<h2 id="trouble"><span class="material-symbols-outlined">build</span>٩. حل المشاكل</h2>
+<table>
+<tr><th>الرسالة أو المشكلة</th><th>الحل</th></tr>
+<tr><td>التطبيق لا يُثبَّت</td><td>فعّل «مصادر غير معروفة» (القسم ٤-أ). إن ظهر «التطبيق لم يُثبَّت»: احذف النسخة القديمة ثم ثبّت الجديدة.</td></tr>
+<tr><td>تعذّر تشغيل قارئ RFID</td><td>أوقف Enable Scanner في Keyboard Emulator، ثم أغلق GoldMind وافتحه من جديد.</td></tr>
+<tr><td>لم تُقرأ أي شريحة</td><td>ضع الملصقة على ظهر الجهاز مباشرة. جرّب ملصقة أخرى: قد تكون الشريحة تالفة.</td></tr>
+<tr><td>كُتبت الشريحة لكن تعذّر التحقق منها</td><td>غالباً توجد ملصقة أخرى قريبة. أبعد الملصقات وأعد المحاولة.</td></tr>
+<tr><td>جهاز البرمجة لا يستجيب (على الكمبيوتر)</td><td>تأكد أن شاشة GoldMind مفتوحة على جهاز الجرد، وأنه متصل بالإنترنت ومربوط بالمحل (القسم ٥).</td></tr>
+<tr><td>لا اتصال بالخادم (على الجهاز)</td><td>تحقق من الواي فاي على الجهاز. إن استمرت، صوّر الرسالة وأرسلها للدعم.</td></tr>
+<tr><td>رمز الربط غير صحيح</td><td>أُنشئ رمز جديد في الإعدادات؛ أدخل الرمز الظاهر حالياً.</td></tr>
+<tr><td>زر الشريحة لا يظهر في صفحة القطعة</td><td>فعّل الجرد بـ RFID وأنشئ رمز ربط في إعدادات الشركة.</td></tr>
+<tr><td>صفحات البرنامج لا تستجيب داخل التطبيق على جهاز قديم</td><td>طبيعي على أندرويد 6؛ التطبيق يفتح شاشة البرمجة فقط. استخدم Chrome 106 للجرد.</td></tr>
+</table>
+
+</main>
+</body></html>

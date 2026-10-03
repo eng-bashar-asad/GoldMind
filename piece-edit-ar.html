@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=32"></script>
-<script src="theme.js?v=46"></script>
+<script src="theme.js?v=47"></script>
 <script src="gm-camera.js?v=2"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
 <script src="zebra-rfid.js?v=2"></script>
@@ -270,6 +270,7 @@
 <div class="gm-bar hidden" id="gmBar">
 <a id="gmSellBtn" href="new-sale-ar.html" data-permission="create_invoice" class="gm-gold flex-1"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined" style="position:relative;">sell</span><span style="position:relative;">بيع القطعة</span></a>
 <button id="gmRfidBtn" onclick="gmWriteRfid(this)" type="button" class="sq hidden" aria-label="برمجة شريحة RFID" title="برمجة شريحة RFID"><span class="material-symbols-outlined">nfc</span></button>
+<button id="gmRfidPrintBtn" onclick="location.href='piece-label-print-ar.html?id=' + encodeURIComponent(currentPiece.id)" type="button" class="sq hidden" aria-label="طباعة وبرمجة بطابعة RFID" title="طباعة وبرمجة بطابعة RFID"><span class="material-symbols-outlined">wifi_tethering</span></button>
 <button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="sq" aria-label="طباعة ملصق القطعة" title="طباعة ملصق القطعة"><span class="material-symbols-outlined">print</span></button>
 <button type="button" class="sq" aria-label="تعديل البيانات" title="تعديل البيانات" onclick="gmOpenEdit()"><span class="material-symbols-outlined">edit</span></button>
 </div>
@@ -515,6 +516,7 @@ async function load() {
   }
 
   currentPiece = piece;
+  if (storeData && storeData.rfid_enabled) document.getElementById('gmRfidPrintBtn').classList.remove('hidden');
   // chip button: on a Chainway handheld itself, or anywhere once a desk handheld is linked
   if (storeData && storeData.rfid_enabled && storeData.rfid_device_key) document.getElementById('gmRfidBtn').classList.remove('hidden');
   document.getElementById('barcode-id').value = piece.barcode || '';

@@ -65,7 +65,9 @@
       ['fiscal-year-close-ar.html', 'event_repeat', 'إغلاق السنة المالية', 'edit_settings'],
       ['subscription-ar.html', 'workspace_premium', 'الاشتراك', 'manage_subscription'],
       ['support-contact-ar.html', 'support_agent', 'تواصل مع الدعم'],
-      ['#tz', 'schedule', 'المنطقة الزمنية للعرض'] ] }
+      ['#tz', 'schedule', 'المنطقة الزمنية للعرض'] ] },
+    { t: 'الأدلة والشروحات', i: 'menu_book', l: [
+      ['rfid-guide-ar.html', 'nfc', 'دليل RFID: البرمجة والجرد'] ] }
   ];
   window.GM_NAV_GROUPS = GROUPS;
 

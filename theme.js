@@ -1016,7 +1016,7 @@ function gmSmartBack(fallbackHref) {
 (function () {
   if (window.GM_NAV_DISABLED || document.querySelector('script[src^="gm-nav.js"]')) return;
   var sc = document.createElement('script');
-  sc.src = 'gm-nav.js?v=3';
+  sc.src = 'gm-nav.js?v=4';
   document.head.appendChild(sc);
 })();
 
