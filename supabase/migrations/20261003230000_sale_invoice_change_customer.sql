@@ -1,0 +1,5 @@
+-- Applied via execute_sql on 2026-10-03: sale_invoice_change_customer(p_invoice, p_customer).
+-- Re-links a sale invoice to another customer of the same shop (edit_invoice
+-- permission) and moves what is still owed on it: debt_decrease on the old
+-- customer, debt_increase on the new one (source 'invoice_edit'). The invoice is
+-- re-linked before the two entries so the allocation trigger stays a no-op.

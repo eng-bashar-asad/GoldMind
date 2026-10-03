@@ -77,6 +77,12 @@
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="counterpartyBlock">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-2" id="counterpartyLabel"></label>
 <input id="counterpartyInput" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm"/>
+<div id="customerPick" class="hidden">
+<p class="text-[13px] mb-2">الحالي: <b id="customerCurrent">—</b></p>
+<input id="customerSearch" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" placeholder="ابحث بالاسم أو رقم الهاتف لتغيير الزبون" autocomplete="off"/>
+<div id="customerResults" class="flex flex-col gap-1 mt-2"></div>
+<p class="text-[11px] text-outline mt-2">عند تغيير الزبون ينتقل الدين المتبقي على هذه الفاتورة من حساب الزبون القديم إلى الجديد.</p>
+</div>
 </div>
 
 <!-- Payment method -->
@@ -281,6 +287,29 @@ async function postLedgerEntry(invoiceType, paymentMethod, amount, mode, descrip
   }
 }
 
+// ---- change the customer of a sale invoice ----
+let newCustomer = null; // { id, name }
+let custTimer = null, custResults = [];
+document.getElementById('customerSearch').addEventListener('input', e => {
+  clearTimeout(custTimer);
+  const q = e.target.value.trim().replace(/[,()]/g, ' ');
+  custTimer = setTimeout(async () => {
+    const box = document.getElementById('customerResults');
+    if (q.length < 2) { box.innerHTML = ''; return; }
+    const { data } = await goldmindClient.from('customers').select('id, name, phone').eq('store_id', GOLDMIND_STORE_ID)
+      .or(`name.ilike.%${q}%,phone.ilike.%${q}%`).order('name').limit(8);
+    custResults = (data || []).filter(c => c.id !== invoice.customer_id);
+    box.innerHTML = custResults.map((c, i) =>
+      `<button type="button" class="text-right px-3 py-2 rounded-lg border border-outline-variant text-[13px]" onclick="pickCustomer(custResults[${i}])">${gmEscapeHtml(c.name)}${c.phone ? ' — ' + gmEscapeHtml(c.phone) : ''}</button>`).join('')
+      || '<p class="text-[12px] text-outline">لا يوجد زبون بهذا الاسم.</p>';
+  }, 300);
+});
+function pickCustomer(c) {
+  newCustomer = c;
+  document.getElementById('customerSearch').value = '';
+  document.getElementById('customerResults').innerHTML = `<div class="px-3 py-2 rounded-lg bg-surface-container-low text-[13px] flex justify-between items-center"><span>الزبون الجديد: <b>${gmEscapeHtml(c.name)}</b></span><button type="button" class="text-error text-[12px]" onclick="newCustomer = null; this.parentElement.remove()">إلغاء</button></div>`;
+}
+
 async function saveEdit() {
   const errEl = document.getElementById('save-error');
   const okEl = document.getElementById('save-success');
@@ -298,6 +327,19 @@ async function saveEdit() {
   const btn = document.getElementById('save-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
+
+  // customer first (with the invoice's old amounts), so its remaining debt moves
+  // to the new customer and any difference below is posted on the new one
+  if (invoice.type === 'sale' && newCustomer && newCustomer.id !== invoice.customer_id) {
+    const { error: custErr } = await goldmindClient.rpc('sale_invoice_change_customer', { p_invoice: invoice.id, p_customer: newCustomer.id });
+    if (custErr) {
+      btn.disabled = false; btn.textContent = 'حفظ التعديلات';
+      errEl.textContent = 'تعذّر تغيير الزبون: ' + custErr.message;
+      errEl.classList.remove('hidden');
+      return;
+    }
+    invoice.customer_id = newCustomer.id;
+  }
 
   const isTrader = invoice.type === 'buyTrader' || invoice.type === 'buyRetail';
   const counterpartyVal = document.getElementById('counterpartyInput').value.trim();
@@ -510,6 +552,14 @@ async function load() {
   if (invoice.type === 'buyRetail') {
     document.getElementById('counterpartyLabel').textContent = 'اسم البائع';
     document.getElementById('counterpartyInput').value = invoice.counterparty_name || '';
+  } else if (invoice.type === 'sale') {
+    document.getElementById('counterpartyLabel').textContent = 'الزبون';
+    document.getElementById('counterpartyInput').classList.add('hidden');
+    document.getElementById('customerPick').classList.remove('hidden');
+    if (invoice.customer_id) {
+      const { data: c } = await goldmindClient.from('customers').select('name, phone').eq('id', invoice.customer_id).maybeSingle();
+      document.getElementById('customerCurrent').textContent = c ? c.name + (c.phone ? ' — ' + c.phone : '') : '—';
+    }
   } else {
     counterpartyBlock.classList.add('hidden');
   }
