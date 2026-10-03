@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=32"></script>
 <script src="theme.js?v=46"></script>
+<script src="zebra-rfid.js?v=2"></script>
 <script src="gm-report.js?v=3"></script>
 <script src="gm-uhf.js?v=1"></script>
 <script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
@@ -569,7 +570,11 @@ async function loadAllPieces() {
       .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'available'));
   }
   const results = await Promise.all(queries);
-  goldPieces = (results[0].data || []).map(p => ({ ...p, source: 'gold' }));
+  // A chip programmed by GoldMind carries shop prefix + barcode (GMZebra.buildEpcHex),
+  // so a piece whose chip was written outside the program (the C72's native
+  // writer screen, no database access) still matches by that computed number.
+  goldPieces = (results[0].data || []).map(p => ({ ...p, source: 'gold',
+    rfid_epc: p.rfid_epc || (p.barcode ? GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID) : null) }));
   diamondPieces = storeInfo.diamonds_enabled ? (results[1].data || []).map(p => ({ ...p, source: 'diamond', rfid_epc: null, category1: null })) : [];
 
   document.getElementById('gold-count-label').textContent = goldPieces.length + ' قطعة متوفرة';
@@ -1035,6 +1040,7 @@ async function gmUhfToggle() {
   } catch (e) { uhfOn = false; t.textContent = 'ابدأ القراءة بالجهاز'; alert(e.message || e); }
 }
 
+const rfidRepeatNoted = new Set();
 async function handleScan(value, method) {
   if (countMethod === 'rfid' && method === 'rfid') scanInput.focus();
   // RFID readers (e.g. Chainway keyboard emulator) may type the EPC in lower case
@@ -1042,6 +1048,11 @@ async function handleScan(value, method) {
   if (matchField === 'rfid_epc') value = String(value).replace(/\s+/g, '').toUpperCase();
   if (!value) return;
 
+  // a UHF reader sees the same chip many times a second — say "already counted" once, then stay quiet
+  if (method === 'rfid' && scannedValues.has(value)) {
+    if (rfidRepeatNoted.has(value)) return;
+    rfidRepeatNoted.add(value);
+  }
   if (scannedValues.has(value)) {
     const by = scanBy[value];
     const msg = by && by !== GOLDMIND_STAFF_ID
