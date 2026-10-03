@@ -1,0 +1,6 @@
+-- Applied via execute_sql on 2026-10-03 (text patch of post_purchase_invoice):
+-- a gold piece bought from a trader gets the box chosen on the line
+-- (items[].box_name, default 'قطع ذهبية') and its making cost per gram
+-- (fab_fee / weight); a diamond piece defaults to 'قطع ألماسية'; the result
+-- now includes 'barcodes' (the new pieces' barcodes) for the page to show.
+-- Data fix: piece 000808 (PINV-2026-000007, Ahmad Al Khayat) put in 'قطع ذهبية'.

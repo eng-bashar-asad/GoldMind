@@ -148,6 +148,10 @@
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-desc">وصف القطعة (عربي)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-desc" placeholder="خاتم، سبيكة، قطع كسر..." type="text"/>
 </div>
+<div class="relative" id="piece-box-wrap">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="piece-box">الصندوق</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="piece-box"><option>قطع ذهبية</option></select>
+</div>
 <div class="grid grid-cols-2 gap-3" id="weight-karat-grid">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-weight" id="manual-weight-label">الوزن (غ)</label>
@@ -505,6 +509,13 @@
         if (params.get('mode') === 'bulk') setItemMode('bulk');
     })();
 
+    // Boxes for a bought piece: the shop's existing boxes ("قطع ذهبية" first)
+    (async function loadPieceBoxes() {
+        const { data } = await goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null);
+        const names = [...new Set(['قطع ذهبية'].concat((data || []).map(r => r.box_name).filter(Boolean)))];
+        document.getElementById('piece-box').innerHTML = names.map(n => `<option>${gmEscapeHtml(n)}</option>`).join('');
+    })();
+
     // ---------- Item mode toggle (individual piece vs. bulk stock lot vs. diamond piece) ----------
     function setItemMode(mode) {
         itemMode = mode;
@@ -516,6 +527,7 @@
         document.getElementById('bulk-fab-per-gram-field').hidden = mode !== 'bulk' || scrap;
         document.getElementById('itemModeBulk').textContent = purchaseType === 'buyRetail' ? 'ذهب كسر' : 'رصيد بالجملة';
         document.getElementById('weight-karat-grid').hidden = mode === 'diamond';
+        document.getElementById('piece-box-wrap').hidden = mode !== 'piece';
         document.getElementById('diamond-fields').classList.toggle('hidden', mode !== 'diamond');
         if (mode !== 'diamond') {
             diamondBulkMode = false;
@@ -935,6 +947,7 @@
             fabFeeVat: (purchaseType === 'buyTrader') ? currentFabFeeVat() : 0,
             vatApplied: vatApplied,
             fabPerGram: itemMode === 'bulk' ? (parseFloat(document.getElementById('bulk-fab-per-gram').value) || 0) : null,
+            boxName: itemMode === 'piece' ? document.getElementById('piece-box').value : null,
             description: (itemMode === 'bulk' && purchaseType === 'buyRetail') ? 'ذهب كسر عيار ' + karat
                 : (document.getElementById('manual-desc').value.trim() || (itemMode === 'bulk' ? 'رصيد بالجملة' : null))
         });
@@ -1303,8 +1316,10 @@
             setTimeout(() => { window.location.href = 'invoice-print-ar.html?id=' + invoiceRow.id; }, 2500);
             return;
         }
+        const codes = (posted && posted.barcodes) || [];
+        if (codes.length) alert('تم حفظ فاتورة الشراء ' + invoiceRow.invoice_number + '\nأرقام الباركود للقطع الجديدة: ' + codes.join('، ') + '\nاطبع ملصقاتها من صفحة كل قطعة في المخزن.');
         showMessage('تم حفظ فاتورة الشراء وتحديث المخزون بنجاح!', false);
-        setTimeout(() => { window.location.href = 'inventory-list-ar.html'; }, 900);
+        setTimeout(() => { window.location.href = 'inventory-list-ar.html'; }, codes.length ? 0 : 900);
     });
 
     // ---------- Keyboard shortcuts (desktop) ----------
