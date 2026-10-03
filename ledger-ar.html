@@ -301,6 +301,47 @@ function goToStatementPrint() {
 <button onclick="toggleTraderOpeningBalanceForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
 <span class="material-symbols-outlined text-[19px]">history</span> رصيد سابق
 </button>
+<button onclick="openTraderCashForm('out')" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
+<span class="material-symbols-outlined text-[19px]">north_east</span> صرف كاش
+</button>
+<button onclick="openTraderCashForm('in')" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
+<span class="material-symbols-outlined text-[19px]">south_west</span> قبض كاش
+</button>
+<button onclick="openTraderConvertForm()" class="col-span-2 h-12 border-2 border-dashed border-secondary text-secondary rounded-xl flex items-center justify-center gap-2 text-[13px] font-semibold">
+<span class="material-symbols-outlined text-[19px]">currency_exchange</span> تسكير عملات (تحويل رصيد الذهب إلى كاش)
+</button>
+</div>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex-col gap-3" id="trader-cash-form">
+<h3 class="font-bold text-[14px]" id="tc-title">صرف كاش للتاجر</h3>
+<p class="text-[11px] text-on-surface-variant" id="tc-hint"></p>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 font-data-mono text-right" dir="ltr" id="tc-amount" placeholder="المبلغ" step="0.01" type="number" inputmode="decimal"/>
+<textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]" id="tc-notes" placeholder="ملاحظة (اختياري)"></textarea>
+<label class="flex items-center gap-2 text-[13px]"><input type="checkbox" id="tc-daily" checked class="w-5 h-5 rounded"/> <span id="tc-daily-label">يخرج من الصندوق اليومي</span></label>
+<button onclick="submitTraderCash()" id="tc-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ</button>
+<p class="text-error text-[12px] hidden" id="tc-error"></p>
+</div>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex-col gap-3" id="trader-convert-form">
+<h3 class="font-bold text-[14px]">تسكير عملات — تحويل الذهب إلى كاش</h3>
+<p class="text-[12px] text-on-surface-variant leading-5">يُسدَّد الذهب بين المحل والتاجر بقيمته نقداً حسب سعر الغرام الذي تحدده. الكاش الناتج يُجمع مع الرصيد النقدي الموجود أو يُخصم منه تلقائياً، ثم تُسدّده بـ"صرف كاش" أو "قبض كاش". لا يتحرك أي نقد من الصندوق الآن.</p>
+<div class="bg-surface-container-low rounded-lg p-3 text-[12px] flex flex-col gap-1" id="tv-balances"></div>
+<div class="grid grid-cols-2 gap-2">
+<button type="button" data-dir="we_owe_gold" class="tv-dir h-11 rounded-lg border font-semibold text-[12px]">ذهب علينا للتاجر</button>
+<button type="button" data-dir="they_owe_gold" class="tv-dir h-11 rounded-lg border font-semibold text-[12px]">ذهب لنا عند التاجر</button>
+</div>
+<div class="grid grid-cols-2 gap-2">
+<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="tv-weight">الوزن (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="tv-weight" step="0.001" type="number" inputmode="decimal"/></div>
+<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="tv-karat">العيار</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="tv-karat"><option value="24">24</option><option value="22">22</option><option value="21">21</option><option value="18">18</option></select></div>
+</div>
+<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="tv-price">سعر غرام الذهب لهذا العيار</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="tv-price" step="0.01" type="number" inputmode="decimal"/></div>
+<div class="rounded-lg p-3 text-[13px] bg-amber-50 border border-amber-200 flex flex-col gap-1" id="tv-preview"></div>
+<textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]" id="tv-notes" placeholder="ملاحظة (اختياري)"></textarea>
+<button onclick="submitTraderConvert()" id="tv-btn" class="w-full h-11 bg-secondary text-on-secondary rounded-lg text-sm font-semibold">تسكير وتحويل إلى كاش</button>
+<p class="text-error text-[12px] hidden" id="tv-error"></p>
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-opening-balance-form">
@@ -521,6 +562,9 @@ function movementLabel(m) {
   if (m.source === 'stock_given') return 'إخراج بضاعة (تسليم للتاجر)';
   if (m.source === 'stock_received') return 'إدخال بضاعة (استلام من التاجر)';
   if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
+  if (m.source === 'cash_out') return 'صرف كاش للتاجر';
+  if (m.source === 'cash_in') return 'قبض كاش من التاجر';
+  if (m.source === 'gold_to_cash') return Number(m.gold_24k_equivalent || 0) > 0 ? 'تسكير عملات — تسديد الذهب' : 'تسكير عملات — قيمته نقداً';
 
   // Manual settlements (and older single-purpose entries) can be gold-only,
   // cash-only, or both -- the old hardcoded label always said "gold" for
@@ -1520,7 +1564,115 @@ async function deleteSettlementMovement(movementId, wasCash) {
   showTraderDetail(traderIdToReopen);
 }
 
+// ---------- صرف كاش / قبض كاش / تسكير عملات ----------
+function hideTraderMoneyForms() {
+  ['trader-cash-form', 'trader-convert-form'].forEach(id => { const el = document.getElementById(id); el.classList.add('hidden'); el.classList.remove('flex'); });
+}
+function hideAllTraderForms() {
+  ['settle-form', 'give-stock-form', 'receive-stock-form', 'trader-opening-balance-form'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  hideTraderMoneyForms();
+}
+let tcDirection = 'out';
+function openTraderCashForm(dir) {
+  const f = document.getElementById('trader-cash-form');
+  const same = !f.classList.contains('hidden') && tcDirection === dir;
+  hideAllTraderForms();
+  if (same) return;
+  tcDirection = dir;
+  const bal = traderFeeBalance(currentTraderId);
+  document.getElementById('tc-title').textContent = dir === 'out' ? 'صرف كاش للتاجر' : 'قبض كاش من التاجر';
+  document.getElementById('tc-daily-label').textContent = dir === 'out' ? 'يخرج من الصندوق اليومي' : 'يدخل إلى الصندوق اليومي';
+  document.getElementById('tc-hint').textContent = 'الرصيد النقدي الحالي: ' + (bal >= 0 ? 'التاجر مديون للمحل ' : 'المحل مديون للتاجر ') + fmtMoney(Math.abs(bal));
+  document.getElementById('tc-amount').value = '';
+  document.getElementById('tc-error').classList.add('hidden');
+  f.classList.remove('hidden'); f.classList.add('flex');
+  document.getElementById('tc-amount').focus();
+}
+async function submitTraderCash() {
+  const amount = parseFloat(document.getElementById('tc-amount').value);
+  const err = document.getElementById('tc-error');
+  err.classList.add('hidden');
+  if (!(amount > 0)) { err.textContent = 'أدخل المبلغ'; err.classList.remove('hidden'); return; }
+  const btn = document.getElementById('tc-btn');
+  btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  const { error } = await goldmindClient.rpc('trader_cash_move', {
+    p_trader: currentTraderId, p_direction: tcDirection, p_amount: amount,
+    p_notes: document.getElementById('tc-notes').value.trim() || null, p_daily: document.getElementById('tc-daily').checked
+  });
+  btn.disabled = false; btn.textContent = 'حفظ';
+  if (error) { err.textContent = 'تعذّر الحفظ: ' + error.message; err.classList.remove('hidden'); return; }
+  document.getElementById('tc-notes').value = '';
+  const id = currentTraderId; await load(); showTraderDetail(id);
+}
+
+let tvDirection = 'we_owe_gold', tvPrices = {};
+document.querySelectorAll('.tv-dir').forEach(b => b.addEventListener('click', () => { tvDirection = b.dataset.dir; renderTraderConvert(); }));
+['tv-weight', 'tv-price'].forEach(id => document.getElementById(id).addEventListener('input', renderTraderConvert));
+document.getElementById('tv-karat').addEventListener('change', () => {
+  const k = document.getElementById('tv-karat').value;
+  if (tvPrices[k]) document.getElementById('tv-price').value = tvPrices[k];
+  renderTraderConvert();
+});
+async function openTraderConvertForm() {
+  const f = document.getElementById('trader-convert-form');
+  const wasOpen = !f.classList.contains('hidden');
+  hideAllTraderForms();
+  if (wasOpen) return;
+  const { data } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
+  tvPrices = {}; (data || []).forEach(p => { tvPrices[p.karat] = p.price_per_gram; });
+  const g = traderGoldBalance(currentTraderId);
+  tvDirection = g < 0 ? 'we_owe_gold' : 'they_owe_gold';
+  document.getElementById('tv-karat').value = '24';
+  document.getElementById('tv-weight').value = Math.abs(g) > 0.0005 ? Math.abs(g).toFixed(3) : '';
+  document.getElementById('tv-price').value = tvPrices[24] || '';
+  document.getElementById('tv-notes').value = '';
+  document.getElementById('tv-error').classList.add('hidden');
+  f.classList.remove('hidden'); f.classList.add('flex');
+  renderTraderConvert();
+}
+function renderTraderConvert() {
+  const g = traderGoldBalance(currentTraderId), c = traderFeeBalance(currentTraderId);
+  const side = v => v >= 0 ? 'لنا عند التاجر' : 'علينا للتاجر';
+  document.getElementById('tv-balances').innerHTML =
+    `<div class="flex justify-between"><span>رصيد الذهب (عيار 24)</span><b class="font-data-mono">${fmt(Math.abs(g))} غ — ${side(g)}</b></div>
+     <div class="flex justify-between"><span>الرصيد النقدي</span><b class="font-data-mono">${fmtMoney(Math.abs(c))} — ${side(c)}</b></div>`;
+  document.querySelectorAll('.tv-dir').forEach(b => {
+    const on = b.dataset.dir === tvDirection;
+    b.style.background = on ? 'var(--gm-primary)' : ''; b.style.color = on ? 'var(--gm-on-primary)' : '';
+  });
+  const w = parseFloat(document.getElementById('tv-weight').value) || 0;
+  const k = parseInt(document.getElementById('tv-karat').value, 10);
+  const pr = parseFloat(document.getElementById('tv-price').value) || 0;
+  const cash = w * pr, g24 = w * k / 24;
+  // after: gold settled by g24 in the chosen direction, cash moves the other way
+  const gAfter = tvDirection === 'we_owe_gold' ? g + g24 : g - g24;
+  const cAfter = tvDirection === 'we_owe_gold' ? c - cash : c + cash;
+  document.getElementById('tv-preview').innerHTML = w > 0 && pr > 0
+    ? `<div class="flex justify-between"><span>قيمة الذهب</span><b class="font-data-mono">${fmt(w)} غ × ${fmt(pr)} = ${fmtMoney(cash)}</b></div>
+       <div class="flex justify-between"><span>رصيد الذهب بعد التسكير</span><b class="font-data-mono">${fmt(Math.abs(gAfter))} غ ${Math.abs(gAfter) > 0.0005 ? '— ' + side(gAfter) : ''}</b></div>
+       <div class="flex justify-between"><span>الرصيد النقدي بعد التسكير</span><b class="font-data-mono">${fmtMoney(Math.abs(cAfter))} ${Math.abs(cAfter) > 0.005 ? '— ' + side(cAfter) : ''}</b></div>`
+    : '<span class="text-on-surface-variant">أدخل الوزن والعيار وسعر الغرام لترى النتيجة.</span>';
+}
+async function submitTraderConvert() {
+  const err = document.getElementById('tv-error');
+  err.classList.add('hidden');
+  const w = parseFloat(document.getElementById('tv-weight').value), pr = parseFloat(document.getElementById('tv-price').value);
+  const k = parseInt(document.getElementById('tv-karat').value, 10);
+  if (!(w > 0) || !(pr > 0)) { err.textContent = 'أدخل الوزن وسعر الغرام'; err.classList.remove('hidden'); return; }
+  if (!confirm('تسكير ' + w + ' غ عيار ' + k + ' بسعر ' + pr + ' = ' + fmtMoney(w * pr) + '؟')) return;
+  const btn = document.getElementById('tv-btn');
+  btn.disabled = true;
+  const { error } = await goldmindClient.rpc('trader_gold_to_cash', {
+    p_trader: currentTraderId, p_weight: w, p_karat: k, p_price: pr, p_direction: tvDirection,
+    p_notes: document.getElementById('tv-notes').value.trim() || null
+  });
+  btn.disabled = false;
+  if (error) { err.textContent = 'تعذّر الحفظ: ' + error.message; err.classList.remove('hidden'); return; }
+  const id = currentTraderId; await load(); showTraderDetail(id);
+}
+
 function toggleSettleForm() {
+  hideTraderMoneyForms();
   document.getElementById('give-stock-form').classList.add('hidden');
   document.getElementById('receive-stock-form').classList.add('hidden');
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
@@ -1529,6 +1681,7 @@ function toggleSettleForm() {
 }
 
 function toggleGiveStockForm() {
+  hideTraderMoneyForms();
   document.getElementById('settle-form').classList.add('hidden');
   document.getElementById('receive-stock-form').classList.add('hidden');
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
@@ -1538,6 +1691,7 @@ function toggleGiveStockForm() {
 }
 
 function toggleReceiveStockForm() {
+  hideTraderMoneyForms();
   document.getElementById('settle-form').classList.add('hidden');
   document.getElementById('give-stock-form').classList.add('hidden');
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
@@ -1571,6 +1725,7 @@ function setTobType(type) {
 }
 
 function toggleTraderOpeningBalanceForm() {
+  hideTraderMoneyForms();
   document.getElementById('settle-form').classList.add('hidden');
   document.getElementById('give-stock-form').classList.add('hidden');
   document.getElementById('receive-stock-form').classList.add('hidden');
