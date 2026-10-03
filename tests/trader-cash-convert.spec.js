@@ -28,9 +28,6 @@ test('convert gold balance to cash, then pay cash out', async ({ page }) => {
   await expect(page.locator('#tv-preview')).toContainText('11,000');
   // after: gold 0, cash we owe 500 + 11000
   await expect(page.locator('#tv-preview')).toContainText('11,500');
-  await page.selectOption('#tv-karat', '21');
-  await expect(page.locator('#tv-price')).toHaveValue('96');
-  await page.selectOption('#tv-karat', '24');
   page.on('dialog', d => d.accept());
   await page.click('#tv-btn');
   await expect.poll(() => calls.some(c => c.name === 'trader_gold_to_cash')).toBe(true);

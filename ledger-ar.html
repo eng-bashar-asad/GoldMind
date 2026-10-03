@@ -330,13 +330,11 @@ function goToStatementPrint() {
 <button type="button" data-dir="we_owe_gold" class="tv-dir h-11 rounded-lg border font-semibold text-[12px]">ذهب علينا للتاجر</button>
 <button type="button" data-dir="they_owe_gold" class="tv-dir h-11 rounded-lg border font-semibold text-[12px]">ذهب لنا عند التاجر</button>
 </div>
-<div class="grid grid-cols-2 gap-2">
-<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="tv-weight">الوزن (غ)</label>
+<!-- the trader balance is always kept in 24k, so the settled weight is 24k too -->
+<input type="hidden" id="tv-karat" value="24"/>
+<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="tv-weight">الوزن المراد تسكيره (غ عيار 24) — كامل الرصيد أو جزء منه</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="tv-weight" step="0.001" type="number" inputmode="decimal"/></div>
-<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="tv-karat">العيار</label>
-<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="tv-karat"><option value="24">24</option><option value="22">22</option><option value="21">21</option><option value="18">18</option></select></div>
-</div>
-<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="tv-price">سعر غرام الذهب لهذا العيار</label>
+<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="tv-price">سعر غرام الذهب عيار 24</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="tv-price" step="0.01" type="number" inputmode="decimal"/></div>
 <div class="rounded-lg p-3 text-[13px] bg-amber-50 border border-amber-200 flex flex-col gap-1" id="tv-preview"></div>
 <textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]" id="tv-notes" placeholder="ملاحظة (اختياري)"></textarea>
@@ -1625,11 +1623,6 @@ async function submitTraderCash() {
 let tvDirection = 'we_owe_gold', tvPrices = {};
 document.querySelectorAll('.tv-dir').forEach(b => b.addEventListener('click', () => { tvDirection = b.dataset.dir; renderTraderConvert(); }));
 ['tv-weight', 'tv-price'].forEach(id => document.getElementById(id).addEventListener('input', renderTraderConvert));
-document.getElementById('tv-karat').addEventListener('change', () => {
-  const k = document.getElementById('tv-karat').value;
-  if (tvPrices[k]) document.getElementById('tv-price').value = tvPrices[k];
-  renderTraderConvert();
-});
 async function openTraderConvertForm() {
   const f = document.getElementById('trader-convert-form');
   const wasOpen = !f.classList.contains('hidden');
@@ -1639,7 +1632,6 @@ async function openTraderConvertForm() {
   tvPrices = {}; (data || []).forEach(p => { tvPrices[p.karat] = p.price_per_gram; });
   const g = traderGoldBalance(currentTraderId);
   tvDirection = g < 0 ? 'we_owe_gold' : 'they_owe_gold';
-  document.getElementById('tv-karat').value = '24';
   document.getElementById('tv-weight').value = Math.abs(g) > 0.0005 ? Math.abs(g).toFixed(3) : '';
   document.getElementById('tv-price').value = tvPrices[24] || '';
   document.getElementById('tv-notes').value = '';
