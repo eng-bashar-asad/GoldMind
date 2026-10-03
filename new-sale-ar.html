@@ -213,9 +213,17 @@
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">إضافة قطعة بالباركود</h2>
 <div class="flex gap-2">
 <input class="flex-1 h-12 px-4 border border-outline-variant rounded-lg font-data-mono text-right" dir="ltr" id="barcode-search-input" placeholder="امسح أو اكتب الباركود" type="text"/>
+<button type="button" onclick="openSaleScanner()" aria-label="مسح الباركود بالكاميرا" title="مسح الباركود بالكاميرا" class="w-12 h-12 border border-primary text-primary rounded-lg flex items-center justify-center active:scale-90 transition-all">
+<span class="material-symbols-outlined">photo_camera</span>
+</button>
 <button onclick="searchByBarcode()" class="w-12 h-12 bg-primary text-white rounded-lg flex items-center justify-center active:scale-90 transition-all">
 <span class="material-symbols-outlined">search</span>
 </button>
+</div>
+<div id="sale-scan-box" class="hidden space-y-2">
+<div id="sale-camera-reader" class="w-full rounded-lg overflow-hidden bg-black min-h-[200px]"></div>
+<p id="sale-scan-msg" class="text-[12px] text-on-surface-variant text-center">وجّه الكاميرا نحو باركود القطعة</p>
+<button type="button" onclick="closeSaleScanner()" class="w-full h-10 border border-outline-variant rounded-lg text-[13px] font-semibold">إغلاق الكاميرا</button>
 </div>
 <div id="barcode-result"></div>
 </section>
@@ -1130,6 +1138,44 @@
     document.getElementById('barcode-search-input').addEventListener('keydown', (e) => {
         if (e.key === 'Enter') searchByBarcode();
     });
+
+    // ---------- Scan a piece's barcode with the camera ----------
+    // html5-qrcode is loaded only when the camera is first opened.
+    let saleScanner = null;
+    function gmLoadScript(src) {
+        return new Promise((ok, fail) => {
+            if (window.Html5Qrcode) return ok();
+            const sc = document.createElement('script'); sc.src = src; sc.onload = ok; sc.onerror = fail; document.head.appendChild(sc);
+        });
+    }
+    async function openSaleScanner() {
+        const box = document.getElementById('sale-scan-box'), msgEl = document.getElementById('sale-scan-msg');
+        if (saleScanner) return;
+        box.classList.remove('hidden');
+        msgEl.textContent = 'جارِ تشغيل الكاميرا...';
+        try { await gmLoadScript('https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'); }
+        catch (e) { msgEl.textContent = 'تعذّر تحميل قارئ الباركود — تحقق من الإنترنت.'; return; }
+        saleScanner = new Html5Qrcode('sale-camera-reader');
+        const F = Html5QrcodeSupportedFormats;
+        saleScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 120 }, formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.QR_CODE] },
+            text => {
+                closeSaleScanner();
+                const input = document.getElementById('barcode-search-input');
+                input.value = text.trim();
+                if (navigator.vibrate) navigator.vibrate(60);
+                searchByBarcode();
+            }, () => {})
+            .then(() => { msgEl.textContent = 'وجّه الكاميرا نحو باركود القطعة'; })
+            .catch(err => { saleScanner = null; msgEl.textContent = 'تعذّر تشغيل الكاميرا — اسمح للبرنامج باستخدام الكاميرا. (' + err + ')'; });
+    }
+    function closeSaleScanner() {
+        document.getElementById('sale-scan-box').classList.add('hidden');
+        const inst = saleScanner; saleScanner = null;
+        if (!inst) return;
+        // stop() throws when the camera never started (e.g. permission denied)
+        try { Promise.resolve(inst.stop()).then(() => inst.clear()).catch(() => {}); } catch (e) { try { inst.clear(); } catch (e2) { /* ignore */ } }
+    }
+    window.addEventListener('pagehide', closeSaleScanner);
 
     async function searchByBarcode() {
         const session = await requireGoldMindSession('login-entry-ar.html');

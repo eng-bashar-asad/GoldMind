@@ -100,3 +100,17 @@ test('price of a line can be changed before posting (tap the price)', async ({ p
   await page.waitForURL(/invoice-print-ar\.html\?id=inv-9/);
   expect(posted[0].items[0].price).toBe(1800);
 });
+
+test('camera scan fills the barcode and finds the piece', async ({ page }) => {
+  await install(page, { db: db() });
+  // fake camera library: decodes one barcode as soon as it starts
+  await page.addInitScript(() => {
+    window.Html5QrcodeSupportedFormats = { CODE_128: 1, CODE_39: 2, EAN_13: 3, QR_CODE: 4 };
+    window.Html5Qrcode = class { start(_c, _o, ok) { setTimeout(() => ok('GM-0001'), 50); return Promise.resolve(); } stop() { return Promise.resolve(); } clear() {} };
+  });
+  await page.goto('/new-sale-ar.html');
+  await page.click('button[onclick="openSaleScanner()"]');
+  await expect(page.locator('#barcode-search-input')).toHaveValue('GM-0001');
+  await expect(page.locator('#barcode-price-input')).toBeVisible();
+  await expect(page.locator('#sale-scan-box')).toHaveClass(/hidden/);
+});
