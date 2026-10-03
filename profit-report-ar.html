@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=32"></script>
-<script src="theme.js?v=47"></script>
+<script src="theme.js?v=48"></script>
 <script src="gm-profit.js?v=1"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -254,7 +254,7 @@ async function applyFilters() {
     gmFetchAllRows(() => goldmindClient.from('invoices').select('id, invoice_number, created_at, type, created_by, total_amount')
       .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return', 'buyRetail', 'buyTrader']).neq('status', 'cancelled')
       .gte('created_at', range.from).lt('created_at', range.to).order('created_at', { ascending: false })),
-    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('id, source, invoice_id, weight_grams, accounting_weight_grams, karat, gold_24k_equivalent, fab_fee_per_gram, fab_fee_amount, cost_fab_per_gram, created_at, trader:trader_id(name), piece:piece_id(cost_fabrication_per_gram)')
+    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('id, source, invoice_id, weight_grams, accounting_weight_grams, karat, gold_24k_equivalent, fab_fee_per_gram, fab_fee_amount, cost_fab_per_gram, sale_cost, created_at, trader:trader_id(name), piece:piece_id(cost_fabrication_per_gram)')
       .eq('store_id', GOLDMIND_STORE_ID).in('source', ['stock_given', 'stock_received'])
       .gte('created_at', range.from).lt('created_at', range.to)),
     goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID),
@@ -310,6 +310,8 @@ async function applyFilters() {
   let unknownCost = 0;
   const wholesale = given.map(m => {
     const acc = Number(m.accounting_weight_grams != null ? m.accounting_weight_grams : m.weight_grams) || 0;
+    // piece given at a fixed price: profit = price − its full cost when given
+    if (m.sale_cost != null) return { m, acc, gross: Number(m.weight_grams) || 0, fee: Number(m.fab_fee_amount) || 0, cost: Number(m.sale_cost) || 0, profit: (Number(m.fab_fee_amount) || 0) - (Number(m.sale_cost) || 0) };
     const fee = acc * (Number(m.fab_fee_per_gram) || 0);
     const perGram = m.piece && m.piece.cost_fabrication_per_gram != null ? m.piece.cost_fabrication_per_gram : m.cost_fab_per_gram;
     if (perGram == null) unknownCost++;

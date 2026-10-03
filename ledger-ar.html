@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=32"></script>
-<script src="theme.js?v=47"></script>
+<script src="theme.js?v=48"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -91,7 +91,7 @@
 </button>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4" id="addTraderForm">
 
-<div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
+<div class="hidden">
 <button type="button" id="trader-type-individual-btn" onclick="setTraderType(false)" class="flex-1 h-10 font-semibold text-xs transition-all">فرد</button>
 <button type="button" id="trader-type-company-btn" onclick="setTraderType(true)" class="flex-1 h-10 font-semibold text-xs transition-all">شركة</button>
 </div>
@@ -443,15 +443,19 @@ function goToStatementPrint() {
 <div class="flex justify-between"><span class="text-on-surface-variant" id="gs-preview-fee-label">إجمالي المصنعية قبل الضريبة</span><span class="font-data-mono font-semibold" id="gs-preview-fee">0.00</span></div>
 <div class="flex justify-between"><span class="text-on-surface-variant">قيمة الضريبة</span><span class="font-data-mono font-semibold" id="gs-preview-vat">0.00</span></div>
 <div class="flex justify-between font-bold pt-1 border-t border-outline-variant"><span>إجمالي دين المصنعية (شامل الضريبة)</span><span class="font-data-mono" id="gs-preview-fee-total">0.00</span></div>
+<div class="hidden justify-between" id="gs-preview-cost-row"><span class="text-on-surface-variant">كلفة القطع علينا الآن</span><span class="font-data-mono font-semibold" id="gs-preview-cost">0.00</span></div>
+<div class="hidden justify-between font-bold pt-1 border-t border-outline-variant" id="gs-preview-price-row"><span>إجمالي القيمة على التاجر</span><span class="font-data-mono" id="gs-preview-price">0.00</span></div>
 </div>
 <div class="relative mb-3">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gs-vat-rate">نسبة الضريبة على المصنعية (%)</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="gs-vat-rate" oninput="renderGiveStockCart()" step="0.01" type="number"/>
 </div>
 <div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3 text-[12px] font-semibold" id="gs-kind">
-<label class="flex-1 h-10 flex items-center justify-center gap-1 cursor-pointer"><input type="radio" name="gs-kind" value="إرجاع للتاجر" checked/> إرجاع للتاجر</label>
-<label class="flex-1 h-10 flex items-center justify-center gap-1 cursor-pointer border-r border-outline-variant"><input type="radio" name="gs-kind" value="بيع للتاجر بالكلفة"/> بيع بالكلفة</label>
+<label class="flex-1 h-10 flex items-center justify-center gap-1 cursor-pointer"><input type="radio" name="gs-kind" value="إخراج بضاعة" checked onchange="renderGiveStockCart()"/> إخراج بضاعة</label>
+<label class="flex-1 h-10 flex items-center justify-center gap-1 cursor-pointer border-r border-outline-variant"><input type="radio" name="gs-kind" value="بيع للتاجر بالكلفة" onchange="renderGiveStockCart()"/> بيع بالكلفة</label>
+<label class="flex-1 h-10 flex items-center justify-center gap-1 cursor-pointer border-r border-outline-variant"><input type="radio" name="gs-kind" value="بسعر محدد" onchange="renderGiveStockCart()"/> بسعر محدد</label>
 </div>
+<p class="hidden text-[11px] text-on-surface-variant mb-3" id="gs-priced-note">بسعر محدد: تُسجَّل القطعة على التاجر <b>كقيمة نقدية فقط</b> (السعر الذي تكتبه)، بلا دين ذهب ولا مصنعية. في حساباتك تخرج القطعة بكلفتها الكاملة (الذهب بسعر المحل الآن + المصنعية + الألماس)، والفرق يظهر ربحاً في تقرير الأرباح.</p>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="gs-notes" placeholder="ملاحظة عامة على السند (اختياري)"></textarea>
 <button onclick="submitGiveStock()" id="gs-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold disabled:opacity-50" disabled="">حفظ التسليم</button>
 <p class="text-error text-[12px] hidden mt-2" id="gs-error"></p>
@@ -723,7 +727,7 @@ function setTraderType(company) {
   document.getElementById('trader-individual-legal-fields').classList.toggle('hidden', company);
   document.getElementById('newTraderNameLabel').textContent = company ? 'اسم التاجر (مختصر/شائع)' : 'اسم التاجر';
 }
-setTraderType(false);
+setTraderType(true); // traders are always companies
 
 async function uploadTraderKycFile(traderId, inputId, category) {
   const filesInput = document.getElementById(inputId);
@@ -1064,11 +1068,14 @@ function showTraderDetail(traderId) {
     const isOpeningBalance = m.source === 'opening_balance';
     const isManualSettlement = !isStockMovement && !isOpeningBalance && !(m.invoice && m.invoice.invoice_number);
     const settlementIsCash = isManualSettlement && Number(m.fab_fee_amount || 0) > 0;
-    const weightLine = isStockMovement
+    const isPriced = m.source === 'stock_given' && m.sale_cost != null;
+    const weightLine = isPriced
+      ? `قطعة بسعر محدد: ${fmt(m.weight_grams)}غ عيار ${m.karat}`
+      : isStockMovement
       ? `${fmt(m.weight_grams)}غ قائم${m.accounting_weight_grams ? ` / ${fmt(m.accounting_weight_grams)}غ محاسبي` : ''} عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)`
       : (m.weight_grams ? `${fmt(m.weight_grams)}غ عيار ${m.karat} = ${fmt(m.gold_24k_equivalent)}غ (٢٤)` : '');
     const feeLine = (m.fab_fee_amount && Number(m.fab_fee_amount) > 0)
-      ? ` ${weightLine ? '+' : ''}${isStockMovement ? `مصنعية (${fmtMoney(m.fab_fee_per_gram)}/غ)` : (isOpeningBalance ? 'نقدي' : (diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية'))} ${fmtMoney(m.fab_fee_amount)}`
+      ? ` ${weightLine ? '+' : ''}${isPriced ? 'قيمة' : isStockMovement ? `مصنعية (${fmtMoney(m.fab_fee_per_gram)}/غ)` : (isOpeningBalance ? 'نقدي' : (diamondsEnabled ? 'نقدي (مصنعية/ألماس)' : 'مصنعية'))} ${fmtMoney(m.fab_fee_amount)}`
       : '';
     return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-move-${m.id}">
@@ -2129,7 +2136,10 @@ async function searchGiveStockBarcode() {
     karat: data.karat,
     grossWeight: Number(data.weight_grams) || 0,
     accountingWeight: Number(data.accounting_weight_grams != null ? data.accounting_weight_grams : data.weight_grams) || 0,
-    fabPerGram: Number(data.cost_fabrication_per_gram) || 0
+    fabPerGram: Number(data.cost_fabrication_per_gram) || 0,
+    costFabPerGram: Number(data.cost_fabrication_per_gram) || 0,
+    accentCost: (Number(data.accent_diamond_carat) || 0) * (Number(data.accent_diamond_price_per_carat) || 0),
+    price: 0
   });
 
   input.value = '';
@@ -2155,7 +2165,34 @@ function updateGiveStockCartItem(cartId, field, value) {
   renderGiveStockCart(true); // preserve focus: skip re-render of the inputs themselves
 }
 
+// Cost of a piece to the shop right now: gold at the shop's price for its karat
+// (24k price × karat/24 if that karat has no price) + making cost + accent diamonds.
+let gsGoldPrices = null;
+async function gsLoadGoldPrices() {
+  const { data } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
+  gsGoldPrices = {}; (data || []).forEach(p => { gsGoldPrices[p.karat] = Number(p.price_per_gram) || 0; });
+  renderGiveStockCart();
+}
+function gsPieceCost(it) {
+  const pr = gsGoldPrices || {};
+  const perGram = pr[it.karat] || ((pr[24] || 0) * (it.karat || 0) / 24);
+  return it.accountingWeight * perGram + it.accountingWeight * (it.costFabPerGram || 0) + (it.accentCost || 0);
+}
+function gsIsPriced() { return ((document.querySelector('input[name="gs-kind"]:checked') || {}).value) === 'بسعر محدد'; }
+
 function renderGiveStockCart(previewOnly) {
+  const priced = gsIsPriced();
+  if (priced && gsGoldPrices === null) { gsGoldPrices = {}; gsLoadGoldPrices(); }
+  document.getElementById('gs-priced-note').classList.toggle('hidden', !priced);
+  ['gs-preview-gold', 'gs-preview-fee', 'gs-preview-vat', 'gs-preview-fee-total'].forEach(id => {
+    const row = document.getElementById(id).parentElement; row.classList.toggle('hidden', priced); row.classList.toggle('flex', !priced);
+  });
+  document.getElementById('gs-vat-rate').parentElement.classList.toggle('hidden', priced);
+  ['gs-preview-cost-row', 'gs-preview-price-row'].forEach(id => { const r = document.getElementById(id); r.classList.toggle('hidden', !priced); r.classList.toggle('flex', priced); });
+  const pricedCost = giveStockCart.reduce((a, it) => a + gsPieceCost(it), 0);
+  const pricedTotal = giveStockCart.reduce((a, it) => a + (Number(it.price) || 0), 0);
+  document.getElementById('gs-preview-cost').textContent = fmtMoney(pricedCost);
+  document.getElementById('gs-preview-price').textContent = fmtMoney(pricedTotal);
   const totals = giveStockCart.reduce((acc, it) => {
     acc.gross += it.grossWeight;
     acc.accounting += it.accountingWeight;
@@ -2191,7 +2228,11 @@ function renderGiveStockCart(previewOnly) {
         </div>
         <button onclick="removeGiveStockCartItem(${it.cartId})" class="text-error shrink-0"><span class="material-symbols-outlined text-[18px]">delete</span></button>
       </div>
-      <div class="grid grid-cols-2 gap-2">
+      ${priced ? `<div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">السعر على التاجر (${currencyUnitLabel()}) — كلفتها علينا الآن ${fmtMoney(gsPieceCost(it))}</label>
+          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.price || ''}" oninput="updateGiveStockCartItem(${it.cartId}, 'price', this.value)"/>
+        </div>` : ''}
+      <div class="grid grid-cols-2 gap-2 ${priced ? 'hidden' : ''}">
         <div>
           <label class="block text-[10px] text-on-surface-variant mb-0.5">الوزن المحاسبي (غ)</label>
           <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.accountingWeight}" oninput="updateGiveStockCartItem(${it.cartId}, 'accountingWeight', this.value)"/>
@@ -2217,6 +2258,17 @@ async function submitGiveStock() {
   // "return" vs "sold at cost" book the same ledger effect (trader owes
   // the weight + fab back); the kind is kept on the note for the record.
   const gsKind = (document.querySelector('input[name="gs-kind"]:checked') || {}).value || '';
+  const priced = gsIsPriced();
+  if (priced && giveStockCart.some(it => !(Number(it.price) > 0))) {
+    errEl.textContent = 'اكتب سعر كل قطعة على التاجر';
+    errEl.classList.remove('hidden');
+    return;
+  }
+  if (priced && (!gsGoldPrices || !Object.keys(gsGoldPrices).length)) {
+    errEl.textContent = 'لا يوجد سعر ذهب في البرنامج لحساب كلفة القطع — حدّث سعر الذهب أولاً';
+    errEl.classList.remove('hidden');
+    return;
+  }
   const typedNotes = document.getElementById('gs-notes').value.trim();
   const notes = gsKind + (typedNotes ? ' — ' + typedNotes : '');
   const btn = document.getElementById('gs-btn');
@@ -2227,6 +2279,14 @@ async function submitGiveStock() {
 
   const gsBatchId = giveStockCart.length > 1 && crypto.randomUUID ? crypto.randomUUID() : null;
   const movements = giveStockCart.map(it => {
+    const note = (notes ? notes + ' — ' : '') + 'باركود ' + it.barcode + (it.description ? ' (' + it.description + ')' : '');
+    // fixed price: a cash amount on the trader only; the piece's full cost is kept for the profit report
+    if (priced) return {
+      batch_id: gsBatchId, store_id: GOLDMIND_STORE_ID, trader_id: currentTraderId, piece_id: it.pieceId,
+      movement_type: 'debt_decrease', weight_grams: it.grossWeight, karat: it.karat, accounting_weight_grams: it.accountingWeight,
+      gold_24k_equivalent: 0, fab_fee_per_gram: null, fab_fee_amount: +Number(it.price).toFixed(2),
+      sale_cost: +gsPieceCost(it).toFixed(2), source: 'stock_given', notes: note
+    };
     const feeBeforeVat = it.accountingWeight * it.fabPerGram;
     return {
       batch_id: gsBatchId,

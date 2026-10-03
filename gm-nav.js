@@ -40,6 +40,7 @@
       ['expense-entry-ar.html?type=gifts', 'redeem', 'إخراج هدايا', 'give_gifts'],
       ['main-cashbox-ar.html', 'account_balance', 'الصندوق الرئيسي', 'manage_daily_cashbox'],
       ['ledger-ar.html', 'handshake', 'حسابات التجار', 'view_traders'],
+      ['ledger-ar.html?action=addTrader', 'person_add', 'إضافة تاجر', 'add_traders'],
       ['company-balances-ar.html', 'account_balance', 'أرصدة الشركة', 'view_reports'],
       ['gold-price-ar.html', 'payments', 'سعر الذهب', 'manage_gold_price'] ] },
     { t: 'التقارير', i: 'bar_chart', l: [
