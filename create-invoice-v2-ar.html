@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=31"></script>
-<script src="theme.js?v=45"></script>
+<script src="theme.js?v=46"></script>
 <script id="tailwind-config">
         tailwind.config = { darkMode: "class", theme: { extend: {
           "colors": {
@@ -554,6 +554,9 @@
         document.getElementById('ocr-photo-btn').classList.toggle('hidden', type !== 'buyTrader');
         document.getElementById('ocr-result-note').classList.add('hidden');
         if (type !== 'buyTrader') selectPayment('cash');
+        // Buying from an individual is scrap by weight: it goes to the scrap box and
+        // never gets a barcode, so the single-piece option is not offered.
+        document.getElementById('itemModePiece').classList.toggle('hidden', type === 'buyRetail');
         if (type === 'buyRetail' && itemMode === 'piece') setItemMode('bulk');
         else setItemMode(itemMode);
         updateFabFeeVisibility();
@@ -588,7 +591,8 @@
         if (!show) return;
         const ref = weight * perGram;
         let txt = 'قيمته حسب سعر اليوم (عيار ' + karat + '): ' + gmMoney(ref);
-        if (price > 0) txt += ' — المبلغ المدفوع = ' + Math.round(price / ref * 100) + '% من هذه القيمة';
+        if (price > 0) txt += ' — المبلغ المدفوع = ' + Math.round(price / ref * 100) + '% من هذه القيمة — '
+            + (ref - price >= 0 ? 'ربح شراء الكسر: ' : 'خسارة شراء الكسر: ') + gmMoney(Math.abs(ref - price)) + ' (يظهر بتقرير الأرباح ولا يدخل الصندوق)';
         el.textContent = txt;
     }
     ['manual-karat', 'manual-weight', 'manual-price'].forEach(id => {

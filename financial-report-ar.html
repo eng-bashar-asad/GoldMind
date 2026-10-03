@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=31"></script>
-<script src="theme.js?v=45"></script>
+<script src="theme.js?v=46"></script>
 <script src="gm-profit.js?v=1"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -199,7 +199,7 @@ async function build(from, to) {
   // ---- lines (profit + weights)
   const saleIds = sales.concat(returns).map(i => i.id), buyIds = buys.map(i => i.id);
   const items = saleIds.length ? await inChunks(saleIds, ids => q().from('invoice_items').select(GM_PROFIT_ITEM_SELECT).in('invoice_id', ids)) : [];
-  const buyItems = buyIds.length ? await inChunks(buyIds, ids => q().from('invoice_items').select('invoice_id, weight_grams, accounting_weight_grams, karat, line_total').in('invoice_id', ids)) : [];
+  const buyItems = buyIds.length ? await inChunks(buyIds, ids => q().from('invoice_items').select('invoice_id, weight_grams, accounting_weight_grams, karat, line_total, gold_price_per_gram, gold_stock_lot_id').in('invoice_id', ids)) : [];
   const invType = {}; invoices.forEach(i => invType[i.id] = i.type);
   const P = { revenue: 0, goldValue: 0, vat: 0, fabCost: 0, diamondCost: 0, profit: 0, estimated: 0 };
   const soldByKarat = {};
@@ -274,14 +274,17 @@ async function build(from, to) {
   (lotsR.data || []).forEach(l => { const w = Number(l.weight_grams_remaining) || 0; stock24 += w * (Number(l.karat) || 0) / 24; stockByKarat[l.karat] = (stockByKarat[l.karat] || 0) + w; });
 
   // ---- render
-  const netProfit = P.profit - expTotal;
+  // scrap bought below the shop's gold price at that moment = profit (report only, not cash)
+  const scrapProfit = buyItems.filter(it => invType[it.invoice_id] === 'buyRetail' && it.gold_stock_lot_id && it.gold_price_per_gram != null)
+    .reduce((a, it) => a + (Number(it.weight_grams) || 0) * Number(it.gold_price_per_gram) - (Number(it.line_total) || 0), 0);
+  const netProfit = P.profit + scrapProfit - expTotal;
   let h = '';
   // profit line: sales → profit − expenses = net. Purchases are their own item
   // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
   const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px]" style="color:#6B6150;">${t[4]}</div>` : ''}</div>`;
   const tiles = FR.canProfit
     ? [['صافي المبيعات', money(netSales), ''], ['ربح المبيعات', money(P.profit), cls(P.profit)],
-       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات − المصاريف', money(netProfit), cls(netProfit)]]
+       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], [scrapProfit ? 'صافي الربح = ربح المبيعات + ربح الكسر − المصاريف' : 'صافي الربح = ربح المبيعات − المصاريف', money(netProfit), cls(netProfit)]]
     : [['صافي المبيعات', money(netSales), ''], ['المصاريف', money(expTotal), '']];
   tiles.push(['المشتريات', money(buysTotal), '', 'col-span-2', 'بند مستقل — لا تُخصم من الربح (شراء ذهب يدخل المخزن)']);
   h += `<div class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
@@ -305,6 +308,7 @@ async function build(from, to) {
       ${row('كلفة المصنعية', money(-P.fabCost))}
       ${P.diamondCost ? row('كلفة الماس', money(-P.diamondCost)) : ''}
       ${row('ربح المبيعات', `<span class="${cls(P.profit)}">${money(P.profit)}</span>`, ' class="tot"')}
+      ${scrapProfit ? row('ربح شراء الكسر (فرق السعر عن سعر البرنامج — لا يدخل الصندوق)', `<span class="${cls(scrapProfit)}">${money(scrapProfit)}</span>`) : ''}
       ${row('المصاريف', money(-expTotal))}
       ${row('صافي الربح', `<span class="${cls(netProfit)}">${money(netProfit)}</span>`, ' class="tot"')}
     </table>`, P.estimated ? `تنبيه: ${P.estimated} سطر قديم بلا سعر ذهب محفوظ — حُسب بسعر اليوم تقديرياً.` : 'نفس طريقة تقرير الأرباح بالضبط.');

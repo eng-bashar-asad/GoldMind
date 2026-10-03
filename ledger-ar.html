@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=31"></script>
-<script src="theme.js?v=45"></script>
+<script src="theme.js?v=46"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -409,6 +409,22 @@ function goToStatementPrint() {
 <div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
 <button type="button" id="gs-mode-barcode-btn" onclick="setGiveStockMode('barcode')" class="flex-1 h-10 text-[12px] font-semibold">قطعة بالباركود</button>
 <button type="button" id="gs-mode-bulk-btn" onclick="setGiveStockMode('bulk')" class="flex-1 h-10 text-[12px] font-semibold">وزن بالجملة</button>
+<button type="button" id="gs-mode-scrap-btn" onclick="setGiveStockMode('scrap')" class="flex-1 h-10 text-[12px] font-semibold">من صندوق الكسر</button>
+</div>
+
+<div class="hidden flex-col gap-3" id="gs-scrap-mode">
+<p class="text-[12px] text-on-surface-variant">إخراج كسر بالكلفة لتاجر أو وسيط تعديل: ينقص الوزن من صندوق الكسر (الأقدم أولاً) ويصير التاجر مديوناً للمحل بهذا الذهب، بلا مصنعية ولا ربح. البضاعة التي تعود مكانه — قطع أو كتلة ومن أي عيار — تُدخلها من "إدخال بضاعة".</p>
+<div id="gsc-boxes" class="flex flex-col gap-2"></div>
+<div class="grid grid-cols-2 gap-2">
+<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="gsc-karat">صندوق</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="gsc-karat" onchange="renderScrapGive()"></select></div>
+<div><label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="gsc-weight">الوزن (غ)</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gsc-weight" oninput="renderScrapGive()" step="0.001" type="number" inputmode="decimal"/></div>
+</div>
+<div class="bg-surface-container-low rounded-lg p-3 text-[12px]" id="gsc-preview"></div>
+<textarea class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]" id="gsc-notes" placeholder="ملاحظة (اختياري)"></textarea>
+<button onclick="submitScrapGive()" id="gsc-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">إخراج الكسر للتاجر</button>
+<p class="text-error text-[12px] hidden" id="gsc-error"></p>
 </div>
 
 <div id="gs-barcode-mode">
@@ -562,6 +578,7 @@ function movementLabel(m) {
   if (m.source === 'stock_given') return 'إخراج بضاعة (تسليم للتاجر)';
   if (m.source === 'stock_received') return 'إدخال بضاعة (استلام من التاجر)';
   if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
+  if (m.source === 'scrap_given') return 'إخراج كسر بالكلفة';
   if (m.source === 'cash_out') return 'صرف كاش للتاجر';
   if (m.source === 'cash_in') return 'قبض كاش من التاجر';
   if (m.source === 'gold_to_cash') return Number(m.gold_24k_equivalent || 0) > 0 ? 'تسكير عملات — تسديد الذهب' : 'تسكير عملات — قيمته نقداً';
@@ -2281,6 +2298,59 @@ function setGiveStockMode(mode) {
   document.getElementById('gs-barcode-mode').classList.toggle('hidden', mode !== 'barcode');
   document.getElementById('gs-bulk-mode').classList.toggle('hidden', mode !== 'bulk');
   document.getElementById('gs-bulk-mode').classList.toggle('flex', mode === 'bulk');
+  document.getElementById('gs-mode-scrap-btn').className = mode === 'scrap' ? active : inactive;
+  document.getElementById('gs-scrap-mode').classList.toggle('hidden', mode !== 'scrap');
+  document.getElementById('gs-scrap-mode').classList.toggle('flex', mode === 'scrap');
+  if (mode === 'scrap') loadScrapBoxes();
+}
+
+// ---------- إخراج من صندوق الكسر بالكلفة ----------
+let scrapBoxes = {};
+async function loadScrapBoxes() {
+  const { data: lots } = await goldmindClient.from('gold_stock_lots')
+    .select('id, karat, box_name, weight_grams_remaining, items:invoice_items(weight_grams, line_total, invoice:invoice_id(type))')
+    .eq('store_id', GOLDMIND_STORE_ID).like('box_name', 'كسر %').gt('weight_grams_remaining', 0).order('created_at');
+  scrapBoxes = {};
+  (lots || []).forEach(l => {
+    const b = scrapBoxes[l.karat] || (scrapBoxes[l.karat] = { weight: 0, cost: 0 });
+    const w = Number(l.weight_grams_remaining) || 0;
+    const items = (l.items || []).filter(i => i.invoice && i.invoice.type === 'buyRetail'), iw = items.reduce((a, i) => a + (Number(i.weight_grams) || 0), 0);
+    const perG = iw ? items.reduce((a, i) => a + (Number(i.line_total) || 0), 0) / iw : 0;
+    b.weight += w; b.cost += w * perG;
+  });
+  const ks = Object.keys(scrapBoxes).sort((a, b) => b - a);
+  document.getElementById('gsc-boxes').innerHTML = ks.length
+    ? ks.map(k => `<div class="flex justify-between bg-surface-container-low rounded-lg px-3 py-2 text-[13px]"><span>كسر ${k}</span><span class="font-data-mono">${fmt(scrapBoxes[k].weight)} غ — كلفته ${fmtMoney(scrapBoxes[k].cost)}</span></div>`).join('')
+    : '<p class="text-[12px] text-on-surface-variant">صندوق الكسر فارغ.</p>';
+  document.getElementById('gsc-karat').innerHTML = ks.map(k => `<option value="${k}">كسر ${k}</option>`).join('');
+  document.getElementById('gsc-weight').value = ks.length ? Number(scrapBoxes[ks[0]].weight.toFixed(3)) : '';
+  document.getElementById('gsc-btn').disabled = !ks.length;
+  renderScrapGive();
+}
+function renderScrapGive() {
+  const k = document.getElementById('gsc-karat').value, b = scrapBoxes[k];
+  const w = parseFloat(document.getElementById('gsc-weight').value) || 0;
+  const el = document.getElementById('gsc-preview');
+  if (!b || !(w > 0)) { el.textContent = 'اختر الصندوق والوزن.'; return; }
+  const over = w > b.weight + 0.0005;
+  el.innerHTML = over ? `<span class="text-error">الوزن أكبر من الموجود في صندوق كسر ${k} (${fmt(b.weight)} غ)</span>`
+    : `<div class="flex justify-between"><span>دين الذهب على التاجر (مكافئ ٢٤)</span><b class="font-data-mono">${fmt(w * k / 24)} غ</b></div>
+       <div class="flex justify-between"><span>الكلفة التقريبية</span><b class="font-data-mono">${fmtMoney(b.weight ? b.cost * w / b.weight : 0)}</b></div>
+       <div class="flex justify-between"><span>يبقى بالصندوق</span><b class="font-data-mono">${fmt(b.weight - w)} غ</b></div>`;
+}
+async function submitScrapGive() {
+  const err = document.getElementById('gsc-error');
+  err.classList.add('hidden');
+  const k = parseInt(document.getElementById('gsc-karat').value, 10), w = parseFloat(document.getElementById('gsc-weight').value);
+  if (!k || !(w > 0)) { err.textContent = 'اختر الصندوق والوزن'; err.classList.remove('hidden'); return; }
+  if (!confirm('إخراج ' + w + ' غ من صندوق كسر ' + k + ' للتاجر بالكلفة؟')) return;
+  const btn = document.getElementById('gsc-btn');
+  btn.disabled = true;
+  const { error } = await goldmindClient.rpc('give_scrap_to_trader', { p_trader: currentTraderId, p_karat: k, p_weight: w, p_notes: document.getElementById('gsc-notes').value.trim() || null });
+  btn.disabled = false;
+  if (error) { err.textContent = 'تعذّر الحفظ: ' + error.message; err.classList.remove('hidden'); return; }
+  document.getElementById('gsc-notes').value = '';
+  const id = currentTraderId; await load(); showTraderDetail(id);
 }
 
 // Several lines (different karat / weight / making) in ONE voucher, like the
