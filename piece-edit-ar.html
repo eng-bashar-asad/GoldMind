@@ -58,6 +58,8 @@
 .gm-back{width:42px;height:42px;border-radius:14px;background:#1F1A12;color:#F3EEDF;display:flex;align-items:center;justify-content:center;border:0}
 .gm-photo{position:relative;height:300px;border-radius:26px;overflow:hidden;background:radial-gradient(circle at 35% 30%,#FFF6D6,#E9D29A 55%,#B8913A);flex-shrink:0}
 .gm-photo img{width:100%;height:100%;object-fit:cover}
+/* wide screens: a square photo of sensible size instead of a full-width banner */
+@media (min-width:640px){.gm-photo{height:auto;width:100%;max-width:400px;aspect-ratio:1/1;margin-inline:auto}}
 .gm-photo .gm-cam{position:absolute;bottom:12px;right:12px;height:36px;padding:0 12px;border-radius:18px;background:rgba(23,20,15,.72);color:#fff;font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;border:0}
 .gm-spec{background:#FFFDF8;border-radius:20px;padding:12px;text-align:center}
 .gm-spec b{display:block;font-size:19px;color:#1F1A12;font-family:inherit}
@@ -127,11 +129,7 @@
 </div>
 
 <div class="gm-age">
-<div class="flex items-center justify-between"><span style="font-size:13px;color:#CDBF9F;">مدة البقاء في المخزن</span><span class="material-symbols-outlined" style="color:#D9B45A;">hourglass_top</span></div>
-<div id="gmAgeText" style="font-size:22px;font-weight:700;margin-top:4px;">—</div>
-<div class="gm-age-bar"><i id="gmAgeBar" style="width:0"></i></div>
-<div id="gmAgeHint" style="font-size:11.5px;color:#CDBF9F;"></div>
-<dl>
+<dl style="margin-top:0">
 <div><dt>المصنعية / غرام</dt><dd id="gmAgeFab" class="font-data-mono">—</dd></div>
 <div><dt>اللون</dt><dd id="gmAgeColor">—</dd></div>
 <div><dt>الصندوق</dt><dd id="gmAgeBox" class="truncate">—</dd></div>
@@ -711,19 +709,6 @@ function gmRenderPieceView() {
   document.getElementById('gmSpecKarat').textContent = p.karat ? p.karat + 'K' : '—';
   document.getElementById('gmSpecWeight').textContent = gmN(p.weight_grams);
   document.getElementById('gmSpecAcc').textContent = gmN(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams);
-  const days = p.created_at ? Math.max(0, Math.floor((Date.now() - new Date(p.created_at).getTime()) / 86400000)) : null;
-  const ageText = document.getElementById('gmAgeText'), bar = document.getElementById('gmAgeBar'), hint = document.getElementById('gmAgeHint');
-  if (p.status === 'sold') {
-    ageText.textContent = 'بيعت هذه القطعة'; bar.style.width = '0'; hint.textContent = '';
-  } else if (days == null) {
-    ageText.textContent = '—'; bar.style.width = '0'; hint.textContent = '';
-  } else {
-    ageText.textContent = days === 0 ? 'دخلت المخزن اليوم' : days === 1 ? 'بالمخزن منذ يوم واحد' : days === 2 ? 'بالمخزن منذ يومين' : 'بالمخزن منذ ' + days + (days <= 10 ? ' أيام' : ' يوماً');
-    const pct = Math.min(100, days / 90 * 100);
-    bar.style.width = pct + '%';
-    bar.style.background = days >= 90 ? 'linear-gradient(90deg,#B24A34,#F2A99C)' : 'linear-gradient(90deg,#8A6A1F,#F6E2A6)';
-    hint.textContent = days >= 90 ? 'تجاوزت 90 يوماً — تُعدّ بضاعة راكدة' : 'بقي ' + (90 - days) + ' يوماً قبل أن تُعدّ راكدة (90 يوماً)';
-  }
   document.getElementById('gmAgeFab').textContent = gmN(p.cost_fabrication_per_gram);
   document.getElementById('gmAgeColor').textContent = GM_COLORS[p.color] || p.color || '—';
   document.getElementById('gmAgeBox').textContent = p.box_name || '—';
