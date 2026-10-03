@@ -1,6 +1,8 @@
 // One date format everywhere: 27/09/2026 01:16 م, left-to-right isolated; date boxes read LTR.
 const { test, expect } = require('@playwright/test');
 const { install, STORE, USER, STAFF } = require('./fake-backend');
+// The shop has no saved time zone, so dates follow the device's: pin it (CI runs in UTC).
+test.use({ timezoneId: 'Asia/Dubai' });
 
 test('dates: one clear format and date boxes read left to right', async ({ page }) => {
   await install(page, { generic: true, db: {
