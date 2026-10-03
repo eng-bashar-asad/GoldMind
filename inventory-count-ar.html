@@ -1027,7 +1027,7 @@ async function gmUhfToggle() {
   uhfOn = true; t.textContent = 'جارِ القراءة… اضغط للإيقاف';
   try {
     await GMUhf.start(epc => {
-      const v = String(epc).replace(/[^0-9a-f]/gi, '').toUpperCase();
+      const v = String(epc).replace(/\s+/g, '').toUpperCase();
       if (!v || uhfSeen.has(v)) return;
       uhfSeen.add(v);
       handleScan(v, 'rfid');
@@ -1038,8 +1038,8 @@ async function gmUhfToggle() {
 async function handleScan(value, method) {
   if (countMethod === 'rfid' && method === 'rfid') scanInput.focus();
   // RFID readers (e.g. Chainway keyboard emulator) may type the EPC in lower case
-  // or with spaces; chips are saved as upper-case hex.
-  if (matchField === 'rfid_epc') value = String(value).replace(/[^0-9a-f]/gi, '').toUpperCase();
+  // or with spaces; chips are saved in upper case.
+  if (matchField === 'rfid_epc') value = String(value).replace(/\s+/g, '').toUpperCase();
   if (!value) return;
 
   if (scannedValues.has(value)) {
