@@ -159,7 +159,9 @@ async function goldmindEnforceIdleTimeout() {
     let lastTouch = 0;
     function throttledTouch() {
         const now = Date.now();
-        if (now - lastTouch > GOLDMIND_IDLE_TOUCH_MIN_INTERVAL_MS) {
+        // Only inside the app (a company is open). Typing on the login screen
+        // used to refresh this and let a days-old session walk straight back in.
+        if (GOLDMIND_STORE_ID && now - lastTouch > GOLDMIND_IDLE_TOUCH_MIN_INTERVAL_MS) {
             lastTouch = now;
             goldmindTouchActivity();
         }
@@ -187,6 +189,15 @@ function gmStoredSession() {
         const s = raw && JSON.parse(raw);
         return s && s.user ? s : null;
     } catch (e) { return null; }
+}
+
+// Starting a new login: drop whatever login this browser still holds (this
+// device only — other devices stay signed in) and forget the last company, so
+// the code/password is really required and the company is picked again.
+async function gmStartFreshLogin() {
+    try { await goldmindClient.auth.signOut({ scope: 'local' }); } catch (e) {}
+    ['goldmind_active_store', 'gm_membership', GOLDMIND_IDLE_KEY].forEach(function (k) { localStorage.removeItem(k); });
+    GOLDMIND_STORE_ID = null; GOLDMIND_STAFF_ID = null;
 }
 
 async function requireGoldMindSession(redirectTo) {

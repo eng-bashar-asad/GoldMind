@@ -103,7 +103,7 @@
     </script>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=31"></script>
+<script src="supabase-config.js?v=32"></script>
 <script src="theme.js?v=46"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="gm-particle-transition.js"></script>
@@ -322,6 +322,8 @@ document.getElementById('joinForm').addEventListener('submit', async function (e
     btn.disabled = true;
     btn.textContent = 'جارِ الإرسال...';
 
+    await gmStartFreshLogin();
+    sessionStorage.setItem('goldmind_otp_sent_at', String(Date.now()));
     const { error } = await goldmindClient.auth.signInWithOtp({
         email: email,
         options: { shouldCreateUser: true, emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html' }
@@ -373,6 +375,8 @@ document.getElementById('newForm').addEventListener('submit', async function (e)
     btn.disabled = true;
     btn.textContent = 'جارِ الإرسال...';
 
+    await gmStartFreshLogin();
+    sessionStorage.setItem('goldmind_otp_sent_at', String(Date.now()));
     const { error } = await goldmindClient.auth.signInWithOtp({
         email: email,
         options: { shouldCreateUser: true, emailRedirectTo: 'https://eng-bashar-asad.github.io/GoldMind/auth-callback-ar.html' }
@@ -424,6 +428,7 @@ document.getElementById('quickForm').addEventListener('submit', async function (
         email = resolvedEmail;
     }
 
+    await gmStartFreshLogin();
     const { data: signInData, error: signInError } = await goldmindClient.auth.signInWithPassword({ email, password });
 
     if (signInError) {

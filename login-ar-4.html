@@ -241,7 +241,7 @@
     }
   </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=31"></script>
+<script src="supabase-config.js?v=32"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="gm-particle-transition.js"></script>
 </head>
@@ -339,11 +339,14 @@
             if (el) el.textContent = email;
         })();
 
-        // If a session already exists (e.g. the user came back after clicking the
-        // email link in another tab), skip straight to the dashboard.
+        // Skip the code only for a login made AFTER this code was requested (the
+        // person clicked the email link in another tab). An older saved login
+        // never counts — the code is required.
         (async function checkExistingSession() {
+            const sentAt = Number(sessionStorage.getItem('goldmind_otp_sent_at')) || 0;
             const { data: { session } } = await goldmindClient.auth.getSession();
-            if (session) window.location.href = 'index-ar.html';
+            const signedInAt = session && session.user && Date.parse(session.user.last_sign_in_at || '');
+            if (session && sentAt && signedInAt >= sentAt - 5000) window.location.href = 'index-ar.html';
         })();
 
         // Auto-advance between the 8 OTP boxes as the user types
