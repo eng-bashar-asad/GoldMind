@@ -90,6 +90,7 @@ test('price of a line can be changed before posting (tap the price)', async ({ p
   await input.fill('1800');
   await input.press('Enter');
   await expect(page.locator('#grand-total')).toContainText('1,800.00');
+  await expect(page.locator('#grand-weight')).toHaveText('10.00 غ');
   // invalid value on leaving the field keeps the previous price
   await page.click('#cart-body button[aria-label^="تعديل سعر القطعة"]');
   await input.fill('0');

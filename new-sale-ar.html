@@ -360,9 +360,13 @@
 <!-- Totals & Payment -->
 <section class="space-y-4 pb-8">
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm space-y-2">
-<div class="pt-2 flex justify-between items-end">
-<span class="text-primary font-bold font-headline-md text-headline-md">الإجمالي</span>
-<span class="text-primary font-bold text-headline-md font-headline-md" id="grand-total">0.00 د.إ</span>
+<div class="flex justify-between items-center text-[14px] text-on-surface-variant">
+<span>مجموع الوزن</span>
+<span class="font-data-mono font-semibold" id="grand-weight">0.00 غ</span>
+</div>
+<div class="flex justify-between items-center pt-1 border-t border-outline-variant">
+<span class="text-primary font-bold text-[17px]">الإجمالي</span>
+<span class="text-primary font-bold text-[17px]" id="grand-total">0.00 د.إ</span>
 </div>
 </div>
 
@@ -1479,6 +1483,7 @@
         if (cart.length === 0) {
             body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
             document.getElementById('grand-total').textContent = '0.00 ' + CUR;
+            document.getElementById('grand-weight').textContent = '0.00 غ';
             document.getElementById('save-invoice-btn').removeAttribute('data-total');
             saveDraftToLocalStorage();
             return;
@@ -1507,6 +1512,9 @@
 
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         document.getElementById('grand-total').textContent = gmMoney(total) + ' ' + CUR;
+        // gold weight only: a diamond line's "weight" is in carats
+        const grams = cart.reduce((sum, item) => sum + (item.mode === 'diamond' ? 0 : Number(item.weight) || 0), 0);
+        document.getElementById('grand-weight').textContent = grams.toFixed(2) + ' غ';
         document.getElementById('save-invoice-btn').setAttribute('data-total', gmMoney(total) + ' ' + CUR); // total stays visible on the sticky save button
         saveDraftToLocalStorage();
     }
