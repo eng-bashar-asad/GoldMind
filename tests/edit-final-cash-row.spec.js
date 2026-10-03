@@ -58,3 +58,17 @@ test('buying from an individual hides the trader-invoice photo button', async ({
   await page.click('#tabTrader');
   await expect(page.locator('#ocr-photo-btn')).not.toHaveClass(/hidden/);
 });
+
+test('daily cashbox lists the day\'s sales with the debt part, even fully on credit', async ({ page }) => {
+  const now = new Date().toISOString();
+  await install(page, { db: base({ daily_cash_log: [],
+    invoices: [
+      { id: 's1', store_id: STORE, invoice_number: 'INV-1', type: 'sale', status: 'unpaid', payment_method: 'credit', total_amount: 2000, amount_paid: 0, created_at: now, customer: { name: 'سامر' } },
+      { id: 's2', store_id: STORE, invoice_number: 'INV-2', type: 'sale', status: 'unpaid', payment_method: 'mixed', total_amount: 11900, amount_paid: 11700, created_at: now, customer: { name: 'حسن' } }] }) });
+  await page.goto('/daily-cashbox-ar.html');
+  const box = page.locator('#day-sales');
+  await expect(box).toContainText('13,900.00');
+  await expect(box).toContainText('منها دين على الزبائن');
+  await expect(box).toContainText('2,200.00');
+  await expect(box).toContainText('INV-1');
+});

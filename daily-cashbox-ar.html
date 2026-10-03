@@ -183,6 +183,7 @@
 </table>
 </div>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد عمليات مسجّلة اليوم بعد.</p>
+<div id="day-sales" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-3 text-[12px]"></div>
 </div>
 
 <!-- Single reusable edit modal (instead of a per-row hidden panel — keeps
@@ -480,6 +481,7 @@ function gmLinkColorHashFallback(group) {
 
 function renderAll() {
   updateDayNav();
+  gmLoadDaySales();
 
   const dayEnd = new Date(selectedDate); dayEnd.setDate(dayEnd.getDate() + 1);
   todayEntries = allEntries.filter(e => new Date(e.created_at) >= selectedDate && new Date(e.created_at) < dayEnd);
@@ -612,6 +614,7 @@ function renderAll() {
       <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>
         <div class="font-semibold">${e.cash_movement_id ? '<span class="material-symbols-outlined align-middle" style="font-size:13px" title="تلقائي من فاتورة">receipt_long</span> ' : ''}${gmEscapeHtml(e.operation_type)}</div>
         ${e.notes ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(e.notes)}</div>` : ''}
+        ${gmSaleNote(e, metaClass)}
         <div class="text-[10px] ${metaClass}">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
       </td>
       <td class="px-2 py-2 border-b border-outline-variant text-center font-bold font-data-mono cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>${fmt(e.amount)}<div class="text-[9px] font-normal ${metaClass}">${e.currency}</div></td>`;
@@ -622,6 +625,49 @@ function renderAll() {
     rowsHtml += '<tr>' + cellHtml(inEntries[i]) + cellHtml(outEntries[i]) + '</tr>';
   }
   bodyEl.innerHTML = rowsHtml;
+}
+
+// ---- Sales of the day: every sale invoice with its value and the part left
+// as debt, including invoices sold fully on credit (they move no cash, so
+// they have no row in the table above). Info only: never changes balances.
+const daySalesCache = {};
+let daySales = [];
+function gmSaleNote(e, cls) {
+  const inv = e.cm && e.cm.invoice_id && daySales.find(x => x.id === e.cm.invoice_id);
+  if (!inv) return '';
+  const debt = Number(inv.total_amount) - Number(inv.amount_paid || 0);
+  return debt > 0.009 ? `<div class="text-[10px] ${cls}">مبيعات بقيمة ${fmt(inv.total_amount)} — منها دين ${fmt(debt)}</div>` : '';
+}
+async function gmLoadDaySales() {
+  const box = document.getElementById('day-sales');
+  if (showFullHistory) { box.classList.add('hidden'); return; }
+  const from = new Date(selectedDate), to = new Date(selectedDate); to.setDate(to.getDate() + 1);
+  const key = from.toISOString();
+  if (!daySalesCache[key]) {
+    const { data } = await goldmindClient.from('invoices')
+      .select('id, invoice_number, total_amount, amount_paid, payment_method, customer:customer_id(name)')
+      .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled')
+      .gte('created_at', from.toISOString()).lt('created_at', to.toISOString()).order('created_at');
+    daySalesCache[key] = data || [];
+  }
+  if (from.getTime() !== selectedDate.getTime()) return; // day changed meanwhile
+  const rows = daySalesCache[key];
+  const changed = rows !== daySales; daySales = rows;
+  if (!rows.length) { box.classList.add('hidden'); box.innerHTML = ''; }
+  else {
+    const total = rows.reduce((t, r) => t + Number(r.total_amount || 0), 0);
+    const debt = rows.reduce((t, r) => t + Math.max(0, Number(r.total_amount || 0) - Number(r.amount_paid || 0)), 0);
+    box.innerHTML = `<div class="flex justify-between font-bold text-[13px] mb-2"><span>مبيعات اليوم</span><span class="font-data-mono">${fmt(total)}</span></div>`
+      + (debt > 0.009 ? `<div class="flex justify-between text-error font-semibold mb-2"><span>منها دين على الزبائن</span><span class="font-data-mono">${fmt(debt)}</span></div>` : '')
+      + rows.map(r => {
+          const d = Number(r.total_amount || 0) - Number(r.amount_paid || 0);
+          return `<a href="invoice-print-ar.html?id=${r.id}" class="flex justify-between gap-2 py-1.5 border-t border-outline-variant">
+            <span>${gmEscapeHtml(r.invoice_number)}${r.customer && r.customer.name ? ' — ' + gmEscapeHtml(r.customer.name) : ''}</span>
+            <span class="font-data-mono text-left">${fmt(r.total_amount)}${d > 0.009 ? ` <span class="text-error">(دين ${fmt(d)})</span>` : ''}</span></a>`;
+        }).join('');
+    box.classList.remove('hidden');
+  }
+  if (changed) renderAll();
 }
 
 // -----------------------------------------------------------------------
