@@ -33,21 +33,17 @@ jobs:
         working-directory: app
         run: npm install
 
-      # Same idea as the packaged app: precompile one static Tailwind CSS
-      # covering every page instead of shipping the runtime Play CDN
-      # script, which recompiles CSS from scratch in-browser on every
-      # single page load — the main source of the site feeling slow.
+      # Same as the packaged app: precompile static Tailwind CSS (one file per
+      # distinct page config) instead of shipping the runtime Play CDN script,
+      # which recompiles CSS in the browser on every page load.
       - name: Assemble deploy output (_site)
         run: |
           rm -rf _site
           mkdir -p _site
           find . -maxdepth 1 -type f \( -name "*.html" -o -name "*.js" -o -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" -o -name "*.svg" -o -name "*.ico" -o -name "*.webmanifest" -o -name "*.json" \) \
             ! -path "./app/*" -exec cp {} _site/ \;
-          cd app
-          node build-tools/merge-tailwind-config.js
-          npx tailwindcss -i build-tools/input.css -o ../_site/tailwind-built.css --config build-tools/tailwind.config.js --minify
-          cd ..
-          node app/build-tools/strip-tailwind-cdn.js --dir=_site
+          node app/build-tools/build-tailwind.js --dir=_site
+          if grep -l "cdn.tailwindcss.com" _site/*.html; then echo "pages still load the Tailwind CDN"; exit 1; fi
           touch _site/.nojekyll
 
       - name: Upload artifact

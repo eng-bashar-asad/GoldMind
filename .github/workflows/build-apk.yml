@@ -89,18 +89,13 @@ jobs:
         run: |
           printf '{"sha": "%s", "built_at": "%s"}' "${{ github.sha }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > app/www/build-info.json
 
-      # The live site loads Tailwind's Play CDN, which recompiles CSS from
-      # scratch in-browser on every single page load — real, measurable
-      # overhead on a phone. For the packaged app we precompile one static
-      # stylesheet covering every page instead, and strip the runtime CDN
-      # script out of the bundled copies (the live GitHub Pages site is
-      # untouched and keeps using the CDN as before).
+      # Precompile static Tailwind CSS (one file per distinct page config)
+      # and strip the runtime Play CDN script from the bundled pages.
       - name: Precompile static Tailwind CSS for the app
         working-directory: app
         run: |
-          node build-tools/merge-tailwind-config.js
-          npx tailwindcss -i build-tools/input.css -o www/tailwind-built.css --config build-tools/tailwind.config.js --minify
-          node build-tools/strip-tailwind-cdn.js
+          node build-tools/build-tailwind.js --dir=www
+          if grep -l "cdn.tailwindcss.com" www/*.html; then echo "pages still load the Tailwind CDN"; exit 1; fi
 
       # Offline: bundle the Supabase library and icon font inside the app.
       - name: Bundle libraries for offline use
