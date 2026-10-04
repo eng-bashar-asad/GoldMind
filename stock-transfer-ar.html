@@ -307,7 +307,17 @@ async function saveOut() {
 // ---- IN ----
 function optionList(key) { return '<option value="">—</option>' + opts[key].map(v => `<option>${esc(v)}</option>`).join(''); }
 // Boxes are the names already given to pieces (created from «إضافة قطعة للمخزون»)
-function boxOptions(sel) { return '<option value="">— اختر الصندوق —</option>' + boxes.map(b => `<option${b === sel ? ' selected' : ''}>${esc(b)}</option>`).join(''); }
+function boxOptions(sel) { return '<option value="">— اختر الصندوق —</option>' + boxes.map(b => `<option${b === sel ? ' selected' : ''}>${esc(b)}</option>`).join('') + '<option value="__new">+ صندوق جديد…</option>'; }
+function pickBox(sel) {
+  if (sel.value === '__new') {
+    const name = (prompt('اسم الصندوق الجديد:') || '').trim();
+    if (!name) { sel.value = lastBox || ''; return; }
+    if (!boxes.includes(name)) boxes.push(name);
+    document.querySelectorAll('[data-f="box_name"]').forEach(s2 => { const v = s2 === sel ? name : s2.value; s2.innerHTML = boxOptions(v); });
+    renderReturnBox();
+  }
+  lastBox = sel.value;
+}
 function renderReturnBox() {
   document.getElementById('return-box').innerHTML = '<option value="">نفس صندوقها</option>' + boxes.map(b => `<option>${esc(b)}</option>`).join('');
 }
@@ -325,7 +335,7 @@ function addNewRow() {
     <label class="flex flex-col gap-1">تصنيف ١<select class="h-10 border border-outline-variant rounded px-2" data-f="category1">${optionList('category1')}</select></label>
     <label class="flex flex-col gap-1">تصنيف ٢<select class="h-10 border border-outline-variant rounded px-2" data-f="category2">${optionList('category2')}</select></label>
     <label class="flex flex-col gap-1">اللون<select class="h-10 border border-outline-variant rounded px-2" data-f="color"><option value="Gold">ذهبي</option><option value="White">أبيض</option><option value="Rose">وردي</option></select></label>
-    <label class="flex flex-col gap-1 col-span-2">الصندوق *<select class="h-10 border border-outline-variant rounded px-2" data-f="box_name" onchange="lastBox = this.value">${boxOptions(lastBox)}</select></label>
+    <label class="flex flex-col gap-1 col-span-2">الصندوق *<select class="h-10 border border-outline-variant rounded px-2" data-f="box_name" onchange="pickBox(this)">${boxOptions(lastBox)}</select></label>
     <label class="flex flex-col gap-1 col-span-2">الوصف<input class="h-10 border border-outline-variant rounded px-2" data-f="description_ar"/></label>
     <label class="flex flex-col gap-1">صورة<input type="file" accept="image/*" capture="environment" class="text-[11px]" data-f="photo"/></label>
     <button type="button" onclick="this.closest('.new-row').remove()" class="self-end h-10 rounded border border-error text-error">حذف</button>`;
@@ -405,7 +415,7 @@ async function loadAllVouchers() {
     goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null),
     goldmindClient.from('diamond_pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null)
   ]);
-  boxes = [...new Set((bx || []).concat(dbx || []).map(r => r.box_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar'));
+  boxes = [...new Set(['قطع ذهبية'].concat((bx || []).concat(dbx || []).map(r => r.box_name).filter(Boolean)))];
   renderReturnBox();
   parties = ps || []; traders = ts || [];
   (gp || []).forEach(p => { prices[p.karat] = Number(p.price_per_gram); });

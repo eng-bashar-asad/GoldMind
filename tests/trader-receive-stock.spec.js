@@ -16,10 +16,11 @@ test('receive from trader: piece + bulk go to stock and account together', async
   page.on('dialog', d => d.accept().catch(() => {}));
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/ledger-ar.html?trader=t1&action=receive');
-  await page.waitForFunction(() => !document.getElementById('receive-stock-form').classList.contains('hidden') && typeof rsBoxes !== 'undefined' && rsBoxes && rsBoxes.length === 1);
+  await page.waitForFunction(() => !document.getElementById('receive-stock-form').classList.contains('hidden') && typeof rsBoxes !== 'undefined' && rsBoxes && rsBoxes.length === 2);
   const line = n => page.locator('#rs-lines-list > div').nth(n);
   await line(0).locator('input[type=number]').nth(0).fill('4.5');
   await line(0).locator('input[type=number]').nth(2).fill('10');
+  await line(0).locator('select').nth(1).selectOption('');
   await page.click('#rs-btn');
   await expect(page.locator('#rs-error')).toContainText('اختر الصندوق');
   await line(0).locator('select').nth(1).selectOption('واجهة 1');

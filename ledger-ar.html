@@ -1752,7 +1752,7 @@ function toggleReceiveStockForm() {
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
   const wasHidden = document.getElementById('receive-stock-form').classList.contains('hidden');
   document.getElementById('receive-stock-form').classList.toggle('hidden');
-  if (wasHidden) openReceiveStockForm();
+  if (wasHidden) { openReceiveStockForm(); rsLoadBoxes(); } // boxes fresh every time the form opens
 }
 
 let tobDirection = 'receivable'; // 'receivable' = التاجر مديون للمحل (قبض), 'payable' = المحل مديون للتاجر (صرف)
@@ -1922,19 +1922,30 @@ function resetReceiveStockLines() {
   addReceiveStockLine();
 }
 
-let rsBoxes = null;
+let rsBoxes = ['قطع ذهبية'];
+// The shop's boxes ("قطع ذهبية" always offered), plus any box typed here for this voucher.
+let rsExtraBoxes = [];
 async function rsLoadBoxes() {
   const { data } = await goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null);
-  rsBoxes = [...new Set((data || []).map(r => r.box_name).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ar'));
+  rsBoxes = [...new Set(['قطع ذهبية'].concat((data || []).map(r => r.box_name).filter(Boolean), rsExtraBoxes))];
+  renderReceiveStockLines();
+}
+function rsPickBox(lineId, value) {
+  if (value === '__new') {
+    const name = (prompt('اسم الصندوق الجديد:') || '').trim();
+    if (!name) { renderReceiveStockLines(); return; }
+    if (!rsBoxes.includes(name)) { rsBoxes.push(name); rsExtraBoxes.push(name); }
+    value = name;
+  }
+  updateReceiveStockLine(lineId, 'boxName', value);
   renderReceiveStockLines();
 }
 function addReceiveStockLine() {
-  if (rsBoxes === null) { rsBoxes = []; rsLoadBoxes(); }
   const prev = receiveStockLines[receiveStockLines.length - 1];
   receiveStockLines.push({
     lineId: ++receiveStockLineCounter,
     kind: prev ? prev.kind : 'piece',
-    boxName: prev ? prev.boxName : '',
+    boxName: prev ? prev.boxName : 'قطع ذهبية',
     description: '',
     karat: 18,
     grossWeight: 0,
@@ -2007,8 +2018,9 @@ function renderReceiveStockLines(previewOnly) {
         </div>
         <div>
           <label class="block text-[10px] text-on-surface-variant mb-0.5">${l.kind === 'bulk' ? 'الصندوق (اختياري)' : 'الصندوق *'}</label>
-          <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="updateReceiveStockLine(${l.lineId}, 'boxName', this.value)">
-            <option value="">— اختر —</option>${(rsBoxes || []).map(b => `<option ${b === l.boxName ? 'selected' : ''}>${gmEscapeHtml(b)}</option>`).join('')}
+          <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="rsPickBox(${l.lineId}, this.value)">
+            <option value="">— اختر —</option>${(rsBoxes || ['قطع ذهبية']).map(b => `<option ${b === l.boxName ? 'selected' : ''}>${gmEscapeHtml(b)}</option>`).join('')}
+            <option value="__new">+ صندوق جديد…</option>
           </select>
         </div>
       </div>
