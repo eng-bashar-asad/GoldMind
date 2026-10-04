@@ -113,7 +113,8 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 <div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
 <div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="cancelled-banner">
-<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm text-center font-semibold">هذه الفاتورة ملغاة ولا تُحتسب في أي تقرير</div>
+<div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm text-center font-semibold">هذه الفاتورة ملغاة ولا تُحتسب في أي تقرير
+<button type="button" id="banner-restore-btn" onclick="restoreInvoiceFlow()" class="hidden mt-2 mx-auto items-center gap-1 px-4 h-9 rounded-lg bg-white border border-red-300 text-blue-700 text-[13px]"><span class="material-symbols-outlined text-[18px]">restore</span>استعادة الفاتورة لتعديلها</button></div>
 </div>
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="profit-panel">
 <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
@@ -550,6 +551,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
                 restoreBtn.classList.remove('hidden');
                 restoreBtn.classList.add('flex');
                 window.__currentInvoiceId = invoiceId;
+                const bb = document.getElementById('banner-restore-btn'); bb.classList.remove('hidden'); bb.classList.add('flex');
             }
         } else {
             const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
