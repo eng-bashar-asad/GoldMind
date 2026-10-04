@@ -379,7 +379,8 @@
      each row has real room, not squeezed into the 2/3 form column. -->
 <section class="hidden pt-6" id="session-list-section">
 <div class="flex items-center justify-between mb-2">
-<h2 class="font-label-md text-label-md text-on-surface-variant font-semibold">القطع المضافة بهذه الجلسة (<span id="session-list-count">0</span>)</h2>
+<div><h2 class="font-label-md text-label-md text-on-surface-variant font-semibold">القطع المضافة بهذه الجلسة (<span id="session-list-count">0</span>)</h2>
+<button type="button" onclick="gmNewAddSession()" class="text-[11px] text-primary underline">سند جديد</button></div>
 <div class="text-[11px] text-on-surface-variant font-data-mono text-left">
 <div>قائم: <span class="font-bold text-on-background" id="session-total-weight">0.00</span>غ</div>
 <div>محاسبة: <span class="font-bold text-on-background" id="session-total-accounting">0.00</span>غ</div>
@@ -434,6 +435,7 @@
             loadClassificationOptions('category1', 'category1', 'صنف ١');
             loadClassificationOptions('category2', 'category2', 'صنف ٢');
             loadBoxNameOptions();
+            gmRestoreAddSession();
 
             // Loaded once here and reused for every "print" tap in the
             // session list below, instead of opening piece-label-print-ar.html
@@ -838,6 +840,33 @@
         function addToSessionList(piece) {
             sessionPieces.unshift(piece); // newest first
             renderSessionList();
+            gmSaveAddSession();
+        }
+
+        // The session (its intake voucher + the pieces added) survives opening a
+        // piece to edit it and coming back: kept in sessionStorage for this tab,
+        // up to 12 hours, until "سند جديد" is pressed.
+        const GM_ADD_SESSION_KEY = 'gm-add-session';
+        function gmSaveAddSession() {
+            try {
+                sessionStorage.setItem(GM_ADD_SESSION_KEY, JSON.stringify({ store: GOLDMIND_STORE_ID, batch: currentBatchId,
+                    ids: sessionPieces.map(p => p.id), at: Date.now() }));
+            } catch (e) { /* storage unavailable: the session just won't survive a reload */ }
+        }
+        async function gmRestoreAddSession() {
+            let saved = null;
+            try { saved = JSON.parse(sessionStorage.getItem(GM_ADD_SESSION_KEY) || 'null'); } catch (e) { saved = null; }
+            if (!saved || saved.store !== GOLDMIND_STORE_ID || !saved.ids || !saved.ids.length || Date.now() - saved.at > 12 * 3600e3) return;
+            currentBatchId = saved.batch || null;
+            const { data } = await goldmindClient.from('pieces').select('*').in('id', saved.ids).eq('store_id', GOLDMIND_STORE_ID);
+            const byId = {}; (data || []).forEach(p => { byId[p.id] = p; });
+            saved.ids.forEach(id => { if (byId[id]) sessionPieces.push(byId[id]); }); // keeps newest-first order, with any edits made meanwhile
+            renderSessionList();
+        }
+        function gmNewAddSession() {
+            if (!confirm('بدء سند إدخال جديد؟ القطع المحفوظة تبقى في المخزن، لكن القائمة هنا تبدأ من جديد.')) return;
+            try { sessionStorage.removeItem(GM_ADD_SESSION_KEY); } catch (e) { /* ignore */ }
+            sessionPieces.length = 0; currentBatchId = null; renderSessionList();
         }
 
         function renderSessionList() {
