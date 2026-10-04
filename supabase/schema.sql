@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict UQEkGE00kpkYcX0hegVFdAt36uQPCW8IhOgHAFJbInROb09veM1YI3bCzbd6uM9
+\restrict 8KVDTor0JCOsRibIvad4uvj1e4hmuLARvSrvvEWA6hqzBgg62Avwro3dMvwpHPa
 
 
 SET statement_timeout = 0;
@@ -1158,6 +1158,51 @@ $$;
 
 
 --
+-- Name: give_scrap_to_trader(uuid, integer, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_weight numeric, p_notes text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare t record; me uuid; w numeric := round(coalesce(p_weight, 0), 3); left_w numeric; take numeric;
+        cost numeric := 0; lot record; avail numeric; note text; mid uuid;
+begin
+  select id, store_id, name into t from traders where id = p_trader;
+  if t is null then raise exception 'التاجر غير موجود'; end if;
+  if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+  if w <= 0 then raise exception 'أدخل الوزن'; end if;
+  select coalesce(sum(weight_grams_remaining), 0) into avail from gold_stock_lots
+   where store_id = t.store_id and box_name = 'كسر ' || p_karat and weight_grams_remaining > 0;
+  if w > avail + 0.0005 then raise exception 'الوزن أكبر من الموجود في صندوق كسر % (% غ)', p_karat, round(avail, 3); end if;
+  select id into me from staff where user_id = auth.uid() and store_id = t.store_id limit 1;
+
+  left_w := w;
+  for lot in select l.id, l.weight_grams_remaining rem,
+                    coalesce((select sum(ii.line_total) / nullif(sum(ii.weight_grams), 0) from invoice_items ii join invoices iv on iv.id = ii.invoice_id
+                               where ii.gold_stock_lot_id = l.id and iv.type = 'buyRetail'), 0) per_g
+               from gold_stock_lots l
+              where l.store_id = t.store_id and l.box_name = 'كسر ' || p_karat and l.weight_grams_remaining > 0
+              order by l.created_at, l.id for update of l
+  loop
+    exit when left_w <= 0.0005;
+    take := least(lot.rem, left_w);
+    update gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining - take, 3) where id = lot.id;
+    cost := cost + take * lot.per_g;
+    left_w := left_w - take;
+  end loop;
+  cost := round(cost, 2);
+
+  note := format('إخراج كسر عيار %s بالكلفة: %s غ (كلفته %s)', p_karat, w, cost) || coalesce(' — ' || nullif(trim(p_notes), ''), '');
+  insert into trader_movements (store_id, trader_id, movement_type, weight_grams, accounting_weight_grams, karat,
+      gold_24k_equivalent, fab_fee_amount, source, notes, created_by)
+    values (t.store_id, t.id, 'debt_decrease', w, w, p_karat, round(w * p_karat / 24.0, 3), 0, 'scrap_given', note, me)
+    returning id into mid;
+  return jsonb_build_object('id', mid, 'cost', cost);
+end $$;
+
+
+--
 -- Name: gm_allocate_customer_credit(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1204,6 +1249,28 @@ CREATE FUNCTION public.gm_can_expense(sid uuid) RETURNS boolean
     AS $$
   select has_permission('manage_daily_cashbox', sid) or has_permission('view_profit_report', sid)
 $$;
+
+
+--
+-- Name: gm_scrap_price_at_purchase(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_scrap_price_at_purchase() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare st uuid; typ text; pr numeric;
+begin
+  if new.gold_stock_lot_id is null or new.gold_price_per_gram is not null or new.karat is null then return new; end if;
+  select store_id, type into st, typ from invoices where id = new.invoice_id;
+  if typ is distinct from 'buyRetail' then return new; end if;
+  select price_per_gram into pr from gold_prices where store_id = st and karat = new.karat;
+  if pr is null then
+    select price_per_gram * new.karat / 24.0 into pr from gold_prices where store_id = st and karat = 24;
+  end if;
+  new.gold_price_per_gram := round(pr, 2);
+  return new;
+end $$;
 
 
 --
@@ -1705,7 +1772,7 @@ declare
   it jsonb; mode text; price numeric; w numeric; k int; fee numeric; fee_vat numeric; carat numeric; ppc numeric;
   has_gold boolean;
   total numeric := 0; fab_total numeric := 0; vat_total numeric := 0;
-  new_id uuid; bc text; chk numeric;
+  new_id uuid; bc text; chk numeric; codes jsonb := '[]';
 begin
   if sid is null then raise exception 'المحل غير محدد'; end if;
   if not has_permission('create_invoice', sid) then
@@ -1782,8 +1849,11 @@ begin
 
     if mode = 'piece' then
       bc := next_piece_barcode(sid, 'gold');
-      insert into pieces (store_id, barcode, weight_grams, karat, description_ar, status, created_by)
-        values (sid, bc, w, k, it->>'description', 'available', me) returning id into new_id;
+      insert into pieces (store_id, barcode, weight_grams, karat, description_ar, status, created_by, box_name, cost_fabrication_per_gram, purchase_cost)
+        values (sid, bc, w, k, it->>'description', 'available', me, coalesce(nullif(trim(it->>'box_name'), ''), 'قطع ذهبية'),
+          case when typ = 'buyTrader' and w > 0 then round(fee / w, 2) end,
+          case when pm = 'cash' and price > 0 then price end) returning id into new_id;
+      codes := codes || to_jsonb(bc);
       insert into invoice_items (invoice_id, piece_id, barcode, karat, weight_grams, accounting_weight_grams,
           fabrication_fee, fabrication_fee_vat, line_total, description)
         values (inv_id, new_id, bc, k, w, w, fee, fee_vat, price, it->>'description');
@@ -1815,12 +1885,14 @@ begin
       bc := next_piece_barcode(sid, 'diamond');
       insert into diamond_pieces (store_id, barcode, has_gold, gold_weight_grams, gold_karat, gold_cost_fabrication_per_gram,
           diamond_carat, diamond_price_per_carat, shape, clarity, cut, color, certificate_lab, certificate_number,
-          description_ar, status, created_by)
+          description_ar, status, created_by, box_name)
         values (sid, bc, has_gold, w, k, nullif(it->>'gold_fab_cost','')::numeric,
           nullif(it->>'diamond_carat','')::numeric, nullif(it->>'diamond_price_per_carat','')::numeric,
           nullif(it->>'shape',''), nullif(it->>'clarity',''), nullif(it->>'cut',''), nullif(it->>'color',''),
-          nullif(it->>'cert_lab',''), nullif(it->>'cert_number',''), it->>'description', 'available', me)
+          nullif(it->>'cert_lab',''), nullif(it->>'cert_number',''), it->>'description', 'available', me,
+          coalesce(nullif(trim(it->>'box_name'), ''), 'قطع ألماسية'))
         returning id into new_id;
+      codes := codes || to_jsonb(bc);
       insert into invoice_items (invoice_id, diamond_piece_id, barcode, karat, weight_grams, accounting_weight_grams,
           fabrication_fee, line_total, description)
         values (inv_id, new_id, bc, k, w, w, 0, price, it->>'description');
@@ -1846,7 +1918,7 @@ begin
   select coalesce(sum(line_total), 0) into chk from invoice_items where invoice_id = inv_id;
   if abs(chk - total) > 0.01 then raise exception 'فحص محاسبي فشل: مجموع السطور % ≠ الإجمالي %', chk, total; end if;
 
-  return jsonb_build_object('id', inv_id, 'invoice_number', inv_no, 'total', total, 'duplicate', false);
+  return jsonb_build_object('id', inv_id, 'invoice_number', inv_no, 'total', total, 'duplicate', false, 'barcodes', codes);
 exception when unique_violation then
   if ref is not null then
     select id, invoice_number into ex from invoices where client_ref = ref and store_id = sid;
@@ -2587,6 +2659,108 @@ $$;
 
 
 --
+-- Name: rfid_device_done(text, uuid, boolean, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.rfid_device_done(p_key text, p_job uuid, p_ok boolean, p_msg text DEFAULT NULL::text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare st uuid; j record;
+begin
+  select id into st from stores where rfid_device_key is not null and length(p_key) >= 12 and rfid_device_key = upper(trim(p_key));
+  if st is null then raise exception 'رمز الربط غير صحيح'; end if;
+  select * into j from rfid_write_jobs where id = p_job and store_id = st and status in ('pending','working');
+  if j.id is null then return; end if;
+  update rfid_write_jobs set status = case when p_ok then 'done' else 'failed' end, message = left(p_msg, 300), done_at = now() where id = j.id;
+  if p_ok then update pieces set rfid_epc = j.epc, rfid_encoded_at = now() where id = j.piece_id and store_id = st; end if;
+end $$;
+
+
+--
+-- Name: rfid_device_hello(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.rfid_device_hello(p_key text) RETURNS jsonb
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select jsonb_build_object('store', name, 'prefix', upper(substr(replace(id::text, '-', ''), 1, 8)))
+    from stores where rfid_device_key is not null and length(p_key) >= 12 and rfid_device_key = upper(trim(p_key));
+$$;
+
+
+--
+-- Name: rfid_device_key_reset(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.rfid_device_key_reset(p_store uuid) RETURNS text
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare k text;
+begin
+  if not has_permission('edit_piece', p_store) then raise exception 'ليس لديك صلاحية' using errcode = '42501'; end if;
+  k := upper(substr(replace(gen_random_uuid()::text, '-', ''), 1, 12));
+  update stores set rfid_device_key = k where id = p_store;
+  return k;
+end $$;
+
+
+--
+-- Name: rfid_device_next(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.rfid_device_next(p_key text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare st uuid; j record;
+begin
+  select id into st from stores where rfid_device_key is not null and length(p_key) >= 12 and rfid_device_key = upper(trim(p_key));
+  if st is null then raise exception 'رمز الربط غير صحيح'; end if;
+  update rfid_write_jobs set status = 'cancelled', message = 'انتهت المهلة'
+   where store_id = st and status in ('pending','working') and created_at < now() - interval '5 minutes';
+  select * into j from rfid_write_jobs where store_id = st and status = 'pending' order by created_at limit 1 for update skip locked;
+  if j.id is null then return null; end if;
+  update rfid_write_jobs set status = 'working' where id = j.id;
+  return jsonb_build_object('id', j.id, 'barcode', j.barcode, 'epc', j.epc);
+end $$;
+
+
+--
+-- Name: sale_invoice_change_customer(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare inv record; newc record; oldname text; rem numeric; me uuid;
+begin
+  select * into inv from invoices where id = p_invoice for update;
+  if inv is null then raise exception 'الفاتورة غير موجودة'; end if;
+  if not has_permission('edit_invoice', inv.store_id) then raise exception 'ليس لديك صلاحية تعديل الفواتير' using errcode = '42501'; end if;
+  if inv.type <> 'sale' or inv.status = 'cancelled' then raise exception 'يمكن تغيير الزبون لفواتير البيع غير الملغاة فقط'; end if;
+  select id, name into newc from customers where id = p_customer and store_id = inv.store_id;
+  if newc is null then raise exception 'الزبون غير موجود'; end if;
+  if inv.customer_id = newc.id then return; end if;
+  select name into oldname from customers where id = inv.customer_id;
+  select id into me from staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
+  rem := round(inv.total_amount - coalesce(inv.amount_paid, 0), 2);
+  update invoices set customer_id = newc.id where id = inv.id;
+  if rem > 0.009 and inv.customer_id is not null then
+    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+    values (inv.store_id, inv.customer_id, inv.id, 'debt_decrease', rem, 0, 'نقل دين الفاتورة ' || inv.invoice_number || ' إلى ' || newc.name, 'invoice_edit', me);
+  end if;
+  if rem > 0.009 then
+    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+    values (inv.store_id, newc.id, inv.id, 'debt_increase', rem, 0, 'دين الفاتورة ' || inv.invoice_number || ' منقول من ' || coalesce(oldname, 'زبون سابق'), 'invoice_edit', me);
+  end if;
+end $$;
+
+
+--
 -- Name: save_expense_category(uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2736,6 +2910,75 @@ begin
       created_by, cost_fabrication_per_gram, description_ar, piece_type, category1, category2)
     values (pt.store_id, bc, nullif(ln->>'photo_url', ''), wt, aw, k, coalesce(nullif(ln->>'color', ''), 'Gold'), 'available',
       actor, fab, nullif(ln->>'description_ar', ''), nullif(ln->>'piece_type', ''), nullif(ln->>'category1', ''), nullif(ln->>'category2', ''))
+    returning id into newid;
+    select price_per_gram into gp from public.gold_prices where store_id = pt.store_id and karat = k;
+    insert into public.stock_voucher_lines (voucher_id, store_id, party_id, direction, piece_id, barcode, karat,
+      weight_grams, accounting_weight_grams, fab_per_gram, gold_price_per_gram, cost_value)
+    values (vid, pt.store_id, pt.id, 'in', newid, bc, k, wt, aw, fab, gp, round(aw * (coalesce(gp, 0) + fab), 2));
+    insert into public.piece_movements (store_id, piece_id, event_type, note, created_by)
+    values (pt.store_id, newid, 'stock_in', 'قطعة جديدة بالسند ' || num || ' من ' || pt.name, actor);
+    cnt := cnt + 1;
+  end loop;
+
+  if cnt = 0 then raise exception 'لا توجد أي قطعة في السند'; end if;
+  return vid;
+end;
+$$;
+
+
+--
+-- Name: stock_in_from_party(uuid, uuid[], jsonb, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  pt record; actor uuid; vid uuid; num text; pc record; ln jsonb; gp numeric;
+  k int; wt numeric; aw numeric; fab numeric; bc text; newid uuid; cnt int := 0; rbox text := nullif(trim(p_return_box), '');
+begin
+  select * into pt from public.stock_parties where id = target_party_id;
+  if pt is null then raise exception 'الجهة غير موجودة'; end if;
+  if not public.has_permission('stock_transfers', pt.store_id) then
+    raise exception 'ليس لديك صلاحية إخراج/إدخال البضاعة' using errcode = '42501';
+  end if;
+  select id into actor from public.staff where user_id = auth.uid() and store_id = pt.store_id limit 1;
+
+  perform 1 from public.stores where id = pt.store_id for update;
+  num := 'IN-' || lpad((select count(*) + 1 from public.stock_vouchers where store_id = pt.store_id and direction = 'in')::text, 5, '0');
+  insert into public.stock_vouchers (store_id, party_id, direction, voucher_number, notes, created_by)
+  values (pt.store_id, pt.id, 'in', num, nullif(trim(p_notes), ''), actor) returning id into vid;
+
+  for pc in select * from public.pieces where id = any(coalesce(return_piece_ids, '{}')) for update loop
+    if pc.store_id <> pt.store_id then raise exception 'قطعة تابعة لشركة أخرى'; end if;
+    if pc.status not in ('in_box', 'at_intermediary') then raise exception 'القطعة % ليست لدى جهة (حالتها: %)', pc.barcode, pc.status; end if;
+    select price_per_gram into gp from public.gold_prices where store_id = pc.store_id and karat = pc.karat;
+    aw := coalesce(pc.accounting_weight_grams, pc.weight_grams, 0);
+    insert into public.stock_voucher_lines (voucher_id, store_id, party_id, direction, piece_id, barcode, karat,
+      weight_grams, accounting_weight_grams, fab_per_gram, gold_price_per_gram, cost_value)
+    values (vid, pc.store_id, pt.id, 'in', pc.id, pc.barcode, pc.karat, pc.weight_grams, aw,
+      coalesce(pc.cost_fabrication_per_gram, 0), gp, round(aw * (coalesce(gp, 0) + coalesce(pc.cost_fabrication_per_gram, 0)), 2));
+    update public.pieces set status = 'available', box_name = coalesce(rbox, box_name) where id = pc.id;
+    insert into public.piece_movements (store_id, piece_id, event_type, note, created_by)
+    values (pc.store_id, pc.id, 'stock_in', 'رجوع بالسند ' || num || ' من ' || pt.name || coalesce(' إلى صندوق ' || rbox, ''), actor);
+    cnt := cnt + 1;
+  end loop;
+
+  for ln in select * from jsonb_array_elements(coalesce(new_lines, '[]'::jsonb)) loop
+    k := (ln->>'karat')::int;
+    wt := (ln->>'weight')::numeric;
+    aw := coalesce(nullif(ln->>'acc_weight', '')::numeric, wt);
+    fab := coalesce(nullif(ln->>'fab_per_gram', '')::numeric, 0);
+    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if wt is null or wt <= 0 or aw <= 0 or fab < 0 then raise exception 'وزن أو مصنعية غير صحيحة'; end if;
+    if nullif(trim(ln->>'box_name'), '') is null then raise exception 'اختر الصندوق لكل قطعة جديدة'; end if;
+    bc := public.next_piece_barcode(pt.store_id, 'gold');
+    insert into public.pieces (store_id, barcode, photo_url, weight_grams, accounting_weight_grams, karat, color, status,
+      created_by, cost_fabrication_per_gram, description_ar, piece_type, category1, category2, box_name)
+    values (pt.store_id, bc, nullif(ln->>'photo_url', ''), wt, aw, k, coalesce(nullif(ln->>'color', ''), 'Gold'), 'available',
+      actor, fab, nullif(ln->>'description_ar', ''), nullif(ln->>'piece_type', ''), nullif(ln->>'category1', ''), nullif(ln->>'category2', ''),
+      trim(ln->>'box_name'))
     returning id into newid;
     select price_per_gram into gp from public.gold_prices where store_id = pt.store_id and karat = k;
     insert into public.stock_voucher_lines (voucher_id, store_id, party_id, direction, piece_id, barcode, karat,
@@ -2920,6 +3163,58 @@ begin
     (t.store_id, t.id, case when p_direction = 'we_owe_gold' then 'debt_decrease' else 'debt_increase' end, w, k, g24, 0, 'gold_to_cash', note, ref, me),
     (t.store_id, t.id, case when p_direction = 'we_owe_gold' then 'debt_increase' else 'debt_decrease' end, 0, null, 0, cash, 'gold_to_cash', note, ref, me);
   return cash;
+end $$;
+
+
+--
+-- Name: trader_receive_stock(uuid, jsonb, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, p_vat_rate numeric DEFAULT 0, p_batch_ref text DEFAULT NULL::text, p_notes text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare t record; me uuid; ln jsonb; k int; wt numeric; aw numeric; fab numeric; kind text; bc text; pid uuid; lid uuid;
+        bid uuid := case when jsonb_array_length(coalesce(p_lines, '[]')) > 1 then gen_random_uuid() end;
+        codes jsonb := '[]'; vat numeric := coalesce(p_vat_rate, 0);
+begin
+  select id, store_id, name into t from traders where id = p_trader;
+  if t is null then raise exception 'التاجر غير موجود'; end if;
+  if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+  if jsonb_array_length(coalesce(p_lines, '[]')) = 0 then raise exception 'أضف سطراً واحداً على الأقل'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = t.store_id limit 1;
+
+  for ln in select * from jsonb_array_elements(p_lines) loop
+    k := (ln->>'karat')::int; wt := (ln->>'weight')::numeric;
+    aw := coalesce(nullif(ln->>'acc_weight', '')::numeric, wt); fab := coalesce(nullif(ln->>'fab_per_gram', '')::numeric, 0);
+    kind := coalesce(ln->>'kind', 'piece');
+    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if wt is null or wt <= 0 or aw <= 0 or fab < 0 then raise exception 'وزن أو مصنعية غير صحيحة'; end if;
+    pid := null; lid := null;
+    if kind = 'piece' then
+      if nullif(trim(ln->>'box_name'), '') is null then raise exception 'اختر الصندوق لكل قطعة'; end if;
+      bc := next_piece_barcode(t.store_id, 'gold');
+      insert into pieces (store_id, barcode, weight_grams, accounting_weight_grams, karat, color, status, created_by,
+        cost_fabrication_per_gram, description_ar, box_name)
+      values (t.store_id, bc, wt, aw, k, 'Gold', 'available', me, fab, nullif(trim(ln->>'description_ar'), ''), trim(ln->>'box_name'))
+      returning id into pid;
+      insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+      values (t.store_id, pid, 'stock_in', 'استلام من التاجر ' || t.name, me);
+      codes := codes || to_jsonb(bc);
+    elsif kind = 'bulk' then
+      insert into gold_stock_lots (store_id, karat, weight_grams_total, weight_grams_remaining, cost_fabrication_per_gram, trader_id, notes, created_by, box_name)
+      values (t.store_id, k, wt, wt, fab, t.id, 'استلام بالجملة من التاجر ' || t.name, me, nullif(trim(ln->>'box_name'), ''))
+      returning id into lid;
+    else raise exception 'نوع سطر غير معروف';
+    end if;
+    insert into trader_movements (store_id, trader_id, movement_type, weight_grams, karat, gold_24k_equivalent, accounting_weight_grams,
+      fab_fee_per_gram, fab_fee_amount, source, batch_id, batch_ref, notes, created_by, piece_id, gold_stock_lot_id)
+    values (t.store_id, t.id, 'debt_increase', wt, k, round(aw * k / 24.0, 3), aw, fab, round(aw * fab * (1 + vat / 100), 2),
+      'stock_received', bid, nullif(trim(p_batch_ref), ''),
+      coalesce(nullif(trim(p_notes), ''), 'استلام بضاعة من التاجر') || case when bc is not null and kind = 'piece' then ' — باركود ' || bc else ' — وزن بالجملة' end,
+      me, pid, lid);
+  end loop;
+  return jsonb_build_object('barcodes', codes);
 end $$;
 
 
@@ -3799,6 +4094,7 @@ CREATE TABLE public.pieces (
     accent_diamond_price_per_carat numeric,
     center_stone_carat numeric,
     center_stone_price_per_carat numeric,
+    purchase_cost numeric,
     CONSTRAINT pieces_karat_check CHECK ((karat = ANY (ARRAY[18, 21, 22, 24])))
 );
 
@@ -3914,6 +4210,26 @@ CREATE TABLE public.repair_tickets (
     notes text,
     created_at timestamp with time zone DEFAULT now(),
     CONSTRAINT repair_tickets_status_check CHECK ((status = ANY (ARRAY['received'::text, 'in_progress'::text, 'ready'::text, 'delivered'::text, 'cancelled'::text])))
+);
+
+
+--
+-- Name: rfid_write_jobs; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.rfid_write_jobs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    store_id uuid NOT NULL,
+    piece_id uuid NOT NULL,
+    barcode text NOT NULL,
+    epc text NOT NULL,
+    status text DEFAULT 'pending'::text NOT NULL,
+    message text,
+    created_by uuid DEFAULT auth.uid(),
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    done_at timestamp with time zone,
+    CONSTRAINT rfid_write_jobs_epc_check CHECK ((epc ~ '^[0-9A-F]{24}$'::text)),
+    CONSTRAINT rfid_write_jobs_status_check CHECK ((status = ANY (ARRAY['pending'::text, 'working'::text, 'done'::text, 'failed'::text, 'cancelled'::text])))
 );
 
 
@@ -4132,6 +4448,7 @@ CREATE TABLE public.stores (
     zebra_barcode_module_width numeric DEFAULT 1 NOT NULL,
     address_en text,
     allow_biometric_login boolean DEFAULT true NOT NULL,
+    rfid_device_key text,
     CONSTRAINT invoice_print_frame_check CHECK ((invoice_print_frame = ANY (ARRAY['classic'::text, 'gold'::text, 'double'::text, 'dashed'::text, 'none'::text]))),
     CONSTRAINT invoice_print_shape_check CHECK ((invoice_print_shape = ANY (ARRAY['square'::text, 'soft'::text, 'round'::text])))
 );
@@ -4254,7 +4571,9 @@ CREATE TABLE public.trader_movements (
     batch_id uuid,
     batch_ref text,
     cost_fab_per_gram numeric,
-    CONSTRAINT trader_movements_source_check CHECK ((source = ANY (ARRAY['settlement'::text, 'stock_given'::text, 'stock_received'::text, 'opening_balance'::text])))
+    sale_cost numeric,
+    gold_stock_lot_id uuid,
+    CONSTRAINT trader_movements_source_check CHECK ((source = ANY (ARRAY['settlement'::text, 'stock_given'::text, 'stock_received'::text, 'opening_balance'::text, 'cash_out'::text, 'cash_in'::text, 'gold_to_cash'::text, 'scrap_given'::text])))
 );
 
 
@@ -4736,6 +5055,14 @@ ALTER TABLE ONLY public.repair_tickets
 
 
 --
+-- Name: rfid_write_jobs rfid_write_jobs_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rfid_write_jobs
+    ADD CONSTRAINT rfid_write_jobs_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: staff staff_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5055,6 +5382,13 @@ CREATE UNIQUE INDEX pieces_rfid_epc_unique ON public.pieces USING btree (rfid_ep
 
 
 --
+-- Name: rfid_write_jobs_pending; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX rfid_write_jobs_pending ON public.rfid_write_jobs USING btree (store_id, created_at) WHERE (status = ANY (ARRAY['pending'::text, 'working'::text]));
+
+
+--
 -- Name: staff_presence_store_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5185,6 +5519,13 @@ CREATE TRIGGER trg_invoices_currency_guard BEFORE INSERT ON public.invoices FOR 
 --
 
 CREATE TRIGGER trg_mirror_invoice_cash_to_daily AFTER INSERT ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION public.mirror_invoice_cash_to_daily();
+
+
+--
+-- Name: invoice_items trg_scrap_price_at_purchase; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_scrap_price_at_purchase BEFORE INSERT ON public.invoice_items FOR EACH ROW EXECUTE FUNCTION public.gm_scrap_price_at_purchase();
 
 
 --
@@ -5920,6 +6261,22 @@ ALTER TABLE ONLY public.repair_tickets
 
 
 --
+-- Name: rfid_write_jobs rfid_write_jobs_piece_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rfid_write_jobs
+    ADD CONSTRAINT rfid_write_jobs_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id);
+
+
+--
+-- Name: rfid_write_jobs rfid_write_jobs_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.rfid_write_jobs
+    ADD CONSTRAINT rfid_write_jobs_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+
+
+--
 -- Name: staff_presence staff_presence_staff_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6109,6 +6466,14 @@ ALTER TABLE ONLY public.support_requests
 
 ALTER TABLE ONLY public.trader_movements
     ADD CONSTRAINT trader_movements_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.staff(id);
+
+
+--
+-- Name: trader_movements trader_movements_gold_stock_lot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trader_movements
+    ADD CONSTRAINT trader_movements_gold_stock_lot_id_fkey FOREIGN KEY (gold_stock_lot_id) REFERENCES public.gold_stock_lots(id);
 
 
 --
@@ -6894,6 +7259,33 @@ CREATE POLICY "restrict delete_piece on diamond_pieces" ON public.diamond_pieces
 
 
 --
+-- Name: rfid_write_jobs rfid_jobs_insert; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY rfid_jobs_insert ON public.rfid_write_jobs FOR INSERT WITH CHECK (public.has_permission('edit_piece'::text, store_id));
+
+
+--
+-- Name: rfid_write_jobs rfid_jobs_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY rfid_jobs_select ON public.rfid_write_jobs FOR SELECT USING (public.is_store_member(store_id));
+
+
+--
+-- Name: rfid_write_jobs rfid_jobs_update; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY rfid_jobs_update ON public.rfid_write_jobs FOR UPDATE USING (public.has_permission('edit_piece'::text, store_id));
+
+
+--
+-- Name: rfid_write_jobs; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.rfid_write_jobs ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: inventory_count_expected run_inventory_count can insert expected snapshot; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -7519,6 +7911,15 @@ GRANT ALL ON FUNCTION public.gift_out_piece(target_piece_id uuid, p_recipient te
 
 
 --
+-- Name: FUNCTION give_scrap_to_trader(p_trader uuid, p_karat integer, p_weight numeric, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_weight numeric, p_notes text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_weight numeric, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_weight numeric, p_notes text) TO service_role;
+
+
+--
 -- Name: FUNCTION gm_allocate_customer_credit(sid uuid, cust uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -7534,6 +7935,15 @@ GRANT ALL ON FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) TO
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO anon;
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_scrap_price_at_purchase(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO anon;
+GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO service_role;
 
 
 --
@@ -7825,6 +8235,51 @@ GRANT ALL ON FUNCTION public.revert_gift(target_gift_id uuid) TO service_role;
 
 
 --
+-- Name: FUNCTION rfid_device_done(p_key text, p_job uuid, p_ok boolean, p_msg text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.rfid_device_done(p_key text, p_job uuid, p_ok boolean, p_msg text) TO anon;
+GRANT ALL ON FUNCTION public.rfid_device_done(p_key text, p_job uuid, p_ok boolean, p_msg text) TO authenticated;
+GRANT ALL ON FUNCTION public.rfid_device_done(p_key text, p_job uuid, p_ok boolean, p_msg text) TO service_role;
+
+
+--
+-- Name: FUNCTION rfid_device_hello(p_key text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.rfid_device_hello(p_key text) TO anon;
+GRANT ALL ON FUNCTION public.rfid_device_hello(p_key text) TO authenticated;
+GRANT ALL ON FUNCTION public.rfid_device_hello(p_key text) TO service_role;
+
+
+--
+-- Name: FUNCTION rfid_device_key_reset(p_store uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.rfid_device_key_reset(p_store uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.rfid_device_key_reset(p_store uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.rfid_device_key_reset(p_store uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION rfid_device_next(p_key text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.rfid_device_next(p_key text) TO anon;
+GRANT ALL ON FUNCTION public.rfid_device_next(p_key text) TO authenticated;
+GRANT ALL ON FUNCTION public.rfid_device_next(p_key text) TO service_role;
+
+
+--
+-- Name: FUNCTION sale_invoice_change_customer(p_invoice uuid, p_customer uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION save_expense_category(p_store uuid, p_name text, p_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -7867,6 +8322,15 @@ GRANT ALL ON FUNCTION public.staff_heartbeat(p_store uuid, p_page text) TO servi
 REVOKE ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text) TO authenticated;
+GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text) TO service_role;
 
 
 --
@@ -7920,6 +8384,15 @@ GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p
 GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO anon;
 GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION trader_receive_stock(p_trader uuid, p_lines jsonb, p_vat_rate numeric, p_batch_ref text, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, p_vat_rate numeric, p_batch_ref text, p_notes text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, p_vat_rate numeric, p_batch_ref text, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, p_vat_rate numeric, p_batch_ref text, p_notes text) TO service_role;
 
 
 --
@@ -8385,6 +8858,15 @@ GRANT ALL ON TABLE public.repair_tickets TO service_role;
 
 
 --
+-- Name: TABLE rfid_write_jobs; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.rfid_write_jobs TO anon;
+GRANT ALL ON TABLE public.rfid_write_jobs TO authenticated;
+GRANT ALL ON TABLE public.rfid_write_jobs TO service_role;
+
+
+--
 -- Name: TABLE staff; Type: ACL; Schema: public; Owner: -
 --
 
@@ -8573,5 +9055,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict UQEkGE00kpkYcX0hegVFdAt36uQPCW8IhOgHAFJbInROb09veM1YI3bCzbd6uM9
+\unrestrict 8KVDTor0JCOsRibIvad4uvj1e4hmuLARvSrvvEWA6hqzBgg62Avwro3dMvwpHPa
 
