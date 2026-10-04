@@ -117,3 +117,22 @@ test('customer payment goes through the server function (cashbox + invoices)', a
   expect(JSON.parse(calls.find(c => c.name === 'record_customer_payment').body)).toMatchObject({ p_customer: 'cu1', p_amount: 3900, p_method: 'cash' });
   expect(calls.some(c => c.method === 'POST' && c.name === 'cash_movements')).toBe(false);
 });
+
+test('discount on a customer debt goes through the server function, no cash', async ({ page }) => {
+  const calls = await install(page, {
+    db: base({ customers: [{ id: 'cu1', store_id: STORE, name: 'ريما شالاتي', phone: '0999' }],
+      customer_debts: [{ id: 'm1', store_id: STORE, customer_id: 'cu1', movement_type: 'debt_increase', cash_amount: 5000, gold_grams_24k: 0, created_at: '2026-09-28T10:00:00Z' }],
+      customer_phones: [], company_kyc_documents: [] }),
+    rpc: { customer_debt_discount: () => ({ body: { ok: true } }) }
+  });
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await page.goto('/customer-debts-ar.html');
+  await expect(page.locator('#customers-list')).toContainText('ريما شالاتي');
+  await page.evaluate(() => showCustomerDetail('cu1'));
+  await page.evaluate(() => toggleDiscountForm());
+  await page.fill('#discount-amount', '2000');
+  await page.click('#discount-btn');
+  await expect.poll(() => calls.some(c => c.name === 'customer_debt_discount')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'customer_debt_discount').body)).toMatchObject({ p_customer: 'cu1', p_amount: 2000 });
+  expect(calls.some(c => c.method === 'POST' && c.name === 'cash_movements')).toBe(false);
+});

@@ -1,0 +1,3 @@
+-- Applied via execute_sql: customer_debt_discount(p_customer, p_amount, p_notes) — balance-only
+-- debt_decrease with source 'discount' (perm edit_customers, capped at the customer's debt).
+-- The allocation trigger settles the oldest open invoices; profit/financial reports deduct it.

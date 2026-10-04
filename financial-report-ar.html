@@ -277,14 +277,15 @@ async function build(from, to) {
   // scrap bought below the shop's gold price at that moment = profit (report only, not cash)
   const scrapProfit = buyItems.filter(it => invType[it.invoice_id] === 'buyRetail' && it.gold_stock_lot_id && it.gold_price_per_gram != null)
     .reduce((a, it) => a + (Number(it.weight_grams) || 0) * Number(it.gold_price_per_gram) - (Number(it.line_total) || 0), 0);
-  const netProfit = P.profit + scrapProfit - expTotal;
+  const discTotal = cdebtR.data.filter(m => m.source === 'discount').reduce((a, m) => a + Number(m.cash_amount || 0), 0);
+  const netProfit = P.profit + scrapProfit - expTotal - discTotal;
   let h = '';
   // profit line: sales → profit − expenses = net. Purchases are their own item
   // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
   const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px]" style="color:#6B6150;">${t[4]}</div>` : ''}</div>`;
   const tiles = FR.canProfit
     ? [['صافي المبيعات', money(netSales), ''], ['ربح المبيعات', money(P.profit), cls(P.profit)],
-       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], [scrapProfit ? 'صافي الربح = ربح المبيعات + ربح الكسر − المصاريف' : 'صافي الربح = ربح المبيعات − المصاريف', money(netProfit), cls(netProfit)]]
+       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات' + (scrapProfit ? ' + ربح الكسر' : '') + ' − المصاريف' + (discTotal ? ' − خصومات الديون' : ''), money(netProfit), cls(netProfit)]]
     : [['صافي المبيعات', money(netSales), ''], ['المصاريف', money(expTotal), '']];
   tiles.push(['المشتريات', money(buysTotal), '', 'col-span-2', 'بند مستقل — لا تُخصم من الربح (شراء ذهب يدخل المخزن)']);
   h += `<div class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
@@ -310,6 +311,7 @@ async function build(from, to) {
       ${row('ربح المبيعات', `<span class="${cls(P.profit)}">${money(P.profit)}</span>`, ' class="tot"')}
       ${scrapProfit ? row('ربح شراء الكسر (فرق السعر عن سعر البرنامج — لا يدخل الصندوق)', `<span class="${cls(scrapProfit)}">${money(scrapProfit)}</span>`) : ''}
       ${row('المصاريف', money(-expTotal))}
+      ${discTotal ? row('خصومات على ديون الزبائن', money(-discTotal)) : ''}
       ${row('صافي الربح', `<span class="${cls(netProfit)}">${money(netProfit)}</span>`, ' class="tot"')}
     </table>`, P.estimated ? `تنبيه: ${P.estimated} سطر قديم بلا سعر ذهب محفوظ — حُسب بسعر اليوم تقديرياً.` : 'نفس طريقة تقرير الأرباح بالضبط.');
   }

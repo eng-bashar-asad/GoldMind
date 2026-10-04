@@ -250,7 +250,7 @@ async function applyFilters() {
   document.getElementById('pr-sections').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-6">جارِ الحساب...</p>';
   document.getElementById('items-tbody').innerHTML = '';
 
-  const [invRes, tmRes, staffRes, expRes, stockRes, lotsRes] = await Promise.all([
+  const [invRes, tmRes, staffRes, expRes, stockRes, lotsRes, discRes] = await Promise.all([
     gmFetchAllRows(() => goldmindClient.from('invoices').select('id, invoice_number, created_at, type, created_by, total_amount')
       .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return', 'buyRetail', 'buyTrader']).neq('status', 'cancelled')
       .gte('created_at', range.from).lt('created_at', range.to).order('created_at', { ascending: false })),
@@ -261,7 +261,9 @@ async function applyFilters() {
     gmFetchAllRows(() => goldmindClient.from('expense_entries').select('amount').eq('store_id', GOLDMIND_STORE_ID)
       .gte('created_at', range.from).lt('created_at', range.to)),
     gmFetchAllRows(() => goldmindClient.from('pieces').select('weight_grams, accounting_weight_grams').eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved'])),
-    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('store_id', GOLDMIND_STORE_ID)
+    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('store_id', GOLDMIND_STORE_ID),
+    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('cash_amount').eq('store_id', GOLDMIND_STORE_ID).eq('source', 'discount')
+      .gte('created_at', range.from).lt('created_at', range.to))
   ]);
   const err = invRes.error || tmRes.error;
   if (err) { document.getElementById('pr-sections').innerHTML = `<p class="text-error text-sm">تعذّر التحميل: ${escH(err.message)}</p>`; return; }
@@ -358,13 +360,16 @@ async function applyFilters() {
   ((lotsRes && lotsRes.data) || []).forEach(l => { const w = Number(l.weight_grams_remaining) || 0; stock.gross += w; stock.acc += w; });
   const scrapT = kTot(scrap), inT = kTot(fromTraders);
   const scrapOut = moves.filter(m => m.source === 'scrap_given').reduce((a, m) => ({ gross: a.gross + (Number(m.weight_grams) || 0), acc: a.acc + (Number(m.accounting_weight_grams != null ? m.accounting_weight_grams : m.weight_grams) || 0) }), { gross: 0, acc: 0 });
-  const shopProfit = retail.profit + ws.profit + scrapProfit.amount - expensesTotal;
+  // discounts given on customers' debts: money the shop gave up, so less profit
+  const discountsTotal = ((discRes && discRes.data) || []).reduce((a, d) => a + (Number(d.cash_amount) || 0), 0);
+  const shopProfit = retail.profit + ws.profit + scrapProfit.amount - expensesTotal - discountsTotal;
   const brief = [
     ['مبيعات الزبائن', W.gross, W.acc, retail.revenue],
     ['ربح مبيعات الزبائن', null, null, retail.profit],
     ['ربح شراء الكسر', null, null, scrapProfit.amount],
     ['مشتريات الكسر', scrapT.gross, scrapT.acc, scrapPaid],
     ['المصاريف', null, null, expensesTotal],
+    ['خصومات على ديون الزبائن', null, null, discountsTotal],
     ['إدخال بضاعة من التجار', inT.gross, inT.acc, inFee],
     ['إخراج بضاعة للتجار', ws.gross, ws.acc, ws.fee],
     ['إخراج كسر للتجار بالكلفة', scrapOut.gross, scrapOut.acc, null],
@@ -392,6 +397,7 @@ async function applyFilters() {
         ${ws.fee ? line('ربح الجملة (مصنعية التجار)', null, null, ws.profit, green) : ''}
         ${scrapProfit.priced ? line('ربح شراء الكسر', null, null, scrapProfit.amount, scrapProfit.amount >= 0 ? green : red) : ''}
         ${line('المصاريف (تُخصم من الربح)', null, null, expensesTotal, red)}
+        ${discountsTotal ? line('خصومات على ديون الزبائن (تُخصم من الربح)', null, null, discountsTotal, red) : ''}
         ${line('صافي ربح المحل', null, null, shopProfit, 'background:#D7EBD2;color:#14532d;font-size:17px;')}
         ${group('٢) حركة الذهب (لا تدخل في حساب الربح)')}
         ${line('مشتريات الكسر', scrapT.gross, scrapT.acc, scrapPaid)}
@@ -402,8 +408,8 @@ async function applyFilters() {
         ${line('وزن البضاعة بالمحل الآن', stock.gross, stock.acc, null)}
       </tbody></table>
     <p style="padding:10px 12px;font-size:13px;line-height:1.7;color:#3b3325;">
-      <b>صافي ربح المحل</b> = ربح مبيعات الزبائن${ws.fee ? ' + ربح الجملة' : ''}${scrapProfit.priced ? ' + ربح شراء الكسر' : ''} − المصاريف
-      <span dir="ltr" style="display:block;text-align:right;font-weight:800;font-size:14px;margin:4px 0;white-space:nowrap;overflow-x:auto;">${nf(shopProfit, 2)} = ${nf(expensesTotal, 2)} − ${scrapProfit.priced ? nf(scrapProfit.amount, 2) + ' + ' : ''}${ws.fee ? nf(ws.profit, 2) + ' + ' : ''}${nf(retail.profit, 2)}</span>
+      <b>صافي ربح المحل</b> = ربح مبيعات الزبائن${ws.fee ? ' + ربح الجملة' : ''}${scrapProfit.priced ? ' + ربح شراء الكسر' : ''} − المصاريف${discountsTotal ? ' − خصومات الديون' : ''}
+      <span dir="ltr" style="display:block;text-align:right;font-weight:800;font-size:14px;margin:4px 0;white-space:nowrap;overflow-x:auto;">${nf(shopProfit, 2)} = ${discountsTotal ? nf(discountsTotal, 2) + ' − ' : ''}${nf(expensesTotal, 2)} − ${scrapProfit.priced ? nf(scrapProfit.amount, 2) + ' + ' : ''}${ws.fee ? nf(ws.profit, 2) + ' + ' : ''}${nf(retail.profit, 2)}</span>
       مشتريات الكسر والبضاعة من التجار ذهب يدخل المخزن، وليست مصروفاً، فلا تُخصم من الربح. مبلغ "إدخال بضاعة من التجار" هو المصنعية المستحقة لهم.
       ${scrapProfit.priced || scrapProfit.unpriced ? '<br><b>ربح شراء الكسر</b> = الوزن × سعر الغرام المعيّر بالبرنامج لحظة الشراء − المبلغ المدفوع. يظهر بالتقارير فقط ولا يدخل الصندوق.' + (scrapProfit.unpriced ? ' (' + scrapProfit.unpriced + ' شراء قديم بلا سعر محفوظ لم يُحسب ربحه.)' : '') : ''}</p></div>`;
 

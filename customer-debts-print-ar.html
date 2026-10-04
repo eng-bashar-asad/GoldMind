@@ -94,6 +94,7 @@ const day = t => gmFormatDateTime(t, { day: '2-digit', month: '2-digit', year: '
 const signed = v => Math.abs(v) < 0.005 ? '0.00' : (v < 0 ? '-' : '') + fmt(Math.abs(v));
 const DEBT_LABEL = m => {
   if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
+  if (m.source === 'discount') return 'خصم على الدين' + (m.notes && m.notes !== 'خصم على الدين' ? ' — ' + m.notes : '');
   if (m.source === 'deposit') return m.notes || 'عربون';
   if (m.source === 'deposit_refund') return m.notes || 'استرجاع عربون';
   if (m.movement_type === 'debt_decrease') return 'دفعة من العميل' + (m.notes && m.notes !== 'دفعة يدوية' && m.notes !== 'دفعة من العميل' ? ' — ' + m.notes : '');
