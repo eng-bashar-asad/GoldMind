@@ -10,7 +10,7 @@ const GOLDMIND_SUPABASE_KEY = 'sb_publishable_QxjJeGblzseQTvTH87eyZw_19Zu206o';
 const GOLDMIND_COUNTRY_PHONE_MAP = {
     'AE': '971', 'SA': '966', 'KW': '965', 'QA': '974', 'BH': '973',
     'OM': '968', 'EG': '20', 'JO': '962', 'LB': '961', 'IQ': '964',
-    'SY': '963', 'US': '1'
+    'SY': '963', 'TR': '90', 'US': '1'
 };
 const GOLDMIND_DEFAULT_PHONE_CODE = '971'; // fallback if store has no country set
 
