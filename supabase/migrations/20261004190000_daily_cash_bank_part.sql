@@ -1,0 +1,9 @@
+-- Card / bank-transfer part of an invoice leaves the daily cash box automatically.
+-- Applied via execute_sql: daily_cash_log.bank_invoice_id (FK invoices, cascade),
+-- sync_invoice_bank_part(uuid) (adds an out/in "فيزا / تحويل بنكي" row so the
+-- invoice's net in the daily box equals its cash part), mirror_invoice_cash_to_daily
+-- now mirrors the full paid amount for cash/bank/mixed and calls the sync,
+-- trg_invoice_bank_part_sync (after update on invoices: method/paid/status/split),
+-- trg_cash_movement_deleted_bank_sync (after delete on cash_movements).
+-- Backfill: INV-2026-000018 (bank) got its mirror + bank rows at its original time;
+-- INV-2026-000021 got its 1350 bank row.

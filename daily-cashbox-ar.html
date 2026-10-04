@@ -612,7 +612,7 @@ function renderAll() {
     const dateLabel = showFullHistory ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit' }) + ' ' : '';
     return `
       <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>
-        <div class="font-semibold">${e.cash_movement_id ? '<span class="material-symbols-outlined align-middle" style="font-size:13px" title="تلقائي من فاتورة">receipt_long</span> ' : ''}${gmEscapeHtml(e.operation_type)}</div>
+        <div class="font-semibold">${e.cash_movement_id || e.bank_invoice_id ? '<span class="material-symbols-outlined align-middle" style="font-size:13px" title="تلقائي من فاتورة">receipt_long</span> ' : ''}${gmEscapeHtml(e.operation_type)}</div>
         ${e.notes ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(e.notes)}</div>` : ''}
         ${gmSaleNote(e, metaClass)}
         <div class="text-[10px] ${metaClass}">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
@@ -689,6 +689,8 @@ function openEditModal(id) {
   // Rows posted automatically from an invoice follow that invoice (edit /
   // cancel / delete it there) -- editing them here would put the two boxes
   // out of sync, so open the invoice instead.
+  // Card / bank-transfer part of an invoice: taken out of the drawer automatically.
+  if (e.bank_invoice_id) { window.location.href = 'invoice-print-ar.html?id=' + e.bank_invoice_id; return; }
   if (e.cash_movement_id) {
     const op = e.operation_type || '';
     if (e.cm && e.cm.invoice_id) window.location.href = 'invoice-print-ar.html?id=' + e.cm.invoice_id;
