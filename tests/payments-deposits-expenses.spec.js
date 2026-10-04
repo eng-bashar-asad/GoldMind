@@ -123,7 +123,7 @@ test('discount on a customer debt goes through the server function, no cash', as
     db: base({ customers: [{ id: 'cu1', store_id: STORE, name: 'ريما شالاتي', phone: '0999' }],
       customer_debts: [{ id: 'm1', store_id: STORE, customer_id: 'cu1', movement_type: 'debt_increase', cash_amount: 5000, gold_grams_24k: 0, created_at: '2026-09-28T10:00:00Z' }],
       customer_phones: [], company_kyc_documents: [] }),
-    rpc: { customer_debt_discount: () => ({ body: { ok: true } }) }
+    rpc: { customer_debt_discount: () => ({ body: { ok: true } }), customer_debt_discount_update: () => ({ body: { ok: true } }) }
   });
   page.on('dialog', d => d.accept().catch(() => {}));
   await page.goto('/customer-debts-ar.html');
@@ -135,4 +135,10 @@ test('discount on a customer debt goes through the server function, no cash', as
   await expect.poll(() => calls.some(c => c.name === 'customer_debt_discount')).toBe(true);
   expect(JSON.parse(calls.find(c => c.name === 'customer_debt_discount').body)).toMatchObject({ p_customer: 'cu1', p_amount: 2000 });
   expect(calls.some(c => c.method === 'POST' && c.name === 'cash_movements')).toBe(false);
+
+  // a saved discount can be deleted from the movements list
+  await page.evaluate(async () => { await load(); showCustomerDetail('cu1'); movementsByCustomer.cu1.unshift({ id: 'dz', movement_type: 'debt_decrease', source: 'discount', cash_amount: 2000, created_at: '2026-10-04T10:00:00Z' }); renderMovementsList(); });
+  await page.getByText('حذف الخصم').click();
+  await expect.poll(() => calls.some(c => c.name === 'customer_debt_discount_update')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'customer_debt_discount_update').body)).toMatchObject({ p_id: 'dz', p_amount: 0 });
 });

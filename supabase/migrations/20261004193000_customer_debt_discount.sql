@@ -1,3 +1,5 @@
 -- Applied via execute_sql: customer_debt_discount(p_customer, p_amount, p_notes) — balance-only
 -- debt_decrease with source 'discount' (perm edit_customers, capped at the customer's debt).
 -- The allocation trigger settles the oldest open invoices; profit/financial reports deduct it.
+-- Also: gm_unallocate_customer_credit(sid, cust) (undo newest allocations when invoices claim less than owed)
+-- and customer_debt_discount_update(p_id, p_amount, p_notes) — edit, or delete when amount = 0; re-settles invoices.

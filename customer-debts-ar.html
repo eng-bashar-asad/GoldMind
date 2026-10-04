@@ -437,6 +437,9 @@ function renderMovementsList() {
         <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-error' : 'text-success'}">${Number(m.cash_amount || 0) !== 0 ? (isIncrease ? '+' : '-') + fmt(m.cash_amount) : ''}${goldLine}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
         ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
+        ${m.source === 'discount' ? `<div class="flex gap-2 mt-2">
+          <button type="button" onclick="editDiscount('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">تعديل الخصم</button>
+          <button type="button" onclick="deleteDiscount('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">حذف الخصم</button></div>` : ''}
       </div>`;
   }).join('');
 }
@@ -445,6 +448,29 @@ function toggleSettleForm() {
   document.getElementById('opening-balance-form').classList.add('hidden');
   document.getElementById('discount-form').classList.add('hidden');
   document.getElementById('settle-form').classList.toggle('hidden');
+}
+
+// Edit / delete a discount: the server re-settles the customer's invoices.
+async function saveDiscountChange(id, amount, notes) {
+  const { error } = await goldmindClient.rpc('customer_debt_discount_update', { p_id: id, p_amount: amount, p_notes: notes });
+  if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+  const customerIdToReopen = currentCustomerId;
+  await load();
+  showCustomerDetail(customerIdToReopen);
+}
+function editDiscount(id) {
+  const m = (movementsByCustomer[currentCustomerId] || []).find(x => x.id === id);
+  if (!m) return;
+  const v = prompt('مبلغ الخصم الجديد:', m.cash_amount);
+  if (v == null) return;
+  const amount = parseFloat(v);
+  if (!(amount > 0)) { alert('فضلاً أدخل مبلغاً صحيحاً — ولحذف الخصم استخدم زر «حذف الخصم».'); return; }
+  saveDiscountChange(id, amount, m.notes);
+}
+function deleteDiscount(id) {
+  const m = (movementsByCustomer[currentCustomerId] || []).find(x => x.id === id);
+  if (!m || !confirm('حذف خصم ' + fmt(m.cash_amount) + '؟ سيرجع المبلغ ديناً على العميل.')) return;
+  saveDiscountChange(id, 0, null);
 }
 
 function toggleDiscountForm() {
@@ -459,7 +485,7 @@ async function submitDiscount() {
   const errEl = document.getElementById('discount-error');
   errEl.classList.add('hidden');
   if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
-  if (!confirm('تسجيل خصم ' + fmt(amount) + ' على دين العميل؟ لا يمكن التراجع عنه إلا بتسجيل رصيد سابق مقابل.')) return;
+  if (!confirm('تسجيل خصم ' + fmt(amount) + ' على دين العميل؟ يمكنك تعديله أو حذفه لاحقاً من سجل الحركات.')) return;
   const btn = document.getElementById('discount-btn');
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
   const { error } = await goldmindClient.rpc('customer_debt_discount', { p_customer: currentCustomerId, p_amount: amount, p_notes: notes || null });
