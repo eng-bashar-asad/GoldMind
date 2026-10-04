@@ -105,7 +105,7 @@
 <h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-total-sales">0</h2>
 <p class="text-[10px] text-outline mt-1" id="returns-note"></p>
 </div>
-<div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
+<div class="hidden bg-surface-container-lowest border border-outline-variant p-5 rounded-xl" id="profit-card">
 <div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-secondary-container">trending_up</span></div>
 <p class="text-[12px] text-on-surface-variant mb-1">صافي الربح (تقديري)</p>
 <h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-net-profit">0</h2>
@@ -475,6 +475,8 @@ async function load() {
   const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_reports'] === true));
   if (!__allowed) { window.__permCheckInserted = true; alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; return; }
 
+  // profit is secret: only the owner or "تقرير الربح (سري)" sees it
+  if (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions.view_profit_report === true)) document.getElementById('profit-card').classList.remove('hidden');
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
   setPeriod('today');
