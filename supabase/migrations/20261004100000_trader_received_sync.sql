@@ -1,0 +1,4 @@
+-- Applied via execute_sql on 2026-10-04: trigger trg_trader_received_sync
+-- (before update on trader_movements, source 'stock_received' with a piece or
+-- bulk lot): re-weighing a goods-in line from the trader page also corrects the
+-- piece / lot it created; refused when that stock was already sold or used.

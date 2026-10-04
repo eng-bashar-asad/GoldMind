@@ -1286,12 +1286,7 @@ function toggleEditStockMovement(id) {
 async function saveEditStockMovement(id) {
   const errEl = document.getElementById('edit-sm-error-' + id);
   errEl.classList.add('hidden');
-  {
-    // a receipt that put stock in can't be re-weighed here (the stock would not follow)
-    const { data: linked } = await goldmindClient.from('trader_movements').select('id').eq('id', id).eq('source', 'stock_received')
-      .or('piece_id.not.is.null,gold_stock_lot_id.not.is.null').limit(1);
-    if (linked && linked.length) { errEl.textContent = 'هذا الاستلام أدخل بضاعة للمخزن، فلا يُعدَّل هنا. لتصحيحه احذفه وأعد إدخاله.'; errEl.classList.remove('hidden'); return; }
-  }
+
 
   const weight = parseFloat(document.getElementById('edit-sm-weight-' + id).value);
   const karat = parseInt(document.getElementById('edit-sm-karat-' + id).value, 10);
@@ -1404,12 +1399,7 @@ function toggleEditStockBatch(batchId) {
 async function saveEditStockBatch(batchId, rowCount) {
   const errEl = document.getElementById('edit-batch-error-' + batchId);
   errEl.classList.add('hidden');
-  {
-    // a receipt that put stock in can't be re-weighed here (the stock would not follow)
-    const { data: linked } = await goldmindClient.from('trader_movements').select('id').eq('batch_id', batchId).eq('source', 'stock_received')
-      .or('piece_id.not.is.null,gold_stock_lot_id.not.is.null').limit(1);
-    if (linked && linked.length) { errEl.textContent = 'هذا الاستلام أدخل بضاعة للمخزن، فلا يُعدَّل هنا. لتصحيحه احذفه وأعد إدخاله.'; errEl.classList.remove('hidden'); return; }
-  }
+
 
   const notes = document.getElementById('edit-batch-notes-' + batchId).value.trim();
   const updates = [];
