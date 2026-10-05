@@ -1,0 +1,2 @@
+-- Applied via execute_sql: customer_cash_out(p_customer, p_amount, p_method cash|bank, p_notes) — money paid out to a
+-- customer: cash_movements out (+ daily box row if cash) and customer_debts debt_increase with source 'cash_out'.

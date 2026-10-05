@@ -158,6 +158,9 @@
 <a id="depositLink" href="deposits-ar.html" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[12px]">
 <span class="material-symbols-outlined text-[19px]">bookmark_added</span> سند عربون لحجز قطعة
 </a>
+<button onclick="toggleCashOutForm()" class="col-span-2 h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[12px]">
+<span class="material-symbols-outlined text-[19px]">output</span> صرف مبلغ للعميل
+</button>
 </div>
 <a id="printStatementLink" href="#" target="_blank" class="w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">print</span> طباعة كشف حساب
@@ -178,6 +181,20 @@
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="settle-notes" placeholder="ملاحظة (اختياري)"></textarea>
 <button onclick="submitSettlement()" id="settle-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الدفعة</button>
 <p class="text-error text-[12px] hidden mt-2" id="settle-error"></p>
+</div>
+
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="cashout-form">
+<p class="text-[12px] text-on-surface-variant mb-3">مبلغ يخرج من المحل للعميل (سلفة، رد مبلغ له، ...). يخرج من الصندوق اليومي إن كان نقداً، ويُسجَّل على حساب العميل: يزيد دينه أو ينقص رصيده لدى المحل.</p>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="cashout-amount">المبلغ</label>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="cashout-amount" step="0.01" type="number"/>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="cashout-method">طريقة الصرف</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 mb-3 text-[13px]" id="cashout-method">
+<option value="cash">نقداً — يخرج من الصندوق اليومي</option>
+<option value="bank">تحويل بنكي / بطاقة</option>
+</select>
+<textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="cashout-notes" placeholder="سبب الصرف (اختياري)"></textarea>
+<button onclick="submitCashOut()" id="cashout-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الصرف</button>
+<p class="text-error text-[12px] hidden mt-2" id="cashout-error"></p>
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="discount-form">
@@ -261,6 +278,7 @@ const MOVEMENT_LABELS = { debt_increase: 'فاتورة بيع بالدين', deb
 function movementLabel(m) {
   if (m.source === 'opening_balance') return 'رصيد سابق (افتتاحي)';
   if (m.source === 'discount') return 'خصم على الدين';
+  if (m.source === 'cash_out') return 'صرف مبلغ للعميل';
   if (m.source === 'deposit') return 'عربون';
   if (m.source === 'deposit_refund') return 'استرجاع عربون';
   return MOVEMENT_LABELS[m.movement_type] || m.movement_type;
@@ -373,6 +391,7 @@ function showCustomerDetail(customerId) {
   document.getElementById('customer-detail-view').classList.remove('hidden');
   document.getElementById('settle-form').classList.add('hidden');
   document.getElementById('discount-form').classList.add('hidden');
+  document.getElementById('cashout-form').classList.add('hidden');
   document.getElementById('opening-balance-form').classList.add('hidden');
   document.getElementById('printStatementLink').href = 'customer-debts-print-ar.html?id=' + customerId;
   document.getElementById('editCustomerLink').href = 'customer-edit-ar.html?id=' + customerId;
@@ -447,6 +466,7 @@ function renderMovementsList() {
 function toggleSettleForm() {
   document.getElementById('opening-balance-form').classList.add('hidden');
   document.getElementById('discount-form').classList.add('hidden');
+  document.getElementById('cashout-form').classList.add('hidden');
   document.getElementById('settle-form').classList.toggle('hidden');
 }
 
@@ -473,6 +493,29 @@ function deleteDiscount(id) {
   saveDiscountChange(id, 0, null);
 }
 
+function toggleCashOutForm() {
+  ['opening-balance-form', 'settle-form', 'discount-form'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  document.getElementById('cashout-form').classList.toggle('hidden');
+}
+async function submitCashOut() {
+  const amount = parseFloat(document.getElementById('cashout-amount').value);
+  const errEl = document.getElementById('cashout-error');
+  errEl.classList.add('hidden');
+  if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
+  if (!confirm('صرف ' + fmt(amount) + ' للعميل؟')) return;
+  const btn = document.getElementById('cashout-btn');
+  btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  const { error } = await goldmindClient.rpc('customer_cash_out', { p_customer: currentCustomerId, p_amount: amount,
+    p_method: document.getElementById('cashout-method').value, p_notes: document.getElementById('cashout-notes').value.trim() || null });
+  btn.disabled = false; btn.textContent = 'حفظ الصرف';
+  if (error) { errEl.textContent = 'تعذّر الحفظ: ' + error.message; errEl.classList.remove('hidden'); return; }
+  document.getElementById('cashout-amount').value = ''; document.getElementById('cashout-notes').value = '';
+  document.getElementById('cashout-form').classList.add('hidden');
+  const customerIdToReopen = currentCustomerId;
+  await load();
+  showCustomerDetail(customerIdToReopen);
+}
+
 function toggleDiscountForm() {
   document.getElementById('opening-balance-form').classList.add('hidden');
   document.getElementById('settle-form').classList.add('hidden');
@@ -494,6 +537,7 @@ async function submitDiscount() {
   document.getElementById('discount-amount').value = '';
   document.getElementById('discount-notes').value = '';
   document.getElementById('discount-form').classList.add('hidden');
+  document.getElementById('cashout-form').classList.add('hidden');
   const customerIdToReopen = currentCustomerId;
   await load();
   showCustomerDetail(customerIdToReopen);

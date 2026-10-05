@@ -163,3 +163,19 @@ test('expenses: an expense can be edited (amount/type) and deleted', async ({ pa
   await page.click('button[onclick="deleteExpense(\'e9\')"]');
   await expect.poll(() => calls.some(c => c.name === 'delete_expense')).toBe(true);
 });
+
+test('cash paid out to a customer goes through the server function', async ({ page }) => {
+  const calls = await install(page, {
+    db: base({ customers: [{ id: 'cu1', store_id: STORE, name: 'سامر الحكيم', phone: '0999' }], customer_debts: [], customer_phones: [], company_kyc_documents: [] }),
+    rpc: { customer_cash_out: () => ({ body: { ok: true } }) }
+  });
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await page.goto('/customer-debts-ar.html');
+  await expect(page.locator('#customers-list')).toContainText('سامر الحكيم');
+  await page.evaluate(() => showCustomerDetail('cu1'));
+  await page.getByText('صرف مبلغ للعميل').click();
+  await page.fill('#cashout-amount', '300');
+  await page.click('#cashout-btn');
+  await expect.poll(() => calls.some(c => c.name === 'customer_cash_out')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'customer_cash_out').body)).toMatchObject({ p_customer: 'cu1', p_amount: 300, p_method: 'cash' });
+});
