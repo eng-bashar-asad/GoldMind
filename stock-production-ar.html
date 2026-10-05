@@ -39,7 +39,7 @@
 </head>
 <body class="bg-background font-body-md text-on-background antialiased min-h-screen flex flex-col md:flex-row-reverse overflow-x-hidden">
 <!-- Navigation Drawer (Desktop) -->
-<aside class="hidden md:flex flex-col h-full fixed right-0 top-0 w-[280px] z-50 bg-surface-container-low border-l border-outline-variant rtl overflow-y-auto">
+<aside class="hidden flex-col h-full fixed right-0 top-0 w-[280px] z-50 bg-surface-container-low border-l border-outline-variant rtl overflow-y-auto">
 <div class="p-8 flex flex-col gap-6">
 <div class="flex items-center gap-3">
 <div class="w-10 h-10 rounded overflow-hidden shrink-0">
@@ -78,7 +78,7 @@
 </div>
 </aside>
 <!-- Main Content Area -->
-<main class="flex-1 md:mr-[280px] pb-24 md:pb-8 flex flex-col">
+<main class="flex-1 pb-24 md:pb-8 flex flex-col">
 <header class="bg-surface-container-lowest text-primary flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full h-16 sticky top-0 z-40 border-b border-outline-variant">
 <div class="flex items-center gap-3">
 <button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer active:opacity-80 font-bold" style="direction:ltr;font-size:32px;line-height:1;" aria-label="رجوع">&#8594;</button>
@@ -131,15 +131,42 @@
         }
 
         lots = data || [];
-        if (lots.length === 0) {
-            document.getElementById('empty-state').classList.remove('hidden');
-            return;
-        }
+        if (lots.length === 0) document.getElementById('empty-state').classList.remove('hidden');
         renderLots();
     }
 
+    // Lots are grouped in boxes: the scrap boxes «كسر 18/21/22/24» always show
+    // (empty ones too), any other box name gets its own box. A box opens to
+    // its lots; a lot opens to the production form.
+    const SCRAP_KARATS = [18, 21, 22, 24];
+    let openBox = null;
+    const lotBox = l => (l.box_name || '').trim() || ('ذهب عيار ' + l.karat);
+    function toggleBox(name) { openBox = openBox === name ? null : name; renderLots(); }
     function renderLots() {
-        document.getElementById('lots-list').innerHTML = lots.map(lot => {
+        const byBox = {};
+        SCRAP_KARATS.forEach(k => { byBox['كسر ' + k] = []; });
+        lots.forEach(l => { (byBox[lotBox(l)] = byBox[lotBox(l)] || []).push(l); });
+        const scrapOrder = n => { const i = SCRAP_KARATS.map(k => 'كسر ' + k).indexOf(n); return i < 0 ? 99 : i; };
+        const names = Object.keys(byBox).sort((a, b) => scrapOrder(a) - scrapOrder(b) || a.localeCompare(b, 'ar'));
+        document.getElementById('lots-list').innerHTML = names.map(name => {
+            const list = byBox[name], isOpen = openBox === name && list.length;
+            const w = list.reduce((t, l) => t + Number(l.weight_grams_remaining || 0), 0);
+            const safe = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `<div class="${isOpen ? 'lg:col-span-2 ' : ''}bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+                <div ${list.length ? `onclick="toggleBox('${safe}')" role="button" tabindex="0"` : ''} class="p-4 flex items-center justify-between gap-3 ${list.length ? 'cursor-pointer' : 'opacity-60'}">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-[#B4955A]">inventory_2</span>
+                        <div><div class="font-bold text-[15px]">${gmEscapeHtml(name)}</div>
+                        <div class="text-[11px] text-on-surface-variant">${list.length ? list.length + ' دفعة' : 'فارغ'}</div></div>
+                    </div>
+                    <div class="flex items-center gap-2"><b class="font-data-mono text-[15px]" dir="ltr">${fmt(w)} غ</b>
+                    ${list.length ? `<span class="material-symbols-outlined text-outline">${isOpen ? 'expand_less' : 'expand_more'}</span>` : ''}</div>
+                </div>
+                ${isOpen ? `<div class="p-3 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">${list.map(lotCardHtml).join('')}</div>` : ''}
+            </div>`;
+        }).join('');
+    }
+    function lotCardHtml(lot) {
             const isOpen = openLotId === lot.id;
             const rows = rowsByLot[lot.id] || [];
             const usedInForm = rows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
@@ -200,7 +227,6 @@
                     <button type="button" onclick="produceFromLot('${lot.id}')" id="produce-btn-${lot.id}" class="w-full h-11 bg-[#B4955A] text-white font-bold rounded-lg text-[13px]">حفظ القطع المنتَجة</button>
                 </div>` : ''}
             </div>`;
-        }).join('');
     }
 
     function toggleLot(lotId) {
