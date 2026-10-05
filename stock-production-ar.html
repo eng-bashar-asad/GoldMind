@@ -141,6 +141,19 @@
     const SCRAP_KARATS = [18, 21, 22, 24];
     let openBox = null;
     const lotBox = l => (l.box_name || '').trim() || ('ذهب عيار ' + l.karat);
+    // A scrap box («كسر 18»...) is one pool: its lots are merged into a single
+    // virtual lot with the total weight; production takes from the oldest
+    // lots first. Purchase details stay on the purchase invoices.
+    const virtualLots = {};
+    function findLot(id) { return virtualLots[id] || lots.find(l => l.id === id); }
+    function scrapPool(name, list) {
+        const members = list.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
+        const w = members.reduce((t, l) => t + Number(l.weight_grams_remaining || 0), 0);
+        const cost = w ? members.reduce((t, l) => t + Number(l.weight_grams_remaining || 0) * Number(l.cost_fabrication_per_gram || 0), 0) / w : 0;
+        const id = 'pool-' + name.replace(/[^0-9]/g, '');
+        virtualLots[id] = { id, pool: true, members, box_name: name, karat: members[0].karat, weight_grams_remaining: w, weight_grams_total: w, cost_fabrication_per_gram: cost };
+        return virtualLots[id];
+    }
     function toggleBox(name) { openBox = openBox === name ? null : name; renderLots(); }
     function renderLots() {
         const byBox = {};
@@ -162,7 +175,9 @@
                     <div class="flex items-center gap-2"><b class="font-data-mono text-[15px]" dir="ltr">${fmt(w)} غ</b>
                     ${list.length ? `<span class="material-symbols-outlined text-outline">${isOpen ? 'expand_less' : 'expand_more'}</span>` : ''}</div>
                 </div>
-                ${isOpen ? `<div class="p-3 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">${list.map(lotCardHtml).join('')}</div>` : ''}
+                ${isOpen ? (/^كسر \d+$/.test(name)
+                    ? `<div class="p-3 pt-0">${lotCardHtml(scrapPool(name, list))}</div>`
+                    : `<div class="p-3 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">${list.map(lotCardHtml).join('')}</div>`) : ''}
             </div>`;
         }).join('');
     }
@@ -197,14 +212,14 @@
             <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
                 <div onclick="toggleLot('${lot.id}')" role="button" tabindex="0" class="w-full p-4 flex items-center justify-between text-right cursor-pointer">
                     <div>
-                        <div class="font-bold text-[14px]">${lot.box_name ? gmEscapeHtml(lot.box_name) + ' — ' : ''}عيار ${lot.karat}K — متبقي ${fmt(lot.weight_grams_remaining)}غ <span class="text-outline font-normal">(من أصل ${fmt(lot.weight_grams_total)}غ)</span></div>
-                        <div class="text-[11px] text-on-surface-variant mt-1">مصنعية الغرام: ${fmt(lot.cost_fabrication_per_gram)}${lot.trader ? ' • من: ' + gmEscapeHtml(lot.trader.name) : ''}${lot.invoice ? ` • <a href="invoice-print-ar.html?id=${lot.source_invoice_id}" onclick="event.stopPropagation()" class="text-secondary font-semibold underline">فاتورة ${gmEscapeHtml(lot.invoice.invoice_number)} ←</a>` : ''}</div>
+                        <div class="font-bold text-[14px]">${lot.pool ? 'إنتاج قطع من ' + gmEscapeHtml(lot.box_name) + ' — المتوفر ' + fmt(lot.weight_grams_remaining) + 'غ' : `${lot.box_name ? gmEscapeHtml(lot.box_name) + ' — ' : ''}عيار ${lot.karat}K — متبقي ${fmt(lot.weight_grams_remaining)}غ <span class="text-outline font-normal">(من أصل ${fmt(lot.weight_grams_total)}غ)</span>`}</div>
+                        ${lot.pool ? '' : `<div class="text-[11px] text-on-surface-variant mt-1">مصنعية الغرام: ${fmt(lot.cost_fabrication_per_gram)}${lot.trader ? ' • من: ' + gmEscapeHtml(lot.trader.name) : ''}${lot.invoice ? ` • <a href="invoice-print-ar.html?id=${lot.source_invoice_id}" onclick="event.stopPropagation()" class="text-secondary font-semibold underline">فاتورة ${gmEscapeHtml(lot.invoice.invoice_number)} ←</a>` : ''}</div>`}
                     </div>
                     <span class="material-symbols-outlined text-outline">${isOpen ? 'expand_less' : 'expand_more'}</span>
                 </div>
                 ${isOpen ? `
                 <div class="p-4 pt-0 border-t border-outline-variant space-y-3">
-                    <div class="relative">
+                    <div class="relative${lot.pool ? ' hidden' : ''}">
                         <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="lot-box-name-${lot.id}">اسم الصندوق المصدر (اختياري)</label>
                         <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="lot-box-name-${lot.id}" oninput="updateLotBoxName('${lot.id}', this.value)" placeholder="مثلاً: ذهب مشغول" value="${(lot.box_name || '').replace(/"/g, '&quot;')}"/>
                     </div>
@@ -264,7 +279,7 @@
     }
 
     function updateLotBoxName(lotId, value) {
-        const lot = lots.find(l => l.id === lotId);
+        const lot = findLot(lotId);
         if (lot) lot.box_name = value; // kept in memory only until "حفظ القطع المنتَجة" -- see produceFromLot
     }
 
@@ -275,7 +290,7 @@
         // so the weight/description input the person is typing in doesn't
         // lose focus or cursor position on every keystroke.
         const rows = rowsByLot[lotId] || [];
-        const lot = lots.find(l => l.id === lotId);
+        const lot = findLot(lotId);
         if (lot) {
             const usedInForm = rows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
             const remainingAfterForm = Number(lot.weight_grams_remaining) - usedInForm;
@@ -293,7 +308,7 @@
     }
 
     async function produceFromLot(lotId) {
-        const lot = lots.find(l => l.id === lotId);
+        const lot = findLot(lotId);
         const rows = (rowsByLot[lotId] || []).filter(r => r.weight && Number(r.weight) > 0);
         const errEl = document.getElementById('lot-error-' + lotId);
         const btn = document.getElementById('produce-btn-' + lotId);
@@ -318,7 +333,7 @@
         // Persist the source-box rename, if the person edited it (kept in
         // memory only up to this point -- see updateLotBoxName above).
         const sourceBoxName = (document.getElementById('lot-box-name-' + lotId).value || '').trim() || null;
-        if (sourceBoxName !== (lot.box_name || null)) {
+        if (!lot.pool && sourceBoxName !== (lot.box_name || null)) {
             await goldmindClient.from('gold_stock_lots').update({ box_name: sourceBoxName }).eq('id', lotId);
         }
         const destBoxName = (document.getElementById('dest-box-name-' + lotId).value || '').trim() || null;
@@ -331,7 +346,7 @@
         const { data: batch, error: batchError } = await goldmindClient.from('piece_intake_batches').insert({
             store_id: GOLDMIND_STORE_ID,
             source_type: 'production',
-            source_lot_id: lotId,
+            source_lot_id: lot.pool ? lot.members[0].id : lotId,
             created_by: GOLDMIND_STAFF_ID
         }).select().single();
         if (batchError) {
@@ -392,7 +407,21 @@
             return;
         }
 
-        const { error: consumeError } = await goldmindClient.rpc('consume_gold_stock_lot', { target_lot_id: lotId, amount: totalWeight });
+        // a scrap pool takes from its oldest lots first
+        const takes = [];
+        if (lot.pool) {
+            let left = totalWeight;
+            for (const m of lot.members) {
+                if (left <= 0.0001) break;
+                const a = Math.min(left, Number(m.weight_grams_remaining));
+                takes.push([m.id, Math.round(a * 1000) / 1000]); left -= a;
+            }
+        } else takes.push([lotId, totalWeight]);
+        let consumeError = null;
+        for (const [id, amount] of takes) {
+            const r = await goldmindClient.rpc('consume_gold_stock_lot', { target_lot_id: id, amount });
+            if (r.error) { consumeError = r.error; break; }
+        }
         if (consumeError) {
             errEl.textContent = 'تم إنشاء القطع لكن تعذّر خصم الوزن من الدفعة: ' + consumeError.message + ' — راجع الرصيد يدوياً.';
             errEl.classList.remove('hidden');
