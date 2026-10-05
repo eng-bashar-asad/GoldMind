@@ -192,9 +192,9 @@
 </header>
 <!-- Page Content -->
 <div class="px-margin-mobile md:px-margin-desktop py-6 md:py-8 max-w-container-max mx-auto w-full">
-<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:items-start">
+<div class="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-12 gap-6 lg:items-start">
 <!-- Photo + Barcode column (sticky on desktop) -->
-<div class="lg:col-span-1 flex flex-col gap-4 lg:sticky lg:top-24">
+<div class="lg:col-span-1 xl:col-span-3 flex flex-col gap-4 lg:sticky lg:top-24">
 <!-- Camera Section -->
 <section>
 <input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
@@ -229,7 +229,7 @@
 </section>
 </div>
 <!-- Form fields column -->
-<div class="lg:col-span-2 flex flex-col gap-6">
+<div class="lg:col-span-2 xl:col-span-4 flex flex-col gap-6">
 <!-- Form Fields -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col gap-3">
 <div class="grid grid-cols-2 gap-3">
@@ -362,11 +362,7 @@
 </div>
 </div>
 <p class="text-[10px] text-outline -mt-1 px-1">Cs = حجر مركزي كبير مستقل (ألماسة أو حجر كريم)، سعره مختلف عن أحجار Di الصغيرة. عند تعبئة هذه الحقول، يستبدل الباركود خانة نوع القطعة برمز Cs: تلقائياً وقت الطباعة.</p>
-</div>
 </section>
-</div>
-</div>
-
 <!-- Status Message -->
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 <!-- Save Button: compact, not a full-width bar -->
@@ -375,9 +371,11 @@
                     حفظ القطعة بالمخزون
                 </button>
 </div>
-<!-- Session list: pieces saved so far in this visit -- full page width so
-     each row has real room, not squeezed into the 2/3 form column. -->
-<section class="hidden pt-6" id="session-list-section">
+</div>
+<div class="lg:col-span-3 xl:col-span-5 xl:sticky xl:top-24 xl:max-h-[calc(100vh-7rem)] xl:overflow-y-auto">
+<p id="session-empty-hint" class="hidden xl:block text-center text-[12px] text-on-surface-variant border border-dashed border-outline-variant rounded-xl py-10">القطع التي تحفظها بهذه الجلسة تظهر هنا.</p>
+<!-- Session list: beside the form on wide screens, below it on smaller ones. -->
+<section class="hidden" id="session-list-section">
 <div class="flex items-center justify-between mb-2">
 <div><h2 class="font-label-md text-label-md text-on-surface-variant font-semibold">القطع المضافة بهذه الجلسة (<span id="session-list-count">0</span>)</h2>
 <button type="button" onclick="gmNewAddSession()" class="text-[11px] text-primary underline">سند جديد</button></div>
@@ -388,6 +386,9 @@
 </div>
 <div class="flex flex-col gap-1.5" id="session-list"></div>
 </section>
+</div>
+</div>
+</div>
 </main>
 <!-- Bottom Navigation Bar (Mobile) -->
 <nav class="md:hidden fixed bottom-0 w-full flex justify-around items-center px-margin-mobile py-2 bg-surface-container-lowest text-primary docked full-width z-50 border-t border-outline-variant shadow-sm h-16">
@@ -873,6 +874,7 @@
             const section = document.getElementById('session-list-section');
             const list = document.getElementById('session-list');
             document.getElementById('session-list-count').textContent = sessionPieces.length;
+            document.getElementById('session-empty-hint').style.display = sessionPieces.length ? 'none' : '';
             const totalWeight = sessionPieces.reduce((s, p) => s + Number(p.weight_grams || 0), 0);
             const totalAccounting = sessionPieces.reduce((s, p) => s + Number(p.accounting_weight_grams || 0), 0);
             document.getElementById('session-total-weight').textContent = totalWeight.toFixed(2);
