@@ -271,7 +271,7 @@ function updateTotal() {
   document.getElementById('newTotal').textContent = FX ? fmt(items.reduce((s, it) => s + fxLine(it), 0)) + ' ' + FX_CUR : fmt(total);
 }
 
-async function postLedgerEntry(invoiceType, paymentMethod, amount, mode, description) {
+async function postLedgerEntry(invoiceType, paymentMethod, amount, mode, description, editDelta) {
   const isTraderInvoice = invoiceType === 'buyTrader' || invoiceType === 'buyRetail';
   const isAdding = mode === 'add';
 
@@ -283,7 +283,7 @@ async function postLedgerEntry(invoiceType, paymentMethod, amount, mode, descrip
 
     await goldmindClient.from('cash_movements').insert({
       store_id: GOLDMIND_STORE_ID, box: 'main', direction, amount,
-      description, created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id
+      description, created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id, edit_delta: !!editDelta
     });
   } else if (paymentMethod === 'credit' && invoiceType === 'sale') {
     await goldmindClient.from('customer_debts').insert({
@@ -495,7 +495,7 @@ async function saveEdit() {
       await goldmindClient.from('cash_movements').insert({
         store_id: GOLDMIND_STORE_ID, box: 'main', direction: saleMoney.cashDelta > 0 ? 'in' : 'out', amount: r2(Math.abs(saleMoney.cashDelta)),
         description: (saleMoney.cashDelta > 0 ? 'تحصيل فرق تعديل فاتورة ' : 'رد فرق تعديل فاتورة ') + invoice.invoice_number,
-        created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id,
+        created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id, edit_delta: true, // changes the invoice's own row in the daily box
         ...(saleMoney.fxDelta ? { fx_amount: Math.abs(saleMoney.fxDelta), fx_currency: FX_CUR } : {})
       });
     }
@@ -514,7 +514,7 @@ async function saveEdit() {
     const delta = Math.round((newTotal - oldTotal) * 100) / 100;
     if (Math.abs(delta) > 0.009) {
       await postLedgerEntry(invoice.type, newPaymentMethod, Math.abs(delta), delta > 0 ? 'add' : 'remove',
-        (delta > 0 ? 'زيادة' : 'نقص') + ' قيمة فاتورة ' + invoice.invoice_number + ' بعد التعديل');
+        (delta > 0 ? 'زيادة' : 'نقص') + ' قيمة فاتورة ' + invoice.invoice_number + ' بعد التعديل', true);
     }
   } else {
     // Payment way changed (e.g. cash → on the trader's account): undo it in

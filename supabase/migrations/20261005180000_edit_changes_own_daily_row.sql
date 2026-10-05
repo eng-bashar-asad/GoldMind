@@ -1,0 +1,2 @@
+-- Applied via execute_sql: cash_movements.edit_delta; mirror_invoice_cash_to_daily: an edit difference updates the
+-- invoice's own (first) daily-box row in its currency instead of adding a +/- row (falls back to a row if it would go <= 0).
