@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 8KVDTor0JCOsRibIvad4uvj1e4hmuLARvSrvvEWA6hqzBgg62Avwro3dMvwpHPa
+\restrict hbOMkODMksqG35d7uPX5xpUOtahqu5f5Ex4mOanwtcHOHLVOxtyZ6RY8S676jNT
 
 
 SET statement_timeout = 0;
@@ -828,6 +828,63 @@ $$;
 
 
 --
+-- Name: customer_debt_discount(uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare c record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); owed numeric;
+begin
+  select id, store_id, name into c from customers where id = p_customer;
+  if c is null then raise exception 'العميل غير موجود'; end if;
+  if not has_permission('edit_customers', c.store_id) then
+    raise exception 'ليس لديك صلاحية تسجيل خصم على دين العميل' using errcode = '42501';
+  end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0) into owed
+    from customer_debts where customer_id = c.id and store_id = c.store_id;
+  if amt > round(owed, 2) + 0.009 then raise exception 'الخصم (%) أكبر من دين العميل (%)', amt, round(owed, 2); end if;
+  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
+  -- Balance-only: no cash moves. Settles the oldest open invoices like a payment.
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+    values (c.store_id, c.id, 'debt_decrease', amt, 0, coalesce(nullif(trim(p_notes), ''), 'خصم على الدين'), 'discount', me);
+  return jsonb_build_object('ok', true);
+end $$;
+
+
+--
+-- Name: customer_debt_discount_update(uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare d record; amt numeric := round(coalesce(p_amount, 0), 2); owed numeric;
+begin
+  select * into d from customer_debts where id = p_id and source = 'discount';
+  if d is null then raise exception 'الخصم غير موجود'; end if;
+  if not has_permission('edit_customers', d.store_id) then
+    raise exception 'ليس لديك صلاحية تعديل خصم دين العميل' using errcode = '42501';
+  end if;
+  if amt < 0 then raise exception 'المبلغ غير صحيح'; end if;
+  if amt = 0 then
+    delete from customer_debts where id = p_id;
+  else
+    select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0) into owed
+      from customer_debts where customer_id = d.customer_id and store_id = d.store_id and id <> p_id;
+    if amt > round(owed, 2) + 0.009 then raise exception 'الخصم (%) أكبر من دين العميل (%)', amt, round(owed, 2); end if;
+    update customer_debts set cash_amount = amt, notes = coalesce(nullif(trim(p_notes), ''), 'خصم على الدين') where id = p_id;
+  end if;
+  perform gm_allocate_customer_credit(d.store_id, d.customer_id);
+  perform gm_unallocate_customer_credit(d.store_id, d.customer_id);
+  return jsonb_build_object('ok', true);
+end $$;
+
+
+--
 -- Name: delete_expense_category(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1274,6 +1331,44 @@ end $$;
 
 
 --
+-- Name: gm_unallocate_customer_credit(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_unallocate_customer_credit(sid uuid, cust uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare owed numeric; open_rem numeric; deficit numeric; r record; a numeric; me uuid;
+begin
+  select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)
+    into owed from customer_debts where store_id = sid and customer_id = cust;
+  select coalesce(sum(total_amount - coalesce(amount_paid, 0)), 0) into open_rem
+    from invoices where store_id = sid and customer_id = cust and type = 'sale' and status <> 'cancelled'
+     and total_amount - coalesce(amount_paid, 0) > 0.009;
+  deficit := round(owed - open_rem, 2);
+  if deficit <= 0.009 then return; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+  for r in select d.invoice_id, i.invoice_number, sum(case when d.movement_type = 'debt_decrease' then d.cash_amount else -d.cash_amount end) alloc, max(d.created_at) last_at
+             from customer_debts d join invoices i on i.id = d.invoice_id
+            where d.store_id = sid and d.customer_id = cust and d.source = 'allocation' and i.status <> 'cancelled'
+            group by d.invoice_id, i.invoice_number
+           having sum(case when d.movement_type = 'debt_decrease' then d.cash_amount else -d.cash_amount end) > 0.009
+            order by max(d.created_at) desc
+  loop
+    exit when deficit <= 0.009;
+    a := least(deficit, r.alloc);
+    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
+      (sid, cust, r.invoice_id, 'debt_increase', a, 0, 'إلغاء تخصيص للفاتورة ' || r.invoice_number, 'allocation', me),
+      (sid, cust, null, 'debt_decrease', a, 0, 'إلغاء تخصيص للفاتورة ' || r.invoice_number, 'allocation', me);
+    update invoices set amount_paid = greatest(coalesce(amount_paid, 0) - a, 0),
+                        status = case when status = 'paid' then 'unpaid' else status end
+     where id = r.invoice_id;
+    deficit := deficit - a;
+  end loop;
+end $$;
+
+
+--
 -- Name: gold_implied_usd_ounce(numeric, integer, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1589,32 +1684,21 @@ CREATE FUNCTION public.mirror_invoice_cash_to_daily() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  inv record;
-  share numeric;
-  amt numeric;
+declare inv record;
 begin
   if new.invoice_id is null then return new; end if;
-  select type, payment_method, cash_paid_amount, bank_paid_amount into inv
-    from public.invoices where id = new.invoice_id;
+  select type, payment_method into inv from public.invoices where id = new.invoice_id;
   if inv is null then return new; end if;
-
-  share := case inv.payment_method
-    when 'cash' then 1
-    when 'mixed' then case when coalesce(inv.cash_paid_amount, 0) + coalesce(inv.bank_paid_amount, 0) > 0
-                           then coalesce(inv.cash_paid_amount, 0) / (coalesce(inv.cash_paid_amount, 0) + coalesce(inv.bank_paid_amount, 0))
-                           else 0 end
-    else 0 end;
-  amt := round(new.amount * share, 2);
-  if amt <= 0 then return new; end if;
-
+  -- The whole paid amount enters the daily box as the sale; the card/transfer
+  -- part is then taken out automatically as its own row (sync_invoice_bank_part).
+  if inv.payment_method not in ('cash', 'bank', 'mixed') or new.amount <= 0 then return new; end if;
   insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
   values (new.store_id,
           case inv.type when 'sale' then 'فاتورة بيع' when 'return' then 'مرتجع مبيعات' else 'فاتورة شراء' end,
-          new.direction, amt, new.currency, new.description, new.created_by, new.id);
+          new.direction, round(new.amount, 2), new.currency, new.description, new.created_by, new.id);
+  perform public.sync_invoice_bank_part(new.invoice_id);
   return new;
-end;
-$$;
+end $$;
 
 
 --
@@ -3087,6 +3171,41 @@ end $$;
 
 
 --
+-- Name: sync_invoice_bank_part(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sync_invoice_bank_part(p_invoice uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare inv record; bank numeric; d numeric; b numeric; target numeric; diff numeric; cm record;
+begin
+  select id, store_id, invoice_number, status, payment_method, amount_paid, bank_paid_amount into inv from invoices where id = p_invoice;
+  if inv is null then return; end if;
+  -- the part of the invoice paid by card / bank transfer
+  bank := case
+    when inv.status = 'cancelled' then 0
+    when inv.payment_method = 'bank' then coalesce(inv.amount_paid, 0)
+    when inv.payment_method = 'mixed' then coalesce(inv.bank_paid_amount, 0)
+    else 0 end;
+  -- d: what the invoice's cash movements put in the daily box; b: card/transfer rows already taken back out
+  select coalesce(sum(case when l.direction='in' then l.amount else -l.amount end), 0) into d
+    from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id where m.invoice_id = p_invoice;
+  select coalesce(sum(case when direction='in' then amount else -amount end), 0) into b
+    from daily_cash_log where bank_invoice_id = p_invoice;
+  target := case when abs(d) < 0.01 then 0 else -sign(d) * least(round(bank, 2), abs(d)) end;
+  diff := round(target - b, 2);
+  if abs(diff) < 0.01 then return; end if;
+  select currency, created_by into cm from cash_movements where invoice_id = p_invoice order by created_at desc limit 1;
+  insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, bank_invoice_id)
+  values (inv.store_id, 'فيزا / تحويل بنكي', case when diff < 0 then 'out' else 'in' end, abs(diff),
+          coalesce(cm.currency, (select currency from stores where id = inv.store_id)),
+          inv.invoice_number || case when (diff < 0) = (d >= 0) then ' — الجزء المدفوع فيزا/تحويل لا يدخل الدرج' else ' — تصحيح جزء الفيزا/التحويل' end,
+          cm.created_by, p_invoice);
+end $$;
+
+
+--
 -- Name: sync_staff_to_hr_employee(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3219,6 +3338,20 @@ end $$;
 
 
 --
+-- Name: trg_cash_movement_deleted_bank_sync(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_cash_movement_deleted_bank_sync() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if old.invoice_id is not null then perform public.sync_invoice_bank_part(old.invoice_id); end if;
+  return old;
+end $$;
+
+
+--
 -- Name: trg_customer_debts_allocate(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3229,6 +3362,57 @@ CREATE FUNCTION public.trg_customer_debts_allocate() RETURNS trigger
 begin
   perform gm_allocate_customer_credit(new.store_id, new.customer_id);
   return null;
+end $$;
+
+
+--
+-- Name: trg_invoice_bank_part_sync(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_invoice_bank_part_sync() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.payment_method is distinct from old.payment_method or new.amount_paid is distinct from old.amount_paid
+     or new.status is distinct from old.status
+     or new.cash_paid_amount is distinct from old.cash_paid_amount or new.bank_paid_amount is distinct from old.bank_paid_amount then
+    perform public.sync_invoice_bank_part(new.id);
+  end if;
+  return new;
+end $$;
+
+
+--
+-- Name: trg_trader_received_sync(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_trader_received_sync() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare pc record; lt record; aw numeric := coalesce(new.accounting_weight_grams, new.weight_grams);
+begin
+  if new.weight_grams is not distinct from old.weight_grams and new.karat is not distinct from old.karat
+     and new.accounting_weight_grams is not distinct from old.accounting_weight_grams
+     and new.fab_fee_per_gram is not distinct from old.fab_fee_per_gram then return new; end if;
+  if new.piece_id is not null then
+    select * into pc from pieces where id = new.piece_id for update;
+    if pc.id is not null then
+      if pc.status <> 'available' then raise exception 'القطعة % لم تعد متوفرة (بيعت أو خرجت) — لا يمكن تعديل وزنها. عدّل الحساب بتسوية.', pc.barcode; end if;
+      update pieces set weight_grams = new.weight_grams, accounting_weight_grams = aw, karat = new.karat,
+        cost_fabrication_per_gram = coalesce(new.fab_fee_per_gram, cost_fabrication_per_gram) where id = pc.id;
+    end if;
+  end if;
+  if new.gold_stock_lot_id is not null then
+    select * into lt from gold_stock_lots where id = new.gold_stock_lot_id for update;
+    if lt.id is not null then
+      if lt.weight_grams_remaining <> lt.weight_grams_total then raise exception 'الوزن بالجملة استُعمل (بيع أو إنتاج) — لا يمكن تعديله. عدّل الحساب بتسوية.'; end if;
+      update gold_stock_lots set weight_grams_total = new.weight_grams, weight_grams_remaining = new.weight_grams, karat = new.karat,
+        cost_fabrication_per_gram = coalesce(new.fab_fee_per_gram, cost_fabrication_per_gram) where id = lt.id;
+    end if;
+  end if;
+  return new;
 end $$;
 
 
@@ -3504,6 +3688,8 @@ CREATE TABLE public.daily_cash_log (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     link_group text,
     cash_movement_id uuid,
+    bank_part boolean DEFAULT false NOT NULL,
+    bank_invoice_id uuid,
     CONSTRAINT daily_cash_log_amount_check CHECK ((amount > (0)::numeric)),
     CONSTRAINT daily_cash_log_direction_check CHECK ((direction = ANY (ARRAY['in'::text, 'out'::text])))
 );
@@ -5228,6 +5414,13 @@ CREATE INDEX customer_deposits_store_idx ON public.customer_deposits USING btree
 
 
 --
+-- Name: daily_cash_log_bank_invoice_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX daily_cash_log_bank_invoice_idx ON public.daily_cash_log USING btree (bank_invoice_id) WHERE (bank_invoice_id IS NOT NULL);
+
+
+--
 -- Name: daily_cash_log_cash_movement_uidx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5466,6 +5659,13 @@ CREATE TRIGGER trg_auto_upgrade_on_staff_change AFTER INSERT OR DELETE ON public
 
 
 --
+-- Name: cash_movements trg_cash_movement_deleted_bank_sync; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cash_movement_deleted_bank_sync AFTER DELETE ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION public.trg_cash_movement_deleted_bank_sync();
+
+
+--
 -- Name: cash_movements trg_cash_movements_currency; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -5505,6 +5705,13 @@ CREATE TRIGGER trg_daily_cash_log_currency BEFORE INSERT ON public.daily_cash_lo
 --
 
 CREATE TRIGGER trg_gold_prices_currency_guard BEFORE INSERT OR UPDATE OF price_per_gram, karat ON public.gold_prices FOR EACH ROW EXECUTE FUNCTION public.gold_prices_currency_guard();
+
+
+--
+-- Name: invoices trg_invoice_bank_part_sync; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_invoice_bank_part_sync AFTER UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.trg_invoice_bank_part_sync();
 
 
 --
@@ -5554,6 +5761,13 @@ CREATE TRIGGER trg_stores_currency_usd_reprice BEFORE UPDATE OF currency ON publ
 --
 
 CREATE TRIGGER trg_sync_staff_to_hr_employee AFTER INSERT ON public.staff FOR EACH ROW EXECUTE FUNCTION public.sync_staff_to_hr_employee();
+
+
+--
+-- Name: trader_movements trg_trader_received_sync; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_trader_received_sync BEFORE UPDATE ON public.trader_movements FOR EACH ROW WHEN (((new.source = 'stock_received'::text) AND ((new.piece_id IS NOT NULL) OR (new.gold_stock_lot_id IS NOT NULL)))) EXECUTE FUNCTION public.trg_trader_received_sync();
 
 
 --
@@ -5722,6 +5936,14 @@ ALTER TABLE ONLY public.customer_phones
 
 ALTER TABLE ONLY public.customers
     ADD CONSTRAINT customers_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: daily_cash_log daily_cash_log_bank_invoice_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.daily_cash_log
+    ADD CONSTRAINT daily_cash_log_bank_invoice_id_fkey FOREIGN KEY (bank_invoice_id) REFERENCES public.invoices(id) ON DELETE CASCADE;
 
 
 --
@@ -7822,6 +8044,24 @@ GRANT ALL ON FUNCTION public.current_store_id() TO service_role;
 
 
 --
+-- Name: FUNCTION customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) TO service_role;
+
+
+--
 -- Name: FUNCTION delete_expense_category(p_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -7944,6 +8184,14 @@ GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO service_role;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO anon;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO service_role;
+
+
+--
+-- Name: FUNCTION gm_unallocate_customer_credit(sid uuid, cust uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_unallocate_customer_credit(sid uuid, cust uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_unallocate_customer_credit(sid uuid, cust uuid) TO service_role;
 
 
 --
@@ -8360,6 +8608,14 @@ GRANT ALL ON FUNCTION public.stores_currency_usd_reprice() TO service_role;
 
 
 --
+-- Name: FUNCTION sync_invoice_bank_part(p_invoice uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.sync_invoice_bank_part(p_invoice uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.sync_invoice_bank_part(p_invoice uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION sync_staff_to_hr_employee(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -8396,12 +8652,39 @@ GRANT ALL ON FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, 
 
 
 --
+-- Name: FUNCTION trg_cash_movement_deleted_bank_sync(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO anon;
+GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO service_role;
+
+
+--
 -- Name: FUNCTION trg_customer_debts_allocate(); Type: ACL; Schema: public; Owner: -
 --
 
 GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO anon;
 GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO service_role;
+
+
+--
+-- Name: FUNCTION trg_invoice_bank_part_sync(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO anon;
+GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO service_role;
+
+
+--
+-- Name: FUNCTION trg_trader_received_sync(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO anon;
+GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO service_role;
 
 
 --
@@ -9055,5 +9338,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 8KVDTor0JCOsRibIvad4uvj1e4hmuLARvSrvvEWA6hqzBgg62Avwro3dMvwpHPa
+\unrestrict hbOMkODMksqG35d7uPX5xpUOtahqu5f5Ex4mOanwtcHOHLVOxtyZ6RY8S676jNT
 
