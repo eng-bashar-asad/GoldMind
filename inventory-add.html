@@ -364,12 +364,12 @@
 </div>
 <p class="text-[10px] text-outline -mt-1 px-1">Cs = حجر مركزي كبير مستقل (ألماسة أو حجر كريم)، سعره مختلف عن أحجار Di الصغيرة. عند تعبئة هذه الحقول، يستبدل الباركود خانة نوع القطعة برمز Cs: تلقائياً وقت الطباعة.</p>
 </section>
-<!-- Status Message -->
-<div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
-<!-- Save Button: compact, not a full-width bar -->
-<div class="pt-4 flex justify-center">
-<button id="save-btn" class="h-11 px-10 bg-secondary text-on-secondary rounded-lg font-bold text-body-md shadow-md active:scale-[0.98] transition-all hover:brightness-110">
-                    حفظ القطعة بالمخزون
+<!-- Save bar: stays on screen (sticky at the bottom) so the button never scrolls away;
+     the result message shows inside it, above the button, without pushing anything -->
+<div class="sticky bottom-[76px] md:bottom-4 z-30 flex flex-col items-center gap-2 pt-2">
+<div id="save-message" role="status" aria-live="polite" class="hidden text-center text-sm font-semibold py-2 px-4 rounded-lg shadow-md"></div>
+<button id="save-btn" class="h-11 px-10 bg-secondary text-on-secondary rounded-lg font-bold text-body-md shadow-lg active:scale-[0.98] transition-all hover:brightness-110">
+                    حفظ القطعة في المخزن
                 </button>
 </div>
 </div>
@@ -954,7 +954,11 @@
             }).join('');
         }
 
+        let __msgTimer = null;
         function showMessage(text, isError) {
+            clearTimeout(__msgTimer);
+            // success fades on its own; an error stays until the next try
+            if (!isError && !/جارِ/.test(text)) __msgTimer = setTimeout(() => messageBox.classList.add('hidden'), 4000);
             messageBox.textContent = text;
             messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
             messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
@@ -1029,7 +1033,7 @@
 
                 if (uploadError) {
                     saveBtn.disabled = false;
-                    saveBtn.textContent = 'حفظ القطعة بالمخزون';
+                    saveBtn.textContent = 'حفظ القطعة في المخزن';
                     showMessage('فشل رفع الصورة: ' + uploadError.message, true);
                     return;
                 }
@@ -1067,7 +1071,7 @@
             }).select().single();
 
             saveBtn.disabled = false;
-            saveBtn.textContent = 'حفظ القطعة بالمخزون';
+            saveBtn.textContent = 'حفظ القطعة في المخزن';
 
             if (error) {
                 showMessage('خطأ: ' + error.message, true);
