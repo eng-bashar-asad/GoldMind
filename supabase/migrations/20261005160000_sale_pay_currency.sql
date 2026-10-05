@@ -1,0 +1,3 @@
+-- Applied via execute_sql: invoices.pay_currency / pay_fx_rate (sale priced in another currency; amounts stay in the shop
+-- currency), post_sale_invoice stores them from p.pay_currency / p.pay_fx_rate, mirror_invoice_cash_to_daily writes the
+-- daily row in pay_currency (amount × rate), sync_invoice_bank_part converts the card/transfer part the same way.

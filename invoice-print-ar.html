@@ -750,6 +750,15 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         document.getElementById('sum-before-tax').textContent = gmFormatDualCurrency(sumBeforeTax, store);
         document.getElementById('sum-tax').textContent = gmFormatDualCurrency(sumTax, store);
         document.getElementById('sum-total').textContent = gmFormatDualCurrency(sumTotal, store);
+        // priced in another currency on the sale screen: show what the customer paid in it
+        if (invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) {
+            const sym = { SYP: 'ل.س', EUR: '€', USD: '$', AED: 'د.إ', TRY: '₺', SAR: 'ر.س' }[invoice.pay_currency] || invoice.pay_currency;
+            const el = document.getElementById('sum-total');
+            const line = document.createElement('div');
+            line.style.cssText = 'font-size:12px;font-weight:600;';
+            line.textContent = 'بـ ' + sym + ': ' + (sumTotal * Number(invoice.pay_fx_rate)).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + sym;
+            el.appendChild(line);
+        }
         if (isTraderPurchase) {
             document.getElementById('sum-before-tax-label').textContent = 'إجمالي أجرة الصنعة قبل الضريبة';
             document.getElementById('sum-total-label').textContent = 'إجمالي دين المصنعية على التاجر';

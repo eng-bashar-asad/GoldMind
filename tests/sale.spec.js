@@ -114,3 +114,27 @@ test('camera scan fills the barcode and finds the piece', async ({ page }) => {
   await expect(page.locator('#barcode-price-input')).toBeVisible();
   await expect(page.locator('#sale-scan-box')).toHaveClass(/hidden/);
 });
+
+test('price typed in another currency (SYP) is kept in the shop currency with its rate', async ({ page }) => {
+  const posted = [];
+  const d = db(); d.stores[0].secondary_currency = 'SYP'; d.stores[0].secondary_currency_rate = 13000;
+  await install(page, { db: d, rpc: { post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-7', invoice_number: 'INV-7' } }; } } });
+  page.on('dialog', dl => dl.accept());
+  await page.goto('/new-sale-ar.html');
+  await expect(page.locator('#pay-cur option[value="SYP"]')).toHaveCount(1);
+  await page.selectOption('#pay-cur', 'SYP');
+  await expect(page.locator('#pay-rate')).toHaveValue('13000');
+  await page.fill('#barcode-search-input', 'GM-0001');
+  await page.click('button[onclick="searchByBarcode()"]');
+  await page.fill('#barcode-price-input', '1000000');
+  await page.press('#barcode-price-input', 'Enter');
+  await expect(page.locator('#grand-total')).toContainText('1,000,000');
+  await expect(page.locator('#grand-total-base')).toContainText('76.92');
+  await page.fill('#customer-search', 'أحمد');
+  await page.click('#customer-results >> text=أحمد خالد');
+  await page.click('#save-invoice-btn');
+  await page.waitForURL(/invoice-print-ar\.html\?id=inv-7/);
+  expect(posted[0].items[0].price).toBe(76.92);
+  expect(posted[0].pay_currency).toBe('SYP');
+  expect(posted[0].pay_fx_rate * 76.92).toBeCloseTo(1000000, 2);
+});

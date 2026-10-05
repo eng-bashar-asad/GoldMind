@@ -200,6 +200,13 @@
 <button type="button" id="held-drafts-btn" onclick="openDraftsModal()" class="hidden self-start h-9 px-3 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 text-[13px] font-semibold items-center gap-1">
 <span class="material-symbols-outlined text-[18px]">pending_actions</span><span id="held-drafts-label">فواتير معلّقة</span>
 </button>
+<div class="flex flex-wrap items-center gap-2 bg-surface-container-lowest border border-outline-variant rounded-xl px-3 py-2 text-[13px]" id="pay-cur-bar">
+<span class="font-semibold">عملة الأسعار</span>
+<select id="pay-cur" class="h-9 border border-outline-variant rounded-lg px-2 bg-surface-container-lowest" onchange="gmSetPayCur(this.value)"></select>
+<span id="pay-rate-wrap" class="hidden items-center gap-1">سعر الصرف: 1 <span id="pay-rate-base"></span> =
+<input id="pay-rate" type="number" step="any" min="0" inputmode="decimal" class="w-28 h-9 border border-outline-variant rounded-lg px-2 text-left font-data-mono" oninput="gmSetPayRate(this.value)"/>
+<span id="pay-rate-sym"></span></span>
+</div>
 <div class="flex gap-1 p-1 bg-surface-container-low border border-outline-variant rounded-xl" id="sale-tabs" role="tablist">
 <button type="button" role="tab" data-tab="barcode" class="sale-tab" onclick="showSaleTab('barcode')"><span class="material-symbols-outlined text-[18px]">barcode_scanner</span>بالباركود</button>
 <button type="button" role="tab" data-tab="manual" class="sale-tab" onclick="showSaleTab('manual')"><span class="material-symbols-outlined text-[18px]">edit_note</span>يدوي</button>
@@ -376,6 +383,7 @@
 <span class="text-primary font-bold text-[17px]">الإجمالي</span>
 <span class="text-primary font-bold text-[17px]" id="grand-total">0.00 د.إ</span>
 </div>
+<div class="hidden text-left text-[12px] text-on-surface-variant font-data-mono" id="grand-total-base"></div>
 </div>
 
 <div class="grid grid-cols-2 gap-3">
@@ -642,7 +650,7 @@
         if (cart.length === 0 && !selectedCustomer) { writeDrafts(others); return; }
         if (!currentDraftId) currentDraftId = 'd' + Date.now();
         others.push({
-            id: currentDraftId, cart, cartCounter, selectedCustomer, selectedPaymentMethod,
+            id: currentDraftId, cart, cartCounter, selectedCustomer, selectedPaymentMethod, pay: { code: PAY.code, rate: PAY.rate },
             savedAt: new Date().toISOString()
         });
         writeDrafts(others);
@@ -656,6 +664,8 @@
     function loadDraft(draft) {
         currentDraftId = draft.id;
         cart.push(...draft.cart);
+        window.__gmDraftPay = draft.pay || null;
+        if (draft.pay && draft.pay.code && document.getElementById('pay-cur').options.length) { document.getElementById('pay-cur').value = draft.pay.code; gmSetPayCur(draft.pay.code); document.getElementById('pay-rate').value = draft.pay.rate || ''; gmSetPayRate(draft.pay.rate); }
         cartCounter = draft.cartCounter || draft.cart.length;
         // bulk-stock weight/fee already taken by this cart (same as when added)
         draft.cart.filter(i => i.mode === 'stock').forEach(i => {
@@ -767,6 +777,53 @@
             if (el) el.textContent = el.textContent.replace(prev, CUR);
         });
         if (!document.getElementById('drafts-modal').classList.contains('hidden')) openDraftsModal();
+    })();
+
+    // ---------- Pricing in another currency (e.g. SYP, EUR) ----------
+    // Prices are typed in the chosen currency and kept on the invoice in the
+    // shop currency (price ÷ rate); the cash lands in the daily box in the
+    // chosen currency. item.priceF keeps the exact amount typed.
+    let BASE_CODE = 'AED', PAY = { code: null, rate: 0 };
+    const gmPayOn = () => !!(PAY.code && PAY.code !== BASE_CODE && PAY.rate > 0);
+    const gmToBase = v => gmPayOn() ? Math.round(v / PAY.rate * 100) / 100 : v;
+    const gmPaySym = () => CUR_SYMBOLS[PAY.code] || PAY.code;
+    const gmItemF = it => it.priceF != null && it.payCode === PAY.code ? it.priceF : (gmPayOn() ? it.price * PAY.rate : it.price);
+    const gmMoneyPay = base => gmPayOn() ? gmMoney(base * PAY.rate) + ' ' + gmPaySym() : gmMoney(base) + ' ' + CUR;
+    function gmRateKey(code) { return 'gm_fx_' + GOLDMIND_STORE_ID + '_' + code; }
+    function gmSetPayCur(code) {
+        PAY.code = code === BASE_CODE ? null : code;
+        let r = 0;
+        try { r = parseFloat(localStorage.getItem(gmRateKey(code))) || 0; } catch (e) { /* ignore */ }
+        if (!r && code === (window.__gmSecondary || {}).code) r = window.__gmSecondary.rate;
+        PAY.rate = PAY.code ? r : 0;
+        document.getElementById('pay-rate').value = PAY.rate || '';
+        document.getElementById('pay-rate-wrap').classList.toggle('hidden', !PAY.code);
+        document.getElementById('pay-rate-wrap').classList.toggle('inline-flex', !!PAY.code);
+        document.getElementById('pay-rate-sym').textContent = PAY.code ? gmPaySym() : '';
+        if (PAY.code && !PAY.rate) document.getElementById('pay-rate').focus();
+        cart.forEach(it => { if (it.payCode !== PAY.code) { it.priceF = null; it.payCode = null; } });
+        renderCart(); if (selectedPaymentMethod === 'mixed') onMixedAmountInput();
+    }
+    function gmSetPayRate(v) {
+        PAY.rate = parseFloat(v) || 0;
+        try { if (PAY.code && PAY.rate > 0) localStorage.setItem(gmRateKey(PAY.code), String(PAY.rate)); } catch (e) { /* ignore */ }
+        // typed amounts stay; their shop-currency value follows the new rate
+        cart.forEach(it => { if (it.priceF != null && it.payCode === PAY.code && PAY.rate > 0) it.price = Math.round(it.priceF / PAY.rate * 100) / 100; });
+        renderCart(); if (selectedPaymentMethod === 'mixed') onMixedAmountInput();
+    }
+    function gmPriced(v) {
+        if (PAY.code && !(PAY.rate > 0)) { alert('أدخل سعر الصرف لعملة ' + gmPaySym() + ' أولاً — السعر حُسب بعملة المحل.'); document.getElementById('pay-rate').focus(); }
+        return { price: gmToBase(v), priceF: gmPayOn() ? v : null, payCode: gmPayOn() ? PAY.code : null }; }
+    (async function __loadPayCurrencies() {
+        await requireGoldMindSession('login-entry-ar.html');
+        const { data } = await goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+        BASE_CODE = (data && data.currency || 'AED').toUpperCase();
+        window.__gmSecondary = data && data.secondary_currency ? { code: data.secondary_currency.toUpperCase(), rate: Number(data.secondary_currency_rate) || 0 } : {};
+        const codes = [BASE_CODE, window.__gmSecondary.code, 'SYP', 'EUR', 'USD', 'AED', 'TRY', 'SAR'].filter((c, i, a) => c && a.indexOf(c) === i);
+        const sel = document.getElementById('pay-cur');
+        sel.innerHTML = codes.map(c => `<option value="${c}">${CUR_SYMBOLS[c] || c}${c === BASE_CODE ? ' (عملة المحل)' : ''}</option>`).join('');
+        document.getElementById('pay-rate-base').textContent = CUR_SYMBOLS[BASE_CODE] || BASE_CODE;
+        if (window.__gmDraftPay && window.__gmDraftPay.code) { sel.value = window.__gmDraftPay.code; gmSetPayCur(window.__gmDraftPay.code); if (window.__gmDraftPay.rate) { document.getElementById('pay-rate').value = window.__gmDraftPay.rate; gmSetPayRate(window.__gmDraftPay.rate); } }
     })();
 
     // ---------- Sell from bulk stock (gold_stock_lots) ----------
@@ -898,7 +955,7 @@
             karat: lot.karat,
             weight: grossWeight,
             accountingWeight: accountingWeight,
-            price: price,
+            ...gmPriced(price),
             isPooled: isPooled,
             fabPerGram: Number(lot.cost_fabrication_per_gram) || 0,
             manualFabFee: isPooled ? manualFabFee : 0,
@@ -1000,7 +1057,7 @@
             barcode: piece.barcode,
             karat: piece.has_gold ? piece.gold_karat : null,
             weight: piece.diamond_carat,
-            price: price,
+            ...gmPriced(price),
             description: descInput.value.trim() || null
         });
         document.getElementById('diamond-search-input').value = '';
@@ -1032,15 +1089,15 @@
 
     function getMixedAmounts() {
         const total = cart.reduce((sum, item) => sum + item.price, 0);
-        const cashAmt = parseFloat(document.getElementById('mixed-cash-amount').value) || 0;
-        const bankAmt = parseFloat(document.getElementById('mixed-bank-amount').value) || 0;
+        const cashAmt = gmToBase(parseFloat(document.getElementById('mixed-cash-amount').value) || 0);
+        const bankAmt = gmToBase(parseFloat(document.getElementById('mixed-bank-amount').value) || 0);
         return { total, cashAmt, bankAmt, remaining: +(total - cashAmt - bankAmt).toFixed(2) };
     }
 
     function onMixedAmountInput() {
         const { remaining } = getMixedAmounts();
         const paidNow = getMixedAmounts();
-        document.getElementById('mixed-paid-now').textContent = gmMoney(paidNow.cashAmt + paidNow.bankAmt) + ' ' + CUR;
+        document.getElementById('mixed-paid-now').textContent = gmMoneyPay(paidNow.cashAmt + paidNow.bankAmt);
 
         const label = document.getElementById('mixed-remaining-label');
         const note = document.getElementById('mixed-remaining-note');
@@ -1050,7 +1107,7 @@
             note.className = 'text-[13px] font-bold font-data-mono text-success';
         } else if (remaining > 0) {
             label.textContent = 'المتبقي كدين على الزبون';
-            note.textContent = gmMoney(remaining) + ' ' + CUR;
+            note.textContent = gmMoneyPay(remaining);
             note.className = 'text-[13px] font-bold font-data-mono text-error';
         } else {
             label.textContent = 'تنبيه';
@@ -1268,7 +1325,7 @@
             barcode: piece.barcode,
             karat: piece.karat,
             weight: piece.weight_grams,
-            price: price,
+            ...gmPriced(price),
             description: descInput.value.trim() || null
         });
         document.getElementById('barcode-search-input').value = '';
@@ -1457,7 +1514,7 @@
             barcode: null,
             karat: karat,
             weight: weight,
-            price: price,
+            ...gmPriced(price),
             description: document.getElementById('manual-desc').value.trim() || null
         });
 
@@ -1492,7 +1549,7 @@
         input.inputMode = 'decimal';
         input.step = '0.01';
         input.min = '0';
-        input.value = item.price;
+        input.value = Math.round(gmItemF(item) * 100) / 100;
         input.setAttribute('aria-label', 'السعر الجديد');
         input.className = 'w-24 h-10 border border-primary rounded px-2 text-left font-data-mono';
         td.appendChild(input);
@@ -1512,7 +1569,7 @@
                     input.focus();
                     return;
                 }
-                if (save) item.price = Math.round(v * 100) / 100;
+                if (save) Object.assign(item, gmPriced(Math.round(v * 100) / 100));
             }
             renderCart();
             if (selectedPaymentMethod === 'mixed') onMixedAmountInput();
@@ -1545,7 +1602,7 @@
                 <td class="px-2 py-3 text-left">${item.mode === 'diamond' ? item.weight + ' ct' : item.weight}</td>
                 <td class="px-2 py-3 text-left font-semibold">
                     <button type="button" onclick="editCartPrice(${item.cartId}, this)" aria-label="تعديل سعر القطعة ${gmEscapeHtml(item.barcode || '')}" title="اضغط لتعديل السعر" class="inline-flex items-center gap-1 min-h-[40px] px-1 -mx-1 rounded hover:bg-surface-container-high underline decoration-dotted decoration-outline underline-offset-4">
-                        ${gmMoney(item.price)}<span class="material-symbols-outlined text-[14px] text-outline" aria-hidden="true">edit</span>
+                        ${gmPayOn() ? gmMoney(gmItemF(item)) : gmMoney(item.price)}<span class="material-symbols-outlined text-[14px] text-outline" aria-hidden="true">edit</span>
                     </button>
                 </td>
                 <td class="px-2 py-3 text-left">
@@ -1557,11 +1614,15 @@
         `).join('');
 
         const total = cart.reduce((sum, item) => sum + item.price, 0);
-        document.getElementById('grand-total').textContent = gmMoney(total) + ' ' + CUR;
+        const totalF = cart.reduce((sum, item) => sum + gmItemF(item), 0);
+        document.getElementById('grand-total').textContent = gmPayOn() ? gmMoney(totalF) + ' ' + gmPaySym() : gmMoney(total) + ' ' + CUR;
+        const gtb = document.getElementById('grand-total-base');
+        gtb.textContent = gmPayOn() ? '= ' + gmMoney(total) + ' ' + CUR + ' بالفاتورة' : '';
+        gtb.classList.toggle('hidden', !gmPayOn());
         // gold weight only: a diamond line's "weight" is in carats
         const grams = cart.reduce((sum, item) => sum + (item.mode === 'diamond' ? 0 : Number(item.weight) || 0), 0);
         document.getElementById('grand-weight').textContent = grams.toFixed(2) + ' غ';
-        document.getElementById('save-invoice-btn').setAttribute('data-total', gmMoney(total) + ' ' + CUR); // total stays visible on the sticky save button
+        document.getElementById('save-invoice-btn').setAttribute('data-total', gmPayOn() ? gmMoney(totalF) + ' ' + gmPaySym() : gmMoney(total) + ' ' + CUR); // total stays visible on the sticky save button
         saveDraftToLocalStorage();
     }
 
@@ -1588,8 +1649,9 @@
             return;
         }
 
+        if (PAY.code && !(PAY.rate > 0)) { showMessage('أدخل سعر الصرف لعملة ' + gmPaySym() + ' أولاً', true); document.getElementById('pay-rate').focus(); return; }
         const confirmTotal = cart.reduce((sum, item) => sum + item.price, 0);
-        if (!confirm('هل أنت متأكد من ترحيل هذه الفاتورة بقيمة ' + gmMoney(confirmTotal) + '؟\nبعد الترحيل ستحصل على رقم رسمي ثابت ولن تتمكن من تعديلها — لكن يمكنك إلغاؤها لاحقاً عند الحاجة.')) {
+        if (!confirm('هل أنت متأكد من ترحيل هذه الفاتورة بقيمة ' + gmMoneyPay(confirmTotal) + (gmPayOn() ? ' (= ' + gmMoney(confirmTotal) + ' ' + CUR + ')' : '') + '؟\nبعد الترحيل ستحصل على رقم رسمي ثابت ولن تتمكن من تعديلها — لكن يمكنك إلغاؤها لاحقاً عند الحاجة.')) {
             return;
         }
 
@@ -1637,6 +1699,9 @@
             payment_method: selectedPaymentMethod,
             cash_paid: selectedPaymentMethod === 'mixed' ? mixedCashAmt : null,
             bank_paid: selectedPaymentMethod === 'mixed' ? mixedBankAmt : null,
+            // exact typed total ÷ invoice total, so the full amount comes back to the same figure
+            pay_currency: gmPayOn() ? PAY.code : null,
+            pay_fx_rate: gmPayOn() && total > 0 ? cart.reduce((t, it) => t + gmItemF(it), 0) / total : null,
             items: cart.map(item => ({
                 mode: item.mode || 'manual',
                 piece_id: (item.piece && item.mode !== 'diamond') ? item.piece.id : null,
