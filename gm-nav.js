@@ -19,9 +19,8 @@
     { t: 'الفواتير والعملاء', i: 'receipt_long', l: [
       ['invoices-list-ar.html', 'list_alt', 'كل الفواتير', 'view_invoices'],
       ['invoices-archive-ar.html', 'inventory', 'الأرشيف الشامل', 'view_invoices'],
-      ['customers-ar.html', 'person', 'الزبائن', 'view_customers'],
-      ['customer-add-ar.html', 'person_add', 'إضافة عميل', 'add_customers'],
-      ['customer-debts-ar.html', 'groups', 'العملاء — الديون وكشف الحساب', 'view_customers'],
+      ['customers-ar.html', 'person', 'الزبائن (أفراد وشركات)', 'view_customers'],
+      ['ledger-ar.html', 'handshake', 'التجار', 'view_traders'],
       ['deposits-ar.html', 'bookmark_added', 'سندات العربون', 'edit_customers|manage_daily_cashbox'],
       ['repairs-ar.html', 'build', 'الصيانة والتصليح', 'view_repairs'] ] },
     { t: 'المستودعات', i: 'inventory_2', l: [
@@ -39,8 +38,6 @@
       ['expense-entry-ar.html', 'receipt', 'المصاريف', 'manage_daily_cashbox|view_profit_report|give_gifts'],
       ['expense-entry-ar.html?type=gifts', 'redeem', 'إخراج هدايا', 'give_gifts'],
       ['main-cashbox-ar.html', 'account_balance', 'الصندوق الرئيسي', 'manage_daily_cashbox'],
-      ['ledger-ar.html', 'handshake', 'حسابات التجار', 'view_traders'],
-      ['ledger-ar.html?action=addTrader', 'person_add', 'إضافة تاجر', 'add_traders'],
       ['company-balances-ar.html', 'account_balance', 'أرصدة الشركة', 'view_reports'],
       ['gold-price-ar.html', 'payments', 'سعر الذهب', 'manage_gold_price'] ] },
     { t: 'التقارير', i: 'bar_chart', l: [

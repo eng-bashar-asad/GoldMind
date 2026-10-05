@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=33"></script>
-<script src="theme.js?v=49"></script>
+<script src="theme.js?v=50"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -74,7 +74,7 @@
 
 <!-- Customer detail -->
 <div id="customer-detail-view" class="hidden py-6 flex flex-col gap-4">
-<button onclick="showCustomersList()" class="text-[12px] text-secondary font-semibold self-start">→ كل العملاء</button>
+<a id="backToCustomers" href="customers-ar.html" class="text-[12px] text-secondary font-semibold self-start">→ كل الزبائن</a>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <div class="flex items-start justify-between gap-2">
@@ -168,6 +168,9 @@
 <a id="editCustomerLink" href="#" class="w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">edit</span> تعديل بيانات العميل / تحويله لشركة (TRN)
 </a>
+<button type="button" id="deleteCustomerBtn" onclick="deleteCustomer()" class="w-full h-11 border border-error text-error rounded-xl flex items-center justify-center gap-2 text-[13px]">
+<span class="material-symbols-outlined text-[18px]">delete</span> حذف العميل
+</button>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form">
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ المدفوع</label>
@@ -319,7 +322,7 @@ async function load() {
   if (openId && customers.some(c => c.id === openId)) {
     showCustomerDetail(openId);
   } else {
-    showCustomersList();
+    location.replace('customers-ar.html');
   }
 }
 
@@ -395,6 +398,9 @@ function showCustomerDetail(customerId) {
   document.getElementById('opening-balance-form').classList.add('hidden');
   document.getElementById('printStatementLink').href = 'customer-debts-print-ar.html?id=' + customerId;
   document.getElementById('editCustomerLink').href = 'customer-edit-ar.html?id=' + customerId;
+  document.getElementById('backToCustomers').href = 'customers-ar.html' + (customer.is_company ? '?kind=company' : '');
+  document.getElementById('deleteCustomerBtn').classList.toggle('hidden', !canEditCustomers);
+  gmLoadCustomerInvoices(customerId);
   document.getElementById('depositLink').href = 'deposits-ar.html?customer=' + customerId;
 
   document.getElementById('detail-customer-name').textContent = customer.name;
@@ -426,32 +432,72 @@ function clearMovementsMonthFilter() {
   renderMovementsList();
 }
 
+// ---- Everything between us and the customer: invoices + account movements ----
+const invoicesByCustomer = {};
+const INV_TYPE = { sale: 'فاتورة بيع', return: 'مرتجع مبيعات', buyRetail: 'شراء من الزبون', buyTrader: 'فاتورة شراء' };
+const PAY_LABEL = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'دفعة جزئية' };
+async function gmLoadCustomerInvoices(customerId) {
+  if (!invoicesByCustomer[customerId]) {
+    const { data } = await goldmindClient.from('invoices')
+      .select('id, invoice_number, type, status, payment_method, total_amount, amount_paid, created_at, pay_currency, pay_fx_rate')
+      .eq('store_id', GOLDMIND_STORE_ID).eq('customer_id', customerId).order('created_at', { ascending: false });
+    invoicesByCustomer[customerId] = data || [];
+  }
+  if (currentCustomerId === customerId) renderMovementsList();
+}
+
 function renderMovementsList() {
   const monthVal = document.getElementById('movementsMonthFilter').value; // 'YYYY-MM' or ''
   document.getElementById('clearMonthFilterBtn').classList.toggle('hidden', !monthVal);
 
-  const allMoves = movementsByCustomer[currentCustomerId] || [];
-  const moves = monthVal ? allMoves.filter(m => (m.created_at || '').slice(0, 7) === monthVal) : allMoves;
+  const invs = invoicesByCustomer[currentCustomerId] || [];
+  const invIds = new Set(invs.map(i => i.id));
+  // an invoice's own debt row is shown inside the invoice entry
+  const moves = (movementsByCustomer[currentCustomerId] || []).filter(m => !(m.invoice_id && invIds.has(m.invoice_id) && (!m.source || m.source === 'invoice_edit')));
+  let entries = invs.map(i => ({ kind: 'inv', at: i.created_at, i })).concat(moves.map(m => ({ kind: 'mv', at: m.created_at, m })));
+  entries.sort((x, y) => String(y.at).localeCompare(String(x.at)));
+  if (monthVal) entries = entries.filter(e => (e.at || '').slice(0, 7) === monthVal);
   const listEl = document.getElementById('movements-list');
   const emptyEl = document.getElementById('empty-movements');
 
-  if (moves.length === 0) {
+  if (entries.length === 0) {
     listEl.innerHTML = '';
     emptyEl.textContent = monthVal ? 'لا توجد حركات بهذا الشهر.' : 'لا توجد حركات مسجّلة بعد.';
     emptyEl.classList.remove('hidden');
     return;
   }
   emptyEl.classList.add('hidden');
+  const dateOf = at => gmFormatDateTime(at, { day: 'numeric', month: 'short', year: 'numeric' });
 
-  listEl.innerHTML = moves.map(m => {
+  listEl.innerHTML = entries.map(e => {
+    if (e.kind === 'inv') {
+      const i = e.i, cancelled = i.status === 'cancelled';
+      const rate = i.pay_currency && Number(i.pay_fx_rate) > 0 ? Number(i.pay_fx_rate) : 1;
+      const cur = i.pay_currency && rate !== 1 ? ' ' + i.pay_currency : '';
+      const rem = Number(i.total_amount || 0) - Number(i.amount_paid || 0);
+      // tap = open the invoice (print / PDF / edit from there)
+      return `
+      <a href="invoice-print-ar.html?id=${i.id}" class="block bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:border-secondary${cancelled ? ' opacity-60' : ''}">
+        <div class="flex items-center justify-between mb-1">
+          <span class="text-[13px] font-semibold">${INV_TYPE[i.type] || 'فاتورة'} ${gmEscapeHtml(i.invoice_number || '')}${cancelled ? ' <span class="text-error">(ملغاة)</span>' : ''}</span>
+          <span class="text-[11px] text-on-surface-variant">${dateOf(i.created_at)}</span>
+        </div>
+        <p class="text-[13px] font-data-mono font-bold">${fmt(Number(i.total_amount || 0) * rate)}${cur}</p>
+        <p class="text-[12px] text-on-surface-variant mt-1">${PAY_LABEL[i.payment_method] || ''}${!cancelled && rem > 0.009 ? ` — <span class="text-error font-semibold">باقي ديناً ${fmt(rem * rate)}${cur}</span>` : ''}</p>
+        <p class="text-[11px] text-secondary font-semibold mt-1">فتح الفاتورة ←</p>
+      </a>`;
+    }
+    const m = e.m;
     const isIncrease = m.movement_type === 'debt_increase';
-    const date = gmFormatDateTime(m.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
     const goldLine = Number(m.gold_grams_24k || 0) !== 0 ? ` <span class="font-data-mono">${isIncrease ? '+' : '-'}${fmt(Math.abs(m.gold_grams_24k))}غ</span>` : '';
+    const href = m.source === 'deposit' || m.source === 'deposit_refund' ? 'deposits-ar.html?customer=' + currentCustomerId
+      : m.invoice_id ? 'invoice-print-ar.html?id=' + m.invoice_id : '';
+    const tag = href ? 'a' : 'div';
     return `
-      <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+      <${tag}${href ? ` href="${href}"` : ''} class="block bg-surface-container-lowest border border-outline-variant rounded-xl p-4${href ? ' hover:border-secondary' : ''}">
         <div class="flex items-center justify-between mb-1">
           <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${gmEscapeHtml(movementLabel(m))}</span>
-          <span class="text-[11px] text-on-surface-variant">${date}</span>
+          <span class="text-[11px] text-on-surface-variant">${dateOf(m.created_at)}</span>
         </div>
         <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-error' : 'text-success'}">${Number(m.cash_amount || 0) !== 0 ? (isIncrease ? '+' : '-') + fmt(m.cash_amount) : ''}${goldLine}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
@@ -459,8 +505,25 @@ function renderMovementsList() {
         ${m.source === 'discount' ? `<div class="flex gap-2 mt-2">
           <button type="button" onclick="editDiscount('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">تعديل الخصم</button>
           <button type="button" onclick="deleteDiscount('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">حذف الخصم</button></div>` : ''}
-      </div>`;
+      </${tag}>`;
   }).join('');
+}
+
+// Delete a customer: only when nothing was ever recorded with them (history stays intact)
+async function deleteCustomer() {
+  const c = customers.find(x => x.id === currentCustomerId); if (!c) return;
+  const [{ count: nInv }, { count: nDep }] = await Promise.all([
+    goldmindClient.from('invoices').select('id', { count: 'exact', head: true }).eq('customer_id', c.id),
+    goldmindClient.from('customer_deposits').select('id', { count: 'exact', head: true }).eq('customer_id', c.id)
+  ]);
+  if ((nInv || 0) + (nDep || 0) + (movementsByCustomer[c.id] || []).length > 0) {
+    alert('لا يمكن حذف «' + c.name + '» لأن له فواتير أو حركات مسجّلة — يمكنك تعديل بياناته فقط.');
+    return;
+  }
+  if (!confirm('حذف العميل «' + c.name + '» نهائياً؟')) return;
+  const { error } = await goldmindClient.from('customers').delete().eq('id', c.id);
+  if (error) { alert('تعذّر الحذف: ' + error.message); return; }
+  location.replace('customers-ar.html' + (c.is_company ? '?kind=company' : ''));
 }
 
 function toggleSettleForm() {

@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=33"></script>
-<script src="theme.js?v=49"></script>
+<script src="theme.js?v=50"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -42,9 +42,11 @@
 <style>
 /* computer: trader card and forms on the right, the movements fill the rest */
 @media (min-width:1024px){
-  #trader-detail-view:not(.hidden){display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);column-gap:28px;align-items:start}
-  #trader-detail-view > *:not(#gm-moves-col){grid-column:1}
-  #trader-detail-view > #gm-moves-col{grid-column:2;grid-row:1 / span 40}
+  #trader-detail-view:not(.hidden){display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr) minmax(0,380px);column-gap:24px;align-items:start}
+  #trader-detail-view > *{grid-column:1}
+  #trader-detail-view > #gm-forms-col{grid-column:2;grid-row:1 / span 40}
+  #trader-detail-view > #gm-side-col{grid-column:3;grid-row:1 / span 40;position:sticky;top:80px;max-height:calc(100vh - 96px);overflow-y:auto}
+  #gm-forms-col:has(> div:not(.hidden)) > #gm-forms-hint{display:none}
 }
 </style>
 </head>
@@ -62,7 +64,7 @@
 </button>
 </div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8">
+<main class="pb-32 max-w-md lg:max-w-none mx-auto px-4 lg:px-8">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 
@@ -274,6 +276,9 @@ function goToStatementPrint() {
 <a id="editTraderLink" href="#" class="shrink-0 h-8 px-3 flex items-center gap-1 rounded-full border border-outline-variant text-on-surface-variant text-[11px] font-semibold">
 <span class="material-symbols-outlined text-[16px]">edit</span> تعديل
 </a>
+<button type="button" onclick="deleteTrader()" class="shrink-0 h-8 px-3 flex items-center gap-1 rounded-full border border-error text-error text-[11px] font-semibold">
+<span class="material-symbols-outlined text-[16px]">delete</span> حذف
+</button>
 </div>
 <div class="mt-3 pt-3 border-t border-outline-variant flex flex-col gap-2">
 <div class="flex justify-between items-center">
@@ -312,6 +317,8 @@ function goToStatementPrint() {
 </button>
 </div>
 
+<div id="gm-forms-col" class="flex flex-col gap-4">
+<p id="gm-forms-hint" class="hidden lg:block text-center text-[13px] text-on-surface-variant border border-dashed border-outline-variant rounded-xl py-12">اختر عملية من الأزرار (إخراج بضاعة، إدخال بضاعة، تسوية...) لتظهر هنا.</p>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex-col gap-3" id="trader-cash-form">
 <h3 class="font-bold text-[14px]" id="tc-title">صرف كاش للتاجر</h3>
 <p class="text-[11px] text-on-surface-variant" id="tc-hint"></p>
@@ -537,10 +544,16 @@ function goToStatementPrint() {
 <p class="text-error text-[12px] hidden mt-2" id="settle-error"></p>
 </div>
 
+</div>
+
+<div id="gm-side-col" class="flex flex-col gap-4">
+<!-- photo of the piece being given out (computer: always visible beside the form) -->
+<div id="gs-photo-panel" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-3"></div>
 <div id="gm-moves-col" class="flex flex-col gap-2">
 <h3 class="font-semibold text-[13px] mt-2">سجل الحركات</h3>
 <div id="movements-list" class="flex flex-col gap-2"></div>
 <p id="empty-movements" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات مسجّلة بعد.</p>
+</div>
 </div>
 
 </div>
@@ -919,6 +932,20 @@ function renderTraders() {
         </div>
       </div>`;
   }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد تجار مطابقون. يُضافون تلقائياً عند إنشاء أول فاتورة شراء منهم.</p>';
+}
+
+// Delete a trader: only when nothing was ever recorded with them (history stays intact)
+async function deleteTrader() {
+  const t = traders.find(x => x.id === currentTraderId); if (!t) return;
+  const [{ count: nMv }, { count: nInv }] = await Promise.all([
+    goldmindClient.from('trader_movements').select('id', { count: 'exact', head: true }).eq('trader_id', t.id),
+    goldmindClient.from('invoices').select('id', { count: 'exact', head: true }).eq('trader_id', t.id)
+  ]);
+  if ((nMv || 0) + (nInv || 0) > 0) { alert('لا يمكن حذف «' + t.name + '» لأن له حركات أو فواتير مسجّلة — يمكنك تعديل بياناته فقط.'); return; }
+  if (!confirm('حذف التاجر «' + t.name + '» نهائياً؟')) return;
+  const { error } = await goldmindClient.from('traders').delete().eq('id', t.id);
+  if (error) { alert('تعذّر الحذف: ' + error.message); return; }
+  location.replace('ledger-ar.html');
 }
 
 function showTraderDetail(traderId) {
@@ -1733,6 +1760,7 @@ function toggleGiveStockForm() {
   const wasHidden = document.getElementById('give-stock-form').classList.contains('hidden');
   document.getElementById('give-stock-form').classList.toggle('hidden');
   if (wasHidden) openGiveStockForm();
+  renderGsPhotoPanel();
 }
 
 function toggleReceiveStockForm() {
@@ -2180,14 +2208,19 @@ async function searchGiveStockBarcode() {
     fabPerGram: Number(data.cost_fabrication_per_gram) || 0,
     costFabPerGram: Number(data.cost_fabrication_per_gram) || 0,
     accentCost: (Number(data.accent_diamond_carat) || 0) * (Number(data.accent_diamond_price_per_carat) || 0),
+    photo: data.photo_url || null,
     price: 0
   });
+  gsPhotoSel = giveStockCartCounter;
 
   input.value = '';
   resultEl.innerHTML = '';
   input.focus();
   renderGiveStockCart();
 }
+
+// the photo panel follows the give-out form being opened/closed by any button
+new MutationObserver(() => renderGsPhotoPanel()).observe(document.getElementById('give-stock-form'), { attributes: true, attributeFilter: ['class'] });
 
 document.addEventListener('DOMContentLoaded', () => {
   const gsInput = document.getElementById('gs-barcode-input');
@@ -2221,7 +2254,30 @@ function gsPieceCost(it) {
 }
 function gsIsPriced() { return ((document.querySelector('input[name="gs-kind"]:checked') || {}).value) === 'بسعر محدد'; }
 
+// Photo panel: the selected (by default the last scanned) piece big, the others as thumbnails
+let gsPhotoSel = null;
+function gsShowPhoto(cartId) { gsPhotoSel = cartId; renderGsPhotoPanel(); }
+function renderGsPhotoPanel() {
+  const el = document.getElementById('gs-photo-panel');
+  const open = !document.getElementById('give-stock-form').classList.contains('hidden');
+  if (!open || !giveStockCart.length) { el.classList.add('hidden'); return; }
+  const sel = giveStockCart.find(it => it.cartId === gsPhotoSel) || giveStockCart[giveStockCart.length - 1];
+  el.innerHTML = `
+    <div class="aspect-square w-full rounded-lg overflow-hidden bg-surface-container-low flex items-center justify-center mb-2">
+      ${sel.photo ? `<img src="${gmEscapeHtml(sel.photo)}" alt="صورة القطعة ${gmEscapeHtml(sel.barcode)}" class="w-full h-full object-contain cursor-zoom-in" onclick="window.gmPhotoViewer ? gmPhotoViewer(this.src) : window.open(this.src)"/>`
+        : '<div class="text-center text-on-surface-variant text-[13px]"><span class="material-symbols-outlined text-[40px] block">no_photography</span>لا توجد صورة لهذه القطعة</div>'}
+    </div>
+    <div class="font-bold text-[14px] font-data-mono">${gmEscapeHtml(sel.barcode)} <span class="font-normal text-on-surface-variant">${gmEscapeHtml(sel.description || '')}</span></div>
+    <div class="text-[12px] text-on-surface-variant mb-2">${fmt(sel.grossWeight)} غ · عيار ${sel.karat || '—'}</div>
+    ${giveStockCart.length > 1 ? `<div class="flex flex-wrap gap-1.5">${giveStockCart.map(it => `
+      <button type="button" onclick="gsShowPhoto(${it.cartId})" title="${gmEscapeHtml(it.barcode)}" class="w-12 h-12 rounded-md overflow-hidden border-2 ${it === sel ? 'border-primary' : 'border-outline-variant'} bg-surface-container-low flex items-center justify-center">
+        ${it.photo ? `<img src="${gmEscapeHtml(it.photo)}" alt="" class="w-full h-full object-cover"/>` : `<span class="text-[9px] font-data-mono">${gmEscapeHtml(it.barcode)}</span>`}
+      </button>`).join('')}</div>` : ''}`;
+  el.classList.remove('hidden');
+}
+
 function renderGiveStockCart(previewOnly) {
+  renderGsPhotoPanel();
   const priced = gsIsPriced();
   if (priced && gsGoldPrices === null) { gsGoldPrices = {}; gsLoadGoldPrices(); }
   document.getElementById('gs-priced-note').classList.toggle('hidden', !priced);
