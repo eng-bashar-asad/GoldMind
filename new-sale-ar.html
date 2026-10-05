@@ -316,7 +316,7 @@
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-price" step="0.01" type="number"/>
 </div>
 <div class="relative hidden" id="stock-fab-wrap">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-fab-fee">مصنعية هذه القطعة (<span class="cur-label">د.إ</span>)</label>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="stock-fab-fee">مصنعية هذه القطعة (<span class="cur-label">AED</span>)</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="stock-fab-fee" step="0.01" type="number"/>
 <p class="text-[10px] text-on-surface-variant mt-1">هذه الدفعة "بضاعة أول المدة" — لا يوجد سعر مصنعية ثابت للغرام، اكتب مصنعية هذه القطعة تحديداً، وستُخصم من مجموع المصنعية المتبقي بالدفعة.</p>
 </div>
@@ -381,7 +381,7 @@
 </div>
 <div class="flex justify-between items-center pt-1 border-t border-outline-variant">
 <span class="text-primary font-bold text-[17px]">الإجمالي</span>
-<span class="text-primary font-bold text-[17px]" id="grand-total">0.00 د.إ</span>
+<span class="text-primary font-bold text-[17px]" id="grand-total">0.00 AED</span>
 </div>
 <div class="hidden text-left text-[12px] text-on-surface-variant font-data-mono" id="grand-total-base"></div>
 </div>
@@ -422,11 +422,11 @@
 <div class="bg-white border border-outline-variant rounded-lg overflow-hidden">
 <div class="flex justify-between items-center px-3 py-2 border-b border-outline-variant">
 <span class="text-[12px] text-on-surface-variant">المدفوع الآن</span>
-<span class="text-[13px] font-bold font-data-mono text-success" id="mixed-paid-now">0.00 د.إ</span>
+<span class="text-[13px] font-bold font-data-mono text-success" id="mixed-paid-now">0.00 AED</span>
 </div>
 <div class="flex justify-between items-center px-3 py-2" id="mixed-remaining-row">
 <span class="text-[12px] text-on-surface-variant" id="mixed-remaining-label">المتبقي كدين على الزبون</span>
-<span class="text-[13px] font-bold font-data-mono" id="mixed-remaining-note">0.00 د.إ</span>
+<span class="text-[13px] font-bold font-data-mono" id="mixed-remaining-note">0.00 AED</span>
 </div>
 </div>
 </div>
@@ -766,8 +766,8 @@
     showSaleTab(__savedSaleTab === 'diamond' ? 'barcode' : __savedSaleTab, false); // diamond tab shows once enabled
 
     // ---------- Store currency (company settings) ----------
-    const CUR_SYMBOLS = { AED: 'د.إ', USD: '$', SAR: 'ر.س', EUR: '€', GBP: '£', KWD: 'د.ك', QAR: 'ر.ق', OMR: 'ر.ع', BHD: 'د.ب', SYP: 'ل.س', TRY: '₺' };
-    let CUR = 'د.إ';
+    const CUR_SYMBOLS = { AED: 'AED', USD: 'USD', SAR: 'SAR', EUR: 'EUR', GBP: 'GBP', KWD: 'KWD', QAR: 'QAR', OMR: 'OMR', BHD: 'BHD', SYP: 'SYP', TRY: 'TRY' };
+    let CUR = 'AED';
     (async function __loadStoreCurrency() {
         await requireGoldMindSession('login-entry-ar.html');
         const { data } = await goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
@@ -1104,7 +1104,7 @@
     // unit) and cash/card. The invoice stays in the shop currency; each
     // currency's cash goes into the daily box in that currency.
     let fxRows = [], fxSeq = 0, FX_BASE = 'AED', FX_SECONDARY = null;
-    const FX_SYM = { AED: 'د.إ', USD: '$', SAR: 'ر.س', EUR: '€', SYP: 'ل.س', TRY: '₺', GBP: '£' };
+    const FX_SYM = { AED: 'AED', USD: 'USD', SAR: 'SAR', EUR: 'EUR', SYP: 'SYP', TRY: 'TRY', GBP: 'GBP' };
     const fxRateKey = c => 'gm_fx_' + GOLDMIND_STORE_ID + '_' + c;
     function fxDefaultRate(c) {
         let r = 0; try { r = parseFloat(localStorage.getItem(fxRateKey(c))) || 0; } catch (e) { /* ignore */ }

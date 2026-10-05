@@ -404,7 +404,7 @@ async function loadAllVouchers() {
   const has = k => me && (me.role === 'owner' || (me.permissions && me.permissions[k] === true));
   if (!has('stock_transfers')) { document.getElementById('no-access').classList.remove('hidden'); return; }
   const code = (store && store.currency || 'AED').toUpperCase();
-  CUR = ({ AED: 'د.إ', USD: '$', SAR: 'ر.س', SYP: 'ل.س' })[code] || code;
+  CUR = ({ AED: 'AED', USD: 'USD', SAR: 'SAR', SYP: 'SYP' })[code] || code;
   const [{ data: ps }, { data: ts }, { data: gp }, { data: cls }] = await Promise.all([
     goldmindClient.from('stock_parties').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
     has('view_traders') ? goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name') : Promise.resolve({ data: [] }),

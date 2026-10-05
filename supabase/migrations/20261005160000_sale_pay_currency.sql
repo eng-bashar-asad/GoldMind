@@ -5,3 +5,5 @@
 -- cash/bank paid). The daily mirror writes one row per cash currency from the breakdown (sale, cancel, restore);
 -- sync_invoice_bank_part skips such invoices. pay_currency/pay_fx_rate now only mean "print the invoice in this currency"
 -- (all lines priced in it).
+-- Edit in the sale currency: cash_movements.fx_amount / fx_currency (exact amount for the daily box);
+-- mirror uses them first, then pay_currency × pay_fx_rate; sync_invoice_bank_part converts by pay_fx_rate again.

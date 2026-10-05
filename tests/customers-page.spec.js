@@ -17,7 +17,7 @@ test('customers page: retail list, search, edit, menu entry', async ({ page }) =
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/customers-ar.html');
   await expect(page.locator('#count')).toHaveText('2 زبون');           // retail only by default
-  await expect(page.locator('#list')).toContainText('عليه 500.00 $');
+  await expect(page.locator('#list')).toContainText('عليه 500.00 USD');
   await page.fill('#q', '0955');
   await expect(page.locator('#count')).toHaveText('1 زبون');
   await expect(page.locator('#list a:has-text("تعديل")')).toHaveAttribute('href', 'customer-edit-ar.html?id=c2');
@@ -28,7 +28,7 @@ test('customers page: retail list, search, edit, menu entry', async ({ page }) =
   await expect(page.locator('#count')).toHaveText('1 زبون');
   await page.click('.kind[data-k="credit"]');
   await expect(page.locator('#count')).toHaveText('1 زبون');
-  await expect(page.locator('#list')).toContainText('له 200.00 $');
+  await expect(page.locator('#list')).toContainText('له 200.00 USD');
   await page.click('.kind[data-k="open"]');
   await expect(page.locator('#count')).toHaveText('2 زبون');
   await page.waitForSelector('#gmNav a[href="customers-ar.html"]', { state: 'attached' });

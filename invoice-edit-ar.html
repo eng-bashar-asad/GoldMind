@@ -139,6 +139,15 @@
 <script>
 let invoice = null;
 let items = [];
+// A sale sold in another currency (e.g. SYP) is edited in that currency:
+// lines show/accept it.f (amount in that currency); line_total = f ÷ FX.
+let FX = 0, FX_CUR = '';
+const fxLine = it => FX ? (it.f != null ? it.f : Math.round(Number(it.line_total || 0) * FX * 100) / 100) : Number(it.line_total || 0);
+function setLinePrice(idx, v) {
+  const it = items[idx];
+  if (FX) { it.f = v; it.line_total = Math.round(v / FX * 100) / 100; } else it.line_total = v;
+  updateTotal();
+}
 let removedItems = [];
 let newlyAddedCount = 0;
 let itemUid = 0;
@@ -161,8 +170,8 @@ function renderItems() {
       ${isDiamond ? `
       <div class="grid grid-cols-1 gap-2">
         <div>
-          <label class="text-[10px] text-outline">السعر</label>
-          <input type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${it.line_total}" oninput="items[${idx}].line_total = parseFloat(this.value)||0; updateTotal();"/>
+          <label class="text-[10px] text-outline">السعر${FX ? ' (' + FX_CUR + ')' : ''}</label>
+          <input type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${fxLine(it)}" oninput="setLinePrice(${idx}, parseFloat(this.value)||0)"/>
         </div>
       </div>
       <p class="text-[10px] text-outline mt-1.5">مواصفات الماس (القيراط/الـ4Cs) تُعدَّل من صفحة مخزون الماس، لا من هنا. ${it.weight_grams ? `الجزء الذهبي المرافق: ${it.weight_grams}غ عيار ${it.karat}.` : ''}</p>
@@ -179,8 +188,8 @@ function renderItems() {
           </select>
         </div>
         <div>
-          <label class="text-[10px] text-outline">السعر</label>
-          <input type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${it.line_total}" oninput="items[${idx}].line_total = parseFloat(this.value)||0; updateTotal();"/>
+          <label class="text-[10px] text-outline">السعر${FX ? ' (' + FX_CUR + ')' : ''}</label>
+          <input type="number" step="0.01" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono" value="${fxLine(it)}" oninput="setLinePrice(${idx}, parseFloat(this.value)||0)"/>
         </div>
       </div>
       `}
@@ -243,7 +252,8 @@ function addNewItem() {
     karat, weight_grams: weight, accounting_weight_grams: piece ? (piece.accounting_weight_grams || weight) : weight,
     description: desc || (piece ? piece.description_ar : null),
     description_en: piece ? piece.description_en : null,
-    line_total: price,
+    line_total: FX ? Math.round(price / FX * 100) / 100 : price,
+    f: FX ? price : null,
     gold_price_per_gram: null
   });
 
@@ -258,7 +268,7 @@ function addNewItem() {
 
 function updateTotal() {
   const total = items.reduce((s, it) => s + Number(it.line_total || 0), 0);
-  document.getElementById('newTotal').textContent = fmt(total);
+  document.getElementById('newTotal').textContent = FX ? fmt(items.reduce((s, it) => s + fxLine(it), 0)) + ' ' + FX_CUR : fmt(total);
 }
 
 async function postLedgerEntry(invoiceType, paymentMethod, amount, mode, description) {
@@ -323,7 +333,7 @@ function gmMixedToggle() {
 }
 function gmMixedNote() {
   const total = items.reduce((t, it) => t + Number(it.line_total || 0), 0);
-  const paid = (parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0);
+  const paid = ((parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0)) / (FX || 1);
   const el = document.getElementById('mixedNote');
   el.textContent = paid > total + 0.009 ? 'المدفوع أكبر من إجمالي الفاتورة' : 'المدفوع ' + fmt(paid) + ' — المتبقي دين على الزبون ' + fmt(total - paid);
   el.className = 'col-span-2 text-[12px] font-semibold ' + (paid > total + 0.009 ? 'text-error' : 'text-on-surface-variant');
@@ -341,11 +351,11 @@ async function saveEdit() {
   const newPaymentMethod = document.getElementById('paymentMethodSelect').value;
   const paymentMethodChanged = newPaymentMethod !== invoice.payment_method;
   if (invoice.type === 'sale' && newPaymentMethod === 'mixed') {
-    const paidMix = (parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0);
+    const paidMix = ((parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0)) / (FX || 1);
     if (paidMix > newTotal + 0.009) { errEl.textContent = 'المبلغ المدفوع (نقدي + فيزا) أكبر من إجمالي الفاتورة'; errEl.classList.remove('hidden'); return; }
   }
 
-  if (!confirm('هل أنت متأكد من حفظ التعديلات؟ الفرق بالمبلغ (' + fmt(delta) + ') سيُسجَّل كحركة بتاريخ اليوم.')) return;
+  if (!confirm('هل أنت متأكد من حفظ التعديلات؟ الفرق بالمبلغ (' + (FX ? fmt(items.reduce((t, it) => t + fxLine(it), 0) - oldTotal * FX) + ' ' + FX_CUR : fmt(delta)) + ') سيُسجَّل كحركة بتاريخ اليوم.')) return;
 
   const btn = document.getElementById('save-btn');
   btn.disabled = true;
@@ -381,10 +391,16 @@ async function saveEdit() {
   if (invoice.type === 'sale') {
     const oldPaid = Number(invoice.amount_paid || 0);
     const oldRem = oldTotal - oldPaid;
-    const mixCash = parseFloat(document.getElementById('mixedCash').value) || 0, mixBank = parseFloat(document.getElementById('mixedBank').value) || 0;
+    const mixCash = Math.round((parseFloat(document.getElementById('mixedCash').value) || 0) / (FX || 1) * 100) / 100, mixBank = Math.round((parseFloat(document.getElementById('mixedBank').value) || 0) / (FX || 1) * 100) / 100;
     const newPaid = newPaymentMethod === 'mixed' ? Math.round((mixCash + mixBank) * 100) / 100
       : newPaymentMethod === 'credit' ? 0 : oldRem <= 0.009 ? newTotal : Math.min(oldPaid, newTotal);
     saleMoney = { cashDelta: newPaid - oldPaid, debtDelta: (newTotal - newPaid) - oldRem };
+    if (FX && newTotal > 0) {
+      // keep the typed amounts exact: new rate = total typed ÷ invoice total
+      const newRate = items.reduce((s, it) => s + fxLine(it), 0) / newTotal;
+      updatePayload.pay_fx_rate = newRate;
+      saleMoney.fxDelta = Math.round((newPaid * newRate - oldPaid * FX) * 100) / 100;
+    }
     updatePayload.amount_paid = newPaid;
     updatePayload.status = newTotal - newPaid > 0.009 ? 'unpaid' : 'paid';
     if (oldRem > 0.009 && newPaymentMethod !== 'credit' && newPaymentMethod !== 'mixed') updatePayload.payment_method = invoice.payment_method;
@@ -479,7 +495,8 @@ async function saveEdit() {
       await goldmindClient.from('cash_movements').insert({
         store_id: GOLDMIND_STORE_ID, box: 'main', direction: saleMoney.cashDelta > 0 ? 'in' : 'out', amount: r2(Math.abs(saleMoney.cashDelta)),
         description: (saleMoney.cashDelta > 0 ? 'تحصيل فرق تعديل فاتورة ' : 'رد فرق تعديل فاتورة ') + invoice.invoice_number,
-        created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id
+        created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id,
+        ...(saleMoney.fxDelta ? { fx_amount: Math.abs(saleMoney.fxDelta), fx_currency: FX_CUR } : {})
       });
     }
     if (Math.abs(saleMoney.debtDelta) > 0.009 && invoice.customer_id) {
@@ -560,6 +577,7 @@ async function load() {
   }
 
   invoice = inv;
+  if (inv.type === 'sale' && inv.pay_currency && Number(inv.pay_fx_rate) > 0 && inv.status !== 'cancelled') { FX = Number(inv.pay_fx_rate); FX_CUR = inv.pay_currency; }
 
   const { data: itemRows } = await goldmindClient.from('invoice_items').select('*').eq('invoice_id', invoiceId);
   items = itemRows || [];
@@ -575,8 +593,8 @@ async function load() {
   }
   paySelect.value = invoice.payment_method;
   if (invoice.type === 'sale' && invoice.payment_method === 'mixed') {
-    document.getElementById('mixedCash').value = Number(invoice.cash_paid_amount || 0) || '';
-    document.getElementById('mixedBank').value = Number(invoice.bank_paid_amount || 0) || '';
+    document.getElementById('mixedCash').value = Math.round(Number(invoice.cash_paid_amount || 0) * (FX || 1) * 100) / 100 || '';
+    document.getElementById('mixedBank').value = Math.round(Number(invoice.bank_paid_amount || 0) * (FX || 1) * 100) / 100 || '';
   }
   gmMixedToggle();
 

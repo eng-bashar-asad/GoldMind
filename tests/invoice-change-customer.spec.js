@@ -51,3 +51,26 @@ test('sale invoice edit: mixed payment (cash + card, rest on debt)', async ({ pa
   expect(JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'customer_debts').body).cash_amount).toBe(350);
   expect(errs).toEqual([]);
 });
+
+test('a sale sold in SYP is edited in SYP; the difference goes to the daily box in SYP', async ({ page }) => {
+  const calls = await install(page, { generic: true, db: {
+    stores: [{ id: STORE, currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {} }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    invoices: [{ id: 'i26', store_id: STORE, invoice_number: 'INV-26', type: 'sale', status: 'paid', payment_method: 'cash', total_amount: 950, amount_paid: 950, pay_currency: 'SYP', pay_fx_rate: 13000, customer_id: 'c1', created_at: '2026-10-05T10:00:00Z' }],
+    invoice_items: [{ id: 'it1', invoice_id: 'i26', description: 'إسوارة', karat: 18, weight_grams: 6.19, line_total: 950 }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'زبائن متفرقة' }]
+  } });
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await page.goto('/invoice-edit-ar.html?id=i26');
+  const price = page.locator('input[oninput^="setLinePrice"]').first();
+  await expect(price).toHaveValue('12350000');
+  await price.fill('10235000');
+  await expect(page.locator('#newTotal')).toContainText('SYP');
+  await page.click('#save-btn');
+  await expect.poll(() => calls.some(c => c.method === 'POST' && c.name === 'cash_movements')).toBe(true);
+  const cm = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'cash_movements').body);
+  expect(cm).toMatchObject({ direction: 'out', fx_currency: 'SYP', fx_amount: 2115000 });
+  const upd = calls.find(c => c.method === 'PATCH' && c.name === 'invoices');
+  expect(JSON.parse(upd.body).pay_fx_rate * JSON.parse(upd.body).total_amount).toBeCloseTo(10235000, 0);
+});

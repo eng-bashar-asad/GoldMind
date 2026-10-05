@@ -23,10 +23,10 @@ test('subscription page: store currency by default, switch to dollars', async ({
   });
   await page.goto('/subscription-ar.html');
   const list = page.locator('#plans-list');
-  await expect(list).toContainText('4,490 درهم');
-  await expect(list).toContainText('2,199 درهم كل 3 أشهر');
+  await expect(list).toContainText('4,490 AED');
+  await expect(list).toContainText('2,199 AED كل 3 أشهر');
   await expect(list).toContainText('حتى 300 فاتورة شهرياً');
-  await expect(page.locator('#staff-usage-note')).toContainText('549 درهم سنوياً لكل موظف');
+  await expect(page.locator('#staff-usage-note')).toContainText('549 AED سنوياً لكل موظف');
   await page.click('.cur-btn[data-cur="USD"]');
   await expect(list).toContainText('$2,175');
   await expect(page.locator('#staff-usage-note')).toContainText('$150 سنوياً');
