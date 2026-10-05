@@ -142,3 +142,24 @@ test('discount on a customer debt goes through the server function, no cash', as
   await expect.poll(() => calls.some(c => c.name === 'customer_debt_discount_update')).toBe(true);
   expect(JSON.parse(calls.find(c => c.name === 'customer_debt_discount_update').body)).toMatchObject({ p_id: 'dz', p_amount: 0 });
 });
+
+test('expenses: an expense can be edited (amount/type) and deleted', async ({ page }) => {
+  const calls = await install(page, {
+    db: base({
+      expense_categories: [{ id: 'c1', store_id: STORE, name: 'كهرباء' }, { id: 'c3', store_id: STORE, name: 'اداريه' }],
+      expense_entries: [{ id: 'e9', store_id: STORE, category_id: 'c1', category: { name: 'كهرباء' }, amount: 200, description: 'فاتورة', created_at: new Date().toISOString() }],
+      inventory_gifts: [], gold_prices: []
+    }),
+    rpc: { update_expense: () => ({ body: { ok: true } }), delete_expense: () => ({ body: { ok: true } }) }
+  });
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await page.goto('/expense-entry-ar.html');
+  await page.getByRole('button', { name: 'تعديل' }).click();
+  await page.selectOption('#ee-cat-e9', 'c3');
+  await page.fill('#ee-amt-e9', '150');
+  await page.click('text=حفظ التعديل');
+  await expect.poll(() => calls.some(c => c.name === 'update_expense')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'update_expense').body)).toMatchObject({ p_id: 'e9', p_category: 'c3', p_amount: 150 });
+  await page.click('button[onclick="deleteExpense(\'e9\')"]');
+  await expect.poll(() => calls.some(c => c.name === 'delete_expense')).toBe(true);
+});

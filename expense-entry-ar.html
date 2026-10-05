@@ -297,21 +297,51 @@ async function revertGift(id, barcode) {
   loadList();
 }
 
+// ---- edit / delete an expense (its cashbox movement follows on the server) ----
+let LIST_ROWS = [];
+function editExpense(id) {
+  const r = LIST_ROWS.find(x => x.id === id); if (!r) return;
+  const box = $('exp-edit-' + id);
+  box.innerHTML = `<div class="p-3 bg-surface-container-low grid grid-cols-2 gap-2 text-[13px]">
+    <select id="ee-cat-${id}" class="col-span-2 h-10 border border-outline-variant rounded-lg px-2 bg-white">${CATS.filter(c => c.name !== GIFT).map(c => `<option value="${c.id}"${c.id === r.catId ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
+    <input id="ee-amt-${id}" type="number" step="0.01" inputmode="decimal" value="${r.amount}" class="h-10 border border-outline-variant rounded-lg px-2 font-data-mono" aria-label="المبلغ"/>
+    <input id="ee-desc-${id}" value="${esc(r.desc === r.cat ? '' : (r.desc || ''))}" placeholder="ملاحظة" class="h-10 border border-outline-variant rounded-lg px-2" aria-label="ملاحظة"/>
+    <button type="button" onclick="saveExpenseEdit('${id}')" class="h-10 bg-primary text-on-primary rounded-lg font-semibold">حفظ التعديل</button>
+    <button type="button" onclick="$('exp-edit-${id}').classList.add('hidden')" class="h-10 border border-outline-variant rounded-lg">إلغاء</button>
+  </div>`;
+  box.classList.remove('hidden');
+}
+async function saveExpenseEdit(id) {
+  const amount = parseFloat($('ee-amt-' + id).value);
+  if (!(amount > 0)) { alert('أدخل مبلغاً صحيحاً'); return; }
+  const { error } = await goldmindClient.rpc('update_expense', { p_id: id, p_category: $('ee-cat-' + id).value, p_amount: amount, p_description: $('ee-desc-' + id).value.trim() || null });
+  if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+  loadList();
+}
+async function deleteExpense(id) {
+  const r = LIST_ROWS.find(x => x.id === id); if (!r) return;
+  if (!confirm('حذف مصروف «' + r.cat + '» بقيمة ' + money(r.amount) + '؟ سيرجع المبلغ إلى الصندوق.')) return;
+  const { error } = await goldmindClient.rpc('delete_expense', { p_id: id });
+  if (error) { alert('تعذّر الحذف: ' + error.message); return; }
+  loadList();
+}
+
 // ---- list of the last 30 days: expenses + gifts (gift rows get a "return to stock" button) ----
 async function loadList() {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const [ex, gf] = await Promise.all([
-    canExpense ? goldmindClient.from('expense_entries').select('id, amount, description, created_at, category:category_id(name), staff:created_by(full_name)')
+    canExpense ? goldmindClient.from('expense_entries').select('id, amount, description, created_at, category_id, category:category_id(name), staff:created_by(full_name)')
       .eq('store_id', GOLDMIND_STORE_ID).gte('created_at', since).order('created_at', { ascending: false }) : { data: [] },
     canGift ? goldmindClient.from('inventory_gifts').select('id, barcode, recipient, total_cost, status, expense_entry_id, created_at')
       .eq('store_id', GOLDMIND_STORE_ID).gte('created_at', since) : { data: [] }
   ]);
   const gifts = gf.data || [];
   const giftByExp = {}; gifts.forEach(g => { if (g.expense_entry_id) giftByExp[g.expense_entry_id] = g; });
-  let rows = (ex.data || []).map(e => ({ at: e.created_at, cat: e.category && e.category.name, desc: e.description, amount: Number(e.amount), who: e.staff && e.staff.full_name, gift: giftByExp[e.id] }));
+  let rows = (ex.data || []).map(e => ({ id: e.id, catId: e.category_id, at: e.created_at, cat: e.category && e.category.name, desc: e.description, amount: Number(e.amount), who: e.staff && e.staff.full_name, gift: giftByExp[e.id] }));
   if (!canExpense) rows = gifts.map(g => ({ at: g.created_at, cat: GIFT, desc: 'هدية: ' + g.barcode + ' — إلى ' + g.recipient, amount: Number(g.total_cost), gift: g }));
   // a reverted gift's expense is removed on the server; keep only live rows
   rows = rows.filter(r => !r.gift || r.gift.status === 'active');
+  LIST_ROWS = rows;
   $('list-total').textContent = rows.length ? 'المجموع: ' + money(rows.reduce((s, r) => s + r.amount, 0)) : '';
   $('list').innerHTML = rows.length ? rows.map(r => `
     <div class="p-3 flex items-center gap-3">
@@ -323,8 +353,10 @@ async function loadList() {
       <div class="text-left">
         <div class="font-bold font-data-mono text-[13px]">${money(r.amount)}</div>
         ${r.gift && canGift ? `<button type="button" onclick="revertGift('${r.gift.id}', '${esc(r.gift.barcode || '').replace(/'/g, '')}')" class="text-[11px] text-primary underline">إرجاع إلى المخزن</button>` : ''}
+        ${!r.gift && r.id && canExpense ? `<button type="button" onclick="editExpense('${r.id}')" class="text-[11px] text-primary underline">تعديل</button> · <button type="button" onclick="deleteExpense('${r.id}')" class="text-[11px] text-error underline">حذف</button>` : ''}
       </div>
-    </div>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد مصاريف في آخر 30 يوماً.</p>';
+    </div>
+    <div id="exp-edit-${r.id}" class="hidden"></div>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد مصاريف في آخر 30 يوماً.</p>';
 }
 
 (async function load() {
