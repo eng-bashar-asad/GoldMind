@@ -530,6 +530,7 @@
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة';
         renderTotals(ALL_PIECES);
+        gmScopeChanged();
     }
     // Kept as an alias -- older calls in this file still reference it.
     function showKaratBoxes() { showTopLevel(); }
@@ -578,6 +579,7 @@
         renderTotals(pieces);
         boxesEl.classList.remove('hidden');
         boxesEl.classList.add('grid');
+        gmScopeChanged();
     }
 
     // Enter a box's (optionally batch-scoped) contents: karat cards for
@@ -613,6 +615,7 @@
         renderTotals(pieces);
 
         document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
+        gmScopeChanged();
     }
 
     // Drill into one box (and, if applicable, one batch within it): show
@@ -629,6 +632,7 @@
         document.getElementById('karat-boxes-back').classList.add('flex');
         document.getElementById('piece-list-title').textContent = 'صندوق: ' + boxName;
         renderKaratBoxesFor(pieces);
+        gmScopeChanged();
     }
 
     function showPrefixKarats(boxName, prefix) {
@@ -643,6 +647,7 @@
         document.getElementById('karat-boxes-back').classList.add('flex');
         document.getElementById('piece-list-title').textContent = 'صندوق: ' + boxName + ' — ' + prefix;
         renderKaratBoxesFor(pieces);
+        gmScopeChanged();
     }
 
     // The back button above the karat/batch cards: where it goes depends
@@ -679,6 +684,7 @@
     // "قطع ذهبية" has a karat layer to return to; every other box goes
     // straight back to its batch picker (if it has one) or the top level.
     function backFromPieceList() {
+        if (gmStatusSel !== 'available' && currentBoxScope !== null) { gmPickStatus('available'); return; }
         if (currentBoxScope && usesKaratGrouping(currentBoxScope)) {
             if (currentPrefixScope) showPrefixKarats(currentBoxScope, currentPrefixScope);
             else showBoxKarats(currentBoxScope);
@@ -732,21 +738,54 @@
         bar.setAttribute('aria-label', 'توزيع الوزن: ' + parts.map(([n, w]) => n + ' ' + Math.round(w / total * 100) + '٪').join('، '));
     }
 
-    // الكل / متوفرة / محجوزة / مباعة -- a tap filters the list by status
-    let gmStatusSel = 'all';
+    // الكل / متوفرة / محجوزة / مباعة -- counts and filtering follow the box
+    // (and batch) currently open; at the top level they cover every box.
+    // "متوفرة" is the normal view (box cards / drill-down); "الكل" really
+    // means every status, sold and reserved included.
+    let gmStatusSel = 'available';
+    const GM_STATUS_LABEL = { all: 'الكل', available: 'متوفرة', reserved: 'محجوزة', sold: 'مباعة' };
+    function gmScopeRaw() {
+        return ALL_PIECES_RAW.filter(p =>
+            (currentBoxScope === null || (p.box_name || '').trim() === currentBoxScope) &&
+            (currentPrefixScope === null || prefixOf(p.barcode) === currentPrefixScope));
+    }
+    // navigation into/out of a box resets the filter to the normal view
+    function gmScopeChanged() { gmStatusSel = 'available'; gmRenderStatusTiles(); }
     function gmRenderStatusTiles() {
         const el = document.getElementById('gmStatusTiles');
         if (!el) return;
-        const n = (st) => ALL_PIECES_RAW.filter(p => p.status === st).length;
-        const tiles = [['all', 'الكل', ALL_PIECES_RAW.length], ['available', 'متوفرة', n('available')], ['reserved', 'محجوزة', n('reserved')], ['sold', 'مباعة', n('sold')]];
-        el.innerHTML = tiles.map(([k, l, c]) => `<button type="button" data-st="${k}" aria-pressed="${gmStatusSel === k}"><span>${l}</span><b>${c}</b></button>`).join('');
-        el.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => {
-            gmStatusSel = b.dataset.st;
-            ['search-barcode', 'search-weight-from', 'search-weight-to', 'search-type'].forEach(id => { document.getElementById(id).value = ''; });
-            if (gmStatusSel === 'all') { closeSearch(); }
-            else { document.getElementById('search-status').value = gmStatusSel; runSearch(); }
-            gmRenderStatusTiles();
-        }));
+        const raw = gmScopeRaw();
+        const n = (st) => raw.filter(p => p.status === st).length;
+        const tiles = [['all', raw.length], ['available', n('available')], ['reserved', n('reserved')], ['sold', n('sold')]];
+        el.innerHTML = tiles.map(([k, c]) => `<button type="button" data-st="${k}" aria-pressed="${gmStatusSel === k}"><span>${GM_STATUS_LABEL[k]}</span><b>${c}</b></button>`).join('');
+        el.querySelectorAll('[data-st]').forEach(b => b.addEventListener('click', () => gmPickStatus(b.dataset.st)));
+    }
+    function gmPickStatus(st) {
+        gmStatusSel = st;
+        ['search-barcode', 'search-weight-from', 'search-weight-to', 'search-type'].forEach(id => { document.getElementById(id).value = ''; });
+        document.getElementById('search-results-view').classList.add('hidden');
+        if (st === 'available') {
+            const box = currentBoxScope, pre = currentPrefixScope;
+            if (box === null) showTopLevel(); else if (pre) enterScope(box, pre); else enterBox(box);
+            return;
+        }
+        if (currentBoxScope === null) {
+            // top level: search every box
+            document.getElementById('search-status').value = st === 'all' ? '' : st;
+            runSearch();
+        } else {
+            const pieces = gmScopeRaw().filter(p => st === 'all' || p.status === st);
+            ['karat-boxes', 'box-boxes'].forEach(id => { const e = document.getElementById(id); e.classList.add('hidden'); e.classList.remove('grid'); });
+            document.getElementById('lots-section').classList.add('hidden');
+            document.getElementById('karat-boxes-back').classList.add('hidden');
+            document.getElementById('karat-boxes-back').classList.remove('flex');
+            document.getElementById('piece-list-view').classList.remove('hidden');
+            document.getElementById('piece-list-title').textContent = currentBoxScope + (currentPrefixScope ? ' — ' + currentPrefixScope : '') + ' — ' + GM_STATUS_LABEL[st];
+            document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
+            renderTotals(pieces);
+            document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('') || '<p class="col-span-full text-center text-[12px] text-on-surface-variant py-8">لا توجد قطع بهذه الحالة في هذا الصندوق.</p>';
+        }
+        gmRenderStatusTiles();
     }
 
     // ---- Gold held by weight (gold_stock_lots with something left) ----
