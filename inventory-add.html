@@ -230,6 +230,7 @@
 </div>
 <!-- Form fields column -->
 <div class="lg:col-span-2 xl:col-span-4 flex flex-col gap-6">
+<div id="gm-prod-banner" class="hidden rounded-xl border border-[#B4955A] bg-[#FBF5E8] px-4 py-3 text-[13px]"></div>
 <!-- Form Fields -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col gap-3">
 <div class="grid grid-cols-2 gap-3">
@@ -436,6 +437,7 @@
             loadClassificationOptions('category1', 'category1', 'صنف ١');
             loadClassificationOptions('category2', 'category2', 'صنف ٢');
             loadBoxNameOptions();
+            await gmInitProduction();
             gmRestoreAddSession();
 
             // Loaded once here and reused for every "print" tap in the
@@ -771,6 +773,54 @@
         const sessionPieces = [];
         let currentBatchId = null; // piece_intake_batches row for this add-piece session, created lazily on first save
 
+        // ---------- Production mode (?prod=كسر 18 or ?lot=<id>) ----------
+        // Same form as adding a piece, but every saved piece takes its gross
+        // weight out of the scrap box (oldest purchases first) or the lot.
+        const __qs = new URLSearchParams(location.search);
+        const GM_PROD_PARAM = __qs.get('prod') ? 'box:' + __qs.get('prod') : (__qs.get('lot') ? 'lot:' + __qs.get('lot') : '');
+        let GM_PROD = null; // { label, karat, lots: [{id, weight_grams_remaining, cost_fabrication_per_gram}] }
+        const gmProdAvail = () => GM_PROD ? GM_PROD.lots.reduce((t, l) => t + Number(l.weight_grams_remaining || 0), 0) : 0;
+        function gmRenderProdBanner() {
+            const el = document.getElementById('gm-prod-banner');
+            el.innerHTML = `<div class="flex items-center justify-between gap-3"><div><b>إنتاج قطع من ${gmEscapeHtml(GM_PROD.label)}</b>
+                <div class="text-[12px] text-on-surface-variant">كل قطعة تحفظها يُخصم وزنها القائم من ${gmEscapeHtml(GM_PROD.label)}.</div></div>
+                <div class="text-left"><div class="text-[11px] text-on-surface-variant">المتوفر</div><b class="font-data-mono text-[16px]" dir="ltr">${gmProdAvail().toFixed(2)} غ</b></div></div>`;
+            el.classList.remove('hidden');
+        }
+        async function gmInitProduction() {
+            if (!GM_PROD_PARAM) return;
+            let q = goldmindClient.from('gold_stock_lots').select('id, karat, box_name, weight_grams_remaining, cost_fabrication_per_gram, created_at')
+                .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).order('created_at');
+            q = __qs.get('prod') ? q.eq('box_name', __qs.get('prod')) : q.eq('id', __qs.get('lot'));
+            const { data } = await q;
+            if (!data || !data.length) { alert('لا يوجد وزن متوفر للإنتاج.'); location.href = 'stock-production-ar.html'; return; }
+            const label = __qs.get('prod') || (data[0].box_name || ('ذهب عيار ' + data[0].karat));
+            GM_PROD = { label, karat: data[0].karat, lots: data };
+            document.title = 'إنتاج قطع | جولد مايند';
+            document.querySelector('header h1').textContent = 'إنتاج قطع — ' + label;
+            const k = document.getElementById('karat');
+            k.value = String(GM_PROD.karat); k.disabled = true;
+            const w = gmProdAvail();
+            const avgCost = w ? data.reduce((t, l) => t + Number(l.weight_grams_remaining) * Number(l.cost_fabrication_per_gram || 0), 0) / w : 0;
+            if (avgCost > 0 && !document.getElementById('fab-cost').value) document.getElementById('fab-cost').value = avgCost.toFixed(2);
+            gmRenderProdBanner();
+        }
+        // take `amount` grams from the oldest lots first
+        async function gmConsumeProduction(amount) {
+            let left = amount;
+            for (const l of GM_PROD.lots) {
+                if (left <= 0.0001) break;
+                const a = Math.round(Math.min(left, Number(l.weight_grams_remaining)) * 1000) / 1000;
+                if (a <= 0) continue;
+                const { error } = await goldmindClient.rpc('consume_gold_stock_lot', { target_lot_id: l.id, amount: a });
+                if (error) return error;
+                l.weight_grams_remaining = Number(l.weight_grams_remaining) - a; left -= a;
+            }
+            GM_PROD.lots = GM_PROD.lots.filter(l => l.weight_grams_remaining > 0.0001);
+            gmRenderProdBanner();
+            return null;
+        }
+
         // Creates the batch ("سند إدخال بضاعة") on the FIRST successful save
         // of this page visit, not on page load -- so visiting the page
         // without ever saving anything never leaves an empty batch behind.
@@ -779,7 +829,8 @@
             if (currentBatchId) return currentBatchId;
             const { data, error } = await goldmindClient.from('piece_intake_batches').insert({
                 store_id: GOLDMIND_STORE_ID,
-                source_type: 'manual',
+                source_type: GM_PROD ? 'production' : 'manual',
+                source_lot_id: GM_PROD ? GM_PROD.lots[0].id : null,
                 created_by: GOLDMIND_STAFF_ID
             }).select().single();
             if (error) { console.error('تعذّر إنشاء سند الإدخال:', error.message); return null; }
@@ -847,7 +898,7 @@
         // The session (its intake voucher + the pieces added) survives opening a
         // piece to edit it and coming back: kept in sessionStorage for this tab,
         // up to 12 hours, until "سند جديد" is pressed.
-        const GM_ADD_SESSION_KEY = 'gm-add-session';
+        const GM_ADD_SESSION_KEY = 'gm-add-session' + (GM_PROD_PARAM ? ':prod:' + GM_PROD_PARAM : '');
         function gmSaveAddSession() {
             try {
                 sessionStorage.setItem(GM_ADD_SESSION_KEY, JSON.stringify({ store: GOLDMIND_STORE_ID, batch: currentBatchId,
@@ -933,6 +984,12 @@
 
             if (!weight || weight <= 0) {
                 showMessage('فضلاً أدخل وزناً صحيحاً.', true);
+                saveBtn.disabled = false;
+                return;
+            }
+
+            if (GM_PROD && weight > gmProdAvail() + 0.0001) {
+                showMessage('وزن القطعة (' + weight + 'غ) أكبر من المتوفر في ' + GM_PROD.label + ' (' + gmProdAvail().toFixed(2) + 'غ).', true);
                 saveBtn.disabled = false;
                 return;
             }
@@ -1023,8 +1080,12 @@
             if (newPiece) {
                 await goldmindClient.from('piece_movements').insert({
                     store_id: GOLDMIND_STORE_ID, piece_id: newPiece.id, event_type: 'created',
-                    note: 'إدخال قطعة جديدة — وزن ' + weight + 'غ، عيار ' + karat, created_by: GOLDMIND_STAFF_ID
+                    note: (GM_PROD ? 'إنتاج من ' + GM_PROD.label : 'إدخال قطعة جديدة') + ' — وزن ' + weight + 'غ، عيار ' + karat, created_by: GOLDMIND_STAFF_ID
                 });
+                if (GM_PROD) {
+                    const cErr = await gmConsumeProduction(weight);
+                    if (cErr) alert('حُفظت القطعة لكن تعذّر خصم الوزن من ' + GM_PROD.label + ': ' + cErr.message + ' — راجع الرصيد.');
+                }
             }
 
             showMessage('تم حفظ القطعة بنجاح! الباركود: ' + barcode, false);

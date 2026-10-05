@@ -13,7 +13,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=33"></script>
 <script src="theme.js?v=49"></script>
-<script src="gm-camera.js?v=2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
         tailwind.config = { darkMode: "class", theme: { extend: {
@@ -87,7 +86,7 @@
 </header>
 <div class="px-margin-mobile md:px-margin-desktop py-6 md:py-8 max-w-container-max mx-auto w-full space-y-4">
 
-<p class="text-[12px] md:text-[13px] text-on-surface-variant leading-5 md:max-w-2xl">حوّل رصيد الجملة (اللوتات) إلى قطع مستقلة برواكيد فردية بالمخزون، مع صورة لكل قطعة — يُؤخذ العيار والمصنعية تلقائياً من الدفعة.</p>
+<p class="text-[12px] md:text-[13px] text-on-surface-variant leading-5 md:max-w-2xl">اختر صندوقاً لإنتاج قطع منه: تُضاف القطع من شاشة إضافة القطعة نفسها، ويُخصم وزن كل قطعة من الصندوق تلقائياً.</p>
 
 <div id="loading-state" class="text-center text-on-surface-variant text-sm py-10">جارِ التحميل...</div>
 <div id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-10">لا يوجد رصيد جملة متوفر حالياً. أضِف رصيداً من فاتورة شراء (وضع "رصيد بالجملة").</div>
@@ -105,56 +104,38 @@
     })();
 
     let lots = [];
-    let openLotId = null;
-    const rowsByLot = {}; // lotId -> [{ rowId, description, weight, photoFile, photoPreviewUrl }]
-    const destBoxByLot = {}; // lotId -> destination box_name for produced pieces
-    let rowCounter = 0;
-
     function fmt(n) { return (Math.round((Number(n) + Number.EPSILON) * 100) / 100).toFixed(2); }
 
     async function load() {
         const session = await requireGoldMindSession('login-entry-ar.html');
         if (!session) return;
-
         const { data, error } = await goldmindClient
             .from('gold_stock_lots')
             .select('*, trader:trader_id(name), invoice:source_invoice_id(invoice_number)')
             .eq('store_id', GOLDMIND_STORE_ID)
             .gt('weight_grams_remaining', 0)
             .order('created_at', { ascending: false });
-
         document.getElementById('loading-state').classList.add('hidden');
-
         if (error) {
-            document.getElementById('lots-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${error.message}</p>`;
+            document.getElementById('lots-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</p>`;
             return;
         }
-
         lots = data || [];
         if (lots.length === 0) document.getElementById('empty-state').classList.remove('hidden');
         renderLots();
     }
 
     // Lots are grouped in boxes: the scrap boxes «كسر 18/21/22/24» always show
-    // (empty ones too), any other box name gets its own box. A box opens to
-    // its lots; a lot opens to the production form.
+    // (empty ones too) and are one pool each -- production opens the normal
+    // add-piece page, and each saved piece takes its weight out of the pool
+    // (oldest purchases first). Other boxes list their lots.
     const SCRAP_KARATS = [18, 21, 22, 24];
     let openBox = null;
     const lotBox = l => (l.box_name || '').trim() || ('ذهب عيار ' + l.karat);
-    // A scrap box («كسر 18»...) is one pool: its lots are merged into a single
-    // virtual lot with the total weight; production takes from the oldest
-    // lots first. Purchase details stay on the purchase invoices.
-    const virtualLots = {};
-    function findLot(id) { return virtualLots[id] || lots.find(l => l.id === id); }
-    function scrapPool(name, list) {
-        const members = list.slice().sort((a, b) => String(a.created_at).localeCompare(String(b.created_at)));
-        const w = members.reduce((t, l) => t + Number(l.weight_grams_remaining || 0), 0);
-        const cost = w ? members.reduce((t, l) => t + Number(l.weight_grams_remaining || 0) * Number(l.cost_fabrication_per_gram || 0), 0) / w : 0;
-        const id = 'pool-' + name.replace(/[^0-9]/g, '');
-        virtualLots[id] = { id, pool: true, members, box_name: name, karat: members[0].karat, weight_grams_remaining: w, weight_grams_total: w, cost_fabrication_per_gram: cost };
-        return virtualLots[id];
-    }
+    const isScrapBox = n => /^كسر \d+$/.test(n);
     function toggleBox(name) { openBox = openBox === name ? null : name; renderLots(); }
+    function produceHref(params) { return 'inventory-add.html?' + new URLSearchParams(params).toString(); }
+
     function renderLots() {
         const byBox = {};
         SCRAP_KARATS.forEach(k => { byBox['كسر ' + k] = []; });
@@ -162,275 +143,29 @@
         const scrapOrder = n => { const i = SCRAP_KARATS.map(k => 'كسر ' + k).indexOf(n); return i < 0 ? 99 : i; };
         const names = Object.keys(byBox).sort((a, b) => scrapOrder(a) - scrapOrder(b) || a.localeCompare(b, 'ar'));
         document.getElementById('lots-list').innerHTML = names.map(name => {
-            const list = byBox[name], isOpen = openBox === name && list.length;
+            const list = byBox[name];
             const w = list.reduce((t, l) => t + Number(l.weight_grams_remaining || 0), 0);
-            const safe = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
-            return `<div class="${isOpen ? 'lg:col-span-2 ' : ''}bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-                <div ${list.length ? `onclick="toggleBox('${safe}')" role="button" tabindex="0"` : ''} class="p-4 flex items-center justify-between gap-3 ${list.length ? 'cursor-pointer' : 'opacity-60'}">
-                    <div class="flex items-center gap-3">
+            const head = `<div class="flex items-center gap-3">
                         <span class="material-symbols-outlined text-[#B4955A]">inventory_2</span>
                         <div><div class="font-bold text-[15px]">${gmEscapeHtml(name)}</div>
-                        <div class="text-[11px] text-on-surface-variant">${list.length ? list.length + ' دفعة' : 'فارغ'}</div></div>
+                        <div class="text-[11px] text-on-surface-variant">${list.length ? (isScrapBox(name) ? 'اضغط لإنتاج قطع' : list.length + ' دفعة') : 'فارغ'}</div></div>
                     </div>
-                    <div class="flex items-center gap-2"><b class="font-data-mono text-[15px]" dir="ltr">${fmt(w)} غ</b>
-                    ${list.length ? `<span class="material-symbols-outlined text-outline">${isOpen ? 'expand_less' : 'expand_more'}</span>` : ''}</div>
-                </div>
-                ${isOpen ? (/^كسر \d+$/.test(name)
-                    ? `<div class="p-3 pt-0">${lotCardHtml(scrapPool(name, list))}</div>`
-                    : `<div class="p-3 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-3 items-start">${list.map(lotCardHtml).join('')}</div>`) : ''}
+                    <b class="font-data-mono text-[15px]" dir="ltr">${fmt(w)} غ</b>`;
+            const card = 'bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden';
+            if (!list.length) return `<div class="${card} opacity-60"><div class="p-4 flex items-center justify-between gap-3">${head}</div></div>`;
+            // scrap box: one pool, straight to production
+            if (isScrapBox(name)) return `<a href="${produceHref({ prod: name })}" class="${card} block hover:border-[#B4955A]"><div class="p-4 flex items-center justify-between gap-3">${head}</div></a>`;
+            const isOpen = openBox === name;
+            const safe = name.replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+            return `<div class="${isOpen ? 'lg:col-span-2 ' : ''}${card}">
+                <div onclick="toggleBox('${safe}')" role="button" tabindex="0" class="p-4 flex items-center justify-between gap-3 cursor-pointer">${head}</div>
+                ${isOpen ? `<div class="p-3 pt-0 grid grid-cols-1 lg:grid-cols-2 gap-3">${list.map(lot => `
+                    <a href="${produceHref({ lot: lot.id })}" class="block border border-outline-variant rounded-lg p-3 hover:border-[#B4955A]">
+                        <div class="font-bold text-[14px]">عيار ${lot.karat}K — متبقي ${fmt(lot.weight_grams_remaining)}غ <span class="text-outline font-normal">(من أصل ${fmt(lot.weight_grams_total)}غ)</span></div>
+                        <div class="text-[11px] text-on-surface-variant mt-1">مصنعية الغرام: ${fmt(lot.cost_fabrication_per_gram)}${lot.trader ? ' • من: ' + gmEscapeHtml(lot.trader.name) : ''}${lot.invoice ? ' • فاتورة ' + gmEscapeHtml(lot.invoice.invoice_number) : ''}</div>
+                    </a>`).join('')}</div>` : ''}
             </div>`;
         }).join('');
-    }
-    function lotCardHtml(lot) {
-            const isOpen = openLotId === lot.id;
-            const rows = rowsByLot[lot.id] || [];
-            const usedInForm = rows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-            const usedAccountingInForm = rows.reduce((s, r) => s + (Number(r.accountingWeight) || Number(r.weight) || 0), 0);
-            const remainingAfterForm = Number(lot.weight_grams_remaining) - usedInForm;
-            const destBoxName = destBoxByLot[lot.id] != null ? destBoxByLot[lot.id] : 'قطع مجوهرات';
-
-            const rowsHtml = rows.map(r => `
-                <div class="border border-outline-variant rounded-lg p-2 space-y-2">
-                    <div class="flex gap-2 items-center">
-                        <button type="button" onclick="triggerRowPhotoCapture('${lot.id}', ${r.rowId}, 'row-photo-input-${r.rowId}')" class="h-11 w-11 shrink-0 rounded-lg border border-dashed border-outline-variant flex items-center justify-center overflow-hidden bg-surface-container-low">
-                            ${r.photoPreviewUrl ? `<img src="${r.photoPreviewUrl}" class="w-full h-full object-cover"/>` : `<span class="material-symbols-outlined text-outline text-[18px]">photo_camera</span>`}
-                        </button>
-                        <input type="file" accept="image/*" capture="environment" class="hidden" id="row-photo-input-${r.rowId}" onchange="onRowPhotoSelected('${lot.id}', ${r.rowId}, this)"/>
-                        <input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 text-sm" placeholder="وصف القطعة" value="${(r.description || '').replace(/"/g, '&quot;')}" oninput="updateRow('${lot.id}', ${r.rowId}, 'description', this.value)"/>
-                        <input class="w-24 h-11 border border-outline-variant rounded-lg px-2 text-sm font-data-mono" dir="ltr" placeholder="الوزن" step="0.01" type="number" value="${r.weight || ''}" oninput="updateRow('${lot.id}', ${r.rowId}, 'weight', this.value)"/>
-                        <button type="button" onclick="removeRow('${lot.id}', ${r.rowId})" class="h-11 w-11 shrink-0 flex items-center justify-center rounded-lg border border-outline-variant text-error">
-                            <span class="material-symbols-outlined text-[16px]">delete</span>
-                        </button>
-                    </div>
-                    <div class="flex items-center gap-2 mr-[52px]">
-                        <span class="text-[11px] text-on-surface-variant shrink-0">وزن المحاسبة (إن وُجدت أحجار):</span>
-                        <input class="w-24 h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" dir="ltr" placeholder="= الوزن إذا فارغ" step="0.01" type="number" value="${r.accountingWeight || ''}" oninput="updateRow('${lot.id}', ${r.rowId}, 'accountingWeight', this.value)"/>
-                    </div>
-                </div>`).join('');
-
-            return `
-            <div class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
-                <div onclick="toggleLot('${lot.id}')" role="button" tabindex="0" class="w-full p-4 flex items-center justify-between text-right cursor-pointer">
-                    <div>
-                        <div class="font-bold text-[14px]">${lot.pool ? 'إنتاج قطع من ' + gmEscapeHtml(lot.box_name) + ' — المتوفر ' + fmt(lot.weight_grams_remaining) + 'غ' : `${lot.box_name ? gmEscapeHtml(lot.box_name) + ' — ' : ''}عيار ${lot.karat}K — متبقي ${fmt(lot.weight_grams_remaining)}غ <span class="text-outline font-normal">(من أصل ${fmt(lot.weight_grams_total)}غ)</span>`}</div>
-                        ${lot.pool ? '' : `<div class="text-[11px] text-on-surface-variant mt-1">مصنعية الغرام: ${fmt(lot.cost_fabrication_per_gram)}${lot.trader ? ' • من: ' + gmEscapeHtml(lot.trader.name) : ''}${lot.invoice ? ` • <a href="invoice-print-ar.html?id=${lot.source_invoice_id}" onclick="event.stopPropagation()" class="text-secondary font-semibold underline">فاتورة ${gmEscapeHtml(lot.invoice.invoice_number)} ←</a>` : ''}</div>`}
-                    </div>
-                    <span class="material-symbols-outlined text-outline">${isOpen ? 'expand_less' : 'expand_more'}</span>
-                </div>
-                ${isOpen ? `
-                <div class="p-4 pt-0 border-t border-outline-variant space-y-3">
-                    <div class="relative${lot.pool ? ' hidden' : ''}">
-                        <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="lot-box-name-${lot.id}">اسم الصندوق المصدر (اختياري)</label>
-                        <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="lot-box-name-${lot.id}" oninput="updateLotBoxName('${lot.id}', this.value)" placeholder="مثلاً: ذهب مشغول" value="${(lot.box_name || '').replace(/"/g, '&quot;')}"/>
-                    </div>
-                    <div class="relative">
-                        <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="dest-box-name-${lot.id}">اسم الصندوق الوجهة للقطع المنتجة</label>
-                        <input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]" id="dest-box-name-${lot.id}" oninput="destBoxByLot['${lot.id}'] = this.value" placeholder="مثلاً: قطع مجوهرات" value="${destBoxName.replace(/"/g, '&quot;')}"/>
-                    </div>
-                    <div class="space-y-2" id="rows-${lot.id}">${rowsHtml}</div>
-                    <button type="button" onclick="addRow('${lot.id}')" class="w-full h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary">+ إضافة قطعة</button>
-                    <div class="text-[11.5px] font-bold text-on-background" id="lot-used-${lot.id}">
-                        مجموع الوزن المدخل بهذا السند حتى الآن: ${fmt(usedInForm)}غ
-                    </div>
-                    <div class="text-[11.5px] font-bold text-on-background" id="lot-used-accounting-${lot.id}">
-                        مجموع وزن المحاسبة بهذا السند حتى الآن: ${fmt(usedAccountingInForm)}غ
-                    </div>
-                    <div class="text-[11.5px] ${remainingAfterForm < 0 ? 'text-error font-bold' : 'text-on-surface-variant'}" id="lot-remaining-${lot.id}">
-                        المتبقي بعد الإنتاج: ${fmt(remainingAfterForm)}غ
-                    </div>
-                    <div class="hidden text-error text-[11.5px]" id="lot-error-${lot.id}"></div>
-                    <button type="button" onclick="produceFromLot('${lot.id}')" id="produce-btn-${lot.id}" class="w-full h-11 bg-[#B4955A] text-white font-bold rounded-lg text-[13px]">حفظ القطع المنتَجة</button>
-                </div>` : ''}
-            </div>`;
-    }
-
-    function toggleLot(lotId) {
-        openLotId = openLotId === lotId ? null : lotId;
-        if (openLotId && !rowsByLot[lotId]) rowsByLot[lotId] = [];
-        renderLots();
-    }
-
-    function addRow(lotId) {
-        if (!rowsByLot[lotId]) rowsByLot[lotId] = [];
-        rowsByLot[lotId].push({ rowId: ++rowCounter, description: '', weight: '', accountingWeight: '', photoFile: null, photoPreviewUrl: null });
-        renderLots();
-    }
-
-    function applyRowPhotoFile(lotId, rowId, file) {
-        if (!file) return;
-        const row = (rowsByLot[lotId] || []).find(r => r.rowId === rowId);
-        if (!row) return;
-        row.photoFile = file;
-        row.photoPreviewUrl = URL.createObjectURL(file);
-        renderLots();
-    }
-
-    async function triggerRowPhotoCapture(lotId, rowId, inputId) {
-        if (typeof GMCamera !== 'undefined' && GMCamera.isSupported()) {
-            const file = await GMCamera.capture();
-            if (file) { applyRowPhotoFile(lotId, rowId, file); return; }
-        }
-        document.getElementById(inputId).click();
-    }
-
-    function onRowPhotoSelected(lotId, rowId, input) {
-        const file = input.files && input.files[0];
-        applyRowPhotoFile(lotId, rowId, file);
-    }
-
-    function updateLotBoxName(lotId, value) {
-        const lot = findLot(lotId);
-        if (lot) lot.box_name = value; // kept in memory only until "حفظ القطع المنتَجة" -- see produceFromLot
-    }
-
-    function updateRow(lotId, rowId, field, value) {
-        const row = (rowsByLot[lotId] || []).find(r => r.rowId === rowId);
-        if (row) row[field] = value;
-        // Update just the running-total line by id, not a full re-render,
-        // so the weight/description input the person is typing in doesn't
-        // lose focus or cursor position on every keystroke.
-        const rows = rowsByLot[lotId] || [];
-        const lot = findLot(lotId);
-        if (lot) {
-            const usedInForm = rows.reduce((s, r) => s + (Number(r.weight) || 0), 0);
-            const remainingAfterForm = Number(lot.weight_grams_remaining) - usedInForm;
-            const el = document.getElementById('lot-remaining-' + lotId);
-            if (el) {
-                el.textContent = 'المتبقي بعد الإنتاج: ' + fmt(remainingAfterForm) + 'غ';
-                el.className = (remainingAfterForm < 0 ? 'text-error font-bold' : 'text-on-surface-variant') + ' text-[11.5px]';
-            }
-        }
-    }
-
-    function removeRow(lotId, rowId) {
-        rowsByLot[lotId] = (rowsByLot[lotId] || []).filter(r => r.rowId !== rowId);
-        renderLots();
-    }
-
-    async function produceFromLot(lotId) {
-        const lot = findLot(lotId);
-        const rows = (rowsByLot[lotId] || []).filter(r => r.weight && Number(r.weight) > 0);
-        const errEl = document.getElementById('lot-error-' + lotId);
-        const btn = document.getElementById('produce-btn-' + lotId);
-        errEl.classList.add('hidden');
-
-        if (rows.length === 0) {
-            errEl.textContent = 'أضف قطعة واحدة على الأقل بوزن صحيح.';
-            errEl.classList.remove('hidden');
-            return;
-        }
-
-        const totalWeight = rows.reduce((s, r) => s + Number(r.weight), 0);
-        if (totalWeight > Number(lot.weight_grams_remaining)) {
-            errEl.textContent = `مجموع أوزان القطع (${fmt(totalWeight)}غ) أكبر من المتبقي بالدفعة (${fmt(lot.weight_grams_remaining)}غ).`;
-            errEl.classList.remove('hidden');
-            return;
-        }
-
-        btn.disabled = true;
-        btn.textContent = 'جارِ الحفظ...';
-
-        // Persist the source-box rename, if the person edited it (kept in
-        // memory only up to this point -- see updateLotBoxName above).
-        const sourceBoxName = (document.getElementById('lot-box-name-' + lotId).value || '').trim() || null;
-        if (!lot.pool && sourceBoxName !== (lot.box_name || null)) {
-            await goldmindClient.from('gold_stock_lots').update({ box_name: sourceBoxName }).eq('id', lotId);
-        }
-        const destBoxName = (document.getElementById('dest-box-name-' + lotId).value || '').trim() || null;
-
-        // One "سند إنتاج" per production run, linked back to the source
-        // lot -- every piece produced here gets tagged with it, so this
-        // batch (and the lot it came from) can be reopened later to see
-        // exactly which pieces came out of it, instead of pieces landing
-        // in inventory with no traceable origin.
-        const { data: batch, error: batchError } = await goldmindClient.from('piece_intake_batches').insert({
-            store_id: GOLDMIND_STORE_ID,
-            source_type: 'production',
-            source_lot_id: lot.pool ? lot.members[0].id : lotId,
-            created_by: GOLDMIND_STAFF_ID
-        }).select().single();
-        if (batchError) {
-            btn.disabled = false;
-            btn.textContent = 'حفظ القطع المنتَجة';
-            errEl.textContent = 'تعذّر إنشاء سند الإنتاج: ' + batchError.message;
-            errEl.classList.remove('hidden');
-            return;
-        }
-        const batchId = batch.id;
-
-        const piecesPayload = [];
-        for (const r of rows) {
-            const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
-            if (bcError) {
-                btn.disabled = false;
-                btn.textContent = 'حفظ القطع المنتَجة';
-                errEl.textContent = 'تعذّر توليد رقم القطعة: ' + bcError.message;
-                errEl.classList.remove('hidden');
-                return;
-            }
-
-            // Photo is optional per piece -- a failed/skipped upload never
-            // blocks saving the piece itself, it just stays without a photo.
-            let photoUrl = null;
-            if (r.photoFile) {
-                const ext = (r.photoFile.name.split('.').pop() || 'jpg').toLowerCase();
-                const path = GOLDMIND_STORE_ID + '/' + barcode + '-' + Date.now() + '.' + ext;
-                const { error: uploadError } = await goldmindClient.storage.from('piece-photos').upload(path, r.photoFile, { upsert: false });
-                if (!uploadError) {
-                    const { data: publicUrlData } = goldmindClient.storage.from('piece-photos').getPublicUrl(path);
-                    photoUrl = publicUrlData ? publicUrlData.publicUrl : null;
-                }
-            }
-
-            piecesPayload.push({
-                store_id: GOLDMIND_STORE_ID,
-                barcode: barcode,
-                photo_url: photoUrl,
-                weight_grams: Number(r.weight),
-                accounting_weight_grams: parseFloat(r.accountingWeight) || Number(r.weight),
-                karat: lot.karat,
-                cost_fabrication_per_gram: lot.cost_fabrication_per_gram,
-                description_ar: r.description || null,
-                box_name: destBoxName,
-                status: 'available',
-                intake_batch_id: batchId,
-                created_by: GOLDMIND_STAFF_ID
-            });
-        }
-
-        const { error: piecesError } = await goldmindClient.from('pieces').insert(piecesPayload);
-        if (piecesError) {
-            btn.disabled = false;
-            btn.textContent = 'حفظ القطع المنتَجة';
-            errEl.textContent = 'تعذّر إنشاء القطع: ' + piecesError.message;
-            errEl.classList.remove('hidden');
-            return;
-        }
-
-        // a scrap pool takes from its oldest lots first
-        const takes = [];
-        if (lot.pool) {
-            let left = totalWeight;
-            for (const m of lot.members) {
-                if (left <= 0.0001) break;
-                const a = Math.min(left, Number(m.weight_grams_remaining));
-                takes.push([m.id, Math.round(a * 1000) / 1000]); left -= a;
-            }
-        } else takes.push([lotId, totalWeight]);
-        let consumeError = null;
-        for (const [id, amount] of takes) {
-            const r = await goldmindClient.rpc('consume_gold_stock_lot', { target_lot_id: id, amount });
-            if (r.error) { consumeError = r.error; break; }
-        }
-        if (consumeError) {
-            errEl.textContent = 'تم إنشاء القطع لكن تعذّر خصم الوزن من الدفعة: ' + consumeError.message + ' — راجع الرصيد يدوياً.';
-            errEl.classList.remove('hidden');
-        }
-
-        delete rowsByLot[lotId];
-        delete destBoxByLot[lotId];
-        openLotId = null;
-        await load();
     }
 
     load();
