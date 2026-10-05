@@ -1,3 +1,7 @@
 -- Applied via execute_sql: invoices.pay_currency / pay_fx_rate (sale priced in another currency; amounts stay in the shop
 -- currency), post_sale_invoice stores them from p.pay_currency / p.pay_fx_rate, mirror_invoice_cash_to_daily writes the
 -- daily row in pay_currency (amount × rate), sync_invoice_bank_part converts the card/transfer part the same way.
+-- Revised: invoices.pay_breakdown jsonb [{currency, amount, rate, method}] (post_sale_invoice validates it against
+-- cash/bank paid). The daily mirror writes one row per cash currency from the breakdown (sale, cancel, restore);
+-- sync_invoice_bank_part skips such invoices. pay_currency/pay_fx_rate now only mean "print the invoice in this currency"
+-- (all lines priced in it).

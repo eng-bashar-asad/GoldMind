@@ -115,7 +115,7 @@ test('camera scan fills the barcode and finds the piece', async ({ page }) => {
   await expect(page.locator('#sale-scan-box')).toHaveClass(/hidden/);
 });
 
-test('price typed in another currency (SYP) is kept in the shop currency with its rate', async ({ page }) => {
+test('price typed in SYP: invoice kept in the shop currency, paid and printed in SYP', async ({ page }) => {
   const posted = [];
   const d = db(); d.stores[0].secondary_currency = 'SYP'; d.stores[0].secondary_currency_rate = 13000;
   await install(page, { db: d, rpc: { post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-7', invoice_number: 'INV-7' } }; } } });
@@ -137,4 +137,24 @@ test('price typed in another currency (SYP) is kept in the shop currency with it
   expect(posted[0].items[0].price).toBe(76.92);
   expect(posted[0].pay_currency).toBe('SYP');
   expect(posted[0].pay_fx_rate * 76.92).toBeCloseTo(1000000, 2);
+  expect(posted[0].pay_breakdown).toEqual([expect.objectContaining({ currency: 'SYP', amount: 1000000, method: 'cash' })]);
+});
+
+test('partial payment in two currencies: dollars + Syrian pounds, rest is debt', async ({ page }) => {
+  const posted = [];
+  const d = db(); d.stores[0].secondary_currency = 'SYP'; d.stores[0].secondary_currency_rate = 13000;
+  await install(page, { db: d, rpc: { post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-8', invoice_number: 'INV-8' } }; } } });
+  page.on('dialog', dl => dl.accept());
+  await fillSale(page);
+  await page.click('#pay-mixed');
+  await page.fill('#mixed-cash-amount', '500');
+  await page.getByText('+ مبلغ بعملة أخرى').click();
+  await page.fill('#fx-rows input[placeholder="المبلغ"]', '6500000');
+  await expect(page.locator('#mixed-paid-now')).toContainText('1,000');
+  await page.click('#save-invoice-btn');
+  await page.waitForURL(/invoice-print-ar\.html\?id=inv-8/);
+  expect(posted[0]).toMatchObject({ payment_method: 'mixed', cash_paid: 1000, bank_paid: 0 });
+  expect(posted[0].pay_breakdown).toEqual([
+    { currency: 'USD', amount: 500, rate: 1, method: 'cash' },
+    { currency: 'SYP', amount: 6500000, rate: 13000, method: 'cash' }]);
 });

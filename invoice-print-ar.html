@@ -680,8 +680,10 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             sumTotal = totalFabBeforeVat + totalFabVat;
         } else {
         const itemsBody = document.getElementById('items-body');
+        // a sale priced in another currency (e.g. SYP) prints entirely in it
+        const payRate = (!isPurchaseDoc && invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) ? Number(invoice.pay_fx_rate) : 0;
         itemsBody.innerHTML = (items || []).map(item => {
-            const full = Number(item.line_total || 0);
+            const full = Number(item.line_total || 0) * (payRate || 1);
             // A purchase voucher (buyTrader/buyRetail) must NOT apply the
             // store's flat sale VAT rate to the gold value here: buyRetail
             // sellers (individuals) never charge VAT at all, and for
@@ -747,17 +749,18 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             apply();
         }
 
-        document.getElementById('sum-before-tax').textContent = gmFormatDualCurrency(sumBeforeTax, store);
-        document.getElementById('sum-tax').textContent = gmFormatDualCurrency(sumTax, store);
-        document.getElementById('sum-total').textContent = gmFormatDualCurrency(sumTotal, store);
-        // priced in another currency on the sale screen: show what the customer paid in it
-        if (invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) {
-            const sym = { SYP: 'ل.س', EUR: '€', USD: '$', AED: 'د.إ', TRY: '₺', SAR: 'ر.س' }[invoice.pay_currency] || invoice.pay_currency;
-            const el = document.getElementById('sum-total');
+        const PAY_SYM = { SYP: 'ل.س', EUR: '€', USD: '$', AED: 'د.إ', TRY: '₺', SAR: 'ر.س' };
+        const payFmt = v => Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ' + (PAY_SYM[invoice.pay_currency] || invoice.pay_currency);
+        const money = v => (!isPurchaseDoc && invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) ? payFmt(v) : gmFormatDualCurrency(v, store);
+        document.getElementById('sum-before-tax').textContent = money(sumBeforeTax);
+        document.getElementById('sum-tax').textContent = money(sumTax);
+        document.getElementById('sum-total').textContent = money(sumTotal);
+        // paid in several currencies: list what was paid in each
+        if (Array.isArray(invoice.pay_breakdown) && invoice.pay_breakdown.length) {
             const line = document.createElement('div');
-            line.style.cssText = 'font-size:12px;font-weight:600;';
-            line.textContent = 'بـ ' + sym + ': ' + (sumTotal * Number(invoice.pay_fx_rate)).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + sym;
-            el.appendChild(line);
+            line.style.cssText = 'font-size:12px;font-weight:600;margin-top:4px;';
+            line.textContent = 'المدفوع: ' + invoice.pay_breakdown.map(b => Number(b.amount).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + (PAY_SYM[b.currency] || b.currency) + (b.method === 'bank' ? ' فيزا' : ' نقداً')).join(' + ');
+            document.getElementById('sum-total').appendChild(line);
         }
         if (isTraderPurchase) {
             document.getElementById('sum-before-tax-label').textContent = 'إجمالي أجرة الصنعة قبل الضريبة';
