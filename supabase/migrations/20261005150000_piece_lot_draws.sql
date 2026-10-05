@@ -1,0 +1,4 @@
+-- Applied via execute_sql: piece_lot_draws (which scrap purchases each produced piece came from, RLS read for members),
+-- gm_draw_for_piece / gm_return_draws (internal), production_take(p_piece, p_box, p_lot) RPC,
+-- triggers on pieces: before update of weight_grams moves the difference to/from the box (or lot),
+-- before delete gives the piece's weight back.

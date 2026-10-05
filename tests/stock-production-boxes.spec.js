@@ -26,11 +26,11 @@ test('production page: karat scrap boxes link to the add-piece page', async ({ p
   expect(errs).toEqual([]);
 });
 
-test('add-piece in production mode takes the weight from the scrap box, oldest first', async ({ page }) => {
+test('add-piece in production mode takes the weight from the scrap box on the server', async ({ page }) => {
   const errs = []; page.on('pageerror', e => errs.push(e.message));
   const calls = await install(page, { generic: true, rpc: {
       next_piece_barcode: () => ({ body: '000900' }),
-      consume_gold_stock_lot: () => ({ body: null }) },
+      production_take: () => ({ body: { ok: true } }) },
     db: base([lot('l1', 'كسر 18', 18, 18.25, '2026-10-01T00:00:00Z'), lot('l2', 'كسر 18', 18, 31.96, '2026-10-02T00:00:00Z')]) });
   await page.goto('/inventory-add.html?prod=' + encodeURIComponent('كسر 18'));
   await expect(page.locator('#gm-prod-banner')).toContainText('50.21 غ');
@@ -40,9 +40,8 @@ test('add-piece in production mode takes the weight from the scrap box, oldest f
   await expect(page.locator('#save-message')).toContainText('أكبر من المتوفر');
   await page.fill('#weight', '20');
   await page.click('#save-btn');
-  await expect.poll(() => calls.filter(c => c.name === 'consume_gold_stock_lot').length).toBe(2);
-  const takes = calls.filter(c => c.name === 'consume_gold_stock_lot').map(c => JSON.parse(c.body));
-  expect(takes).toEqual([{ target_lot_id: 'l1', amount: 18.25 }, { target_lot_id: 'l2', amount: 1.75 }]);
+  await expect.poll(() => calls.filter(c => c.name === 'production_take').length).toBe(1);
+  expect(JSON.parse(calls.find(c => c.name === 'production_take').body)).toMatchObject({ p_box: 'كسر 18' });
   await expect(page.locator('#gm-prod-banner')).toContainText('30.21 غ');
   expect(errs).toEqual([]);
 });
