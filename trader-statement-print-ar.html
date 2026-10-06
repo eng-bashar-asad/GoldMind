@@ -26,7 +26,19 @@
     .st-seg { display: inline-flex; border: 1px solid #d8cfb8; border-radius: 10px; overflow: hidden; }
     .st-seg button { padding: 6px 14px; font-size: 12px; font-weight: 700; background: #fff; color: #5b5140; }
     .st-seg button.on { background: #1F1A12; color: #fff; }
+    .st-gold { table-layout: fixed; }
+    .st-gold td { overflow-wrap: anywhere; }
+    .stmt-table tr.st-d td { background: #F1E9D6; text-align: right; font-weight: 700; padding: 7px 10px; border-bottom: 0; }
     .stmt-table tr.st-v td { background: #faf6ec; font-weight: 700; }
+    .st-pc { display: flex; align-items: center; gap: 6px; text-align: right; }
+    @media (max-width: 640px) {
+      .stmt-table th { font-size: 9.5px; padding: 6px 2px; }
+      .stmt-table td { font-size: 11px; padding: 6px 2px; }
+      .stmt-table tr.st-p td { font-size: 10.5px; padding: 4px 2px; }
+      .summary-card { padding: 10px 12px; }
+      .st-ph { width: 38px; height: 38px; }
+      .st-pc { flex-direction: column; text-align: center; gap: 2px; }
+    }
     .stmt-table tr.st-p td { font-size: 11px; color: #5b5140; padding: 5px 6px; }
     .st-ph { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; display: inline-block; vertical-align: middle; }
 </style>
@@ -47,21 +59,21 @@
 <button onclick="gmSmartBack('ledger-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
 <span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
 </button>
-<h1 class="text-lg font-bold">كشف حساب تاجر</h1>
+<h1 class="text-lg font-bold whitespace-nowrap">كشف حساب تاجر</h1>
 </div>
 <div class="flex gap-2">
-<button onclick="stWhatsApp(this)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold flex items-center gap-1 border" style="color:#25A244;border-color:#25A244;"><span class="material-symbols-outlined text-[16px]">chat</span>واتساب</button>
-<button onclick="gmReportPdf(document.getElementById('page-content'), stPdfName(), this)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold flex items-center gap-1 border border-gray-400"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span>PDF</button>
-<button onclick="window.print()" class="h-10 px-4 rounded-lg text-[12.5px] font-bold flex items-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined text-[16px]">print</span>طباعة</button>
+<button onclick="stWhatsApp(this)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold flex items-center gap-1 border" style="color:#25A244;border-color:#25A244;"><span class="material-symbols-outlined text-[16px]">chat</span><span class="hidden sm:inline">واتساب</span></button>
+<button onclick="gmReportPdf(document.getElementById('page-content'), stPdfName(), this)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold flex items-center gap-1 border border-gray-400"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span><span class="hidden sm:inline">PDF</span></button>
+<button onclick="window.print()" class="h-10 px-4 rounded-lg text-[12.5px] font-bold flex items-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined text-[16px]">print</span><span class="hidden sm:inline">طباعة</span></button>
 </div>
 </div>
 </header>
 
-<main class="max-w-3xl mx-auto px-4 py-6">
+<main class="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 <div id="loading-state" class="py-16 text-center text-sm text-gray-500">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-sm text-red-600">ليس لديك صلاحية الوصول لهذه الشاشة.</div>
 
-<div id="page-content" class="hidden stmt-sheet p-6">
+<div id="page-content" class="hidden stmt-sheet p-4 sm:p-6">
 <div class="flex items-center justify-between mb-1">
 <div>
 <div class="font-bold text-[18px]" id="stTraderName"></div>
@@ -91,8 +103,9 @@
 <div class="st-seg"><button type="button" data-photos="1">مع الصور</button><button type="button" data-photos="0">بدون صور</button></div>
 </div>
 <div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">workspace_premium</span>حركات الذهب <span class="text-[10px] font-normal text-gray-500 mr-2"><span class="material-symbols-outlined st-arrow" style="color:#8A3B32;font-size:15px">arrow_upward</span> صادر &nbsp; <span class="material-symbols-outlined st-arrow" style="color:#3F6B47;font-size:15px">arrow_downward</span> وارد</span></div>
-<table class="w-full stmt-table" style="border-collapse:collapse;">
-<thead><tr><th>التاريخ</th><th></th><th>البيان</th><th>العدد</th><th>الوزن</th><th>عيار ٢٤</th><th>المصنعية</th></tr></thead>
+<table class="w-full stmt-table st-gold" style="border-collapse:collapse;">
+<colgroup><col style="width:34%"><col style="width:10%"><col style="width:19%"><col style="width:18%"><col style="width:19%"></colgroup>
+<thead><tr><th>البيان</th><th>العدد</th><th>الوزن (غ)</th><th>عيار ٢٤ (غ)</th><th>المصنعية<span id="stFabCur"></span></th></tr></thead>
 <tbody id="stGoldRows"></tbody>
 </table>
 </div>
@@ -158,26 +171,26 @@ function stRenderGold() {
         const karats = [...new Set(g.rows.map(m => m.karat).filter(Boolean))].join('/');
         let title = (ST_SRC[f.source] || '') + (f.batch_ref ? ' ' + f.batch_ref : '');
         if (g.rows.length === 1 && !f.piece_id && f.notes) title = stShort(f.notes);
-        const head = `<tr class="st-v">
-            <td>${fmtDate(f.created_at)}</td><td>${stArrow(f.movement_type)}</td>
-            <td class="text-[11.5px]">${gmEscapeHtml(title.trim() || '—')}${karats ? ` <span class="text-gray-500 font-normal">· عيار ${karats}</span>` : ''}</td>
+        const dateRow = `<tr class="st-d"><td colspan="5">${stArrow(f.movement_type)} ${fmtDate(f.created_at)} <span class="font-normal text-gray-600">· ${gmEscapeHtml(title.trim() || '—')}${karats ? ' · عيار ' + karats : ''}</span></td></tr>`;
+        const head = dateRow + `<tr class="st-v">
+            <td>المجموع</td>
             <td>${pcs || '—'}</td>
-            <td class="font-data-mono">${fmt(w)} غ</td>
-            <td class="font-data-mono" style="color:${col(gold)}">${gold >= 0 ? '+' : ''}${fmt(gold)} غ</td>
-            <td class="font-data-mono" style="color:${col(fab)}">${fab ? fmt(fab) + ' ' + ST_CUR : '—'}</td></tr>`;
+            <td class="font-data-mono">${fmt(w)}</td>
+            <td class="font-data-mono" style="color:${col(gold)}">${gold >= 0 ? '+' : ''}${fmt(gold)}</td>
+            <td class="font-data-mono" style="color:${col(fab)}">${fab ? fmt(fab) : '—'}</td></tr>`;
         if (ST_VIEW !== 'details' || g.rows.length < 2 && !f.piece_id) return head;
         return head + g.rows.map(m => {
             const p = ST_PIECES[m.piece_id] || {};
-            const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph ml-1" src="${gmEscapeHtml(p.photo_url)}" alt=""/>` : '';
-            return `<tr class="st-p"><td></td><td></td>
-                <td class="text-right">${ph}${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}</td>
-                <td>${m.karat || ''}</td>
-                <td class="font-data-mono">${fmt(stBilled(m))} غ</td>
-                <td class="font-data-mono">${fmt(m.gold_24k_equivalent)} غ</td>
+            const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph" src="${gmEscapeHtml(p.photo_url)}" alt=""/>` : '';
+            return `<tr class="st-p">
+                <td><div class="st-pc">${ph}<span>${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}</span></div></td>
+                <td>${m.karat ? 'ع' + m.karat : ''}</td>
+                <td class="font-data-mono">${fmt(stBilled(m))}</td>
+                <td class="font-data-mono">${fmt(m.gold_24k_equivalent)}</td>
                 <td class="font-data-mono">${Number(m.fab_fee_amount) ? fmt(m.fab_fee_amount) : ''}</td></tr>`;
         }).join('');
     }).join('');
-    document.getElementById('stGoldRows').innerHTML = html || '<tr><td colspan="7" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
+    document.getElementById('stGoldRows').innerHTML = html || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
 }
 document.addEventListener('click', e => {
     const b = e.target.closest('#stOpts button'); if (!b) return;
@@ -254,6 +267,7 @@ async function loadStatement() {
         (pcs || []).forEach(p => { ST_PIECES[p.id] = p; });
     }
     ST_CUR = CUR;
+    document.getElementById('stFabCur').textContent = CUR ? ' (' + CUR + ')' : '';
     stRenderGold();
     document.getElementById('stGoldNet').textContent = fmt(goldNet) + ' غ';
     document.getElementById('stGoldNet').style.color = goldNet >= 0 ? '#3F6B47' : '#8A3B32';

@@ -23,9 +23,9 @@ test('vouchers vs details, arrows, photos toggle', async ({ page }) => {
   await expect(rows.locator('tr.st-v')).toHaveCount(1);
   await expect(rows.locator('tr.st-p')).toHaveCount(0);
   await expect(rows).toContainText('arrow_upward');
-  await expect(rows).toContainText('30.00 غ');      // billed weight 10 + 20
+  await expect(rows).toContainText('30.00');      // billed weight 10 + 20
   await expect(rows).toContainText('22.50');        // 24k total
-  await expect(rows).toContainText('450.00 USD');   // making total
+  await expect(rows).toContainText('450.00');   // making total
   await expect(rows).not.toContainText('إعطاء بضاعة');
   await expect(page.locator('#stCashRows')).toContainText('arrow_downward');
   await expect(page.locator('#stCashRows')).not.toContainText('450'); // making not repeated
