@@ -457,7 +457,13 @@ function renderMovementsList() {
   const invs = invoicesByCustomer[currentCustomerId] || [];
   const invIds = new Set(invs.map(i => i.id));
   // an invoice's own debt row is shown inside the invoice entry
-  const moves = (movementsByCustomer[currentCustomerId] || []).filter(m => !(m.invoice_id && invIds.has(m.invoice_id) && (!m.source || m.source === 'invoice_edit')));
+  // an invoice moved to another customer: its rows here cancel out, so hide them all
+  const netByInv = {};
+  (movementsByCustomer[currentCustomerId] || []).forEach(m => {
+    if (m.invoice_id && !invIds.has(m.invoice_id)) netByInv[m.invoice_id] = (netByInv[m.invoice_id] || 0) + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0);
+  });
+  const movedAway = id => id in netByInv && Math.abs(netByInv[id]) < 0.009;
+  const moves = (movementsByCustomer[currentCustomerId] || []).filter(m => !(m.invoice_id && invIds.has(m.invoice_id) && (!m.source || m.source === 'invoice_edit')) && !movedAway(m.invoice_id));
   let entries = invs.map(i => ({ kind: 'inv', at: i.created_at, i })).concat(moves.map(m => ({ kind: 'mv', at: m.created_at, m })));
   entries.sort((x, y) => String(y.at).localeCompare(String(x.at)));
   if (monthVal) entries = entries.filter(e => (e.at || '').slice(0, 7) === monthVal);
