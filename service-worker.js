@@ -15,7 +15,7 @@ const SHELL_ASSETS = [
   './gm-logo.js?v=2',
   './favicon.png',
   './gm-biometric.js?v=1',
-  './gm-profit.js?v=1',
+  './gm-profit.js?v=3',
   './gm-report.js?v=3',
   './gm-nav.js?v=6'
 ];
