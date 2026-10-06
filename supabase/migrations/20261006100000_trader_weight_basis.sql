@@ -1,1 +1,2 @@
 -- Applied via execute_sql: traders.weight_basis ('accounting' default | 'gross') — which weight a trader is billed on when goods are given out.
+-- traders.weight_basis is no longer used: the gross/accounting choice is per give-out voucher (client side).

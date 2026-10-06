@@ -55,7 +55,7 @@ test('give-out list: the last scanned piece is on top', async ({ page }) => {
   await expect(page.locator('#gs-cart-list > div').first()).toContainText('000035');
 });
 
-test('give-out: trader billed on the gross weight when chosen for him', async ({ page }) => {
+test('give-out: this voucher billed on the gross weight when chosen (not saved on the trader)', async ({ page }) => {
   const calls = await install(page, { generic: true, db: {
     stores: [{ id: STORE, name: 'x', currency: 'USD' }],
     staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
@@ -73,7 +73,7 @@ test('give-out: trader billed on the gross weight when chosen for him', async ({
   await expect(page.locator('#gs-preview-gold')).toContainText('6.00');        // 8 × 18/24
   await page.click('#gs-basis button[data-v="gross"]');
   await expect(page.locator('#gs-preview-gold')).toContainText('7.50');        // 10 × 18/24
-  expect(calls.some(c => c.method === 'PATCH' && c.name === 'traders' && JSON.parse(c.body).weight_basis === 'gross')).toBe(true);
+  expect(calls.some(c => c.method === 'PATCH' && c.name === 'traders')).toBe(false);
   await page.click('#gs-btn');
   await expect.poll(() => calls.some(c => c.method === 'POST' && c.name === 'trader_movements')).toBe(true);
   const [r] = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'trader_movements').body);
