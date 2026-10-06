@@ -330,6 +330,7 @@ function goldmindApplyTheme(name) {
     root.style.setProperty(key, theme.vars[key]);
   });
   root.setAttribute('data-gm-display-font', theme.displayFont ? '1' : '0');
+  root.setAttribute('data-gm-theme', GOLDMIND_THEMES[name] ? name : 'warm-ingot'); // lets page CSS follow the chosen theme
   if (theme.displayFont) gmEnsureDisplayFont();
   root.classList.toggle('gm-light-canvas', !!theme.lightCanvas);
   root.classList.toggle('gm-shimmer', !!theme.shimmer);
