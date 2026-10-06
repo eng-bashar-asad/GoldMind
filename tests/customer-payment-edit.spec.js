@@ -25,3 +25,20 @@ test('edit and delete a customer payment', async ({ page }) => {
   expect(JSON.parse(calls.filter(c => c.name === 'customer_payment_update')[1].body)).toMatchObject({ p_id: 'p1', p_amount: 0 });
   expect(errs.filter(e => !e.includes("reading 'replace'"))).toEqual([]);
 });
+
+test('edit a cash-out to the customer', async ({ page }) => {
+  const calls = await install(page, { generic: true, rpc: { customer_payment_update: () => ({ body: { ok: true } }) }, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ديمة الانصاري' }], invoices: [],
+    customer_debts: [{ id: 'o1', store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', source: 'cash_out', cash_amount: 500, notes: 'صرف للعميل', created_at: T }]
+  } });
+  await page.goto('/customer-debts-ar.html?open=c1');
+  await page.click('button:has-text("تعديل الصرف")');
+  await page.fill('#pay-edit-amount-o1', '450');
+  await page.locator('#pay-edit-o1 button', { hasText: 'حفظ التعديل' }).click();
+  await expect.poll(() => calls.filter(c => c.name === 'customer_payment_update').length).toBe(1);
+  expect(JSON.parse(calls.find(c => c.name === 'customer_payment_update').body)).toMatchObject({ p_id: 'o1', p_amount: 450 });
+  await expect(page.locator('button:has-text("حذف الصرف")')).toBeVisible();
+});

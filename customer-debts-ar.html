@@ -512,9 +512,9 @@ function renderMovementsList() {
         ${m.source === 'discount' ? `<div class="flex gap-2 mt-2">
           <button type="button" onclick="editDiscount('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">تعديل الخصم</button>
           <button type="button" onclick="deleteDiscount('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">حذف الخصم</button></div>` : ''}
-        ${m.source === 'payment' && canEditCustomers ? `<div class="flex gap-2 mt-2">
-          <button type="button" onclick="togglePaymentEdit('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">تعديل الدفعة</button>
-          <button type="button" onclick="deletePayment('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">حذف الدفعة</button></div>
+        ${(m.source === 'payment' || m.source === 'cash_out') && canEditCustomers ? `<div class="flex gap-2 mt-2">
+          <button type="button" onclick="togglePaymentEdit('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">${m.source === 'cash_out' ? 'تعديل الصرف' : 'تعديل الدفعة'}</button>
+          <button type="button" onclick="deletePayment('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">${m.source === 'cash_out' ? 'حذف الصرف' : 'حذف الدفعة'}</button></div>
         <div id="pay-edit-${m.id}" class="hidden mt-2 flex-col gap-2">
           <input id="pay-edit-amount-${m.id}" type="number" step="0.01" min="0" dir="ltr" value="${Number(m.cash_amount)}" aria-label="المبلغ الجديد" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono"/>
           <input id="pay-edit-notes-${m.id}" type="text" value="${gmEscapeHtml(m.notes || '')}" placeholder="ملاحظة" aria-label="ملاحظة" class="h-10 border border-outline-variant rounded-lg px-3 text-[13px]"/>
@@ -589,12 +589,14 @@ async function paymentChange(id, amount, notes) {
 }
 function savePaymentEdit(id) {
   const amount = parseFloat(document.getElementById('pay-edit-amount-' + id).value);
-  if (!(amount > 0)) { alert('فضلاً أدخل مبلغاً صحيحاً — ولحذف الدفعة استخدم زر «حذف الدفعة».'); return; }
+  if (!(amount > 0)) { alert('فضلاً أدخل مبلغاً صحيحاً — وللحذف استخدم زر الحذف.'); return; }
   paymentChange(id, amount, document.getElementById('pay-edit-notes-' + id).value.trim() || null);
 }
 function deletePayment(id) {
   const m = (movementsByCustomer[currentCustomerId] || []).find(x => x.id === id);
-  if (!m || !confirm('حذف دفعة ' + fmt(m.cash_amount) + '؟ سيرجع المبلغ ديناً على العميل ويُحذف من الصندوق.')) return;
+  if (!m || !confirm(m.source === 'cash_out'
+    ? 'حذف صرف ' + fmt(m.cash_amount) + ' للعميل؟ يُنقص المبلغ من دين العميل ويُحذف من الصندوق.'
+    : 'حذف دفعة ' + fmt(m.cash_amount) + '؟ سيرجع المبلغ ديناً على العميل ويُحذف من الصندوق.')) return;
   paymentChange(id, 0, null);
 }
 
