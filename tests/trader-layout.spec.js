@@ -35,3 +35,22 @@ test('trader page: photo of the scanned piece shows beside the give-out form', a
   await expect(panel).toHaveClass(/hidden/);
   expect(errs).toEqual([]);
 });
+
+test('give-out list: the last scanned piece is on top', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'جليل' }], trader_movements: [], gold_prices: [],
+    pieces: ['000034', '000035'].map((b, i) => ({ id: 'p' + i, store_id: STORE, barcode: b, status: 'available', karat: 18, weight_grams: 5, accounting_weight_grams: 5 }))
+  } });
+  await page.goto('/ledger-ar.html?trader=t1&action=give');
+  await expect(page.locator('#give-stock-form')).not.toHaveClass(/hidden/);
+  await page.evaluate(() => setGiveStockMode('barcode'));
+  for (const b of ['000034', '000035']) {
+    await page.fill('#gs-barcode-input', b);
+    await page.press('#gs-barcode-input', 'Enter');
+    await expect(page.locator('#gs-cart-list')).toContainText(b);
+  }
+  await expect(page.locator('#gs-cart-list > div').first()).toContainText('000035');
+});
