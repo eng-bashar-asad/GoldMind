@@ -999,6 +999,11 @@ function showTraderDetail(traderId) {
   // moves[] is already ordered by created_at desc, so rows from the same
   // save action (batch or invoice) are guaranteed adjacent.
   const renderGroups = [];
+  // the weight each voucher line was billed on (gross or accounting, as chosen then)
+  window.gmBilledWeight = rows => rows.reduce((t, r) => {
+    const k = Number(r.karat) || 0, g24 = Number(r.gold_24k_equivalent) || 0;
+    return t + (k > 0 && g24 > 0 ? g24 * 24 / k : Number(r.accounting_weight_grams != null ? r.accounting_weight_grams : r.weight_grams) || 0);
+  }, 0);
   moves.forEach(m => {
     if (m.batch_id) {
       const last = renderGroups[renderGroups.length - 1];
@@ -1031,15 +1036,14 @@ function showTraderDetail(traderId) {
       return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-invgroup-${group.invoiceId}">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(first)} (${rows.length} ${rows.length === 1 ? 'صنف' : 'أصناف'})</span>
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(first)}</span>
           <span class="text-[11px] text-on-surface-variant">${date}</span>
         </div>
-        <div class="flex flex-col gap-1 mb-2">
-          ${rows.map(r => `<div class="flex items-center justify-between text-[12px] font-data-mono border-b border-outline-variant/40 pb-1 pt-1"><span>${r.weight_grams ? fmt(r.weight_grams) + 'غ عيار ' + r.karat : (r.notes ? gmEscapeHtml(r.notes) : '—')}</span><span>${fmt(r.gold_24k_equivalent)}غ (٢٤)${Number(r.fab_fee_amount || 0) > 0 ? ' + ' + fmtMoney(r.fab_fee_amount) : ''}</span></div>`).join('')}
-        </div>
-        <div class="flex items-center justify-between text-[13px] font-bold pt-1 border-t border-outline-variant">
-          <span>الإجمالي</span>
-          <span class="font-data-mono">${fmt(totalGold24k)}غ (٢٤) + ${fmtMoney(totalFee)}</span>
+        <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12px] mb-1">
+          <span class="text-on-surface-variant">عدد القطع</span><span class="font-data-mono font-semibold text-left">${rows.length}</span>
+          <span class="text-on-surface-variant">الوزن</span><span class="font-data-mono font-semibold text-left">${fmt(gmBilledWeight(rows))} غ</span>
+          <span class="text-on-surface-variant">مجموع المصنعيات</span><span class="font-data-mono font-semibold text-left">${fmtMoney(totalFee)}</span>
+          <span class="text-on-surface-variant">ذهب عيار ٢٤</span><span class="font-data-mono font-semibold text-left">${fmt(totalGold24k)} غ</span>
         </div>
         ${invoiceNumber ? `<a href="invoice-print-ar.html?id=${group.invoiceId}" class="text-[11px] text-secondary font-semibold underline mt-1 inline-block">عرض فاتورة الشراء: ${gmEscapeHtml(invoiceNumber)} ←</a>` : ''}
       </div>`;
@@ -1055,18 +1059,15 @@ function showTraderDetail(traderId) {
       return `
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-batch-${group.batchId}">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(first)} (${rows.length} أسطر)</span>
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(first)}</span>
           <span class="text-[11px] text-on-surface-variant">${date}</span>
         </div>
-        ${first.batch_ref ? `<p class="text-[11px] text-on-surface-variant mb-2">مرجع: ${gmEscapeHtml(first.batch_ref)}</p>` : ''}
-        <div class="flex flex-col gap-1 mb-2">
-          ${rows.map(r => `<div class="flex items-center justify-between text-[12px] font-data-mono border-b border-outline-variant/40 pb-1 pt-1"><span>${fmt(r.weight_grams)}غ قائم / ${fmt(r.accounting_weight_grams)}غ محاسبي &middot; عيار ${r.karat}</span><span>${fmtMoney(r.fab_fee_per_gram)}/غ</span></div>`).join('')}
+        <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12px] mb-1">
+          <span class="text-on-surface-variant">عدد القطع</span><span class="font-data-mono font-semibold text-left">${rows.length}</span>
+          <span class="text-on-surface-variant">الوزن</span><span class="font-data-mono font-semibold text-left">${fmt(gmBilledWeight(rows))} غ</span>
+          <span class="text-on-surface-variant">مجموع المصنعيات</span><span class="font-data-mono font-semibold text-left">${fmtMoney(totalFee)}</span>
+          <span class="text-on-surface-variant">ذهب عيار ٢٤</span><span class="font-data-mono font-semibold text-left">${fmt(totalGold24k)} غ</span>
         </div>
-        <div class="flex items-center justify-between text-[13px] font-bold pt-1 border-t border-outline-variant">
-          <span>الإجمالي</span>
-          <span class="font-data-mono">${fmt(totalGold24k)}غ (٢٤) + ${fmtMoney(totalFee)}</span>
-        </div>
-        ${first.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(first.notes)}</p>` : ''}
         <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
           <button onclick="toggleEditStockBatch('${group.batchId}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
           <button onclick="deleteStockMovementBatch('${group.batchId}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف السند بالكامل</button>

@@ -79,3 +79,23 @@ test('give-out: this voucher billed on the gross weight when chosen (not saved o
   const [r] = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'trader_movements').body);
   expect(r.gold_24k_equivalent).toBe(7.5);
 });
+
+test('movements: a give-out voucher shows only count, weight, making, 24k and date', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const mv = (id, w, fee) => ({ id, store_id: STORE, trader_id: 't1', batch_id: 'b1', movement_type: 'debt_decrease', source: 'stock_given',
+    weight_grams: w, accounting_weight_grams: w, karat: 18, gold_24k_equivalent: w * 0.75, fab_fee_amount: fee, created_at: '2026-10-06T10:00:00Z' });
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'جليل' }], gold_prices: [], pieces: [],
+    trader_movements: [mv('m1', 10, 15), mv('m2', 6, 15)]
+  } });
+  await page.goto('/ledger-ar.html?trader=t1');
+  const card = page.locator('#trader-batch-b1');
+  await expect(card).toContainText('عدد القطع');
+  await expect(card).toContainText('16.00 غ');
+  await expect(card).toContainText('12.00 غ');
+  await expect(card).not.toContainText('محاسبي');
+  expect(errs).toEqual([]);
+});
