@@ -13,7 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=33"></script>
 <script src="theme.js?v=50"></script>
-<script src="gm-profit.js?v=2"></script>
+<script src="gm-profit.js?v=3"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -315,22 +315,9 @@ async function applyFilters() {
   const given = moves.filter(m => m.source === 'stock_given');
   let unknownCost = 0;
   const wholesale = given.map(m => {
-    const k = Number(m.karat) || 0;
-    const billed = k && Number(m.gold_24k_equivalent) ? Number(m.gold_24k_equivalent) * 24 / k : (Number(m.accounting_weight_grams != null ? m.accounting_weight_grams : m.weight_grams) || 0);
-    const pc = m.piece || {};
-    const pieceAcc = m.piece_acc_weight != null ? Number(m.piece_acc_weight)
-      : (pc.accounting_weight_grams != null ? Number(pc.accounting_weight_grams) : (pc.weight_grams != null ? Number(pc.weight_grams) : billed));
-    const base = { m, gross: Number(m.weight_grams) || 0, billed, pieceAcc, diff: 0, diff24: 0, goldVal: 0, goldNow: 0 };
-    // piece given at a fixed price: profit = price − its full cost when given
-    if (m.sale_cost != null) { const fee = Number(m.fab_fee_amount) || 0, cost = Number(m.sale_cost) || 0; return Object.assign(base, { acc: billed, fee, cost, making: fee - cost, profit: fee - cost }); }
-    const fee = billed * (Number(m.fab_fee_per_gram) || 0);
-    const perGram = pc.cost_fabrication_per_gram != null ? pc.cost_fabrication_per_gram : m.cost_fab_per_gram;
-    if (perGram == null) unknownCost++;
-    const cost = pieceAcc * (Number(perGram) || 0);
-    const diff = billed - pieceAcc, diff24 = diff * k / 24;
-    const p24 = m.gold_price_24k != null ? Number(m.gold_price_24k) : price24Now;
-    const goldVal = diff24 * p24, goldNow = diff24 * price24Now;
-    return Object.assign(base, { acc: billed, fee, cost, diff, diff24, goldVal, goldNow, making: fee - cost, profit: fee - cost + goldVal });
+    const r = gmTraderGiveProfit(m, price24Now); // shared formula (gm-profit.js)
+    if (r.unknownCost) unknownCost++;
+    return Object.assign({ m, acc: r.billed }, r);
   });
   const ws = wholesale.reduce((a, r) => { ['gross', 'acc', 'pieceAcc', 'fee', 'cost', 'making', 'diff', 'diff24', 'goldVal', 'goldNow', 'profit'].forEach(f => a[f] += r[f] || 0); return a; },
     { gross: 0, acc: 0, pieceAcc: 0, fee: 0, cost: 0, making: 0, diff: 0, diff24: 0, goldVal: 0, goldNow: 0, profit: 0 });
