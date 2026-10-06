@@ -1384,3 +1384,19 @@ function gmClosePhotoViewer() {
   };
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
 })();
+
+// -----------------------------------------------------------------------
+// Number boxes: no up/down arrows, and the mouse wheel never changes the
+// number (scrolling the page over a focused box used to silently change it).
+// -----------------------------------------------------------------------
+(function () {
+  const style = document.createElement('style');
+  style.textContent = 'input[type=number]::-webkit-inner-spin-button,input[type=number]::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}' +
+    'input[type=number]{-moz-appearance:textfield;appearance:textfield}';
+  document.head.appendChild(style);
+  // wheel over the focused number box: drop focus so the wheel scrolls the page instead
+  document.addEventListener('wheel', function (e) {
+    const el = document.activeElement;
+    if (el && el.type === 'number' && e.target === el) el.blur();
+  }, { passive: true });
+})();
