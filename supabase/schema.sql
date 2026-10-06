@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict hbOMkODMksqG35d7uPX5xpUOtahqu5f5Ex4mOanwtcHOHLVOxtyZ6RY8S676jNT
+\restrict orpmsfqZUHu1AgviCuSpOKjYA0nujeOZYDXwnxcPW8IqS8VvmohJLWXG1WEYqGm
 
 
 SET statement_timeout = 0;
@@ -828,6 +828,40 @@ $$;
 
 
 --
+-- Name: customer_cash_out(uuid, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text DEFAULT 'cash'::text, p_notes text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare c record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text;
+begin
+  select id, store_id, name into c from customers where id = p_customer;
+  if c is null then raise exception 'العميل غير موجود'; end if;
+  if not (has_permission('edit_customers', c.store_id) or has_permission('manage_daily_cashbox', c.store_id)) then
+    raise exception 'ليس لديك صلاحية صرف مبالغ للعملاء' using errcode = '42501';
+  end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
+  note := coalesce(nullif(trim(p_notes), ''), 'صرف للعميل');
+  -- money out of the shop to the customer: his balance goes up by it (he owes it, or his credit shrinks)
+  insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (c.store_id, case when p_method = 'bank' then 'bank' else 'main' end, 'out', amt,
+            'صرف للعميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
+    returning id into cm;
+  if coalesce(p_method, 'cash') = 'cash' then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+      values (c.store_id, 'صرف لعميل', 'out', amt, c.name || ' — ' || note, me, cm);
+  end if;
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+    values (c.store_id, c.id, 'debt_increase', amt, 0, note, 'cash_out', me);
+  return jsonb_build_object('ok', true);
+end $$;
+
+
+--
 -- Name: customer_debt_discount(uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -882,6 +916,26 @@ begin
   perform gm_unallocate_customer_credit(d.store_id, d.customer_id);
   return jsonb_build_object('ok', true);
 end $$;
+
+
+--
+-- Name: delete_expense(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.delete_expense(p_id uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare e record;
+begin
+  select * into e from expense_entries where id = p_id;
+    if e is null then raise exception 'المصروف غير موجود'; end if;
+      if not gm_can_expense(e.store_id) or not is_store_member(e.store_id) then raise exception 'ليس لديك صلاحية حذف المصاريف' using errcode = '42501'; end if;
+        if exists (select 1 from inventory_gifts where expense_entry_id = p_id) then raise exception 'هذا مصروف هدية — احذفه بإرجاع الهدية إلى المخزن'; end if;
+          delete from expense_entries where id = p_id;
+            if e.cash_movement_id is not null then delete from cash_movements where id = e.cash_movement_id; end if;
+              return jsonb_build_object('ok', true);
+              end $$;
 
 
 --
@@ -1309,6 +1363,58 @@ $$;
 
 
 --
+-- Name: gm_draw_for_piece(uuid, uuid, text, uuid, numeric); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_draw_for_piece(p_piece uuid, p_store uuid, p_box text, p_lot uuid, p_grams numeric) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare left_g numeric := round(p_grams, 3); r record; a numeric; avail numeric;
+begin
+  if left_g <= 0 then return; end if;
+  select coalesce(sum(weight_grams_remaining), 0) into avail from gold_stock_lots
+   where store_id = p_store and weight_grams_remaining > 0
+     and (case when p_box is not null then box_name = p_box else id = p_lot end);
+  if avail + 0.0005 < left_g then
+    raise exception 'الوزن المطلوب (% غ) أكبر من المتوفر في % (% غ)', left_g, coalesce(p_box, 'الدفعة'), round(avail, 2);
+  end if;
+  for r in select id, weight_grams_remaining from gold_stock_lots
+            where store_id = p_store and weight_grams_remaining > 0
+              and (case when p_box is not null then box_name = p_box else id = p_lot end)
+            order by created_at, id for update
+  loop
+    exit when left_g <= 0.0005;
+    a := least(left_g, r.weight_grams_remaining);
+    update gold_stock_lots set weight_grams_remaining = weight_grams_remaining - a where id = r.id;
+    insert into piece_lot_draws (store_id, piece_id, lot_id, grams) values (p_store, p_piece, r.id, a);
+    left_g := left_g - a;
+  end loop;
+end $$;
+
+
+--
+-- Name: gm_return_draws(uuid, numeric); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_return_draws(p_piece uuid, p_grams numeric) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare left_g numeric := round(p_grams, 3); r record; a numeric;
+begin
+  for r in select id, lot_id, grams from piece_lot_draws where piece_id = p_piece order by created_at desc, id desc loop
+    exit when left_g <= 0.0005;
+    a := least(left_g, r.grams);
+    update gold_stock_lots set weight_grams_remaining = weight_grams_remaining + a where id = r.lot_id;
+    if r.grams - a <= 0.0005 then delete from piece_lot_draws where id = r.id;
+    else update piece_lot_draws set grams = grams - a where id = r.id; end if;
+    left_g := left_g - a;
+  end loop;
+end $$;
+
+
+--
 -- Name: gm_scrap_price_at_purchase(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1684,18 +1790,54 @@ CREATE FUNCTION public.mirror_invoice_cash_to_daily() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare inv record;
+declare inv record; r record; first boolean := true; full_base numeric; amt numeric; cur text; note text; op text;
 begin
   if new.invoice_id is null then return new; end if;
-  select type, payment_method into inv from public.invoices where id = new.invoice_id;
+  select id, type, payment_method, pay_breakdown, pay_currency, pay_fx_rate into inv from public.invoices where id = new.invoice_id;
   if inv is null then return new; end if;
-  -- The whole paid amount enters the daily box as the sale; the card/transfer
-  -- part is then taken out automatically as its own row (sync_invoice_bank_part).
   if inv.payment_method not in ('cash', 'bank', 'mixed') or new.amount <= 0 then return new; end if;
+  op := case inv.type when 'sale' then 'فاتورة بيع' when 'return' then 'مرتجع مبيعات' else 'فاتورة شراء' end;
+  -- an invoice edit changes the invoice's own row in the daily box (no extra +/- rows)
+  if new.edit_delta then
+    amt := case when new.fx_currency is not null and new.fx_amount > 0 then new.fx_amount
+                when inv.pay_currency is not null and inv.pay_fx_rate > 0 then new.amount * inv.pay_fx_rate else new.amount end;
+    cur := coalesce(upper(new.fx_currency), case when inv.pay_currency is not null and inv.pay_fx_rate > 0 then inv.pay_currency end, new.currency);
+    select l.id, l.direction, l.amount into r from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id
+     where m.invoice_id = inv.id and not m.edit_delta and upper(l.currency) = upper(cur)
+     order by l.created_at limit 1;
+    if r.id is not null then
+      full_base := round(r.amount + case when new.direction = r.direction then amt else -amt end, 2);
+      if full_base > 0 then
+        update daily_cash_log set amount = full_base where id = r.id;
+        perform public.sync_invoice_bank_part(new.invoice_id);
+        return new;
+      end if;
+    end if;
+  end if;
+  -- paid in several currencies: the full amount (sale, cancel, restore) goes in/out
+  -- of the daily box per currency, cash parts only (card/transfer never enters the drawer)
+  if new.fx_currency is null and inv.pay_breakdown is not null then
+    select sum((b->>'amount')::numeric / (b->>'rate')::numeric) into full_base from jsonb_array_elements(inv.pay_breakdown) b;
+    if abs(new.amount - full_base) < 0.05 then
+      for r in select upper(b->>'currency') c, sum((b->>'amount')::numeric) a from jsonb_array_elements(inv.pay_breakdown) b
+                where b->>'method' = 'cash' and (b->>'amount')::numeric > 0 group by 1 order by 1 loop
+        insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id, bank_invoice_id)
+        values (new.store_id, op, new.direction, round(r.a, 2), r.c, new.description, new.created_by,
+                case when first then new.id end, case when first then null else inv.id end);
+        first := false;
+      end loop;
+      return new;
+    end if;
+  end if;
+  amt := round(new.amount, 2); cur := new.currency; note := new.description;
+  if new.fx_currency is not null and new.fx_amount > 0 then
+    -- exact amount in the currency the invoice was sold in (from the edit page)
+    amt := round(new.fx_amount, 2); cur := upper(new.fx_currency);
+  elsif inv.pay_currency is not null and inv.pay_fx_rate > 0 and upper(inv.pay_currency) <> upper(coalesce(new.currency, '')) then
+    amt := round(new.amount * inv.pay_fx_rate, 2); cur := inv.pay_currency;
+  end if;
   insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
-  values (new.store_id,
-          case inv.type when 'sale' then 'فاتورة بيع' when 'return' then 'مرتجع مبيعات' else 'فاتورة شراء' end,
-          new.direction, round(new.amount, 2), new.currency, new.description, new.created_by, new.id);
+  values (new.store_id, op, new.direction, amt, cur, note, new.created_by, new.id);
   perform public.sync_invoice_bank_part(new.invoice_id);
   return new;
 end $$;
@@ -2129,6 +2271,19 @@ begin
       0, 0, 0, total, paid, case when remaining > 0.01 then 'unpaid' else 'paid' end, me, sold_at, ref)
     returning id into inv_id;
 
+  -- paid in several currencies: [{currency, amount, rate (per 1 shop currency), method cash|bank}]
+  if jsonb_typeof(p->'pay_breakdown') = 'array' and jsonb_array_length(p->'pay_breakdown') > 0 then
+    if pm = 'credit' then raise exception 'الدين لا يُقسّم على عملات'; end if;
+    if abs(coalesce((select sum((b->>'amount')::numeric / (b->>'rate')::numeric) from jsonb_array_elements(p->'pay_breakdown') b where b->>'method' = 'cash'), 0) - case pm when 'cash' then total when 'mixed' then cash_amt else 0 end) > 0.05
+       or abs(coalesce((select sum((b->>'amount')::numeric / (b->>'rate')::numeric) from jsonb_array_elements(p->'pay_breakdown') b where b->>'method' = 'bank'), 0) - case pm when 'bank' then total when 'mixed' then bank_amt else 0 end) > 0.05 then
+      raise exception 'مبالغ العملات لا تطابق المدفوع';
+    end if;
+    update invoices set pay_breakdown = p->'pay_breakdown' where id = inv_id;
+  end if;
+  if nullif(upper(p->>'pay_currency'), '') is not null and (p->>'pay_fx_rate')::numeric > 0 then
+    update invoices set pay_currency = upper(p->>'pay_currency'), pay_fx_rate = (p->>'pay_fx_rate')::numeric where id = inv_id;
+  end if;
+
   insert into invoice_items (invoice_id, piece_id, diamond_piece_id, gold_stock_lot_id, barcode, karat, weight_grams,
       accounting_weight_grams, fabrication_fee, line_total, description, description_en, item_photo_url, gold_price_per_gram)
   select inv_id, (l->>'piece_id')::uuid, (l->>'diamond_piece_id')::uuid, (l->>'lot_id')::uuid, l->>'barcode', (l->>'karat')::int,
@@ -2283,6 +2438,26 @@ end $$;
 
 
 --
+-- Name: production_take(uuid, text, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.production_take(p_piece uuid, p_box text DEFAULT NULL::text, p_lot uuid DEFAULT NULL::uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare pc record;
+begin
+  select id, store_id, weight_grams into pc from pieces where id = p_piece;
+  if pc is null then raise exception 'القطعة غير موجودة'; end if;
+  if not has_permission('add_piece', pc.store_id) then raise exception 'ليس لديك صلاحية الإنتاج' using errcode = '42501'; end if;
+  if p_box is null and p_lot is null then raise exception 'حدّد الصندوق أو الدفعة'; end if;
+  if exists (select 1 from piece_lot_draws where piece_id = p_piece) then raise exception 'القطعة مسحوبة من الكسر مسبقاً'; end if;
+  perform gm_draw_for_piece(p_piece, pc.store_id, p_box, p_lot, pc.weight_grams);
+  return jsonb_build_object('ok', true);
+end $$;
+
+
+--
 -- Name: record_customer_payment(uuid, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2336,6 +2511,7 @@ begin
     values (sid, cat.id, amt, coalesce(descr, cat.name), nullif(p->>'attachment_url', ''), me) returning id into eid;
   insert into cash_movements (store_id, box, direction, amount, description, created_by)
     values (sid, 'main', 'out', amt, 'مصروف ' || cat.name || coalesce(': ' || descr, ''), me) returning id into cm;
+  update expense_entries set cash_movement_id = cm where id = eid;
   if coalesce((p->>'from_daily_cashbox')::boolean, true) then
     insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
       values (sid, 'مصروف: ' || cat.name, 'out', amt, descr, me, cm);
@@ -3178,17 +3354,16 @@ CREATE FUNCTION public.sync_invoice_bank_part(p_invoice uuid) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare inv record; bank numeric; d numeric; b numeric; target numeric; diff numeric; cm record;
+declare inv record; bank numeric; d numeric; b numeric; target numeric; diff numeric; cm record; rate numeric;
 begin
-  select id, store_id, invoice_number, status, payment_method, amount_paid, bank_paid_amount into inv from invoices where id = p_invoice;
-  if inv is null then return; end if;
-  -- the part of the invoice paid by card / bank transfer
-  bank := case
+  select id, store_id, invoice_number, status, payment_method, amount_paid, bank_paid_amount, pay_breakdown, pay_currency, pay_fx_rate into inv from invoices where id = p_invoice;
+  if inv is null or inv.pay_breakdown is not null then return; end if; -- multi-currency: handled per currency in the mirror
+  rate := case when inv.pay_currency is not null and inv.pay_fx_rate > 0 then inv.pay_fx_rate else 1 end;
+  bank := rate * case
     when inv.status = 'cancelled' then 0
     when inv.payment_method = 'bank' then coalesce(inv.amount_paid, 0)
     when inv.payment_method = 'mixed' then coalesce(inv.bank_paid_amount, 0)
     else 0 end;
-  -- d: what the invoice's cash movements put in the daily box; b: card/transfer rows already taken back out
   select coalesce(sum(case when l.direction='in' then l.amount else -l.amount end), 0) into d
     from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id where m.invoice_id = p_invoice;
   select coalesce(sum(case when direction='in' then amount else -amount end), 0) into b
@@ -3199,7 +3374,7 @@ begin
   select currency, created_by into cm from cash_movements where invoice_id = p_invoice order by created_at desc limit 1;
   insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, bank_invoice_id)
   values (inv.store_id, 'فيزا / تحويل بنكي', case when diff < 0 then 'out' else 'in' end, abs(diff),
-          coalesce(cm.currency, (select currency from stores where id = inv.store_id)),
+          coalesce(inv.pay_currency, cm.currency, (select currency from stores where id = inv.store_id)),
           inv.invoice_number || case when (diff < 0) = (d >= 0) then ' — الجزء المدفوع فيزا/تحويل لا يدخل الدرج' else ' — تصحيح جزء الفيزا/التحويل' end,
           cm.created_by, p_invoice);
 end $$;
@@ -3384,6 +3559,44 @@ end $$;
 
 
 --
+-- Name: trg_piece_draws_delete(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_piece_draws_delete() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  perform gm_return_draws(old.id, (select coalesce(sum(grams), 0) from piece_lot_draws where piece_id = old.id));
+  return old;
+end $$;
+
+
+--
+-- Name: trg_piece_draws_weight(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_piece_draws_weight() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare d record; diff numeric;
+begin
+  diff := round(coalesce(new.weight_grams, 0) - coalesce(old.weight_grams, 0), 3);
+  if abs(diff) < 0.0005 then return new; end if;
+  select l.box_name, l.id lot_id into d from piece_lot_draws w join gold_stock_lots l on l.id = w.lot_id
+   where w.piece_id = new.id order by w.created_at limit 1;
+  if d is null then return new; end if;
+  if diff > 0 then
+    perform gm_draw_for_piece(new.id, new.store_id, case when d.box_name ~ '^كسر [0-9]+$' then d.box_name end, d.lot_id, diff);
+  else
+    perform gm_return_draws(new.id, -diff);
+  end if;
+  return new;
+end $_$;
+
+
+--
 -- Name: trg_trader_received_sync(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3413,6 +3626,32 @@ begin
     end if;
   end if;
   return new;
+end $$;
+
+
+--
+-- Name: update_expense(uuid, uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_expense(p_id uuid, p_category uuid, p_amount numeric, p_description text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare e record; cat record; amt numeric := round(coalesce(p_amount, 0), 2); descr text := nullif(trim(p_description), '');
+begin
+  select * into e from expense_entries where id = p_id;
+  if e is null then raise exception 'المصروف غير موجود'; end if;
+  if not gm_can_expense(e.store_id) or not is_store_member(e.store_id) then raise exception 'ليس لديك صلاحية تعديل المصاريف' using errcode = '42501'; end if;
+  if exists (select 1 from inventory_gifts where expense_entry_id = p_id) then raise exception 'هذا مصروف هدية — عدّله بإرجاع الهدية إلى المخزن'; end if;
+  select id, name into cat from expense_categories where id = p_category and store_id = e.store_id;
+  if cat is null then raise exception 'اختر نوع المصروف'; end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  update expense_entries set category_id = cat.id, amount = amt, description = coalesce(descr, cat.name) where id = p_id;
+  if e.cash_movement_id is not null then
+    update cash_movements set amount = amt, description = 'مصروف ' || cat.name || coalesce(': ' || descr, '') where id = e.cash_movement_id;
+    update daily_cash_log set amount = amt, operation_type = 'مصروف: ' || cat.name, notes = descr where cash_movement_id = e.cash_movement_id;
+  end if;
+  return jsonb_build_object('ok', true);
 end $$;
 
 
@@ -3524,7 +3763,10 @@ CREATE TABLE public.cash_movements (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now(),
     currency text,
-    trader_movement_id uuid
+    trader_movement_id uuid,
+    fx_amount numeric,
+    fx_currency text,
+    edit_delta boolean DEFAULT false NOT NULL
 );
 
 
@@ -3791,7 +4033,8 @@ CREATE TABLE public.expense_entries (
     description text,
     created_by uuid,
     created_at timestamp with time zone DEFAULT now(),
-    attachment_url text
+    attachment_url text,
+    cash_movement_id uuid
 );
 
 
@@ -4095,6 +4338,9 @@ CREATE TABLE public.invoices (
     client_ref uuid,
     seller_id_type text,
     seller_id_number text,
+    pay_currency text,
+    pay_fx_rate numeric,
+    pay_breakdown jsonb,
     CONSTRAINT invoices_seller_id_type_check CHECK (((seller_id_type IS NULL) OR (seller_id_type = ANY (ARRAY['emirates_id'::text, 'passport'::text, 'other'::text]))))
 );
 
@@ -4231,6 +4477,21 @@ CREATE TABLE public.piece_intake_batches (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     CONSTRAINT piece_intake_batches_source_type_check CHECK ((source_type = ANY (ARRAY['manual'::text, 'production'::text, 'opening'::text])))
+);
+
+
+--
+-- Name: piece_lot_draws; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.piece_lot_draws (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    store_id uuid NOT NULL,
+    piece_id uuid NOT NULL,
+    lot_id uuid NOT NULL,
+    grams numeric NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT piece_lot_draws_grams_check CHECK ((grams > (0)::numeric))
 );
 
 
@@ -5185,6 +5446,14 @@ ALTER TABLE ONLY public.piece_intake_batches
 
 
 --
+-- Name: piece_lot_draws piece_lot_draws_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_lot_draws
+    ADD CONSTRAINT piece_lot_draws_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: piece_movements piece_movements_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -5561,6 +5830,13 @@ CREATE INDEX piece_intake_batches_store_idx ON public.piece_intake_batches USING
 
 
 --
+-- Name: piece_lot_draws_piece_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_lot_draws_piece_idx ON public.piece_lot_draws USING btree (piece_id);
+
+
+--
 -- Name: pieces_intake_batch_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -5726,6 +6002,20 @@ CREATE TRIGGER trg_invoices_currency_guard BEFORE INSERT ON public.invoices FOR 
 --
 
 CREATE TRIGGER trg_mirror_invoice_cash_to_daily AFTER INSERT ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION public.mirror_invoice_cash_to_daily();
+
+
+--
+-- Name: pieces trg_piece_draws_delete; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_piece_draws_delete BEFORE DELETE ON public.pieces FOR EACH ROW EXECUTE FUNCTION public.trg_piece_draws_delete();
+
+
+--
+-- Name: pieces trg_piece_draws_weight; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_piece_draws_weight BEFORE UPDATE OF weight_grams ON public.pieces FOR EACH ROW EXECUTE FUNCTION public.trg_piece_draws_weight();
 
 
 --
@@ -6024,6 +6314,14 @@ ALTER TABLE ONLY public.diamond_stock_lots
 
 ALTER TABLE ONLY public.expense_categories
     ADD CONSTRAINT expense_categories_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: expense_entries expense_entries_cash_movement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.expense_entries
+    ADD CONSTRAINT expense_entries_cash_movement_id_fkey FOREIGN KEY (cash_movement_id) REFERENCES public.cash_movements(id) ON DELETE SET NULL;
 
 
 --
@@ -6392,6 +6690,30 @@ ALTER TABLE ONLY public.piece_intake_batches
 
 ALTER TABLE ONLY public.piece_intake_batches
     ADD CONSTRAINT piece_intake_batches_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: piece_lot_draws piece_lot_draws_lot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_lot_draws
+    ADD CONSTRAINT piece_lot_draws_lot_id_fkey FOREIGN KEY (lot_id) REFERENCES public.gold_stock_lots(id) ON DELETE CASCADE;
+
+
+--
+-- Name: piece_lot_draws piece_lot_draws_piece_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_lot_draws
+    ADD CONSTRAINT piece_lot_draws_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id) ON DELETE CASCADE;
+
+
+--
+-- Name: piece_lot_draws piece_lot_draws_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_lot_draws
+    ADD CONSTRAINT piece_lot_draws_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -7402,6 +7724,19 @@ CREATE POLICY piece_classification_options_update ON public.piece_classification
 ALTER TABLE public.piece_intake_batches ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: piece_lot_draws; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.piece_lot_draws ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: piece_lot_draws piece_lot_draws_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY piece_lot_draws_read ON public.piece_lot_draws FOR SELECT USING (public.is_store_member(store_id));
+
+
+--
 -- Name: piece_movements; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -8044,6 +8379,15 @@ GRANT ALL ON FUNCTION public.current_store_id() TO service_role;
 
 
 --
+-- Name: FUNCTION customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO service_role;
+
+
+--
 -- Name: FUNCTION customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -8059,6 +8403,15 @@ GRANT ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount nu
 REVOKE ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION delete_expense(p_id uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.delete_expense(p_id uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.delete_expense(p_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.delete_expense(p_id uuid) TO service_role;
 
 
 --
@@ -8175,6 +8528,22 @@ GRANT ALL ON FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) TO
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO anon;
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_draw_for_piece(p_piece uuid, p_store uuid, p_box text, p_lot uuid, p_grams numeric); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_draw_for_piece(p_piece uuid, p_store uuid, p_box text, p_lot uuid, p_grams numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_draw_for_piece(p_piece uuid, p_store uuid, p_box text, p_lot uuid, p_grams numeric) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_return_draws(p_piece uuid, p_grams numeric); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_return_draws(p_piece uuid, p_grams numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_return_draws(p_piece uuid, p_grams numeric) TO service_role;
 
 
 --
@@ -8372,6 +8741,15 @@ GRANT ALL ON FUNCTION public.post_sale_invoice(p jsonb) TO service_role;
 REVOKE ALL ON FUNCTION public.post_sales_return(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.post_sales_return(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.post_sales_return(p jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION production_take(p_piece uuid, p_box text, p_lot uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.production_take(p_piece uuid, p_box text, p_lot uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.production_take(p_piece uuid, p_box text, p_lot uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.production_take(p_piece uuid, p_box text, p_lot uuid) TO service_role;
 
 
 --
@@ -8679,12 +9057,39 @@ GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO service_role;
 
 
 --
+-- Name: FUNCTION trg_piece_draws_delete(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO anon;
+GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO service_role;
+
+
+--
+-- Name: FUNCTION trg_piece_draws_weight(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO anon;
+GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO service_role;
+
+
+--
 -- Name: FUNCTION trg_trader_received_sync(); Type: ACL; Schema: public; Owner: -
 --
 
 GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO anon;
 GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO service_role;
+
+
+--
+-- Name: FUNCTION update_expense(p_id uuid, p_category uuid, p_amount numeric, p_description text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.update_expense(p_id uuid, p_category uuid, p_amount numeric, p_description text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.update_expense(p_id uuid, p_category uuid, p_amount numeric, p_description text) TO authenticated;
+GRANT ALL ON FUNCTION public.update_expense(p_id uuid, p_category uuid, p_amount numeric, p_description text) TO service_role;
 
 
 --
@@ -9096,6 +9501,15 @@ GRANT ALL ON TABLE public.piece_intake_batches TO service_role;
 
 
 --
+-- Name: TABLE piece_lot_draws; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.piece_lot_draws TO anon;
+GRANT ALL ON TABLE public.piece_lot_draws TO authenticated;
+GRANT ALL ON TABLE public.piece_lot_draws TO service_role;
+
+
+--
 -- Name: TABLE piece_movements; Type: ACL; Schema: public; Owner: -
 --
 
@@ -9338,5 +9752,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict hbOMkODMksqG35d7uPX5xpUOtahqu5f5Ex4mOanwtcHOHLVOxtyZ6RY8S676jNT
+\unrestrict orpmsfqZUHu1AgviCuSpOKjYA0nujeOZYDXwnxcPW8IqS8VvmohJLWXG1WEYqGm
 
