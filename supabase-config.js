@@ -127,10 +127,10 @@ document.addEventListener('visibilitychange', function () {
     }
 });
 
-// ---- Idle timeout: auto sign-out after 2 hours with no activity ----
-const GOLDMIND_IDLE_TIMEOUT_MS = 2 * 60 * 60 * 1000; // 2 hours
+// ---- Idle timeout: auto sign-out after 5 minutes with no activity (any account, any device) ----
+const GOLDMIND_IDLE_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
 const GOLDMIND_IDLE_KEY = 'goldmind_last_activity';
-const GOLDMIND_IDLE_TOUCH_MIN_INTERVAL_MS = 60 * 1000; // don't write on every single click
+const GOLDMIND_IDLE_TOUCH_MIN_INTERVAL_MS = 10 * 1000; // don't write on every single click
 
 function goldmindTouchActivity() {
     localStorage.setItem(GOLDMIND_IDLE_KEY, Date.now().toString());
@@ -143,7 +143,7 @@ async function goldmindEnforceIdleTimeout() {
         GOLDMIND_STORE_ID = null;
         GOLDMIND_STAFF_ID = null;
         localStorage.removeItem(GOLDMIND_IDLE_KEY);
-        await goldmindClient.auth.signOut();
+        try { await goldmindClient.auth.signOut({ scope: 'local' }); } catch (e) {} // this device only
         if (!window.location.pathname.endsWith('login-entry-ar.html')) {
             window.location.href = 'login-entry-ar.html?idle=1';
         }
@@ -166,14 +166,18 @@ async function goldmindEnforceIdleTimeout() {
             goldmindTouchActivity();
         }
     }
-    ['click', 'keydown', 'touchstart', 'scroll'].forEach(function (evt) {
+    ['click', 'keydown', 'touchstart', 'scroll', 'mousemove', 'wheel', 'input'].forEach(function (evt) {
         window.addEventListener(evt, throttledTouch, { passive: true });
     });
     // Also catch a tab left open and idle with no interaction at all —
     // checked periodically so it doesn't need a page navigation to trigger.
     setInterval(function () {
         if (GOLDMIND_STORE_ID) goldmindEnforceIdleTimeout();
-    }, 60 * 1000);
+    }, 20 * 1000);
+    // coming back to a tab / the app after a while: check straight away
+    document.addEventListener('visibilitychange', function () {
+        if (document.visibilityState === 'visible' && GOLDMIND_STORE_ID) goldmindEnforceIdleTimeout();
+    });
 })();
 
 // Redirect to the login entry screen if there's no active session.
