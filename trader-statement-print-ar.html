@@ -22,6 +22,13 @@
     .stmt-table th { font-size: 10.5px; color: #8a7f68; font-weight: 700; text-align: center; padding: 8px 6px; border-bottom: 2px solid #e5ddc8; }
     .stmt-table td { font-size: 12px; text-align: center; padding: 8px 6px; border-bottom: 1px solid #f0ebdc; }
     .summary-card { border-radius: 12px; padding: 14px 16px; }
+    .st-arrow { font-size: 22px !important; font-variation-settings: 'FILL' 1, 'wght' 700 !important; line-height: 1; vertical-align: middle; }
+    .st-seg { display: inline-flex; border: 1px solid #d8cfb8; border-radius: 10px; overflow: hidden; }
+    .st-seg button { padding: 6px 14px; font-size: 12px; font-weight: 700; background: #fff; color: #5b5140; }
+    .st-seg button.on { background: #1F1A12; color: #fff; }
+    .stmt-table tr.st-v td { background: #faf6ec; font-weight: 700; }
+    .stmt-table tr.st-p td { font-size: 11px; color: #5b5140; padding: 5px 6px; }
+    .st-ph { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; display: inline-block; vertical-align: middle; }
 </style>
 <style>
 /* Printing: no top/bottom page margin = no room for the browser's own
@@ -77,11 +84,15 @@
 <div id="stCashCards" class="flex flex-col gap-2"></div>
 </div>
 
-<!-- Gold movements -->
+<!-- Gold movements (grouped per voucher) -->
 <div class="mb-6">
-<div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">workspace_premium</span>حركات الذهب</div>
+<div class="no-print flex flex-wrap gap-2 mb-3" id="stOpts">
+<div class="st-seg"><button type="button" data-view="vouchers">سندات</button><button type="button" data-view="details">تفاصيل</button></div>
+<div class="st-seg"><button type="button" data-photos="1">مع الصور</button><button type="button" data-photos="0">بدون صور</button></div>
+</div>
+<div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">workspace_premium</span>حركات الذهب <span class="text-[10px] font-normal text-gray-500 mr-2"><span class="material-symbols-outlined st-arrow" style="color:#8A3B32;font-size:15px">arrow_upward</span> صادر &nbsp; <span class="material-symbols-outlined st-arrow" style="color:#3F6B47;font-size:15px">arrow_downward</span> وارد</span></div>
 <table class="w-full stmt-table" style="border-collapse:collapse;">
-<thead><tr><th>التاريخ</th><th>النوع</th><th>العيار</th><th>الوزن (مكافئ عيار ٢٤)</th><th>الوصف</th></tr></thead>
+<thead><tr><th>التاريخ</th><th></th><th>البيان</th><th>العدد</th><th>الوزن</th><th>عيار ٢٤</th><th>المصنعية</th></tr></thead>
 <tbody id="stGoldRows"></tbody>
 </table>
 </div>
@@ -90,7 +101,7 @@
 <div>
 <div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#3F6B47;">payments</span>حركات النقد</div>
 <table class="w-full stmt-table" style="border-collapse:collapse;">
-<thead><tr><th>التاريخ</th><th>نوع الحركة</th><th>المبلغ</th><th>الوصف</th></tr></thead>
+<thead><tr><th>التاريخ</th><th></th><th>نوع الحركة</th><th>المبلغ</th><th>الوصف</th></tr></thead>
 <tbody id="stCashRows"></tbody>
 </table>
 </div>
@@ -117,6 +128,63 @@ const GOLD_TYPE_LABELS = {
     'debt_decrease|scrap_given': 'إخراج كسر بالكلفة',
     'debt_increase|gold_to_cash': 'تسكير عملات — تسديد ذهب لنا'
 };
+let ST_GOLD_GROUPS = [], ST_PIECES = {}, ST_CUR = '';
+function stGet(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }
+function stSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+let ST_VIEW = stGet('gm_stmt_view', 'vouchers'), ST_PHOTOS = stGet('gm_stmt_photos', '1') === '1';
+// ↑ صادر = goods/gold going out to the trader; ↓ وارد = coming in from him
+function stArrow(type) {
+    return type === 'debt_increase'
+        ? '<span class="material-symbols-outlined st-arrow" style="color:#3F6B47" title="وارد">arrow_downward</span>'
+        : '<span class="material-symbols-outlined st-arrow" style="color:#8A3B32" title="صادر">arrow_upward</span>';
+}
+// strip the long repeated wording the give-out screen writes into notes
+function stShort(n) {
+    return String(n || '').replace(/^\s*(إخراج|إعطاء|استلام|إدخال)\s+(بضاعة|قطع|قطعة)\s*[—–-]\s*/, '').replace(/باركود\s*/g, '').trim();
+}
+const ST_SRC = { stock_given: 'بضاعة', stock_received: 'بضاعة', opening_balance: 'رصيد سابق', settlement: 'تسوية', gold_to_cash: 'تسكير عملات', scrap_given: 'كسر بالكلفة' };
+const stBilled = m => Number(m.karat) ? Number(m.gold_24k_equivalent || 0) * 24 / Number(m.karat) : Number(m.weight_grams || 0);
+function stRenderGold() {
+    document.querySelectorAll('#stOpts [data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === ST_VIEW));
+    document.querySelectorAll('#stOpts [data-photos]').forEach(b => b.classList.toggle('on', (b.dataset.photos === '1') === ST_PHOTOS));
+    const sgn = m => m.movement_type === 'debt_increase' ? -1 : 1;
+    const col = v => v >= 0 ? '#3F6B47' : '#8A3B32';
+    const html = ST_GOLD_GROUPS.map(g => {
+        const f = g.rows[0], s = sgn(f);
+        const gold = g.rows.reduce((a, m) => a + sgn(m) * Number(m.gold_24k_equivalent || 0), 0);
+        const fab = g.rows.reduce((a, m) => a + sgn(m) * Number(m.fab_fee_amount || 0), 0);
+        const w = g.rows.reduce((a, m) => a + stBilled(m), 0);
+        const pcs = g.rows.filter(m => m.piece_id).length;
+        const karats = [...new Set(g.rows.map(m => m.karat).filter(Boolean))].join('/');
+        let title = (ST_SRC[f.source] || '') + (f.batch_ref ? ' ' + f.batch_ref : '');
+        if (g.rows.length === 1 && !f.piece_id && f.notes) title = stShort(f.notes);
+        const head = `<tr class="st-v">
+            <td>${fmtDate(f.created_at)}</td><td>${stArrow(f.movement_type)}</td>
+            <td class="text-[11.5px]">${gmEscapeHtml(title.trim() || '—')}${karats ? ` <span class="text-gray-500 font-normal">· عيار ${karats}</span>` : ''}</td>
+            <td>${pcs || '—'}</td>
+            <td class="font-data-mono">${fmt(w)} غ</td>
+            <td class="font-data-mono" style="color:${col(gold)}">${gold >= 0 ? '+' : ''}${fmt(gold)} غ</td>
+            <td class="font-data-mono" style="color:${col(fab)}">${fab ? fmt(fab) + ' ' + ST_CUR : '—'}</td></tr>`;
+        if (ST_VIEW !== 'details' || g.rows.length < 2 && !f.piece_id) return head;
+        return head + g.rows.map(m => {
+            const p = ST_PIECES[m.piece_id] || {};
+            const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph ml-1" src="${gmEscapeHtml(p.photo_url)}" alt=""/>` : '';
+            return `<tr class="st-p"><td></td><td></td>
+                <td class="text-right">${ph}${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}</td>
+                <td>${m.karat || ''}</td>
+                <td class="font-data-mono">${fmt(stBilled(m))} غ</td>
+                <td class="font-data-mono">${fmt(m.gold_24k_equivalent)} غ</td>
+                <td class="font-data-mono">${Number(m.fab_fee_amount) ? fmt(m.fab_fee_amount) : ''}</td></tr>`;
+        }).join('');
+    }).join('');
+    document.getElementById('stGoldRows').innerHTML = html || '<tr><td colspan="7" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
+}
+document.addEventListener('click', e => {
+    const b = e.target.closest('#stOpts button'); if (!b) return;
+    if (b.dataset.view) { ST_VIEW = b.dataset.view; stSet('gm_stmt_view', ST_VIEW); }
+    if (b.dataset.photos) { ST_PHOTOS = b.dataset.photos === '1'; stSet('gm_stmt_photos', ST_PHOTOS ? '1' : '0'); }
+    stRenderGold();
+});
 let ST_TRADER = null, ST_STORE = {};
 const stPdfName = () => 'كشف حساب ' + (ST_TRADER ? ST_TRADER.name : '') + '.pdf';
 async function stWhatsApp(btn) {
@@ -170,19 +238,23 @@ async function loadStatement() {
     // debt_increase -> shop owes the trader more (subtracts from "trader owes shop" balance)
     // debt_decrease -> trader owes the shop more / settles up (adds to that balance)
     let goldNet = 0;
-    const goldRows = (allMoves || []).filter(m => Number(m.gold_24k_equivalent || 0) !== 0);
-    document.getElementById('stGoldRows').innerHTML = goldRows.map(m => {
-        const signed = m.movement_type === 'debt_increase' ? -Number(m.gold_24k_equivalent || 0) : Number(m.gold_24k_equivalent || 0);
-        goldNet += signed;
-        const label = GOLD_TYPE_LABELS[m.movement_type + '|' + m.source] || (m.movement_type === 'debt_increase' ? 'استلام ذهب' : 'تسوية/دفعة');
-        return `<tr>
-            <td>${fmtDate(m.created_at)}</td>
-            <td>${gmEscapeHtml(label)}</td>
-            <td>${m.karat || '—'}</td>
-            <td class="font-data-mono font-bold" style="color:${signed >= 0 ? '#3F6B47' : '#8A3B32'};">${signed >= 0 ? '+' : ''}${fmt(signed)} غ</td>
-            <td class="text-[11px]">${gmEscapeHtml(m.notes || '')}</td>
-        </tr>`;
-    }).join('') || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
+    (allMoves || []).forEach(m => { goldNet += m.movement_type === 'debt_increase' ? -Number(m.gold_24k_equivalent || 0) : Number(m.gold_24k_equivalent || 0); });
+    // one voucher = one batch (all pieces given/received together)
+    const groups = [], byKey = {};
+    (allMoves || []).forEach(m => {
+        const k = m.batch_id || m.id;
+        if (!byKey[k]) { byKey[k] = { key: k, rows: [] }; groups.push(byKey[k]); }
+        byKey[k].rows.push(m);
+    });
+    ST_GOLD_GROUPS = groups.filter(g => g.rows.some(m => Number(m.gold_24k_equivalent || 0) !== 0));
+    const goldIds = new Set(); ST_GOLD_GROUPS.forEach(g => g.rows.forEach(m => goldIds.add(m.id)));
+    const pieceIds = [...new Set(ST_GOLD_GROUPS.flatMap(g => g.rows.map(m => m.piece_id)).filter(Boolean))];
+    if (pieceIds.length) {
+        const { data: pcs } = await goldmindClient.from('pieces').select('id, barcode, photo_url').in('id', pieceIds);
+        (pcs || []).forEach(p => { ST_PIECES[p.id] = p; });
+    }
+    ST_CUR = CUR;
+    stRenderGold();
     document.getElementById('stGoldNet').textContent = fmt(goldNet) + ' غ';
     document.getElementById('stGoldNet').style.color = goldNet >= 0 ? '#3F6B47' : '#8A3B32';
     document.getElementById('stGoldHint').textContent = goldNet >= 0 ? '(التاجر مديون للمحل)' : '(المحل مديون للتاجر)';
@@ -207,18 +279,20 @@ async function loadStatement() {
         'debt_decrease|gold_to_cash': 'تسكير عملات — قيمة الذهب لصالح المحل'
     };
     let cashNet = 0;
-    const cashRows = (allMoves || []).filter(m => Number(m.fab_fee_amount || 0) !== 0);
+    (allMoves || []).forEach(m => { cashNet += m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0); });
+    // making of goods vouchers already shows in the gold table above
+    const cashRows = (allMoves || []).filter(m => Number(m.fab_fee_amount || 0) !== 0 && !goldIds.has(m.id));
     document.getElementById('stCashRows').innerHTML = cashRows.map(m => {
         const signed = m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0);
-        cashNet += signed;
         const label = CASH_TYPE_LABELS[m.movement_type + '|' + m.source] || (signed >= 0 ? 'تخفيض دين' : 'زيادة دين');
         return `<tr>
             <td>${fmtDate(m.created_at)}</td>
+            <td>${stArrow(m.movement_type)}</td>
             <td>${gmEscapeHtml(label)}</td>
             <td class="font-data-mono font-bold" style="color:${signed >= 0 ? '#3F6B47' : '#8A3B32'};">${signed >= 0 ? '+' : ''}${fmt(signed)} ${CUR}</td>
-            <td>${gmEscapeHtml(m.notes || label)}</td>
+            <td class="text-[11px]">${gmEscapeHtml(stShort(m.notes) === label ? '' : stShort(m.notes))}</td>
         </tr>`;
-    }).join('') || '<tr><td colspan="4" class="text-gray-400 py-6">لا توجد حركات نقدية بهذه الفترة</td></tr>';
+    }).join('') || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات نقدية بهذه الفترة</td></tr>';
 
     const cashCardsEl = document.getElementById('stCashCards');
     cashCardsEl.innerHTML = `<div class="summary-card flex-1" style="background:#E1EADB;">
