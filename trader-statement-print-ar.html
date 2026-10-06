@@ -237,13 +237,16 @@ async function loadStatement() {
     let goldQuery = goldmindClient.from('trader_movements').select('*')
         .eq('store_id', GOLDMIND_STORE_ID).eq('trader_id', traderId).order('created_at', { ascending: true });
     if (fromDate) goldQuery = goldQuery.gte('created_at', fromDate + 'T00:00:00');
+    const batchId = params.get('batch');
+    if (batchId) goldQuery = goldQuery.eq('batch_id', batchId); // one voucher: its pieces with photos
     const { data: allMoves } = await goldQuery;
+    if (batchId) { ST_VIEW = 'details'; ST_PHOTOS = true; }
 
     // ---- Header ----
     document.getElementById('stTraderName').textContent = trader.name;
     document.getElementById('stTraderPhone').textContent = trader.phone || '';
     document.getElementById('stStoreName').textContent = (store && store.name) || '';
-    document.getElementById('stPeriodLabel').textContent = fromDate
+    document.getElementById('stPeriodLabel').textContent = batchId ? 'سند واحد' : fromDate
         ? ('من ' + fmtDate(fromDate + 'T00:00:00') + ' إلى اليوم')
         : 'كل الحركات منذ بداية الحساب';
 

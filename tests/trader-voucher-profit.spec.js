@@ -22,9 +22,25 @@ test('voucher profit popup', async ({ page }) => {
   await expect(btn).toBeVisible();
   await btn.click();
   // per piece: making 15×10 − 6×9 = 96, gold 0.75 g × 100 = 75 → 171; two pieces → 342
-  await expect(page.locator('#gm-vp-total')).toHaveText('342.00');
-  await expect(page.locator('#gm-vp-body')).toContainText('192.00');  // making profit
-  await expect(page.locator('#gm-vp-body')).toContainText('1.500');   // diff 24k
-  await expect(page.locator('#gm-vp-body')).toContainText('180.00');  // value now
+  await expect(page.locator('#gm-profit-total')).toHaveText('342.00');
+  await expect(page.locator('#gm-profit-body')).toContainText('192.00');  // making profit
+  await expect(page.locator('#gm-profit-body')).toContainText('1.500');   // diff 24k
+  await expect(page.locator('#gm-profit-body')).toContainText('180.00');  // value now
   expect(errs).toEqual([]);
+});
+
+test('trader period profit and voucher pieces link', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'جليل' }], pieces: [],
+    gold_prices: [{ store_id: STORE, karat: 24, price_per_gram: 120 }],
+    trader_movements: [mv('1'), mv('2')]
+  } });
+  await page.goto('/ledger-ar.html?trader=t1');
+  await expect(page.locator('#trader-batch-b1 a', { hasText: 'القطع' })).toHaveAttribute('href', /batch=b1/);
+  await page.click('button:has-text("أرباحي مع التاجر")');
+  await expect(page.locator('#gm-pp-total')).toHaveText('342.00');
+  await expect(page.locator('#gm-profit-body')).toContainText('عدد السندات');
 });

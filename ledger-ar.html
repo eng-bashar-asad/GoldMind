@@ -13,8 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=33"></script>
 <script src="theme.js?v=50"></script>
-<script src="gm-profit.js?v=3"></script>
-<style>.gm-profit-btn{display:none!important}body.gm-can-profit .gm-profit-btn{display:flex!important}</style>
+<script src="gm-profit.js?v=5"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -239,6 +238,7 @@
 <div class="flex items-center justify-between">
 <button onclick="showTradersList()" class="text-[12px] text-secondary font-semibold">→ كل التجار</button>
 <button onclick="openStatementDatePrompt()" class="text-[12px] text-secondary font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">print</span>طباعة كشف حساب</button>
+<button onclick="gmPartyProfitPopup('trader', currentTraderId, document.getElementById('detail-trader-name').textContent)" class="gm-profit-btn text-[12px] font-semibold items-center gap-1" style="color:#3F6B47"><span class="material-symbols-outlined text-[16px]">trending_up</span>أرباحي مع التاجر</button>
 </div>
 
 <!-- "من تاريخ" prompt before printing the statement -->
@@ -1071,7 +1071,8 @@ function showTraderDetail(traderId) {
           <span class="text-on-surface-variant">ذهب عيار ٢٤</span><span class="font-data-mono font-semibold text-left">${fmt(totalGold24k)} غ</span>
         </div>
         <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
-          ${first.source === 'stock_given' ? `<button onclick="gmShowVoucherProfit('batch_id','${group.batchId}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
+          ${first.source === 'stock_given' ? `<a href="trader-statement-print-ar.html?trader=${first.trader_id}&batch=${group.batchId}" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">photo_library</span> القطع</a>` : ''}
+          ${first.source === 'stock_given' ? `<button onclick="gmVoucherProfitPopup('batch_id','${group.batchId}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
           <button onclick="toggleEditStockBatch('${group.batchId}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
           <button onclick="deleteStockMovementBatch('${group.batchId}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف السند بالكامل</button>
         </div>
@@ -1154,7 +1155,7 @@ function showTraderDetail(traderId) {
         </div>` : ''}
         ${isStockMovement ? `
         <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
-          ${m.source === 'stock_given' ? `<button onclick="gmShowVoucherProfit('id','${m.id}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
+          ${m.source === 'stock_given' ? `<button onclick="gmVoucherProfitPopup('id','${m.id}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
           <button onclick="toggleEditStockMovement('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
           <button onclick="deleteStockMovement('${m.id}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>
@@ -2760,57 +2761,6 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
   });
-}
-</script>
-<div id="gm-vp-modal" class="hidden fixed inset-0 z-[80] bg-black/40 flex items-center justify-center p-3" onclick="if(event.target===this)this.classList.add('hidden')">
-<div class="bg-white rounded-2xl w-full max-w-md max-h-[90vh] overflow-y-auto p-4" id="gm-vp-body"></div>
-</div>
-<script>
-// "ربح السند": the profit of one give-out voucher, same formula as the profit report (gm-profit.js)
-(async () => {
-  try {
-    for (let i = 0; i < 100 && !(typeof GOLDMIND_STAFF_ID !== 'undefined' && GOLDMIND_STAFF_ID); i++) await new Promise(r => setTimeout(r, 200));
-    const { data: st } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-    if (st && (st.role === 'owner' || (st.permissions && st.permissions.view_profit_report === true))) document.body.classList.add('gm-can-profit');
-  } catch (e) {}
-})();
-async function gmShowVoucherProfit(col, val) {
-  const modal = document.getElementById('gm-vp-modal'), body = document.getElementById('gm-vp-body');
-  body.innerHTML = '<p class="text-center text-[13px] py-8">جارِ الحساب...</p>';
-  modal.classList.remove('hidden');
-  const [{ data: rows, error }, { data: gp }] = await Promise.all([
-    goldmindClient.from('trader_movements').select(GM_TRADER_GIVE_SELECT).eq(col, val).eq('source', 'stock_given'),
-    goldmindClient.from('gold_prices').select('price_per_gram').eq('store_id', GOLDMIND_STORE_ID).eq('karat', 24).maybeSingle()
-  ]);
-  if (error || !rows || !rows.length) { body.innerHTML = '<p class="text-error text-[13px] py-6 text-center">تعذّر حساب الربح</p>'; return; }
-  const now24 = Number(gp && gp.price_per_gram) || 0;
-  const t = { billed: 0, pieceAcc: 0, fee: 0, cost: 0, making: 0, diff: 0, diff24: 0, goldVal: 0, goldNow: 0, profit: 0 };
-  let unknown = 0;
-  rows.forEach(m => { const r = gmTraderGiveProfit(m, now24); if (r.unknownCost) unknown++; Object.keys(t).forEach(k => t[k] += r[k] || 0); });
-  const n = (v, d) => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: d, maximumFractionDigits: d });
-  const row = (l, v, cls) => `<div class="flex justify-between py-1.5 border-b border-outline-variant ${cls || ''}"><span>${l}</span><span class="font-data-mono" dir="ltr">${v}</span></div>`;
-  body.innerHTML = `
-    <div class="flex items-center justify-between mb-1"><b class="text-[16px]">ربح السند</b>
-      <button onclick="document.getElementById('gm-vp-modal').classList.add('hidden')" class="p-1" aria-label="إغلاق"><span class="material-symbols-outlined">close</span></button></div>
-    <div class="text-[11px] text-on-surface-variant mb-3">${gmFormatDateTime(rows[0].created_at, { day: 'numeric', month: 'short', year: 'numeric' })} · ${rows.length} قطعة</div>
-    <div class="rounded-xl p-4 mb-3 text-center" style="background:#D7EBD2;color:#14532d">
-      <div class="text-[12px] font-bold">صافي ربح السند</div>
-      <div class="text-[26px] font-bold font-data-mono" id="gm-vp-total" dir="ltr">${n(t.profit, 2)}</div></div>
-    <div class="text-[13px]">
-      ${row('الوزن المحسوب على التاجر', n(t.billed, 3) + ' غ')}
-      ${row('الوزن المحاسبي للقطع بالمخزن', n(t.pieceAcc, 3) + ' غ')}
-      <div class="font-bold mt-3 mb-1">المصنعية</div>
-      ${row('مصنعية التاجر', n(t.fee, 2))}
-      ${row('كلفة مصنعيتنا', n(t.cost, 2))}
-      ${row('ربح المصنعية', n(t.making, 2), 'font-bold')}
-      <div class="font-bold mt-3 mb-1">فرق الذهب</div>
-      ${row('فرق الوزن (بعيار القطع)', n(t.diff, 3) + ' غ')}
-      ${row('فرق الوزن عيار ٢٤', n(t.diff24, 3) + ' غ')}
-      ${row('قيمته يوم السند', n(t.goldVal, 2), 'font-bold')}
-      ${row('قيمته الآن', n(t.goldNow, 2), 'text-on-surface-variant')}
-    </div>
-    ${unknown ? `<p class="text-[11px] text-error mt-2">${unknown} قطعة بدون كلفة مصنعية مسجّلة، فحُسبت مصنعيتها كاملة ربحاً.</p>` : ''}
-    <p class="text-[11px] text-on-surface-variant mt-3">ربح السند = ربح المصنعية + قيمة فرق الذهب يوم السند.</p>`;
 }
 </script>
 </body></html>

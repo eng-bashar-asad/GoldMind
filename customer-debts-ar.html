@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=33"></script>
 <script src="theme.js?v=50"></script>
+<script src="gm-profit.js?v=5"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -162,6 +163,9 @@
 <span class="material-symbols-outlined text-[19px]">output</span> صرف مبلغ للعميل
 </button>
 </div>
+<button type="button" onclick="gmPartyProfitPopup('customer', currentCustomerId, document.getElementById('detail-customer-name').textContent)" class="gm-profit-btn w-full h-11 border rounded-xl items-center justify-center gap-2 text-[13px] font-semibold" style="color:#3F6B47;border-color:#3F6B47">
+<span class="material-symbols-outlined text-[18px]">trending_up</span> أرباحي مع هذا الزبون
+</button>
 <a id="printStatementLink" href="#" target="_blank" class="w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">print</span> طباعة كشف حساب
 </a>
@@ -484,7 +488,10 @@ function renderMovementsList() {
         </div>
         <p class="text-[13px] font-data-mono font-bold">${fmt(Number(i.total_amount || 0) * rate)}${cur}</p>
         <p class="text-[12px] text-on-surface-variant mt-1">${PAY_LABEL[i.payment_method] || ''}${!cancelled && rem > 0.009 ? ` — <span class="text-error font-semibold">باقي ديناً ${fmt(rem * rate)}${cur}</span>` : ''}</p>
-        <p class="text-[11px] text-secondary font-semibold mt-1">فتح الفاتورة ←</p>
+        <div class="flex items-center justify-between gap-2 mt-1">
+          <span class="text-[11px] text-secondary font-semibold">فتح الفاتورة (الأوزان والصور) ←</span>
+          ${(i.type === 'sale' || i.type === 'return') && !cancelled ? `<button type="button" onclick="event.preventDefault(); event.stopPropagation(); gmInvoiceProfitPopup('${i.id}')" class="gm-profit-btn h-8 px-3 border rounded-lg text-[11px] font-semibold items-center gap-1" style="color:#3F6B47;border-color:#3F6B47"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح الفاتورة</button>` : ''}
+        </div>
       </a>`;
     }
     const m = e.m;
