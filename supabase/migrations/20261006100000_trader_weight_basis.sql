@@ -1,0 +1,1 @@
+-- Applied via execute_sql: traders.weight_basis ('accounting' default | 'gross') — which weight a trader is billed on when goods are given out.

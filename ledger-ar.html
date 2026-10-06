@@ -441,6 +441,13 @@ function goToStatementPrint() {
 </button>
 </div>
 <div id="gs-barcode-result" class="mb-3"></div>
+<div class="flex items-center gap-2 mb-3 text-[12px]">
+<span class="font-semibold shrink-0">الحساب مع هذا التاجر على:</span>
+<div class="flex flex-1 rounded-lg border border-outline-variant overflow-hidden font-semibold" id="gs-basis">
+<button type="button" data-v="gross" onclick="gsSetBasis('gross')" class="flex-1 h-9">الوزن القائم</button>
+<button type="button" data-v="accounting" onclick="gsSetBasis('accounting')" class="flex-1 h-9 border-r border-outline-variant">الوزن المحاسبي</button>
+</div>
+</div>
 <div id="gs-cart-list" class="flex flex-col gap-2 mb-3"></div>
 <div class="bg-surface-container-low rounded-lg p-3 mb-3 text-[12px] flex flex-col gap-1" id="gs-preview">
 <div class="flex justify-between"><span class="text-on-surface-variant">عدد القطع</span><span class="font-data-mono font-semibold" id="gs-preview-count">0</span></div>
@@ -2254,6 +2261,18 @@ function gsPieceCost(it) {
 }
 function gsIsPriced() { return ((document.querySelector('input[name="gs-kind"]:checked') || {}).value) === 'بسعر محدد'; }
 
+// Which weight the trader is billed on: set per trader (some work on the gross
+// weight, others on the accounting weight). Stored on the trader.
+function gsBasis() { const t = traders.find(x => x.id === currentTraderId); return (t && t.weight_basis) || 'accounting'; }
+const gsBillW = it => gsBasis() === 'gross' ? it.grossWeight : it.accountingWeight;
+async function gsSetBasis(v) {
+  const t = traders.find(x => x.id === currentTraderId); if (!t || t.weight_basis === v) return;
+  const { error } = await goldmindClient.from('traders').update({ weight_basis: v }).eq('id', t.id);
+  if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+  t.weight_basis = v;
+  renderGiveStockCart();
+}
+
 // Photo panel: the selected (by default the last scanned) piece big, the others as thumbnails
 let gsPhotoSel = null;
 function gsShowPhoto(cartId) { gsPhotoSel = cartId; renderGsPhotoPanel(); }
@@ -2278,6 +2297,7 @@ function renderGsPhotoPanel() {
 
 function renderGiveStockCart(previewOnly) {
   renderGsPhotoPanel();
+  document.querySelectorAll('#gs-basis button').forEach(b => { const on = b.dataset.v === gsBasis(); b.style.background = on ? '#000' : ''; b.style.color = on ? '#fff' : ''; });
   const priced = gsIsPriced();
   if (priced && gsGoldPrices === null) { gsGoldPrices = {}; gsLoadGoldPrices(); }
   document.getElementById('gs-priced-note').classList.toggle('hidden', !priced);
@@ -2297,8 +2317,8 @@ function renderGiveStockCart(previewOnly) {
     // matching accounting_weight_grams' role everywhere else in the app
     // (profit-report-ar.html, invoice-print-ar.html's COGS) — gross/standing
     // weight is only the physical reference, never the billing basis.
-    acc.gold24k += it.accountingWeight * ((it.karat || 0) / 24);
-    acc.fee += it.accountingWeight * it.fabPerGram;
+    acc.gold24k += gsBillW(it) * ((it.karat || 0) / 24);
+    acc.fee += gsBillW(it) * it.fabPerGram;
     return acc;
   }, { gross: 0, accounting: 0, gold24k: 0, fee: 0 });
 
@@ -2321,7 +2341,7 @@ function renderGiveStockCart(previewOnly) {
     <div class="bg-white border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
       <div class="flex items-center justify-between gap-2">
         <div class="min-w-0">
-          <div class="font-data-mono font-bold text-sm">${fmt(it.grossWeight)} غ &middot; عيار ${it.karat}</div>
+          <div class="font-data-mono font-bold text-sm">قائم ${fmt(it.grossWeight)} غ &middot; محاسبي ${fmt(it.accountingWeight)} غ &middot; عيار ${it.karat}</div>
           <div class="text-outline text-[11px] font-data-mono truncate">${gmEscapeHtml(it.barcode)}${it.description ? ' — ' + gmEscapeHtml(it.description) : ''}</div>
         </div>
         <button onclick="removeGiveStockCartItem(${it.cartId})" class="text-error shrink-0"><span class="material-symbols-outlined text-[18px]">delete</span></button>
@@ -2385,7 +2405,7 @@ async function submitGiveStock() {
       gold_24k_equivalent: 0, fab_fee_per_gram: null, fab_fee_amount: +Number(it.price).toFixed(2),
       sale_cost: +gsPieceCost(it).toFixed(2), source: 'stock_given', notes: note
     };
-    const feeBeforeVat = it.accountingWeight * it.fabPerGram;
+    const feeBeforeVat = gsBillW(it) * it.fabPerGram;
     return {
       batch_id: gsBatchId,
       store_id: GOLDMIND_STORE_ID,
@@ -2396,7 +2416,7 @@ async function submitGiveStock() {
       karat: it.karat,
       // Billed on the accounting (billable) weight, not the physical gross
       // weight — see comment in renderGiveStockCart above.
-      gold_24k_equivalent: +(it.accountingWeight * ((it.karat || 0) / 24)).toFixed(3),
+      gold_24k_equivalent: +(gsBillW(it) * ((it.karat || 0) / 24)).toFixed(3),
       accounting_weight_grams: it.accountingWeight,
       fab_fee_per_gram: it.fabPerGram,
       // Includes VAT on the fab fee too, at the rate the user set for this

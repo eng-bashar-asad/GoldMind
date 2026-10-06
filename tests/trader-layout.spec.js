@@ -54,3 +54,28 @@ test('give-out list: the last scanned piece is on top', async ({ page }) => {
   }
   await expect(page.locator('#gs-cart-list > div').first()).toContainText('000035');
 });
+
+test('give-out: trader billed on the gross weight when chosen for him', async ({ page }) => {
+  const calls = await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'جليل', weight_basis: 'accounting' }], trader_movements: [], gold_prices: [],
+    pieces: [{ id: 'p1', store_id: STORE, barcode: '000034', status: 'available', karat: 18, weight_grams: 10, accounting_weight_grams: 8, cost_fabrication_per_gram: 0 }]
+  } });
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await page.goto('/ledger-ar.html?trader=t1&action=give');
+  await expect(page.locator('#give-stock-form')).not.toHaveClass(/hidden/);
+  await page.evaluate(() => setGiveStockMode('barcode'));
+  await page.fill('#gs-barcode-input', '000034');
+  await page.press('#gs-barcode-input', 'Enter');
+  await expect(page.locator('#gs-cart-list')).toContainText('قائم 10.00');
+  await expect(page.locator('#gs-preview-gold')).toContainText('6.00');        // 8 × 18/24
+  await page.click('#gs-basis button[data-v="gross"]');
+  await expect(page.locator('#gs-preview-gold')).toContainText('7.50');        // 10 × 18/24
+  expect(calls.some(c => c.method === 'PATCH' && c.name === 'traders' && JSON.parse(c.body).weight_basis === 'gross')).toBe(true);
+  await page.click('#gs-btn');
+  await expect.poll(() => calls.some(c => c.method === 'POST' && c.name === 'trader_movements')).toBe(true);
+  const [r] = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'trader_movements').body);
+  expect(r.gold_24k_equivalent).toBe(7.5);
+});
