@@ -894,6 +894,19 @@ goldmindLoadSavedFont();
   } catch (e) { /* sessionStorage unavailable (private mode etc.) -- gmSmartBack falls back to fallbackHref every time */ }
 })();
 
+// A page that only forwards somewhere else must not stay in the back-stack,
+// otherwise "back" lands on it and it forwards again — an endless loop.
+function gmReplace(url) {
+  try {
+    var stack = JSON.parse(sessionStorage.getItem('gm_nav_stack') || '[]');
+    if (stack[stack.length - 1] === location.pathname + location.search) {
+      stack.pop();
+      sessionStorage.setItem('gm_nav_stack', JSON.stringify(stack));
+    }
+  } catch (e) { /* ignore */ }
+  location.replace(url);
+}
+
 function gmSmartBack(fallbackHref) {
   try {
     var stack = JSON.parse(sessionStorage.getItem('gm_nav_stack') || '[]');

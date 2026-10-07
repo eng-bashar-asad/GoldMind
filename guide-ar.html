@@ -14,7 +14,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="gm-guides.js?v=8"></script>
 <script src="supabase-config.js?v=34"></script>
-<script src="theme.js?v=53"></script>
+<script src="theme.js?v=54"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -112,7 +112,7 @@ console.assert(gmGuideRender('1. **أ**\n[ب](a-b.html)').includes('<li><b>أ</b
   const id = new URLSearchParams(location.search).get('id');
   const g = GM_GUIDES.find(x => x.id === id);
   if (!g) { document.getElementById('gd-body').innerHTML = '<p class="py-6">الدليل غير موجود. <a class="text-primary underline" href="guides-ar.html">كل الأدلة</a></p>'; return; }
-  if (g.href) { location.replace(g.href); return; }
+  if (g.href) { gmReplace(g.href); return; }
   document.title = g.title + ' | GoldMind';
   document.getElementById('gd-body').innerHTML = '<p class="text-xl font-bold mb-1">' + gdEsc(g.title) + '</p><p class="gd-sum">' + gdEsc(g.summary) + '</p>' + gmGuideRender(g.md);
 })();
