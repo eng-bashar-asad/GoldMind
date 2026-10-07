@@ -443,11 +443,10 @@ async function submitEntry() {
 }
 
 async function loadAll() {
-  const { data, error } = await goldmindClient
-    .from('daily_cash_log')
-    .select('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id)')
-    .eq('store_id', GOLDMIND_STORE_ID)
-    .order('created_at', { ascending: true });
+  const sel = cols => goldmindClient.from('daily_cash_log').select(cols).eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: true });
+  let { data, error } = await sel('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id, trader_movement_id, tm:trader_movement_id(trader_id), cd:customer_debts!customer_debts_cash_movement_id_fkey(customer_id))');
+  // the links to customer/trader are only for tapping a row — never let them hide the box
+  if (error) ({ data, error } = await sel('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id)'));
 
   if (error) {
     document.getElementById('cashbox-table-body').innerHTML = `<tr><td colspan="4" class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</td></tr>`;
@@ -695,7 +694,10 @@ function openEditModal(id) {
     const op = e.operation_type || '';
     if (e.cm && e.cm.invoice_id) window.location.href = 'invoice-print-ar.html?id=' + e.cm.invoice_id;
     else if (op.includes('عربون')) window.location.href = 'deposits-ar.html';
-    else if (op === 'دفعة من عميل' || op === 'صرف لعميل') window.location.href = 'customers-ar.html';
+    // customer payment / cash-out → that customer's page; trader cash → that trader
+    else if (e.cm && e.cm.tm && e.cm.tm.trader_id) window.location.href = 'ledger-ar.html?trader=' + e.cm.tm.trader_id;
+    else if (e.cm && e.cm.cd && e.cm.cd.length) window.location.href = 'customer-debts-ar.html?open=' + e.cm.cd[0].customer_id;
+    else if (op === 'دفعة من عميل' || op === 'صرف لعميل' || /^(دفعة من|صرف إلى|قبض من) /.test(op)) window.location.href = 'customers-ar.html';
     else if (op.startsWith('مصروف')) window.location.href = 'expense-entry-ar.html';
     return;
   }
@@ -860,7 +862,7 @@ async function runCashboxSearch() {
     return;
   }
 
-  let query = goldmindClient.from('daily_cash_log').select('*, cm:cash_movement_id(invoice_id)')
+  let query = goldmindClient.from('daily_cash_log').select('*, cm:cash_movement_id(invoice_id, trader_movement_id, tm:trader_movement_id(trader_id), cd:customer_debts!customer_debts_cash_movement_id_fkey(customer_id))')
     .eq('store_id', GOLDMIND_STORE_ID)
     .or(`notes.ilike.%${keyword}%,operation_type.ilike.%${keyword}%`)
     .order('created_at', { ascending: false })

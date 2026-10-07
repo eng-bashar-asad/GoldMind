@@ -1,0 +1,4 @@
+-- Applied via SQL. Daily cash box wording: gm_daily_label(op, notes, cash_movement_id) + BEFORE INSERT
+-- trigger trg_daily_label on daily_cash_log turn "دفعة من عميل / احمد — دفعة من العميل" into
+-- "دفعة من احمد" (second line keeps only the extra note / foreign amount), "صرف إلى X", "قبض من X",
+-- "مبيعات لـ X" + invoice no., "مشتريات من X" + invoice no. Existing rows were updated the same way.
