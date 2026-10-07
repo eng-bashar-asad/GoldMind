@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>سند قبض / صرف | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=34"></script>
+<script src="theme.js?v=53"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32", "success-container": "#d7f3dc"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .seg { display: flex; border: 1px solid var(--gm-outline-variant); border-radius: 12px; overflow: hidden; }
+    .seg button { flex: 1; height: 46px; font-size: 14px; font-weight: 700; background: var(--gm-surface-lowest); color: var(--gm-on-surface-variant); }
+    .seg button.on { background: var(--gm-primary); color: var(--gm-on-primary); }
+    .seg.kind button.on[data-kind="in"] { background: #3F6B47; color: #fff; }
+    .seg.kind button.on[data-kind="out"] { background: #8A3B32; color: #fff; }
+    .fld { width: 100%; height: 46px; border: 1px solid var(--gm-outline-variant); border-radius: 10px; padding: 0 12px; font-size: 15px; background: var(--gm-surface-lowest); color: var(--gm-on-surface); }
+    .lbl { display: block; font-size: 12px; font-weight: 600; color: var(--gm-on-surface-variant); margin: 12px 0 4px; }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" aria-label="رجوع" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">سند قبض / صرف</h1>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md mx-auto px-4">
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<form id="cv-form" class="hidden bg-surface-container-lowest border border-outline-variant rounded-2xl p-4 mt-4 text-on-surface" onsubmit="event.preventDefault(); cvSave();">
+  <div class="seg kind" role="radiogroup" aria-label="نوع السند">
+    <button type="button" data-kind="in" class="on" onclick="cvKind('in')">سند قبض (وارد)</button>
+    <button type="button" data-kind="out" onclick="cvKind('out')">سند صرف (صادر)</button>
+  </div>
+
+  <span class="lbl">الطرف</span>
+  <div class="seg party" role="radiogroup" aria-label="الطرف">
+    <button type="button" data-party="customer" class="on" onclick="cvParty('customer')">زبون</button>
+    <button type="button" data-party="trader" onclick="cvParty('trader')">تاجر</button>
+    <button type="button" data-party="expense" onclick="cvParty('expense')">مصروف</button>
+  </div>
+
+  <label class="lbl" for="cv-who" id="cv-who-lbl">الزبون</label>
+  <input id="cv-who-search" class="fld mb-2" placeholder="ابحث بالاسم أو الهاتف..." oninput="cvFillWho()" aria-label="بحث"/>
+  <select id="cv-who" class="fld"></select>
+  <p id="cv-bal" class="text-[12px] text-on-surface-variant mt-1"></p>
+
+  <div class="grid grid-cols-2 gap-2">
+    <div><label class="lbl" for="cv-amount">المبلغ</label>
+      <input id="cv-amount" type="number" step="0.01" min="0" dir="ltr" class="fld font-data-mono" oninput="cvPreview()"/></div>
+    <div><label class="lbl" for="cv-cur">العملة</label>
+      <select id="cv-cur" class="fld" onchange="cvCur()"></select></div>
+  </div>
+  <div id="cv-rate-wrap" class="hidden">
+    <label class="lbl" for="cv-rate">سعر الصرف: كم <span id="cv-rate-sym"></span> مقابل 1 <span class="cv-base"></span></label>
+    <input id="cv-rate" type="number" step="0.0001" min="0" dir="ltr" class="fld font-data-mono" oninput="cvRate()"/>
+  </div>
+  <p id="cv-preview" class="text-[13px] font-semibold mt-2"></p>
+
+  <span class="lbl">طريقة الدفع</span>
+  <div class="seg method">
+    <button type="button" data-method="cash" class="on" onclick="cvMethod('cash')">نقدي (الصندوق)</button>
+    <button type="button" data-method="bank" onclick="cvMethod('bank')">تحويل / بطاقة</button>
+  </div>
+
+  <label class="lbl" for="cv-notes">ملاحظة</label>
+  <input id="cv-notes" class="fld" placeholder="اختياري"/>
+
+  <p id="cv-error" class="hidden text-error text-[13px] mt-3" role="alert"></p>
+  <button id="cv-btn" type="submit" class="w-full h-12 mt-4 rounded-xl font-bold text-[15px] bg-primary text-on-primary">حفظ السند</button>
+  <p id="cv-ok" class="hidden mt-3 rounded-lg px-3 py-2 text-[13px] font-semibold" style="background:#E1EADB;color:#2E5235" role="status"></p>
+</form>
+</main>
+<script>
+const CV = { kind: 'in', party: 'customer', method: 'cash', base: 'AED', cur: null, rate: 0, lists: {} };
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const n2 = v => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const money = (v, c) => '<bdi dir="ltr">' + n2(v) + ' ' + c + '</bdi>'; // amount + currency stay in order inside Arabic text
+const rateKey = code => 'gm_fx_' + GOLDMIND_STORE_ID + '_' + code; // same remembered rates as the sale page
+const seg = (cls, attr, val) => document.querySelectorAll('.seg.' + cls + ' button').forEach(b => b.classList.toggle('on', b.dataset[attr] === val));
+
+function cvKind(k) {
+  CV.kind = k; seg('kind', 'kind', k);
+  if (k === 'in' && CV.party === 'expense') cvParty('customer');
+  document.querySelector('.seg.party [data-party="expense"]').disabled = k === 'in';
+  document.querySelector('.seg.party [data-party="expense"]').style.opacity = k === 'in' ? .4 : 1;
+  cvPreview();
+}
+function cvParty(p) {
+  if (p === 'expense' && CV.kind === 'in') return;
+  CV.party = p; seg('party', 'party', p);
+  document.getElementById('cv-who-lbl').textContent = { customer: 'الزبون', trader: 'التاجر', expense: 'نوع المصروف' }[p];
+  document.getElementById('cv-who-search').value = '';
+  cvFillWho();
+}
+function cvMethod(m) { CV.method = m; seg('method', 'method', m); }
+function cvFillWho(selectId) {
+  const q = document.getElementById('cv-who-search').value.trim().toLowerCase();
+  const list = (CV.lists[CV.party] || []).filter(x => !q || (x.name || '').toLowerCase().includes(q) || (x.phone || '').includes(q));
+  const sel = document.getElementById('cv-who');
+  sel.innerHTML = '<option value="">— اختر —</option>' + list.map(x => `<option value="${x.id}">${esc(x.name)}${x.phone ? ' — ' + esc(x.phone) : ''}</option>`).join('');
+  if (selectId) sel.value = selectId;
+  else if (list.length === 1) sel.value = list[0].id;
+  cvBalance();
+}
+async function cvBalance() {
+  const el = document.getElementById('cv-bal'), id = document.getElementById('cv-who').value;
+  el.textContent = '';
+  if (!id || CV.party === 'expense') return;
+  if (CV.party === 'customer') {
+    const { data } = await goldmindClient.from('customer_debts').select('movement_type, cash_amount').eq('customer_id', id);
+    const b = (data || []).reduce((a, r) => a + (r.movement_type === 'debt_increase' ? 1 : -1) * Number(r.cash_amount || 0), 0);
+    el.innerHTML = Math.abs(b) < 0.01 ? 'الرصيد: 0' : (b > 0 ? 'عليه: ' : 'له: ') + money(Math.abs(b), CV.base);
+  } else {
+    const { data } = await goldmindClient.from('trader_movements').select('movement_type, fab_fee_amount').eq('trader_id', id);
+    const b = (data || []).reduce((a, r) => a + (r.movement_type === 'debt_decrease' ? 1 : -1) * Number(r.fab_fee_amount || 0), 0);
+    el.innerHTML = 'الرصيد النقدي: ' + (Math.abs(b) < 0.01 ? '0' : (b > 0 ? 'التاجر مديون للمحل ' : 'المحل مديون للتاجر ') + money(Math.abs(b), CV.base));
+  }
+}
+function cvCur() {
+  const code = document.getElementById('cv-cur').value;
+  CV.cur = code === CV.base ? null : code;
+  let r = 0;
+  try { r = parseFloat(localStorage.getItem(rateKey(code))) || 0; } catch (e) {}
+  if (!r && CV.secondary && code === CV.secondary.code) r = CV.secondary.rate;
+  CV.rate = CV.cur ? r : 0;
+  document.getElementById('cv-rate').value = CV.rate || '';
+  document.getElementById('cv-rate-sym').textContent = code;
+  document.getElementById('cv-rate-wrap').classList.toggle('hidden', !CV.cur);
+  cvPreview();
+}
+function cvRate() {
+  CV.rate = parseFloat(document.getElementById('cv-rate').value) || 0;
+  try { if (CV.cur && CV.rate > 0) localStorage.setItem(rateKey(CV.cur), String(CV.rate)); } catch (e) {}
+  cvPreview();
+}
+function cvPreview() {
+  const amt = parseFloat(document.getElementById('cv-amount').value) || 0, el = document.getElementById('cv-preview');
+  if (!amt) { el.textContent = ''; return; }
+  const code = CV.cur || CV.base;
+  const line = (CV.kind === 'in' ? 'يدخل الصندوق: ' : 'يخرج من الصندوق: ') + money(amt, code);
+  el.innerHTML = CV.cur ? line + '<br>' + (CV.rate > 0 ? 'يُسجّل بالحساب: ' + money(amt / CV.rate, CV.base) : 'أدخل سعر الصرف') : line;
+  el.style.color = CV.kind === 'in' ? '#3F6B47' : '#8A3B32';
+}
+async function cvSave() {
+  const err = document.getElementById('cv-error'), ok = document.getElementById('cv-ok'), btn = document.getElementById('cv-btn');
+  err.classList.add('hidden'); ok.classList.add('hidden');
+  const who = document.getElementById('cv-who').value, amt = parseFloat(document.getElementById('cv-amount').value) || 0;
+  const fail = m => { err.textContent = m; err.classList.remove('hidden'); };
+  if (!who) return fail(CV.party === 'expense' ? 'اختر نوع المصروف' : 'اختر ' + (CV.party === 'customer' ? 'الزبون' : 'التاجر'));
+  if (!(amt > 0)) return fail('أدخل مبلغاً صحيحاً');
+  if (CV.cur && !(CV.rate > 0)) return fail('أدخل سعر الصرف');
+  const name = document.getElementById('cv-who').selectedOptions[0].textContent.split(' — ')[0];
+  if (!confirm((CV.kind === 'in' ? 'قبض ' : 'صرف ') + n2(amt) + ' ' + (CV.cur || CV.base) + (CV.kind === 'in' ? ' من ' : ' إلى ') + name + '؟')) return;
+  btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  const p = { store_id: GOLDMIND_STORE_ID, kind: CV.kind, party: CV.party, amount: amt, currency: CV.cur || CV.base,
+    fx_rate: CV.cur ? CV.rate : null, method: CV.method, notes: document.getElementById('cv-notes').value.trim() || null };
+  if (CV.party === 'expense') p.category_id = who; else p.party_id = who;
+  const { error } = await goldmindClient.rpc('cash_voucher', { p });
+  btn.disabled = false; btn.textContent = 'حفظ السند';
+  if (error) return fail('تعذّر الحفظ: ' + error.message);
+  ok.textContent = 'تم حفظ ' + (CV.kind === 'in' ? 'سند القبض' : 'سند الصرف') + ': ' + n2(amt) + ' ' + (CV.cur || CV.base) + ' — ' + name;
+  ok.classList.remove('hidden');
+  document.getElementById('cv-amount').value = ''; document.getElementById('cv-notes').value = '';
+  cvPreview(); cvBalance();
+}
+document.getElementById('cv-who').addEventListener('change', cvBalance);
+
+(async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const [st, cu, tr, ca] = await Promise.all([
+    goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('customers').select('id, name, phone').eq('store_id', GOLDMIND_STORE_ID).order('name'),
+    goldmindClient.from('traders').select('id, name, phone').eq('store_id', GOLDMIND_STORE_ID).order('name'),
+    goldmindClient.from('expense_categories').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name')
+  ]);
+  CV.base = ((st.data && st.data.currency) || 'AED').toUpperCase();
+  if (st.data && st.data.secondary_currency) CV.secondary = { code: st.data.secondary_currency.toUpperCase(), rate: Number(st.data.secondary_currency_rate) || 0 };
+  CV.lists = { customer: cu.data || [], trader: tr.data || [], expense: ca.data || [] };
+  const codes = [CV.base, CV.secondary && CV.secondary.code, 'USD', 'SYP', 'EUR', 'AED', 'TRY', 'SAR'].filter((c, i, a) => c && a.indexOf(c) === i);
+  document.getElementById('cv-cur').innerHTML = codes.map(c => `<option value="${c}">${c}${c === CV.base ? ' (عملة المحل)' : ''}</option>`).join('');
+  document.querySelectorAll('.cv-base').forEach(e => e.textContent = CV.base);
+  // opened from a customer/trader page: ?party=customer&id=...&kind=in
+  const q = new URLSearchParams(location.search);
+  if (q.get('kind') === 'out') cvKind('out');
+  if (['customer', 'trader', 'expense'].includes(q.get('party'))) { if (q.get('party') === 'expense') cvKind('out'); CV.party = q.get('party'); seg('party', 'party', CV.party); document.getElementById('cv-who-lbl').textContent = { customer: 'الزبون', trader: 'التاجر', expense: 'نوع المصروف' }[CV.party]; }
+  cvFillWho(q.get('id'));
+  cvCur();
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('cv-form').classList.remove('hidden');
+})();
+</script>
+</body></html>

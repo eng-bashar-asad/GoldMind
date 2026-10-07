@@ -1,0 +1,5 @@
+-- Applied via SQL. cash_voucher(p jsonb): one receipt/payment voucher (سند قبض / صرف) for a customer,
+-- trader or expense in any currency. Account rows (customer_debts / trader_movements / expense_entries)
+-- are in the store currency (amount ÷ fx_rate); cash_movements keeps base amount + fx_amount/fx_currency;
+-- daily_cash_log gets the amount in the currency actually paid.
+-- customer_payment_update now keeps a foreign-currency payment's cash box row in that currency when edited.

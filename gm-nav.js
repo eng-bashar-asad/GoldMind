@@ -35,6 +35,7 @@
       ['diamond-stock-production-ar.html', 'diamond', 'إنتاج قطع الألماس', 'add_piece'] ] },
     { t: 'المالية', i: 'account_balance_wallet', l: [
       ['daily-cashbox-ar.html', 'point_of_sale', 'الصندوق اليومي', 'manage_daily_cashbox'],
+      ['cash-voucher-ar.html', 'swap_vert', 'سند قبض / صرف', 'manage_daily_cashbox|edit_customers|edit_traders'],
       ['expense-entry-ar.html', 'receipt', 'المصاريف', 'manage_daily_cashbox|view_profit_report|give_gifts'],
       ['expense-entry-ar.html?type=gifts', 'redeem', 'إخراج هدايا', 'give_gifts'],
       ['main-cashbox-ar.html', 'account_balance', 'الصندوق الرئيسي', 'manage_daily_cashbox'],
