@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict orpmsfqZUHu1AgviCuSpOKjYA0nujeOZYDXwnxcPW8IqS8VvmohJLWXG1WEYqGm
+\restrict 5tT6fQTY9xXcAaymtKnTYkRWEYMLXi5VFAY8biX7QI2A78dTC71VFpEtskdNnI2
 
 
 SET statement_timeout = 0;
@@ -846,7 +846,6 @@ begin
   if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
   select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
   note := coalesce(nullif(trim(p_notes), ''), 'صرف للعميل');
-  -- money out of the shop to the customer: his balance goes up by it (he owes it, or his credit shrinks)
   insert into cash_movements (store_id, box, direction, amount, description, created_by)
     values (c.store_id, case when p_method = 'bank' then 'bank' else 'main' end, 'out', amt,
             'صرف للعميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
@@ -855,8 +854,8 @@ begin
     insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
       values (c.store_id, 'صرف لعميل', 'out', amt, c.name || ' — ' || note, me, cm);
   end if;
-  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
-    values (c.store_id, c.id, 'debt_increase', amt, 0, note, 'cash_out', me);
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+    values (c.store_id, c.id, 'debt_increase', amt, 0, note, 'cash_out', me, cm);
   return jsonb_build_object('ok', true);
 end $$;
 
@@ -915,6 +914,40 @@ begin
   perform gm_allocate_customer_credit(d.store_id, d.customer_id);
   perform gm_unallocate_customer_credit(d.store_id, d.customer_id);
   return jsonb_build_object('ok', true);
+end $$;
+
+
+--
+-- Name: customer_payment_update(uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.customer_payment_update(p_id uuid, p_amount numeric, p_notes text DEFAULT NULL::text) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare d record; c record; amt numeric := round(coalesce(p_amount, 0), 2); note text;
+begin
+  select * into d from customer_debts where id = p_id and source in ('payment', 'cash_out');
+  if d is null then raise exception 'الحركة غير موجودة'; end if;
+  if not has_permission('edit_customers', d.store_id) then
+    raise exception 'ليس لديك صلاحية تعديل دفعات العملاء' using errcode = '42501';
+  end if;
+  if amt < 0 then raise exception 'المبلغ غير صحيح'; end if;
+  select name into c from customers where id = d.customer_id;
+  if amt = 0 then
+    delete from customer_debts where id = p_id;
+    if d.cash_movement_id is not null then delete from cash_movements where id = d.cash_movement_id; end if; -- daily row cascades
+  else
+    note := coalesce(nullif(trim(p_notes), ''), case when d.source = 'cash_out' then 'صرف للعميل' else 'دفعة من العميل' end);
+    update customer_debts set cash_amount = amt, notes = note where id = p_id;
+    if d.cash_movement_id is not null then
+      update cash_movements set amount = amt where id = d.cash_movement_id;
+      update daily_cash_log set amount = amt, notes = c.name || ' — ' || note where cash_movement_id = d.cash_movement_id;
+    end if;
+  end if;
+  perform gm_allocate_customer_credit(d.store_id, d.customer_id);
+  perform gm_unallocate_customer_credit(d.store_id, d.customer_id);
+  return jsonb_build_object('ok', true, 'linked', d.cash_movement_id is not null);
 end $$;
 
 
@@ -1432,6 +1465,27 @@ begin
     select price_per_gram * new.karat / 24.0 into pr from gold_prices where store_id = st and karat = 24;
   end if;
   new.gold_price_per_gram := round(pr, 2);
+  return new;
+end $$;
+
+
+--
+-- Name: gm_tm_snapshot(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_tm_snapshot() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.source = 'stock_given' then
+    if new.piece_acc_weight is null and new.piece_id is not null then
+      select coalesce(accounting_weight_grams, weight_grams) into new.piece_acc_weight from pieces where id = new.piece_id;
+    end if;
+    if new.gold_price_24k is null then
+      select price_per_gram into new.gold_price_24k from gold_prices where store_id = new.store_id and karat = 24 limit 1;
+    end if;
+  end if;
   return new;
 end $$;
 
@@ -2476,7 +2530,6 @@ begin
   if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
   select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
   note := coalesce(nullif(trim(p_notes), ''), 'دفعة من العميل');
-
   insert into cash_movements (store_id, box, direction, amount, description, created_by)
     values (c.store_id, case when p_method = 'bank' then 'bank' else 'main' end, 'in', amt,
             'دفعة من العميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
@@ -2485,8 +2538,8 @@ begin
     insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
       values (c.store_id, 'دفعة من عميل', 'in', amt, c.name || ' — ' || note, me, cm);
   end if;
-  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
-    values (c.store_id, c.id, 'debt_decrease', amt, 0, note, 'payment', me);
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+    values (c.store_id, c.id, 'debt_decrease', amt, 0, note, 'payment', me, cm);
   return jsonb_build_object('ok', true);
 end $$;
 
@@ -2996,7 +3049,7 @@ CREATE FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer u
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare inv record; newc record; oldname text; rem numeric; me uuid;
+declare inv record; newc record; oldname text; rem numeric; me uuid; alloc numeric;
 begin
   select * into inv from invoices where id = p_invoice for update;
   if inv is null then raise exception 'الفاتورة غير موجودة'; end if;
@@ -3007,6 +3060,18 @@ begin
   if inv.customer_id = newc.id then return; end if;
   select name into oldname from customers where id = inv.customer_id;
   select id into me from staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
+  -- the old customer's later payments that were applied to this invoice go back to him as credit
+  if inv.customer_id is not null then
+    select coalesce(sum(case when movement_type = 'debt_decrease' then cash_amount else -cash_amount end), 0) into alloc
+      from customer_debts where invoice_id = inv.id and customer_id = inv.customer_id and source = 'allocation';
+    if alloc > 0.009 then
+      insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
+        (inv.store_id, inv.customer_id, inv.id, 'debt_increase', alloc, 0, 'إلغاء تخصيص للفاتورة ' || inv.invoice_number || ' (نُقلت إلى ' || newc.name || ')', 'allocation', me),
+        (inv.store_id, inv.customer_id, null, 'debt_decrease', alloc, 0, 'إلغاء تخصيص للفاتورة ' || inv.invoice_number || ' (نُقلت إلى ' || newc.name || ')', 'allocation', me);
+      update invoices set amount_paid = greatest(coalesce(amount_paid, 0) - alloc, 0), status = case when status = 'paid' then 'unpaid' else status end
+       where id = inv.id returning * into inv;
+    end if;
+  end if;
   rem := round(inv.total_amount - coalesce(inv.amount_paid, 0), 2);
   update invoices set customer_id = newc.id where id = inv.id;
   if rem > 0.009 and inv.customer_id is not null then
@@ -3017,6 +3082,8 @@ begin
     insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
     values (inv.store_id, newc.id, inv.id, 'debt_increase', rem, 0, 'دين الفاتورة ' || inv.invoice_number || ' منقول من ' || coalesce(oldname, 'زبون سابق'), 'invoice_edit', me);
   end if;
+  if inv.customer_id is not null then perform gm_allocate_customer_credit(inv.store_id, inv.customer_id); end if;
+  perform gm_allocate_customer_credit(inv.store_id, newc.id);
 end $$;
 
 
@@ -3830,7 +3897,8 @@ CREATE TABLE public.customer_debts (
     notes text,
     created_by uuid,
     source text,
-    currency text
+    currency text,
+    cash_movement_id uuid
 );
 
 
@@ -4054,6 +4122,19 @@ CREATE TABLE public.fiscal_year_closures (
     notes text,
     closed_by uuid,
     closed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: gift_cost_adjust_20261006; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.gift_cost_adjust_20261006 (
+    gift_id uuid,
+    old_fab numeric,
+    old_total numeric,
+    expense_entry_id uuid,
+    old_amount numeric(12,2)
 );
 
 
@@ -4461,6 +4542,17 @@ CREATE TABLE public.piece_classification_options (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     value_en text,
     CONSTRAINT piece_classification_options_field_key_check CHECK ((field_key = ANY (ARRAY['type'::text, 'category1'::text, 'category2'::text])))
+);
+
+
+--
+-- Name: piece_cost_adjust_20261006; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.piece_cost_adjust_20261006 (
+    piece_id uuid,
+    old_cost numeric,
+    at_time timestamp with time zone
 );
 
 
@@ -5020,6 +5112,8 @@ CREATE TABLE public.trader_movements (
     cost_fab_per_gram numeric,
     sale_cost numeric,
     gold_stock_lot_id uuid,
+    piece_acc_weight numeric,
+    gold_price_24k numeric,
     CONSTRAINT trader_movements_source_check CHECK ((source = ANY (ARRAY['settlement'::text, 'stock_given'::text, 'stock_received'::text, 'opening_balance'::text, 'cash_out'::text, 'cash_in'::text, 'gold_to_cash'::text, 'scrap_given'::text])))
 );
 
@@ -5105,7 +5199,9 @@ CREATE TABLE public.traders (
     authorized_signatory_name text,
     authorized_signatory_id_number text,
     kyc_declaration_accepted boolean DEFAULT false,
-    kyc_completed_at timestamp with time zone
+    kyc_completed_at timestamp with time zone,
+    weight_basis text DEFAULT 'accounting'::text NOT NULL,
+    CONSTRAINT traders_weight_basis_chk CHECK ((weight_basis = ANY (ARRAY['accounting'::text, 'gross'::text])))
 );
 
 
@@ -6054,6 +6150,13 @@ CREATE TRIGGER trg_sync_staff_to_hr_employee AFTER INSERT ON public.staff FOR EA
 
 
 --
+-- Name: trader_movements trg_tm_snapshot; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_tm_snapshot BEFORE INSERT ON public.trader_movements FOR EACH ROW EXECUTE FUNCTION public.gm_tm_snapshot();
+
+
+--
 -- Name: trader_movements trg_trader_received_sync; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -6146,6 +6249,14 @@ ALTER TABLE ONLY public.company_kyc_documents
 
 ALTER TABLE ONLY public.company_kyc_documents
     ADD CONSTRAINT company_kyc_documents_uploaded_by_fkey FOREIGN KEY (uploaded_by) REFERENCES public.staff(id);
+
+
+--
+-- Name: customer_debts customer_debts_cash_movement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.customer_debts
+    ADD CONSTRAINT customer_debts_cash_movement_id_fkey FOREIGN KEY (cash_movement_id) REFERENCES public.cash_movements(id) ON DELETE SET NULL;
 
 
 --
@@ -7389,6 +7500,12 @@ CREATE POLICY expense_entries_write ON public.expense_entries USING ((public.is_
 ALTER TABLE public.fiscal_year_closures ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: gift_cost_adjust_20261006; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.gift_cost_adjust_20261006 ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: inventory_gifts gifts_select; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -7716,6 +7833,12 @@ CREATE POLICY piece_classification_options_select ON public.piece_classification
 
 CREATE POLICY piece_classification_options_update ON public.piece_classification_options FOR UPDATE USING ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
 
+
+--
+-- Name: piece_cost_adjust_20261006; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.piece_cost_adjust_20261006 ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: piece_intake_batches; Type: ROW SECURITY; Schema: public; Owner: -
@@ -8406,6 +8529,15 @@ GRANT ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount n
 
 
 --
+-- Name: FUNCTION customer_payment_update(p_id uuid, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.customer_payment_update(p_id uuid, p_amount numeric, p_notes text) TO anon;
+GRANT ALL ON FUNCTION public.customer_payment_update(p_id uuid, p_amount numeric, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.customer_payment_update(p_id uuid, p_amount numeric, p_notes text) TO service_role;
+
+
+--
 -- Name: FUNCTION delete_expense(p_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -8553,6 +8685,15 @@ GRANT ALL ON FUNCTION public.gm_return_draws(p_piece uuid, p_grams numeric) TO s
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO anon;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO service_role;
+
+
+--
+-- Name: FUNCTION gm_tm_snapshot(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_tm_snapshot() TO anon;
+GRANT ALL ON FUNCTION public.gm_tm_snapshot() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_tm_snapshot() TO service_role;
 
 
 --
@@ -9339,6 +9480,15 @@ GRANT ALL ON TABLE public.fiscal_year_closures TO service_role;
 
 
 --
+-- Name: TABLE gift_cost_adjust_20261006; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.gift_cost_adjust_20261006 TO anon;
+GRANT ALL ON TABLE public.gift_cost_adjust_20261006 TO authenticated;
+GRANT ALL ON TABLE public.gift_cost_adjust_20261006 TO service_role;
+
+
+--
 -- Name: TABLE gold_prices; Type: ACL; Schema: public; Owner: -
 --
 
@@ -9489,6 +9639,15 @@ GRANT ALL ON TABLE public.payroll_payments TO service_role;
 GRANT ALL ON TABLE public.piece_classification_options TO anon;
 GRANT ALL ON TABLE public.piece_classification_options TO authenticated;
 GRANT ALL ON TABLE public.piece_classification_options TO service_role;
+
+
+--
+-- Name: TABLE piece_cost_adjust_20261006; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.piece_cost_adjust_20261006 TO anon;
+GRANT ALL ON TABLE public.piece_cost_adjust_20261006 TO authenticated;
+GRANT ALL ON TABLE public.piece_cost_adjust_20261006 TO service_role;
 
 
 --
@@ -9752,5 +9911,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict orpmsfqZUHu1AgviCuSpOKjYA0nujeOZYDXwnxcPW8IqS8VvmohJLWXG1WEYqGm
+\unrestrict 5tT6fQTY9xXcAaymtKnTYkRWEYMLXi5VFAY8biX7QI2A78dTC71VFpEtskdNnI2
 
