@@ -35,7 +35,10 @@ function gmIsNetworkError(e) {
     return !navigator.onLine || /Failed to fetch|NetworkError|Network request failed|Load failed|fetch failed/i.test(String(e && (e.message || e)));
 }
 async function gmFetch(input, init) {
-    const req = new Request(input, init);
+    let req = new Request(input, init);
+    if (window.gmOpDate && req.method !== 'GET' && req.url.indexOf('/rest/v1/') !== -1) {
+        req = new Request(req, { headers: (function (h) { h.set('x-gm-op-date', window.gmOpDate); return h; })(new Headers(req.headers)) });
+    }
     const isRead = req.method === 'GET' && req.url.indexOf('/rest/v1/') !== -1;
     try {
         const res = await fetch(req);
@@ -772,3 +775,49 @@ async function gmPdfFromNodes(nodes, filename, title, shareText) {
         frame.remove();
     }
 }
+
+
+// Back-dating: every element marked data-gm-opdate gets a "تاريخ العملية" date field.
+// Clicking/submitting inside it sets window.gmOpDate, which gmFetch sends as x-gm-op-date;
+// the DB trigger trg_op_date then stamps created_at on that day (today or future = ignored).
+// Clicking inside another (undated) form clears it so nothing else gets back-dated.
+window.gmOpDate = null;
+function gmTodayStr() { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); }
+function gmOpDatePaint(inp) {
+    const past = inp.value && inp.value < gmTodayStr();
+    inp.style.borderColor = past ? '#d97706' : '';
+    inp.style.background = past ? 'rgba(217,119,6,.12)' : '';
+    const note = inp.closest('.gm-opdate').querySelector('.gm-opdate-note');
+    if (note) note.textContent = past ? 'ستُسجَّل العملية بتاريخ سابق' : '';
+}
+function gmOpDateInit() {
+    document.querySelectorAll('[data-gm-opdate]').forEach(function (box) {
+        if (box.querySelector('.gm-opdate')) return;
+        const wrap = document.createElement('div');
+        wrap.className = 'gm-opdate';
+        wrap.style.cssText = 'margin-bottom:10px';
+        wrap.innerHTML = '<label style="display:block;font-size:11px;font-weight:600;opacity:.75;margin-bottom:4px">تاريخ العملية</label>'
+            + '<input type="date" dir="ltr" style="width:100%;height:44px;border:1px solid rgba(128,128,128,.45);border-radius:8px;padding:0 12px;background:transparent;color:inherit">'
+            + '<span class="gm-opdate-note" style="display:block;font-size:11px;color:#d97706;margin-top:2px"></span>';
+        const inp = wrap.querySelector('input');
+        inp.value = gmTodayStr(); inp.max = gmTodayStr();
+        inp.addEventListener('change', function () { if (!inp.value || inp.value > gmTodayStr()) inp.value = gmTodayStr(); gmOpDatePaint(inp); });
+        const first = box.firstElementChild;
+        if (first && /^H[1-6]$/.test(first.tagName)) first.after(wrap); else box.prepend(wrap);
+    });
+}
+function gmOpDateCapture(e) {
+    const t = e.target;
+    if (!t || !t.closest) return;
+    const box = t.closest('[data-gm-opdate]');
+    if (box) {
+        const inp = box.querySelector('.gm-opdate input');
+        const v = inp && inp.value;
+        window.gmOpDate = v && v < gmTodayStr() ? v : null;
+    } else if (t.closest('[id$="-form"],[id$="Form"],form')) {
+        window.gmOpDate = null;
+    }
+}
+document.addEventListener('click', gmOpDateCapture, true);
+document.addEventListener('submit', gmOpDateCapture, true);
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', gmOpDateInit); else gmOpDateInit();
