@@ -1,0 +1,5 @@
+-- Applied via SQL. Discount on the cash balance with a trader (no money moves):
+-- trader_movements.source 'discount' (added to trader_movements_source_check);
+-- debt_increase = in the trader's favour (shop profit −), debt_decrease = in the shop's favour (shop profit +).
+-- RPC trader_discount(p_trader, p_for 'trader'|'shop', p_amount, p_notes). Counted in profit report,
+-- financial report and the "أرباحي مع التاجر" popup.

@@ -230,12 +230,19 @@ async function gmPartyProfitRun(kind, partyId) {
   };
   var total, html;
   if (kind === 'trader') {
-    var r = await Promise.all([range(goldmindClient.from('trader_movements').select(GM_TRADER_GIVE_SELECT).eq('trader_id', partyId).eq('source', 'stock_given')), gmPrice24()]);
+    var r = await Promise.all([range(goldmindClient.from('trader_movements').select(GM_TRADER_GIVE_SELECT).eq('trader_id', partyId).eq('source', 'stock_given')), gmPrice24(),
+      range(goldmindClient.from('trader_movements').select('movement_type, fab_fee_amount').eq('trader_id', partyId).eq('source', 'discount'))]);
     var rows = r[0].data || [];
+    // discounts on the cash balance: in the trader's favour = less profit, in ours = more
+    var dShop = 0, dTrader = 0;
+    (r[2].data || []).forEach(function (m) { if (m.movement_type === 'debt_increase') dTrader += Number(m.fab_fee_amount) || 0; else dShop += Number(m.fab_fee_amount) || 0; });
     var vouchers = new Set(rows.map(function (m) { return m.batch_id || m.id; }));
     var t = gmSumTraderGive(rows, r[1]);
-    total = t.profit;
-    html = gmPRow('عدد السندات', vouchers.size) + gmPRow('عدد القطع', rows.length) + gmTraderGiveHtml(t);
+    total = t.profit + dShop - dTrader;
+    html = gmPRow('عدد السندات', vouchers.size) + gmPRow('عدد القطع', rows.length) + gmTraderGiveHtml(t) +
+      (dShop || dTrader ? '<div class="font-bold mt-3 mb-1">الخصومات</div>' +
+        (dShop ? gmPRow('خصم لصالح المحل', '+ ' + gmPN(dShop, 2), 'text-success') : '') +
+        (dTrader ? gmPRow('خصم لصالح التاجر', '− ' + gmPN(dTrader, 2), 'text-error') : '') : '');
   } else {
     var ri = await Promise.all([
       range(goldmindClient.from('invoices').select('id, type').eq('store_id', GOLDMIND_STORE_ID).eq('customer_id', partyId).in('type', ['sale', 'return']).neq('status', 'cancelled')),

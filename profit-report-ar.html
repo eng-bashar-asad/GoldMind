@@ -13,7 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=34"></script>
 <script src="theme.js?v=54"></script>
-<script src="gm-profit.js?v=5"></script>
+<script src="gm-profit.js?v=6"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -250,7 +250,7 @@ async function applyFilters() {
   document.getElementById('pr-sections').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-6">جارِ الحساب...</p>';
   document.getElementById('items-tbody').innerHTML = '';
 
-  const [invRes, tmRes, staffRes, expRes, stockRes, lotsRes, discRes, gpRes] = await Promise.all([
+  const [invRes, tmRes, staffRes, expRes, stockRes, lotsRes, discRes, gpRes, tdRes] = await Promise.all([
     gmFetchAllRows(() => goldmindClient.from('invoices').select('id, invoice_number, created_at, type, created_by, total_amount')
       .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return', 'buyRetail', 'buyTrader']).neq('status', 'cancelled')
       .gte('created_at', range.from).lt('created_at', range.to).order('created_at', { ascending: false })),
@@ -264,7 +264,9 @@ async function applyFilters() {
     goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('store_id', GOLDMIND_STORE_ID),
     gmFetchAllRows(() => goldmindClient.from('customer_debts').select('cash_amount').eq('store_id', GOLDMIND_STORE_ID).eq('source', 'discount')
       .gte('created_at', range.from).lt('created_at', range.to)),
-    goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID).eq('karat', 24).maybeSingle()
+    goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID).eq('karat', 24).maybeSingle(),
+    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('movement_type, fab_fee_amount').eq('store_id', GOLDMIND_STORE_ID).eq('source', 'discount')
+      .gte('created_at', range.from).lt('created_at', range.to))
   ]);
   const price24Now = Number(gpRes && gpRes.data && gpRes.data.price_per_gram) || 0;
   const err = invRes.error || tmRes.error;
@@ -371,7 +373,9 @@ async function applyFilters() {
   const scrapOut = moves.filter(m => m.source === 'scrap_given').reduce((a, m) => ({ gross: a.gross + (Number(m.weight_grams) || 0), acc: a.acc + (Number(m.accounting_weight_grams != null ? m.accounting_weight_grams : m.weight_grams) || 0) }), { gross: 0, acc: 0 });
   // discounts given on customers' debts: money the shop gave up, so less profit
   const discountsTotal = ((discRes && discRes.data) || []).reduce((a, d) => a + (Number(d.cash_amount) || 0), 0);
-  const shopProfit = retail.profit + ws.profit + scrapProfit.amount - expensesTotal - discountsTotal;
+  // discounts with traders on the cash balance: in their favour = less profit, in ours = more profit
+  const trDisc = ((tdRes && tdRes.data) || []).reduce((a, m) => { const v = Number(m.fab_fee_amount) || 0; if (m.movement_type === 'debt_increase') a.forTrader += v; else a.forShop += v; return a; }, { forTrader: 0, forShop: 0 });
+  const shopProfit = retail.profit + ws.profit + scrapProfit.amount - expensesTotal - discountsTotal + trDisc.forShop - trDisc.forTrader;
   const brief = [
     ['مبيعات الزبائن', W.gross, W.acc, retail.revenue],
     ['ربح مبيعات الزبائن', null, null, retail.profit],
@@ -379,6 +383,8 @@ async function applyFilters() {
     ['مشتريات الكسر', scrapT.gross, scrapT.acc, scrapPaid],
     ['المصاريف', null, null, expensesTotal],
     ['خصومات على ديون الزبائن', null, null, discountsTotal],
+    ['خصومات التجار لصالح المحل (تُضاف للربح)', null, null, trDisc.forShop],
+    ['خصومات لصالح التجار (تُخصم من الربح)', null, null, trDisc.forTrader],
     ['إدخال بضاعة من التجار', inT.gross, inT.acc, inFee],
     ['إخراج بضاعة للتجار', ws.gross, ws.pieceAcc, ws.fee],
     ['إخراج كسر للتجار بالكلفة', scrapOut.gross, scrapOut.acc, null],
@@ -408,6 +414,8 @@ async function applyFilters() {
         ${scrapProfit.priced ? line('ربح شراء الكسر', null, null, scrapProfit.amount, scrapProfit.amount >= 0 ? green : red) : ''}
         ${line('المصاريف (تُخصم من الربح)', null, null, expensesTotal, red)}
         ${discountsTotal ? line('خصومات على ديون الزبائن (تُخصم من الربح)', null, null, discountsTotal, red) : ''}
+        ${trDisc.forShop ? line('خصومات التجار لصالح المحل (تُضاف للربح)', null, null, trDisc.forShop, green) : ''}
+        ${trDisc.forTrader ? line('خصومات لصالح التجار (تُخصم من الربح)', null, null, trDisc.forTrader, red) : ''}
         ${line('صافي ربح المحل', null, null, shopProfit, 'background:#D7EBD2;color:#14532d;font-size:17px;')}
         ${group('٢) حركة الذهب (لا تدخل في حساب الربح)')}
         ${line('مشتريات الكسر', scrapT.gross, scrapT.acc, scrapPaid)}
@@ -418,12 +426,12 @@ async function applyFilters() {
         ${line('وزن البضاعة بالمحل الآن', stock.gross, stock.acc, null)}
       </tbody></table>
     <p style="padding:10px 12px;font-size:13px;line-height:1.7;color:#3b3325;">
-      <b>صافي ربح المحل</b> = ربح مبيعات الزبائن${ws.fee ? ' + ربح الجملة' : ''}${scrapProfit.priced ? ' + ربح شراء الكسر' : ''} − المصاريف${discountsTotal ? ' − خصومات الديون' : ''}
-      <span dir="ltr" style="display:block;text-align:right;font-weight:800;font-size:14px;margin:4px 0;white-space:nowrap;overflow-x:auto;">${nf(shopProfit, 2)} = ${discountsTotal ? nf(discountsTotal, 2) + ' − ' : ''}${nf(expensesTotal, 2)} − ${scrapProfit.priced ? nf(scrapProfit.amount, 2) + ' + ' : ''}${ws.fee ? nf(ws.profit, 2) + ' + ' : ''}${nf(retail.profit, 2)}</span>
+      <b>صافي ربح المحل</b> = ربح مبيعات الزبائن${ws.fee ? ' + ربح الجملة' : ''}${scrapProfit.priced ? ' + ربح شراء الكسر' : ''} − المصاريف${discountsTotal ? ' − خصومات الديون' : ''}${trDisc.forShop ? ' + خصومات التجار لصالحنا' : ''}${trDisc.forTrader ? ' − خصومات لصالح التجار' : ''}
+      <span dir="ltr" style="display:block;text-align:right;font-weight:800;font-size:14px;margin:4px 0;white-space:nowrap;overflow-x:auto;">${nf(shopProfit, 2)} = ${trDisc.forTrader ? nf(trDisc.forTrader, 2) + ' − ' : ''}${trDisc.forShop ? nf(trDisc.forShop, 2) + ' + ' : ''}${discountsTotal ? nf(discountsTotal, 2) + ' − ' : ''}${nf(expensesTotal, 2)} − ${scrapProfit.priced ? nf(scrapProfit.amount, 2) + ' + ' : ''}${ws.fee ? nf(ws.profit, 2) + ' + ' : ''}${nf(retail.profit, 2)}</span>
       مشتريات الكسر والبضاعة من التجار ذهب يدخل المخزن، وليست مصروفاً، فلا تُخصم من الربح. مبلغ "إدخال بضاعة من التجار" هو المصنعية المستحقة لهم.
       ${scrapProfit.priced || scrapProfit.unpriced ? '<br><b>ربح شراء الكسر</b> = الوزن × سعر الغرام المعيّر بالبرنامج لحظة الشراء − المبلغ المدفوع. يظهر بالتقارير فقط ولا يدخل الصندوق.' + (scrapProfit.unpriced ? ' (' + scrapProfit.unpriced + ' شراء قديم بلا سعر محفوظ لم يُحسب ربحه.)' : '') : ''}</p></div>`;
 
-  REPORT = { fromDate, toDate: toDate || today, rows, retail, ws, wholesale, wsVouchers, W, scrap, fromTraders, scrapPaid, scrapProfit, staffRows, brief };
+  REPORT = { fromDate, toDate: toDate || today, trDisc, rows, retail, ws, wholesale, wsVouchers, W, scrap, fromTraders, scrapPaid, scrapProfit, staffRows, brief };
 
   const avgMaking = W.makingAcc ? W.makingSold / W.makingAcc : 0, avgCost = W.makingAcc ? W.fabCost / W.makingAcc : 0;
   document.getElementById('pr-sections').innerHTML =
@@ -431,7 +439,8 @@ async function applyFilters() {
       { cells: ['مبيعات الزبائن (مفرق)', f2(retail.revenue), f2(retail.profit)] },
       { cells: ['تجار الجملة (مصنعية البضاعة المُسلّمة)', f2(ws.fee), f2(ws.profit)] },
       { cells: ['شراء الكسر (فرق السعر عن سعر البرنامج)', f2(scrapPaid), f2(scrapProfit.amount)] },
-      { total: true, cells: ['المجموع', f2(retail.revenue + ws.fee), f2(retail.profit + ws.profit + scrapProfit.amount)] }
+      ...(trDisc.forShop || trDisc.forTrader ? [{ cells: ['خصومات مع التجار (لصالحنا − لصالحهم)', '', f2(trDisc.forShop - trDisc.forTrader)] }] : []),
+      { total: true, cells: ['المجموع', f2(retail.revenue + ws.fee), f2(retail.profit + ws.profit + scrapProfit.amount + trDisc.forShop - trDisc.forTrader)] }
     ], 'ربح الجملة = (المصنعية/غ للتاجر × الوزن المحسوب عليه − كلفة مصنعية القطعة على وزنها المحاسبي بالمخزن) + قيمة فرق الذهب. فرق الذهب = الوزن المحسوب على التاجر − الوزن المحاسبي للقطعة بالمخزن، محوّلاً لعيار ٢٤ ومحسوباً بسعر غرام عيار ٢٤ يوم السند.' + (unknownCost ? ` ${unknownCost} تسليم بالوزن بدون باركود لا توجد له كلفة مسجّلة، فحُسبت مصنعيته كاملة ربحاً.` : '')) +
     table('المبيع بالوزن (مفرق)', ['الوزن القائم المباع', 'الوزن المحاسبي المباع', 'قيراط الألماس المباع', 'متوسط المصنعية المباعة / غ', 'متوسط كلفة المصنعية / غ'], [
       { cells: [f3(W.gross) + ' غ', f3(W.acc) + ' غ', f2(W.carats) + ' ct', f2(avgMaking), f2(avgCost)] }
@@ -499,7 +508,7 @@ async function exportExcel(btn) {
       { name: 'الملخص', header: ['البند', 'القيمة'], rows: [
         ['الفترة', R.fromDate + ' — ' + R.toDate],
         ['مبيعات الزبائن (مفرق)', r2(R.retail.revenue)], ['ربح المفرق', r2(R.retail.profit)],
-        ['مصنعية الجملة', r2(R.ws.fee)], ['ربح الجملة', r2(R.ws.profit)], ['مجموع الربح', r2(R.retail.profit + R.ws.profit)],
+        ['مصنعية الجملة', r2(R.ws.fee)], ['ربح الجملة', r2(R.ws.profit)], ['خصومات التجار لصالح المحل', r2(R.trDisc.forShop)], ['خصومات لصالح التجار', r2(-R.trDisc.forTrader)], ['مجموع الربح', r2(R.retail.profit + R.ws.profit + R.trDisc.forShop - R.trDisc.forTrader)],
         ['الوزن القائم المباع (غ)', r3(R.W.gross)], ['الوزن المحاسبي المباع (غ)', r3(R.W.acc)], ['قيراط الألماس المباع', r2(R.W.carats)],
         ['متوسط المصنعية المباعة للغرام', r2(avg)] ] },
       { name: 'مبيعات المفرق', header: ['التاريخ', 'الفاتورة', 'مرتجع', 'القطعة', 'العيار', 'الوزن القائم', 'الوزن المحاسبي', 'قيراط', 'سعر البيع', 'قيمة الذهب', 'الضريبة', 'كلفة المصنعية', 'كلفة الماس', 'الربح'],

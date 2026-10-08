@@ -13,7 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=34"></script>
 <script src="theme.js?v=54"></script>
-<script src="gm-profit.js?v=5"></script>
+<script src="gm-profit.js?v=6"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -179,7 +179,7 @@ async function build(from, to) {
     gmFetchAllRows(() => q().from('daily_cash_log').select('direction, amount, currency').eq('store_id', S).lt('created_at', from)),
     gmFetchAllRows(() => inPeriod(q().from('customer_debts').select('movement_type, cash_amount, gold_grams_24k, source').eq('store_id', S))),
     gmFetchAllRows(() => q().from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, source').eq('store_id', S).lt('created_at', to)),
-    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('movement_type, gold_24k_equivalent, fab_fee_amount').eq('store_id', S))),
+    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('movement_type, source, gold_24k_equivalent, fab_fee_amount').eq('store_id', S))),
     gmFetchAllRows(() => q().from('trader_movements').select('movement_type, gold_24k_equivalent').eq('store_id', S).lt('created_at', to)),
     gmFetchAllRows(() => q().from('pieces').select('weight_grams, accounting_weight_grams, karat').eq('store_id', S).eq('status', 'available')),
     q().from('gold_stock_lots').select('weight_grams_remaining, karat').eq('store_id', S),
@@ -278,14 +278,17 @@ async function build(from, to) {
   const scrapProfit = buyItems.filter(it => invType[it.invoice_id] === 'buyRetail' && it.gold_stock_lot_id && it.gold_price_per_gram != null)
     .reduce((a, it) => a + (Number(it.weight_grams) || 0) * Number(it.gold_price_per_gram) - (Number(it.line_total) || 0), 0);
   const discTotal = cdebtR.data.filter(m => m.source === 'discount').reduce((a, m) => a + Number(m.cash_amount || 0), 0);
-  const netProfit = P.profit + scrapProfit - expTotal - discTotal;
+  // discounts with traders on the cash balance: theirs = less profit, ours = more profit
+  const trDiscShop = tmR.data.filter(m => m.source === 'discount' && m.movement_type !== 'debt_increase').reduce((a, m) => a + Number(m.fab_fee_amount || 0), 0);
+  const trDiscTrader = tmR.data.filter(m => m.source === 'discount' && m.movement_type === 'debt_increase').reduce((a, m) => a + Number(m.fab_fee_amount || 0), 0);
+  const netProfit = P.profit + scrapProfit - expTotal - discTotal + trDiscShop - trDiscTrader;
   let h = '';
   // profit line: sales → profit − expenses = net. Purchases are their own item
   // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
   const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px]" style="color:#6B6150;">${t[4]}</div>` : ''}</div>`;
   const tiles = FR.canProfit
     ? [['صافي المبيعات', money(netSales), ''], ['ربح المبيعات', money(P.profit), cls(P.profit)],
-       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات' + (scrapProfit ? ' + ربح الكسر' : '') + ' − المصاريف' + (discTotal ? ' − خصومات الديون' : ''), money(netProfit), cls(netProfit)]]
+       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات' + (scrapProfit ? ' + ربح الكسر' : '') + ' − المصاريف' + (discTotal ? ' − خصومات الديون' : '') + (trDiscShop || trDiscTrader ? ' ± خصومات التجار' : ''), money(netProfit), cls(netProfit)]]
     : [['صافي المبيعات', money(netSales), ''], ['المصاريف', money(expTotal), '']];
   tiles.push(['المشتريات', money(buysTotal), '', 'col-span-2', 'بند مستقل — لا تُخصم من الربح (شراء ذهب يدخل المخزن)']);
   h += `<div class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
@@ -312,6 +315,8 @@ async function build(from, to) {
       ${scrapProfit ? row('ربح شراء الكسر (فرق السعر عن سعر البرنامج — لا يدخل الصندوق)', `<span class="${cls(scrapProfit)}">${money(scrapProfit)}</span>`) : ''}
       ${row('المصاريف', money(-expTotal))}
       ${discTotal ? row('خصومات على ديون الزبائن', money(-discTotal)) : ''}
+      ${trDiscShop ? row('خصومات التجار لصالح المحل', money(trDiscShop)) : ''}
+      ${trDiscTrader ? row('خصومات لصالح التجار', money(-trDiscTrader)) : ''}
       ${row('صافي الربح', `<span class="${cls(netProfit)}">${money(netProfit)}</span>`, ' class="tot"')}
     </table>`, P.estimated ? `تنبيه: ${P.estimated} سطر قديم بلا سعر ذهب محفوظ — حُسب بسعر اليوم تقديرياً.` : 'نفس طريقة تقرير الأرباح بالضبط.');
   }
