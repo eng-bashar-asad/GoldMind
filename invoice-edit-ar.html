@@ -532,6 +532,7 @@ async function saveEdit() {
       pieceId = newPiece ? newPiece.id : null;
     } else if (pieceId && invoice.type === 'sale') {
       await goldmindClient.from('pieces').update({ status: 'sold' }).eq('id', pieceId);
+      await goldmindClient.from('piece_movements').insert({ store_id: GOLDMIND_STORE_ID, piece_id: pieceId, event_type: 'sold', note: 'بيع بفاتورة ' + invoice.invoice_number + ' (أُضيفت عند تعديل الفاتورة)', created_by: GOLDMIND_STAFF_ID });
     }
 
     await goldmindClient.from('invoice_items').insert({
@@ -551,6 +552,8 @@ async function saveEdit() {
       await goldmindClient.from('pieces').update({
         status: invoice.type === 'sale' ? 'available' : 'cancelled'
       }).eq('id', it.piece_id);
+      await goldmindClient.from('piece_movements').insert({ store_id: GOLDMIND_STORE_ID, piece_id: it.piece_id, event_type: invoice.type === 'sale' ? 'returned' : 'status_changed',
+        note: 'حُذفت من الفاتورة ' + invoice.invoice_number + ' عند التعديل' + (invoice.type === 'sale' ? ' فعادت متوفرة' : ''), created_by: GOLDMIND_STAFF_ID });
     }
     if (it.diamond_piece_id) {
       await goldmindClient.from('diamond_pieces').update({
