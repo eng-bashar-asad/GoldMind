@@ -94,3 +94,35 @@ test('mixed invoice paid off later: editing it does not refund the later payment
   await page.waitForTimeout(500);
   expect(calls.some(c => c.method === 'POST' && (c.name === 'cash_movements' || c.name === 'customer_debts'))).toBe(false);
 });
+
+test('edit a sale: pay part of it in another currency (pay_breakdown, box out old / in new)', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const calls = await install(page, { db: {
+    stores: [{ id: STORE, name: 'محل', currency: 'USD', secondary_currency: 'SYP', secondary_currency_rate: 13000 }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    invoices: [{ id: 's1', store_id: STORE, invoice_number: 'INV-40', type: 'sale', status: 'paid', payment_method: 'cash', customer_id: 'c1', total_amount: 1000, amount_paid: 1000, created_at: '2026-10-01T07:00:00Z' }],
+    invoice_items: [{ id: 'it1', invoice_id: 's1', karat: 18, weight_grams: 7, line_total: 1000, description: 'خاتم' }],
+    cash_movements: [{ id: 'cm1', store_id: STORE, invoice_id: 's1', direction: 'in', amount: 1000 }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ديمة', phone: '1' }], pieces: []
+  } });
+  await page.goto('/invoice-edit-ar.html?id=s1');
+  await expect(page.locator('#lockedNumber')).toHaveText('INV-40');
+  await page.selectOption('#paymentMethodSelect', 'mixed');
+  await page.fill('#mixedCash', '600');
+  await page.click('text=+ مبلغ بعملة أخرى');
+  await expect(page.locator('.fx-cur')).toHaveValue('SYP');
+  await expect(page.locator('.fx-rate')).toHaveValue('13000');
+  await page.fill('.fx-amount', '5200000');
+  await expect(page.locator('#mixedNote')).toContainText('1,000.00');
+  page.on('dialog', d => d.accept());
+  await page.click('#save-btn');
+  await expect.poll(() => calls.filter(c => c.method === 'POST' && c.name === 'cash_movements').length).toBe(2);
+  const seq = calls.filter(c => (c.method === 'POST' && c.name === 'cash_movements') || (c.method === 'PATCH' && c.name === 'invoices')).map(c => c.method === 'PATCH' ? 'patch' : JSON.parse(c.body).direction + ' ' + JSON.parse(c.body).amount);
+  expect(seq).toEqual(['out 1000', 'patch', 'in 1000']);
+  const body = JSON.parse(calls.find(c => c.method === 'PATCH' && c.name === 'invoices').body);
+  expect(body.pay_breakdown).toEqual([{ currency: 'USD', amount: 600, rate: 1, method: 'cash' }, { currency: 'SYP', amount: 5200000, rate: 13000, method: 'cash' }]);
+  expect([body.payment_method, body.amount_paid, body.cash_paid_amount, body.status]).toEqual(['mixed', 1000, 1000, 'paid']);
+  expect(calls.some(c => c.method === 'POST' && c.name === 'customer_debts')).toBe(false);
+  expect(errs).toEqual([]);
+});

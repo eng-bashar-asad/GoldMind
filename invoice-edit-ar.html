@@ -92,6 +92,10 @@
 <div id="mixedBox" class="hidden mt-3 grid grid-cols-2 gap-2">
 <label class="text-[11px] text-on-surface-variant">المبلغ نقداً<input id="mixedCash" type="number" step="0.01" min="0" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-sm mt-1" oninput="gmMixedNote()"/></label>
 <label class="text-[11px] text-on-surface-variant">المبلغ فيزا / بنك<input id="mixedBank" type="number" step="0.01" min="0" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-sm mt-1" oninput="gmMixedNote()"/></label>
+<div id="fxBox" class="col-span-2 hidden flex-col gap-2">
+<div id="fx-rows" class="flex flex-col gap-2"></div>
+<button type="button" onclick="gmAddFxRow()" class="h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary">+ مبلغ بعملة أخرى (ليرة، يورو...)</button>
+</div>
 <p id="mixedNote" class="col-span-2 text-[12px] font-semibold"></p>
 </div>
 </div>
@@ -331,6 +335,58 @@ function gmMixedToggle() {
   document.getElementById('mixedBox').classList.toggle('hidden', !on);
   if (on) gmMixedNote();
 }
+// ---- Paying in other currencies (same rows as the new-sale page) ----
+// Each row: amount in its currency, rate (per 1 shop-currency unit), cash/card. The base
+// boxes above hold only the shop-currency part; rows go to pay_breakdown.
+let fxRows = [], fxSeq = 0, FX_BASE = 'AED', FX_SECONDARY = null;
+const fxRateKey = c => 'gm_fx_' + GOLDMIND_STORE_ID + '_' + c;
+function fxDefaultRate(c) {
+  let r = 0; try { r = parseFloat(localStorage.getItem(fxRateKey(c))) || 0; } catch (e) { /* ignore */ }
+  if (!r && FX_SECONDARY && FX_SECONDARY.code === c) r = FX_SECONDARY.rate;
+  return r || '';
+}
+function fxCodes() { return [FX_SECONDARY && FX_SECONDARY.code, 'SYP', 'EUR', 'USD', 'AED', 'TRY', 'SAR', 'GBP'].filter((c, i, a) => c && c !== FX_BASE && a.indexOf(c) === i); }
+const fxBase = r => (Number(r.amount) > 0 && Number(r.rate) > 0) ? Math.round(Number(r.amount) / Number(r.rate) * 100) / 100 : 0;
+function gmAddFxRow() { const c = fxCodes()[0]; fxRows.push({ id: ++fxSeq, currency: c, amount: '', rate: fxDefaultRate(c), method: 'cash' }); renderFxRows(); }
+function gmFxSet(id, k, v) {
+  const r = fxRows.find(x => x.id === id); if (!r) return;
+  r[k] = v;
+  if (k === 'currency') { r.rate = fxDefaultRate(v); renderFxRows(); }
+  if (k === 'rate') { try { if (parseFloat(v) > 0) localStorage.setItem(fxRateKey(r.currency), String(parseFloat(v))); } catch (e) { /* ignore */ } }
+  const eq = document.getElementById('fx-eq-' + id); if (eq) eq.textContent = '= ' + fmt(fxBase(r)) + ' ' + FX_BASE;
+  gmMixedNote();
+}
+function gmFxRemove(id) { fxRows = fxRows.filter(x => x.id !== id); renderFxRows(); gmMixedNote(); }
+function renderFxRows() {
+  const esc = v => String(v == null ? '' : v).replace(/"/g, '&quot;');
+  document.getElementById('fx-rows').innerHTML = fxRows.map(r => `<div class="fx-row border border-outline-variant rounded-lg p-2 grid grid-cols-2 gap-2 text-[12px]">
+    <input type="number" step="any" inputmode="decimal" placeholder="المبلغ" value="${esc(r.amount)}" oninput="gmFxSet(${r.id}, 'amount', this.value)" class="fx-amount h-10 border border-outline-variant rounded-lg px-2 font-data-mono"/>
+    <select onchange="gmFxSet(${r.id}, 'currency', this.value)" class="fx-cur h-10 border border-outline-variant rounded-lg px-2">${fxCodes().map(c => `<option value="${c}"${c === r.currency ? ' selected' : ''}>${c}</option>`).join('')}</select>
+    <label class="flex items-center gap-1">1 ${FX_BASE} = <input type="number" step="any" inputmode="decimal" placeholder="سعر الصرف" value="${esc(r.rate)}" oninput="gmFxSet(${r.id}, 'rate', this.value)" class="fx-rate w-full h-10 border border-outline-variant rounded-lg px-2 font-data-mono"/></label>
+    <select onchange="gmFxSet(${r.id}, 'method', this.value)" class="h-10 border border-outline-variant rounded-lg px-2"><option value="cash"${r.method === 'cash' ? ' selected' : ''}>نقداً</option><option value="bank"${r.method === 'bank' ? ' selected' : ''}>فيزا / تحويل</option></select>
+    <span class="font-data-mono text-on-surface-variant self-center" id="fx-eq-${r.id}">= ${fmt(fxBase(r))} ${FX_BASE}</span>
+    <button type="button" onclick="gmFxRemove(${r.id})" class="h-9 text-error text-[12px] font-semibold justify-self-end">حذف</button>
+  </div>`).join('');
+}
+// shop-currency value of what is paid now (base boxes + currency rows), split cash / card
+function gmMixedPaid() {
+  const c = (parseFloat(document.getElementById('mixedCash').value) || 0) / (FX || 1);
+  const b = (parseFloat(document.getElementById('mixedBank').value) || 0) / (FX || 1);
+  const fc = FX ? 0 : fxRows.filter(r => r.method === 'cash').reduce((t, r) => t + fxBase(r), 0);
+  const fb = FX ? 0 : fxRows.filter(r => r.method === 'bank').reduce((t, r) => t + fxBase(r), 0);
+  return { cash: Math.round((c + fc) * 100) / 100, bank: Math.round((b + fb) * 100) / 100, baseCash: c, baseBank: b };
+}
+function gmNewBreakdown(method) {
+  if (FX || method !== 'mixed') return null;
+  const used = fxRows.filter(r => fxBase(r) > 0);
+  if (!used.length) return null;
+  const m = gmMixedPaid(), out = [];
+  if (m.baseCash > 0) out.push({ currency: FX_BASE, amount: Math.round(m.baseCash * 100) / 100, rate: 1, method: 'cash' });
+  if (m.baseBank > 0) out.push({ currency: FX_BASE, amount: Math.round(m.baseBank * 100) / 100, rate: 1, method: 'bank' });
+  used.forEach(r => out.push({ currency: r.currency, amount: Number(r.amount), rate: Number(r.rate), method: r.method }));
+  return out;
+}
+
 // Payments the customer made after the sale (allocated to this invoice) are not part of
 // cash_paid_amount/bank_paid_amount; they stay paid whatever is typed in the mixed boxes.
 function gmLaterPaid() {
@@ -339,7 +395,8 @@ function gmLaterPaid() {
 }
 function gmMixedNote() {
   const total = items.reduce((t, it) => t + Number(it.line_total || 0), 0);
-  const paid = ((parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0)) / (FX || 1) + gmLaterPaid();
+  const mp = gmMixedPaid();
+  const paid = mp.cash + mp.bank + gmLaterPaid();
   const el = document.getElementById('mixedNote');
   el.textContent = paid > total + 0.009 ? 'المدفوع أكبر من إجمالي الفاتورة' : 'المدفوع ' + fmt(paid) + ' — المتبقي دين على الزبون ' + fmt(total - paid);
   el.className = 'col-span-2 text-[12px] font-semibold ' + (paid > total + 0.009 ? 'text-error' : 'text-on-surface-variant');
@@ -357,7 +414,9 @@ async function saveEdit() {
   const newPaymentMethod = document.getElementById('paymentMethodSelect').value;
   const paymentMethodChanged = newPaymentMethod !== invoice.payment_method;
   if (invoice.type === 'sale' && newPaymentMethod === 'mixed') {
-    const paidMix = ((parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0)) / (FX || 1) + gmLaterPaid();
+    const mp0 = gmMixedPaid();
+    const paidMix = mp0.cash + mp0.bank + gmLaterPaid();
+    if (fxRows.some(r => Number(r.amount) > 0 && !(Number(r.rate) > 0))) { errEl.textContent = 'اكتب سعر الصرف لكل مبلغ بعملة أخرى'; errEl.classList.remove('hidden'); return; }
     if (paidMix > newTotal + 0.009) { errEl.textContent = 'المبلغ المدفوع (نقدي + فيزا) أكبر من إجمالي الفاتورة'; errEl.classList.remove('hidden'); return; }
   }
 
@@ -397,7 +456,7 @@ async function saveEdit() {
   if (invoice.type === 'sale') {
     const oldPaid = Number(invoice.amount_paid || 0);
     const oldRem = oldTotal - oldPaid;
-    const mixCash = Math.round((parseFloat(document.getElementById('mixedCash').value) || 0) / (FX || 1) * 100) / 100, mixBank = Math.round((parseFloat(document.getElementById('mixedBank').value) || 0) / (FX || 1) * 100) / 100;
+    const mp = gmMixedPaid(), mixCash = mp.cash, mixBank = mp.bank;
     const newPaid = newPaymentMethod === 'mixed' ? Math.round((mixCash + mixBank + gmLaterPaid()) * 100) / 100
       : newPaymentMethod === 'credit' ? 0 : oldRem <= 0.009 ? newTotal : Math.min(oldPaid, newTotal);
     saleMoney = { cashDelta: newPaid - oldPaid, debtDelta: (newTotal - newPaid) - oldRem };
@@ -412,6 +471,13 @@ async function saveEdit() {
     if (oldRem > 0.009 && newPaymentMethod !== 'credit' && newPaymentMethod !== 'mixed') updatePayload.payment_method = invoice.payment_method;
     updatePayload.cash_paid_amount = newPaymentMethod === 'mixed' ? mixCash : null;
     updatePayload.bank_paid_amount = newPaymentMethod === 'mixed' ? mixBank : null;
+    // The currencies paid changed: take the invoice's old money out of the box (in the old
+    // currencies) and put the new payment in (in the new ones), instead of one net delta.
+    const newBD = gmNewBreakdown(newPaymentMethod);
+    if (!FX && (invoice.pay_breakdown || newBD) && JSON.stringify(invoice.pay_breakdown || null) !== JSON.stringify(newBD)) {
+      updatePayload.pay_breakdown = newBD;
+      saleMoney.replace = { newIn: Math.max(0, Math.round((newPaid - gmLaterPaid()) * 100) / 100) };
+    }
   }
   if (invoice.type === 'sale' || invoice.type === 'return') {
     // customer editing left as-is (rare case) — only re-linkable via cancel+reissue
@@ -419,6 +485,18 @@ async function saveEdit() {
     updatePayload.counterparty_name = counterpartyVal || null;
   }
 
+  // currency switch, step 1: before the invoice changes, so the box removes it in the OLD currencies
+  if (saleMoney && saleMoney.replace) {
+    const { data: cms } = await goldmindClient.from('cash_movements').select('direction, amount').eq('invoice_id', invoice.id);
+    const inBox = Math.round((cms || []).reduce((t, m) => t + (m.direction === 'in' ? 1 : -1) * Number(m.amount || 0), 0) * 100) / 100;
+    if (inBox > 0.009) {
+      const { error: outErr } = await goldmindClient.from('cash_movements').insert({
+        store_id: GOLDMIND_STORE_ID, box: 'main', direction: 'out', amount: inBox, invoice_id: invoice.id, created_by: GOLDMIND_STAFF_ID,
+        description: 'تعديل عملات الدفع — إخراج المبلغ القديم للفاتورة ' + invoice.invoice_number
+      });
+      if (outErr) { btn.disabled = false; btn.textContent = 'حفظ التعديلات'; errEl.textContent = 'تعذّر حفظ الفاتورة: ' + outErr.message; errEl.classList.remove('hidden'); return; }
+    }
+  }
   const { data: invUpdateData, error: invUpdateError } = await goldmindClient.from('invoices').update(updatePayload).eq('id', invoice.id);
   if (invUpdateError) {
     btn.disabled = false; btn.textContent = 'حفظ التعديلات';
@@ -497,7 +575,13 @@ async function saveEdit() {
   // value — instead of one net delta. Never touches the original entry.
   if (saleMoney) {
     const r2 = v => Math.round(v * 100) / 100;
-    if (Math.abs(saleMoney.cashDelta) > 0.009) {
+    if (saleMoney.replace) {
+      // step 2: the new payment, split into the daily box per currency by the new pay_breakdown
+      if (saleMoney.replace.newIn > 0.009) await goldmindClient.from('cash_movements').insert({
+        store_id: GOLDMIND_STORE_ID, box: 'main', direction: 'in', amount: saleMoney.replace.newIn, invoice_id: invoice.id, created_by: GOLDMIND_STAFF_ID,
+        description: 'تعديل عملات الدفع — المبلغ الجديد للفاتورة ' + invoice.invoice_number
+      });
+    } else if (Math.abs(saleMoney.cashDelta) > 0.009) {
       await goldmindClient.from('cash_movements').insert({
         store_id: GOLDMIND_STORE_ID, box: 'main', direction: saleMoney.cashDelta > 0 ? 'in' : 'out', amount: r2(Math.abs(saleMoney.cashDelta)),
         description: (saleMoney.cashDelta > 0 ? 'تحصيل فرق تعديل فاتورة ' : 'رد فرق تعديل فاتورة ') + invoice.invoice_number,
@@ -593,12 +677,25 @@ async function load() {
 
   const paySelect = document.getElementById('paymentMethodSelect');
   if (invoice.type === 'sale') {
-    paySelect.innerHTML = '<option value="cash">نقدي</option><option value="bank">فيزا/بنك</option><option value="credit">دين</option><option value="mixed">مختلط: نقدي + فيزا و/أو دين</option>';
+    paySelect.innerHTML = '<option value="cash">نقدي</option><option value="bank">فيزا/بنك</option><option value="credit">دين</option><option value="mixed">مختلط / عدة عملات: نقدي + فيزا و/أو دين</option>';
   } else {
     paySelect.innerHTML = '<option value="cash">نقدي</option><option value="credit">دين</option>';
   }
   paySelect.value = invoice.payment_method;
-  if (invoice.type === 'sale' && invoice.payment_method === 'mixed') {
+  if (invoice.type === 'sale' && !FX) {
+    const { data: st } = await goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+    FX_BASE = (st && st.currency || 'AED').toUpperCase();
+    FX_SECONDARY = st && st.secondary_currency ? { code: st.secondary_currency.toUpperCase(), rate: Number(st.secondary_currency_rate) || 0 } : null;
+    document.getElementById('fxBox').classList.remove('hidden');
+    document.getElementById('fxBox').classList.add('flex');
+  }
+  if (invoice.type === 'sale' && invoice.payment_method === 'mixed' && Array.isArray(invoice.pay_breakdown) && invoice.pay_breakdown.length && !FX) {
+    const baseOf = m => invoice.pay_breakdown.filter(b => String(b.currency).toUpperCase() === FX_BASE && b.method === m).reduce((t, b) => t + Number(b.amount || 0), 0);
+    document.getElementById('mixedCash').value = baseOf('cash') || '';
+    document.getElementById('mixedBank').value = baseOf('bank') || '';
+    invoice.pay_breakdown.filter(b => String(b.currency).toUpperCase() !== FX_BASE).forEach(b => fxRows.push({ id: ++fxSeq, currency: String(b.currency).toUpperCase(), amount: Number(b.amount), rate: Number(b.rate), method: b.method === 'bank' ? 'bank' : 'cash' }));
+    renderFxRows();
+  } else if (invoice.type === 'sale' && invoice.payment_method === 'mixed') {
     document.getElementById('mixedCash').value = Math.round(Number(invoice.cash_paid_amount || 0) * (FX || 1) * 100) / 100 || '';
     document.getElementById('mixedBank').value = Math.round(Number(invoice.bank_paid_amount || 0) * (FX || 1) * 100) / 100 || '';
   }
