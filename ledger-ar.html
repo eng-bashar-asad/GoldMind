@@ -1442,7 +1442,10 @@ async function saveEditStockBatch(batchId, rowCount) {
   errEl.classList.add('hidden');
 
 
-  const notes = document.getElementById('edit-batch-notes-' + batchId).value.trim();
+  const notesEl = document.getElementById('edit-batch-notes-' + batchId);
+  const notes = notesEl.value.trim();
+  // each line keeps its own note (its barcode) unless the note was actually edited
+  const notesChanged = notesEl.value !== notesEl.defaultValue;
   const updates = [];
 
   for (let idx = 0; idx < rowCount; idx++) {
@@ -1482,7 +1485,7 @@ async function saveEditStockBatch(batchId, rowCount) {
       gold_24k_equivalent: u.gold_24k_equivalent,
       fab_fee_per_gram: u.fab_fee_per_gram,
       fab_fee_amount: u.fab_fee_amount,
-      notes: u.notes
+      ...(notesChanged ? { notes: u.notes } : {})
     }).eq('id', u.id))
   );
 

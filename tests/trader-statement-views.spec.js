@@ -39,3 +39,15 @@ test('vouchers vs details, arrows, photos toggle', async ({ page }) => {
   await expect(rows.locator('img.st-ph')).toHaveCount(0);
   expect(errs).toEqual([]);
 });
+
+test('return one piece to stock from the statement', async ({ page }) => {
+  const calls = await install(page, { db: db(), rpc: { trader_return_piece: () => ({ body: { ok: true } }) } });
+  page.on('dialog', d => d.accept());
+  await page.goto('/trader-statement-print-ar.html?trader=t1');
+  await page.click('#stOpts [data-view=details]');
+  const btn = page.locator('#stGoldRows tr.st-p button.st-ret').first();
+  await expect(btn).toBeVisible();
+  await btn.click();
+  await expect.poll(() => calls.some(c => c.name === 'trader_return_piece')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'trader_return_piece').body)).toEqual({ p_movement: 'm1' });
+});

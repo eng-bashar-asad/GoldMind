@@ -40,6 +40,7 @@
       .st-pc { flex-direction: column; text-align: center; gap: 2px; }
     }
     .stmt-table tr.st-p td { font-size: 11px; color: #5b5140; padding: 5px 6px; }
+    .st-ret { display: block; margin-top: 4px; font-size: 11px; font-weight: 700; color: #8A3B32; border: 1px solid #8A3B32; border-radius: 8px; padding: 3px 8px; background: #fff; }
     .st-ph { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; display: inline-block; vertical-align: middle; }
 </style>
 <style>
@@ -141,7 +142,17 @@ const GOLD_TYPE_LABELS = {
     'debt_decrease|scrap_given': 'إخراج كسر بالكلفة',
     'debt_increase|gold_to_cash': 'تسكير عملات — تسديد ذهب لنا'
 };
-let ST_GOLD_GROUPS = [], ST_PIECES = {}, ST_CUR = '';
+let ST_GOLD_GROUPS = [], ST_PIECES = {}, ST_CUR = '', ST_CAN_RETURN = false;
+// "إرجاع للمخزن": the piece goes back to stock as it was (gross & accounting weight, making cost)
+// and leaves the trader's account; the statement reloads.
+async function stReturnPiece(movementId, btn) {
+    const row = btn.closest('tr'), what = row ? row.querySelector('.st-pc span').firstChild.textContent : '';
+    if (!confirm('إرجاع القطعة ' + what + ' إلى المخزن؟\nتُحذف من حساب التاجر (ذهب ومصنعية) وترجع للمخزن بنفس وزنها القائم والمحاسبي ومصنعيتها.')) return;
+    btn.disabled = true; btn.textContent = 'جارِ الإرجاع...';
+    const { error } = await goldmindClient.rpc('trader_return_piece', { p_movement: movementId });
+    if (error) { alert('تعذّر الإرجاع: ' + error.message); btn.disabled = false; btn.textContent = '↩ إرجاع للمخزن'; return; }
+    location.reload();
+}
 function stGet(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }
 function stSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
 let ST_VIEW = stGet('gm_stmt_view', 'vouchers'), ST_PHOTOS = stGet('gm_stmt_photos', '1') === '1';
@@ -183,7 +194,7 @@ function stRenderGold() {
             const p = ST_PIECES[m.piece_id] || {};
             const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph" src="${gmEscapeHtml(p.photo_url)}" alt=""/>` : '';
             return `<tr class="st-p">
-                <td><div class="st-pc">${ph}<span>${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}</span></div></td>
+                <td><div class="st-pc">${ph}<span>${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}${ST_CAN_RETURN && m.source === 'stock_given' && m.piece_id ? `<button type="button" class="st-ret no-print" onclick="stReturnPiece('${m.id}', this)">↩ إرجاع للمخزن</button>` : ''}</span></div></td>
                 <td>${m.karat ? 'ع' + m.karat : ''}</td>
                 <td class="font-data-mono">${fmt(stBilled(m))}</td>
                 <td class="font-data-mono">${fmt(m.gold_24k_equivalent)}</td>
@@ -220,6 +231,7 @@ async function loadStatement() {
 
     const { data: staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
     const allowed = staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['view_reports'] === true));
+    ST_CAN_RETURN = !!(staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['edit_traders'] === true)));
     if (!allowed) {
         document.getElementById('loading-state').classList.add('hidden');
         document.getElementById('no-access').classList.remove('hidden');
