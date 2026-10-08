@@ -74,3 +74,23 @@ test('a sale sold in SYP is edited in SYP; the difference goes to the daily box 
   const upd = calls.find(c => c.method === 'PATCH' && c.name === 'invoices');
   expect(JSON.parse(upd.body).pay_fx_rate * JSON.parse(upd.body).total_amount).toBeCloseTo(10235000, 0);
 });
+
+test('mixed invoice paid off later: editing it does not refund the later payment', async ({ page }) => {
+  const calls = await install(page, { db: {
+    stores: [{ id: STORE, name: 'محل', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    invoices: [{ id: 's1', store_id: STORE, invoice_number: 'INV-17', type: 'sale', status: 'paid', payment_method: 'mixed', cash_paid_amount: 11700, bank_paid_amount: 0, customer_id: 'c1', total_amount: 11900, amount_paid: 11900, created_at: '2026-10-01T07:00:00Z' }],
+    invoice_items: [{ id: 'it1', invoice_id: 's1', karat: 18, weight_grams: 80, line_total: 11900, description: 'طقم' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ام عدنان', phone: '1' }], pieces: []
+  } });
+  await page.goto('/invoice-edit-ar.html?id=s1');
+  await expect(page.locator('#lockedNumber')).toHaveText('INV-17');
+  page.on('dialog', d => d.accept());
+  await page.click('#save-btn');
+  await expect.poll(() => calls.some(c => c.method === 'PATCH' && c.name === 'invoices')).toBe(true);
+  const body = JSON.parse(calls.find(c => c.method === 'PATCH' && c.name === 'invoices').body);
+  expect([body.amount_paid, body.status]).toEqual([11900, 'paid']);
+  await page.waitForTimeout(500);
+  expect(calls.some(c => c.method === 'POST' && (c.name === 'cash_movements' || c.name === 'customer_debts'))).toBe(false);
+});

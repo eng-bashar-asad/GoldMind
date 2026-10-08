@@ -331,9 +331,15 @@ function gmMixedToggle() {
   document.getElementById('mixedBox').classList.toggle('hidden', !on);
   if (on) gmMixedNote();
 }
+// Payments the customer made after the sale (allocated to this invoice) are not part of
+// cash_paid_amount/bank_paid_amount; they stay paid whatever is typed in the mixed boxes.
+function gmLaterPaid() {
+  if (!invoice || invoice.payment_method !== 'mixed') return 0;
+  return Math.max(0, Number(invoice.amount_paid || 0) - Number(invoice.cash_paid_amount || 0) - Number(invoice.bank_paid_amount || 0));
+}
 function gmMixedNote() {
   const total = items.reduce((t, it) => t + Number(it.line_total || 0), 0);
-  const paid = ((parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0)) / (FX || 1);
+  const paid = ((parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0)) / (FX || 1) + gmLaterPaid();
   const el = document.getElementById('mixedNote');
   el.textContent = paid > total + 0.009 ? 'المدفوع أكبر من إجمالي الفاتورة' : 'المدفوع ' + fmt(paid) + ' — المتبقي دين على الزبون ' + fmt(total - paid);
   el.className = 'col-span-2 text-[12px] font-semibold ' + (paid > total + 0.009 ? 'text-error' : 'text-on-surface-variant');
@@ -351,7 +357,7 @@ async function saveEdit() {
   const newPaymentMethod = document.getElementById('paymentMethodSelect').value;
   const paymentMethodChanged = newPaymentMethod !== invoice.payment_method;
   if (invoice.type === 'sale' && newPaymentMethod === 'mixed') {
-    const paidMix = ((parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0)) / (FX || 1);
+    const paidMix = ((parseFloat(document.getElementById('mixedCash').value) || 0) + (parseFloat(document.getElementById('mixedBank').value) || 0)) / (FX || 1) + gmLaterPaid();
     if (paidMix > newTotal + 0.009) { errEl.textContent = 'المبلغ المدفوع (نقدي + فيزا) أكبر من إجمالي الفاتورة'; errEl.classList.remove('hidden'); return; }
   }
 
@@ -392,7 +398,7 @@ async function saveEdit() {
     const oldPaid = Number(invoice.amount_paid || 0);
     const oldRem = oldTotal - oldPaid;
     const mixCash = Math.round((parseFloat(document.getElementById('mixedCash').value) || 0) / (FX || 1) * 100) / 100, mixBank = Math.round((parseFloat(document.getElementById('mixedBank').value) || 0) / (FX || 1) * 100) / 100;
-    const newPaid = newPaymentMethod === 'mixed' ? Math.round((mixCash + mixBank) * 100) / 100
+    const newPaid = newPaymentMethod === 'mixed' ? Math.round((mixCash + mixBank + gmLaterPaid()) * 100) / 100
       : newPaymentMethod === 'credit' ? 0 : oldRem <= 0.009 ? newTotal : Math.min(oldPaid, newTotal);
     saleMoney = { cashDelta: newPaid - oldPaid, debtDelta: (newTotal - newPaid) - oldRem };
     if (FX && newTotal > 0) {
