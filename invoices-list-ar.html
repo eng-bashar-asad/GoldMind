@@ -68,7 +68,7 @@
 
 <div class="relative">
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
-<input id="searchInput" oninput="applyFilters()" placeholder="رقم الفاتورة، اسم العميل/التاجر، أو رقم الهاتف" class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-background text-on-background"/>
+<input id="searchInput" oninput="applyFilters()" placeholder="رقم الفاتورة، الباركود، اسم العميل/التاجر، أو رقم الهاتف" class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-background text-on-background"/>
 </div>
 
 <div>
@@ -121,6 +121,75 @@ const TYPE_COLORS = {
 const STATUS_LABELS = { paid: 'مدفوعة', unpaid: 'غير مدفوعة', cancelled: 'ملغاة', received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة', delivered: 'تم التسليم' };
 
 let allRows = [];
+const INV_SELECT = 'id, invoice_number, type, status, total_amount, fabrication_fees, vat_amount, created_at, currency, pay_currency, pay_fx_rate, pay_breakdown, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name';
+
+// Barcodes (all invoices) + net weight (buyTrader) from invoice_items, in chunks of 100 ids.
+async function gmLoadItems(ids) {
+  const out = [];
+  for (let k = 0; k < ids.length; k += 100) {
+    const { data } = await goldmindClient.from('invoice_items').select('invoice_id, barcode, weight_grams, karat').in('invoice_id', ids.slice(k, k + 100));
+    out.push(...(data || []));
+  }
+  return out;
+}
+
+// What the customer actually paid in: one foreign currency (pay_currency x rate), a split
+// (pay_breakdown), or the store currency.
+function gmPaidText(i) {
+  const n = v => Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+  const isBuy = i.type === 'buyTrader' || i.type === 'buyRetail';
+  if (!isBuy && i.pay_currency && Number(i.pay_fx_rate) > 0) return { main: n(Number(i.total_amount || 0) * Number(i.pay_fx_rate)) + ' ' + i.pay_currency, sub: true };
+  if (Array.isArray(i.pay_breakdown) && i.pay_breakdown.length) return { main: null, split: i.pay_breakdown.map(b => n(b.amount) + ' ' + b.currency).join(' + ') };
+  return { main: null };
+}
+
+async function gmBuildInvoiceRows(invoices) {
+  const items = await gmLoadItems(invoices.map(i => i.id));
+  const bc = {}, weightByInvoice = {};
+  items.forEach(it => {
+    if (it.barcode) (bc[it.invoice_id] = bc[it.invoice_id] || []).push(String(it.barcode));
+    weightByInvoice[it.invoice_id] = (weightByInvoice[it.invoice_id] || 0) + Number(it.weight_grams || 0) * (Number(it.karat || 0) / 24);
+  });
+  return invoices.map(i => {
+    const paid = gmPaidText(i);
+    return {
+      id: i.id,
+      kind: 'invoice',
+      number: i.invoice_number,
+      type: i.type,
+      status: i.status,
+      // buyTrader: total_amount is only the cash paid now; the fab fee + VAT is the debt it created.
+      amount: i.type === 'buyTrader' ? (Number(i.fabrication_fees || 0) + Number(i.vat_amount || 0)) : i.total_amount,
+      currency: i.currency || '',
+      paidMain: paid.main, paidSub: !!paid.sub, paidSplit: paid.split || '',
+      barcodes: bc[i.id] || [],
+      isTraderDebt: i.type === 'buyTrader',
+      netWeight: i.type === 'buyTrader' ? (weightByInvoice[i.id] || 0) : null,
+      created_at: i.created_at,
+      counterpartyName: (i.customer && i.customer.name) || (i.trader && i.trader.name) || i.counterparty_name || '',
+      counterpartyPhone: (i.customer && i.customer.phone) || (i.trader && i.trader.phone) || '',
+      href: 'invoice-print-ar.html?id=' + i.id
+    };
+  });
+}
+
+// A barcode typed in the search may belong to an invoice older than the 300 loaded: look it up.
+let gmBcTimer = null, gmBcSeen = {};
+function gmBarcodeLookup(q) {
+  clearTimeout(gmBcTimer);
+  if (q.length < 3 || gmBcSeen[q]) return;
+  gmBcTimer = setTimeout(async () => {
+    gmBcSeen[q] = true;
+    const { data: hits } = await goldmindClient.from('invoice_items').select('invoice_id').ilike('barcode', '%' + q + '%').limit(50);
+    const have = new Set(allRows.map(r => r.id));
+    const ids = [...new Set((hits || []).map(h => h.invoice_id))].filter(id => !have.has(id));
+    if (!ids.length) return;
+    const { data: inv } = await goldmindClient.from('invoices').select(INV_SELECT).eq('store_id', GOLDMIND_STORE_ID).in('id', ids);
+    if (!inv || !inv.length) return;
+    allRows = allRows.concat(await gmBuildInvoiceRows(inv)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    if (document.getElementById('searchInput').value.trim().toLowerCase() === q) applyFilters();
+  }, 350);
+}
 
 function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -132,7 +201,7 @@ async function loadData() {
 
   let invQuery = goldmindClient
     .from('invoices')
-    .select('id, invoice_number, type, status, total_amount, fabrication_fees, vat_amount, created_at, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name')
+    .select(INV_SELECT)
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('created_at', { ascending: false })
     .limit(300);
@@ -150,39 +219,7 @@ async function loadData() {
 
   const [{ data: invoices, error: invErr }, { data: repairs, error: repErr }] = await Promise.all([invQuery, repQuery]);
 
-  // Net weight per buyTrader invoice, fetched in one bulk query (not one
-  // query per row) so the list stays fast even with 300 invoices.
-  const traderInvoiceIds = (invoices || []).filter(i => i.type === 'buyTrader').map(i => i.id);
-  let weightByInvoice = {};
-  if (traderInvoiceIds.length) {
-    const { data: itemsForWeight } = await goldmindClient
-      .from('invoice_items').select('invoice_id, weight_grams, karat').in('invoice_id', traderInvoiceIds);
-    (itemsForWeight || []).forEach(it => {
-      const pureWeight = Number(it.weight_grams || 0) * (Number(it.karat || 0) / 24);
-      weightByInvoice[it.invoice_id] = (weightByInvoice[it.invoice_id] || 0) + pureWeight;
-    });
-  }
-
-  const invRows = (invoices || []).map(i => ({
-    id: i.id,
-    kind: 'invoice',
-    number: i.invoice_number,
-    type: i.type,
-    status: i.status,
-    // buyTrader's total_amount is the cash-paid-now portion only (always 0
-    // on credit, since the gold itself is settled by weight via
-    // trader_movements/ledger-ar.html, not priced in cash) -- showing that
-    // here reads as a broken "0.00" with no context. The fab fee + its VAT
-    // is the actual debt this invoice created, so that's what's meaningful
-    // in a list glance.
-    amount: i.type === 'buyTrader' ? (Number(i.fabrication_fees || 0) + Number(i.vat_amount || 0)) : i.total_amount,
-    isTraderDebt: i.type === 'buyTrader',
-    netWeight: i.type === 'buyTrader' ? (weightByInvoice[i.id] || 0) : null,
-    created_at: i.created_at,
-    counterpartyName: (i.customer && i.customer.name) || (i.trader && i.trader.name) || i.counterparty_name || '',
-    counterpartyPhone: (i.customer && i.customer.phone) || (i.trader && i.trader.phone) || '',
-    href: 'invoice-print-ar.html?id=' + i.id
-  }));
+  const invRows = await gmBuildInvoiceRows(invoices || []);
 
   const repRows = (repairs || []).map(r => ({
     id: r.id,
@@ -216,8 +253,10 @@ function applyFilters() {
     rows = rows.filter(r =>
       (r.number || '').toLowerCase().includes(q) ||
       (r.counterpartyName || '').toLowerCase().includes(q) ||
-      (r.counterpartyPhone || '').toLowerCase().includes(q)
+      (r.counterpartyPhone || '').toLowerCase().includes(q) ||
+      (r.barcodes || []).some(b => b.toLowerCase().includes(q))
     );
+    gmBarcodeLookup(q);
   }
 
   document.getElementById('resultCount').textContent = rows.length + ' نتيجة';
@@ -245,16 +284,29 @@ function applyFilters() {
           </div>
           <p class="text-[12px] text-on-surface-variant truncate">${r.counterpartyName || 'بدون اسم'} ${r.counterpartyPhone ? '· ' + r.counterpartyPhone : ''}</p>
           <p class="text-[10px] text-outline">${dateStr}${statusLabel ? ' · ' + statusLabel : ''}${r.isTraderDebt ? ' · وزن صافي ' + fmt(r.netWeight) + ' غ' : ''}</p>
+          ${r.barcodes && r.barcodes.length ? `<p class="inv-bc text-[11px] font-data-mono text-on-surface-variant flex flex-wrap gap-1" dir="ltr">${gmBarcodeChips(r.barcodes, q)}</p>` : ''}
         </div>
         <div class="flex items-center gap-1 shrink-0">
           <div class="flex flex-col items-end">
-            <span class="font-data-mono font-bold text-[14px]">${fmt(r.amount)}</span>
+            <span class="inv-amount font-data-mono font-bold text-[14px]" dir="ltr">${r.paidMain ? gmEscapeHtml(r.paidMain) : fmt(r.amount) + (r.currency ? ' ' + gmEscapeHtml(r.currency) : '')}</span>
+            ${r.paidMain ? `<span class="font-data-mono text-[10px] text-on-surface-variant" dir="ltr">${fmt(r.amount)} ${gmEscapeHtml(r.currency)}</span>` : ''}
+            ${r.paidSplit ? `<span class="inv-split font-data-mono text-[10px] text-on-surface-variant" dir="ltr">${gmEscapeHtml(r.paidSplit)}</span>` : ''}
             ${r.isTraderDebt ? '<span class="text-[9px] text-on-surface-variant">دين مصنعية</span>' : ''}
           </div>
           <span class="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_left</span>
         </div>
       </a>`;
   }).join('');
+}
+
+function gmBarcodeChips(list, q) {
+  const shown = list.slice(0, 8).map(b => `<span class="px-1.5 rounded ${q && b.toLowerCase().includes(q) ? 'bg-amber-200 text-amber-900 font-bold' : 'bg-surface-container-high'}">${gmEscapeHtml(b)}</span>`);
+  if (list.length > 8) {
+    const hit = q && list.slice(8).find(b => b.toLowerCase().includes(q));
+    if (hit) shown.push(`<span class="px-1.5 rounded bg-amber-200 text-amber-900 font-bold">${gmEscapeHtml(hit)}</span>`);
+    shown.push(`<span>+${list.length - 8}</span>`);
+  }
+  return shown.join('');
 }
 
 function clearFilters() {
