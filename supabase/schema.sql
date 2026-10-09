@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict QRFwYgSJ01X4JcbbD0OIP1vdpnZ5R4yUlK6fC3VXCLrJTEsrccoKTXX2gGqNeP2
+\restrict QMttb8aACbeLVLLgES7qKY7twABp5MeEqujs902h5ZI6jqSF67dZW7m9ltguGyY
 
 
 SET statement_timeout = 0;
@@ -68,7 +68,8 @@ begin
          format('مدفوع %s — بالصندوق %s — دفعات لاحقة %s', i.amount_paid, coalesce(c.s, 0), coalesce(al.s, 0)), i.id, i.invoice_number
   from invoices i
   left join lateral (select sum(case when direction = 'in' then amount else -amount end) s from cash_movements where invoice_id = i.id) c on true
-  left join lateral (select sum(cash_amount) s from customer_debts where invoice_id = i.id and source = 'allocation') al on true
+  left join lateral (select sum(case when movement_type = 'debt_decrease' then cash_amount else -cash_amount end) s
+                       from customer_debts where invoice_id = i.id and source = 'allocation') al on true
   where i.store_id = sid and i.type = 'sale' and i.status <> 'cancelled' and i.payment_method in ('cash','bank','mixed')
     and abs(coalesce(c.s, 0) + coalesce(al.s, 0) - coalesce(i.amount_paid, 0)) > 0.01;
 
@@ -1551,6 +1552,39 @@ begin
     insert into piece_lot_draws (store_id, piece_id, lot_id, grams) values (p_store, p_piece, r.id, a);
     left_g := left_g - a;
   end loop;
+end $$;
+
+
+--
+-- Name: gm_op_date(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_op_date() RETURNS date
+    LANGUAGE plpgsql STABLE
+    AS $_$
+declare h text; d date; today date := (now() at time zone 'Asia/Dubai')::date;
+begin
+  h := nullif(current_setting('request.headers', true), '')::json->>'x-gm-op-date';
+  if h is null or h !~ '^\d{4}-\d{2}-\d{2}$' then return null; end if;
+  begin d := h::date; exception when others then return null; end;
+  if d >= today or d < today - 3650 then return null; end if;
+  return d;
+end $_$;
+
+
+--
+-- Name: gm_op_date_stamp(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_op_date_stamp() RETURNS trigger
+    LANGUAGE plpgsql
+    AS $$
+declare d date := public.gm_op_date();
+begin
+  if d is not null then
+    new.created_at := (d + (now() at time zone 'Asia/Dubai')::time) at time zone 'Asia/Dubai';
+  end if;
+  return new;
 end $$;
 
 
@@ -3628,6 +3662,33 @@ end $$;
 
 
 --
+-- Name: trader_discount(uuid, text, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text DEFAULT NULL::text) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+-- Discount on the cash balance with a trader. No money moves.
+--  for = 'trader': in the trader's favour (he owes less / we owe him more) → shop profit goes down
+--  for = 'shop'  : in the shop's favour  (he owes more / we owe him less) → shop profit goes up
+declare t record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); mid uuid;
+begin
+  select id, store_id, name into t from traders where id = p_trader;
+  if t is null then raise exception 'التاجر غير موجود'; end if;
+  if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+  if p_for not in ('trader', 'shop') then raise exception 'اختر لصالح من الخصم'; end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = t.store_id limit 1;
+  insert into trader_movements (store_id, trader_id, movement_type, weight_grams, karat, gold_24k_equivalent, fab_fee_amount, source, notes, created_by)
+    values (t.store_id, t.id, case when p_for = 'trader' then 'debt_increase' else 'debt_decrease' end, 0, null, 0, amt, 'discount',
+            coalesce(nullif(trim(p_notes), ''), case when p_for = 'trader' then 'خصم لصالح التاجر' else 'خصم لصالح المحل' end), me)
+    returning id into mid;
+  return mid;
+end $$;
+
+
+--
 -- Name: trader_gold_to_cash(uuid, numeric, integer, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3708,6 +3769,28 @@ end $$;
 
 
 --
+-- Name: trader_return_piece(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trader_return_piece(p_movement uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+ declare m record; me uuid; bc text;
+ begin
+   select * into m from trader_movements where id = p_movement and source = 'stock_given' and piece_id is not null;
+     if m is null then raise exception 'القطعة غير موجودة في حساب التاجر'; end if;
+       if not has_permission('edit_traders', m.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+         select id into me from staff where user_id = auth.uid() and store_id = m.store_id limit 1;
+           delete from trader_movements where id = m.id;
+             update pieces set status = 'available' where id = m.piece_id and status = 'given_to_trader' returning barcode into bc;
+               insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+                   values (m.store_id, m.piece_id, 'returned_from_trader', 'مرتجع من التاجر — رجعت إلى المخزن', me);
+                     return jsonb_build_object('ok', true, 'barcode', bc);
+                     end $$;
+
+
+--
 -- Name: trg_cash_movement_deleted_bank_sync(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3764,6 +3847,32 @@ begin
      or new.status is distinct from old.status
      or new.cash_paid_amount is distinct from old.cash_paid_amount or new.bank_paid_amount is distinct from old.bank_paid_amount then
     perform public.sync_invoice_bank_part(new.id);
+  end if;
+  return new;
+end $$;
+
+
+--
+-- Name: trg_invoice_status_piece_log(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_invoice_status_piece_log() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare sid uuid := (select id from staff where user_id = auth.uid() and store_id = new.store_id limit 1);
+begin
+  if new.type not in ('sale', 'buyTrader', 'buyRetail') then return new; end if;
+  if new.status = 'cancelled' and old.status is distinct from 'cancelled' then
+    insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+    select new.store_id, ii.piece_id, 'status_changed',
+           'إلغاء الفاتورة ' || new.invoice_number || case when new.type = 'sale' then ' — عادت القطعة متوفرة' else '' end, sid
+      from invoice_items ii where ii.invoice_id = new.id and ii.piece_id is not null;
+  elsif old.status = 'cancelled' and new.status is distinct from 'cancelled' then
+    insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+    select new.store_id, ii.piece_id, case when new.type = 'sale' then 'sold' else 'restored' end,
+           'استعادة الفاتورة ' || new.invoice_number, sid
+      from invoice_items ii where ii.invoice_id = new.id and ii.piece_id is not null;
   end if;
   return new;
 end $$;
@@ -5258,7 +5367,7 @@ CREATE TABLE public.trader_movements (
     gold_stock_lot_id uuid,
     piece_acc_weight numeric,
     gold_price_24k numeric,
-    CONSTRAINT trader_movements_source_check CHECK ((source = ANY (ARRAY['settlement'::text, 'stock_given'::text, 'stock_received'::text, 'opening_balance'::text, 'cash_out'::text, 'cash_in'::text, 'gold_to_cash'::text, 'scrap_given'::text])))
+    CONSTRAINT trader_movements_source_check CHECK ((source = ANY (ARRAY['settlement'::text, 'stock_given'::text, 'stock_received'::text, 'opening_balance'::text, 'cash_out'::text, 'cash_in'::text, 'gold_to_cash'::text, 'scrap_given'::text, 'discount'::text])))
 );
 
 
@@ -6238,6 +6347,13 @@ CREATE TRIGGER trg_invoice_bank_part_sync AFTER UPDATE ON public.invoices FOR EA
 
 
 --
+-- Name: invoices trg_invoice_status_piece_log; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_invoice_status_piece_log AFTER UPDATE OF status ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.trg_invoice_status_piece_log();
+
+
+--
 -- Name: invoices trg_invoices_currency_guard; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -6249,6 +6365,41 @@ CREATE TRIGGER trg_invoices_currency_guard BEFORE INSERT ON public.invoices FOR 
 --
 
 CREATE TRIGGER trg_mirror_invoice_cash_to_daily AFTER INSERT ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION public.mirror_invoice_cash_to_daily();
+
+
+--
+-- Name: cash_movements trg_op_date; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_op_date BEFORE INSERT ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION public.gm_op_date_stamp();
+
+
+--
+-- Name: customer_debts trg_op_date; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_op_date BEFORE INSERT ON public.customer_debts FOR EACH ROW EXECUTE FUNCTION public.gm_op_date_stamp();
+
+
+--
+-- Name: daily_cash_log trg_op_date; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_op_date BEFORE INSERT ON public.daily_cash_log FOR EACH ROW EXECUTE FUNCTION public.gm_op_date_stamp();
+
+
+--
+-- Name: piece_movements trg_op_date; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_op_date BEFORE INSERT ON public.piece_movements FOR EACH ROW EXECUTE FUNCTION public.gm_op_date_stamp();
+
+
+--
+-- Name: trader_movements trg_op_date; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_op_date BEFORE INSERT ON public.trader_movements FOR EACH ROW EXECUTE FUNCTION public.gm_op_date_stamp();
 
 
 --
@@ -8840,6 +8991,24 @@ GRANT ALL ON FUNCTION public.gm_draw_for_piece(p_piece uuid, p_store uuid, p_box
 
 
 --
+-- Name: FUNCTION gm_op_date(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_op_date() TO anon;
+GRANT ALL ON FUNCTION public.gm_op_date() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_op_date() TO service_role;
+
+
+--
+-- Name: FUNCTION gm_op_date_stamp(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_op_date_stamp() TO anon;
+GRANT ALL ON FUNCTION public.gm_op_date_stamp() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_op_date_stamp() TO service_role;
+
+
+--
 -- Name: FUNCTION gm_return_draws(p_piece uuid, p_grams numeric); Type: ACL; Schema: public; Owner: -
 --
 
@@ -9322,6 +9491,15 @@ GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p
 
 
 --
+-- Name: FUNCTION trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text) TO anon;
+GRANT ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text) TO service_role;
+
+
+--
 -- Name: FUNCTION trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -9337,6 +9515,15 @@ GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric
 REVOKE ALL ON FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, p_vat_rate numeric, p_batch_ref text, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, p_vat_rate numeric, p_batch_ref text, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, p_vat_rate numeric, p_batch_ref text, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION trader_return_piece(p_movement uuid); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO anon;
+GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO service_role;
 
 
 --
@@ -9373,6 +9560,15 @@ GRANT ALL ON FUNCTION public.trg_daily_label() TO service_role;
 GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO anon;
 GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO service_role;
+
+
+--
+-- Name: FUNCTION trg_invoice_status_piece_log(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_invoice_status_piece_log() TO anon;
+GRANT ALL ON FUNCTION public.trg_invoice_status_piece_log() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_invoice_status_piece_log() TO service_role;
 
 
 --
@@ -10089,5 +10285,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict QRFwYgSJ01X4JcbbD0OIP1vdpnZ5R4yUlK6fC3VXCLrJTEsrccoKTXX2gGqNeP2
+\unrestrict QMttb8aACbeLVLLgES7qKY7twABp5MeEqujs902h5ZI6jqSF67dZW7m9ltguGyY
 
