@@ -11,7 +11,7 @@
 <title>لوحة تحكم المنصة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=35"></script>
+<script src="supabase-config.js?v=36"></script>
 <script src="theme.js?v=55"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -80,6 +80,7 @@
 <div class="flex bg-surface-container-low rounded-lg p-1 gap-1 mb-6">
 <button class="tab-btn active flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabCompanies" onclick="setTab('companies')">الشركات</button>
 <button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabSupport" onclick="setTab('support')">طلبات الدعم</button>
+<button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabErrors" onclick="setTab('errors')">أخطاء البرنامج <span id="errors-badge" class="hidden mr-1 text-[10px] bg-error text-white rounded-full px-1.5"></span></button>
 </div>
 
 <!-- Companies tab -->
@@ -107,6 +108,12 @@
 <!-- Support tab -->
 <section id="supportPanel" class="hidden">
 <div id="support-list" class="flex flex-col gap-3"></div>
+</section>
+
+<!-- Errors tab: code errors reported by the app on any store's devices (last 7 days) -->
+<section id="errorsPanel" class="hidden">
+<p class="text-[12px] text-on-surface-variant mb-3">أخطاء برمجية حدثت عند المستخدمين خلال آخر 7 أيام، مجمّعة حسب الخطأ والصفحة.</p>
+<div id="errors-list" class="flex flex-col gap-3"></div>
 </section>
 
 </div>
@@ -262,6 +269,35 @@ function setTab(tab) {
   document.getElementById('tabSupport').classList.toggle('active', tab === 'support');
   document.getElementById('companiesPanel').classList.toggle('hidden', tab !== 'companies');
   document.getElementById('supportPanel').classList.toggle('hidden', tab !== 'support');
+  document.getElementById('tabErrors').classList.toggle('active', tab === 'errors');
+  document.getElementById('errorsPanel').classList.toggle('hidden', tab !== 'errors');
+}
+
+async function loadClientErrors() {
+  const since = new Date(Date.now() - 7 * 86400000).toISOString();
+  const { data, error } = await goldmindClient.from('client_errors')
+    .select('created_at, page, message, source, line, stack, user_agent, app_version, store_id, stores(name)')
+    .gte('created_at', since).order('created_at', { ascending: false }).limit(500);
+  const list = document.getElementById('errors-list');
+  if (error) { list.innerHTML = '<p class="text-error text-sm">تعذّر تحميل الأخطاء: ' + gmEscapeHtml(error.message) + '</p>'; return; }
+  const groups = new Map();
+  (data || []).forEach(r => {
+    const page = String(r.page || '').split('?')[0];
+    const k = page + '|' + r.message;
+    const g = groups.get(k) || { page, message: r.message, count: 0, last: r.created_at, stores: new Set(), sample: r };
+    g.count++; if (r.stores && r.stores.name) g.stores.add(r.stores.name);
+    groups.set(k, g);
+  });
+  const badge = document.getElementById('errors-badge');
+  badge.textContent = groups.size; badge.classList.toggle('hidden', !groups.size);
+  list.innerHTML = [...groups.values()].map(g => `
+    <details class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4">
+      <summary class="cursor-pointer">
+        <span class="font-bold text-[13px] text-error" dir="ltr">${gmEscapeHtml(g.message)}</span>
+        <span class="block text-[11px] text-on-surface-variant mt-1">${gmEscapeHtml(g.page)} — ${g.count} مرة — آخرها ${gmEscapeHtml(fmtDate(g.last))}${g.stores.size ? ' — ' + gmEscapeHtml([...g.stores].join('، ')) : ''}</span>
+      </summary>
+      <pre class="mt-2 text-[10px] whitespace-pre-wrap break-all bg-surface-container-low rounded-lg p-2" dir="ltr">${gmEscapeHtml([g.sample.source ? g.sample.source + ':' + (g.sample.line || '') : '', g.sample.stack || '', g.sample.user_agent || '', g.sample.app_version ? 'v' + g.sample.app_version : ''].filter(Boolean).join('\n'))}</pre>
+    </details>`).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد أخطاء خلال آخر 7 أيام.</p>';
 }
 
 function fmtDate(iso) {
@@ -763,6 +799,7 @@ async function load() {
   document.getElementById('page-content').classList.remove('hidden');
   loadStores();
   loadSupportRequests();
+  loadClientErrors();
 }
 
 load();

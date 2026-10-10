@@ -523,7 +523,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=35"></script>
+<script src="supabase-config.js?v=36"></script>
 <script src="gm-logo.js?v=2" defer></script>
 <script src="gm-biometric.js?v=1"></script>
 <script>window.addEventListener('load', function () { setTimeout(function () { if (window.GMBio) GMBio.maybePrompt(); }, 2500); });</script>
@@ -2308,14 +2308,14 @@ if ('serviceWorker' in navigator) {
   if (!session || !navigator.onLine) return;
   const { data, error } = await goldmindClient.rpc('accounting_health_check', { sid: GOLDMIND_STORE_ID });
   if (error || !data) return; // no report permission: stay quiet
-  const n = data.filter(r => r.severity === 'error').length;
-  if (!n) return;
+  const n = data.filter(r => r.severity === 'error').length, w = data.length - n;
+  if (!n && !w) return;
   const make = () => {
     const a = document.createElement('a');
     a.href = 'accounting-check-ar.html';
     a.setAttribute('role', 'alert');
     a.style.cssText = 'display:flex;align-items:center;gap:10px;margin:0 0 14px;padding:12px 14px;border-radius:12px;background:#FDECEA;border:1px solid #F5C2BC;color:#8A1C12;font-weight:600;font-size:13px;text-decoration:none;';
-    a.innerHTML = '<span class="material-symbols-outlined" style="font-size:22px">error</span><span style="flex:1">وجد فحص الحسابات ' + n + ' مشكلة — اضغط لعرضها</span><span class="material-symbols-outlined" style="font-size:18px">chevron_left</span>';
+    a.innerHTML = '<span class="material-symbols-outlined" style="font-size:22px">' + (n ? 'error' : 'warning') + '</span><span style="flex:1">وجد فحص الحسابات ' + (n ? n + ' مشكلة' : '') + (n && w ? ' و' : '') + (w ? w + ' تنبيه' : '') + ' — اضغط لعرضها</span><span class="material-symbols-outlined" style="font-size:18px">chevron_left</span>';
     return a;
   };
   const mob = document.querySelector('main.lg\\:hidden');

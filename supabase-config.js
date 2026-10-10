@@ -821,3 +821,39 @@ function gmOpDateCapture(e) {
 document.addEventListener('click', gmOpDateCapture, true);
 document.addEventListener('submit', gmOpDateCapture, true);
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', gmOpDateInit); else gmOpDateInit();
+
+// ---- Error reports ----
+// Code errors on any page are sent to client_errors so the platform owner sees
+// them in the admin panel (with the page and store) before anyone complains.
+// At most 5 different reports per page load; offline, extension and browser noise is skipped.
+const GM_ERR_SENT = new Set();
+function gmReportError(message, source, line, stack) {
+    try {
+        message = String(message || '').slice(0, 1000);
+        if (!message || GM_ERR_SENT.size >= 5 || GM_ERR_SENT.has(message)) return;
+        if (!navigator.onLine || gmIsNetworkError(message)) return;
+        if (/^Script error\.?$|ResizeObserver loop|chrome-extension:|moz-extension:|safari-extension:/i.test(message + ' ' + (source || ''))) return;
+        GM_ERR_SENT.add(message);
+        goldmindClient.auth.getSession().then(function (r) {
+            const s = r && r.data && r.data.session;
+            if (!s) return; // only signed-in users can report
+            return goldmindClient.from('client_errors').insert({
+                store_id: GOLDMIND_STORE_ID || null,
+                page: (location.pathname.split('/').pop() || 'index') + location.search.slice(0, 80),
+                message: message,
+                source: String(source || '').slice(0, 300) || null,
+                line: Number.isFinite(line) ? line : null,
+                stack: String(stack || '').slice(0, 4000) || null,
+                user_agent: navigator.userAgent.slice(0, 300),
+                app_version: (document.querySelector('script[src*="supabase-config.js"]') || {}).src ? String(document.querySelector('script[src*="supabase-config.js"]').src.split('v=')[1] || '') : null
+            });
+        }).catch(function () {});
+    } catch (e) { /* reporting must never break the page */ }
+}
+window.addEventListener('error', function (e) {
+    if (e && e.message) gmReportError(e.message, e.filename, e.lineno, e.error && e.error.stack);
+});
+window.addEventListener('unhandledrejection', function (e) {
+    const r = e && e.reason;
+    gmReportError(r && r.message ? r.message : String(r), null, null, r && r.stack);
+});
