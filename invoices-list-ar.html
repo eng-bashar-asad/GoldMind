@@ -121,7 +121,7 @@ const TYPE_COLORS = {
 const STATUS_LABELS = { paid: 'مدفوعة', unpaid: 'غير مدفوعة', cancelled: 'ملغاة', received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة', delivered: 'تم التسليم' };
 
 let allRows = [];
-const INV_SELECT = 'id, invoice_number, type, status, total_amount, fabrication_fees, vat_amount, created_at, currency, pay_currency, pay_fx_rate, pay_breakdown, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name';
+const INV_SELECT = 'id, invoice_number, type, is_exchange, status, total_amount, fabrication_fees, vat_amount, created_at, currency, pay_currency, pay_fx_rate, pay_breakdown, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name';
 
 // Barcodes (all invoices) + net weight (buyTrader) from invoice_items, in chunks of 100 ids.
 async function gmLoadItems(ids) {
@@ -163,6 +163,7 @@ async function gmBuildInvoiceRows(invoices) {
       currency: i.currency || '',
       paidMain: paid.main, paidSub: !!paid.sub, paidSplit: paid.split || '',
       barcodes: bc[i.id] || [],
+      isExchange: !!i.is_exchange,
       isTraderDebt: i.type === 'buyTrader',
       netWeight: i.type === 'buyTrader' ? (weightByInvoice[i.id] || 0) : null,
       created_at: i.created_at,
@@ -294,7 +295,7 @@ function applyFilters() {
         <div class="flex flex-col gap-1 min-w-0 flex-1">
           <div class="flex items-center gap-2">
             <span class="font-data-mono font-bold text-[13px]">${r.number}</span>
-            <span class="type-badge ${badgeColor}">${TYPE_LABELS[r.type] || r.type}</span>
+            <span class="type-badge ${r.isExchange ? 'bg-indigo-100 text-indigo-800' : badgeColor}">${r.isExchange ? 'تبديل' : (TYPE_LABELS[r.type] || r.type)}</span>
           </div>
           <p class="text-[12px] text-on-surface-variant truncate">${r.counterpartyName || 'بدون اسم'} ${r.counterpartyPhone ? '· ' + r.counterpartyPhone : ''}</p>
           <p class="text-[10px] text-outline">${dateStr}${statusLabel ? ' · ' + statusLabel : ''}${r.isTraderDebt ? ' · وزن صافي ' + fmt(r.netWeight) + ' غ' : ''}</p>
@@ -302,7 +303,8 @@ function applyFilters() {
         </div>
         <div class="flex items-center gap-1 shrink-0">
           <div class="flex flex-col items-end">
-            <span class="inv-amount font-data-mono font-bold text-[14px]" dir="ltr">${r.paidMain ? gmEscapeHtml(r.paidMain) : fmt(r.amount) + (r.currency ? ' ' + gmEscapeHtml(r.currency) : '')}</span>
+            <span class="inv-amount font-data-mono font-bold text-[14px]" dir="ltr">${r.paidMain ? gmEscapeHtml(r.paidMain) : fmt(r.isExchange ? Math.abs(r.amount) : r.amount) + (r.currency ? ' ' + gmEscapeHtml(r.currency) : '')}</span>
+            ${r.isExchange ? `<span class="text-[9px] text-on-surface-variant">${Number(r.amount) > 0.004 ? 'فرق على الزبون' : Number(r.amount) < -0.004 ? 'فرق للزبون' : 'بدون فرق'}</span>` : ''}
             ${r.paidMain ? `<span class="font-data-mono text-[10px] text-on-surface-variant" dir="ltr">${fmt(r.amount)} ${gmEscapeHtml(r.currency)}</span>` : ''}
             ${r.paidSplit ? `<span class="inv-split font-data-mono text-[10px] text-on-surface-variant" dir="ltr">${gmEscapeHtml(r.paidSplit)}</span>` : ''}
             ${r.isTraderDebt ? '<span class="text-[9px] text-on-surface-variant">دين مصنعية</span>' : ''}

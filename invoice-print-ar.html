@@ -21,7 +21,7 @@
 <script src="supabase-config.js?v=35"></script>
 <script src="pint-ae.js"></script>
 <script src="theme.js?v=54"></script>
-<script src="gm-profit.js?v=6"></script>
+<script src="gm-profit.js?v=7"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -596,7 +596,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         // its number is reused with no gap (server re-checks all of this).
         {
             const m = String(invoice.invoice_number || '').split('-');
-            const isLast = invoice.type === 'sale' && Number(m[1]) === Number(store.next_invoice_seq_year)
+            const isLast = invoice.type === 'sale' && !invoice.is_exchange && Number(m[1]) === Number(store.next_invoice_seq_year)
                 && Number(m[2]) === Number(store.next_invoice_seq) - 1;
             if (isLast) {
                 const { data: ownerRow } = await goldmindClient.from('staff').select('role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
@@ -704,8 +704,17 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         const itemsBody = document.getElementById('items-body');
         // a sale priced in another currency (e.g. SYP) prints entirely in it
         const payRate = (!isPurchaseDoc && invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) ? Number(invoice.pay_fx_rate) : 0;
-        itemsBody.innerHTML = (items || []).map(item => {
+        // exchange invoice: the returned pieces first, under their own heading, shown without a minus
+        const isExchange = !!invoice.is_exchange;
+        const printItems = isExchange ? [...(items || [])].sort((a, b) => (Number(a.line_total) < 0 ? 0 : 1) - (Number(b.line_total) < 0 ? 0 : 1)) : (items || []);
+        let exGroup = null;
+        itemsBody.innerHTML = printItems.map(item => {
             const full = Number(item.line_total || 0) * (payRate || 1);
+            let exHead = '';
+            if (isExchange) {
+                const g = Number(item.line_total) < 0 ? 'back' : 'new';
+                if (g !== exGroup) { exGroup = g; exHead = `<tr class="ex-head"><td colspan="4" class="pt-2 pb-1 font-bold text-[11px] text-gray-700">${g === 'back' ? 'القطعة المُرجَعة' : 'القطعة الجديدة'}</td></tr>`; }
+            }
             // A purchase voucher (buyTrader/buyRetail) must NOT apply the
             // store's flat sale VAT rate to the gold value here: buyRetail
             // sellers (individuals) never charge VAT at all, and for
@@ -724,12 +733,12 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             sumTax += tax;
             sumTotal += full;
 
-            return `
+            return exHead + `
                 <tr>
                     <td class="py-1"><div class="flex items-center gap-2">${(item.item_photo_url || piecePhotoById[item.piece_id]) ? `<img class="item-photo" src="${gmEscapeHtml(item.item_photo_url || piecePhotoById[item.piece_id])}" crossorigin="anonymous" alt="صورة القطعة" onclick="gmPhotoViewer(this.src)" style="cursor:zoom-in"/>` : ''}<div>${gmEscapeHtml(item.description) || '—'}${item.description_en ? `<br><span class="text-[10px] text-gray-500" dir="ltr">${gmEscapeHtml(item.description_en)}</span>` : ''}</div></div></td>
                     <td class="py-1 text-center">${item.karat ? item.karat + 'K' : '—'}</td>
                     <td class="py-1 text-center">${fmt(item.weight_grams)}</td>
-                    <td class="py-1 text-left font-semibold">${fmt(full)}</td>
+                    <td class="py-1 text-left font-semibold">${fmt(isExchange ? Math.abs(full) : full)}</td>
                 </tr>
             `;
         }).join('');
@@ -774,6 +783,14 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         const PAY_SYM = { SYP: 'SYP', EUR: 'EUR', USD: 'USD', AED: 'AED', TRY: 'TRY', SAR: 'SAR' };
         const payFmt = v => Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ' + (PAY_SYM[invoice.pay_currency] || invoice.pay_currency);
         const money = v => (!isPurchaseDoc && invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) ? payFmt(v) : gmFormatDualCurrency(v, store);
+        if (invoice.is_exchange) {
+            // the total is the difference: say who owes whom instead of printing a minus
+            document.getElementById('sum-total-label').textContent = sumTotal > 0.004 ? 'الفرق المستحق على الزبون' : sumTotal < -0.004 ? 'الفرق المردود للزبون' : 'بدون فرق';
+            document.getElementById('sum-before-tax-label').textContent = 'الفرق قبل الضريبة';
+            sumBeforeTax = Math.abs(sumBeforeTax); sumTax = Math.abs(sumTax); sumTotal = Math.abs(sumTotal);
+            document.getElementById('doc-type-ar').textContent = 'فاتورة تبديل';
+            document.getElementById('doc-type-en').textContent = 'Exchange Invoice';
+        }
         document.getElementById('sum-before-tax').textContent = money(sumBeforeTax);
         document.getElementById('sum-tax').textContent = money(sumTax);
         document.getElementById('sum-total').textContent = money(sumTotal);
@@ -782,6 +799,12 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             const line = document.createElement('div');
             line.style.cssText = 'font-size:12px;font-weight:600;margin-top:4px;';
             line.textContent = 'المدفوع: ' + invoice.pay_breakdown.map(b => Number(b.amount).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + (PAY_SYM[b.currency] || b.currency) + (b.method === 'bank' ? ' فيزا' : ' نقداً')).join(' + ');
+            document.getElementById('sum-total').appendChild(line);
+        }
+        if (invoice.is_exchange && Number(invoice.total_amount) > 0.004 && Number(invoice.total_amount) - Number(invoice.amount_paid || 0) > 0.009) {
+            const line = document.createElement('div');
+            line.style.cssText = 'font-size:12px;font-weight:600;margin-top:4px;';
+            line.textContent = 'الباقي على الزبون: ' + money(Number(invoice.total_amount) - Number(invoice.amount_paid || 0));
             document.getElementById('sum-total').appendChild(line);
         }
         if (isTraderPurchase) {

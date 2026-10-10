@@ -13,7 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=35"></script>
 <script src="theme.js?v=54"></script>
-<script src="gm-profit.js?v=6"></script>
+<script src="gm-profit.js?v=7"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -210,7 +210,7 @@ async function build(from, to) {
     if (p.isEstimated) P.estimated++;
     if (it.karat) {
       const k = soldByKarat[it.karat] || (soldByKarat[it.karat] = { g: 0, a: 0 });
-      k.g += (ret ? -1 : 1) * p.grossWeight; k.a += (ret ? -1 : 1) * Math.abs(p.weight);
+      k.g += p.sign * p.grossWeight; k.a += p.sign * Math.abs(p.weight);
     }
   });
   const boughtByKarat = {};

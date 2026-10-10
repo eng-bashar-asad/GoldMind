@@ -61,7 +61,7 @@
 <div id="no-access" class="hidden py-16 text-center text-error text-sm"></div>
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
-<p class="text-[11px] text-outline">الفاتورة الأصلية ويومها بالصندوق لا يتغيّران. تُسجَّل القطعة الراجعة كمرتجع على حساب الزبون، والقطعة الجديدة كفاتورة بيع مرتبطة بالفاتورة الأصلية، ولا يدخل الصندوق إلا الفرق بالعملة التي دُفع بها.</p>
+<p class="text-[11px] text-outline">تُسجَّل فاتورة تبديل واحدة فيها القطعة المُرجَعة والقطعة الجديدة، مرتبطة بالفاتورة الأصلية. الفاتورة الأصلية ويومها بالصندوق لا يتغيّران، ولا يدخل الصندوق إلا الفرق بالعملة التي دُفع بها.</p>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <div class="flex justify-between items-center mb-1"><p class="font-bold text-[14px]" id="orig-number"></p><p class="text-[12px] text-on-surface-variant" id="orig-date"></p></div>
@@ -92,7 +92,8 @@
 <label class="text-[11px] text-on-surface-variant">العملة<select id="diff-cur" class="w-full h-11 border border-outline-variant rounded-lg px-2 mt-1" onchange="exCur()"></select></label>
 </div>
 <label id="rate-wrap" class="hidden text-[11px] text-on-surface-variant">سعر الصرف: 1 <span class="base-cur"></span> = <input id="diff-rate" type="number" step="any" inputmode="decimal" class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mt-1" oninput="exRateSave();exSummary()"/></label>
-<label class="text-[11px] text-on-surface-variant">طريقة دفع الفرق<select id="diff-method" class="w-full h-11 border border-outline-variant rounded-lg px-2 mt-1" onchange="exSummary()"></select></label>
+<label class="text-[11px] text-on-surface-variant">طريقة دفع الفرق<select id="diff-method" class="w-full h-11 border border-outline-variant rounded-lg px-2 mt-1" onchange="exMethod()"></select></label>
+<label id="paid-wrap" class="hidden text-[11px] text-on-surface-variant">المدفوع الآن (بنفس العملة)، والباقي دين<input id="paid-amount" type="number" step="any" inputmode="decimal" class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mt-1" oninput="exSummary()"/></label>
 </div>
 <div id="ex-summary" class="bg-surface-container-low rounded-lg p-3 text-[12px] flex flex-col gap-1"></div>
 </div>
@@ -125,9 +126,10 @@ function exDir(d) {
   document.getElementById('diff-box').classList.toggle('hidden', d === 'none');
   document.getElementById('diff-method').innerHTML = d === 'out'
     ? '<option value="cash">نقداً من الصندوق</option><option value="bank">تحويل / فيزا</option><option value="account">يبقى رصيداً للزبون</option>'
-    : '<option value="cash">نقداً</option><option value="bank">فيزا / تحويل</option><option value="account">دين على الزبون</option>';
-  exSummary();
+    : '<option value="cash">نقداً</option><option value="bank">فيزا / تحويل</option><option value="partial">جزء نقداً والباقي دين</option><option value="account">كله دين على الزبون</option>';
+  exMethod();
 }
+function exMethod() { document.getElementById('paid-wrap').classList.toggle('hidden', !(EX_DIR === 'in' && document.getElementById('diff-method').value === 'partial')); exSummary(); }
 function exDiffBase() {
   if (EX_DIR === 'none') return 0;
   const a = parseFloat(document.getElementById('diff-amount').value) || 0, c = document.getElementById('diff-cur').value;
@@ -147,7 +149,8 @@ function exSummary() {
     (EX_DIR !== 'none' ? `<div class="flex justify-between"><span>الفرق</span><b class="font-data-mono" dir="ltr">${isNaN(d) ? '—' : (EX_DIR === 'in' ? '+' : '−') + fmt(d)} ${BASE}</b></div>` : '') +
     `<div class="flex justify-between border-t border-outline-variant pt-1"><span>قيمة القطعة الجديدة بالفاتورة</span><b class="font-data-mono" dir="ltr">${isNaN(d) ? '—' : fmt(newV)} ${BASE}</b></div>` +
     (how ? `<div class="text-on-surface-variant">${esc(how)}</div>` : '') +
-    `<div class="text-on-surface-variant">يدخل الصندوق: ${EX_DIR !== 'none' && a && m.value !== 'account' ? esc((EX_DIR === 'in' ? 'وارد ' : 'صادر ') + a.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + c) + (m.value === 'bank' ? ' (تحويل/فيزا)' : '') : 'لا شيء'}</div>`;
+    `<div class="text-on-surface-variant">يدخل الصندوق: ${EX_DIR !== 'none' && a && m.value !== 'account' ? esc((EX_DIR === 'in' ? 'وارد ' : 'صادر ') + (m.value === 'partial' ? (parseFloat(document.getElementById('paid-amount').value) || 0) : a).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + c) + (m.value === 'bank' ? ' (تحويل/فيزا)' : '') : 'لا شيء'}</div>` +
+    (m.value === 'partial' && EX_DIR === 'in' && a ? `<div class="text-on-surface-variant">يبقى دين على الزبون: ${esc((a - (parseFloat(document.getElementById('paid-amount').value) || 0)).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + c)}</div>` : '');
 }
 function exRenderOld() {
   const box = document.getElementById('old-list');
@@ -183,6 +186,8 @@ async function exSave() {
   const a = parseFloat(document.getElementById('diff-amount').value) || 0, c = document.getElementById('diff-cur').value;
   if (EX_DIR !== 'none' && !(a > 0)) return fail('اكتب مبلغ الفرق، أو اختر «بدون فرق»');
   if (EX_DIR !== 'none' && isNaN(exDiffBase())) return fail('اكتب سعر الصرف');
+  const meth = document.getElementById('diff-method').value, paid = parseFloat(document.getElementById('paid-amount').value) || 0;
+  if (EX_DIR === 'in' && meth === 'partial' && !(paid > 0 && paid < a)) return fail('اكتب المدفوع الآن (أقل من الفرق)');
   if (!confirm('تأكيد التبديل؟')) return;
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
   const { data, error } = await goldmindClient.rpc('post_sale_exchange', { p: {
@@ -190,10 +195,10 @@ async function exSave() {
     item_ids: [...EX_OLD], new_piece_ids: EX_NEW.map(p => p.id),
     diff_dir: EX_DIR, diff_amount: EX_DIR === 'none' ? 0 : a, diff_currency: c,
     diff_rate: c === BASE ? null : parseFloat(document.getElementById('diff-rate').value) || null,
-    diff_method: document.getElementById('diff-method').value
+    diff_method: meth, paid_amount: meth === 'partial' ? paid : null
   } });
   if (error) { btn.disabled = false; btn.textContent = 'حفظ التبديل'; return fail('تعذّر الحفظ: ' + error.message); }
-  gmReplace('invoice-print-ar.html?id=' + data.sale.id);
+  gmReplace('invoice-print-ar.html?id=' + data.id);
 }
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
@@ -221,12 +226,17 @@ async function load() {
     goldmindClient.from('invoice_items').select('*').eq('invoice_id', inv.id),
     goldmindClient.from('invoices').select('id').eq('related_invoice_id', inv.id).eq('type', 'return').neq('status', 'cancelled')
   ]);
-  let back = new Set();
+  let back = new Set(), exchanged = new Set();
   if (rets && rets.length) {
     const { data: ri } = await goldmindClient.from('invoice_items').select('piece_id').in('invoice_id', rets.map(r => r.id));
     back = new Set((ri || []).map(r => r.piece_id).filter(Boolean));
   }
-  EX_ITEMS = (items || []).filter(it => it.piece_id && !back.has(it.piece_id));
+  const saleLines = (items || []).filter(it => it.piece_id && Number(it.line_total) > 0);
+  if (saleLines.length) {   // lines already taken back by an earlier exchange
+    const { data: ex } = await goldmindClient.from('invoice_items').select('returned_item_id, invoice:invoice_id(status)').in('returned_item_id', saleLines.map(it => it.id));
+    (ex || []).forEach(r => { if (!r.invoice || r.invoice.status !== 'cancelled') exchanged.add(r.returned_item_id); });
+  }
+  EX_ITEMS = saleLines.filter(it => !back.has(it.piece_id) && !exchanged.has(it.id));
   if (EX_ITEMS.length === 1) EX_OLD.add(EX_ITEMS[0].id);
   document.getElementById('orig-number').textContent = inv.invoice_number;
   document.getElementById('orig-date').textContent = gmFormatDateTime(inv.created_at);

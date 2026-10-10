@@ -204,8 +204,15 @@ async function searchInvoice() {
     });
   }
 
+  // lines an exchange already took back, and an exchange invoice's own "returned" lines, can't be returned
+  const exchangedIds = new Set();
+  const posIds = (items || []).filter(it => Number(it.line_total) > 0).map(it => it.id);
+  if (posIds.length) {
+    const { data: ex } = await goldmindClient.from('invoice_items').select('returned_item_id, invoice:invoice_id(status)').in('returned_item_id', posIds);
+    (ex || []).forEach(r => { if (!r.invoice || r.invoice.status !== 'cancelled') exchangedIds.add(r.returned_item_id); });
+  }
   const remainingWeightByLot = {};
-  originalItems = (items || []).filter(it => {
+  originalItems = (items || []).filter(it => !(Number(it.line_total) < 0 || it.returned_item_id || exchangedIds.has(it.id))).filter(it => {
     if (it.piece_id) return !alreadyReturnedPieceIds.has(it.piece_id);
     if (it.diamond_piece_id) return !alreadyReturnedDiamondIds.has(it.diamond_piece_id);
     if (it.gold_stock_lot_id) {

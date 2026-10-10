@@ -13,7 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=35"></script>
 <script src="theme.js?v=54"></script>
-<script src="gm-profit.js?v=6"></script>
+<script src="gm-profit.js?v=7"></script>
 <script src="gm-report.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -295,7 +295,7 @@ async function applyFilters() {
     const inv = invoiceMap[it.invoice_id];
     const isReturn = inv.type === 'return';
     const p = gmLineProfit(it, isReturn, vatMultiplier, livePriceMap);
-    const sign = isReturn ? -1 : 1;
+    const sign = p.sign;
     const pureDiamond = it.diamond && !it.diamond.has_gold;
     const carats = sign * ((it.diamond ? Number(it.diamond.diamond_carat) || 0 : 0) + (it.piece ? Number(it.piece.accent_diamond_carat) || 0 : 0));
     const gross = pureDiamond ? 0 : sign * p.grossWeight, acc = pureDiamond ? 0 : sign * p.weight;
@@ -305,7 +305,7 @@ async function applyFilters() {
     const st = byStaff[inv.created_by] || (byStaff[inv.created_by] = { invoices: new Set(), revenue: 0, profit: 0, gross: 0, acc: 0, makingSold: 0, makingAcc: 0 });
     st.invoices.add(inv.id); st.revenue += p.revenue; st.profit += p.profit; st.gross += gross; st.acc += acc;
     if (!it.diamond && !(it.piece && Number(it.piece.accent_diamond_carat))) { st.makingSold += p.revenue - p.vat - p.goldValue; st.makingAcc += acc; }
-    return { it, inv, isReturn, weight: p.weight, displayWeight: p.grossWeight, revenue: p.revenue, goldValue: p.goldValue, vat: p.vat, fabCost: p.fabCost, diamondCost: p.diamondCost, profit: p.profit, isEstimated: p.isEstimated, carats };
+    return { it, inv, isReturn: isReturn || p.neg, exchanged: p.neg, weight: p.weight, displayWeight: p.grossWeight, revenue: p.revenue, goldValue: p.goldValue, vat: p.vat, fabCost: p.fabCost, diamondCost: p.diamondCost, profit: p.profit, isEstimated: p.isEstimated, carats };
   });
   const sum = k => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
   const retail = { revenue: sum('revenue'), goldValue: sum('goldValue'), vat: sum('vat'), fabCost: sum('fabCost'), diamondCost: sum('diamondCost'), profit: sum('profit') };
@@ -459,7 +459,7 @@ async function applyFilters() {
 
   document.getElementById('items-tbody').innerHTML = rows.map(r => `
     <tr class="border-t border-outline-variant ${r.isReturn ? 'bg-error-container/20' : ''}">
-      <td class="px-3 py-2">${escH((r.inv && r.inv.invoice_number) || '—')}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">(مرتجع)</span>' : ''}</td>
+      <td class="px-3 py-2">${escH((r.inv && r.inv.invoice_number) || '—')}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">' + (r.exchanged ? '(مُرجَعة بتبديل)' : '(مرتجع)') + '</span>' : ''}</td>
       <td class="px-3 py-2">${escH(r.it.barcode || r.it.description || '—')}</td>
       <td class="px-3 py-2 font-data-mono">${r.it.diamond ? (Number(r.it.diamond.diamond_carat).toFixed(2) + ' ct' + (r.it.diamond.has_gold ? ` + ${r.displayWeight}غ/ع${r.it.karat}` : '')) : `${r.displayWeight}غ / ع${r.it.karat}${r.displayWeight !== r.weight ? ` <span class="text-outline">(محاسبة: ${r.weight}غ)</span>` : ''}`}</td>
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>

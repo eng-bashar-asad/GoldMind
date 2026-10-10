@@ -18,12 +18,14 @@ var GM_PROFIT_ITEM_SELECT = '*, piece:piece_id(cost_fabrication_per_gram, purcha
 // vatMultiplier: 1 + vat_rate/100
 // livePriceMap: { karat: price } — only used for very old lines saved before the price snapshot existed
 function gmLineProfit(it, isReturn, vatMultiplier, livePriceMap) {
-  var sign = isReturn ? -1 : 1;
   var num = function (v) { var n = Number(v); return isFinite(n) ? n : 0; };
+  // a negative line on a sale = a piece taken back by an exchange (تبديل): it undoes that piece's sale
+  var neg = !isReturn && num(it.line_total) < 0;
+  var sign = (isReturn || neg) ? -1 : 1;
   var isEstimated = it.gold_price_per_gram == null;
   var goldPrice = isEstimated ? num((livePriceMap || {})[it.karat]) : num(it.gold_price_per_gram);
   var weight = num(it.accounting_weight_grams != null ? it.accounting_weight_grams : it.weight_grams);
-  var revenue = sign * num(it.line_total);
+  var revenue = sign * Math.abs(num(it.line_total));
   var goldValue = sign * weight * goldPrice;
   var vat = revenue - revenue / (vatMultiplier || 1);
   var perGram = (it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) ||
@@ -40,11 +42,14 @@ function gmLineProfit(it, isReturn, vatMultiplier, livePriceMap) {
   return {
     revenue: revenue, goldValue: goldValue, vat: vat, fabCost: fabCost,
     diamondCost: diamondCost + accentCost, profit: profit,
-    weight: weight, grossWeight: num(it.weight_grams), goldPrice: goldPrice, isEstimated: isEstimated
+    weight: weight, grossWeight: num(it.weight_grams), goldPrice: goldPrice, isEstimated: isEstimated,
+    neg: neg, sign: sign
   };
 }
 
 // ponytail: self-check — bought 5180, sold 6700, no VAT → profit 1520
+// ponytail: self-check — an exchange line of −6700 exactly undoes that sale
+console.assert(gmLineProfit({ line_total: -6700, weight_grams: 11.72, karat: 18, gold_price_per_gram: 300, piece: { purchase_cost: 5180, cost_fabrication_per_gram: 10 } }, false, 1, {}).profit === -1520, 'gmLineProfit exchange line');
 console.assert(gmLineProfit({ line_total: 6700, weight_grams: 11.72, karat: 18, gold_price_per_gram: 300, piece: { purchase_cost: 5180, cost_fabrication_per_gram: 10 } }, false, 1, {}).profit === 1520, 'gmLineProfit purchase_cost');
 
 // Profit of one piece given to a wholesale trader (trader_movements row, source 'stock_given',
@@ -150,7 +155,7 @@ async function gmInvoicesProfit(invoices) {
   var typeOf = {}; invoices.forEach(function (i) { typeOf[i.id] = i.type; });
   items.forEach(function (it) {
     var p = gmLineProfit(it, typeOf[it.invoice_id] === 'return', ctx.vatMul, ctx.prices);
-    out.total += p.profit; out.revenue += p.revenue - p.vat; out.weight += (typeOf[it.invoice_id] === 'return' ? -1 : 1) * p.grossWeight;
+    out.total += p.profit; out.revenue += p.revenue - p.vat; out.weight += p.sign * p.grossWeight;
     out.byInvoice[it.invoice_id] = (out.byInvoice[it.invoice_id] || 0) + p.profit;
   });
   return out;
@@ -166,7 +171,7 @@ async function gmInvoiceProfitPopup(invoiceId, label) {
   var rows = (r2.data || []).map(function (it) {
     var p = gmLineProfit(it, inv.type === 'return', ctx.vatMul, ctx.prices);
     Object.keys(t).forEach(function (k) { t[k] += p[k]; });
-    return gmPRow(String(it.barcode || it.description || 'قطعة').replace(/[<>&"]/g, ''), gmPN(p.profit, 2));
+    return gmPRow(String(it.barcode || it.description || 'قطعة').replace(/[<>&"]/g, '') + (p.neg ? ' (مُرجَعة بتبديل)' : ''), gmPN(p.profit, 2));
   });
   gmProfitPopup('ربح الفاتورة', (inv.invoice_number || '') + ' · ' + rows.length + ' قطعة', t.profit,
     gmPRow('المبيع بدون ضريبة', gmPN(t.revenue - t.vat, 2)) + gmPRow('قيمة الذهب', gmPN(t.goldValue, 2)) +
