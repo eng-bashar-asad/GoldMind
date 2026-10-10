@@ -1,0 +1,20 @@
+-- 3) username → email lookup: the per-IP limit trusts the first x-forwarded-for value, which a caller can set,
+--    so add a store-wide ceiling as well (60 lookups a minute in total)
+create or replace function public.lookup_email_by_username(p_username text) returns text
+language plpgsql security definer set search_path = public as $$
+declare
+  v_ip text;
+  v_recent_count int;
+begin
+  v_ip := split_part(coalesce((current_setting('request.headers', true)::json ->> 'x-forwarded-for'), 'unknown'), ',', 1);
+  select count(*) into v_recent_count from public.lookup_username_attempts
+   where caller_ip = v_ip and attempted_at > now() - interval '60 seconds';
+  if v_recent_count >= 5 then raise exception 'RATE_LIMITED' using errcode = '42901'; end if;
+  if (select count(*) from public.lookup_username_attempts where attempted_at > now() - interval '60 seconds') >= 60 then
+    raise exception 'RATE_LIMITED' using errcode = '42901';
+  end if;
+  insert into public.lookup_username_attempts (caller_ip) values (v_ip);
+  delete from public.lookup_username_attempts where attempted_at < now() - interval '10 minutes';
+  return (select u.email::text from public.user_profiles up join auth.users u on u.id = up.id
+           where lower(up.username) = lower(trim(p_username)) limit 1);
+end $$;

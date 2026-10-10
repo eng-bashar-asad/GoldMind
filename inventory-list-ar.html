@@ -549,7 +549,7 @@
     // Batch cards: one per distinct barcode-prefix within this box.
     function prefixBoxHtml(boxName, prefix, pieces) {
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
-        return gmRowCard(`onclick="enterScope('${boxName.replace(/'/g, "\\'")}', '${prefix.replace(/'/g, "\\'")}')"`,
+        return gmRowCard(`onclick="enterScope(${gmEscapeHtml(JSON.stringify(String(boxName)))}, ${gmEscapeHtml(JSON.stringify(String(prefix)))})"`,
             '<span class="material-symbols-outlined" style="position:relative;font-size:22px;">sell</span>',
             gmEscapeHtml(prefix), pieces.length + ' قطعة', totalWeight.toFixed(2) + ' غ');
     }
@@ -717,7 +717,7 @@
     function boxBoxHtml(boxName, pieces) {
         const totalWeight = pieces.reduce((sum, p) => sum + Number(p.weight_grams || 0), 0);
         const icon = boxName === KARAT_GROUPED_BOX ? 'diamond' : 'inventory_2';
-        return gmRowCard(`onclick="enterBox('${boxName.replace(/'/g, "\\'")}')"`,
+        return gmRowCard(`onclick="enterBox(${gmEscapeHtml(JSON.stringify(String(boxName)))})"`,
             `<span class="material-symbols-outlined" style="position:relative;font-size:22px;">${icon}</span>`,
             gmEscapeHtml(boxName), pieces.length + ' قطعة', totalWeight.toFixed(2) + ' غ');
     }
