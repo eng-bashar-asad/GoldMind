@@ -270,28 +270,29 @@ const GOLDMIND_THEMES = {
     }
   },
   'velvet-wine': {
-    // Burgundy now carries through the whole canvas (bg/surface/outline),
-    // not just the accent/secondary/shimmer — a warm blush-wine tint
-    // throughout, with "دم الغزال" as the deep accent anchor.
+    // Deep wine ("دم الغزال") is now the big canvas colour, like a dark theme,
+    // with white cards on it and warm gold as the accent (the daily-cashbox
+    // tile turns gold so it stands out on the wine background).
     label: 'الخمري',
-    swatch: ['#7A1B2B', '#C07884', '#F6EDEA'],
-    lightCanvas: true,
+    swatch: ['#6A1626', '#C9A24D', '#F6EDEA'],
+    lightCanvas: false,
     shimmer: true,
     vars: {
-      '--gm-bg': '#F6EDEA',
-      '--gm-bg-elevated': '#F6EDEA',
+      '--gm-bg': '#6A1626',
+      '--gm-bg-elevated': '#6A1626',
       '--gm-surface-lowest': '#FFFFFF',
-      '--gm-surface-low': '#EFD9D9',
-      '--gm-primary': '#1C1A16',
-      '--gm-on-primary': '#FBF8F1',
-      '--gm-accent': '#7A1B2B',
-      '--gm-on-accent': '#ffffff',
-      '--gm-secondary': '#5E1420',
-      '--gm-on-surface': '#211D17',
-      '--gm-on-surface-variant': '#6B6355',
-      '--gm-outline-variant': '#D9BEC2',
-      '--gm-shimmer-grad': 'linear-gradient(120deg, #430A13 0%, #7A1B2B 28%, #C07884 50%, #7A1B2B 72%, #430A13 100%)',
-      '--gm-avatar-grad': 'linear-gradient(135deg, #5E1420 0%, #7A1B2B 60%, #C07884 100%)'
+      '--gm-surface-low': '#F4E6E6',
+      '--gm-primary': '#6A1626',
+      '--gm-on-primary': '#FFFFFF',
+      '--gm-accent': '#C9A24D',
+      '--gm-on-accent': '#2A1A08',
+      '--gm-secondary': '#8A6A2E',
+      '--gm-on-surface': '#2A1418',
+      '--gm-on-surface-variant': '#7A5F63',
+      '--gm-outline-variant': '#DCC3C7',
+      '--gm-shadow-color': 'rgba(40, 6, 12, 0.5)',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #4A0E19 0%, #6A1626 26%, #C9A24D 48%, #E8D3A0 54%, #C9A24D 60%, #6A1626 80%, #4A0E19 100%)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #8A6A2E 0%, #C9A24D 55%, #6A1626 100%)'
     }
   },
   'cosmic-steel': {

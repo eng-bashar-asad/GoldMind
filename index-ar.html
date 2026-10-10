@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=54"></script>
+<script src="theme.js?v=55"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -251,6 +251,10 @@
   html[data-gm-theme="cosmic-steel"][data-gm-theme] .dsk-app{ --dsk-bg:#4F5868; }
   @media (min-width: 1024px) { html[data-gm-theme="cosmic-steel"][data-gm-theme] body { background:#4F5868; } }
   html[data-gm-theme="cosmic-steel"] .dsk-toolbar-label{ color:#E3E7EE; }
+  /* "الخمري": deep wine canvas */
+  html[data-gm-theme="velvet-wine"][data-gm-theme] .dsk-app{ --dsk-bg:#6A1626; }
+  @media (min-width: 1024px) { html[data-gm-theme="velvet-wine"][data-gm-theme] body { background:#6A1626; } }
+  html[data-gm-theme="velvet-wine"] .dsk-toolbar-label{ color:#F4E6E6; }
   html[data-gm-theme]:not([data-gm-theme="warm-ingot"]) .dsk-store-banner{
     background:var(--gm-shimmer-grad, linear-gradient(120deg, var(--gm-primary), var(--gm-secondary) 50%, var(--gm-primary)));background-size:220% 100%;
   }
@@ -559,6 +563,10 @@
 .gm-qa{position:relative;display:flex;flex-direction:column;align-items:flex-start;justify-content:space-between;gap:8px;min-height:88px;padding:13px;border-radius:22px;background:#FFFDF8;color:#1F1A12;font-size:13px;font-weight:600;line-height:1.25;transition:transform .15s}
 .gm-card{background:#FFFDF8;border-radius:22px;overflow:hidden}
 .gm-chip-btn{display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:18px;border:1px solid #C9B98F;font-size:13px;font-weight:600;color:#1F1A12;background:transparent}
+/* dark-canvas themes (الخمري، الفولاذي): text sitting straight on the page background turns light */
+html:not(.gm-light-canvas) .gm-on-canvas, html:not(.gm-light-canvas) #storeNameEl, html:not(.gm-light-canvas) #welcomeEl{color:#F7EFE9 !important}
+html:not(.gm-light-canvas) .gm-chip-btn{color:#F7EFE9;border-color:rgba(255,255,255,.4)}
+html:not(.gm-light-canvas) #movementsDayNav .text-on-surface{color:#F7EFE9 !important}
 .gm-menu-btn{position:relative;width:46px;height:46px;border-radius:16px;border:0;display:flex;align-items:center;justify-content:center}
 /* ===== dark drawer ===== */
 #navDrawer.gm-dark{background:#17140F;color:#F3EEDF;width:316px;max-width:86vw;border-radius:28px 0 0 28px;transition:transform .5s cubic-bezier(.22,1,.36,1),box-shadow .5s;box-shadow:none!important}
@@ -939,7 +947,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <header class="lg:hidden fixed top-0 right-0 w-full h-16 z-50 flex justify-between items-center px-margin-mobile" style="background:var(--gm-bg-elevated, #F3EEDF);">
 <div class="flex items-center gap-3">
 <button class="gm-menu-btn gm-gold" aria-label="فتح القائمة" onclick="openNavDrawer()"><span class="material-symbols-outlined" style="position:relative;">menu</span><span class="gm-sweep" aria-hidden="true"></span></button>
-<h1 style="margin:0; font-size:18px; font-weight:700; color:#1F1A12;">الشاشة الرئيسية</h1>
+<h1 class="gm-on-canvas" style="margin:0; font-size:18px; font-weight:700; color:#1F1A12;">الشاشة الرئيسية</h1>
 </div>
 <div class="flex items-center gap-2">
 <button id="moves-btn" aria-label="الحركات اليومية" onclick="document.getElementById('gmMovesSection').scrollIntoView({behavior:'smooth', block:'start'})" class="gm-hit w-10 h-10 rounded-full bg-surface-container-lowest flex items-center justify-center active:scale-90 transition-all relative" title="الحركات اليومية">
@@ -1070,7 +1078,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <!-- Summary Cards (Bento Style for Mobile) -->
 <section class="mb-5 lg:hidden">
 <div class="flex justify-between items-center mb-3">
-<h3 style="margin:0;font-size:15px;font-weight:700;color:#1F1A12;">الوصول السريع</h3>
+<h3 class="gm-on-canvas" style="margin:0;font-size:15px;font-weight:700;color:#1F1A12;">الوصول السريع</h3>
 <button type="button" id="mobCustomizeBtn" class="gm-chip-btn"><span class="material-symbols-outlined" style="font-size:18px;">tune</span>تخصيص</button>
 </div>
 <div class="grid grid-cols-3 gap-2.5" id="mobActionStrip"></div>
@@ -1493,7 +1501,7 @@ document.addEventListener('DOMContentLoaded', function () {
 <!-- Recent Movements Log -->
 <section class="mb-4" id="gmMovesSection" style="scroll-margin-top:80px;">
 <div class="flex justify-between items-center mb-3">
-<h3 style="margin:0;font-size:15px;font-weight:700;color:#1F1A12;">حركات اليوم</h3>
+<h3 class="gm-on-canvas" style="margin:0;font-size:15px;font-weight:700;color:#1F1A12;">حركات اليوم</h3>
 <div class="flex items-center gap-2">
 <div class="hidden items-center gap-1" id="movementsDayNav">
 <button onclick="shiftMovementsDay(-1)" aria-label="اليوم السابق" class="gm-hit w-7 h-7 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined text-[16px] text-on-surface">chevron_right</span></button>
