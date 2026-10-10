@@ -1,0 +1,51 @@
+-- تصليح الفاتورة INV-2026-000026: بيع القطعة 000100 بـ 10,350,000 ل.س نقداً + 530$ دين على المهندسة نغم
+do $$
+declare
+  inv uuid := '522079ca-f2fa-44cf-a0f8-6a98530a12b7';
+  ret uuid := '257eda9d-9791-45fd-8473-a8b44f427dde';
+  st  uuid := 'a15f496a-a4b5-4388-b304-5397eaeeda1b';
+  cus uuid := 'deb63dad-4378-42a8-9dcc-2d8a462d3b2d';
+  stf uuid := 'c54a581a-5ce2-4aa4-9942-2873365698b0';
+  p100 uuid := 'ec01af07-88aa-4998-ade9-5638d2d326c3';
+  p118 uuid := 'b3739649-7e40-4fc1-94c2-43b634a20cf3';
+  cm uuid;
+begin
+  -- 1) الفاتورة بشكلها النهائي (بالدولار، والمدفوع بالليرة محفوظ بتفصيل الدفع)
+  update invoices set status = 'unpaid', payment_method = 'mixed', total_amount = 1326.15, amount_paid = 796.15,
+         cash_paid_amount = 796.15, bank_paid_amount = 0, pay_currency = null, pay_fx_rate = null,
+         pay_breakdown = '[{"currency":"SYP","amount":10350000,"rate":13000.06280223576,"method":"cash"}]'::jsonb
+   where id = inv;
+  update invoice_items set line_total = 1326.15 where invoice_id = inv;
+
+  -- 2) مسح كل حركات الصندوق والديون القديمة للفاتورة وللمرتجع الملغى
+  delete from daily_cash_log where bank_invoice_id in (inv, ret)
+     or cash_movement_id in (select id from cash_movements where invoice_id in (inv, ret));
+  delete from cash_movements where invoice_id in (inv, ret);
+  delete from customer_debts where invoice_id in (inv, ret);
+  delete from invoice_items where invoice_id = ret;
+  delete from invoices where id = ret;
+
+  -- 3) القبض يوم 5/10: 10,350,000 ل.س نقداً (يدخل الصندوق اليومي بالليرة)
+  insert into cash_movements (store_id, box, direction, amount, invoice_id, created_by, description, created_at)
+  values (st, 'main', 'in', 796.15, inv, stf, 'تحصيل فاتورة بيع INV-2026-000026', '2026-10-05 15:39:52.023038+00')
+  returning id into cm;
+  update daily_cash_log set created_at = '2026-10-05 15:39:52.023038+00' where cash_movement_id = cm;
+
+  -- 4) الدين يوم 8/10 (يوم التبديل): 530$
+  insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by, created_at)
+  values (st, cus, inv, 'debt_increase', 530, 0, 'متبقي فاتورة بيع INV-2026-000026 بعد تبديل القطعة 000118 بـ 000100 (دُفع 10,350,000 ل.س)', stf, '2026-10-08 18:07:49+00');
+
+  -- 5) القطع وسجلها
+  update pieces set status = 'sold' where id = p100;
+  update pieces set status = 'available' where id = p118;
+  delete from piece_movements where piece_id = p100 and event_type <> 'created';
+  insert into piece_movements (store_id, piece_id, event_type, note, created_by, created_at)
+  values (st, p100, 'sold', 'بيع بفاتورة INV-2026-000026 — تبديل بدل القطعة 000118', stf, '2026-10-08 18:07:49+00');
+  update piece_movements set event_type = 'returned', note = 'رجعت من الفاتورة INV-2026-000026 — تبديل بالقطعة 000100'
+   where piece_id = p118 and note like 'مرتجع RET-2026-000001%';
+end $$;
+
+-- للتأكد بعد التشغيل:
+select (select sum(case when direction='in' then amount else -amount end) from cash_movements where invoice_id='522079ca-f2fa-44cf-a0f8-6a98530a12b7') as "بالصندوق $",
+       (select string_agg(direction||' '||amount||' '||currency, ' | ') from daily_cash_log l join cash_movements m on m.id=l.cash_movement_id where m.invoice_id='522079ca-f2fa-44cf-a0f8-6a98530a12b7') as "الصندوق اليومي",
+       (select sum(case when movement_type='debt_increase' then cash_amount else -cash_amount end) from customer_debts where customer_id='deb63dad-4378-42a8-9dcc-2d8a462d3b2d') as "دين نغم $";

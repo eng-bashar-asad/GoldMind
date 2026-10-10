@@ -90,8 +90,8 @@
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-2">طريقة الدفع</label>
 <select id="paymentMethodSelect" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" onchange="gmMixedToggle()"></select>
 <div id="mixedBox" class="hidden mt-3 grid grid-cols-2 gap-2">
-<label class="text-[11px] text-on-surface-variant">المبلغ نقداً<input id="mixedCash" type="number" step="0.01" min="0" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-sm mt-1" oninput="gmMixedNote()"/></label>
-<label class="text-[11px] text-on-surface-variant">المبلغ فيزا / بنك<input id="mixedBank" type="number" step="0.01" min="0" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-sm mt-1" oninput="gmMixedNote()"/></label>
+<label class="text-[11px] text-on-surface-variant">المبلغ نقداً <b class="mix-cur"></b><input id="mixedCash" type="number" step="0.01" min="0" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-sm mt-1" oninput="gmMixedNote()"/></label>
+<label class="text-[11px] text-on-surface-variant">المبلغ فيزا / بنك <b class="mix-cur"></b><input id="mixedBank" type="number" step="0.01" min="0" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-sm mt-1" oninput="gmMixedNote()"/></label>
 <div id="fxBox" class="col-span-2 hidden flex-col gap-2">
 <div id="fx-rows" class="flex flex-col gap-2"></div>
 <button type="button" onclick="gmAddFxRow()" class="h-10 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-primary">+ مبلغ بعملة أخرى (ليرة، يورو...)</button>
@@ -691,6 +691,10 @@ async function load() {
     FX_SECONDARY = st && st.secondary_currency ? { code: st.secondary_currency.toUpperCase(), rate: Number(st.secondary_currency_rate) || 0 } : null;
     document.getElementById('fxBox').classList.remove('hidden');
     document.getElementById('fxBox').classList.add('flex');
+  }
+  if (invoice.type === 'sale') {
+    let cur = FX ? FX_CUR : FX_BASE;
+    document.querySelectorAll('.mix-cur').forEach(el => { el.textContent = cur ? '(' + cur + ')' : ''; });
   }
   if (invoice.type === 'sale' && invoice.payment_method === 'mixed' && Array.isArray(invoice.pay_breakdown) && invoice.pay_breakdown.length && !FX) {
     const baseOf = m => invoice.pay_breakdown.filter(b => String(b.currency).toUpperCase() === FX_BASE && b.method === m).reduce((t, b) => t + Number(b.amount || 0), 0);
