@@ -44,11 +44,11 @@
 <div class="flex flex-col gap-4">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--ink-soft);" for="f-company">اسم الشركة / المحل</label>
-<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--hairline); background: var(--card);" id="f-company" type="text" autocomplete="organization"/>
+<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--hairline); background: var(--card);" id="f-company" type="text" maxlength="100" autocomplete="organization"/>
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--ink-soft);" for="f-owner">اسمك (المالك)</label>
-<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--hairline); background: var(--card);" id="f-owner" type="text" autocomplete="name"/>
+<input class="w-full h-12 border rounded-lg px-3" style="border-color: var(--hairline); background: var(--card);" id="f-owner" type="text" maxlength="80" autocomplete="name"/>
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--ink-soft);" for="f-email">البريد الإلكتروني</label>
@@ -56,7 +56,7 @@
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-background px-1 text-[10px] font-semibold" style="color: var(--ink-soft);" for="f-phone">رقم الهاتف (اختياري)</label>
-<input class="w-full h-12 border rounded-lg px-3 font-data-mono" dir="ltr" style="border-color: var(--hairline); background: var(--card);" id="f-phone" type="tel" autocomplete="tel" inputmode="tel"/>
+<input class="w-full h-12 border rounded-lg px-3 font-data-mono" dir="ltr" style="border-color: var(--hairline); background: var(--card);" id="f-phone" type="tel" maxlength="30" autocomplete="tel" inputmode="tel"/>
 </div>
 
 <div class="hidden text-error text-[12.5px] p-3 rounded-lg" style="background: #FBEAEA;" id="error-box"></div>
@@ -69,13 +69,15 @@
 <div class="hidden text-center" id="success-view">
 <span class="material-symbols-outlined mb-3 inline-block" style="color: var(--gold-deep); font-size: 40px;">check_circle</span>
 <h1 class="display text-2xl mb-2">تم إنشاء حسابك!</h1>
-<p class="text-[13px] leading-relaxed mb-6" style="color: var(--ink-soft);">احفظ بيانات الدخول هذه (لن تظهر مرة أخرى) — ثم اضغط "دخول الآن".</p>
+<p class="text-[13px] leading-relaxed mb-6" style="color: var(--ink-soft);" id="success-note">احفظ بيانات الدخول هذه (لن تظهر مرة أخرى) — ثم اضغط "دخول الآن".</p>
 
 <div class="text-right p-4 rounded-xl border mb-6" style="border-color: var(--hairline); background: var(--card);">
 <p class="text-[11px] mb-1" style="color: var(--ink-soft);">البريد الإلكتروني</p>
 <p class="font-data-mono text-[14px] font-bold mb-3" dir="ltr" id="result-email"></p>
+<div id="result-password-wrap">
 <p class="text-[11px] mb-1" style="color: var(--ink-soft);">كلمة المرور المؤقتة</p>
 <p class="font-data-mono text-[16px] font-bold" dir="ltr" id="result-password"></p>
+</div>
 </div>
 
 <button onclick="window.location.href='login-entry-ar.html'" class="btn-gold w-full h-12 font-bold rounded-lg" style="color: #2E2113;">دخول الآن</button>
@@ -103,9 +105,13 @@ async function registerCompany() {
     btn.textContent = 'جارِ الإنشاء...';
 
     try {
-        const { data, error } = await goldmindClient.functions.invoke('register-company', {
+        let { data, error } = await goldmindClient.functions.invoke('register-company', {
             body: { company_name, owner_name, owner_email, owner_phone }
         });
+        // a refused request (400/429) carries its Arabic message in the response body
+        if (error && error.context && typeof error.context.json === 'function') {
+            data = await error.context.json().catch(() => null);
+        }
 
         if (error || !data || data.error) {
             errBox.textContent = (data && data.error) || 'تعذّر إنشاء الحساب، حاول مرة أخرى.';
@@ -116,7 +122,12 @@ async function registerCompany() {
         }
 
         document.getElementById('result-email').textContent = data.email;
-        document.getElementById('result-password').textContent = data.temp_password;
+        if (data.emailed) {
+            document.getElementById('success-note').textContent = 'أرسلنا كلمة المرور إلى بريدك الإلكتروني. افتح بريدك (وتحقق من مجلد الرسائل غير المرغوب فيها) ثم اضغط "دخول الآن".';
+            document.getElementById('result-password-wrap').style.display = 'none';
+        } else {
+            document.getElementById('result-password').textContent = data.temp_password;
+        }
         document.getElementById('form-view').classList.add('hidden');
         document.getElementById('success-view').classList.remove('hidden');
     } catch (e) {
