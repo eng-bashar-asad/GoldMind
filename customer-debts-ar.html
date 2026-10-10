@@ -178,7 +178,8 @@
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form" data-gm-opdate>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ المدفوع</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="settle-amount" step="0.01" type="number"/>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="settle-amount" step="0.01" type="number" oninput="cdNote('settle')"/>
+<div class="flex gap-2 mb-3"><select class="h-11 border border-outline-variant rounded-lg px-2 text-[13px] w-36 cd-cur" id="settle-cur" onchange="cdCur('settle')" aria-label="العملة"></select><input class="hidden flex-1 min-w-0 h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-rate" step="any" type="number" placeholder="سعر الصرف" oninput="cdNote('settle')"/></div><p class="hidden text-[11px] text-on-surface-variant -mt-2 mb-3" id="settle-fx-note"></p>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="settle-method">طريقة الدفع</label>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3 mb-3 text-[13px]" id="settle-method">
 <option value="cash">نقداً — تدخل الصندوق اليومي</option>
@@ -187,14 +188,14 @@
 <p class="text-[11px] text-on-surface-variant mb-3">تُخصم الدفعة من فواتير العميل غير المدفوعة، الأقدم أولاً.</p>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="settle-notes" placeholder="ملاحظة (اختياري)"></textarea>
 <button onclick="submitSettlement()" id="settle-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الدفعة</button>
-<button type="button" onclick="location.href='cash-voucher-ar.html?party=customer&kind=in&id='+currentCustomerId" class="w-full mt-2 text-[12px] text-secondary font-semibold underline">بعملة أخرى (ليرة سورية، يورو...) ←</button>
 <p class="text-error text-[12px] hidden mt-2" id="settle-error"></p>
 </div>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="cashout-form" data-gm-opdate>
 <p class="text-[12px] text-on-surface-variant mb-3">مبلغ يخرج من المحل للعميل (سلفة، رد مبلغ له، ...). يخرج من الصندوق اليومي إن كان نقداً، ويُسجَّل على حساب العميل: يزيد دينه أو ينقص رصيده لدى المحل.</p>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="cashout-amount">المبلغ</label>
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="cashout-amount" step="0.01" type="number"/>
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mb-3" id="cashout-amount" step="0.01" type="number" oninput="cdNote('cashout')"/>
+<div class="flex gap-2 mb-3"><select class="h-11 border border-outline-variant rounded-lg px-2 text-[13px] w-36 cd-cur" id="cashout-cur" onchange="cdCur('cashout')" aria-label="العملة"></select><input class="hidden flex-1 min-w-0 h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="cashout-rate" step="any" type="number" placeholder="سعر الصرف" oninput="cdNote('cashout')"/></div><p class="hidden text-[11px] text-on-surface-variant -mt-2 mb-3" id="cashout-fx-note"></p>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="cashout-method">طريقة الصرف</label>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3 mb-3 text-[13px]" id="cashout-method">
 <option value="cash">نقداً — يخرج من الصندوق اليومي</option>
@@ -202,7 +203,6 @@
 </select>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-[13px] mb-3" id="cashout-notes" placeholder="سبب الصرف (اختياري)"></textarea>
 <button onclick="submitCashOut()" id="cashout-btn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ الصرف</button>
-<button type="button" onclick="location.href='cash-voucher-ar.html?party=customer&kind=out&id='+currentCustomerId" class="w-full mt-2 text-[12px] text-secondary font-semibold underline">بعملة أخرى (ليرة سورية، يورو...) ←</button>
 <p class="text-error text-[12px] hidden mt-2" id="cashout-error"></p>
 </div>
 
@@ -296,6 +296,7 @@ function movementLabel(m) {
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+  if (!CD_FX.base) cdInitCur();
 
   // Enforce permission (real page-level gate, not just the dashboard icon)
   const { data: __staffPerm } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
@@ -612,15 +613,58 @@ function toggleCashOutForm() {
   ['opening-balance-form', 'settle-form', 'discount-form'].forEach(id => document.getElementById(id).classList.add('hidden'));
   document.getElementById('cashout-form').classList.toggle('hidden');
 }
+// Currency for a payment / payout: the store currency goes through the usual functions;
+// any other currency goes through cash_voucher (the box gets the real currency, the account the converted value).
+const CD_FX = { base: null, secondary: null };
+const cdRateKey = code => 'gm_fx_' + GOLDMIND_STORE_ID + '_' + code; // same remembered rates as the sale page
+const cdMoney = (n, c) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + c;
+async function cdInitCur() {
+  const { data } = await goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  CD_FX.base = ((data && data.currency) || 'AED').toUpperCase();
+  if (data && data.secondary_currency) CD_FX.secondary = { code: data.secondary_currency.toUpperCase(), rate: Number(data.secondary_currency_rate) || 0 };
+  const codes = [CD_FX.base, CD_FX.secondary && CD_FX.secondary.code, 'USD', 'SYP', 'EUR', 'AED', 'TRY', 'SAR'].filter((c, i, a) => c && a.indexOf(c) === i);
+  document.querySelectorAll('.cd-cur').forEach(sel => { sel.innerHTML = codes.map(c => `<option value="${c}">${c}${c === CD_FX.base ? ' (عملة المحل)' : ''}</option>`).join(''); });
+}
+function cdCur(p) {
+  const code = document.getElementById(p + '-cur').value, other = code !== CD_FX.base, rateEl = document.getElementById(p + '-rate');
+  let r = 0;
+  try { r = parseFloat(localStorage.getItem(cdRateKey(code))) || 0; } catch (e) {}
+  if (!r && CD_FX.secondary && code === CD_FX.secondary.code) r = CD_FX.secondary.rate;
+  rateEl.value = other && r ? r : '';
+  rateEl.placeholder = 'سعر الصرف: ' + code + ' مقابل 1 ' + CD_FX.base;
+  rateEl.classList.toggle('hidden', !other);
+  cdNote(p);
+}
+function cdFx(p) {
+  const sel = document.getElementById(p + '-cur');
+  if (!sel || !CD_FX.base || sel.value === CD_FX.base) return null;
+  return { cur: sel.value, rate: parseFloat(document.getElementById(p + '-rate').value) || 0 };
+}
+function cdNote(p) {
+  const el = document.getElementById(p + '-fx-note'), fx = cdFx(p), amt = parseFloat(document.getElementById(p + '-amount').value) || 0;
+  if (!el) return;
+  el.classList.toggle('hidden', !fx);
+  if (fx) el.textContent = fx.rate > 0 ? 'يُسجّل بحساب العميل: ' + cdMoney(amt / fx.rate, CD_FX.base) : 'أدخل سعر الصرف';
+}
+async function cdVoucher(kind, amount, fx, method, notes) {
+  try { localStorage.setItem(cdRateKey(fx.cur), String(fx.rate)); } catch (e) {}
+  return goldmindClient.rpc('cash_voucher', { p: { store_id: GOLDMIND_STORE_ID, kind, party: 'customer', party_id: currentCustomerId,
+    amount, currency: fx.cur, fx_rate: fx.rate, method, notes: notes || null } });
+}
+
 async function submitCashOut() {
   const amount = parseFloat(document.getElementById('cashout-amount').value);
   const errEl = document.getElementById('cashout-error');
   errEl.classList.add('hidden');
   if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
-  if (!confirm('صرف ' + fmt(amount) + ' للعميل؟')) return;
+  const fx = cdFx('cashout');
+  if (fx && !(fx.rate > 0)) { errEl.textContent = 'أدخل سعر الصرف'; errEl.classList.remove('hidden'); return; }
+  if (!confirm('صرف ' + (fx ? cdMoney(amount, fx.cur) : fmt(amount)) + ' للعميل؟')) return;
   const btn = document.getElementById('cashout-btn');
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
-  const { error } = await goldmindClient.rpc('customer_cash_out', { p_customer: currentCustomerId, p_amount: amount,
+  const { error } = fx
+    ? await cdVoucher('out', amount, fx, document.getElementById('cashout-method').value, document.getElementById('cashout-notes').value.trim())
+    : await goldmindClient.rpc('customer_cash_out', { p_customer: currentCustomerId, p_amount: amount,
     p_method: document.getElementById('cashout-method').value, p_notes: document.getElementById('cashout-notes').value.trim() || null });
   btn.disabled = false; btn.textContent = 'حفظ الصرف';
   if (error) { errEl.textContent = 'تعذّر الحفظ: ' + error.message; errEl.classList.remove('hidden'); return; }
@@ -768,10 +812,14 @@ async function submitSettlement() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  const { error } = await goldmindClient.rpc('record_customer_payment', {
-    p_customer: currentCustomerId, p_amount: amount,
-    p_method: document.getElementById('settle-method').value, p_notes: notes || null
-  });
+  const fx = cdFx('settle');
+  if (fx && !(fx.rate > 0)) { errEl.textContent = 'أدخل سعر الصرف'; errEl.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'حفظ الدفعة'; return; }
+  const { error } = fx
+    ? await cdVoucher('in', amount, fx, document.getElementById('settle-method').value, notes)
+    : await goldmindClient.rpc('record_customer_payment', {
+        p_customer: currentCustomerId, p_amount: amount,
+        p_method: document.getElementById('settle-method').value, p_notes: notes || null
+      });
 
   btn.disabled = false;
   btn.textContent = 'حفظ الدفعة';

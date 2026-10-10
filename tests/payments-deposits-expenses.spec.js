@@ -176,3 +176,22 @@ test('cash paid out to a customer goes through the server function', async ({ pa
   await expect.poll(() => calls.some(c => c.name === 'customer_cash_out')).toBe(true);
   expect(JSON.parse(calls.find(c => c.name === 'customer_cash_out').body)).toMatchObject({ p_customer: 'cu1', p_amount: 300, p_method: 'cash' });
 });
+
+test('customer payout and payment in another currency go through cash_voucher', async ({ page }) => {
+  const calls = await install(page, {
+    db: base({ customers: [{ id: 'cu1', store_id: STORE, name: 'سامر الحكيم', phone: '0999' }], customer_debts: [], customer_phones: [], company_kyc_documents: [] }),
+    rpc: { cash_voucher: () => ({ body: { ok: true } }) }
+  });
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await page.goto('/customer-debts-ar.html?open=cu1');
+  await expect(page.locator('#detail-customer-name')).not.toBeEmpty();
+  await page.getByText('صرف مبلغ للعميل').click();
+  await page.fill('#cashout-amount', '1300000');
+  await page.selectOption('#cashout-cur', 'SYP');
+  await page.fill('#cashout-rate', '13000');
+  await page.locator('#cashout-rate').dispatchEvent('input');
+  await expect(page.locator('#cashout-fx-note')).toContainText('100 USD');
+  await page.click('#cashout-btn');
+  await expect.poll(() => calls.some(c => c.name === 'cash_voucher')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'cash_voucher').body).p).toMatchObject({ kind: 'out', party: 'customer', party_id: 'cu1', amount: 1300000, currency: 'SYP', fx_rate: 13000, method: 'cash' });
+});
