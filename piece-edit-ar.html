@@ -561,13 +561,36 @@ async function loadPieceLog() {
     el.innerHTML = '<div class="text-[12px] text-on-surface-variant">لا توجد حركات مسجّلة لهذه القطعة</div>';
     return;
   }
+  // invoice numbers in the notes open the invoice; trader events open the trader voucher
+  const nums = [...new Set(logs.flatMap(l => (l.note || '').match(/\b[A-Z]{2,5}-\d{4}-\d{3,}\b/g) || []))];
+  const invByNo = {};
+  if (nums.length) {
+    const { data: invs } = await goldmindClient.from('invoices').select('id, invoice_number').eq('store_id', GOLDMIND_STORE_ID).in('invoice_number', nums);
+    (invs || []).forEach(i => { invByNo[i.invoice_number] = i.id; });
+  }
+  let tms = [];
+  if (logs.some(l => l.event_type === 'given_to_trader' || l.event_type === 'returned_from_trader')) {
+    const { data } = await goldmindClient.from('trader_movements').select('trader_id, batch_id, source, created_at, trader:trader_id(name)').eq('piece_id', pieceId);
+    tms = data || [];
+  }
+  const escH = t => String(t || '').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+  const linkNote = note => escH(note).replace(/\b[A-Z]{2,5}-\d{4}-\d{3,}\b/g, n => invByNo[n]
+    ? `<a class="gm-log-link" href="invoice-print-ar.html?id=${invByNo[n]}" style="color:var(--gm-secondary);font-weight:700;text-decoration:underline">${n}</a>` : n);
+  const traderLink = l => {
+    if (l.event_type !== 'given_to_trader' && l.event_type !== 'returned_from_trader') return '';
+    const t = new Date(l.created_at).getTime();
+    const m = tms.filter(x => x.trader_id).sort((a, b) => Math.abs(new Date(a.created_at) - t) - Math.abs(new Date(b.created_at) - t))[0];
+    if (!m || Math.abs(new Date(m.created_at) - t) > 10 * 60 * 1000) return '';
+    const href = 'trader-statement-print-ar.html?trader=' + m.trader_id + (m.batch_id ? '&batch=' + m.batch_id : '');
+    return ` <a class="gm-log-link" href="${href}" style="color:var(--gm-secondary);font-weight:700;text-decoration:underline">فتح السند${m.trader && m.trader.name ? ' — ' + escH(m.trader.name) : ''}</a>`;
+  };
   el.innerHTML = logs.map(l => `
     <div>
       <div class="flex items-center justify-between mb-0.5">
         <span class="text-[12px] font-bold text-on-surface">${EVENT_LABELS[l.event_type] || l.event_type}</span>
         <span class="text-[10.5px] text-on-surface-variant">${fmtLogDate(l.created_at)}</span>
       </div>
-      ${l.note ? `<div class="text-[11.5px] text-on-surface-variant">${(l.note || '').replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</div>` : ''}
+      ${l.note || traderLink(l) ? `<div class="text-[11.5px] text-on-surface-variant">${linkNote(l.note)}${traderLink(l)}</div>` : ''}
       ${l.staff && l.staff.full_name ? `<div class="text-[10px] text-outline mt-0.5">${l.staff.full_name}</div>` : ''}
     </div>`).join('');
 }

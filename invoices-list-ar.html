@@ -270,8 +270,22 @@ function applyFilters() {
   }
   empty.classList.add('hidden');
 
-  list.innerHTML = rows.map(r => {
-    const dateStr = gmFormatDateTime(r.created_at, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' });
+  // grouped by day: a header per date with the count and that day's sales
+  const dayKey = r => gmFormatDateTime(r.created_at, { day: 'numeric', month: 'numeric', year: 'numeric' });
+  const groups = [];
+  rows.forEach(r => { const k = dayKey(r); const g = groups[groups.length - 1]; if (g && g.key === k) g.rows.push(r); else groups.push({ key: k, rows: [r] }); });
+  const today = dayKey({ created_at: new Date() }), yday = dayKey({ created_at: new Date(Date.now() - 864e5) });
+  const weekday = d => gmFormatDateTime(d, { weekday: 'long' });
+  list.innerHTML = groups.map(g => {
+    const sales = g.rows.filter(r => r.type === 'sale');
+    const cur = (sales[0] && sales[0].currency) || '';
+    const sum = sales.reduce((t, r) => t + Number(r.amount || 0), 0);
+    const label = g.key === today ? 'اليوم' : g.key === yday ? 'أمس' : weekday(g.rows[0].created_at);
+    return `<div class="inv-day flex items-center justify-between gap-2 mt-3 mb-1 px-1 sticky top-16 z-10 py-2 bg-background border-b border-outline-variant">
+      <span class="text-[13px] font-bold">${label} <span class="font-data-mono text-on-surface-variant font-semibold">${g.key}</span></span>
+      <span class="text-[11px] text-on-surface-variant">${g.rows.length} ${g.rows.length === 1 ? 'مستند' : 'مستندات'}${sales.length ? ' · مبيعات <b class="font-data-mono" dir="ltr">' + fmt(sum) + (cur ? ' ' + gmEscapeHtml(cur) : '') + '</b>' : ''}</span>
+    </div>` + g.rows.map(r => {
+    const dateStr = gmFormatDateTime(r.created_at, { hour: '2-digit', minute: '2-digit' });
     const badgeColor = TYPE_COLORS[r.type] || 'bg-gray-100 text-gray-700';
     const statusLabel = STATUS_LABELS[r.status] || r.status || '';
     return `
@@ -296,6 +310,7 @@ function applyFilters() {
           <span class="material-symbols-outlined text-on-surface-variant text-[18px]">chevron_left</span>
         </div>
       </a>`;
+  }).join('');
   }).join('');
 }
 

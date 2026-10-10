@@ -18,6 +18,9 @@ test('paid currency and barcodes', async ({ page }) => {
       { id: 'c', invoice_id: 'i2', barcode: '000900', weight_grams: 5, karat: 21 }]
   } });
   await page.goto('/invoices-list-ar.html');
+  await expect(page.locator('.inv-day')).toHaveCount(1);
+  await expect(page.locator('.inv-day')).toContainText('01/10/2026');
+  await expect(page.locator('.inv-day')).toContainText('2 مستندات');
   const card1 = page.locator('a', { hasText: 'INV-26' });
   await expect(card1.locator('.inv-amount')).toHaveText('1,300,000 SYP');
   await expect(card1).toContainText('100.00 USD');
