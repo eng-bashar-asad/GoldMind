@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>تبديل قطعة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=35"></script>
+<script src="theme.js?v=54"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+</style>
+<style> body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-headline-md text-headline-md font-bold">تبديل قطعة</h1>
+</div>
+<button onclick="gmOpenTimezonePicker()" class="w-9 h-9 rounded-full border border-outline-variant flex items-center justify-center active:scale-90 transition-all" title="المنطقة الزمنية للعرض">
+<span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
+</button>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
+
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية تسجيل مرتجعات.</div>
+<main class="pb-32 max-w-md lg:max-w-3xl mx-auto px-4">
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm"></div>
+
+<div id="page-content" class="hidden py-6 flex flex-col gap-4">
+<p class="text-[11px] text-outline">الفاتورة الأصلية ويومها بالصندوق لا يتغيّران. تُسجَّل القطعة الراجعة كمرتجع على حساب الزبون، والقطعة الجديدة كفاتورة بيع مرتبطة بالفاتورة الأصلية، ولا يدخل الصندوق إلا الفرق بالعملة التي دُفع بها.</p>
+
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<div class="flex justify-between items-center mb-1"><p class="font-bold text-[14px]" id="orig-number"></p><p class="text-[12px] text-on-surface-variant" id="orig-date"></p></div>
+<p class="text-[12px] text-on-surface-variant" id="orig-customer"></p>
+</div>
+
+<h3 class="font-semibold text-[13px]">١. القطعة التي رجعت</h3>
+<div id="old-list" class="flex flex-col gap-2"></div>
+
+<h3 class="font-semibold text-[13px]">٢. القطعة الجديدة</h3>
+<div class="flex gap-2">
+<input id="bc-input" class="flex-1 h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" placeholder="باركود القطعة الجديدة" onkeydown="if(event.key==='Enter'){event.preventDefault();exAddPiece();}"/>
+<button type="button" onclick="exAddPiece()" class="h-11 px-4 bg-primary text-on-primary rounded-lg text-sm font-semibold">إضافة</button>
+</div>
+<p class="text-error text-[12px] hidden" id="bc-error"></p>
+<div id="new-list" class="flex flex-col gap-2"></div>
+
+<h3 class="font-semibold text-[13px]">٣. الفرق</h3>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+<div class="grid grid-cols-3 gap-2 text-[12px] font-semibold" id="dir-seg">
+<button type="button" data-dir="in" onclick="exDir('in')" class="h-10 rounded-lg border border-outline-variant">الزبون يدفع فرق</button>
+<button type="button" data-dir="out" onclick="exDir('out')" class="h-10 rounded-lg border border-outline-variant">نرجّع للزبون فرق</button>
+<button type="button" data-dir="none" onclick="exDir('none')" class="h-10 rounded-lg border border-outline-variant">بدون فرق</button>
+</div>
+<div id="diff-box" class="flex flex-col gap-3">
+<div class="grid grid-cols-2 gap-2">
+<label class="text-[11px] text-on-surface-variant">مبلغ الفرق<input id="diff-amount" type="number" step="any" inputmode="decimal" class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mt-1" oninput="exSummary()"/></label>
+<label class="text-[11px] text-on-surface-variant">العملة<select id="diff-cur" class="w-full h-11 border border-outline-variant rounded-lg px-2 mt-1" onchange="exCur()"></select></label>
+</div>
+<label id="rate-wrap" class="hidden text-[11px] text-on-surface-variant">سعر الصرف: 1 <span class="base-cur"></span> = <input id="diff-rate" type="number" step="any" inputmode="decimal" class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mt-1" oninput="exRateSave();exSummary()"/></label>
+<label class="text-[11px] text-on-surface-variant">طريقة دفع الفرق<select id="diff-method" class="w-full h-11 border border-outline-variant rounded-lg px-2 mt-1" onchange="exSummary()"></select></label>
+</div>
+<div id="ex-summary" class="bg-surface-container-low rounded-lg p-3 text-[12px] flex flex-col gap-1"></div>
+</div>
+
+<button onclick="exSave()" id="ex-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md">حفظ التبديل</button>
+<p class="text-error text-[12px] hidden text-center" id="ex-error"></p>
+</div>
+</main>
+
+<script>
+let EX_INV = null, EX_ITEMS = [], EX_OLD = new Set(), EX_NEW = [], EX_DIR = 'in', BASE = 'USD', SECOND = null;
+const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = s => gmEscapeHtml(String(s == null ? '' : s));
+const rateKey = c => 'gm_fx_' + GOLDMIND_STORE_ID + '_' + c;
+function exDefaultRate(c) {
+  let r = 0; try { r = parseFloat(localStorage.getItem(rateKey(c))) || 0; } catch (e) { /* storage off */ }
+  if (!r && SECOND && SECOND.code === c) r = SECOND.rate;
+  return r || '';
+}
+function exRateSave() { const c = document.getElementById('diff-cur').value, v = parseFloat(document.getElementById('diff-rate').value); try { if (v > 0) localStorage.setItem(rateKey(c), String(v)); } catch (e) { /* ignore */ } }
+function exCur() {
+  const c = document.getElementById('diff-cur').value;
+  document.getElementById('rate-wrap').classList.toggle('hidden', c === BASE);
+  document.getElementById('diff-rate').value = c === BASE ? '' : exDefaultRate(c);
+  exSummary();
+}
+function exDir(d) {
+  EX_DIR = d;
+  document.querySelectorAll('#dir-seg button').forEach(b => { const on = b.dataset.dir === d; b.style.background = on ? 'var(--gm-primary)' : ''; b.style.color = on ? 'var(--gm-on-primary)' : ''; });
+  document.getElementById('diff-box').classList.toggle('hidden', d === 'none');
+  document.getElementById('diff-method').innerHTML = d === 'out'
+    ? '<option value="cash">نقداً من الصندوق</option><option value="bank">تحويل / فيزا</option><option value="account">يبقى رصيداً للزبون</option>'
+    : '<option value="cash">نقداً</option><option value="bank">فيزا / تحويل</option><option value="account">دين على الزبون</option>';
+  exSummary();
+}
+function exDiffBase() {
+  if (EX_DIR === 'none') return 0;
+  const a = parseFloat(document.getElementById('diff-amount').value) || 0, c = document.getElementById('diff-cur').value;
+  if (c === BASE) return a;
+  const r = parseFloat(document.getElementById('diff-rate').value) || 0;
+  return r > 0 ? a / r : NaN;
+}
+function exOldTotal() { return EX_ITEMS.filter(it => EX_OLD.has(it.id)).reduce((t, it) => t + Number(it.line_total || 0), 0); }
+function exSummary() {
+  const old = exOldTotal(), d = exDiffBase();
+  const newV = old + (EX_DIR === 'in' ? 1 : EX_DIR === 'out' ? -1 : 0) * (d || 0);
+  const a = parseFloat(document.getElementById('diff-amount').value) || 0, c = document.getElementById('diff-cur').value;
+  const m = document.getElementById('diff-method');
+  const how = EX_DIR === 'none' || !a ? '' : (EX_DIR === 'in' ? 'الزبون يدفع ' : 'نرجّع للزبون ') + a.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + c + ' — ' + (m.options[m.selectedIndex] ? m.options[m.selectedIndex].text : '');
+  document.getElementById('ex-summary').innerHTML =
+    `<div class="flex justify-between"><span>قيمة القطعة الراجعة</span><b class="font-data-mono" dir="ltr">${fmt(old)} ${BASE}</b></div>` +
+    (EX_DIR !== 'none' ? `<div class="flex justify-between"><span>الفرق</span><b class="font-data-mono" dir="ltr">${isNaN(d) ? '—' : (EX_DIR === 'in' ? '+' : '−') + fmt(d)} ${BASE}</b></div>` : '') +
+    `<div class="flex justify-between border-t border-outline-variant pt-1"><span>قيمة القطعة الجديدة بالفاتورة</span><b class="font-data-mono" dir="ltr">${isNaN(d) ? '—' : fmt(newV)} ${BASE}</b></div>` +
+    (how ? `<div class="text-on-surface-variant">${esc(how)}</div>` : '') +
+    `<div class="text-on-surface-variant">يدخل الصندوق: ${EX_DIR !== 'none' && a && m.value !== 'account' ? esc((EX_DIR === 'in' ? 'وارد ' : 'صادر ') + a.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + c) + (m.value === 'bank' ? ' (تحويل/فيزا)' : '') : 'لا شيء'}</div>`;
+}
+function exRenderOld() {
+  const box = document.getElementById('old-list');
+  if (!EX_ITEMS.length) { box.innerHTML = '<p class="text-[12px] text-on-surface-variant">لا توجد قطع قابلة للتبديل بهذه الفاتورة.</p>'; return; }
+  box.innerHTML = EX_ITEMS.map(it => `<label class="ex-old flex items-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
+    <input type="checkbox" class="w-5 h-5" ${EX_OLD.has(it.id) ? 'checked' : ''} onchange="exToggleOld('${it.id}', this.checked)"/>
+    <span class="flex-1 text-[13px]"><b class="font-data-mono">${esc(it.barcode || '—')}</b> · ${esc(it.description || '')} · ${Number(it.weight_grams || 0)} غ · عيار ${esc(it.karat || '')}</span>
+    <b class="font-data-mono text-[13px]" dir="ltr">${fmt(it.line_total)} ${BASE}</b></label>`).join('');
+}
+function exToggleOld(id, on) { if (on) EX_OLD.add(id); else EX_OLD.delete(id); exSummary(); }
+function exRenderNew() {
+  document.getElementById('new-list').innerHTML = EX_NEW.map((p, i) => `<div class="ex-new flex items-center gap-3 bg-surface-container-lowest border border-outline-variant rounded-xl p-3">
+    <span class="flex-1 text-[13px]"><b class="font-data-mono">${esc(p.barcode)}</b> · ${esc(p.description_ar || p.piece_type || '')} · ${Number(p.weight_grams || 0)} غ · عيار ${esc(p.karat || '')}</span>
+    <button type="button" onclick="EX_NEW.splice(${i},1);exRenderNew()" class="text-error text-[12px] font-semibold">حذف</button></div>`).join('');
+}
+async function exAddPiece() {
+  const el = document.getElementById('bc-input'), err = document.getElementById('bc-error'), bc = el.value.trim();
+  err.classList.add('hidden');
+  if (!bc) return;
+  const { data: p } = await goldmindClient.from('pieces').select('id, barcode, status, weight_grams, karat, description_ar, piece_type').eq('store_id', GOLDMIND_STORE_ID).eq('barcode', bc).maybeSingle();
+  const fail = t => { err.textContent = t; err.classList.remove('hidden'); };
+  if (!p) return fail('لا توجد قطعة بهذا الباركود');
+  if (p.status !== 'available') return fail('القطعة ' + bc + ' غير متوفرة للبيع');
+  if (EX_NEW.some(x => x.id === p.id)) return fail('القطعة مضافة مسبقاً');
+  EX_NEW.push(p); el.value = ''; exRenderNew();
+}
+async function exSave() {
+  const err = document.getElementById('ex-error'), btn = document.getElementById('ex-btn');
+  const fail = t => { err.textContent = t; err.classList.remove('hidden'); };
+  err.classList.add('hidden');
+  if (!EX_OLD.size) return fail('اختر القطعة التي رجعت');
+  if (!EX_NEW.length) return fail('أضف القطعة الجديدة');
+  const a = parseFloat(document.getElementById('diff-amount').value) || 0, c = document.getElementById('diff-cur').value;
+  if (EX_DIR !== 'none' && !(a > 0)) return fail('اكتب مبلغ الفرق، أو اختر «بدون فرق»');
+  if (EX_DIR !== 'none' && isNaN(exDiffBase())) return fail('اكتب سعر الصرف');
+  if (!confirm('تأكيد التبديل؟')) return;
+  btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  const { data, error } = await goldmindClient.rpc('post_sale_exchange', { p: {
+    store_id: GOLDMIND_STORE_ID, original_invoice_id: EX_INV.id, client_ref: crypto.randomUUID ? crypto.randomUUID() : null,
+    item_ids: [...EX_OLD], new_piece_ids: EX_NEW.map(p => p.id),
+    diff_dir: EX_DIR, diff_amount: EX_DIR === 'none' ? 0 : a, diff_currency: c,
+    diff_rate: c === BASE ? null : parseFloat(document.getElementById('diff-rate').value) || null,
+    diff_method: document.getElementById('diff-method').value
+  } });
+  if (error) { btn.disabled = false; btn.textContent = 'حفظ التبديل'; return fail('تعذّر الحفظ: ' + error.message); }
+  gmReplace('invoice-print-ar.html?id=' + data.sale.id);
+}
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const id = new URLSearchParams(location.search).get('id');
+  const noAcc = document.getElementById('no-access');
+  const stop = t => { document.getElementById('loading-state').classList.add('hidden'); noAcc.textContent = t; noAcc.classList.remove('hidden'); };
+  const [{ data: staffRow }, { data: st }, { data: inv }] = await Promise.all([
+    goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+    goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('invoices').select('*, customer:customer_id(name, phone)').eq('id', id).maybeSingle()
+  ]);
+  if (!(staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.create_invoice)))) return stop('ليس لديك صلاحية التبديل.');
+  if (!inv || inv.type !== 'sale') return stop('فاتورة البيع غير موجودة.');
+  if (inv.status === 'cancelled') return stop('هذه الفاتورة ملغاة.');
+  if (!inv.customer_id) return stop('الفاتورة بدون زبون — اختر الزبون من تعديل الفاتورة أولاً.');
+  EX_INV = inv;
+  BASE = (st && st.currency || 'AED').toUpperCase();
+  SECOND = st && st.secondary_currency ? { code: st.secondary_currency.toUpperCase(), rate: Number(st.secondary_currency_rate) || 0 } : null;
+  document.querySelectorAll('.base-cur').forEach(e => { e.textContent = BASE; });
+  const codes = [BASE, SECOND && SECOND.code, 'SYP', 'USD', 'EUR', 'AED', 'TRY', 'SAR'].filter((c, i, a) => c && a.indexOf(c) === i);
+  document.getElementById('diff-cur').innerHTML = codes.map(c => `<option value="${c}">${c}</option>`).join('');
+  // lines not returned yet (an earlier return or exchange already took them back)
+  const [{ data: items }, { data: rets }] = await Promise.all([
+    goldmindClient.from('invoice_items').select('*').eq('invoice_id', inv.id),
+    goldmindClient.from('invoices').select('id').eq('related_invoice_id', inv.id).eq('type', 'return').neq('status', 'cancelled')
+  ]);
+  let back = new Set();
+  if (rets && rets.length) {
+    const { data: ri } = await goldmindClient.from('invoice_items').select('piece_id').in('invoice_id', rets.map(r => r.id));
+    back = new Set((ri || []).map(r => r.piece_id).filter(Boolean));
+  }
+  EX_ITEMS = (items || []).filter(it => it.piece_id && !back.has(it.piece_id));
+  if (EX_ITEMS.length === 1) EX_OLD.add(EX_ITEMS[0].id);
+  document.getElementById('orig-number').textContent = inv.invoice_number;
+  document.getElementById('orig-date').textContent = gmFormatDateTime(inv.created_at);
+  document.getElementById('orig-customer').textContent = 'الزبون: ' + (inv.customer ? inv.customer.name : '—');
+  exRenderOld(); exDir('in'); exCur();
+  document.getElementById('loading-state').classList.add('hidden');
+  document.getElementById('page-content').classList.remove('hidden');
+}
+load();
+</script>
+</body></html>

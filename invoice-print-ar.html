@@ -77,6 +77,10 @@
 <span class="material-symbols-outlined">edit</span>
                 تعديل
             </button>
+<button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-indigo-800" id="exchange-btn">
+<span class="material-symbols-outlined">swap_horiz</span>
+                تبديل قطعة
+            </button>
 <button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-red-700" id="cancel-invoice-btn" onclick="gmCloseMore();cancelInvoiceFlow()">
 <span class="material-symbols-outlined">cancel</span>
                 إلغاء الفاتورة
@@ -507,6 +511,18 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             document.getElementById('doc-type-ar').textContent = 'فاتورة';
             document.getElementById('doc-type-en').textContent = 'Invoice';
         }
+        if (invoice.type === 'sale') {
+            // exchanges: this sale replaced pieces of an older invoice, and/or later ones replaced pieces of this one
+            const relEl = document.getElementById('doc-related-invoice');
+            const parts = [];
+            if (invoice.related_invoice_id) {
+                const { data: o } = await goldmindClient.from('invoices').select('invoice_number').eq('id', invoice.related_invoice_id).maybeSingle();
+                if (o) parts.push('تبديل بدل قطع من الفاتورة رقم: ' + o.invoice_number);
+            }
+            const { data: kids } = await goldmindClient.from('invoices').select('invoice_number, type, created_at').eq('related_invoice_id', invoiceId).neq('status', 'cancelled').order('created_at');
+            (kids || []).forEach(k => parts.push((k.type === 'return' ? 'مرتجع ' : 'تبديل بفاتورة ') + k.invoice_number + ' بتاريخ ' + gmFormatDateTime(k.created_at)));
+            if (parts.length) { relEl.textContent = parts.join(' · '); relEl.classList.remove('hidden'); }
+        }
 
         function buildStoreInfoRows(labels) {
             const rows = [];
@@ -567,6 +583,12 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
                 editBtn.classList.remove('hidden');
                 editBtn.classList.add('flex');
                 editBtn.onclick = function () { window.location.href = 'invoice-edit-ar.html?id=' + invoiceId; };
+            }
+            if (staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.create_invoice)) && invoice.type === 'sale' && invoice.customer_id) {
+                const exBtn = document.getElementById('exchange-btn');
+                exBtn.classList.remove('hidden');
+                exBtn.classList.add('flex');
+                exBtn.onclick = function () { window.location.href = 'exchange-ar.html?id=' + invoiceId; };
             }
         }
 
