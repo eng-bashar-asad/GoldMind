@@ -78,7 +78,13 @@
 <div id="money-form" class="hidden flex flex-col gap-4">
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-2" for="amount-input">المبلغ</label>
-<input class="w-full h-12 border border-outline-variant rounded-lg px-3 font-data-mono text-right mb-4" dir="ltr" id="amount-input" placeholder="0.00" step="0.01" type="number" inputmode="decimal"/>
+<div class="flex gap-2 mb-2">
+<input class="flex-1 min-w-0 h-12 border border-outline-variant rounded-lg px-3 font-data-mono text-right" dir="ltr" id="amount-input" placeholder="0.00" step="any" type="number" inputmode="decimal" oninput="exFxNote()"/>
+<select id="cur-input" class="w-28 h-12 border border-outline-variant rounded-lg px-2" onchange="exCurChange()" aria-label="العملة"></select>
+</div>
+<label id="rate-wrap" class="hidden block text-[11px] text-on-surface-variant mb-2">سعر الصرف: 1 <span class="base-cur"></span> =
+<input id="rate-input" type="number" step="any" inputmode="decimal" class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono mt-1" dir="ltr" oninput="exRateSave();exFxNote()"/></label>
+<p id="fx-note" class="text-[11px] text-on-surface-variant mb-4"></p>
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-2" for="desc-input">الوصف (اختياري)</label>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-right" id="desc-input" placeholder="مثال: فاتورة كهرباء شهر أيلول"></textarea>
 <label class="flex items-center gap-2 mt-3 text-[13px]"><input type="checkbox" id="from-cashbox" checked class="w-5 h-5 rounded"/> دُفع من الصندوق اليومي (يُخصم من الصندوق)</label>
@@ -144,6 +150,22 @@ $('attachment-input').addEventListener('change', e => {
 });
 $('barcode-input').addEventListener('keydown', e => { if (e.key === 'Enter') addGiftPiece(); });
 
+// ---- currency of the expense (the daily box gets it in that currency) ----
+let SECOND = null;
+const rateKey = c => 'gm_fx_' + GOLDMIND_STORE_ID + '_' + c;
+function defRate(c) {
+  let r = 0; try { r = parseFloat(localStorage.getItem(rateKey(c))) || 0; } catch (e) { /* storage off */ }
+  if (!r && SECOND && SECOND.code === c) r = SECOND.rate;
+  return r || '';
+}
+function curOptions(sel) { return [CUR, SECOND && SECOND.code, 'SYP', 'USD', 'EUR', 'AED', 'TRY', 'SAR'].filter((c, i, a) => c && a.indexOf(c) === i).map(c => `<option value="${c}"${c === sel ? ' selected' : ''}>${c}</option>`).join(''); }
+function exRateSave() { const c = $('cur-input').value, v = parseFloat($('rate-input').value); try { if (v > 0) localStorage.setItem(rateKey(c), String(v)); } catch (e) { /* ignore */ } }
+function exCurChange() { const c = $('cur-input').value; $('rate-wrap').classList.toggle('hidden', c === CUR); $('rate-input').value = c === CUR ? '' : defRate(c); exFxNote(); }
+function exFxNote() {
+  const c = $('cur-input').value, a = parseFloat($('amount-input').value) || 0, r = parseFloat($('rate-input').value) || 0;
+  $('fx-note').textContent = c !== CUR && a > 0 && r > 0 ? '= ' + money(a / r) + ' — يخرج من الصندوق اليومي ' + a.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + c : '';
+}
+
 async function loadCategories() {
   const { data } = await goldmindClient.from('expense_categories').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name');
   CATS = (data || []).filter(c => c.name !== GIFT || canGift);
@@ -206,6 +228,8 @@ async function saveExpense() {
   const amount = parseFloat($('amount-input').value);
   if (!selected) return msg('save-error', 'اختر نوع المصروف');
   if (!(amount > 0)) return msg('save-error', 'أدخل مبلغاً صحيحاً');
+  const cur = $('cur-input').value, rate = parseFloat($('rate-input').value) || 0;
+  if (cur !== CUR && !(rate > 0)) return msg('save-error', 'اكتب سعر الصرف');
   const btn = $('save-btn');
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
   let attachmentUrl = null;
@@ -218,12 +242,13 @@ async function saveExpense() {
   }
   const { error } = await goldmindClient.rpc('record_expense', { p: {
     store_id: GOLDMIND_STORE_ID, category_id: selected.id, amount, description: $('desc-input').value.trim(),
-    attachment_url: attachmentUrl, from_daily_cashbox: $('from-cashbox').checked
+    attachment_url: attachmentUrl, from_daily_cashbox: $('from-cashbox').checked,
+    currency: cur, fx_rate: cur !== CUR ? rate : null
   } });
   btn.disabled = false; btn.textContent = 'حفظ المصروف';
   if (error) return msg('save-error', 'تعذّر الحفظ: ' + error.message);
   msg('save-success', 'تم حفظ المصروف' + ($('from-cashbox').checked ? ' وخُصم من الصندوق اليومي.' : '.'));
-  $('amount-input').value = ''; $('desc-input').value = '';
+  $('amount-input').value = ''; $('desc-input').value = ''; exFxNote();
   attachmentFile = null; $('attachment-label').textContent = 'اختر ملف';
   loadList();
 }
@@ -304,8 +329,10 @@ function editExpense(id) {
   const box = $('exp-edit-' + id);
   box.innerHTML = `<div class="p-3 bg-surface-container-low grid grid-cols-2 gap-2 text-[13px]">
     <select id="ee-cat-${id}" class="col-span-2 h-10 border border-outline-variant rounded-lg px-2 bg-white">${CATS.filter(c => c.name !== GIFT).map(c => `<option value="${c.id}"${c.id === r.catId ? ' selected' : ''}>${esc(c.name)}</option>`).join('')}</select>
-    <input id="ee-amt-${id}" type="number" step="0.01" inputmode="decimal" value="${r.amount}" class="h-10 border border-outline-variant rounded-lg px-2 font-data-mono" aria-label="المبلغ"/>
-    <input id="ee-desc-${id}" value="${esc(r.desc === r.cat ? '' : (r.desc || ''))}" placeholder="ملاحظة" class="h-10 border border-outline-variant rounded-lg px-2" aria-label="ملاحظة"/>
+    <input id="ee-amt-${id}" type="number" step="any" inputmode="decimal" value="${r.fxCur ? r.fxAmt : r.amount}" class="h-10 border border-outline-variant rounded-lg px-2 font-data-mono" aria-label="المبلغ"/>
+    <select id="ee-cur-${id}" class="h-10 border border-outline-variant rounded-lg px-2" aria-label="العملة" onchange="$('ee-rate-${id}').classList.toggle('hidden', this.value === CUR); if (this.value !== CUR && !$('ee-rate-${id}').value) $('ee-rate-${id}').value = defRate(this.value)">${curOptions(r.fxCur || CUR)}</select>
+    <input id="ee-rate-${id}" type="number" step="any" inputmode="decimal" value="${r.fxCur ? +(r.fxAmt / r.amount).toFixed(4) : ''}" placeholder="سعر الصرف مقابل ${esc(CUR)}" class="${r.fxCur ? '' : 'hidden '}col-span-2 h-10 border border-outline-variant rounded-lg px-2 font-data-mono" aria-label="سعر الصرف"/>
+    <input id="ee-desc-${id}" value="${esc(r.desc === r.cat ? '' : (r.desc || ''))}" placeholder="ملاحظة" class="col-span-2 h-10 border border-outline-variant rounded-lg px-2" aria-label="ملاحظة"/>
     <button type="button" onclick="saveExpenseEdit('${id}')" class="h-10 bg-primary text-on-primary rounded-lg font-semibold">حفظ التعديل</button>
     <button type="button" onclick="$('exp-edit-${id}').classList.add('hidden')" class="h-10 border border-outline-variant rounded-lg">إلغاء</button>
   </div>`;
@@ -314,13 +341,15 @@ function editExpense(id) {
 async function saveExpenseEdit(id) {
   const amount = parseFloat($('ee-amt-' + id).value);
   if (!(amount > 0)) { alert('أدخل مبلغاً صحيحاً'); return; }
-  const { error } = await goldmindClient.rpc('update_expense', { p_id: id, p_category: $('ee-cat-' + id).value, p_amount: amount, p_description: $('ee-desc-' + id).value.trim() || null });
+  const cur = $('ee-cur-' + id).value, rate = parseFloat($('ee-rate-' + id).value) || 0;
+  if (cur !== CUR && !(rate > 0)) { alert('اكتب سعر الصرف'); return; }
+  const { error } = await goldmindClient.rpc('update_expense_fx', { p: { id, category_id: $('ee-cat-' + id).value, amount, currency: cur, fx_rate: cur !== CUR ? rate : null, description: $('ee-desc-' + id).value.trim() || null } });
   if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
   loadList();
 }
 async function deleteExpense(id) {
   const r = LIST_ROWS.find(x => x.id === id); if (!r) return;
-  if (!confirm('حذف مصروف «' + r.cat + '» بقيمة ' + money(r.amount) + '؟ سيرجع المبلغ إلى الصندوق.')) return;
+  if (!confirm('حذف مصروف «' + r.cat + '» بقيمة ' + (r.fxCur ? r.fxAmt.toLocaleString('en-US') + ' ' + r.fxCur : money(r.amount)) + '؟ سيرجع المبلغ إلى الصندوق.')) return;
   const { error } = await goldmindClient.rpc('delete_expense', { p_id: id });
   if (error) { alert('تعذّر الحذف: ' + error.message); return; }
   loadList();
@@ -330,14 +359,14 @@ async function deleteExpense(id) {
 async function loadList() {
   const since = new Date(Date.now() - 30 * 864e5).toISOString();
   const [ex, gf] = await Promise.all([
-    canExpense ? goldmindClient.from('expense_entries').select('id, amount, description, created_at, category_id, category:category_id(name), staff:created_by(full_name)')
+    canExpense ? goldmindClient.from('expense_entries').select('id, amount, fx_amount, fx_currency, description, created_at, category_id, category:category_id(name), staff:created_by(full_name)')
       .eq('store_id', GOLDMIND_STORE_ID).gte('created_at', since).order('created_at', { ascending: false }) : { data: [] },
     canGift ? goldmindClient.from('inventory_gifts').select('id, barcode, recipient, total_cost, status, expense_entry_id, created_at')
       .eq('store_id', GOLDMIND_STORE_ID).gte('created_at', since) : { data: [] }
   ]);
   const gifts = gf.data || [];
   const giftByExp = {}; gifts.forEach(g => { if (g.expense_entry_id) giftByExp[g.expense_entry_id] = g; });
-  let rows = (ex.data || []).map(e => ({ id: e.id, catId: e.category_id, at: e.created_at, cat: e.category && e.category.name, desc: e.description, amount: Number(e.amount), who: e.staff && e.staff.full_name, gift: giftByExp[e.id] }));
+  let rows = (ex.data || []).map(e => ({ id: e.id, catId: e.category_id, at: e.created_at, cat: e.category && e.category.name, desc: e.description, amount: Number(e.amount), fxAmt: e.fx_amount != null ? Number(e.fx_amount) : null, fxCur: e.fx_currency, who: e.staff && e.staff.full_name, gift: giftByExp[e.id] }));
   if (!canExpense) rows = gifts.map(g => ({ at: g.created_at, cat: GIFT, desc: 'هدية: ' + g.barcode + ' — إلى ' + g.recipient, amount: Number(g.total_cost), gift: g }));
   // a reverted gift's expense is removed on the server; keep only live rows
   rows = rows.filter(r => !r.gift || r.gift.status === 'active');
@@ -351,7 +380,8 @@ async function loadList() {
         <div class="text-[11px] text-on-surface-variant">${esc(r.desc)} · ${gmFormatDateTime(r.at)}${r.who ? ' · ' + esc(r.who) : ''}</div>
       </div>
       <div class="text-left">
-        <div class="font-bold font-data-mono text-[13px]">${money(r.amount)}</div>
+        <div class="font-bold font-data-mono text-[13px]" dir="ltr">${r.fxCur ? esc(r.fxAmt.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + r.fxCur) : money(r.amount)}</div>
+        ${r.fxCur ? `<div class="text-[10px] text-on-surface-variant font-data-mono" dir="ltr">= ${money(r.amount)}</div>` : ''}
         ${r.gift && canGift ? `<button type="button" onclick="revertGift('${r.gift.id}', '${esc(r.gift.barcode || '').replace(/'/g, '')}')" class="text-[11px] text-primary underline">إرجاع إلى المخزن</button>` : ''}
         ${!r.gift && r.id && canExpense ? `<button type="button" onclick="editExpense('${r.id}')" class="text-[11px] text-primary underline">تعديل</button> · <button type="button" onclick="deleteExpense('${r.id}')" class="text-[11px] text-error underline">حذف</button>` : ''}
       </div>
@@ -364,7 +394,7 @@ async function loadList() {
   if (!session) return;
   const [{ data: me }, { data: store }, { data: prices }] = await Promise.all([
     goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
-    goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
     goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID)
   ]);
   $('loading-state').classList.add('hidden');
@@ -375,6 +405,9 @@ async function loadList() {
   if (!canExpense && !canGift) { $('no-access').classList.remove('hidden'); return; }
   const code = (store && store.currency || 'AED').toUpperCase();
   CUR = ({ AED: 'AED', USD: 'USD', SAR: 'SAR', SYP: 'SYP' })[code] || code;
+  SECOND = store && store.secondary_currency ? { code: store.secondary_currency.toUpperCase(), rate: Number(store.secondary_currency_rate) || 0 } : null;
+  $('cur-input').innerHTML = curOptions(CUR);
+  document.querySelectorAll('.base-cur').forEach(e => { e.textContent = CUR; });
   (prices || []).forEach(p => { PRICES[p.karat] = p.price_per_gram; });
   await loadCategories();
   const want = new URLSearchParams(location.search).get('type');

@@ -156,8 +156,8 @@ test('expenses: an expense can be edited (amount/type) and deleted', async ({ pa
   await page.selectOption('#ee-cat-e9', 'c3');
   await page.fill('#ee-amt-e9', '150');
   await page.click('text=حفظ التعديل');
-  await expect.poll(() => calls.some(c => c.name === 'update_expense')).toBe(true);
-  expect(JSON.parse(calls.find(c => c.name === 'update_expense').body)).toMatchObject({ p_id: 'e9', p_category: 'c3', p_amount: 150 });
+  await expect.poll(() => calls.some(c => c.name === 'update_expense_fx')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'update_expense_fx').body).p).toMatchObject({ id: 'e9', category_id: 'c3', amount: 150 });
   await page.click('button[onclick="deleteExpense(\'e9\')"]');
   await expect.poll(() => calls.some(c => c.name === 'delete_expense')).toBe(true);
 });

@@ -1,0 +1,4 @@
+-- Expenses in any currency (applied as migration "expense_currency"):
+-- expense_entries.fx_amount / fx_currency; record_expense(p) accepts currency + fx_rate
+-- (expense + main box in store currency = amount ÷ rate, daily box in the paid currency);
+-- update_expense_fx(p jsonb) edits keeping the currency. See the live function bodies.
