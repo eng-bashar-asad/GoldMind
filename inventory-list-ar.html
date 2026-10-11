@@ -511,15 +511,42 @@
     const KARAT_GROUPED_BOX = 'قطع ذهبية';
     function usesKaratGrouping(boxName) { return boxName === KARAT_GROUPED_BOX; }
 
+    // The drilled-in view (box / batch / karat) is kept in the address, so going back
+    // from a piece reopens the same list instead of the top of the inventory.
+    function gmViewUrl(params) {
+        const u = new URL(location.href);
+        ['box', 'pre', 'k', 'v'].forEach(x => u.searchParams.delete(x));
+        Object.entries(params).forEach(([a, b]) => { if (b !== null && b !== undefined && b !== '') u.searchParams.set(a, b); });
+        const before = location.pathname + location.search;
+        history.replaceState(history.state, '', u);
+        try { // keep the app's back-stack entry for this page in step with the address
+            const st = JSON.parse(sessionStorage.getItem('gm_nav_stack') || '[]');
+            if (st[st.length - 1] === before) { st[st.length - 1] = location.pathname + location.search; sessionStorage.setItem('gm_nav_stack', JSON.stringify(st)); }
+        } catch (e) {}
+    }
+    window.addEventListener('pagehide', () => { try { sessionStorage.setItem('gm_inv_scroll', location.search + '|' + Math.round(scrollY)); } catch (e) {} });
+
     function renderKaratBoxes() {
-        // Initial entry point (called once after pieces load).
-        showTopLevel();
+        // Initial entry point (called once after pieces load): reopen the view in the address, if any.
+        const q = new URLSearchParams(location.search);
+        const box = q.get('box'), pre = q.get('pre'), k = q.get('k'), v = q.get('v');
+        const boxExists = box && ALL_PIECES.some(p => (p.box_name || '').trim() === box);
+        if (!boxExists) { showTopLevel(); return; }
+        if (v === 'pre') showBoxPrefixes(box);
+        else if (v === 'list') showScopePieces(box, pre);
+        else if (k) { currentBoxScope = box; currentPrefixScope = pre; showKaratPieces(Number(k)); }
+        else enterScope(box, pre);
+        try {
+            const [where, y] = (sessionStorage.getItem('gm_inv_scroll') || '').split('|');
+            if (where === location.search && y) requestAnimationFrame(() => window.scrollTo(0, Number(y)));
+        } catch (e) {}
     }
 
     // Top level: just the main boxes -- karats live inside "قطع ذهبية" only.
     function showTopLevel() {
         currentBoxScope = null;
         currentPrefixScope = null;
+        gmViewUrl({});
         document.getElementById('karat-boxes-back').classList.add('hidden');
         document.getElementById('karat-boxes-back').classList.remove('flex');
         document.getElementById('karat-boxes').classList.add('hidden');
@@ -557,6 +584,7 @@
     function showBoxPrefixes(boxName) {
         currentBoxScope = boxName;
         currentPrefixScope = null;
+        gmViewUrl({ box: boxName, v: 'pre' });
         const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName);
         const byPrefix = {};
         pieces.forEach(p => {
@@ -598,6 +626,7 @@
     function showScopePieces(boxName, prefix) {
         currentBoxScope = boxName;
         currentPrefixScope = prefix;
+        gmViewUrl({ box: boxName, pre: prefix, v: 'list' });
         const pieces = ALL_PIECES.filter(p =>
             (p.box_name || '').trim() === boxName &&
             (prefix === null || prefixOf(p.barcode) === prefix)
@@ -623,6 +652,7 @@
     function showBoxKarats(boxName) {
         currentBoxScope = boxName;
         currentPrefixScope = null;
+        gmViewUrl({ box: boxName });
         const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName);
         document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
@@ -638,6 +668,7 @@
     function showPrefixKarats(boxName, prefix) {
         currentBoxScope = boxName;
         currentPrefixScope = prefix;
+        gmViewUrl({ box: boxName, pre: prefix });
         const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName && prefixOf(p.barcode) === prefix);
         document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
@@ -659,6 +690,7 @@
     }
 
     function showKaratPieces(karat) {
+        gmViewUrl({ box: currentBoxScope, pre: currentPrefixScope, k: karat });
         const pieces = ALL_PIECES.filter(p =>
             (p.karat || 0) === karat &&
             (currentBoxScope === null || (p.box_name || '').trim() === currentBoxScope) &&
