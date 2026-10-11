@@ -106,7 +106,7 @@
 <div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">workspace_premium</span>حركات الذهب <span class="text-[10px] font-normal text-gray-500 mr-2"><span class="material-symbols-outlined st-arrow" style="color:#8A3B32;font-size:15px">arrow_upward</span> صادر &nbsp; <span class="material-symbols-outlined st-arrow" style="color:#3F6B47;font-size:15px">arrow_downward</span> وارد</span></div>
 <table class="w-full stmt-table st-gold" style="border-collapse:collapse;">
 <colgroup><col style="width:34%"><col style="width:10%"><col style="width:19%"><col style="width:18%"><col style="width:19%"></colgroup>
-<thead><tr><th>البيان</th><th>العدد</th><th>الوزن (غ)</th><th>عيار ٢٤ (غ)</th><th>المصنعية<span id="stFabCur"></span></th></tr></thead>
+<thead><tr><th>البيان</th><th>العدد</th><th>الوزن القائم (غ)</th><th>عيار ٢٤ (غ)</th><th>المصنعية<span id="stFabCur"></span></th></tr></thead>
 <tbody id="stGoldRows"></tbody>
 </table>
 </div>
@@ -167,6 +167,8 @@ function stShort(n) {
     return String(n || '').replace(/^\s*(إخراج|إعطاء|استلام|إدخال)\s+(بضاعة|قطع|قطعة)\s*[—–-]\s*/, '').replace(/باركود\s*/g, '').trim();
 }
 const ST_SRC = { stock_given: 'بضاعة', stock_received: 'بضاعة', opening_balance: 'رصيد سابق', settlement: 'تسوية', gold_to_cash: 'تسكير عملات', scrap_given: 'كسر بالكلفة' };
+// only the gross (قائم) weight is shown; older rows without it fall back to the billed weight
+const stGross = m => Number(m.weight_grams) > 0 ? Number(m.weight_grams) : stBilled(m);
 const stBilled = m => Number(m.karat) ? Number(m.gold_24k_equivalent || 0) * 24 / Number(m.karat) : Number(m.weight_grams || 0);
 function stRenderGold() {
     document.querySelectorAll('#stOpts [data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === ST_VIEW));
@@ -177,18 +179,17 @@ function stRenderGold() {
         const f = g.rows[0], s = sgn(f);
         const gold = g.rows.reduce((a, m) => a + sgn(m) * Number(m.gold_24k_equivalent || 0), 0);
         const fab = g.rows.reduce((a, m) => a + sgn(m) * Number(m.fab_fee_amount || 0), 0);
-        const w = g.rows.reduce((a, m) => a + stBilled(m), 0);
-        const gross = g.rows.reduce((a, m) => a + Number(m.weight_grams || 0), 0); // الوزن القائم
+        const gross = g.rows.reduce((a, m) => a + stGross(m), 0); // الوزن القائم
         const pcs = g.rows.filter(m => m.piece_id).length;
         const karats = [...new Set(g.rows.map(m => m.karat).filter(Boolean))].join('/');
         let title = (ST_SRC[f.source] || '') + (f.batch_ref ? ' ' + f.batch_ref : '');
         if (g.rows.length === 1 && !f.piece_id && f.notes) title = stShort(f.notes);
         const dateRow = `<tr class="st-d"><td colspan="5">${stArrow(f.movement_type)} ${fmtDate(f.created_at)} <span class="font-normal text-gray-600">· ${gmEscapeHtml(title.trim() || '—')}${karats ? ' · عيار ' + karats : ''}</span></td></tr>`;
-        // totals: gross (قائم) weight, and the billed weight under it when it differs
+        // totals: gross (قائم) weight, 24K, making
         const total = `<tr class="st-v">
             <td>المجموع</td>
             <td>${pcs || '—'}</td>
-            <td class="font-data-mono">${gross ? 'قائم ' + fmt(gross) : fmt(w)}${gross && Math.abs(gross - w) > 0.005 ? `<div class="text-[10px] font-normal text-gray-600">محاسبي ${fmt(w)}</div>` : ''}</td>
+            <td class="font-data-mono">${fmt(gross)}</td>
             <td class="font-data-mono" style="color:${col(gold)}">${gold >= 0 ? '+' : ''}${fmt(gold)}</td>
             <td class="font-data-mono" style="color:${col(fab)}">${fab ? fmt(fab) : '—'}</td></tr>`;
         if (ST_VIEW !== 'details' || g.rows.length < 2 && !f.piece_id) return dateRow + total;
@@ -199,7 +200,7 @@ function stRenderGold() {
             return `<tr class="st-p">
                 <td><div class="st-pc">${ph}<span>${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}${ST_CAN_RETURN && m.source === 'stock_given' && m.piece_id ? `<button type="button" class="st-ret no-print" onclick="stReturnPiece('${m.id}', this)">↩ إرجاع للمخزن</button>` : ''}</span></div></td>
                 <td>${m.karat ? 'ع' + m.karat : ''}</td>
-                <td class="font-data-mono">${fmt(stBilled(m))}</td>
+                <td class="font-data-mono">${fmt(stGross(m))}</td>
                 <td class="font-data-mono">${fmt(m.gold_24k_equivalent)}</td>
                 <td class="font-data-mono">${Number(m.fab_fee_amount) ? fmt(m.fab_fee_amount) : ''}</td></tr>`;
         }).join('') + total;

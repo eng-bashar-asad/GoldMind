@@ -37,8 +37,8 @@ test('vouchers vs details, arrows, photos toggle', async ({ page }) => {
   // totals sit under the pieces: gross weight, 24K, making
   const last = rows.locator('tr').last();
   await expect(last).toHaveClass(/st-v/);
-  await expect(last).toContainText('قائم 30.00');
-  await expect(last).not.toContainText('محاسبي'); // same as gross here
+  await expect(last).toContainText('30.00');
+  await expect(page.locator('#stGold, table').first()).not.toContainText('محاسبي');
   await expect(last).toContainText('22.50');
   await expect(last).toContainText('450.00');
   await expect(rows.locator('img.st-ph')).toHaveCount(1);
