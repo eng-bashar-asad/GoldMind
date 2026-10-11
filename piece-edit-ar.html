@@ -81,18 +81,25 @@
 .gm-tl:before{content:'';position:absolute;right:5px;top:6px;bottom:6px;width:2px;background:#E3D6B4}
 .gm-tl>div{position:relative;padding:8px 0}
 .gm-tl>div:before{content:'';position:absolute;right:-17px;top:13px;width:10px;height:10px;border-radius:50%;background:#D9B45A;box-shadow:0 0 0 3px #F3EEDF}
-.gm-bar{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(243,238,223,.94);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.gm-bar{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;gap:10px;padding:12px 16px calc(12px + env(safe-area-inset-bottom));background:rgba(243,238,223,.94);background:color-mix(in srgb,var(--gm-bg,#F3EEDF) 94%,transparent);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
 .gm-bar a,.gm-bar button{position:relative;height:52px;border-radius:18px;display:flex;align-items:center;justify-content:center;gap:6px;font-weight:700;font-size:14px;border:0}
 .gm-bar .sq{width:52px;background:#1F1A12;color:#F3EEDF;flex-shrink:0}
+/* dark themes (الخمري / الفولاذي): the page follows the theme colour, text sitting straight on it turns light,
+   and the history list gets its own light card */
+html:not(.gm-light-canvas) .gm-on-canvas, html:not(.gm-light-canvas) #gmPieceTitle{color:#F4F1EA!important}
+html:not(.gm-light-canvas) #gmPieceBarcode{color:#C9CED8!important}
+html:not(.gm-light-canvas) #piece-log-list{background:#FFFDF8!important;border-radius:20px;padding:12px 26px 12px 12px}
+html:not(.gm-light-canvas) #piece-log-list.gm-tl:before{right:13px}
+html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 @media (prefers-reduced-motion: reduce){.gm-gold,.gm-sweep::after,.gm-age-bar i{animation:none!important}}
 </style>
 </head>
-<body class="bg-background text-on-background font-body-md" style="background:#F3EEDF;">
-<header class="z-50 sticky top-0" style="background:#F3EEDF;">
+<body class="bg-background text-on-background font-body-md" style="background:var(--gm-bg,#F3EEDF);">
+<header class="z-50 sticky top-0" style="background:var(--gm-bg,#F3EEDF);">
 <div class="flex justify-between items-center px-4 w-full h-16">
 <div class="flex items-center gap-3">
 <button onclick="gmSmartBack('inventory-list-ar.html')" class="gm-back" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button>
-<h1 style="margin:0;font-size:18px;font-weight:700;color:#1F1A12;">بيانات القطعة</h1>
+<h1 class="gm-on-canvas" style="margin:0;font-size:18px;font-weight:700;color:#1F1A12;">بيانات القطعة</h1>
 </div>
 </div>
 </header>
@@ -259,7 +266,7 @@
 
 <!-- Per-piece movement/audit log -->
 <div class="mt-2">
-<h2 style="margin:0 0 8px;font-size:15px;font-weight:700;color:#1F1A12;">سجل القطعة</h2>
+<h2 class="gm-on-canvas" style="margin:0 0 8px;font-size:15px;font-weight:700;color:#1F1A12;">سجل القطعة</h2>
 <div id="piece-log-list" class="gm-card gm-tl" style="background:transparent;">
 <div class="p-4 text-center text-[12px] text-on-surface-variant">جارِ التحميل...</div>
 </div>
