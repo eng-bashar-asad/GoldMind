@@ -190,7 +190,7 @@ async function build(from, to) {
     gmFetchAllRows(() => q().from('pieces').select('weight_grams, accounting_weight_grams, karat').eq('store_id', S).eq('status', 'available')),
     q().from('gold_stock_lots').select('weight_grams_remaining, karat').eq('store_id', S),
     q().from('gold_prices').select('karat, price_per_gram').eq('store_id', S),
-    gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer:customer_id(name)').eq('store_id', S).lt('created_at', to).order('created_at'))
+    gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer_id, customer:customer_id(name)').eq('store_id', S).lt('created_at', to).order('created_at'))
   ]);
   for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR]) if (x.error) throw x.error;
 
@@ -263,8 +263,16 @@ async function build(from, to) {
   const perCust = {};
   cdebtAllR.data.forEach(m => { perCust[m.customer_id] = (perCust[m.customer_id] || 0) + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0); });
   const deposits = (depR && depR.data) || [];
-  const depOpen = deposits.filter(d => d.status === 'active' || (d.refunded_at && d.refunded_at >= to));
-  const depOpenTotal = sum(depOpen, 'amount');
+  // what is left of each deposit at the end of the period: a customer's credit
+  // (−balance) spread over their open deposits, newest first — a sale uses it up
+  const left = {};
+  [...deposits].filter(d => d.status === 'active' || (d.refunded_at && d.refunded_at >= to)).reverse().forEach(d => {
+    const c = Math.max(0, -(perCust[d.customer_id] || 0)) - (left['_' + d.customer_id] || 0);
+    d.left = Math.max(0, Math.min(Number(d.amount), c));
+    left['_' + d.customer_id] = (left['_' + d.customer_id] || 0) + d.left;
+  });
+  const depOpen = deposits.filter(d => d.left > 0.009);
+  const depOpenTotal = depOpen.reduce((a, d) => a + d.left, 0);
   const depInPeriod = deposits.filter(d => d.created_at >= from);
   const owedToUs = Object.values(perCust).reduce((a, b) => a + (b > 0.005 ? b : 0), 0);
   const creditTotal = Object.values(perCust).reduce((a, b) => a + (b < -0.005 ? -b : 0), 0);
@@ -363,7 +371,7 @@ async function build(from, to) {
     const shown = deposits.filter(d => depOpen.includes(d) || depInPeriod.includes(d));
     h += sec('bookmark_added', 'إيصالات العربون', `<table class="fr-t">
       <tr><th>الإيصال</th><th>العميل</th><th>القطع</th><th>الحالة</th><th class="n">المبلغ</th></tr>
-      ${shown.map(d => `<tr><td dir="ltr" style="text-align:right">${esc(d.deposit_number)}</td><td>${esc(d.customer && d.customer.name)}</td><td>${esc((d.items || []).map(i => i.description || i.barcode).join('، '))}</td><td>${d.status === 'active' ? 'قائم' : 'مُسترجَع'}</td><td class="n">${money(d.amount)}</td></tr>`).join('')}
+      ${shown.map(d => `<tr><td dir="ltr" style="text-align:right">${esc(d.deposit_number)}</td><td>${esc(d.customer && d.customer.name)}</td><td>${esc((d.items || []).map(i => i.description || i.barcode).join('، '))}</td><td>${d.status === 'refunded' && !(d.left > 0.009) ? 'مُسترجَع' : !(d.left > 0.009) ? 'استُخدم في فاتورة' : d.left < Number(d.amount) - 0.009 ? 'الباقي ' + money(d.left) : 'قائم'}</td><td class="n">${money(d.amount)}</td></tr>`).join('')}
     </table>`, 'العربون القائم مبلغ دفعه العميل لحجز قطعة، ويُخصم من فاتورته عند الشراء.');
   }
   h += sec('diamond', 'الذهب بالوزن', karats.length ? `<table class="fr-t">

@@ -13,6 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=36"></script>
 <script src="theme.js?v=57"></script>
+<script src="gm-invoice-edit.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -275,37 +276,6 @@ function updateTotal() {
   document.getElementById('newTotal').textContent = FX ? fmt(items.reduce((s, it) => s + fxLine(it), 0)) + ' ' + FX_CUR : fmt(total);
 }
 
-async function postLedgerEntry(invoiceType, paymentMethod, amount, mode, description, editDelta) {
-  const isTraderInvoice = invoiceType === 'buyTrader' || invoiceType === 'buyRetail';
-  const isAdding = mode === 'add';
-
-  if (paymentMethod === 'cash' || paymentMethod === 'bank') {
-    // Sale: adding money in means direction 'in'; purchase: adding means 'out'.
-    let direction;
-    if (invoiceType === 'sale') direction = isAdding ? 'in' : 'out';
-    else direction = isAdding ? 'out' : 'in';
-
-    await goldmindClient.from('cash_movements').insert({
-      store_id: GOLDMIND_STORE_ID, box: 'main', direction, amount,
-      description, created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id, edit_delta: !!editDelta
-    });
-  } else if (paymentMethod === 'credit' && invoiceType === 'sale') {
-    await goldmindClient.from('customer_debts').insert({
-      store_id: GOLDMIND_STORE_ID, customer_id: invoice.customer_id, invoice_id: invoice.id,
-      movement_type: isAdding ? 'debt_increase' : 'debt_decrease',
-      cash_amount: amount, gold_grams_24k: 0,
-      notes: description, created_by: GOLDMIND_STAFF_ID
-    });
-  } else if (paymentMethod === 'credit' && isTraderInvoice) {
-    await goldmindClient.from('trader_movements').insert({
-      store_id: GOLDMIND_STORE_ID, trader_id: invoice.trader_id, invoice_id: invoice.id,
-      movement_type: isAdding ? 'debt_increase' : 'debt_decrease',
-      weight_grams: 0, karat: null, gold_24k_equivalent: 0, fab_fee_amount: amount,
-      notes: description
-    });
-  }
-}
-
 // ---- change the customer of a sale invoice ----
 let newCustomer = null; // { id, name }
 let custTimer = null, custResults = [];
@@ -426,203 +396,24 @@ async function saveEdit() {
   btn.disabled = true;
   btn.textContent = 'جارِ الحفظ...';
 
-  // customer first (with the invoice's old amounts), so its remaining debt moves
-  // to the new customer and any difference below is posted on the new one
-  if (invoice.type === 'sale' && newCustomer && newCustomer.id !== invoice.customer_id) {
-    const { error: custErr } = await goldmindClient.rpc('sale_invoice_change_customer', { p_invoice: invoice.id, p_customer: newCustomer.id });
-    if (custErr) {
-      btn.disabled = false; btn.textContent = 'حفظ التعديلات';
-      errEl.textContent = 'تعذّر تغيير الزبون: ' + custErr.message;
-      errEl.classList.remove('hidden');
-      return;
-    }
-    invoice.customer_id = newCustomer.id;
-  }
-
-  const isTrader = invoice.type === 'buyTrader' || invoice.type === 'buyRetail';
-  const counterpartyVal = document.getElementById('counterpartyInput').value.trim();
-
-  const updatePayload = {
-    payment_method: newPaymentMethod,
-    total_amount: newTotal,
-    amount_paid: (newPaymentMethod === 'credit') ? 0 : newTotal
-  };
-  // Sale invoices: money already received stays received. Only a fully paid
-  // invoice settles the difference in cash; otherwise the difference goes to
-  // the customer's debt on this invoice (and a total below what was paid is
-  // refunded). Before this, editing a part-paid invoice marked it fully paid
-  // and booked the whole total into the cashbox a second time.
-  let saleMoney = null;
-  if (invoice.type === 'sale') {
-    const oldPaid = Number(invoice.amount_paid || 0);
-    const oldRem = oldTotal - oldPaid;
-    const mp = gmMixedPaid(), mixCash = mp.cash, mixBank = mp.bank;
-    const newPaid = newPaymentMethod === 'mixed' ? Math.round((mixCash + mixBank + gmLaterPaid()) * 100) / 100
-      : newPaymentMethod === 'credit' ? 0 : oldRem <= 0.009 ? newTotal : Math.min(oldPaid, newTotal);
-    saleMoney = { cashDelta: newPaid - oldPaid, debtDelta: (newTotal - newPaid) - oldRem };
-    if (FX && newTotal > 0) {
-      // keep the typed amounts exact: new rate = total typed ÷ invoice total
-      const newRate = items.reduce((s, it) => s + fxLine(it), 0) / newTotal;
-      updatePayload.pay_fx_rate = newRate;
-      saleMoney.fxDelta = Math.round((newPaid * newRate - oldPaid * FX) * 100) / 100;
-    }
-    updatePayload.amount_paid = newPaid;
-    updatePayload.status = newTotal - newPaid > 0.009 ? 'unpaid' : 'paid';
-    if (oldRem > 0.009 && newPaymentMethod !== 'credit' && newPaymentMethod !== 'mixed') updatePayload.payment_method = invoice.payment_method;
-    updatePayload.cash_paid_amount = newPaymentMethod === 'mixed' ? mixCash : null;
-    updatePayload.bank_paid_amount = newPaymentMethod === 'mixed' ? mixBank : null;
-    // The currencies paid changed: take the invoice's old money out of the box (in the old
-    // currencies) and put the new payment in (in the new ones), instead of one net delta.
-    const newBD = gmNewBreakdown(newPaymentMethod);
-    if (!FX && (invoice.pay_breakdown || newBD) && JSON.stringify(invoice.pay_breakdown || null) !== JSON.stringify(newBD)) {
-      updatePayload.pay_breakdown = newBD;
-      saleMoney.replace = { newIn: Math.max(0, Math.round((newPaid - gmLaterPaid()) * 100) / 100) };
-    }
-  }
-  if (invoice.type === 'sale' || invoice.type === 'return') {
-    // customer editing left as-is (rare case) — only re-linkable via cancel+reissue
-  } else if (invoice.type === 'buyRetail') {
-    updatePayload.counterparty_name = counterpartyVal || null;
-  }
-
-  // currency switch, step 1: before the invoice changes, so the box removes it in the OLD currencies
-  if (saleMoney && saleMoney.replace) {
-    const { data: cms } = await goldmindClient.from('cash_movements').select('direction, amount').eq('invoice_id', invoice.id);
-    const inBox = Math.round((cms || []).reduce((t, m) => t + (m.direction === 'in' ? 1 : -1) * Number(m.amount || 0), 0) * 100) / 100;
-    if (inBox > 0.009) {
-      const { error: outErr } = await goldmindClient.from('cash_movements').insert({
-        store_id: GOLDMIND_STORE_ID, box: 'main', direction: 'out', amount: inBox, invoice_id: invoice.id, created_by: GOLDMIND_STAFF_ID,
-        description: 'تعديل عملات الدفع — إخراج المبلغ القديم للفاتورة ' + invoice.invoice_number
-      });
-      if (outErr) { btn.disabled = false; btn.textContent = 'حفظ التعديلات'; errEl.textContent = 'تعذّر حفظ الفاتورة: ' + outErr.message; errEl.classList.remove('hidden'); return; }
-    }
-  }
-  const { data: invUpdateData, error: invUpdateError } = await goldmindClient.from('invoices').update(updatePayload).eq('id', invoice.id);
-  if (invUpdateError) {
+  const res = await gmSaveInvoiceEdit({
+    invoice, items, removedItems, method: newPaymentMethod,
+    mixed: gmMixedPaid(), newBreakdown: invoice.type === 'sale' ? gmNewBreakdown(newPaymentMethod) : null,
+    newCustomer, FX, FX_CUR, fxLineSum: items.reduce((t, it) => t + fxLine(it), 0),
+    counterparty: document.getElementById('counterpartyInput').value.trim()
+  });
+  if (res.error) {
     btn.disabled = false; btn.textContent = 'حفظ التعديلات';
-    errEl.textContent = 'تعذّر حفظ الفاتورة: ' + invUpdateError.message;
+    errEl.textContent = res.error;
     errEl.classList.remove('hidden');
     return;
-  }
-
-  // Update fields on items that already existed
-  for (const it of items.filter(i => !i._new)) {
-    await goldmindClient.from('invoice_items').update({
-      description: it.description,
-      weight_grams: it.weight_grams,
-      karat: it.karat,
-      line_total: it.line_total
-    }).eq('id', it.id);
-  }
-
-  // Insert brand-new items (create a piece first for purchase invoices so
-  // the added stock actually lands in inventory; sale items reuse a piece
-  // found via barcode lookup, or stay unlinked like a manual sale line)
-  const newItems = items.filter(i => i._new);
-  for (const it of newItems) {
-    let pieceId = it.piece_id;
-    if (!pieceId && isTrader) {
-      const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
-      const { data: newPiece } = await goldmindClient.from('pieces').insert({
-        store_id: GOLDMIND_STORE_ID,
-        barcode: bcError ? null : barcode,
-        weight_grams: it.weight_grams, karat: it.karat, description_ar: it.description,
-        status: 'available', created_by: GOLDMIND_STAFF_ID
-      }).select().single();
-      pieceId = newPiece ? newPiece.id : null;
-    } else if (pieceId && invoice.type === 'sale') {
-      await goldmindClient.from('pieces').update({ status: 'sold' }).eq('id', pieceId);
-      await goldmindClient.from('piece_movements').insert({ store_id: GOLDMIND_STORE_ID, piece_id: pieceId, event_type: 'sold', note: 'بيع بفاتورة ' + invoice.invoice_number + ' (أُضيفت عند تعديل الفاتورة)', created_by: GOLDMIND_STAFF_ID });
-    }
-
-    await goldmindClient.from('invoice_items').insert({
-      invoice_id: invoice.id, piece_id: pieceId, barcode: it.barcode,
-      karat: it.karat, weight_grams: it.weight_grams, accounting_weight_grams: it.accounting_weight_grams,
-      fabrication_fee: 0, line_total: it.line_total,
-      description: it.description, description_en: it.description_en,
-      gold_price_per_gram: it.gold_price_per_gram
-    });
-  }
-
-  // Release pieces/diamonds/bulk-lot weight from removed items back to a sane inventory state
-  const bulkRestoreByLot = {};
-  for (const it of removedItems) {
-    await goldmindClient.from('invoice_items').delete().eq('id', it.id);
-    if (it.piece_id) {
-      await goldmindClient.from('pieces').update({
-        status: invoice.type === 'sale' ? 'available' : 'cancelled'
-      }).eq('id', it.piece_id);
-      await goldmindClient.from('piece_movements').insert({ store_id: GOLDMIND_STORE_ID, piece_id: it.piece_id, event_type: invoice.type === 'sale' ? 'returned' : 'status_changed',
-        note: 'حُذفت من الفاتورة ' + invoice.invoice_number + ' عند التعديل' + (invoice.type === 'sale' ? ' فعادت متوفرة' : ''), created_by: GOLDMIND_STAFF_ID });
-    }
-    if (it.diamond_piece_id) {
-      await goldmindClient.from('diamond_pieces').update({
-        status: invoice.type === 'sale' ? 'available' : 'cancelled'
-      }).eq('id', it.diamond_piece_id);
-    }
-    if (it.gold_stock_lot_id && it.weight_grams && invoice.type === 'sale') {
-      bulkRestoreByLot[it.gold_stock_lot_id] = (bulkRestoreByLot[it.gold_stock_lot_id] || 0) + Number(it.weight_grams);
-    }
-  }
-  for (const lotId of Object.keys(bulkRestoreByLot)) {
-    const { data: lot } = await goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('id', lotId).maybeSingle();
-    if (lot) {
-      await goldmindClient.from('gold_stock_lots').update({
-        weight_grams_remaining: Number(lot.weight_grams_remaining) + bulkRestoreByLot[lotId]
-      }).eq('id', lotId);
-    }
-  }
-
-  // Post the money/debt effect as TWO explicit dated entries — a full
-  // removal of the old invoice value, then a full addition of the new
-  // value — instead of one net delta. Never touches the original entry.
-  if (saleMoney) {
-    const r2 = v => Math.round(v * 100) / 100;
-    if (saleMoney.replace) {
-      // step 2: the new payment, split into the daily box per currency by the new pay_breakdown
-      if (saleMoney.replace.newIn > 0.009) await goldmindClient.from('cash_movements').insert({
-        store_id: GOLDMIND_STORE_ID, box: 'main', direction: 'in', amount: saleMoney.replace.newIn, invoice_id: invoice.id, created_by: GOLDMIND_STAFF_ID,
-        description: 'تعديل عملات الدفع — المبلغ الجديد للفاتورة ' + invoice.invoice_number
-      });
-    } else if (Math.abs(saleMoney.cashDelta) > 0.009) {
-      await goldmindClient.from('cash_movements').insert({
-        store_id: GOLDMIND_STORE_ID, box: 'main', direction: saleMoney.cashDelta > 0 ? 'in' : 'out', amount: r2(Math.abs(saleMoney.cashDelta)),
-        description: (saleMoney.cashDelta > 0 ? 'تحصيل فرق تعديل فاتورة ' : 'رد فرق تعديل فاتورة ') + invoice.invoice_number,
-        created_by: GOLDMIND_STAFF_ID, invoice_id: invoice.id, edit_delta: true, // changes the invoice's own row in the daily box
-        ...(saleMoney.fxDelta ? { fx_amount: Math.abs(saleMoney.fxDelta), fx_currency: FX_CUR } : {})
-      });
-    }
-    if (Math.abs(saleMoney.debtDelta) > 0.009 && invoice.customer_id) {
-      await goldmindClient.from('customer_debts').insert({
-        store_id: GOLDMIND_STORE_ID, customer_id: invoice.customer_id, invoice_id: invoice.id,
-        movement_type: saleMoney.debtDelta > 0 ? 'debt_increase' : 'debt_decrease',
-        cash_amount: r2(Math.abs(saleMoney.debtDelta)), gold_grams_24k: 0, source: 'invoice_edit',
-        notes: 'تعديل فاتورة ' + invoice.invoice_number, created_by: GOLDMIND_STAFF_ID
-      });
-    }
-  } else if (invoice.payment_method === newPaymentMethod) {
-    // Same way of paying: post only the difference (nothing when the amount
-    // didn't change, e.g. a fixed customer name), so the cashbox shows the
-    // invoice once with its final value.
-    const delta = Math.round((newTotal - oldTotal) * 100) / 100;
-    if (Math.abs(delta) > 0.009) {
-      await postLedgerEntry(invoice.type, newPaymentMethod, Math.abs(delta), delta > 0 ? 'add' : 'remove',
-        (delta > 0 ? 'زيادة' : 'نقص') + ' قيمة فاتورة ' + invoice.invoice_number + ' بعد التعديل', true);
-    }
-  } else {
-    // Payment way changed (e.g. cash → on the trader's account): undo it in
-    // the old place and post it in the new one.
-    if (oldTotal > 0) await postLedgerEntry(invoice.type, invoice.payment_method, oldTotal, 'remove',
-      'حذف قيمة فاتورة ' + invoice.invoice_number + ' (قبل التعديل)');
-    if (newTotal > 0) await postLedgerEntry(invoice.type, newPaymentMethod, newTotal, 'add',
-      'إضافة قيمة فاتورة ' + invoice.invoice_number + ' (بعد التعديل)');
   }
 
   okEl.textContent = 'تم حفظ التعديلات بنجاح';
   okEl.classList.remove('hidden');
   btn.disabled = false;
   btn.textContent = 'حفظ التعديلات';
-  setTimeout(() => { window.location.replace('invoice-print-ar.html?id=' + invoice.id); }, 1000);
+  setTimeout(() => gmAfterInvoiceEdit(invoice.id), 1000);
 }
 
 async function load() {

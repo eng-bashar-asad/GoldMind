@@ -86,7 +86,7 @@ test('financial report: debts owed to us, owed by us, deposits and their receipt
     D('x', 'debt_increase', 900, null, 'i7'), D('x', 'debt_decrease', 100, 'invoice_edit', 'i7'),
     D('hala', 'debt_decrease', 200, 'deposit'),
     D('y', 'debt_decrease', 50, 'payment') ];
-  db.customer_deposits = [{ store_id: STORE, deposit_number: 'DEP-000001', amount: 200, status: 'active', created_at: now, items: [{ description: 'طقم ديور' }], customer: { name: 'هلا الهفل' } }];
+  db.customer_deposits = [{ store_id: STORE, deposit_number: 'DEP-000001', customer_id: 'hala', amount: 200, status: 'active', created_at: now, items: [{ description: 'طقم ديور' }], customer: { name: 'هلا الهفل' } }];
   await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
   await page.goto('/financial-report-ar.html');
   await expect(page.locator('#fr-body')).toContainText('ديون لنا على الزبائن');

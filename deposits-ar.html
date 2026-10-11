@@ -191,10 +191,14 @@ async function loadDeposits() {
   const list = document.getElementById('list');
   if (error) { list.innerHTML = `<p class="p-4 text-error text-sm">${esc(error.message)}</p>`; return; }
   DEPOSITS = data || [];
-  const active = DEPOSITS.filter(d => d.status === 'active');
-  document.getElementById('list-total').textContent = active.length ? 'قائمة: ' + money(active.reduce((s, d) => s + Number(d.amount), 0)) : '';
+  // how much of each active deposit is still unused (a sale uses it up automatically)
+  const { data: rem } = await goldmindClient.rpc('customer_deposit_remaining', { sid: GOLDMIND_STORE_ID });
+  const left = new Map((rem || []).map(r => [r.deposit_id, Number(r.remaining)]));
+  DEPOSITS.forEach(d => { d.left = d.status === 'active' ? (left.has(d.id) ? left.get(d.id) : Number(d.amount)) : 0; });
+  const openTotal = DEPOSITS.reduce((s, d) => s + d.left, 0);
+  document.getElementById('list-total').textContent = openTotal > 0.009 ? 'قائمة: ' + money(openTotal) : '';
   list.innerHTML = DEPOSITS.length ? DEPOSITS.map(d => `
-    <button type="button" onclick="showVoucher('${d.id}')" class="w-full text-right p-3 flex items-center gap-3 ${d.status === 'refunded' ? 'opacity-50' : ''}">
+    <button type="button" onclick="showVoucher('${d.id}')" class="w-full text-right p-3 flex items-center gap-3 ${d.status === 'refunded' || d.left < 0.009 ? 'opacity-50' : ''}">
       <span class="material-symbols-outlined text-secondary">bookmark_added</span>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-[13px]">${esc(d.customer && d.customer.name)} <span class="font-data-mono text-on-surface-variant font-normal" dir="ltr">${esc(d.deposit_number)}</span></div>
@@ -202,9 +206,16 @@ async function loadDeposits() {
       </div>
       <div class="text-left">
         <div class="font-bold font-data-mono text-[13px]">${money(d.amount)}</div>
-        <div class="text-[11px]">${d.status === 'refunded' ? 'مُسترجَع' : 'قائم'}</div>
+        <div class="text-[11px]">${depState(d)}</div>
       </div>
     </button>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد سندات عربون بعد.</p>';
+}
+
+function depState(d) {
+  if (d.status === 'refunded') return 'مُسترجَع';
+  if (d.left < 0.009) return 'استُخدم في فاتورة';
+  if (d.left < Number(d.amount) - 0.009) return 'الباقي ' + money(d.left);
+  return 'قائم';
 }
 
 function showVoucher(id) {
@@ -224,7 +235,8 @@ function showVoucher(id) {
     </div>
     <div class="text-center font-bold text-[17px] mb-1">سند قبض عربون</div>
     <div class="flex justify-between text-[12px] mb-3"><span>رقم السند: <b dir="ltr">${esc(d.deposit_number)}</b></span><span>التاريخ: <bdi dir="ltr">${gmFormatDateTime(d.created_at)}</bdi></span></div>
-    ${d.status === 'refunded' ? '<div class="text-center font-bold text-red-700 border border-red-700 rounded mb-3">مُسترجَع — أُعيد المبلغ للعميل</div>' : ''}
+    ${d.status === 'refunded' ? '<div class="text-center font-bold text-red-700 border border-red-700 rounded mb-3">مُسترجَع — أُعيد المبلغ للعميل</div>'
+      : d.left < Number(d.amount) - 0.009 ? `<div class="no-print text-center font-bold text-emerald-800 border border-emerald-700 rounded mb-3">${d.left < 0.009 ? 'استُخدم كاملاً في فاتورة' : 'استُخدم منه ' + money(Number(d.amount) - d.left) + ' — الباقي ' + money(d.left)}</div>` : ''}
     <div class="mb-3">استلمنا من السيد/السيدة: <b>${esc(d.customer && d.customer.name)}</b>${d.customer && d.customer.phone ? ` — <bdi dir="ltr">${esc(d.customer.phone)}</bdi>` : ''}</div>
     <div class="mb-3 p-2 rounded border text-center">مبلغ وقدره <b class="text-[16px]">${money(d.amount)}</b> ${d.method === 'bank' ? '(تحويل / بطاقة)' : '(نقداً)'}<br/>عربوناً لحجز القطع التالية:</div>
     <table class="mb-3"><thead><tr><th>#</th><th>القطعة</th><th>الباركود</th><th>العيار</th><th>الوزن</th><th>السعر المتفق عليه</th></tr></thead><tbody>
@@ -236,7 +248,7 @@ function showVoucher(id) {
     ${d.notes ? `<div class="mb-3 text-[12px]">ملاحظات: ${esc(d.notes)}</div>` : ''}
     <div class="text-[11px] text-gray-600 mb-6">يُخصم هذا العربون من قيمة الفاتورة عند استلام القطع. يُرجى الاحتفاظ بهذا السند.</div>
     <div class="flex justify-between text-[12px]"><span>المستلم: ${esc(d.staff && d.staff.full_name)}</span><span>توقيع العميل: ..................</span></div>
-    ${d.status === 'active' ? `<button type="button" onclick="refundDeposit()" class="no-print mt-5 w-full h-10 border border-error text-error rounded-lg text-[12px] font-semibold">استرجاع العربون للعميل (يخرج المبلغ من الصندوق)</button>` : ''}`;
+    ${d.status === 'active' && d.left >= Number(d.amount) - 0.009 ? `<button type="button" onclick="refundDeposit()" class="no-print mt-5 w-full h-10 border border-error text-error rounded-lg text-[12px] font-semibold">استرجاع العربون للعميل (يخرج المبلغ من الصندوق)</button>` : ''}`;
   const m = document.getElementById('voucher-modal');
   m.classList.remove('hidden');
 }

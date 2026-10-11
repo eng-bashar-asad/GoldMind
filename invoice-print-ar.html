@@ -582,7 +582,9 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
                 const editBtn = document.getElementById('edit-invoice-btn');
                 editBtn.classList.remove('hidden');
                 editBtn.classList.add('flex');
-                editBtn.onclick = function () { window.location.href = 'invoice-edit-ar.html?id=' + invoiceId; };
+                // a sale is edited on the sale screen (clearer); other-currency sales, exchanges and purchases keep the edit page
+                const onSaleScreen = invoice.type === 'sale' && !invoice.is_exchange && !(invoice.pay_currency && Number(invoice.pay_fx_rate) > 0);
+                editBtn.onclick = function () { window.location.href = (onSaleScreen ? 'new-sale-ar.html?edit=' : 'invoice-edit-ar.html?id=') + invoiceId; };
             }
             if (staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.create_invoice)) && invoice.type === 'sale' && invoice.customer_id) {
                 const exBtn = document.getElementById('exchange-btn');

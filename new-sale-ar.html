@@ -17,6 +17,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=36"></script>
 <script src="theme.js?v=57"></script>
+<script src="gm-invoice-edit.js?v=1"></script>
 <script id="tailwind-config">
         tailwind.config = {
           darkMode: "class",
@@ -134,13 +135,15 @@
 <header class="bg-surface-container-lowest text-primary flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full h-16 sticky top-0 z-40 border-b border-outline-variant">
 <div class="flex items-center gap-3">
 <button onclick="gmSmartBack('index-ar.html')" class="cursor-pointer active:opacity-80 font-bold" style="direction:ltr;font-size:32px;line-height:1;" aria-label="رجوع">&#8594;</button>
-<h1 class="font-headline-md text-headline-md font-bold text-primary">بيع جديد</h1>
+<h1 id="sale-title" class="font-headline-md text-headline-md font-bold text-primary">بيع جديد</h1>
 </div>
 </header>
 <div class="px-margin-mobile md:px-margin-desktop py-6 md:py-8 max-w-container-max mx-auto w-full">
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 <!-- Item-entry column -->
 <div class="lg:col-span-2 flex flex-col gap-6">
+
+<div id="edit-banner" class="hidden rounded-xl p-3 text-[13px] leading-6" style="background:#FFF7E6;color:#5C3D00;border:1px solid #E8C77A"></div>
 
 <!-- Client Info Section -->
 <section class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm">
@@ -153,6 +156,8 @@
 </div>
 <button onclick="clearCustomer()" class="text-secondary text-sm font-semibold px-3 h-10 rounded-lg hover:bg-surface-container-low">تغيير</button>
 </div>
+
+<div id="customer-credit" class="hidden mt-2 rounded-lg p-3 text-[12px] leading-5" style="background:#ECFDF5;color:#065F46"></div>
 
 <div id="customer-search-block" class="space-y-3">
 <div class="relative">
@@ -424,6 +429,14 @@
 <span class="text-[12px] text-on-surface-variant">المدفوع الآن</span>
 <span class="text-[13px] font-bold font-data-mono text-success" id="mixed-paid-now">0.00 AED</span>
 </div>
+<div class="hidden justify-between items-center px-3 py-2 border-b border-outline-variant" id="mixed-later-row">
+<span class="text-[12px] text-on-surface-variant">مدفوع سابقاً على الفاتورة (دفعات لاحقة / عربون)</span>
+<span class="text-[13px] font-bold font-data-mono text-success" id="mixed-later"></span>
+</div>
+<div class="hidden justify-between items-center px-3 py-2 border-b border-outline-variant" id="mixed-credit-row">
+<span class="text-[12px] text-on-surface-variant">يُخصم من رصيد الزبون (عربون)</span>
+<span class="text-[13px] font-bold font-data-mono text-success" id="mixed-credit"></span>
+</div>
 <div class="flex justify-between items-center px-3 py-2" id="mixed-remaining-row">
 <span class="text-[12px] text-on-surface-variant" id="mixed-remaining-label">المتبقي كدين على الزبون</span>
 <span class="text-[13px] font-bold font-data-mono" id="mixed-remaining-note">0.00 AED</span>
@@ -616,6 +629,10 @@
 
     let selectedCustomer = null;
     let selectedPaymentMethod = 'cash';
+    // ?edit=<invoice id>: this screen edits a posted sale invoice (gm-invoice-edit.js saves it)
+    const EDIT_ID = new URLSearchParams(location.search).get('edit');
+    let EDIT = null, EDIT_LATER = 0, CUST_CREDIT = 0;
+    const editRemoved = []; // existing lines taken off the invoice
     const cart = []; // { cartId, piece (or null), barcode, karat, weight, price }
     let cartCounter = 0;
 
@@ -648,6 +665,7 @@
     }
 
     function saveDraftToLocalStorage() {
+        if (EDIT_ID) return; // editing a posted invoice: nothing to hold
         const others = readDrafts().filter(d => d.id !== currentDraftId);
         if (cart.length === 0 && !selectedCustomer) { writeDrafts(others); return; }
         if (!currentDraftId) currentDraftId = 'd' + Date.now();
@@ -731,6 +749,7 @@
     }
 
     function restoreDraftIfAny() {
+        if (EDIT_ID) { gmLoadEdit(); return; }
         // one-time migration from the old single-draft key
         try {
             const old = JSON.parse(localStorage.getItem(OLD_DRAFT_KEY) || 'null');
@@ -1167,7 +1186,7 @@
         const fxBank = fxRows.filter(r => r.method === 'bank').reduce((t, r) => t + fxBase(r), 0);
         const cashAmt = Math.round(((parseFloat(document.getElementById('mixed-cash-amount').value) || 0) + fxCash) * 100) / 100;
         const bankAmt = Math.round(((parseFloat(document.getElementById('mixed-bank-amount').value) || 0) + fxBank) * 100) / 100;
-        return { total, cashAmt, bankAmt, remaining: +(total - cashAmt - bankAmt).toFixed(2) };
+        return { total, cashAmt, bankAmt, remaining: +(total - cashAmt - bankAmt - EDIT_LATER).toFixed(2) };
     }
 
     function onMixedAmountInput() {
@@ -1177,7 +1196,23 @@
 
         const label = document.getElementById('mixed-remaining-label');
         const note = document.getElementById('mixed-remaining-note');
-        if (Math.abs(remaining) < 0.01) {
+        const laterRow = document.getElementById('mixed-later-row');
+        laterRow.classList.toggle('hidden', !(EDIT_LATER > 0.009)); laterRow.classList.toggle('flex', EDIT_LATER > 0.009);
+        document.getElementById('mixed-later').textContent = gmMoney(EDIT_LATER) + ' ' + CUR;
+        // the customer's deposit / credit is used up automatically by what stays unpaid
+        const fromCredit = Math.min(CUST_CREDIT, Math.max(0, remaining));
+        const creditRow = document.getElementById('mixed-credit-row');
+        creditRow.classList.toggle('hidden', !(fromCredit > 0.009)); creditRow.classList.toggle('flex', fromCredit > 0.009);
+        document.getElementById('mixed-credit').textContent = gmMoney(fromCredit) + ' ' + CUR;
+        if (fromCredit > 0.009 && remaining - fromCredit < 0.01) {
+            label.textContent = 'المتبقي';
+            note.textContent = 'لا يبقى دين — يُغطّى من رصيده';
+            note.className = 'text-[13px] font-bold font-data-mono text-success';
+        } else if (fromCredit > 0.009) {
+            label.textContent = 'المتبقي كدين على الزبون';
+            note.textContent = gmMoney(remaining - fromCredit) + ' ' + CUR;
+            note.className = 'text-[13px] font-bold font-data-mono text-error';
+        } else if (Math.abs(remaining) < 0.01) {
             label.textContent = 'المتبقي';
             note.textContent = 'لا يوجد متبقي — مدفوعة بالكامل';
             note.className = 'text-[13px] font-bold font-data-mono text-success';
@@ -1244,6 +1279,23 @@
         document.getElementById('customer-selected').classList.add('flex');
         document.getElementById('customer-search-block').classList.add('hidden');
         saveDraftToLocalStorage();
+        gmShowCustomerCredit(c);
+    }
+
+    // money the shop already holds for this customer (deposit / overpayment)
+    async function gmShowCustomerCredit(c) {
+        const box = document.getElementById('customer-credit');
+        CUST_CREDIT = 0; box.classList.add('hidden');
+        if (!c || !c.id) return;
+        const { data } = await goldmindClient.rpc('customer_credit', { sid: GOLDMIND_STORE_ID, cust: c.id });
+        if (!selectedCustomer || selectedCustomer.id !== c.id) return;
+        CUST_CREDIT = Number(data) || 0;
+        if (CUST_CREDIT > 0.009) {
+            box.innerHTML = '<b>للزبون عندنا رصيد ' + gmMoney(CUST_CREDIT) + ' ' + CUR + '</b> (عربون أو دفعة سابقة).<br>'
+                + 'يُخصم تلقائياً من المبلغ الذي يبقى عليه بهذه الفاتورة. اختر «دفعة جزئية» واكتب فقط ما يدفعه الآن — لا تكتب العربون، فهو في الصندوق من قبل.';
+            box.classList.remove('hidden');
+        }
+        if (selectedPaymentMethod === 'mixed') onMixedAmountInput();
     }
 
     // Offline there's no customer page to go to: take name + phone here and the
@@ -1258,6 +1310,7 @@
 
     function clearCustomer() {
         selectedCustomer = null;
+        CUST_CREDIT = 0; document.getElementById('customer-credit').classList.add('hidden');
         document.getElementById('customer-selected').classList.add('hidden');
         document.getElementById('customer-selected').classList.remove('flex');
         document.getElementById('customer-search-block').classList.remove('hidden');
@@ -1605,6 +1658,7 @@
         const idx = cart.findIndex(item => item.cartId === cartId);
         if (idx !== -1) {
             const removed = cart[idx];
+            if (removed.line) editRemoved.push(removed.line);
             if (removed.mode === 'stock' && reservedByLot[removed.lotId]) {
                 reservedByLot[removed.lotId] -= removed.weight;
             }
@@ -1721,6 +1775,7 @@
     saveBtn.addEventListener('click', async () => {
         const gmSession = await requireGoldMindSession('login-entry-ar.html');
         if (!gmSession) return;
+        if (EDIT_ID) return gmSaveEditFromSale();
 
         if (!selectedCustomer) {
             showMessage('الرجاء اختيار عميل أولاً.', true);
@@ -1830,6 +1885,87 @@
             window.location.href = 'invoice-print-ar.html?id=' + invoiceRow.id;
         }, 800);
     });
+
+    // ---------- Editing a posted sale invoice on this screen ----------
+    async function gmLoadEdit() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+        document.getElementById('sale-title').textContent = 'تعديل فاتورة';
+        document.getElementById('save-invoice-btn').lastChild.textContent = ' حفظ التعديلات ';
+        ['held-drafts-btn', 'pay-cur-bar', 'drafts-modal'].forEach(id => { const el = document.getElementById(id); if (el) el.style.display = 'none'; });
+        // new lines here: by barcode or typed in (bulk / diamond lines are added from a new sale)
+        const st = document.createElement('style');
+        st.textContent = '#sale-tabs [data-tab="stock"], #sale-tab-diamond { display: none !important; }';
+        document.head.appendChild(st);
+        showSaleTab('barcode', false);
+        const fail = msg => { showMessage(msg, true); saveBtn.disabled = true; };
+        const [{ data: staffRow }, { data: inv }, { data: store }] = await Promise.all([
+            goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+            goldmindClient.from('invoices').select('*, items:invoice_items(*), customer:customer_id(id, name, phone)').eq('id', EDIT_ID).maybeSingle(),
+            goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+        ]);
+        if (!(staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.edit_invoice)))) return fail('ليس لديك صلاحية تعديل الفواتير.');
+        if (!inv) return fail('تعذّر تحميل الفاتورة.');
+        // purchases, exchanges, cancelled and other-currency sales keep their own edit page
+        if (inv.type !== 'sale' || inv.status === 'cancelled' || inv.is_exchange || (inv.pay_currency && Number(inv.pay_fx_rate) > 0)) { gmReplace('invoice-edit-ar.html?id=' + inv.id); return; }
+        EDIT = inv;
+        EDIT_LATER = await gmInvoiceLaterPaid(inv);
+        const banner = document.getElementById('edit-banner');
+        banner.innerHTML = '<b>تعديل الفاتورة <span dir="ltr">' + gmEscapeHtml(inv.invoice_number) + '</span></b> — رقمها وتاريخها ثابتان (' + gmEscapeHtml(gmFormatDateTime(inv.created_at)) + ').<br>'
+            + 'عدّل السعر بالضغط عليه، احذف قطعة بـ ✕ فتعود متوفرة بالمخزن، أو أضف قطعة. يُسجَّل فرق المبلغ في الصندوق أو دين الزبون بتاريخ اليوم.';
+        banner.classList.remove('hidden');
+        (inv.items || []).forEach(l => cart.push({
+            cartId: ++cartCounter, line: l,
+            piece: l.piece_id ? { id: l.piece_id, barcode: l.barcode, description_ar: l.description } : null,
+            barcode: l.barcode, karat: l.karat, weight: l.diamond_piece_id ? '' : l.weight_grams,
+            price: Number(l.line_total) || 0, description: l.description,
+            mode: l.diamond_piece_id ? 'diamond' : l.gold_stock_lot_id ? 'stock' : undefined
+        }));
+        if (inv.customer) pickCustomer(inv.customer);
+        selectPayment(inv.payment_method || 'cash');
+        if (inv.payment_method === 'mixed') {
+            const base = ((store && store.currency) || 'AED').toUpperCase();
+            const bd = Array.isArray(inv.pay_breakdown) ? inv.pay_breakdown : [];
+            const baseOf = m => bd.filter(b => String(b.currency).toUpperCase() === base && b.method === m).reduce((t, b) => t + Number(b.amount || 0), 0);
+            document.getElementById('mixed-cash-amount').value = (bd.length ? baseOf('cash') : Number(inv.cash_paid_amount || 0)) || '';
+            document.getElementById('mixed-bank-amount').value = (bd.length ? baseOf('bank') : Number(inv.bank_paid_amount || 0)) || '';
+            bd.filter(b => String(b.currency).toUpperCase() !== base).forEach(b => fxRows.push({ id: ++fxSeq, currency: String(b.currency).toUpperCase(), amount: Number(b.amount), rate: Number(b.rate), method: b.method === 'bank' ? 'bank' : 'cash' }));
+            renderFxRows();
+            onMixedAmountInput();
+        }
+        renderCart();
+    }
+
+    async function gmSaveEditFromSale() {
+        if (!EDIT) return;
+        if (!selectedCustomer || !selectedCustomer.id) { showMessage('الرجاء اختيار عميل مسجّل.', true); return; }
+        if (cart.length === 0) { showMessage('لا يمكن حفظ فاتورة بدون قطع — لإلغائها كلها استخدم «إلغاء الفاتورة» من صفحتها.', true); return; }
+        if (selectedPaymentMethod === 'mixed') {
+            if (fxRows.some(r => Number(r.amount) > 0 && !(Number(r.rate) > 0))) { showMessage('أدخل سعر الصرف لكل مبلغ بعملة أخرى', true); return; }
+            if (getMixedAmounts().remaining < -0.01) { showMessage('المبلغ المُدخل أكبر من إجمالي الفاتورة', true); return; }
+        }
+        const total = cart.reduce((t, i) => t + i.price, 0);
+        const delta = Math.round((total - Number(EDIT.total_amount)) * 100) / 100;
+        if (!confirm('حفظ التعديلات على الفاتورة ' + EDIT.invoice_number + '؟\nالإجمالي الجديد ' + gmMoney(total) + ' ' + CUR
+            + (Math.abs(delta) > 0.009 ? ' (الفرق ' + (delta > 0 ? '+' : '') + gmMoney(delta) + ')' : '') + ' — يُسجَّل الفرق بتاريخ اليوم.')) return;
+        saveBtn.disabled = true; saveBtn.setAttribute('aria-busy', 'true');
+        const items = cart.map(i => i.line ? { ...i.line, line_total: i.price } : {
+            _new: true, piece_id: i.piece ? i.piece.id : null, barcode: i.barcode || null, karat: i.karat || null,
+            weight_grams: i.weight, accounting_weight_grams: i.piece ? (i.piece.accounting_weight_grams || i.weight) : i.weight,
+            description: (i.piece && i.piece.description_ar) || i.description || null, description_en: i.piece ? i.piece.description_en : null,
+            line_total: i.price, gold_price_per_gram: null
+        });
+        const m = getMixedAmounts();
+        const res = await gmSaveInvoiceEdit({
+            invoice: EDIT, items, removedItems: editRemoved, method: selectedPaymentMethod,
+            mixed: { cash: m.cashAmt, bank: m.bankAmt },
+            newBreakdown: selectedPaymentMethod === 'mixed' ? gmPayBreakdown() : null,
+            newCustomer: selectedCustomer
+        });
+        if (res.error) { saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); showMessage(res.error, true); return; }
+        showMessage('تم حفظ التعديلات بنجاح', false);
+        setTimeout(() => gmAfterInvoiceEdit(EDIT.id), 800);
+    }
 
     // ---------- Keyboard shortcuts (desktop) ----------
     // F2 → jump straight to the barcode field (fast rescanning without
