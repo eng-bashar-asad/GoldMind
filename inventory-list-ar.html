@@ -267,7 +267,7 @@
 <h2 class="gm-sec" style="margin-top:0;">الذهب بالوزن</h2>
 <p class="text-[12px] text-on-surface-variant mb-3">الكسر والذهب غير المقطّع، مجمّعاً حسب الصندوق.</p>
 <div id="lot-boxes" class="grid grid-cols-1 lg:grid-cols-2 gap-2.5"></div>
-<div id="lot-detail" class="hidden mt-3 rounded-2xl overflow-hidden" style="background:#FFFDF8;"></div>
+<div id="lot-detail" class="hidden mt-3 rounded-2xl overflow-hidden" style="background:#FFFDF8;color:#1F1A12;"></div>
 </section>
 
 <!-- Piece list for the selected karat -->
@@ -796,7 +796,7 @@
 
     async function loadLots() {
         const { data, error } = await goldmindClient.from('gold_stock_lots')
-            .select('id, karat, weight_grams_total, weight_grams_remaining, box_name, source_invoice_id, notes, created_at')
+            .select('id, karat, weight_grams_total, weight_grams_remaining, box_name, source_invoice_id, notes, created_at, trader:trader_id(name)')
             .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0)
             .order('created_at', { ascending: false });
         if (error) { console.warn('lots', error); return; }
@@ -837,14 +837,20 @@
                 const num = LOT_INVOICES[l.source_invoice_id];
                 const d = gmFormatDateTime(l.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' });
                 const partial = Number(l.weight_grams_remaining) < Number(l.weight_grams_total);
-                return `<div class="flex items-center justify-between gap-3 px-4 py-3 border-b border-outline-variant last:border-0">
+                // where this gold came from: a purchase invoice, a trader, or only a note
+                const src = num
+                    ? `فاتورة شراء <a style="color:#8A6A1C;text-decoration:underline;font-weight:600" href="invoice-print-ar.html?id=${encodeURIComponent(l.source_invoice_id)}">${gmEscapeHtml(num)}</a>`
+                    : (l.trader && l.trader.name ? 'مستلم من التاجر ' + gmEscapeHtml(l.trader.name) : '');
+                const note = l.notes && !(num && /^ذهب كسر عيار \d+$/.test(l.notes.trim())) ? l.notes : '';
+                return `<div class="flex items-start justify-between gap-3 px-4 py-3" style="border-bottom:1px solid #E8E0CF;">
                     <div class="min-w-0">
                         <div class="text-[13px] font-semibold">عيار ${l.karat || '—'} · ${d}</div>
-                        ${num ? `<a class="text-[12px] text-primary underline" href="invoice-print-ar.html?id=${encodeURIComponent(l.source_invoice_id)}">${gmEscapeHtml(num)}</a>` : (l.notes ? `<div class="text-[12px] text-on-surface-variant truncate">${gmEscapeHtml(l.notes)}</div>` : '')}
+                        ${src ? `<div class="text-[12px] mt-0.5" style="color:#5A5040">${src}</div>` : ''}
+                        ${note ? `<div class="text-[11.5px] mt-0.5" style="color:#6B6150;white-space:normal">${gmEscapeHtml(note)}</div>` : ''}
                     </div>
                     <div class="text-left shrink-0">
                         <div class="font-bold text-[14px]" dir="ltr">${Number(l.weight_grams_remaining).toFixed(2)} غ</div>
-                        ${partial ? `<div class="text-[11px] text-on-surface-variant">من أصل ${Number(l.weight_grams_total).toFixed(2)} غ</div>` : ''}
+                        ${partial ? `<div class="text-[11px]" style="color:#6B6150">من أصل ${Number(l.weight_grams_total).toFixed(2)} غ</div>` : ''}
                     </div>
                 </div>`;
             }).join('');
