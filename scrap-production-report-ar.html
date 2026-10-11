@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>تقرير الإنتاج من الكسر | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=36"></script>
+<script src="theme.js?v=55"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = { darkMode: "class", theme: { extend: {
+          "colors": {
+                  "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "on-tertiary": "#ffffff",
+                  "error": "#ba1a1a", "on-secondary": "#ffffff", "primary-container": "#131b2e",
+                  "on-surface": "var(--gm-on-surface)", "surface-container": "#eceef0", "surface-container-highest": "#e0e3e5",
+                  "surface-container-low": "var(--gm-surface-low)", "on-primary": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)",
+                  "outline-variant": "var(--gm-outline-variant)", "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)",
+                  "error-container": "#ffdad6", "primary": "var(--gm-primary)", "on-background": "var(--gm-on-primary)",
+                  "on-error": "#ffffff", "surface-variant": "#e0e3e5", "outline": "#76777d",
+                  "surface-container-high": "#e6e8ea", "secondary-container": "#ffdb99", "on-secondary-container": "#795f29"
+          },
+          "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"], "body-lg": ["Inter"] },
+          "spacing": { "margin-desktop": "40px", "gutter": "24px", "unit": "4px", "margin-mobile": "16px", "container-max": "1440px" }
+        } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { min-height: max(884px, 100dvh); }
+    .rp-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .rp-table th, .rp-table td { padding: 8px 10px; border-bottom: 1px solid var(--gm-outline-variant); text-align: right; }
+    .rp-table th { font-size: 11.5px; color: var(--gm-on-surface-variant); font-weight: 600; }
+    .rp-num { font-family: 'IBM Plex Sans', sans-serif; direction: ltr; text-align: left !important; white-space: nowrap; }
+    @media print {
+      .no-print { display: none !important; }
+      header { position: static !important; }
+      body { background: #fff !important; min-height: 0; }
+      .rp-card { box-shadow: none !important; break-inside: avoid; }
+    }
+</style>
+</head>
+<body class="bg-background font-body-md text-on-background antialiased min-h-screen flex flex-col overflow-x-hidden">
+<main class="flex-1 pb-24 md:pb-8 flex flex-col">
+<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full h-16 sticky top-0 z-40 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<button onclick="gmSmartBack('stock-production-ar.html')" class="no-print cursor-pointer active:opacity-80 font-bold" style="direction:ltr;font-size:32px;line-height:1;" aria-label="رجوع">&#8594;</button>
+<h1 class="font-headline-md text-headline-md font-bold text-primary">تقرير الإنتاج من الكسر</h1>
+</div>
+<button onclick="window.print()" class="no-print h-9 px-3 flex items-center gap-1 rounded-lg border border-outline-variant text-[12px] font-semibold"><span class="material-symbols-outlined">print</span> طباعة</button>
+</header>
+<div class="px-margin-mobile md:px-margin-desktop py-6 md:py-8 max-w-container-max mx-auto w-full space-y-4">
+
+<div class="no-print bg-surface-container-lowest border border-outline-variant rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+<label class="block"><span class="block text-[11px] font-semibold text-on-surface-variant mb-1">من تاريخ</span>
+<input type="date" id="rp-from" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]"/></label>
+<label class="block"><span class="block text-[11px] font-semibold text-on-surface-variant mb-1">إلى تاريخ</span>
+<input type="date" id="rp-to" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]"/></label>
+<label class="block"><span class="block text-[11px] font-semibold text-on-surface-variant mb-1">المستودع</span>
+<select id="rp-box" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]"><option value="">كل مستودعات الكسر</option></select></label>
+<button onclick="loadReport()" class="h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">عرض</button>
+</div>
+
+<p id="rp-period" class="text-[13px] font-semibold text-on-surface-variant"></p>
+<div id="rp-state" class="text-center text-on-surface-variant text-sm py-10">جارِ التحميل...</div>
+
+<div id="rp-tiles" class="hidden grid grid-cols-3 gap-3"></div>
+
+<section id="rp-summary-wrap" class="hidden rp-card bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<h2 class="px-4 pt-4 pb-2 font-bold text-[15px]">الملخص حسب العيار</h2>
+<div class="overflow-x-auto"><table class="rp-table">
+<thead><tr><th>المستودع</th><th>العيار</th><th class="rp-num">عدد القطع</th><th class="rp-num">الوزن القائم (غ)</th><th class="rp-num rp-acc">الوزن المحاسبي (غ)</th><th class="rp-num">المسحوب من الكسر (غ)</th></tr></thead>
+<tbody id="rp-summary"></tbody>
+</table></div>
+</section>
+
+<section id="rp-list-wrap" class="hidden rp-card bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+<h2 class="px-4 pt-4 pb-2 font-bold text-[15px]">القطع المنتَجة</h2>
+<div class="overflow-x-auto"><table class="rp-table">
+<thead><tr><th>التاريخ</th><th>الباركود</th><th>الوصف</th><th>العيار</th><th class="rp-num">الوزن القائم</th><th class="rp-num rp-acc">الوزن المحاسبي</th><th>الحالة</th></tr></thead>
+<tbody id="rp-list"></tbody>
+</table></div>
+</section>
+
+</div>
+</main>
+
+<script>
+// Pieces produced from the scrap boxes (كسر 18/21/22/24) in a chosen period:
+// count, gross and accounting weight per box/karat, then the pieces themselves.
+// Source: piece_lot_draws (one row per piece per scrap lot it drew weight from).
+const isScrapBox = n => /^كسر \d+$/.test(n || '');
+const STATUS_AR = { available: 'متوفرة', sold: 'مباعة', reserved: 'محجوزة', given_to_trader: 'مُعادة للتاجر', gifted: 'هدية', cancelled: 'ملغاة' };
+const w3 = n => (Math.round(Number(n || 0) * 1000) / 1000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+let canSeeAcc = false;
+
+function dayStart(d) { return new Date(d + 'T00:00:00').toISOString(); }
+function dayAfter(d) { const x = new Date(d + 'T00:00:00'); x.setDate(x.getDate() + 1); return x.toISOString(); }
+
+async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const perms = (me && me.permissions) || {};
+  const isOwner = me && me.role === 'owner';
+  if (!(isOwner || perms.add_piece === true || perms.view_reports === true)) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); location.href = 'index-ar.html'; return; }
+  canSeeAcc = isOwner || perms.view_reports === true; // accounting weight: owner / report viewers only
+  if (!canSeeAcc) document.querySelectorAll('.rp-acc').forEach(e => e.remove());
+  const q = new URLSearchParams(location.search);
+  const today = gmTodayStr();
+  document.getElementById('rp-from').value = q.get('from') || today.slice(0, 8) + '01';
+  document.getElementById('rp-to').value = q.get('to') || today;
+  const { data: lots } = await goldmindClient.from('gold_stock_lots').select('box_name').eq('store_id', GOLDMIND_STORE_ID);
+  const boxes = [...new Set((lots || []).map(l => (l.box_name || '').trim()).filter(isScrapBox))].sort();
+  const sel = document.getElementById('rp-box');
+  boxes.forEach(b => { const o = document.createElement('option'); o.value = b; o.textContent = b; sel.appendChild(o); });
+  if (q.get('box')) sel.value = q.get('box');
+  loadReport();
+}
+
+async function loadReport() {
+  const from = document.getElementById('rp-from').value, to = document.getElementById('rp-to').value;
+  const box = document.getElementById('rp-box').value;
+  const state = document.getElementById('rp-state');
+  ['rp-tiles', 'rp-summary-wrap', 'rp-list-wrap'].forEach(id => document.getElementById(id).classList.add('hidden'));
+  if (!from || !to || from > to) { state.textContent = 'اختر فترة صحيحة (من تاريخ قبل إلى تاريخ).'; state.classList.remove('hidden'); return; }
+  state.textContent = 'جارِ التحميل...'; state.classList.remove('hidden');
+  document.getElementById('rp-period').textContent = 'الفترة: من ' + from.split('-').reverse().join('/') + ' إلى ' + to.split('-').reverse().join('/') + (box ? ' — ' + box : '');
+  const { data, error } = await goldmindClient.from('piece_lot_draws')
+    .select('piece_id, grams, created_at, lot:lot_id(box_name, karat), piece:piece_id(barcode, description_ar, karat, weight_grams, accounting_weight_grams, status)')
+    .eq('store_id', GOLDMIND_STORE_ID).gte('created_at', dayStart(from)).lt('created_at', dayAfter(to))
+    .order('created_at', { ascending: true }).limit(5000);
+  if (error) { state.textContent = 'تعذّر التحميل: ' + error.message; return; }
+  // one entry per piece (a piece can draw from several lots of the same box)
+  const pieces = new Map();
+  (data || []).forEach(d => {
+    const b = ((d.lot && d.lot.box_name) || '').trim();
+    if (!isScrapBox(b) || (box && b !== box) || !d.piece) return;
+    const p = pieces.get(d.piece_id) || { id: d.piece_id, box: b, at: d.created_at, drawn: 0, ...d.piece };
+    p.drawn += Number(d.grams || 0);
+    pieces.set(d.piece_id, p);
+  });
+  const list = [...pieces.values()];
+  if (!list.length) { state.textContent = 'لا توجد قطع منتَجة من الكسر في هذه الفترة.'; return; }
+  state.classList.add('hidden');
+  const groups = new Map();
+  list.forEach(p => {
+    const k = p.box + '|' + p.karat;
+    const g = groups.get(k) || { box: p.box, karat: p.karat, n: 0, gross: 0, acc: 0, drawn: 0 };
+    g.n++; g.gross += Number(p.weight_grams || 0); g.acc += Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams || 0); g.drawn += p.drawn;
+    groups.set(k, g);
+  });
+  const rows = [...groups.values()].sort((a, b) => a.box.localeCompare(b.box) || a.karat - b.karat);
+  const tot = rows.reduce((t, g) => ({ n: t.n + g.n, gross: t.gross + g.gross, acc: t.acc + g.acc, drawn: t.drawn + g.drawn }), { n: 0, gross: 0, acc: 0, drawn: 0 });
+  const acc = v => canSeeAcc ? `<td class="rp-num">${w3(v)}</td>` : '';
+  document.getElementById('rp-summary').innerHTML = rows.map(g => `<tr><td>${gmEscapeHtml(g.box)}</td><td>${gmEscapeHtml(String(g.karat))}K</td><td class="rp-num">${g.n}</td><td class="rp-num">${w3(g.gross)}</td>${acc(g.acc)}<td class="rp-num">${w3(g.drawn)}</td></tr>`).join('')
+    + (rows.length > 1 ? `<tr class="font-bold"><td colspan="2">المجموع</td><td class="rp-num">${tot.n}</td><td class="rp-num">${w3(tot.gross)}</td>${acc(tot.acc)}<td class="rp-num">${w3(tot.drawn)}</td></tr>` : '');
+  document.getElementById('rp-list').innerHTML = list.map(p => `<tr>
+    <td class="rp-num">${gmEscapeHtml(new Date(p.at).toLocaleDateString('en-GB'))}</td>
+    <td><a class="underline font-semibold" href="piece-edit-ar.html?id=${encodeURIComponent(p.id)}">${gmEscapeHtml(p.barcode || '—')}</a></td>
+    <td>${gmEscapeHtml(p.description_ar || '')}</td>
+    <td>${gmEscapeHtml(String(p.karat || ''))}K</td>
+    <td class="rp-num">${w3(p.weight_grams)}</td>${acc(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams)}
+    <td>${gmEscapeHtml(STATUS_AR[p.status] || p.status || '')}</td></tr>`).join('');
+  const tile = (label, v) => `<div class="rp-card bg-surface-container-lowest border border-outline-variant rounded-xl p-3"><div class="text-[11px] text-on-surface-variant mb-1">${label}</div><div class="font-bold text-[18px] rp-num" style="text-align:right">${v}</div></div>`;
+  document.getElementById('rp-tiles').innerHTML = tile('عدد القطع', tot.n) + tile('الوزن القائم', w3(tot.gross) + ' غ') + (canSeeAcc ? tile('الوزن المحاسبي', w3(tot.acc) + ' غ') : tile('المسحوب من الكسر', w3(tot.drawn) + ' غ'));
+  ['rp-tiles', 'rp-summary-wrap', 'rp-list-wrap'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+}
+
+init();
+</script>
+</body></html>
