@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 0NnUhbCbaFAFdhoGer4FzmRheKz9qjvvTLIknRgGiF5DWyhZSSoE1JVDP1XKLTO
+\restrict T8sc3mnYLxC8XhT4QL4e0C3P6Z9VNeTN9xRhAlUIML0hi8LlikTCg3ryBAMcA2m
 
 
 SET statement_timeout = 0;
@@ -92,7 +92,20 @@ begin
   select 'error', 'piece_still_available', 'قطعة مباعة لكنها ما زالت تظهر متاحة',
          format('القطعة %s بالفاتورة %s', p.barcode, i.invoice_number), p.id, p.barcode
   from invoice_items ii join invoices i on i.id = ii.invoice_id join pieces p on p.id = ii.piece_id
-  where i.store_id = sid and i.type = 'sale' and i.status <> 'cancelled' and p.status = 'available';
+  where i.store_id = sid and i.type = 'sale' and i.status <> 'cancelled' and p.status = 'available'
+    and ii.line_total >= 0
+    and not exists (
+      select 1 from invoice_items r join invoices ri on ri.id = r.invoice_id
+       where r.piece_id = p.id and ri.status <> 'cancelled' and ri.created_at >= i.created_at and ri.id <> i.id
+         and (ri.type = 'return' or r.line_total < 0 or r.returned_item_id = ii.id));
+
+  return query
+  select 'warning', 'daily_box_missing', 'دفعة فاتورة نقدية غير ظاهرة بالصندوق اليومي',
+         format('%s %s %s بتاريخ %s', case cm.direction when 'in' then 'قبض' else 'صرف' end, cm.amount, coalesce(cm.currency, scur), to_char(cm.created_at, 'YYYY-MM-DD')),
+         cm.invoice_id, i.invoice_number
+  from cash_movements cm join invoices i on i.id = cm.invoice_id
+  where cm.store_id = sid and cm.box = 'main' and cm.created_at >= '2026-08-08'
+    and not exists (select 1 from daily_cash_log l where l.cash_movement_id = cm.id);
 
   return query
   select 'error', 'negative_stock', 'رصيد جملة سالب',
@@ -502,58 +515,46 @@ declare
   actor_staff_id uuid;
 begin
   select * into inv from public.invoices where id = target_invoice_id;
-  if inv is null then
-    raise exception 'INVOICE_NOT_FOUND';
-  end if;
-  if not public.has_permission('delete_invoice', inv.store_id) then
-    raise exception 'NOT_AUTHORIZED';
-  end if;
-  if inv.status = 'cancelled' then
-    raise exception 'ALREADY_CANCELLED';
-  end if;
+  if inv is null then raise exception 'INVOICE_NOT_FOUND'; end if;
+  if not public.has_permission('delete_invoice', inv.store_id) then raise exception 'NOT_AUTHORIZED'; end if;
+  if inv.status = 'cancelled' then raise exception 'ALREADY_CANCELLED'; end if;
 
   select id into actor_staff_id from public.staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
 
-  -- Never delete the invoice or renumber it — mark it cancelled and keep it
-  -- in the record permanently (tax-compliance requirement: no gaps, no reuse).
   update public.invoices set status = 'cancelled' where id = target_invoice_id;
 
-  -- Return any pieces this invoice touched to a sane inventory state.
   if inv.type = 'sale' then
     update public.pieces set status = 'available'
-    where id in (select piece_id from public.invoice_items where invoice_id = target_invoice_id and piece_id is not null);
+    where id in (select piece_id from public.invoice_items where invoice_id = target_invoice_id and piece_id is not null and returned_item_id is null);
+    update public.pieces set status = 'sold'
+    where id in (select piece_id from public.invoice_items where invoice_id = target_invoice_id and piece_id is not null and returned_item_id is not null);
   elsif inv.type in ('buyTrader', 'buyRetail') then
     update public.pieces set status = 'cancelled'
     where id in (select piece_id from public.invoice_items where invoice_id = target_invoice_id and piece_id is not null);
   end if;
 
-  -- Zero out any bulk gold lot (رصيد بالجملة) this purchase invoice created —
-  -- previously left untouched, so a cancelled bulk buyTrader invoice kept
-  -- silently counting toward warehouse stock (company-balances-ar.html,
-  -- reports-ar.html) forever. Only zeroes the remainder, never the total, so
-  -- the lot's history stays intact if any of it was already sold onward.
-  update public.gold_stock_lots
-    set weight_grams_remaining = 0
+  update public.gold_stock_lots set weight_grams_remaining = 0
     where source_invoice_id = target_invoice_id and weight_grams_remaining > 0;
 
-  -- Post reversing entries everywhere this invoice created a ledger movement
-  -- (never delete history — a cancellation is itself an auditable event).
-  insert into public.cash_movements (store_id, box, direction, amount, currency, description, created_by, invoice_id)
-  select store_id, box, case when direction = 'in' then 'out' else 'in' end, amount, currency,
+  insert into public.cash_movements (store_id, box, direction, amount, currency, fx_amount, fx_currency, description, created_by, invoice_id)
+  select store_id, box, case when direction = 'in' then 'out' else 'in' end, amount, currency, fx_amount, fx_currency,
          'إلغاء فاتورة ' || inv.invoice_number || coalesce(' — ' || reason, ''), actor_staff_id, target_invoice_id
-  from public.cash_movements where invoice_id = target_invoice_id;
+  from public.cash_movements where invoice_id = target_invoice_id
+    and coalesce(description, '') not like 'إلغاء فاتورة%' and coalesce(description, '') not like 'استعادة فاتورة%';
 
   insert into public.customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
   select store_id, customer_id, invoice_id,
          case when movement_type = 'debt_increase' then 'debt_decrease' else 'debt_increase' end,
          cash_amount, gold_grams_24k, 'إلغاء فاتورة ' || inv.invoice_number || coalesce(' — ' || reason, ''), actor_staff_id
-  from public.customer_debts where invoice_id = target_invoice_id;
+  from public.customer_debts where invoice_id = target_invoice_id
+    and coalesce(notes, '') not like 'إلغاء فاتورة%' and coalesce(notes, '') not like 'استعادة فاتورة%';
 
   insert into public.trader_movements (store_id, trader_id, invoice_id, movement_type, weight_grams, karat, gold_24k_equivalent, fab_fee_amount, notes)
   select store_id, trader_id, invoice_id,
          case when movement_type = 'debt_increase' then 'debt_decrease' else 'debt_increase' end,
          weight_grams, karat, gold_24k_equivalent, fab_fee_amount, 'إلغاء فاتورة ' || inv.invoice_number || coalesce(' — ' || reason, '')
-  from public.trader_movements where invoice_id = target_invoice_id;
+  from public.trader_movements where invoice_id = target_invoice_id
+    and coalesce(notes, '') not like 'إلغاء فاتورة%' and coalesce(notes, '') not like 'استعادة فاتورة%';
 end;
 $$;
 
@@ -899,6 +900,7 @@ end $$;
 
 CREATE FUNCTION public.currency_usd_peg(cur text) RETURNS numeric
     LANGUAGE sql IMMUTABLE
+    SET search_path TO 'public'
     AS $$
   select case upper(coalesce(cur,''))
     when 'USD' then 1 when 'AED' then 3.6725 when 'SAR' then 3.75 when 'QAR' then 3.64
@@ -1561,6 +1563,7 @@ end $$;
 
 CREATE FUNCTION public.gm_op_date() RETURNS date
     LANGUAGE plpgsql STABLE
+    SET search_path TO 'public'
     AS $_$
 declare h text; d date; today date := (now() at time zone 'Asia/Dubai')::date;
 begin
@@ -1578,6 +1581,7 @@ end $_$;
 
 CREATE FUNCTION public.gm_op_date_stamp() RETURNS trigger
     LANGUAGE plpgsql
+    SET search_path TO 'public'
     AS $$
 declare d date := public.gm_op_date();
 begin
@@ -1696,6 +1700,7 @@ end $$;
 
 CREATE FUNCTION public.gold_implied_usd_ounce(price_per_gram numeric, karat integer, cur text) RETURNS numeric
     LANGUAGE sql IMMUTABLE
+    SET search_path TO 'public'
     AS $$
   select case when currency_usd_peg(cur) is null or karat is null or karat <= 0 or price_per_gram is null then null
     else price_per_gram * 24.0 / karat * 31.1034768 / currency_usd_peg(cur) end
@@ -1966,36 +1971,20 @@ CREATE FUNCTION public.lookup_email_by_username(p_username text) RETURNS text
     AS $$
 declare
   v_ip text;
-  v_recent_count int;
-begin
-  v_ip := coalesce(
-    (current_setting('request.headers', true)::json ->> 'x-forwarded-for'),
-    'unknown'
-  );
-  v_ip := split_part(v_ip, ',', 1);
-
-  select count(*) into v_recent_count
-  from public.lookup_username_attempts
-  where caller_ip = v_ip and attempted_at > now() - interval '60 seconds';
-
-  if v_recent_count >= 5 then
-    raise exception 'RATE_LIMITED' using errcode = '42901';
-  end if;
-
-  insert into public.lookup_username_attempts (caller_ip) values (v_ip);
-
-  delete from public.lookup_username_attempts
-  where attempted_at < now() - interval '10 minutes';
-
-  return (
-    select u.email::text
-    from public.user_profiles up
-    join auth.users u on u.id = up.id
-    where lower(up.username) = lower(trim(p_username))
-    limit 1
-  );
-end;
-$$;
+    v_recent_count int;
+    begin
+      v_ip := split_part(coalesce((current_setting('request.headers', true)::json ->> 'x-forwarded-for'), 'unknown'), ',', 1);
+        select count(*) into v_recent_count from public.lookup_username_attempts
+           where caller_ip = v_ip and attempted_at > now() - interval '60 seconds';
+             if v_recent_count >= 5 then raise exception 'RATE_LIMITED' using errcode = '42901'; end if;
+               if (select count(*) from public.lookup_username_attempts where attempted_at > now() - interval '60 seconds') >= 60 then
+                   raise exception 'RATE_LIMITED' using errcode = '42901';
+                     end if;
+                       insert into public.lookup_username_attempts (caller_ip) values (v_ip);
+                         delete from public.lookup_username_attempts where attempted_at < now() - interval '10 minutes';
+                           return (select u.email::text from public.user_profiles up join auth.users u on u.id = up.id
+                                      where lower(up.username) = lower(trim(p_username)) limit 1);
+                                      end $$;
 
 
 --
@@ -2371,6 +2360,152 @@ end $$;
 
 
 --
+-- Name: post_sale_exchange(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.post_sale_exchange(p jsonb) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  sid uuid := nullif(p->>'store_id', '')::uuid;
+  orig uuid := nullif(p->>'original_invoice_id', '')::uuid;
+  ref uuid := nullif(p->>'client_ref', '')::uuid;
+  dir text := coalesce(nullif(p->>'diff_dir', ''), 'none');
+  meth text := coalesce(nullif(p->>'diff_method', ''), 'cash');
+  amt numeric := round(coalesce(nullif(p->>'diff_amount', '')::numeric, 0), 2);
+  paid_amt numeric := round(coalesce(nullif(p->>'paid_amount', '')::numeric, 0), 2);
+  cur text := upper(coalesce(nullif(p->>'diff_currency', ''), ''));
+  rate numeric := nullif(p->>'diff_rate', '')::numeric;
+  o record; ex record; pc record; it record;
+  me uuid; base_cur text; fx boolean := false; base_diff numeric := 0; paid_base numeric := 0;
+  ret_total numeric; new_total numeric; total numeric;
+  n_ret int; n_new int; n_found int; wsum numeric; acc numeric := 0; k int := 0; price numeric;
+  inv_id uuid; inv_no text; pm text; old_codes text; new_codes text; gp numeric; bd jsonb;
+begin
+  if sid is null then raise exception 'المحل غير محدد'; end if;
+  if not has_permission('create_invoice', sid) then raise exception 'ليس لديك صلاحية التبديل' using errcode = '42501'; end if;
+  if ref is not null then
+    select id, invoice_number into ex from invoices where client_ref = ref and store_id = sid;
+    if found then return jsonb_build_object('id', ex.id, 'invoice_number', ex.invoice_number, 'duplicate', true); end if;
+  end if;
+  select * into o from invoices where id = orig and store_id = sid for update;
+  if not found or o.type <> 'sale' then raise exception 'فاتورة البيع الأصلية غير موجودة'; end if;
+  if o.status = 'cancelled' then raise exception 'الفاتورة الأصلية ملغاة'; end if;
+  if o.customer_id is null then raise exception 'الفاتورة بدون زبون — اختر الزبون بتعديل الفاتورة أولاً'; end if;
+  if dir not in ('in', 'out', 'none') then raise exception 'اتجاه الفرق غير معروف'; end if;
+  if meth not in ('cash', 'bank', 'account', 'partial') or (meth = 'partial' and dir <> 'in') then raise exception 'طريقة دفع الفرق غير معروفة'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+
+  select count(*), round(sum(line_total), 2), string_agg(coalesce(barcode, description, '—'), '، ')
+    into n_ret, ret_total, old_codes
+    from invoice_items ii
+   where ii.invoice_id = orig and ii.piece_id is not null and ii.line_total > 0
+     and ii.id in (select x::uuid from jsonb_array_elements_text(coalesce(p->'item_ids', '[]'::jsonb)) x)
+     and not exists (select 1 from invoice_items r join invoices ri on ri.id = r.invoice_id
+                      where r.returned_item_id = ii.id and ri.status <> 'cancelled')
+     and not exists (select 1 from invoice_items r join invoices ri on ri.id = r.invoice_id
+                      where ri.related_invoice_id = orig and ri.type = 'return' and ri.status <> 'cancelled' and r.piece_id = ii.piece_id);
+  if n_ret = 0 or n_ret <> (select count(distinct x) from jsonb_array_elements_text(coalesce(p->'item_ids', '[]'::jsonb)) x) then
+    raise exception 'القطعة الراجعة غير صحيحة أو رجعت من قبل من هذه الفاتورة';
+  end if;
+
+  select coalesce(nullif(upper(currency), ''), 'AED') into base_cur from stores where id = sid;
+  if dir = 'none' then amt := 0; end if;
+  if amt < 0 or paid_amt < 0 then raise exception 'مبلغ غير صحيح'; end if;
+  if dir <> 'none' and amt = 0 then raise exception 'اكتب مبلغ الفرق'; end if;
+  if amt > 0 then
+    if cur = '' then cur := base_cur; end if;
+    fx := cur <> base_cur;
+    if fx and (rate is null or rate <= 0) then raise exception 'أدخل سعر صرف % مقابل %', cur, base_cur; end if;
+    base_diff := case when fx then round(amt / rate, 2) else amt end;
+  end if;
+  total := case dir when 'in' then base_diff when 'out' then -base_diff else 0 end;
+  new_total := round(ret_total + total, 2);
+  if new_total < 0 then raise exception 'الفرق أكبر من قيمة القطع الراجعة'; end if;
+  if meth = 'partial' then
+    if paid_amt <= 0 or paid_amt >= amt then raise exception 'المدفوع الآن يجب أن يكون أقل من الفرق وأكبر من صفر'; end if;
+    paid_base := case when fx then round(paid_amt / rate, 2) else paid_amt end;
+  end if;
+
+  select count(*) into n_new from (select distinct x from jsonb_array_elements_text(coalesce(p->'new_piece_ids', '[]'::jsonb)) x) s;
+  if n_new = 0 then raise exception 'أضف القطعة الجديدة'; end if;
+  select count(*), sum(coalesce(accounting_weight_grams, weight_grams, 0)), string_agg(barcode, '، ')
+    into n_found, wsum, new_codes
+    from pieces where store_id = sid and status = 'available'
+     and id in (select x::uuid from jsonb_array_elements_text(p->'new_piece_ids') x);
+  if n_found <> n_new then raise exception 'إحدى القطع الجديدة غير متوفرة للبيع'; end if;
+
+  pm := case when dir = 'out' or meth = 'account' then 'credit' when meth = 'partial' then 'mixed' when dir = 'none' then 'cash' else meth end;
+  inv_no := next_invoice_number(sid, 'INV');
+  insert into invoices (store_id, invoice_number, type, customer_id, payment_method, cash_paid_amount, bank_paid_amount,
+      gold_value, fabrication_fees, vat_amount, total_amount, amount_paid, status, created_by, client_ref, related_invoice_id, is_exchange)
+    values (sid, inv_no, 'sale', o.customer_id, pm,
+      case when pm = 'mixed' then paid_base end, case when pm = 'mixed' then 0 end,
+      0, 0, 0, total,
+      case pm when 'credit' then 0 when 'mixed' then paid_base else total end,
+      case when pm = 'credit' and total > 0.009 then 'unpaid' when pm = 'mixed' then 'unpaid' else 'paid' end,
+      me, ref, orig, true)
+    returning id into inv_id;
+  if fx and dir = 'in' and meth in ('cash', 'bank', 'partial') then
+    bd := jsonb_build_array(jsonb_build_object('currency', cur, 'amount', case when meth = 'partial' then paid_amt else amt end,
+                                               'rate', rate, 'method', case when meth = 'bank' then 'bank' else 'cash' end));
+    update invoices set pay_breakdown = bd where id = inv_id;
+  end if;
+
+  for it in select * from invoice_items where invoice_id = orig and id in (select x::uuid from jsonb_array_elements_text(p->'item_ids') x) loop
+    insert into invoice_items (invoice_id, piece_id, barcode, karat, weight_grams, accounting_weight_grams, fabrication_fee,
+        line_total, description, description_en, item_photo_url, gold_price_per_gram, returned_item_id)
+      values (inv_id, it.piece_id, it.barcode, it.karat, it.weight_grams, it.accounting_weight_grams, 0,
+        -it.line_total, it.description, it.description_en, it.item_photo_url, it.gold_price_per_gram, it.id);
+    update pieces set status = 'available' where id = it.piece_id and store_id = sid;
+    insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+      values (sid, it.piece_id, 'returned', 'رجعت بتبديل بفاتورة ' || inv_no || ' (من الفاتورة ' || o.invoice_number || ') — بدلها ' || new_codes, me);
+  end loop;
+  for pc in select * from pieces where store_id = sid and id in (select x::uuid from jsonb_array_elements_text(p->'new_piece_ids') x) order by barcode for update loop
+    k := k + 1;
+    price := case when k = n_new then round(new_total - acc, 2)
+                  when coalesce(wsum, 0) > 0 then round(new_total * coalesce(pc.accounting_weight_grams, pc.weight_grams, 0) / wsum, 2)
+                  else round(new_total / n_new, 2) end;
+    acc := acc + price;
+    select price_per_gram into gp from gold_prices where store_id = sid and karat = pc.karat;
+    insert into invoice_items (invoice_id, piece_id, barcode, karat, weight_grams, accounting_weight_grams, fabrication_fee,
+        line_total, description, description_en, gold_price_per_gram)
+      values (inv_id, pc.id, pc.barcode, pc.karat, pc.weight_grams, coalesce(pc.accounting_weight_grams, pc.weight_grams), 0,
+        price, coalesce(pc.description_ar, pc.piece_type, 'قطعة'), pc.description_en, gp);
+    update pieces set status = 'sold' where id = pc.id;
+    insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+      values (sid, pc.id, 'sold', 'بيع بفاتورة ' || inv_no || ' — تبديل بدل ' || old_codes || ' (فاتورة ' || o.invoice_number || ')', me);
+  end loop;
+
+  if dir = 'in' and meth in ('cash', 'bank') then
+    insert into cash_movements (store_id, box, direction, amount, description, created_by, invoice_id)
+      values (sid, 'main', 'in', total, 'فرق تبديل بفاتورة ' || inv_no, me, inv_id);
+  elsif dir = 'in' and meth = 'partial' then
+    insert into cash_movements (store_id, box, direction, amount, description, created_by, invoice_id)
+      values (sid, 'main', 'in', paid_base, 'فرق تبديل (جزء) بفاتورة ' || inv_no, me, inv_id);
+    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
+      values (sid, o.customer_id, inv_id, 'debt_increase', round(total - paid_base, 2), 0, 'باقي فرق تبديل بفاتورة ' || inv_no, me);
+  elsif dir = 'in' and meth = 'account' then
+    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
+      values (sid, o.customer_id, inv_id, 'debt_increase', total, 0, 'فرق تبديل بفاتورة ' || inv_no, me);
+  elsif dir = 'out' then
+    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
+      values (sid, o.customer_id, inv_id, 'debt_decrease', -total, 0, 'فرق تبديل لصالح الزبون بفاتورة ' || inv_no, me);
+    if meth in ('cash', 'bank') then
+      perform cash_voucher(jsonb_build_object('store_id', sid, 'kind', 'out', 'party', 'customer', 'party_id', o.customer_id,
+        'amount', amt, 'currency', cur, 'fx_rate', rate, 'method', meth, 'notes', 'رد فرق تبديل بفاتورة ' || inv_no));
+    end if;
+  end if;
+
+  if abs((select coalesce(sum(line_total), 0) from invoice_items where invoice_id = inv_id) - total) > 0.01 then
+    raise exception 'فحص محاسبي فشل: مجموع السطور ≠ الفرق';
+  end if;
+  return jsonb_build_object('id', inv_id, 'invoice_number', inv_no, 'total', total, 'returned_total', ret_total, 'new_total', new_total, 'duplicate', false);
+end $$;
+
+
+--
 -- Name: post_sale_invoice(jsonb); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2591,7 +2726,10 @@ begin
       join invoice_items r on (r.piece_id = s.piece_id or r.diamond_piece_id = s.diamond_piece_id)
       join invoices ri on ri.id = r.invoice_id
      where s.id = any(ids) and ri.related_invoice_id = orig and ri.type = 'return' and ri.status <> 'cancelled') then
-    raise exception 'بعض القطع المختارة أُرجعت مسبقاً';
+    raise exception 'بعض القطع المختارة أُرجعت مسبقاً'; end if;
+  if exists (select 1 from invoice_items where id = any(ids) and (line_total < 0 or returned_item_id is not null))
+     or exists (select 1 from invoice_items r join invoices ri on ri.id = r.invoice_id where r.returned_item_id = any(ids) and ri.status <> 'cancelled') then
+    raise exception 'بعض القطع المختارة رجعت بتبديل';
   end if;
   for lr in select gold_stock_lot_id lid, sum(coalesce(weight_grams, 0)) w
               from invoice_items where id = any(ids) and gold_stock_lot_id is not null group by 1 loop
@@ -2716,20 +2854,34 @@ CREATE FUNCTION public.record_expense(p jsonb) RETURNS uuid
     AS $$
 declare sid uuid := (p->>'store_id')::uuid; me uuid; cat record; amt numeric := round(coalesce(nullif(p->>'amount', '')::numeric, 0), 2);
         eid uuid; cm uuid; descr text := nullif(trim(p->>'description'), '');
+        cur text := upper(coalesce(nullif(p->>'currency', ''), '')); rate numeric := nullif(p->>'fx_rate', '')::numeric;
+        base_cur text; fx boolean; base_amt numeric; fxnote text := '';
 begin
   if not gm_can_expense(sid) or not is_store_member(sid) then raise exception 'ليس لديك صلاحية تسجيل المصاريف' using errcode = '42501'; end if;
   select id, name into cat from expense_categories where id = (p->>'category_id')::uuid and store_id = sid;
   if cat is null then raise exception 'اختر نوع المصروف'; end if;
   if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  select coalesce(nullif(upper(currency), ''), 'AED') into base_cur from stores where id = sid;
+  if cur = '' then cur := base_cur; end if;
+  fx := cur <> base_cur;
+  if fx then
+    if rate is null or rate <= 0 then raise exception 'أدخل سعر صرف % مقابل %', cur, base_cur; end if;
+    base_amt := round(amt / rate, 2);
+    fxnote := ' (' || trim(to_char(amt, 'FM999,999,999,990.##')) || ' ' || cur || ')';
+  else
+    base_amt := amt;
+  end if;
   select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
-  insert into expense_entries (store_id, category_id, amount, description, attachment_url, created_by)
-    values (sid, cat.id, amt, coalesce(descr, cat.name), nullif(p->>'attachment_url', ''), me) returning id into eid;
-  insert into cash_movements (store_id, box, direction, amount, description, created_by)
-    values (sid, 'main', 'out', amt, 'مصروف ' || cat.name || coalesce(': ' || descr, ''), me) returning id into cm;
+  insert into expense_entries (store_id, category_id, amount, description, attachment_url, created_by, fx_amount, fx_currency)
+    values (sid, cat.id, base_amt, coalesce(descr, cat.name), nullif(p->>'attachment_url', ''), me,
+            case when fx then amt end, case when fx then cur end) returning id into eid;
+  insert into cash_movements (store_id, box, direction, amount, description, created_by, fx_amount, fx_currency)
+    values (sid, 'main', 'out', base_amt, 'مصروف ' || cat.name || coalesce(': ' || descr, '') || fxnote, me,
+            case when fx then amt end, case when fx then cur end) returning id into cm;
   update expense_entries set cash_movement_id = cm where id = eid;
   if coalesce((p->>'from_daily_cashbox')::boolean, true) then
-    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
-      values (sid, 'مصروف: ' || cat.name, 'out', amt, descr, me, cm);
+    insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
+      values (sid, 'مصروف: ' || cat.name, 'out', amt, cur, descr, me, cm);
   end if;
   return eid;
 end $$;
@@ -3057,51 +3209,39 @@ declare
   restored_status text;
 begin
   select * into inv from public.invoices where id = target_invoice_id;
-  if inv is null then
-    raise exception 'INVOICE_NOT_FOUND';
-  end if;
-  if not public.has_permission('delete_invoice', inv.store_id) then
-    raise exception 'NOT_AUTHORIZED';
-  end if;
-  if inv.status != 'cancelled' then
-    raise exception 'NOT_CANCELLED';
-  end if;
+  if inv is null then raise exception 'INVOICE_NOT_FOUND'; end if;
+  if not public.has_permission('delete_invoice', inv.store_id) then raise exception 'NOT_AUTHORIZED'; end if;
+  if inv.status != 'cancelled' then raise exception 'NOT_CANCELLED'; end if;
 
   select id into actor_staff_id from public.staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
 
-  -- The pre-cancel status wasn't stored anywhere, so re-derive it the same
-  -- way it was originally set at creation time (credit -> unpaid, else paid).
-  restored_status := case when inv.payment_method = 'credit' then 'unpaid' else 'paid' end;
+  restored_status := case when inv.total_amount - coalesce(inv.amount_paid, 0) <= 0.009 then 'paid' else 'unpaid' end;
   update public.invoices set status = restored_status where id = target_invoice_id;
 
-  -- Put pieces back in the state they'd be in for an active invoice of this type.
   if inv.type = 'sale' then
     update public.pieces set status = 'sold'
-    where id in (select piece_id from public.invoice_items where invoice_id = target_invoice_id and piece_id is not null);
+    where id in (select piece_id from public.invoice_items where invoice_id = target_invoice_id and piece_id is not null and returned_item_id is null);
+    update public.pieces set status = 'available'
+    where id in (select piece_id from public.invoice_items where invoice_id = target_invoice_id and piece_id is not null and returned_item_id is not null);
   elsif inv.type in ('buyTrader', 'buyRetail') then
     update public.pieces set status = 'available'
     where id in (select piece_id from public.invoice_items where invoice_id = target_invoice_id and piece_id is not null);
   end if;
 
-  -- Never delete or edit the cancellation's reversing entries (they're a real
-  -- past event) — post a new batch that reverses the reversal, restoring the
-  -- original ledger effect while keeping full history.
-  insert into public.cash_movements (store_id, box, direction, amount, currency, description, created_by, invoice_id)
-  select store_id, box, case when direction = 'in' then 'out' else 'in' end, amount, currency,
-         'استعادة فاتورة ' || inv.invoice_number, actor_staff_id, target_invoice_id
-  from public.cash_movements where invoice_id = target_invoice_id and description like 'إلغاء فاتورة%';
+  insert into public.cash_movements (store_id, box, direction, amount, currency, fx_amount, fx_currency, description, created_by, invoice_id)
+  select store_id, box, direction, amount, currency, fx_amount, fx_currency, 'استعادة فاتورة ' || inv.invoice_number, actor_staff_id, target_invoice_id
+  from public.cash_movements where invoice_id = target_invoice_id
+    and coalesce(description, '') not like 'إلغاء فاتورة%' and coalesce(description, '') not like 'استعادة فاتورة%';
 
   insert into public.customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
-  select store_id, customer_id, invoice_id,
-         case when movement_type = 'debt_increase' then 'debt_decrease' else 'debt_increase' end,
-         cash_amount, gold_grams_24k, 'استعادة فاتورة ' || inv.invoice_number, actor_staff_id
-  from public.customer_debts where invoice_id = target_invoice_id and notes like 'إلغاء فاتورة%';
+  select store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, 'استعادة فاتورة ' || inv.invoice_number, actor_staff_id
+  from public.customer_debts where invoice_id = target_invoice_id
+    and coalesce(notes, '') not like 'إلغاء فاتورة%' and coalesce(notes, '') not like 'استعادة فاتورة%';
 
   insert into public.trader_movements (store_id, trader_id, invoice_id, movement_type, weight_grams, karat, gold_24k_equivalent, fab_fee_amount, notes)
-  select store_id, trader_id, invoice_id,
-         case when movement_type = 'debt_increase' then 'debt_decrease' else 'debt_increase' end,
-         weight_grams, karat, gold_24k_equivalent, fab_fee_amount, 'استعادة فاتورة ' || inv.invoice_number
-  from public.trader_movements where invoice_id = target_invoice_id and notes like 'إلغاء فاتورة%';
+  select store_id, trader_id, invoice_id, movement_type, weight_grams, karat, gold_24k_equivalent, fab_fee_amount, 'استعادة فاتورة ' || inv.invoice_number
+  from public.trader_movements where invoice_id = target_invoice_id
+    and coalesce(notes, '') not like 'إلغاء فاتورة%' and coalesce(notes, '') not like 'استعادة فاتورة%';
 end;
 $$;
 
@@ -3975,6 +4115,44 @@ begin
 end $$;
 
 
+--
+-- Name: update_expense_fx(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_expense_fx(p jsonb) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare e record; cat record; amt numeric := round(coalesce(nullif(p->>'amount', '')::numeric, 0), 2);
+        descr text := nullif(trim(p->>'description'), ''); cur text := upper(coalesce(nullif(p->>'currency', ''), ''));
+        rate numeric := nullif(p->>'fx_rate', '')::numeric; base_cur text; fx boolean; base_amt numeric; fxnote text := '';
+begin
+  select * into e from expense_entries where id = (p->>'id')::uuid;
+  if e is null then raise exception 'المصروف غير موجود'; end if;
+  if not gm_can_expense(e.store_id) or not is_store_member(e.store_id) then raise exception 'ليس لديك صلاحية تعديل المصاريف' using errcode = '42501'; end if;
+  if exists (select 1 from inventory_gifts where expense_entry_id = e.id) then raise exception 'هذا مصروف هدية — عدّله بإرجاع الهدية إلى المخزن'; end if;
+  select id, name into cat from expense_categories where id = (p->>'category_id')::uuid and store_id = e.store_id;
+  if cat is null then raise exception 'اختر نوع المصروف'; end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  select coalesce(nullif(upper(currency), ''), 'AED') into base_cur from stores where id = e.store_id;
+  if cur = '' then cur := base_cur; end if;
+  fx := cur <> base_cur;
+  if fx then
+    if rate is null or rate <= 0 then raise exception 'أدخل سعر صرف % مقابل %', cur, base_cur; end if;
+    base_amt := round(amt / rate, 2);
+    fxnote := ' (' || trim(to_char(amt, 'FM999,999,999,990.##')) || ' ' || cur || ')';
+  else base_amt := amt; end if;
+  update expense_entries set category_id = cat.id, amount = base_amt, description = coalesce(descr, cat.name),
+         fx_amount = case when fx then amt end, fx_currency = case when fx then cur end where id = e.id;
+  if e.cash_movement_id is not null then
+    update cash_movements set amount = base_amt, description = 'مصروف ' || cat.name || coalesce(': ' || descr, '') || fxnote,
+           fx_amount = case when fx then amt end, fx_currency = case when fx then cur end where id = e.cash_movement_id;
+    update daily_cash_log set amount = amt, currency = cur, operation_type = 'مصروف: ' || cat.name, notes = descr where cash_movement_id = e.cash_movement_id;
+  end if;
+  return jsonb_build_object('ok', true);
+end $$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -4091,6 +4269,45 @@ CREATE TABLE public.cash_movements (
 
 
 --
+-- Name: client_errors; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.client_errors (
+    id bigint NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    user_id uuid DEFAULT auth.uid(),
+    store_id uuid,
+    page text,
+    message text NOT NULL,
+    source text,
+    line integer,
+    stack text,
+    user_agent text,
+    app_version text,
+    CONSTRAINT client_errors_app_version_check CHECK ((char_length(app_version) <= 50)),
+    CONSTRAINT client_errors_message_check CHECK ((char_length(message) <= 1000)),
+    CONSTRAINT client_errors_page_check CHECK ((char_length(page) <= 200)),
+    CONSTRAINT client_errors_source_check CHECK ((char_length(source) <= 300)),
+    CONSTRAINT client_errors_stack_check CHECK ((char_length(stack) <= 4000)),
+    CONSTRAINT client_errors_user_agent_check CHECK ((char_length(user_agent) <= 300))
+);
+
+
+--
+-- Name: client_errors_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.client_errors ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.client_errors_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
+);
+
+
+--
 -- Name: company_kyc_documents; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -4105,6 +4322,31 @@ CREATE TABLE public.company_kyc_documents (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     document_category text DEFAULT 'kyc'::text NOT NULL,
     CONSTRAINT company_kyc_documents_owner_type_check CHECK ((owner_type = ANY (ARRAY['customer'::text, 'trader'::text, 'invoice'::text])))
+);
+
+
+--
+-- Name: company_register_attempts; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.company_register_attempts (
+    id bigint NOT NULL,
+    caller_ip text NOT NULL,
+    attempted_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: company_register_attempts_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+ALTER TABLE public.company_register_attempts ALTER COLUMN id ADD GENERATED ALWAYS AS IDENTITY (
+    SEQUENCE NAME public.company_register_attempts_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1
 );
 
 
@@ -4355,7 +4597,9 @@ CREATE TABLE public.expense_entries (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now(),
     attachment_url text,
-    cash_movement_id uuid
+    cash_movement_id uuid,
+    fx_amount numeric,
+    fx_currency text
 );
 
 
@@ -4595,7 +4839,8 @@ CREATE TABLE public.invoice_items (
     item_photo_url text,
     diamond_piece_id uuid,
     fabrication_fee_vat numeric,
-    diamond_stock_lot_id uuid
+    diamond_stock_lot_id uuid,
+    returned_item_id uuid
 );
 
 
@@ -4675,6 +4920,7 @@ CREATE TABLE public.invoices (
     pay_currency text,
     pay_fx_rate numeric,
     pay_breakdown jsonb,
+    is_exchange boolean DEFAULT false NOT NULL,
     CONSTRAINT invoices_seller_id_type_check CHECK (((seller_id_type IS NULL) OR (seller_id_type = ANY (ARRAY['emirates_id'::text, 'passport'::text, 'other'::text]))))
 );
 
@@ -5531,11 +5777,27 @@ ALTER TABLE ONLY public.cash_movements
 
 
 --
+-- Name: client_errors client_errors_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.client_errors
+    ADD CONSTRAINT client_errors_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: company_kyc_documents company_kyc_documents_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.company_kyc_documents
     ADD CONSTRAINT company_kyc_documents_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: company_register_attempts company_register_attempts_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.company_register_attempts
+    ADD CONSTRAINT company_register_attempts_pkey PRIMARY KEY (id);
 
 
 --
@@ -6011,6 +6273,20 @@ ALTER TABLE ONLY public.zebra_label_fields
 
 
 --
+-- Name: audit_log_staff_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_staff_id_fk_idx ON public.audit_log USING btree (staff_id);
+
+
+--
+-- Name: audit_log_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_store_id_fk_idx ON public.audit_log USING btree (store_id);
+
+
+--
 -- Name: auth_device_keys_user_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6025,10 +6301,129 @@ CREATE INDEX auth_passkeys_user_idx ON public.auth_passkeys USING btree (user_id
 
 
 --
+-- Name: auth_webauthn_challenges_user_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX auth_webauthn_challenges_user_id_fk_idx ON public.auth_webauthn_challenges USING btree (user_id);
+
+
+--
+-- Name: cash_movements_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX cash_movements_created_by_fk_idx ON public.cash_movements USING btree (created_by);
+
+
+--
+-- Name: cash_movements_invoice_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX cash_movements_invoice_id_fk_idx ON public.cash_movements USING btree (invoice_id);
+
+
+--
+-- Name: cash_movements_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX cash_movements_store_id_fk_idx ON public.cash_movements USING btree (store_id);
+
+
+--
+-- Name: client_errors_created_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX client_errors_created_at_idx ON public.client_errors USING btree (created_at DESC);
+
+
+--
+-- Name: client_errors_store_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX client_errors_store_id_idx ON public.client_errors USING btree (store_id);
+
+
+--
+-- Name: company_kyc_documents_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX company_kyc_documents_store_id_fk_idx ON public.company_kyc_documents USING btree (store_id);
+
+
+--
+-- Name: company_kyc_documents_uploaded_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX company_kyc_documents_uploaded_by_fk_idx ON public.company_kyc_documents USING btree (uploaded_by);
+
+
+--
+-- Name: company_register_attempts_at_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX company_register_attempts_at_idx ON public.company_register_attempts USING btree (attempted_at);
+
+
+--
+-- Name: customer_debts_cash_movement_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_debts_cash_movement_id_fk_idx ON public.customer_debts USING btree (cash_movement_id);
+
+
+--
+-- Name: customer_debts_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_debts_created_by_fk_idx ON public.customer_debts USING btree (created_by);
+
+
+--
+-- Name: customer_debts_customer_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_debts_customer_id_fk_idx ON public.customer_debts USING btree (customer_id);
+
+
+--
+-- Name: customer_debts_invoice_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_debts_invoice_id_fk_idx ON public.customer_debts USING btree (invoice_id);
+
+
+--
+-- Name: customer_debts_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_debts_store_id_fk_idx ON public.customer_debts USING btree (store_id);
+
+
+--
+-- Name: customer_deposits_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_deposits_created_by_fk_idx ON public.customer_deposits USING btree (created_by);
+
+
+--
+-- Name: customer_deposits_customer_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_deposits_customer_id_fk_idx ON public.customer_deposits USING btree (customer_id);
+
+
+--
 -- Name: customer_deposits_store_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX customer_deposits_store_idx ON public.customer_deposits USING btree (store_id, created_at DESC);
+
+
+--
+-- Name: customers_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customers_store_id_fk_idx ON public.customers USING btree (store_id);
 
 
 --
@@ -6043,6 +6438,146 @@ CREATE INDEX daily_cash_log_bank_invoice_idx ON public.daily_cash_log USING btre
 --
 
 CREATE UNIQUE INDEX daily_cash_log_cash_movement_uidx ON public.daily_cash_log USING btree (cash_movement_id) WHERE (cash_movement_id IS NOT NULL);
+
+
+--
+-- Name: daily_cash_log_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX daily_cash_log_created_by_fk_idx ON public.daily_cash_log USING btree (created_by);
+
+
+--
+-- Name: daily_cash_log_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX daily_cash_log_store_id_fk_idx ON public.daily_cash_log USING btree (store_id);
+
+
+--
+-- Name: diamond_pieces_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX diamond_pieces_created_by_fk_idx ON public.diamond_pieces USING btree (created_by);
+
+
+--
+-- Name: diamond_pieces_diamond_stock_lot_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX diamond_pieces_diamond_stock_lot_id_fk_idx ON public.diamond_pieces USING btree (diamond_stock_lot_id);
+
+
+--
+-- Name: diamond_stock_lots_source_invoice_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX diamond_stock_lots_source_invoice_id_fk_idx ON public.diamond_stock_lots USING btree (source_invoice_id);
+
+
+--
+-- Name: diamond_stock_lots_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX diamond_stock_lots_store_id_fk_idx ON public.diamond_stock_lots USING btree (store_id);
+
+
+--
+-- Name: diamond_stock_lots_trader_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX diamond_stock_lots_trader_id_fk_idx ON public.diamond_stock_lots USING btree (trader_id);
+
+
+--
+-- Name: expense_categories_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX expense_categories_store_id_fk_idx ON public.expense_categories USING btree (store_id);
+
+
+--
+-- Name: expense_entries_cash_movement_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX expense_entries_cash_movement_id_fk_idx ON public.expense_entries USING btree (cash_movement_id);
+
+
+--
+-- Name: expense_entries_category_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX expense_entries_category_id_fk_idx ON public.expense_entries USING btree (category_id);
+
+
+--
+-- Name: expense_entries_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX expense_entries_created_by_fk_idx ON public.expense_entries USING btree (created_by);
+
+
+--
+-- Name: expense_entries_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX expense_entries_store_id_fk_idx ON public.expense_entries USING btree (store_id);
+
+
+--
+-- Name: fiscal_year_closures_closed_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX fiscal_year_closures_closed_by_fk_idx ON public.fiscal_year_closures USING btree (closed_by);
+
+
+--
+-- Name: gold_stock_lots_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX gold_stock_lots_created_by_fk_idx ON public.gold_stock_lots USING btree (created_by);
+
+
+--
+-- Name: gold_stock_lots_source_invoice_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX gold_stock_lots_source_invoice_id_fk_idx ON public.gold_stock_lots USING btree (source_invoice_id);
+
+
+--
+-- Name: gold_stock_lots_trader_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX gold_stock_lots_trader_id_fk_idx ON public.gold_stock_lots USING btree (trader_id);
+
+
+--
+-- Name: hr_employees_linked_staff_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX hr_employees_linked_staff_id_fk_idx ON public.hr_employees USING btree (linked_staff_id);
+
+
+--
+-- Name: hr_employees_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX hr_employees_store_id_fk_idx ON public.hr_employees USING btree (store_id);
+
+
+--
+-- Name: hr_leave_requests_employee_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX hr_leave_requests_employee_id_fk_idx ON public.hr_leave_requests USING btree (employee_id);
+
+
+--
+-- Name: hr_leave_requests_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX hr_leave_requests_store_id_fk_idx ON public.hr_leave_requests USING btree (store_id);
 
 
 --
@@ -6151,10 +6686,73 @@ CREATE INDEX idx_trader_movements_batch_id ON public.trader_movements USING btre
 
 
 --
+-- Name: inventory_count_expected_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_count_expected_store_id_fk_idx ON public.inventory_count_expected USING btree (store_id);
+
+
+--
 -- Name: inventory_count_scans_count_value_uniq; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX inventory_count_scans_count_value_uniq ON public.inventory_count_scans USING btree (count_id, rfid_epc);
+
+
+--
+-- Name: inventory_count_scans_piece_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_count_scans_piece_id_fk_idx ON public.inventory_count_scans USING btree (piece_id);
+
+
+--
+-- Name: inventory_count_scans_scanned_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_count_scans_scanned_by_fk_idx ON public.inventory_count_scans USING btree (scanned_by);
+
+
+--
+-- Name: inventory_count_scans_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_count_scans_store_id_fk_idx ON public.inventory_count_scans USING btree (store_id);
+
+
+--
+-- Name: inventory_counts_started_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_counts_started_by_fk_idx ON public.inventory_counts USING btree (started_by);
+
+
+--
+-- Name: inventory_counts_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_counts_store_id_fk_idx ON public.inventory_counts USING btree (store_id);
+
+
+--
+-- Name: inventory_gifts_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_gifts_created_by_fk_idx ON public.inventory_gifts USING btree (created_by);
+
+
+--
+-- Name: inventory_gifts_expense_entry_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_gifts_expense_entry_id_fk_idx ON public.inventory_gifts USING btree (expense_entry_id);
+
+
+--
+-- Name: inventory_gifts_piece_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX inventory_gifts_piece_id_fk_idx ON public.inventory_gifts USING btree (piece_id);
 
 
 --
@@ -6165,10 +6763,129 @@ CREATE INDEX inventory_gifts_store_idx ON public.inventory_gifts USING btree (st
 
 
 --
+-- Name: invoice_items_diamond_piece_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_items_diamond_piece_id_fk_idx ON public.invoice_items USING btree (diamond_piece_id);
+
+
+--
+-- Name: invoice_items_diamond_stock_lot_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_items_diamond_stock_lot_id_fk_idx ON public.invoice_items USING btree (diamond_stock_lot_id);
+
+
+--
+-- Name: invoice_items_gold_stock_lot_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_items_gold_stock_lot_id_fk_idx ON public.invoice_items USING btree (gold_stock_lot_id);
+
+
+--
+-- Name: invoice_items_invoice_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_items_invoice_id_fk_idx ON public.invoice_items USING btree (invoice_id);
+
+
+--
+-- Name: invoice_items_piece_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_items_piece_id_fk_idx ON public.invoice_items USING btree (piece_id);
+
+
+--
+-- Name: invoice_items_returned_item_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoice_items_returned_item_idx ON public.invoice_items USING btree (returned_item_id) WHERE (returned_item_id IS NOT NULL);
+
+
+--
 -- Name: invoices_client_ref_key; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX invoices_client_ref_key ON public.invoices USING btree (client_ref) WHERE (client_ref IS NOT NULL);
+
+
+--
+-- Name: invoices_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoices_created_by_fk_idx ON public.invoices USING btree (created_by);
+
+
+--
+-- Name: invoices_customer_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoices_customer_id_fk_idx ON public.invoices USING btree (customer_id);
+
+
+--
+-- Name: invoices_related_invoice_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoices_related_invoice_id_fk_idx ON public.invoices USING btree (related_invoice_id);
+
+
+--
+-- Name: invoices_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoices_store_id_fk_idx ON public.invoices USING btree (store_id);
+
+
+--
+-- Name: invoices_trader_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoices_trader_id_fk_idx ON public.invoices USING btree (trader_id);
+
+
+--
+-- Name: kyc_screenings_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX kyc_screenings_store_id_fk_idx ON public.kyc_screenings USING btree (store_id);
+
+
+--
+-- Name: organizations_primary_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organizations_primary_store_id_fk_idx ON public.organizations USING btree (primary_store_id);
+
+
+--
+-- Name: payroll_payments_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX payroll_payments_created_by_fk_idx ON public.payroll_payments USING btree (created_by);
+
+
+--
+-- Name: payroll_payments_staff_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX payroll_payments_staff_id_fk_idx ON public.payroll_payments USING btree (staff_id);
+
+
+--
+-- Name: piece_classification_options_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_classification_options_created_by_fk_idx ON public.piece_classification_options USING btree (created_by);
+
+
+--
+-- Name: piece_intake_batches_source_lot_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_intake_batches_source_lot_id_fk_idx ON public.piece_intake_batches USING btree (source_lot_id);
 
 
 --
@@ -6179,10 +6896,45 @@ CREATE INDEX piece_intake_batches_store_idx ON public.piece_intake_batches USING
 
 
 --
+-- Name: piece_lot_draws_lot_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_lot_draws_lot_id_fk_idx ON public.piece_lot_draws USING btree (lot_id);
+
+
+--
 -- Name: piece_lot_draws_piece_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX piece_lot_draws_piece_idx ON public.piece_lot_draws USING btree (piece_id);
+
+
+--
+-- Name: piece_lot_draws_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_lot_draws_store_id_fk_idx ON public.piece_lot_draws USING btree (store_id);
+
+
+--
+-- Name: piece_movements_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_movements_created_by_fk_idx ON public.piece_movements USING btree (created_by);
+
+
+--
+-- Name: piece_movements_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_movements_store_id_fk_idx ON public.piece_movements USING btree (store_id);
+
+
+--
+-- Name: pieces_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pieces_created_by_fk_idx ON public.pieces USING btree (created_by);
 
 
 --
@@ -6200,10 +6952,52 @@ CREATE UNIQUE INDEX pieces_rfid_epc_unique ON public.pieces USING btree (rfid_ep
 
 
 --
+-- Name: pieces_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pieces_store_id_fk_idx ON public.pieces USING btree (store_id);
+
+
+--
+-- Name: repair_tickets_customer_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX repair_tickets_customer_id_fk_idx ON public.repair_tickets USING btree (customer_id);
+
+
+--
+-- Name: repair_tickets_delivered_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX repair_tickets_delivered_by_fk_idx ON public.repair_tickets USING btree (delivered_by);
+
+
+--
+-- Name: repair_tickets_received_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX repair_tickets_received_by_fk_idx ON public.repair_tickets USING btree (received_by);
+
+
+--
+-- Name: repair_tickets_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX repair_tickets_store_id_fk_idx ON public.repair_tickets USING btree (store_id);
+
+
+--
 -- Name: rfid_write_jobs_pending; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX rfid_write_jobs_pending ON public.rfid_write_jobs USING btree (store_id, created_at) WHERE (status = ANY (ARRAY['pending'::text, 'working'::text]));
+
+
+--
+-- Name: rfid_write_jobs_piece_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX rfid_write_jobs_piece_id_fk_idx ON public.rfid_write_jobs USING btree (piece_id);
 
 
 --
@@ -6214,10 +7008,66 @@ CREATE INDEX staff_presence_store_idx ON public.staff_presence USING btree (stor
 
 
 --
+-- Name: staff_salaries_staff_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX staff_salaries_staff_id_fk_idx ON public.staff_salaries USING btree (staff_id);
+
+
+--
+-- Name: staff_salaries_updated_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX staff_salaries_updated_by_fk_idx ON public.staff_salaries USING btree (updated_by);
+
+
+--
+-- Name: staff_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX staff_store_id_fk_idx ON public.staff USING btree (store_id);
+
+
+--
 -- Name: stock_voucher_lines_party_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX stock_voucher_lines_party_idx ON public.stock_voucher_lines USING btree (party_id);
+
+
+--
+-- Name: stock_voucher_lines_piece_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_voucher_lines_piece_id_fk_idx ON public.stock_voucher_lines USING btree (piece_id);
+
+
+--
+-- Name: stock_voucher_lines_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_voucher_lines_store_id_fk_idx ON public.stock_voucher_lines USING btree (store_id);
+
+
+--
+-- Name: stock_voucher_lines_voucher_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_voucher_lines_voucher_id_fk_idx ON public.stock_voucher_lines USING btree (voucher_id);
+
+
+--
+-- Name: stock_vouchers_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_vouchers_created_by_fk_idx ON public.stock_vouchers USING btree (created_by);
+
+
+--
+-- Name: stock_vouchers_party_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stock_vouchers_party_id_fk_idx ON public.stock_vouchers USING btree (party_id);
 
 
 --
@@ -6228,6 +7078,13 @@ CREATE INDEX stock_vouchers_store_idx ON public.stock_vouchers USING btree (stor
 
 
 --
+-- Name: store_invites_invited_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX store_invites_invited_by_fk_idx ON public.store_invites USING btree (invited_by);
+
+
+--
 -- Name: store_invites_unique_pending; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -6235,10 +7092,94 @@ CREATE UNIQUE INDEX store_invites_unique_pending ON public.store_invites USING b
 
 
 --
+-- Name: stores_organization_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX stores_organization_id_fk_idx ON public.stores USING btree (organization_id);
+
+
+--
 -- Name: subscriptions_one_per_store; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE UNIQUE INDEX subscriptions_one_per_store ON public.subscriptions USING btree (store_id);
+
+
+--
+-- Name: subscriptions_pending_upgrade_plan_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subscriptions_pending_upgrade_plan_id_fk_idx ON public.subscriptions USING btree (pending_upgrade_plan_id);
+
+
+--
+-- Name: subscriptions_plan_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX subscriptions_plan_id_fk_idx ON public.subscriptions USING btree (plan_id);
+
+
+--
+-- Name: support_requests_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX support_requests_created_by_fk_idx ON public.support_requests USING btree (created_by);
+
+
+--
+-- Name: support_requests_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX support_requests_store_id_fk_idx ON public.support_requests USING btree (store_id);
+
+
+--
+-- Name: trader_movements_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_created_by_fk_idx ON public.trader_movements USING btree (created_by);
+
+
+--
+-- Name: trader_movements_gold_stock_lot_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_gold_stock_lot_id_fk_idx ON public.trader_movements USING btree (gold_stock_lot_id);
+
+
+--
+-- Name: trader_movements_invoice_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_invoice_id_fk_idx ON public.trader_movements USING btree (invoice_id);
+
+
+--
+-- Name: trader_movements_piece_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_piece_id_fk_idx ON public.trader_movements USING btree (piece_id);
+
+
+--
+-- Name: trader_movements_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_store_id_fk_idx ON public.trader_movements USING btree (store_id);
+
+
+--
+-- Name: trader_movements_trader_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_trader_id_fk_idx ON public.trader_movements USING btree (trader_id);
+
+
+--
+-- Name: traders_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX traders_store_id_fk_idx ON public.traders USING btree (store_id);
 
 
 --
@@ -6538,6 +7479,14 @@ ALTER TABLE ONLY public.cash_movements
 
 
 --
+-- Name: client_errors client_errors_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.client_errors
+    ADD CONSTRAINT client_errors_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
 -- Name: company_kyc_documents company_kyc_documents_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -6710,7 +7659,7 @@ ALTER TABLE ONLY public.diamond_stock_lots
 --
 
 ALTER TABLE ONLY public.diamond_stock_lots
-    ADD CONSTRAINT diamond_stock_lots_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+    ADD CONSTRAINT diamond_stock_lots_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -6830,7 +7779,7 @@ ALTER TABLE ONLY public.hr_employees
 --
 
 ALTER TABLE ONLY public.hr_employees
-    ADD CONSTRAINT hr_employees_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+    ADD CONSTRAINT hr_employees_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -6846,7 +7795,7 @@ ALTER TABLE ONLY public.hr_leave_requests
 --
 
 ALTER TABLE ONLY public.hr_leave_requests
-    ADD CONSTRAINT hr_leave_requests_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+    ADD CONSTRAINT hr_leave_requests_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -6862,7 +7811,7 @@ ALTER TABLE ONLY public.inventory_count_expected
 --
 
 ALTER TABLE ONLY public.inventory_count_expected
-    ADD CONSTRAINT inventory_count_expected_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+    ADD CONSTRAINT inventory_count_expected_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -6894,7 +7843,7 @@ ALTER TABLE ONLY public.inventory_count_scans
 --
 
 ALTER TABLE ONLY public.inventory_count_scans
-    ADD CONSTRAINT inventory_count_scans_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+    ADD CONSTRAINT inventory_count_scans_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -6910,7 +7859,7 @@ ALTER TABLE ONLY public.inventory_counts
 --
 
 ALTER TABLE ONLY public.inventory_counts
-    ADD CONSTRAINT inventory_counts_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+    ADD CONSTRAINT inventory_counts_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -6986,6 +7935,14 @@ ALTER TABLE ONLY public.invoice_items
 
 
 --
+-- Name: invoice_items invoice_items_returned_item_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoice_items
+    ADD CONSTRAINT invoice_items_returned_item_id_fkey FOREIGN KEY (returned_item_id) REFERENCES public.invoice_items(id);
+
+
+--
 -- Name: invoice_number_counters invoice_number_counters_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7038,7 +7995,7 @@ ALTER TABLE ONLY public.invoices
 --
 
 ALTER TABLE ONLY public.kyc_screenings
-    ADD CONSTRAINT kyc_screenings_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+    ADD CONSTRAINT kyc_screenings_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -7230,7 +8187,7 @@ ALTER TABLE ONLY public.rfid_write_jobs
 --
 
 ALTER TABLE ONLY public.rfid_write_jobs
-    ADD CONSTRAINT rfid_write_jobs_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+    ADD CONSTRAINT rfid_write_jobs_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -7507,14 +8464,14 @@ ALTER TABLE public._backup_20260927_piece_batches ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "admins can view admin list" ON public.platform_admins FOR SELECT USING ((EXISTS ( SELECT 1
    FROM public.platform_admins pa
-  WHERE (pa.id = auth.uid()))));
+  WHERE (pa.id = ( SELECT auth.uid() AS uid)))));
 
 
 --
 -- Name: plans anyone authenticated can view plans; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "anyone authenticated can view plans" ON public.plans FOR SELECT USING ((auth.role() = 'authenticated'::text));
+CREATE POLICY "anyone authenticated can view plans" ON public.plans FOR SELECT USING ((( SELECT auth.role() AS role) = 'authenticated'::text));
 
 
 --
@@ -7569,10 +8526,22 @@ CREATE POLICY cash_movements_write ON public.cash_movements USING ((public.is_st
 
 
 --
+-- Name: client_errors; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.client_errors ENABLE ROW LEVEL SECURITY;
+
+--
 -- Name: company_kyc_documents; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.company_kyc_documents ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: company_register_attempts; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.company_register_attempts ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: company_search_attempts; Type: ROW SECURITY; Schema: public; Owner: -
@@ -8021,49 +8990,49 @@ ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
 -- Name: auth_device_keys own device keys: remove; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "own device keys: remove" ON public.auth_device_keys FOR DELETE TO authenticated USING ((user_id = auth.uid()));
+CREATE POLICY "own device keys: remove" ON public.auth_device_keys FOR DELETE TO authenticated USING ((user_id = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: auth_device_keys own device keys: view; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "own device keys: view" ON public.auth_device_keys FOR SELECT TO authenticated USING ((user_id = auth.uid()));
+CREATE POLICY "own device keys: view" ON public.auth_device_keys FOR SELECT TO authenticated USING ((user_id = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: auth_passkeys own passkeys: remove; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "own passkeys: remove" ON public.auth_passkeys FOR DELETE TO authenticated USING ((user_id = auth.uid()));
+CREATE POLICY "own passkeys: remove" ON public.auth_passkeys FOR DELETE TO authenticated USING ((user_id = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: auth_passkeys own passkeys: view; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "own passkeys: view" ON public.auth_passkeys FOR SELECT TO authenticated USING ((user_id = auth.uid()));
+CREATE POLICY "own passkeys: view" ON public.auth_passkeys FOR SELECT TO authenticated USING ((user_id = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: user_profiles own profile select; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "own profile select" ON public.user_profiles FOR SELECT USING ((id = auth.uid()));
+CREATE POLICY "own profile select" ON public.user_profiles FOR SELECT USING ((id = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: user_profiles own profile update; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "own profile update" ON public.user_profiles FOR UPDATE USING ((id = auth.uid()));
+CREATE POLICY "own profile update" ON public.user_profiles FOR UPDATE USING ((id = ( SELECT auth.uid() AS uid)));
 
 
 --
 -- Name: user_profiles own profile upsert; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "own profile upsert" ON public.user_profiles FOR INSERT WITH CHECK ((id = auth.uid()));
+CREATE POLICY "own profile upsert" ON public.user_profiles FOR INSERT WITH CHECK ((id = ( SELECT auth.uid() AS uid)));
 
 
 --
@@ -8093,7 +9062,7 @@ CREATE POLICY "owner or manage_staff can manage staff" ON public.staff USING ((p
 
 CREATE POLICY "owners can close a year" ON public.fiscal_year_closures FOR INSERT WITH CHECK ((public.is_store_member(store_id) AND (EXISTS ( SELECT 1
    FROM public.staff
-  WHERE ((staff.user_id = auth.uid()) AND (staff.store_id = fiscal_year_closures.store_id) AND (staff.role = 'owner'::text))))));
+  WHERE ((staff.user_id = ( SELECT auth.uid() AS uid)) AND (staff.store_id = fiscal_year_closures.store_id) AND (staff.role = 'owner'::text))))));
 
 
 --
@@ -8201,6 +9170,13 @@ CREATE POLICY "platform admins full access to organizations" ON public.organizat
 
 
 --
+-- Name: client_errors platform admins read errors; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "platform admins read errors" ON public.client_errors FOR SELECT TO authenticated USING (( SELECT public.is_platform_admin() AS is_platform_admin));
+
+
+--
 -- Name: platform_admins; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -8231,6 +9207,13 @@ CREATE POLICY repair_tickets_select ON public.repair_tickets FOR SELECT USING ((
 --
 
 CREATE POLICY repair_tickets_update ON public.repair_tickets FOR UPDATE USING ((public.is_store_member(store_id) AND public.has_permission('edit_repair'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_repair'::text, store_id)));
+
+
+--
+-- Name: client_errors report own errors; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "report own errors" ON public.client_errors FOR INSERT TO authenticated WITH CHECK (((user_id = ( SELECT auth.uid() AS uid)) AND ((store_id IS NULL) OR public.is_store_member(store_id))));
 
 
 --
@@ -8977,7 +9960,7 @@ GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO service_role;
 -- Name: FUNCTION gm_daily_label(p_op text, p_notes text, p_cm uuid, OUT op text, OUT notes text); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.gm_daily_label(p_op text, p_notes text, p_cm uuid, OUT op text, OUT notes text) TO anon;
+REVOKE ALL ON FUNCTION public.gm_daily_label(p_op text, p_notes text, p_cm uuid, OUT op text, OUT notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_daily_label(p_op text, p_notes text, p_cm uuid, OUT op text, OUT notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.gm_daily_label(p_op text, p_notes text, p_cm uuid, OUT op text, OUT notes text) TO service_role;
 
@@ -9202,6 +10185,15 @@ GRANT ALL ON FUNCTION public.next_repair_number(p_store_id uuid) TO service_role
 REVOKE ALL ON FUNCTION public.post_purchase_invoice(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.post_purchase_invoice(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.post_purchase_invoice(p jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION post_sale_exchange(p jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.post_sale_exchange(p jsonb) TO anon;
+GRANT ALL ON FUNCTION public.post_sale_exchange(p jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.post_sale_exchange(p jsonb) TO service_role;
 
 
 --
@@ -9608,6 +10600,15 @@ GRANT ALL ON FUNCTION public.update_expense(p_id uuid, p_category uuid, p_amount
 
 
 --
+-- Name: FUNCTION update_expense_fx(p jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.update_expense_fx(p jsonb) TO anon;
+GRANT ALL ON FUNCTION public.update_expense_fx(p jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.update_expense_fx(p jsonb) TO service_role;
+
+
+--
 -- Name: TABLE _backup_20260927_intake_batches; Type: ACL; Schema: public; Owner: -
 --
 
@@ -9737,12 +10738,46 @@ GRANT ALL ON TABLE public.cash_movements TO service_role;
 
 
 --
+-- Name: TABLE client_errors; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.client_errors TO anon;
+GRANT ALL ON TABLE public.client_errors TO authenticated;
+GRANT ALL ON TABLE public.client_errors TO service_role;
+
+
+--
+-- Name: SEQUENCE client_errors_id_seq; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON SEQUENCE public.client_errors_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.client_errors_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.client_errors_id_seq TO service_role;
+
+
+--
 -- Name: TABLE company_kyc_documents; Type: ACL; Schema: public; Owner: -
 --
 
 GRANT ALL ON TABLE public.company_kyc_documents TO anon;
 GRANT ALL ON TABLE public.company_kyc_documents TO authenticated;
 GRANT ALL ON TABLE public.company_kyc_documents TO service_role;
+
+
+--
+-- Name: TABLE company_register_attempts; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.company_register_attempts TO service_role;
+
+
+--
+-- Name: SEQUENCE company_register_attempts_id_seq; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON SEQUENCE public.company_register_attempts_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.company_register_attempts_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.company_register_attempts_id_seq TO service_role;
 
 
 --
@@ -10285,5 +11320,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 0NnUhbCbaFAFdhoGer4FzmRheKz9qjvvTLIknRgGiF5DWyhZSSoE1JVDP1XKLTO
+\unrestrict T8sc3mnYLxC8XhT4QL4e0C3P6Z9VNeTN9xRhAlUIML0hi8LlikTCg3ryBAMcA2m
 
