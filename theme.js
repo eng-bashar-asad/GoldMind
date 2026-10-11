@@ -598,6 +598,18 @@ function goldmindLoadSavedTheme() {
   return saved;
 }
 
+// Print-preview pages (a white paper on a grey page): on screen, the page around the paper follows the
+// chosen theme; controls that sit straight on the page get a light panel. Printing is unchanged (white).
+(function () {
+  var st = document.createElement('style');
+  st.id = 'gm-paper-pages-theme';
+  st.textContent = '@media screen{'
+    + 'html:not(.gm-light-canvas) body.bg-gray-100,html:not(.gm-light-canvas) body.gm-paper-page{background:var(--gm-bg)!important}'
+    + 'html:not(.gm-light-canvas) body.bg-gray-100>.no-print:not(.sticky):not(.hidden),html:not(.gm-light-canvas) body.gm-paper-page .gm-paper-controls{background:#fff;border-radius:12px;padding:10px 12px;color:#1F1A12}'
+    + '}';
+  (document.head || document.documentElement).appendChild(st);
+})();
+
 // Apply immediately on script load (before first paint as much as possible)
 goldmindLoadSavedTheme();
 goldmindLoadSavedFont();
