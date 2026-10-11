@@ -553,14 +553,26 @@ function goToStatementPrint() {
 <div class="mb-3">
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">الجزء الذهبي (اختياري)</label>
 <div class="grid grid-cols-2 gap-3">
-<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-weight" placeholder="الوزن (غ)" step="0.01" type="number"/>
-<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="settle-karat">
+<input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-weight" placeholder="الوزن (غ)" step="0.01" type="number" oninput="settleBoxPreview()"/>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="settle-karat" onchange="settleBoxDefault()">
 <option selected value="18">18</option>
 <option value="21">21</option>
 <option value="22">22</option>
 <option value="24">24</option>
 </select>
 </div>
+</div>
+<!-- received gold: into which stock box (incoming settlements only) -->
+<div class="hidden mb-3" id="settle-box-wrap">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="settle-box">إدخال الذهب المستلم إلى المستودع</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="settle-box" onchange="settleBoxPreview()">
+<option value="">لا يُدخل للمخزون</option>
+<option value="18">كسر 18</option>
+<option value="21">كسر 21</option>
+<option value="22">كسر 22</option>
+<option value="24">كسر 24</option>
+</select>
+<p class="text-[11px] text-on-surface-variant mt-1" id="settle-box-preview"></p>
 </div>
 <div class="mb-3">
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="settle-cash-amount-label">الجزء النقدي (اختياري)</label>
@@ -2720,6 +2732,28 @@ function setSettleDirection(dir) {
   outBtn.className = dir === 'out' ? active : inactive;
   inBtn.className = dir === 'in' ? active : inactive;
   document.getElementById('settle-cash-amount-label').textContent = dir === 'out' ? 'الجزء النقدي (اختياري) — المبلغ المدفوع' : 'الجزء النقدي (اختياري) — المبلغ المُستلم';
+  document.getElementById('settle-box-wrap').classList.toggle('hidden', dir !== 'in');
+  settleBoxDefault();
+}
+
+// Incoming gold goes into a scrap box. The box keeps the same pure gold as the trader's
+// statement: weight in the box's karat = 24K equivalent × 24 ÷ box karat
+// (e.g. 279.22 g of 24K → 372.29 g in «كسر 18»).
+function settleBoxWeight() {
+  const w = parseFloat(document.getElementById('settle-weight').value) || 0;
+  const k = parseInt(document.getElementById('settle-karat').value, 10) || 18;
+  const bk = parseInt(document.getElementById('settle-box').value, 10);
+  return w > 0 && bk ? Math.round(w * k / bk * 1000) / 1000 : 0;
+}
+function settleBoxDefault() {
+  const k = document.getElementById('settle-karat').value;
+  document.getElementById('settle-box').value = settleDirection === 'in' ? k : '';
+  settleBoxPreview();
+}
+function settleBoxPreview() {
+  const bk = document.getElementById('settle-box').value, el = document.getElementById('settle-box-preview');
+  const bw = settleBoxWeight();
+  el.textContent = bk && bw ? 'يدخل «كسر ' + bk + '»: ' + fmt(bw) + ' غ عيار ' + bk : (bk ? '' : 'الذهب يُسجّل بحساب التاجر فقط ولا يظهر بالمستودعات.');
 }
 
 async function submitSettlement() {
@@ -2761,6 +2795,22 @@ async function submitSettlement() {
 
   const { data: insertedMovement, error } = await goldmindClient.from('trader_movements').insert(movement).select().single();
 
+  // incoming gold → its stock box (linked to this settlement: editing/removing the settlement follows)
+  const boxKarat = settleDirection === 'in' ? parseInt(document.getElementById('settle-box').value, 10) : 0;
+  let lotError = null;
+  if (!error && insertedMovement && weight > 0 && boxKarat) {
+    const trader = traders.find(t => t.id === currentTraderId);
+    const lotNote = 'مستلم من التاجر ' + (trader ? trader.name : '') + ': ' + weight + ' غ عيار ' + karat
+      + (boxKarat !== karat ? ' — حُوّل إلى عيار ' + boxKarat : '') + (notes ? ' — ' + notes : '');
+    const r = await goldmindClient.from('gold_stock_lots').insert({
+      store_id: GOLDMIND_STORE_ID, karat: boxKarat, box_name: 'كسر ' + boxKarat,
+      weight_grams_total: settleBoxWeight(), weight_grams_remaining: settleBoxWeight(), cost_fabrication_per_gram: 0,
+      trader_id: currentTraderId, trader_movement_id: insertedMovement.id, notes: lotNote,
+      created_by: GOLDMIND_STAFF_ID, created_at: insertedMovement.created_at
+    });
+    lotError = r.error;
+  }
+
   if (!error && cashAmount > 0) {
     // Real cash moving in/out of the register right now -> reflect it in
     // the daily cash box, same as customer debt settlements already do.
@@ -2789,6 +2839,7 @@ async function submitSettlement() {
     errEl.classList.remove('hidden');
     return;
   }
+  if (lotError) alert('حُفظت التسوية، لكن تعذّر إدخال الذهب إلى المستودع: ' + lotError.message);
 
   document.getElementById('settle-weight').value = '';
   document.getElementById('settle-cash-amount').value = '';
