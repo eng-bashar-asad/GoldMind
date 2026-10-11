@@ -235,13 +235,24 @@ function gmCollapseInvoiceRows(entries) {
     const net = rows.reduce((s, e) => s + (e.direction === 'in' ? 1 : -1) * Number(e.amount || 0), 0);
     if (Math.abs(net) < 0.005) return [];
     const last = rows[rows.length - 1];
-    return [{ ...rows[0], id: last.id, created_at: last.created_at, direction: net > 0 ? 'in' : 'out', amount: Math.round(Math.abs(net) * 100) / 100, merged: rows.length }];
+    // label it after the real sale, never after a cancel/restore row
+    const undo = /^(إلغاء|استعادة) فاتورة\s*/;
+    const base = rows.find(r => !undo.test(r.notes || r.description || '')) || { ...rows[0], notes: rows[0].notes && rows[0].notes.replace(undo, ''), description: rows[0].description && rows[0].description.replace(undo, 'فاتورة ') };
+    return [{ ...base, id: last.id, created_at: last.created_at, direction: net > 0 ? 'in' : 'out', amount: Math.round(Math.abs(net) * 100) / 100, merged: rows.length }];
   });
+}
+// Same rule for cash_movements lists (home "حركات اليوم", main box), which come newest-first.
+function gmCollapseMovements(list) {
+  const asc = (list || []).map(m => ({ ...m, cm: { invoice_id: m.invoice_id } })).reverse();
+  return gmCollapseInvoiceRows(asc).reverse();
 }
 // ponytail: quick self-check of the netting rule
 console.assert(gmCollapseInvoiceRows([{ id: 1, cm: { invoice_id: 'a' }, currency: 'USD', created_at: '2026-10-01T10:00:00Z', direction: 'out', amount: 1500 },
   { id: 2, cm: { invoice_id: 'a' }, currency: 'USD', created_at: '2026-10-01T10:05:00Z', direction: 'in', amount: 1500 },
   { id: 3, cm: { invoice_id: 'a' }, currency: 'USD', created_at: '2026-10-01T10:05:00Z', direction: 'out', amount: 1700 }]).map(e => e.direction + e.amount).join() === 'out1700', 'gmCollapseInvoiceRows');
+console.assert(gmCollapseMovements([{ id: 3, invoice_id: 'b', currency: 'USD', created_at: '2026-10-01T11:00:00Z', direction: 'in', amount: 6370, description: 'استعادة فاتورة X' },
+  { id: 2, invoice_id: 'b', currency: 'USD', created_at: '2026-10-01T10:30:00Z', direction: 'out', amount: 6100, description: 'إلغاء فاتورة X' }])
+  .map(e => e.direction + e.amount + e.description).join() === 'in270فاتورة X', 'gmCollapseMovements');
 
 function gmFormatDualCurrency(amount, store) {
   const base = (store && store.currency) || '';

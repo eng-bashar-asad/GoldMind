@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=36"></script>
-<script src="theme.js?v=56"></script>
+<script src="theme.js?v=57"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -61,6 +61,19 @@ const LINK = { invoice: id => 'invoice-print-ar.html?id=' + id, piece: id => 'pi
 const CODE_LINK = { invoice_currency: 'invoice', invoice_lines_total: 'invoice', invoice_cash_mismatch: 'invoice', invoice_debt_mismatch: 'invoice', cash_currency: 'invoice', piece_still_available: 'piece', daily_box_missing: 'invoice' };
 const esc = v => gmEscapeHtml(v == null ? '' : String(v));
 
+// For each alert: what it means in plain words, and what the employee should do.
+const HELP = {
+  gold_price_currency: ['سعر الذهب المُدخل لا يناسب عملة المحل (مثلاً سعر بالدرهم والمحل بالدولار)، فتُحسب الأسعار والأرباح خطأ.', 'افتح صفحة سعر الذهب وأدخل السعر بعملة المحل.'],
+  invoice_currency: ['هذه الفاتورة محفوظة بعملة غير عملة المحل، فتظهر مبالغها مختلفة في التقارير.', 'افتح الفاتورة وتأكد من العملة؛ إذا كانت خطأ عدّلها أو ألغِها وأعد إصدارها.'],
+  invoice_lines_total: ['مجموع أسعار القطع داخل الفاتورة لا يساوي إجمالي الفاتورة، فيُحسب الربح خطأ.', 'افتح الفاتورة واضغط تعديل، وتأكد من سعر كل قطعة ومن الإجمالي ثم احفظ.'],
+  invoice_cash_mismatch: ['المبلغ المكتوب أنه مدفوع في الفاتورة لا يساوي ما دخل الصندوق فعلاً (مع الدفعات اللاحقة). يحدث غالباً بعد تعديل سعر أو طريقة دفع.', 'افتح الفاتورة وراجع المدفوع وطريقة الدفع، وقارنها بالصندوق اليومي لذلك اليوم.'],
+  invoice_debt_mismatch: ['الباقي على الزبون في هذه الفاتورة لا يطابق الدين المسجّل في حسابه.', 'افتح الفاتورة وتأكد من المدفوع والباقي، ثم افتح حساب الزبون وتأكد أن دينه صحيح.'],
+  cash_currency: ['دخلت للصندوق حركة لهذه الفاتورة بعملة غير عملة الفاتورة.', 'افتح الفاتورة وراجع طريقة الدفع والعملات، أو أبلغ المدير.'],
+  piece_still_available: ['هذه القطعة مباعة بفاتورة، لكنها ما زالت تظهر متوفرة في المخزن، فقد تُباع مرة ثانية بالخطأ.', 'افتح القطعة وتأكد من حالتها؛ إذا كانت عند الزبون فعلاً أبلغ المدير لتصحيح حالتها.'],
+  daily_box_missing: ['دفعة نقدية لهذه الفاتورة سُجّلت في الحسابات لكنها لا تظهر في الصندوق اليومي، فيختلف رصيد الصندوق عن الحقيقة.', 'افتح الفاتورة وقارنها بالصندوق اليومي لنفس اليوم، وأبلغ المدير لتصحيحها.'],
+  negative_stock: ['وزن الذهب المتبقي في هذا الصندوق صار بالسالب، أي خرج منه أكثر مما دخل إليه.', 'راجع آخر القطع المُنتَجة من هذا الصندوق وأوزانها، وتأكد أن كل شراء أو استلام دخل إليه.']
+};
+
 async function runCheck() {
   const state = document.getElementById('state'), sum = document.getElementById('summary'), list = document.getElementById('list');
   state.classList.remove('hidden'); state.textContent = 'جارِ الفحص...'; sum.classList.add('hidden'); list.innerHTML = '';
@@ -81,6 +94,9 @@ async function runCheck() {
     return `<${href ? 'a href="' + href + '"' : 'div'} class="block bg-surface-container-lowest border border-outline-variant rounded-xl p-4 ${href ? 'hover:border-primary' : ''}">
       <div class="flex items-center justify-between gap-2 mb-1"><div class="font-semibold text-[13px]">${esc(r.title)}</div>${tag}</div>
       <div class="text-[12px] text-on-surface-variant leading-5">${r.ref_label ? '<b dir="ltr">' + esc(r.ref_label) + '</b> — ' : ''}${esc(r.details)}</div>
+      ${HELP[r.code] ? `<div class="mt-2 rounded-lg p-2.5 text-[12px] leading-5" style="background:#F6F1E4;color:#3A3226">
+        <div><b>ماذا يعني؟</b> ${esc(HELP[r.code][0])}</div>
+        <div class="mt-1"><b>ماذا أفعل؟</b> ${esc(HELP[r.code][1])}${href ? ' (اضغط على البطاقة لفتحها)' : ''}</div></div>` : ''}
     </${href ? 'a' : 'div'}>`;
   }).join('');
 }

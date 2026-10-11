@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=56"></script>
+<script src="theme.js?v=57"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -1968,7 +1968,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const dayStart = new Date(movementsViewDate); dayStart.setHours(0, 0, 0, 0);
             const dayEnd = new Date(dayStart); dayEnd.setDate(dayEnd.getDate() + 1);
 
-            const [{ data: recent }, { data: store }] = await Promise.all([
+            const [{ data: recentRaw }, { data: store }] = await Promise.all([
                 goldmindClient
                     .from('cash_movements')
                     .select('direction, amount, currency, description, created_at, invoice_id')
@@ -1979,6 +1979,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
             ]);
             const baseCurrency = (store && store.currency) || 'AED';
+            // an invoice cancelled, edited and re-posted shows once, with its final value
+            const recent = gmCollapseMovements(recentRaw);
 
             const container = document.getElementById('recentMovementsEl');
             if (!recent || recent.length === 0) {
