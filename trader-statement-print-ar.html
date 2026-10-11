@@ -178,19 +178,22 @@ function stRenderGold() {
         const gold = g.rows.reduce((a, m) => a + sgn(m) * Number(m.gold_24k_equivalent || 0), 0);
         const fab = g.rows.reduce((a, m) => a + sgn(m) * Number(m.fab_fee_amount || 0), 0);
         const w = g.rows.reduce((a, m) => a + stBilled(m), 0);
+        const gross = g.rows.reduce((a, m) => a + Number(m.weight_grams || 0), 0); // الوزن القائم
         const pcs = g.rows.filter(m => m.piece_id).length;
         const karats = [...new Set(g.rows.map(m => m.karat).filter(Boolean))].join('/');
         let title = (ST_SRC[f.source] || '') + (f.batch_ref ? ' ' + f.batch_ref : '');
         if (g.rows.length === 1 && !f.piece_id && f.notes) title = stShort(f.notes);
         const dateRow = `<tr class="st-d"><td colspan="5">${stArrow(f.movement_type)} ${fmtDate(f.created_at)} <span class="font-normal text-gray-600">· ${gmEscapeHtml(title.trim() || '—')}${karats ? ' · عيار ' + karats : ''}</span></td></tr>`;
-        const head = dateRow + `<tr class="st-v">
+        // totals: gross (قائم) weight, and the billed weight under it when it differs
+        const total = `<tr class="st-v">
             <td>المجموع</td>
             <td>${pcs || '—'}</td>
-            <td class="font-data-mono">${fmt(w)}</td>
+            <td class="font-data-mono">${gross ? 'قائم ' + fmt(gross) : fmt(w)}${gross && Math.abs(gross - w) > 0.005 ? `<div class="text-[10px] font-normal text-gray-600">محاسبي ${fmt(w)}</div>` : ''}</td>
             <td class="font-data-mono" style="color:${col(gold)}">${gold >= 0 ? '+' : ''}${fmt(gold)}</td>
             <td class="font-data-mono" style="color:${col(fab)}">${fab ? fmt(fab) : '—'}</td></tr>`;
-        if (ST_VIEW !== 'details' || g.rows.length < 2 && !f.piece_id) return head;
-        return head + g.rows.map(m => {
+        if (ST_VIEW !== 'details' || g.rows.length < 2 && !f.piece_id) return dateRow + total;
+        // with the pieces listed, the totals go underneath them
+        return dateRow + g.rows.map(m => {
             const p = ST_PIECES[m.piece_id] || {};
             const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph" src="${gmEscapeHtml(p.photo_url)}" alt=""/>` : '';
             return `<tr class="st-p">
@@ -199,7 +202,7 @@ function stRenderGold() {
                 <td class="font-data-mono">${fmt(stBilled(m))}</td>
                 <td class="font-data-mono">${fmt(m.gold_24k_equivalent)}</td>
                 <td class="font-data-mono">${Number(m.fab_fee_amount) ? fmt(m.fab_fee_amount) : ''}</td></tr>`;
-        }).join('');
+        }).join('') + total;
     }).join('');
     document.getElementById('stGoldRows').innerHTML = html || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
 }
