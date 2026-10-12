@@ -89,7 +89,7 @@
 </button>
 </div>
 <div class="mt-3 pt-3 border-t border-outline-variant flex justify-between items-center">
-<span class="text-[13px] text-on-surface-variant">رصيد الدين (نقدي)</span>
+<span class="text-[13px] text-on-surface-variant">الرصيد (نقدي)</span>
 <span class="font-bold text-[18px] font-data-mono" id="detail-balance">0.00</span>
 </div>
 <div class="mt-1 flex justify-between items-center">
@@ -377,7 +377,7 @@ function renderCustomers() {
               <p class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr"></p>
             </div>
           </div>
-          <span class="font-bold text-[14px] font-data-mono shrink-0 ${bal > 0 ? 'text-error' : 'text-success'}">${fmt(Math.abs(bal))}</span>
+          <span class="font-bold text-[14px] font-data-mono shrink-0 ${bal > 0.005 ? 'text-success' : bal < -0.005 ? 'text-error' : 'text-on-surface-variant'}">${bal > 0.005 ? '<span class="text-[10px] font-normal">لنا</span> ' : bal < -0.005 ? '<span class="text-[10px] font-normal">علينا</span> ' : ''}${fmt(Math.abs(bal))}</span>
         </div>`;
     card.querySelector('.gm-avatar-grad').textContent = gmInitials(c.name);
     card.querySelector('p.font-bold').textContent = c.name;
@@ -421,13 +421,14 @@ function showCustomerDetail(customerId) {
 
   const bal = customerBalance(customerId);
   const balEl = document.getElementById('detail-balance');
-  balEl.textContent = fmt(Math.abs(bal));
-  balEl.className = 'font-bold text-[18px] font-data-mono ' + (bal > 0 ? 'text-error' : 'text-success');
+  // same colours as the traders: لنا (the customer owes us) green, علينا (we owe the customer) red
+  balEl.textContent = (bal > 0.005 ? 'لنا عنده ' : bal < -0.005 ? 'علينا له ' : '') + fmt(Math.abs(bal));
+  balEl.className = 'font-bold text-[18px] font-data-mono ' + (bal > 0.005 ? 'text-success' : bal < -0.005 ? 'text-error' : '');
 
   const goldBal = customerGoldBalance(customerId);
   const goldBalEl = document.getElementById('detail-gold-balance');
-  goldBalEl.textContent = fmt(Math.abs(goldBal)) + ' غ';
-  goldBalEl.className = 'font-bold text-[15px] font-data-mono ' + (goldBal > 0 ? 'text-error' : (goldBal < 0 ? 'text-success' : ''));
+  goldBalEl.textContent = (goldBal > 0.0005 ? 'لنا عنده ' : goldBal < -0.0005 ? 'علينا له ' : '') + fmt(Math.abs(goldBal)) + ' غ';
+  goldBalEl.className = 'font-bold text-[15px] font-data-mono ' + (goldBal > 0.0005 ? 'text-success' : (goldBal < -0.0005 ? 'text-error' : ''));
 
   document.getElementById('movementsMonthFilter').value = '';
   document.getElementById('clearMonthFilterBtn').classList.add('hidden');
@@ -512,10 +513,10 @@ function renderMovementsList() {
     return `
       <${tag}${href ? ` href="${href}"` : ''} class="block bg-surface-container-lowest border border-outline-variant rounded-xl p-4${href ? ' hover:border-secondary' : ''}">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${gmEscapeHtml(movementLabel(m))}</span>
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-success' : 'text-error'}">${gmEscapeHtml(movementLabel(m))}</span>
           <span class="text-[11px] text-on-surface-variant">${dateOf(m.created_at)}</span>
         </div>
-        <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-error' : 'text-success'}">${Number(m.cash_amount || 0) !== 0 ? (isIncrease ? '+' : '-') + fmt(m.cash_amount) : ''}${goldLine}</p>
+        <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-success' : 'text-error'}">${Number(m.cash_amount || 0) !== 0 ? (isIncrease ? '+' : '-') + fmt(m.cash_amount) : ''}${goldLine}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
         ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
         ${m.source === 'discount' ? `<div class="flex gap-2 mt-2">
