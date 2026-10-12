@@ -59,6 +59,7 @@
     { t: 'الإعدادات', i: 'settings', l: [
       ['settings-ar.html', 'settings', 'الإعدادات'],
       ['company-settings-ar.html', 'store', 'إعدادات الشركة', 'edit_settings'],
+      ['devices-setup-ar.html', 'print', 'إعداد الأجهزة'],
       ['theme-picker-ar.html', 'palette', 'مظهر التطبيق'],
       ['account-security-ar.html', 'lock', 'الأمان وكلمة المرور'],
       ['fiscal-year-close-ar.html', 'event_repeat', 'إغلاق السنة المالية', 'edit_settings'],

@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إعداد الأجهزة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
+<script src="supabase-config.js?v=37"></script>
+<script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
+<script src="zebra-rfid.js?v=3"></script>
+<script src="theme.js?v=59"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": { "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}] }
+      } } }
+</script>
+<style>
+  html { font-size: 87.5%; }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+  body { min-height: 100dvh; }
+  .card { border: 1px solid var(--gm-outline-variant); border-radius: 14px; padding: 16px; background: var(--gm-surface-lowest); }
+  .step { display: flex; gap: 10px; align-items: flex-start; }
+  .step-n { flex: none; width: 26px; height: 26px; border-radius: 50%; background: var(--gm-primary); color: var(--gm-on-primary); font-weight: 700; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+  .choice { border: 2px solid var(--gm-outline-variant); border-radius: 14px; padding: 14px; text-align: right; width: 100%; background: var(--gm-surface-lowest); }
+  .choice[aria-pressed="true"] { border-color: var(--gm-primary); background: var(--gm-surface-low); }
+  .fld { width: 100%; height: 42px; border: 1px solid var(--gm-outline-variant); border-radius: 10px; padding: 0 10px; background: var(--gm-surface-lowest); color: var(--gm-on-surface); }
+  .btn { height: 44px; border-radius: 10px; padding: 0 14px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 6px; }
+  .btn-main { background: var(--gm-primary); color: var(--gm-on-primary); }
+  .btn-line { border: 1px solid var(--gm-outline-variant); color: var(--gm-primary); }
+  .ok { color: #1e7d32; } .bad { color: #ba1a1a; }
+  .tips li { font-size: 13.5px; line-height: 1.9; }
+  .tips { list-style: decimal; padding-inline-start: 20px; }
+  code { font-family: monospace; background: rgba(127,127,127,.15); padding: 1px 6px; border-radius: 5px; direction: ltr; unicode-bidi: embed; }
+  #test-label { display: none; }
+  @media print {
+    body > *:not(#test-label) { display: none !important; }
+    #test-label { display: block !important; }
+  }
+</style>
+</head>
+<body class="bg-background text-on-surface">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant sticky top-0 z-40">
+<div class="flex items-center gap-3 px-4 h-16">
+<button onclick="gmSmartBack('settings-ar.html')" class="p-2 rounded-full flex items-center justify-center" aria-label="رجوع">
+<span class="material-symbols-outlined" style="font-size:28px">arrow_forward</span>
+</button>
+<h1 class="text-headline-md font-bold">إعداد الأجهزة</h1>
+</div>
+</header>
+
+<main class="max-w-md lg:max-w-2xl mx-auto px-4 py-5 pb-32 flex flex-col gap-4">
+<p class="text-[13px] text-on-surface-variant leading-6">اختر الجهاز الذي تريد تعريفه، ثم اتبع الخطوات. تُحفظ الإعدادات على هذا الجهاز فقط، فلكل كمبيوتر طابعته وإعداداته.</p>
+
+<div class="grid grid-cols-2 gap-3" id="kind-pick">
+  <button type="button" class="choice" data-kind="printer" aria-pressed="false">
+    <span class="material-symbols-outlined text-primary" style="font-size:30px">print</span>
+    <p class="font-bold mt-1">طابعة الباركود</p>
+    <p class="text-[12px] text-on-surface-variant">ملصقات القطع</p>
+  </button>
+  <button type="button" class="choice" data-kind="rfid" aria-pressed="false">
+    <span class="material-symbols-outlined text-primary" style="font-size:30px">nfc</span>
+    <p class="font-bold mt-1">قارئ RFID</p>
+    <p class="text-[12px] text-on-surface-variant">مسدس الجرد السريع</p>
+  </button>
+</div>
+
+<!-- ================= PRINTER ================= -->
+<section id="sec-printer" class="hidden flex flex-col gap-4">
+  <div class="card">
+    <div class="step"><span class="step-n">1</span><div class="flex-1">
+      <p class="font-bold mb-2">ما نوع الطابعة؟</p>
+      <div class="grid grid-cols-2 gap-2" id="brand-pick">
+        <button type="button" class="choice" data-brand="zebra" aria-pressed="false"><p class="font-bold">Zebra</p><p class="text-[12px] text-on-surface-variant">مثل ZD421 و ZD220 و ZT411</p></button>
+        <button type="button" class="choice" data-brand="other" aria-pressed="false"><p class="font-bold">ماركة أخرى</p><p class="text-[12px] text-on-surface-variant">TSC، Xprinter، Godex، Honeywell...</p></button>
+      </div>
+    </div></div>
+  </div>
+
+  <!-- Zebra -->
+  <div id="zebra-steps" class="hidden flex flex-col gap-4">
+    <div class="card">
+      <div class="step"><span class="step-n">2</span><div class="flex-1">
+        <p class="font-bold mb-1">برنامج الربط Zebra Browser Print</p>
+        <p class="text-[13px] text-on-surface-variant leading-6 mb-2">برنامج مجاني صغير من Zebra يوصل البرنامج بالطابعة. يُثبَّت مرة واحدة على هذا الكمبيوتر.</p>
+        <p id="bp-status" class="font-bold text-[14px] mb-2">جارِ الفحص...</p>
+        <ol class="tips mb-3" id="bp-help">
+          <li>وصّل الطابعة بالكمبيوتر وشغّلها، وثبّت تعريفها إن طلب الويندوز ذلك.</li>
+          <li>نزّل البرنامج من موقع Zebra: <a class="text-primary underline" href="https://www.zebra.com/us/en/support-downloads/software/printer-software/browser-print.html" target="_blank" rel="noopener">صفحة Browser Print</a> (اختر نسخة Windows).</li>
+          <li>ثبّته وشغّله. يظهر رمزه بجانب الساعة أسفل الشاشة.</li>
+          <li>اضغط على الرمز ← <b>Settings</b>، وتأكد أن طابعتك ظاهرة ومختارة كطابعة افتراضية.</li>
+          <li>اضغط «أعد الفحص» هنا. إن سألك البرنامج هل تسمح لهذا الموقع، اختر <b>Yes</b>.</li>
+        </ol>
+        <button type="button" class="btn btn-line" id="bp-retry"><span class="material-symbols-outlined">refresh</span> أعد الفحص</button>
+      </div></div>
+    </div>
+
+    <div class="card">
+      <div class="step"><span class="step-n">3</span><div class="flex-1">
+        <p class="font-bold mb-2">اختر الطابعة</p>
+        <select id="printer-select" class="fld"><option value="">الطابعة الافتراضية في برنامج Zebra</option></select>
+        <p class="text-[12px] text-on-surface-variant mt-1">إن كان على الكمبيوتر أكثر من طابعة Zebra، اختر طابعة الملصقات هنا.</p>
+      </div></div>
+    </div>
+
+    <div class="card">
+      <div class="step"><span class="step-n">4</span><div class="flex-1">
+        <p class="font-bold mb-1">ملصق تجربة وضبط</p>
+        <p class="text-[13px] text-on-surface-variant leading-6 mb-3">اطبع ملصق تجربة. إن خرجت الكتابة مزاحة أو باهتة، عدّل القيم ثم اطبع مجدداً. اترك الخانة فارغة لاستخدام إعداد الشركة <span id="co-hint"></span>.</p>
+        <div class="grid grid-cols-2 gap-3">
+          <label class="text-[12px] font-semibold">دقة الطابعة (DPI)
+            <select id="d-dpi" class="fld mt-1"><option value="">حسب إعداد الشركة</option><option value="203">203</option><option value="300">300</option><option value="600">600</option></select>
+          </label>
+          <label class="text-[12px] font-semibold">التغميق (٠ – ٣٠)
+            <input id="d-darkness" class="fld mt-1" type="number" min="0" max="30" step="1" inputmode="numeric"/>
+          </label>
+          <label class="text-[12px] font-semibold">إزاحة أفقية (ملم)
+            <span class="flex gap-1 mt-1"><button type="button" class="btn btn-line w-11 px-0" data-nudge="d-x" data-by="-0.5" aria-label="يسار">◀</button><input id="d-x" class="fld text-center" type="number" step="0.5" dir="ltr"/><button type="button" class="btn btn-line w-11 px-0" data-nudge="d-x" data-by="0.5" aria-label="يمين">▶</button></span>
+          </label>
+          <label class="text-[12px] font-semibold">إزاحة رأسية (ملم)
+            <span class="flex gap-1 mt-1"><button type="button" class="btn btn-line w-11 px-0" data-nudge="d-y" data-by="-0.5" aria-label="أعلى">▲</button><input id="d-y" class="fld text-center" type="number" step="0.5" dir="ltr"/><button type="button" class="btn btn-line w-11 px-0" data-nudge="d-y" data-by="0.5" aria-label="أسفل">▼</button></span>
+          </label>
+        </div>
+        <div class="flex flex-wrap gap-2 mt-4">
+          <button type="button" class="btn btn-main" id="zebra-test"><span class="material-symbols-outlined">print</span> طباعة ملصق تجربة</button>
+          <button type="button" class="btn btn-line" id="zebra-save"><span class="material-symbols-outlined">save</span> حفظ لهذا الجهاز</button>
+          <button type="button" class="btn btn-line" id="zebra-reset">إرجاع لإعداد الشركة</button>
+        </div>
+        <p id="zebra-msg" class="text-[13px] font-semibold mt-2"></p>
+        <p class="text-[12px] text-on-surface-variant mt-3">مقاس الملصق وترتيب الحقول وطول الباركود هي إعدادات الشركة كلها، وتُعدَّل من <a class="text-primary underline" href="zebra-label-designer-ar.html">مصمم الملصق</a>.</p>
+      </div></div>
+    </div>
+  </div>
+
+  <!-- Other brands -->
+  <div id="other-steps" class="hidden flex flex-col gap-4">
+    <div class="card">
+      <div class="step"><span class="step-n">2</span><div class="flex-1">
+        <p class="font-bold mb-1">تعريف الطابعة على الويندوز</p>
+        <ol class="tips">
+          <li>وصّل الطابعة وشغّلها، ثم ثبّت تعريفها من موقع الشركة المصنّعة (ابحث عن اسم الطابعة + driver).</li>
+          <li>من الويندوز: <b>الإعدادات ← الطابعات</b> ← طابعتك ← <b>تفضيلات الطباعة</b>.</li>
+          <li>اضبط مقاس الورق على مقاس الملصق: <b id="other-size">—</b>، ونوع الورق «ملصقات بفراغات» (Labels with gaps).</li>
+          <li>نفّذ «المعايرة» (Calibrate) من نفس النافذة إن وُجدت، كي تتعرف الطابعة على بداية كل ملصق.</li>
+        </ol>
+      </div></div>
+    </div>
+    <div class="card">
+      <div class="step"><span class="step-n">3</span><div class="flex-1">
+        <p class="font-bold mb-1">ملصق تجربة</p>
+        <p class="text-[13px] text-on-surface-variant leading-6 mb-2">في نافذة الطباعة: اختر طابعة الملصقات، والهوامش <b>بلا</b>، والمقياس <b>100%</b>، وألغِ «الرؤوس والتذييلات». يتذكر المتصفح اختيارك في المرات القادمة.</p>
+        <button type="button" class="btn btn-main" id="other-test"><span class="material-symbols-outlined">print</span> طباعة ملصق تجربة</button>
+        <p class="text-[12px] text-on-surface-variant mt-3">بعدها تطبع ملصقات القطع من زر «طباعة» في صفحة ملصق القطعة.</p>
+      </div></div>
+    </div>
+  </div>
+</section>
+
+<!-- ================= RFID ================= -->
+<section id="sec-rfid" class="hidden flex flex-col gap-4">
+  <div class="card">
+    <div class="step"><span class="step-n">1</span><div class="flex-1">
+      <p class="font-bold mb-2">ما نوع القارئ؟</p>
+      <div class="flex flex-col gap-2" id="reader-pick">
+        <button type="button" class="choice" data-reader="zebra" aria-pressed="false"><p class="font-bold">Zebra</p><p class="text-[12px] text-on-surface-variant">جهاز Zebra أندرويد مع قبضة RFD40 / RFD90، أو MC3330R</p></button>
+        <button type="button" class="choice" data-reader="chainway" aria-pressed="false"><p class="font-bold">Chainway</p><p class="text-[12px] text-on-surface-variant">مثل C72 و C66، داخل تطبيق GoldMind للأندرويد</p></button>
+        <button type="button" class="choice" data-reader="usb" aria-pressed="false"><p class="font-bold">قارئ USB أو بلوتوث على الكمبيوتر</p><p class="text-[12px] text-on-surface-variant">يعمل بوضع «لوحة المفاتيح» (HID / Keyboard)</p></button>
+      </div>
+    </div></div>
+  </div>
+
+  <div class="card hidden" id="reader-zebra">
+    <div class="step"><span class="step-n">2</span><div class="flex-1">
+      <p class="font-bold mb-1">ضبط DataWedge (مرة واحدة)</p>
+      <p class="text-[13px] text-on-surface-variant leading-6 mb-2">DataWedge أداة موجودة مسبقاً على أجهزة Zebra، تكتب رقم كل شريحة في البرنامج كأنه كُتب بلوحة المفاتيح.</p>
+      <ol class="tips">
+        <li>على جهاز Zebra: ثبّت تطبيق GoldMind، أو افتح GoldMind في Chrome.</li>
+        <li>افتح تطبيق <b>DataWedge</b> ← القائمة ⋮ ← <b>New profile</b> ← سمّه <code>GoldMind</code>.</li>
+        <li>افتح الملف ← <b>Associated apps</b> ← أضف <code>com.goldmind.app</code> (أو <code>com.android.chrome</code> إن كنت تستخدم Chrome) واختر النشاط <code>*</code>.</li>
+        <li>فعّل <b>RFID input</b>. ومن إعداداته فعّل <b>Hardware trigger</b> ليعمل زر المسدس.</li>
+        <li>أوقف <b>Barcode input</b> إن كنت لا تريد قراءة الباركود بنفس الزر.</li>
+        <li>في <b>Keystroke output</b>: فعّله، ثم <b>Basic data formatting</b> ← فعّل <b>Send ENTER key</b>. هذا ضروري ليُسجَّل كل رقم على حدة.</li>
+        <li>اختبر القراءة في الخطوة التالية على نفس الجهاز.</li>
+      </ol>
+    </div></div>
+  </div>
+
+  <div class="card hidden" id="reader-chainway">
+    <div class="step"><span class="step-n">2</span><div class="flex-1">
+      <p class="font-bold mb-1">تطبيق GoldMind للأندرويد</p>
+      <p class="text-[13px] text-on-surface-variant leading-6">أجهزة Chainway تعمل مباشرة داخل تطبيق GoldMind، بلا أي إعداد إضافي. التثبيت والربط مشروحان خطوة بخطوة في <a class="text-primary underline" href="rfid-guide-ar.html">دليل RFID</a>. في صفحة الجرد اضغط «ابدأ القراءة بالجهاز» أو زر المسدس.</p>
+    </div></div>
+  </div>
+
+  <div class="card hidden" id="reader-usb">
+    <div class="step"><span class="step-n">2</span><div class="flex-1">
+      <p class="font-bold mb-1">وصل القارئ</p>
+      <ol class="tips">
+        <li>وصّله بكابل USB، أو اربطه بالبلوتوث من إعدادات الويندوز.</li>
+        <li>اضبطه على وضع <b>لوحة المفاتيح (HID / Keyboard)</b>. غالباً يتم ذلك بمسح باركود الإعداد من دليل الجهاز، أو من برنامج الشركة المصنّعة.</li>
+        <li>اضبطه ليضيف <b>Enter</b> بعد كل رقم إن وُجد هذا الخيار.</li>
+      </ol>
+    </div></div>
+  </div>
+
+  <div class="card hidden" id="reader-test">
+    <div class="step"><span class="step-n">3</span><div class="flex-1">
+      <p class="font-bold mb-1">اختبار القراءة</p>
+      <p class="text-[13px] text-on-surface-variant leading-6 mb-2">اضغط داخل الخانة، ثم قرّب ملصقة RFID من القارئ واضغط الزناد.</p>
+      <input id="rfid-test" class="fld h-14 text-center text-lg font-data-mono" dir="ltr" autocomplete="off" placeholder="بانتظار القراءة..."/>
+      <p id="rfid-result" class="text-[14px] font-bold mt-2"></p>
+      <ul id="rfid-list" class="text-[12px] font-data-mono mt-1" dir="ltr"></ul>
+      <a href="inventory-count-ar.html" class="btn btn-line mt-3 hidden" id="rfid-go"><span class="material-symbols-outlined">inventory</span> اذهب إلى الجرد</a>
+    </div></div>
+  </div>
+</section>
+</main>
+
+<div id="test-label"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+let store = null, fields = [];
+const SAMPLE = { barcode: '000123', storeName: 'GoldMind', weight: '12.34', karat: '21', mc: '25', description: 'TEST', diamondCarat: '', centerStoneCarat: '' };
+
+function pick(groupId, attr, val) {
+  $(groupId).querySelectorAll('[' + attr + ']').forEach(b => b.setAttribute('aria-pressed', String(b.getAttribute(attr) === val)));
+}
+function showKind(kind) {
+  pick('kind-pick', 'data-kind', kind);
+  $('sec-printer').classList.toggle('hidden', kind !== 'printer');
+  $('sec-rfid').classList.toggle('hidden', kind !== 'rfid');
+}
+function showBrand(brand) {
+  pick('brand-pick', 'data-brand', brand);
+  $('zebra-steps').classList.toggle('hidden', brand !== 'zebra');
+  $('other-steps').classList.toggle('hidden', brand !== 'other');
+  if (brand === 'zebra') checkBrowserPrint();
+}
+function showReader(r) {
+  pick('reader-pick', 'data-reader', r);
+  ['zebra', 'chainway', 'usb'].forEach(k => $('reader-' + k).classList.toggle('hidden', k !== r));
+  $('reader-test').classList.toggle('hidden', r === 'chainway');
+  if (r !== 'chainway') setTimeout(() => $('rfid-test').focus(), 50);
+}
+$('kind-pick').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) showKind(b.dataset.kind); });
+$('brand-pick').addEventListener('click', e => { const b = e.target.closest('[data-brand]'); if (b) showBrand(b.dataset.brand); });
+$('reader-pick').addEventListener('click', e => { const b = e.target.closest('[data-reader]'); if (b) showReader(b.dataset.reader); });
+
+// ---- Zebra ----
+async function checkBrowserPrint() {
+  const st = $('bp-status');
+  st.className = 'font-bold text-[14px] mb-2'; st.textContent = 'جارِ الفحص...';
+  let list = [];
+  try { list = await GMZebra.listPrinters(); } catch (e) {
+    st.classList.add('bad'); st.textContent = '✗ برنامج Zebra Browser Print غير متصل على هذا الكمبيوتر. اتبع الخطوات ثم أعد الفحص.';
+    $('bp-help').classList.remove('hidden'); return;
+  }
+  const sel = $('printer-select'), saved = GMZebra.deviceSettings().printer_uid || '';
+  sel.innerHTML = '<option value="">الطابعة الافتراضية في برنامج Zebra</option>' +
+    list.map(d => '<option value="' + gmEscapeHtml(d.uid) + '">' + gmEscapeHtml(d.name || d.uid) + '</option>').join('');
+  if (saved && list.some(d => d.uid === saved)) sel.value = saved;
+  if (!list.length) { st.classList.add('bad'); st.textContent = '✗ البرنامج يعمل لكنه لا يرى أي طابعة. شغّل الطابعة وتأكد من ظهورها في Settings داخل برنامج Zebra.'; return; }
+  st.classList.add('ok'); st.textContent = '✓ البرنامج متصل، ويرى ' + list.length + (list.length === 1 ? ' طابعة' : ' طابعات') + '.';
+  $('bp-help').classList.add('hidden');
+}
+$('bp-retry').addEventListener('click', checkBrowserPrint);
+
+function readDeviceForm() {
+  const num = id => { const v = $(id).value.trim(); return v === '' ? null : Number(v); };
+  const dk = num('d-darkness');
+  return { printer_uid: $('printer-select').value || null, dpi: num('d-dpi'), darkness: dk == null ? null : Math.max(0, Math.min(30, Math.round(dk))), x_offset_mm: num('d-x'), y_offset_mm: num('d-y') };
+}
+function fillDeviceForm() {
+  const d = GMZebra.deviceSettings();
+  $('d-dpi').value = d.dpi != null ? String(d.dpi) : '';
+  $('d-darkness').value = d.darkness != null ? d.darkness : '';
+  $('d-x').value = d.x_offset_mm != null ? d.x_offset_mm : '';
+  $('d-y').value = d.y_offset_mm != null ? d.y_offset_mm : '';
+}
+document.querySelectorAll('[data-nudge]').forEach(b => b.addEventListener('click', () => {
+  const inp = $(b.dataset.nudge);
+  const base = inp.value !== '' ? Number(inp.value) : Number((b.dataset.nudge === 'd-x' ? store && store.zebra_label_x_offset_mm : store && store.zebra_label_y_offset_mm) || 0);
+  inp.value = Math.round((base + Number(b.dataset.by)) * 10) / 10;
+}));
+function zmsg(t, bad) { $('zebra-msg').textContent = t; $('zebra-msg').className = 'text-[13px] font-semibold mt-2 ' + (bad ? 'bad' : 'ok'); }
+
+$('zebra-save').addEventListener('click', () => { GMZebra.saveDeviceSettings(readDeviceForm()); zmsg('✓ حُفظت إعدادات هذا الجهاز. كل صفحات طباعة الملصقات ستستخدمها.'); });
+$('zebra-reset').addEventListener('click', () => {
+  GMZebra.saveDeviceSettings({ printer_uid: $('printer-select').value || null });
+  fillDeviceForm(); zmsg('✓ عاد هذا الجهاز لإعدادات الشركة.');
+});
+$('zebra-test').addEventListener('click', async () => {
+  const btn = $('zebra-test'); btn.disabled = true;
+  const keep = GMZebra.deviceSettings();
+  GMZebra.saveDeviceSettings(readDeviceForm()); // the test uses what's on screen, incl. the chosen printer
+  try {
+    const s = GMZebra.withDevice(store || {});
+    const dpi = s.zebra_label_dpi || 203, mm = v => GMZebra.mmToDots(v || 0, dpi);
+    await GMZebra.printBarcodeLabel({
+      fields, values: Object.assign({}, SAMPLE, { storeName: (store && store.name) || 'GoldMind' }), dpi, storeName: (store && store.name) || 'GoldMind',
+      barcode: SAMPLE.barcode, line1: '21K  12.34g', line2: 'TEST',
+      widthDots: mm(s.zebra_label_width_mm || 50), heightDots: mm(s.zebra_label_height_mm || 25),
+      xOffsetDots: mm(s.zebra_label_x_offset_mm), yOffsetDots: mm(s.zebra_label_y_offset_mm),
+      barHeightDots: mm(s.zebra_barcode_height_mm || 5), moduleWidth: s.zebra_barcode_module_width || 2,
+      spacingDots: mm(s.zebra_field_spacing_mm != null ? s.zebra_field_spacing_mm : 0.75),
+      rotate180: !!s.zebra_label_rotate_180, darkness: s.zebra_darkness != null ? s.zebra_darkness : 15
+    });
+    zmsg('✓ أُرسل ملصق التجربة. إن كان مضبوطاً اضغط «حفظ لهذا الجهاز».');
+  } catch (e) { zmsg(e.message || 'تعذّرت الطباعة', true); }
+  GMZebra.saveDeviceSettings(keep);
+  btn.disabled = false;
+});
+
+// ---- other brands: browser print at the label size ----
+$('other-test').addEventListener('click', () => {
+  const w = Number(store && store.zebra_label_width_mm) || 50, h = Number(store && store.zebra_label_height_mm) || 25;
+  let css = document.getElementById('label-page');
+  if (!css) { css = document.createElement('style'); css.id = 'label-page'; document.head.appendChild(css); }
+  css.textContent = '@media print{@page{size:' + w + 'mm ' + h + 'mm;margin:0}html,body{margin:0!important;padding:0!important;min-height:0!important;background:#fff!important}}';
+  const box = $('test-label');
+  box.style.cssText = 'width:' + w + 'mm;height:' + h + 'mm;padding:1.5mm;box-sizing:border-box;font:9px Arial,sans-serif;color:#000;overflow:hidden;text-align:center;direction:ltr';
+  box.innerHTML = '<div style="font-weight:700">' + gmEscapeHtml((store && store.name) || 'GoldMind') + '</div><div>21K  12.34g  TEST</div><svg id="test-bars"></svg>';
+  try { JsBarcode('#test-bars', SAMPLE.barcode, { format: 'CODE128', height: Math.max(20, h * 1.4), width: 1.4, fontSize: 10, margin: 0 }); } catch (e) { /* library offline */ }
+  $('test-bars').style.maxWidth = '100%';
+  window.print();
+});
+
+// ---- RFID read test ----
+const shopPrefix = () => String(window.GOLDMIND_STORE_ID || '').replace(/[^0-9a-f]/gi, '').slice(0, 8).toUpperCase();
+let reads = 0, idle = null;
+async function gotTag(raw) {
+  const v = String(raw).replace(/\s+/g, '').toUpperCase();
+  if (!v) return;
+  reads++;
+  const res = $('rfid-result');
+  res.className = 'text-[14px] font-bold mt-2 ok';
+  res.textContent = '✓ القارئ يعمل. عدد القراءات: ' + reads;
+  $('rfid-go').classList.remove('hidden');
+  const li = document.createElement('li');
+  li.textContent = v;
+  $('rfid-list').prepend(li);
+  while ($('rfid-list').children.length > 8) $('rfid-list').lastChild.remove();
+  if (v.length >= 24 && v.startsWith(shopPrefix())) {
+    const { data } = await goldmindClient.from('pieces').select('barcode, description_ar').eq('store_id', GOLDMIND_STORE_ID).eq('rfid_epc', v).maybeSingle();
+    li.textContent = v + '  ←  ' + (data ? (data.barcode + ' ' + (data.description_ar || '')) : 'شريحة من محلك غير مرتبطة بقطعة');
+  } else if (!/^[0-9A-F]+$/.test(v)) {
+    li.textContent = v + '  ←  هذا باركود وليس شريحة RFID';
+  }
+}
+$('rfid-test').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault(); clearTimeout(idle);
+  const v = $('rfid-test').value; $('rfid-test').value = ''; gotTag(v);
+});
+// readers that send no Enter: take the value after a short pause
+$('rfid-test').addEventListener('input', () => {
+  clearTimeout(idle);
+  idle = setTimeout(() => { const v = $('rfid-test').value; $('rfid-test').value = ''; gotTag(v); }, 400);
+});
+
+(async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const [{ data: s }, { data: f }] = await Promise.all([
+    goldmindClient.from('stores').select('name, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi, zebra_label_x_offset_mm, zebra_label_y_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness, zebra_field_spacing_mm, zebra_barcode_module_width').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('zebra_label_fields').select('*').eq('store_id', GOLDMIND_STORE_ID).order('column_num').order('row_order')
+  ]);
+  store = s || {}; fields = f || [];
+  const w = store.zebra_label_width_mm || 50, h = store.zebra_label_height_mm || 25;
+  $('other-size').textContent = w + ' × ' + h + ' ملم';
+  $('co-hint').textContent = '(الدقة ' + (store.zebra_label_dpi || 203) + '، التغميق ' + (store.zebra_darkness != null ? store.zebra_darkness : 15) +
+    '، الإزاحة ' + (store.zebra_label_x_offset_mm || 0) + ' / ' + (store.zebra_label_y_offset_mm || 0) + ' ملم)';
+  fillDeviceForm();
+  const q = new URLSearchParams(location.search).get('device');
+  if (q === 'printer' || q === 'rfid') showKind(q);
+})();
+</script>
+</body></html>

@@ -265,7 +265,43 @@ var GMZebra = (function () {
     return typeof window !== 'undefined' && !!window.BrowserPrint;
   }
 
+  // Settings for THIS computer only (devices-setup-ar.html): the chosen
+  // printer plus label tweaks that override the company's label settings,
+  // so a branch with a 300 dpi printer doesn't change everyone's labels.
+  var DEVICE_KEY = 'gm_zebra_device';
+  function deviceSettings() {
+    try { return JSON.parse(localStorage.getItem(DEVICE_KEY)) || {}; } catch (e) { return {}; }
+  }
+  function saveDeviceSettings(o) {
+    try { localStorage.setItem(DEVICE_KEY, JSON.stringify(o || {})); } catch (e) { /* private mode */ }
+  }
+  var DEVICE_COLS = { dpi: 'zebra_label_dpi', x_offset_mm: 'zebra_label_x_offset_mm', y_offset_mm: 'zebra_label_y_offset_mm', darkness: 'zebra_darkness' };
+  function withDevice(store) {
+    if (!store) return store;
+    var d = deviceSettings(), out = Object.assign({}, store);
+    Object.keys(DEVICE_COLS).forEach(function (k) {
+      if (d[k] !== undefined && d[k] !== null && d[k] !== '' && !isNaN(Number(d[k]))) out[DEVICE_COLS[k]] = Number(d[k]);
+    });
+    return out;
+  }
+  function listPrinters() {
+    return new Promise(function (resolve, reject) {
+      if (!isAvailable()) { reject(new Error('Zebra Browser Print غير مثبّت أو غير متاح على هذا الجهاز.')); return; }
+      window.BrowserPrint.getLocalDevices(function (list) {
+        resolve((Array.isArray(list) ? list : (list && list.printer) || []).filter(function (d) { return !d.deviceType || d.deviceType === 'printer'; }));
+      }, function (err) { reject(new Error('تعذّر الاتصال ببرنامج Zebra Browser Print: ' + err)); }, 'printer');
+    });
+  }
+
   function getDefaultPrinter() {
+    var chosen = deviceSettings().printer_uid;
+    if (chosen) {
+      return listPrinters().then(function (list) {
+        var hit = list.filter(function (d) { return d.uid === chosen; })[0];
+        if (hit) return hit;
+        throw new Error('الطابعة المختارة لهذا الجهاز غير متصلة. شغّلها أو اختر طابعة أخرى من صفحة «إعداد الأجهزة».');
+      });
+    }
     return new Promise(function (resolve, reject) {
       if (!isAvailable()) { reject(new Error('Zebra Browser Print غير مثبّت أو غير متاح على هذا الجهاز.')); return; }
       window.BrowserPrint.getDefaultDevice('printer', function (device) {
@@ -326,6 +362,10 @@ var GMZebra = (function () {
     mmToDots: mmToDots,
     isAvailable: isAvailable,
     getDefaultPrinter: getDefaultPrinter,
+    listPrinters: listPrinters,
+    deviceSettings: deviceSettings,
+    saveDeviceSettings: saveDeviceSettings,
+    withDevice: withDevice,
     sendZpl: sendZpl,
     printBarcodeLabel: printBarcodeLabel,
     printAndEncodeRfid: printAndEncodeRfid,
