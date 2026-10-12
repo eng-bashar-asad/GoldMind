@@ -30,6 +30,7 @@ test('subscription page: store currency by default, switch to dollars', async ({
   await expect(page.locator('#staff-usage-note')).toContainText('$150 سنوياً');
   await expect(page.locator('.cur-btn')).toHaveCount(0);
   await expect(list).not.toContainText('AED');
+  await expect(list).toContainText('بالدرهم في الإمارات مثلاً');
   if (process.env.UI_OUT) await page.screenshot({ path: `${process.env.UI_OUT}/subscription.png`, fullPage: true });
 });
 
@@ -42,6 +43,6 @@ test('landing page shows the plans in dollars', async ({ page }) => {
   await expect(p).toContainText('سعر خاص — تواصل معنا');
   await expect(p).toContainText('مسدس الجرد');
   await expect(p).toContainText('6 مستخدمين ضمن الباقة');
-  await expect(p).not.toContainText('درهم');
+  await expect(p).toContainText('ما يعادلها بعملة بلدك');
   if (process.env.UI_OUT) await page.locator('#pricing-h').scrollIntoViewIfNeeded(), await page.screenshot({ path: `${process.env.UI_OUT}/landing-pricing.png` });
 });
