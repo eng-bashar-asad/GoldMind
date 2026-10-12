@@ -20,3 +20,8 @@ update public.plans set name_ar = 'الخاصة', name_en = 'Custom', sort_order
 update public.plans set included_staff = 20,
   highlights_ar = array['20 مستخدماً، والفروع حسب حاجتك','تركيب وربط الأجهزة بالبرنامج: طابعات الفواتير، طابعات الباركود، مسدس الجرد','الفوترة الإلكترونية مشمولة','تدريب الموظفين ودعم مباشر']
  where key = 'enterprise';
+-- Final prices (owner, 2026-10-12): US dollars only — Basic $5,990/yr, Professional $8,390/yr
+update public.plans set price_yearly = 5990, currency = 'USD',
+  prices = '{"USD":{"yearly":5990,"quarterly":1650,"extra_staff_yearly":600,"einvoice_addon_monthly":27,"einvoice_overage":0.27}}'::jsonb where key = 'basic';
+update public.plans set price_yearly = 8390, currency = 'USD',
+  prices = '{"USD":{"yearly":8390,"quarterly":2310,"extra_staff_yearly":550,"einvoice_overage":0.27}}'::jsonb where key = 'pro';

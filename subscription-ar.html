@@ -97,12 +97,8 @@
 <section class="mb-6">
 <div class="flex items-center justify-between gap-3 mb-3">
 <h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">الخطط المتاحة</h3>
-<div class="inline-flex rounded-full border border-outline-variant p-0.5 text-[12px] font-semibold" role="group" aria-label="عملة الأسعار">
-<button type="button" data-cur="AED" class="cur-btn px-3 h-8 rounded-full">درهم</button>
-<button type="button" data-cur="USD" class="cur-btn px-3 h-8 rounded-full">دولار</button>
 </div>
-</div>
-<p class="text-[11.5px] text-on-surface-variant mb-3 leading-5">الاشتراك سنوي. يمكنك دفع قيمة السنة دفعة واحدة (الأوفر) أو على 4 دفعات كل 3 أشهر. جرّب أي خطة مجاناً لمدة 30 يوماً.</p>
+<p class="text-[11.5px] text-on-surface-variant mb-3 leading-5">الاشتراك سنوي بالدولار الأمريكي. يمكنك دفع قيمة السنة دفعة واحدة (الأوفر) أو على 4 دفعات كل 3 أشهر. جرّب أي خطة مجاناً لمدة 30 يوماً.</p>
 <div id="plans-list" class="flex flex-col gap-3"></div>
 </section>
 
@@ -176,12 +172,7 @@ function fmtPrice(v, cur) {
   return cur === 'USD' ? '$' + n : n + ' ' + CUR_SYMBOL.AED;
 }
 let GM_PRICE_CUR = 'USD';
-function pickCurrency() {
-  // plans are priced in dollars: show dollars unless this person switched to dirhams
-  let saved = null;
-  try { saved = localStorage.getItem('gm_price_cur_v2'); } catch (e) {}
-  return saved === 'AED' ? 'AED' : 'USD';
-}
+function pickCurrency() { return 'USD'; } // plans are sold in US dollars only
 
 function renderPlans(plans, currentPlanId) {
   const featureLabels = {

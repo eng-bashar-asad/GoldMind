@@ -165,12 +165,8 @@
 <section class="mb-14 text-right" aria-labelledby="pricing-h">
 <div class="flex items-center justify-between gap-3 mb-2">
 <h2 id="pricing-h" class="display text-2xl" style="color: var(--ink);">الأسعار</h2>
-<div class="inline-flex rounded-full border p-0.5 text-[12px] font-semibold" style="border-color: var(--hairline);" role="group" aria-label="عملة الأسعار">
-<button type="button" data-cur="AED" class="lp-cur px-3 h-8 rounded-full">درهم</button>
-<button type="button" data-cur="USD" class="lp-cur px-3 h-8 rounded-full">دولار</button>
 </div>
-</div>
-<p class="text-[12.5px] mb-5" style="color: var(--ink-soft);">اشتراك سنوي — ادفع دفعة واحدة، أو على 4 دفعات كل 3 أشهر. الفوترة الإلكترونية مجانية ضمن باقتَي الاحترافية والأعمال.</p>
+<p class="text-[12.5px] mb-5" style="color: var(--ink-soft);">اشتراك سنوي بالدولار الأمريكي — ادفع دفعة واحدة، أو على 4 دفعات كل 3 أشهر. الفوترة الإلكترونية مشمولة في الباقتين الاحترافية والخاصة.</p>
 <div id="lp-plans" class="grid sm:grid-cols-3 gap-4"></div>
 <p class="text-[11.5px] mt-3" style="color: var(--ink-soft);">لديك أكثر من فرع أو عدد كبير من الموظفين؟ باقة المؤسسات بتسعير مخصص.</p>
 </section>
@@ -233,9 +229,9 @@ function hidePaidComingSoon() { document.getElementById('paidModal').classList.a
 <script>
 (function () {
   var PLANS = [
-    { name: 'الأساسية', staff: 6, AED: [15425, 4240], USD: [4200, 1155], einv: { AED: 'الفوترة الإلكترونية: إضافة 99 درهماً شهرياً', USD: 'الفوترة الإلكترونية: إضافة $27 شهرياً' },
+    { name: 'الأساسية', staff: 6, USD: [5990, 1650], einv: 'الفوترة الإلكترونية: إضافة $27 شهرياً',
       hl: ['المبيعات والمشتريات والمخزون والصندوق', 'حسابات الزبائن والتجار وكشوفاتهم', 'تقارير الأرباح والتقارير المالية'] },
-    { name: 'الاحترافية', staff: 10, pro: true, AED: [24240, 6665], USD: [6600, 1815], einv: 'الفوترة الإلكترونية مشمولة — 300 فاتورة شهرياً',
+    { name: 'الاحترافية', staff: 10, pro: true, USD: [8390, 2310], einv: 'الفوترة الإلكترونية مشمولة — 300 فاتورة شهرياً',
       hl: ['كل ما في الباقة الأساسية', 'الإدخال بالصورة والصوت (AI)', 'الجرد بـ RFID والماس والصيانة'] },
     { name: 'الخاصة', custom: true, einv: 'الفوترة الإلكترونية مشمولة',
       hl: ['20 مستخدماً، والفروع حسب حاجتك', 'تركيب وربط الأجهزة: طابعات الفواتير والباركود ومسدس الجرد', 'تدريب الموظفين ودعم مباشر'] }
@@ -265,15 +261,7 @@ function hidePaidComingSoon() { document.getElementById('paidModal').classList.a
         '<div class="text-[12px] pt-3 border-t flex flex-col gap-1" style="border-color: var(--hairline); color: var(--ink);"><span>' + p.staff + ' مستخدمين ضمن الباقة</span>' + hl + '<span>' + e + '</span></div></div>';
     }).join('');
   }
-  var cur = 'USD'; // prices are set in dollars; dirhams on request
-  try { var s = localStorage.getItem('gm_price_cur_v2'); if (s === 'USD' || s === 'AED') cur = s; } catch (e) {}
-  document.querySelectorAll('.lp-cur').forEach(function (b) {
-    b.addEventListener('click', function () {
-      cur = b.dataset.cur;
-      try { localStorage.setItem('gm_price_cur_v2', cur); } catch (e) {}
-      render(cur);
-    });
-  });
+  var cur = 'USD'; // plans are sold in US dollars only
   render(cur);
 })();
 </script>
