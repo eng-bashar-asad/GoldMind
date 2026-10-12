@@ -410,6 +410,64 @@ function gmEnsureStatShimmerStyle() {
 }
 gmEnsureAvatarStyle();
 gmEnsureStatShimmerStyle();
+// A dropdown's open list is drawn by the browser on white; on dark themes the options
+// inherited the field's light text and became invisible. Same readable list everywhere.
+(function () {
+  const style = document.createElement('style');
+  style.id = 'gm-native-lists';
+  style.textContent = '@media screen { html body .gm-cfix-light { color: #F3F4F6 !important; } html body .gm-cfix-dark { color: #1F1A12 !important; } }' +
+    'select option, select optgroup, datalist option { background-color: #ffffff; color: #1a1c1e; }' +
+    'select option:disabled { color: #8a8f98; }' +
+    'select option:checked { background-color: #E8DFC8; color: #1a1c1e; }';
+  document.head.appendChild(style);
+})();
+
+// Contrast guard (dark themes): text written for white cards (dark navy / wine) that ends up
+// straight on the dark canvas, or light text on a white card, is invisible. After the page
+// draws (and whenever it redraws), any text with almost no contrast against what is behind
+// it gets a readable color — light on dark, dark on light. Screen only; print is untouched.
+// ponytail: a safety net over ~20 pages with hand-made colors. Upgrade path: give those
+// elements gm-on-canvas / theme variables in each page and drop this.
+(function () {
+  if (typeof window === 'undefined' || !window.MutationObserver) return;
+  const rgb = s => { const m = (s || '').match(/[\d.]+/g); if (!m) return null; const v = m.map(Number); return /color\(/.test(s) ? [v[0] * 255, v[1] * 255, v[2] * 255, v[3]] : v; };
+  const lum = c => { const a = c.slice(0, 3).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : Math.pow((v + .055) / 1.055, 2.4); }); return .2126 * a[0] + .7152 * a[1] + .0722 * a[2]; };
+  function bgOf(el) {
+    for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
+      const cs = getComputedStyle(e);
+      if (cs.backgroundImage && cs.backgroundImage !== 'none') return null; // gradient / picture: can't judge
+      const c = rgb(cs.backgroundColor);
+      if (c && (c[3] === undefined || c[3] > .6)) return c;
+    }
+    return rgb(getComputedStyle(document.body).backgroundColor) || [255, 255, 255];
+  }
+  function pass() {
+    const dark = !document.documentElement.classList.contains('gm-light-canvas');
+    const fixed = document.querySelectorAll('.gm-cfix-light, .gm-cfix-dark');
+    if (!dark) { fixed.forEach(e => e.classList.remove('gm-cfix-light', 'gm-cfix-dark')); return; }
+    const els = document.body ? document.body.getElementsByTagName('*') : [];
+    for (let i = 0; i < els.length && i < 6000; i++) {
+      const el = els[i];
+      if (el.classList.contains('gm-cfix-light') || el.classList.contains('gm-cfix-dark')) continue;
+      if (/^(SCRIPT|STYLE|SVG|svg|path|IMG|CANVAS|OPTION|BR)$/.test(el.tagName)) continue;
+      let own = /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
+      if (!own) for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) { own = true; break; }
+      if (!own || !el.getClientRects().length) continue;
+      const fg = rgb(getComputedStyle(el).color), bg = bgOf(el);
+      if (!fg || !bg || (fg[3] !== undefined && fg[3] < .3)) continue;
+      const L1 = lum(fg), L2 = lum(bg);
+      if ((Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05) < 1.8) el.classList.add(L2 < .35 ? 'gm-cfix-light' : 'gm-cfix-dark');
+    }
+  }
+  let t = null;
+  const later = () => { clearTimeout(t); t = setTimeout(pass, 250); };
+  function start() {
+    later(); setTimeout(pass, 1500);
+    new MutationObserver(muts => { if (muts.some(m => m.type === 'childList' || (m.attributeName === 'class' && m.target === document.documentElement))) later(); })
+      .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
+})();
 
 // (Removed: a hardcoded Times New Roman + Amiri Quran site-wide font
 // override used to live here. Reverted per feedback back to the app's
