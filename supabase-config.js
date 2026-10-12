@@ -207,6 +207,30 @@ async function gmStartFreshLogin() {
     GOLDMIND_STORE_ID = null; GOLDMIND_STAFF_ID = null;
 }
 
+// ---- Two-step login (password sign-ins only) ----
+// The server refuses data to a password session until its emailed code is entered
+// (gm_session_ok); this sends the person to the code page instead of showing empty screens.
+function gmJwtClaims(session) {
+    try { return JSON.parse(atob(session.access_token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))); } catch (e) { return {}; }
+}
+async function gmTwoFactorNeeded(session) {
+    if (!session || !session.access_token) return false;
+    const c = gmJwtClaims(session);
+    const methods = Array.isArray(c.amr) ? c.amr.map(a => a && a.method) : [];
+    if (!methods.length || methods.some(m => m !== 'password')) return false; // fingerprint / email code
+    if (String(c.email || '').toLowerCase().endsWith('@staff.goldmind.app')) return false; // username-only accounts
+    const key = 'gm_2fa_ok_' + c.session_id;
+    try { if (sessionStorage.getItem(key) === '1') return false; } catch (e) { /* ignore */ }
+    const { data, error } = await goldmindClient.rpc('gm_session_ok');
+    if (error) return false; // can't tell: the server still guards the data
+    if (data) { try { sessionStorage.setItem(key, '1'); } catch (e) { /* ignore */ } }
+    return !data;
+}
+function gmGoTwoFactor(next) {
+    const here = next || ((location.pathname.split('/').pop() || 'index-ar.html') + location.search);
+    location.replace('login-2fa-ar.html?next=' + encodeURIComponent(here));
+}
+
 async function requireGoldMindSession(redirectTo) {
     let session = null;
     if (navigator.onLine) {
@@ -220,6 +244,8 @@ async function requireGoldMindSession(redirectTo) {
 
     const timedOut = await goldmindEnforceIdleTimeout();
     if (timedOut) return null;
+
+    if (navigator.onLine && await gmTwoFactorNeeded(session)) { gmGoTwoFactor(); return null; }
 
     // Mandatory privacy-policy acceptance gate — applies to every user (owner
     // or staff), regardless of how they signed up. Skipped only on the gate

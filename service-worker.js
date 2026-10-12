@@ -1,11 +1,11 @@
-const CACHE_NAME = 'goldmind-shell-v152';
+const CACHE_NAME = 'goldmind-shell-v153';
 // Pages and files needed to keep selling with no internet. Each is cached on
 // its own so one missing file can't block the rest.
 const SHELL_ASSETS = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  './supabase-config.js?v=36',
+  './supabase-config.js?v=37',
   './theme.js?v=58',
   './gm-invoice-edit.js?v=1',
   './index-ar.html',

@@ -103,7 +103,7 @@
     </script>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=36"></script>
+<script src="supabase-config.js?v=37"></script>
 <script src="theme.js?v=58"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="gm-particle-transition.js"></script>
@@ -439,9 +439,21 @@ document.getElementById('quickForm').addEventListener('submit', async function (
         return;
     }
 
+    // password sign-in: the emailed 8-digit code comes next (fingerprint logins skip it)
+    if (await gmTwoFactorNeeded(signInData.session)) { gmGoTwoFactor('login-entry-ar.html?resume=1'); return; }
     const ok = await gmAfterLogin(signInData.user, errEl);
     if (!ok) { btn.disabled = false; btn.textContent = 'دخول'; }
 });
+
+// back from the code page: finish the sign-in (pick company / go home)
+(async function () {
+    if (new URLSearchParams(location.search).get('resume') !== '1') return;
+    const { data: { session } } = await goldmindClient.auth.getSession();
+    if (!session) return;
+    if (await gmTwoFactorNeeded(session)) { gmGoTwoFactor('login-entry-ar.html?resume=1'); return; }
+    goToStep('quick');
+    await gmAfterLogin(session.user, document.getElementById('quickFormError'));
+})();
 
 // Shared by password and fingerprint/Face ID login: where to go once signed in.
 // Returns false (after showing why) when the account can't enter.

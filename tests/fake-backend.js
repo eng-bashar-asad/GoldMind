@@ -5,10 +5,10 @@ const STORE = '11111111-1111-1111-1111-111111111111';
 const USER = '22222222-2222-2222-2222-222222222222';
 const STAFF = '33333333-3333-3333-3333-333333333333';
 
-function fakeSession() {
+function fakeSession(extra) {
   const exp = Math.floor(Date.now() / 1000) + 3600;
   const b64 = o => Buffer.from(JSON.stringify(o)).toString('base64url');
-  const jwt = b64({ alg: 'HS256', typ: 'JWT' }) + '.' + b64({ sub: USER, exp, role: 'authenticated' }) + '.sig';
+  const jwt = b64({ alg: 'HS256', typ: 'JWT' }) + '.' + b64({ sub: USER, exp, role: 'authenticated', ...(extra || {}) }) + '.sig';
   return { access_token: jwt, refresh_token: 'r', token_type: 'bearer', expires_in: 3600, expires_at: exp,
     user: { id: USER, email: 't@example.com', aud: 'authenticated', role: 'authenticated' } };
 }
@@ -29,7 +29,7 @@ function matches(row, key, expr) {
 }
 
 // db: { table: rows[] }, rpc: { name: (args) => ({status, body}) }
-async function install(page, { db = {}, rpc = {}, generic = false, realCdn = false } = {}) {
+async function install(page, { db = {}, rpc = {}, generic = false, realCdn = false, claims = null } = {}) {
   const calls = [];
   // Playwright's offline mode doesn't stop routed requests, so we cut them here.
   const state = { offline: false };
@@ -43,7 +43,7 @@ async function install(page, { db = {}, rpc = {}, generic = false, realCdn = fal
     const req = route.request(), url = new URL(req.url());
     const [, kind, name] = url.pathname.match(/^\/(rest\/v1\/rpc|rest\/v1|auth\/v1|storage\/v1)\/?([^/]*)/) || [];
     calls.push({ method: req.method(), kind, name, url: req.url(), body: req.postData() });
-    if (kind === 'auth/v1') return route.fulfill({ json: name === 'user' ? fakeSession().user : fakeSession() });
+    if (kind === 'auth/v1') return route.fulfill({ json: name === 'user' ? fakeSession(claims).user : fakeSession(claims) });
     if (kind === 'rest/v1/rpc') {
       const h = rpc[name];
       const out = h ? await h(JSON.parse(req.postData() || '{}')) : { status: 200, body: null };
@@ -70,7 +70,7 @@ async function install(page, { db = {}, rpc = {}, generic = false, realCdn = fal
     localStorage.setItem('goldmind_active_store', store);
     localStorage.setItem('goldmind_last_activity', String(Date.now()));
     localStorage.setItem('gm_membership', JSON.stringify({ user, store, staff }));
-  }, [fakeSession(), STORE, STAFF, USER]);
+  }, [fakeSession(claims), STORE, STAFF, USER]);
   return calls;
 }
 

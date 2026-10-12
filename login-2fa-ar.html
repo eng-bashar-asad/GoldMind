@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f232a"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>GoldMind | رمز التحقق</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=37"></script>
+<style>
+  html { font-size: 87.5%; }
+  body { font-family: 'IBM Plex Sans Arabic', 'Inter', sans-serif; background: #0f232a; color: #fff; min-height: 100dvh; }
+  .gold-gradient { background: linear-gradient(135deg, #F5D77A, #D4AF37); color: #0f172a; }
+  #code { letter-spacing: .45em; }
+</style>
+</head>
+<body class="flex items-center justify-center p-4">
+<main class="w-full max-w-sm rounded-2xl p-6 border" style="background:#16303a;border-color:rgba(212,175,55,.3)">
+  <h1 class="text-xl font-bold mb-1" style="color:#D4AF37">التحقق بخطوتين</h1>
+  <p id="info" class="text-[13px] leading-6 mb-4" style="color:rgba(255,255,255,.8)">جارِ إرسال رمز التحقق إلى بريدك الإلكتروني...</p>
+  <form id="form" class="flex flex-col gap-3" autocomplete="off">
+    <label for="code" class="text-[13px] font-semibold" style="color:rgba(255,255,255,.85)">رمز التحقق (8 أرقام)</label>
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" dir="ltr"
+      class="w-full h-14 rounded-lg text-center text-2xl font-bold" style="background:#0f232a;color:#fff;border:1px solid rgba(212,175,55,.4)" required/>
+    <p id="timer" class="text-[12px]" style="color:rgba(255,255,255,.65)"></p>
+    <p id="err" class="hidden text-[13px] font-semibold rounded-lg p-2" style="background:#3b1a1a;color:#fca5a5"></p>
+    <button id="verifyBtn" type="submit" class="gold-gradient h-12 rounded-lg font-bold">تأكيد</button>
+    <button id="resendBtn" type="button" class="h-11 rounded-lg font-semibold border" style="border-color:rgba(255,255,255,.3);color:#fff" disabled>إرسال رمز جديد</button>
+    <button id="outBtn" type="button" class="text-[12px] underline mt-1" style="color:rgba(255,255,255,.6)">تسجيل الخروج والعودة</button>
+  </form>
+  <p class="text-[11px] leading-5 mt-4" style="color:rgba(255,255,255,.5)">لحماية حسابك، الدخول بكلمة السر يحتاج رمزاً يصل إلى بريدك. الدخول بالبصمة لا يحتاج رمزاً.</p>
+</main>
+<script>
+// only a page of this site, never an outside address
+const rawNext = new URLSearchParams(location.search).get('next') || 'index-ar.html';
+const NEXT = /^[a-z0-9-]+\.html(\?[^#]*)?$/i.test(rawNext) ? rawNext : 'index-ar.html';
+const $ = id => document.getElementById(id);
+let tick = null, sessionKey = '';
+
+function showErr(msg) { $('err').textContent = msg; $('err').classList.toggle('hidden', !msg); }
+function countdown(sec, resendIn) {
+  clearInterval(tick);
+  let left = sec, wait = resendIn;
+  const draw = () => {
+    $('timer').textContent = left > 0 ? 'الرمز صالح لمدة ' + left + ' ثانية' : 'انتهت صلاحية الرمز — اطلب رمزاً جديداً';
+    $('resendBtn').disabled = wait > 0;
+    $('resendBtn').textContent = wait > 0 ? 'إرسال رمز جديد (' + wait + ')' : 'إرسال رمز جديد';
+  };
+  draw();
+  tick = setInterval(() => { left = Math.max(0, left - 1); wait = Math.max(0, wait - 1); draw(); if (!left && !wait) clearInterval(tick); }, 1000);
+}
+async function call(action, extra) {
+  const res = await goldmindClient.functions.invoke('login-2fa', { body: { action, ...(extra || {}) } });
+  if (!res.error) return res.data || {};
+  let body = {};
+  try { body = await res.error.context.json(); } catch (e) { /* offline */ }
+  return { error: body.error || (navigator.onLine ? 'حدث خطأ، حاول مرة أخرى' : 'لا يوجد اتصال بالإنترنت'), wait: body.wait };
+}
+function done() {
+  try { sessionStorage.setItem(sessionKey, '1'); } catch (e) { /* ignore */ }
+  location.replace(NEXT);
+}
+async function send() {
+  showErr('');
+  $('resendBtn').disabled = true;
+  const r = await call('send');
+  if (r.not_needed || r.verified) return done();
+  if (r.error) { showErr(r.error); countdown(0, r.wait || 0); return; }
+  $('info').innerHTML = 'أرسلنا رمزاً من 8 أرقام إلى <b dir="ltr">' + String(r.to || '').replace(/[&<>"']/g, '') + '</b>. اكتبه هنا لإكمال الدخول.';
+  countdown(r.ttl || 60, 20);
+  $('code').value = ''; $('code').focus();
+}
+$('form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const code = $('code').value.replace(/\D/g, '');
+  if (code.length !== 8) { showErr('الرمز 8 أرقام'); return; }
+  $('verifyBtn').disabled = true; $('verifyBtn').textContent = 'جارِ التحقق...';
+  const r = await call('verify', { code });
+  $('verifyBtn').disabled = false; $('verifyBtn').textContent = 'تأكيد';
+  if (r.verified) return done();
+  showErr(r.error + (r.left != null && r.left > 0 ? ' (بقي ' + r.left + ' محاولات)' : ''));
+});
+$('code').addEventListener('input', () => { const v = $('code').value.replace(/\D/g, '').slice(0, 8); $('code').value = v; if (v.length === 8) $('form').requestSubmit(); });
+$('resendBtn').addEventListener('click', send);
+$('outBtn').addEventListener('click', async () => { await goldmindClient.auth.signOut(); location.replace('login-entry-ar.html'); });
+
+(async () => {
+  const { data: { session } } = await goldmindClient.auth.getSession();
+  if (!session) { location.replace('login-entry-ar.html'); return; }
+  sessionKey = 'gm_2fa_ok_' + (gmJwtClaims(session).session_id || '');
+  if (!(await gmTwoFactorNeeded(session))) return done();
+  send();
+})();
+</script>
+</body></html>
