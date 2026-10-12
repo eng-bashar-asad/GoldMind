@@ -175,12 +175,12 @@ function fmtPrice(v, cur) {
   const n = Number(v).toLocaleString('en-US', { maximumFractionDigits: v % 1 ? 2 : 0 });
   return cur === 'USD' ? '$' + n : n + ' ' + CUR_SYMBOL.AED;
 }
-let GM_PRICE_CUR = 'AED';
-function pickCurrency(storeCurrency) {
+let GM_PRICE_CUR = 'USD';
+function pickCurrency() {
+  // plans are priced in dollars: show dollars unless this person switched to dirhams
   let saved = null;
-  try { saved = localStorage.getItem('gm_price_currency'); } catch (e) {}
-  if (saved === 'AED' || saved === 'USD') return saved;
-  return storeCurrency === 'USD' ? 'USD' : 'AED';
+  try { saved = localStorage.getItem('gm_price_cur_v2'); } catch (e) {}
+  return saved === 'AED' ? 'AED' : 'USD';
 }
 
 function renderPlans(plans, currentPlanId) {
@@ -303,7 +303,7 @@ async function load() {
   renderPlans(plans, sub.plan_id);
   document.querySelectorAll('.cur-btn').forEach(b => b.onclick = () => {
     GM_PRICE_CUR = b.dataset.cur;
-    try { localStorage.setItem('gm_price_currency', GM_PRICE_CUR); } catch (e) {}
+    try { localStorage.setItem('gm_price_cur_v2', GM_PRICE_CUR); } catch (e) {}
     renderPlans(plans, sub.plan_id);
     renderStaffUsage();
   });

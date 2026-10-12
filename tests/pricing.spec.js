@@ -23,27 +23,29 @@ test('subscription page: store currency by default, switch to dollars', async ({
   });
   await page.goto('/subscription-ar.html');
   const list = page.locator('#plans-list');
-  await expect(list).toContainText('4,490 AED');
+  await expect(list).toContainText('$1,225'); // dollars by default, even for a dirham store
   await expect(list).toContainText('حسابات الزبائن والتجار');
-  await expect(list).toContainText('2,199 AED كل 3 أشهر');
+  await expect(list).toContainText('$599 كل 3 أشهر');
   await expect(list).toContainText('حتى 300 فاتورة شهرياً');
-  await expect(page.locator('#staff-usage-note')).toContainText('549 AED سنوياً لكل موظف');
-  await page.click('.cur-btn[data-cur="USD"]');
-  await expect(list).toContainText('$2,175');
   await expect(page.locator('#staff-usage-note')).toContainText('$150 سنوياً');
+  await page.click('.cur-btn[data-cur="AED"]');
+  await expect(list).toContainText('4,490 AED');
+  await expect(page.locator('#staff-usage-note')).toContainText('549 AED سنوياً لكل موظف');
   if (process.env.UI_OUT) await page.screenshot({ path: `${process.env.UI_OUT}/subscription.png`, fullPage: true });
 });
 
 test('landing page shows prices and remembers the currency', async ({ page }) => {
   await install(page, {});
   await page.goto('/landing-ar.html');
-  await expect(page.locator('#lp-plans')).toContainText('24,240 درهم');
+  await expect(page.locator('#lp-plans')).toContainText('$6,600');
   await expect(page.locator('#lp-plans')).toContainText('سعر خاص — تواصل معنا');
   await expect(page.locator('#lp-plans')).toContainText('مسدس الجرد');
-  await page.click('.lp-cur[data-cur="USD"]');
-  await expect(page.locator('#lp-plans')).toContainText('$6,600');
+  await page.click('.lp-cur[data-cur="AED"]');
+  await expect(page.locator('#lp-plans')).toContainText('24,240 درهم');
   if (process.env.UI_OUT) await page.locator('#pricing-h').scrollIntoViewIfNeeded(), await page.screenshot({ path: `${process.env.UI_OUT}/landing-pricing.png` });
   await page.reload();
+  await expect(page.locator('#lp-plans')).toContainText('15,425 درهم'); // remembered
+  await page.click('.lp-cur[data-cur="USD"]');
   await expect(page.locator('#lp-plans')).toContainText('$4,200');
   await expect(page.locator('#lp-plans')).toContainText('6 مستخدمين ضمن الباقة');
 });

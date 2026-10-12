@@ -265,12 +265,12 @@ function hidePaidComingSoon() { document.getElementById('paidModal').classList.a
         '<div class="text-[12px] pt-3 border-t flex flex-col gap-1" style="border-color: var(--hairline); color: var(--ink);"><span>' + p.staff + ' مستخدمين ضمن الباقة</span>' + hl + '<span>' + e + '</span></div></div>';
     }).join('');
   }
-  var cur = 'AED';
-  try { var s = localStorage.getItem('gm_price_currency'); if (s === 'USD' || s === 'AED') cur = s; } catch (e) {}
+  var cur = 'USD'; // prices are set in dollars; dirhams on request
+  try { var s = localStorage.getItem('gm_price_cur_v2'); if (s === 'USD' || s === 'AED') cur = s; } catch (e) {}
   document.querySelectorAll('.lp-cur').forEach(function (b) {
     b.addEventListener('click', function () {
       cur = b.dataset.cur;
-      try { localStorage.setItem('gm_price_currency', cur); } catch (e) {}
+      try { localStorage.setItem('gm_price_cur_v2', cur); } catch (e) {}
       render(cur);
     });
   });
