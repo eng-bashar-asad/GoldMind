@@ -233,9 +233,12 @@ function hidePaidComingSoon() { document.getElementById('paidModal').classList.a
 <script>
 (function () {
   var PLANS = [
-    { name: 'الأساسية', staff: 4, AED: [4490, 1235], USD: [1225, 337], einv: { AED: 'الفوترة الإلكترونية: إضافة 99 درهماً شهرياً', USD: 'الفوترة الإلكترونية: إضافة $27 شهرياً' } },
-    { name: 'الاحترافية', staff: 8, pro: true, AED: [7990, 2199], USD: [2175, 599], einv: 'الفوترة الإلكترونية مشمولة — 300 فاتورة شهرياً' },
-    { name: 'الأعمال', staff: 14, AED: [14990, 4125], USD: [4080, 1125], einv: 'الفوترة الإلكترونية مشمولة — 1,000 فاتورة شهرياً' }
+    { name: 'الأساسية', staff: 6, AED: [15425, 4240], USD: [4200, 1155], einv: { AED: 'الفوترة الإلكترونية: إضافة 99 درهماً شهرياً', USD: 'الفوترة الإلكترونية: إضافة $27 شهرياً' },
+      hl: ['المبيعات والمشتريات والمخزون والصندوق', 'حسابات الزبائن والتجار وكشوفاتهم', 'تقارير الأرباح والتقارير المالية'] },
+    { name: 'الاحترافية', staff: 10, pro: true, AED: [24240, 6665], USD: [6600, 1815], einv: 'الفوترة الإلكترونية مشمولة — 300 فاتورة شهرياً',
+      hl: ['كل ما في الباقة الأساسية', 'الإدخال بالصورة والصوت (AI)', 'الجرد بـ RFID والماس والصيانة'] },
+    { name: 'الخاصة', custom: true, einv: 'الفوترة الإلكترونية مشمولة',
+      hl: ['عدد المستخدمين والفروع حسب حاجتك', 'تركيب وربط الأجهزة: طابعات الفواتير والباركود ومسدس الجرد', 'تدريب الموظفين ودعم مباشر'] }
   ];
   function money(v, c) { var n = v.toLocaleString('en-US'); return c === 'USD' ? '$' + n : n + ' درهم'; }
   function render(c) {
@@ -246,14 +249,20 @@ function hidePaidComingSoon() { document.getElementById('paidModal').classList.a
       b.style.color = on ? '#2E2113' : 'var(--ink-soft)';
     });
     document.getElementById('lp-plans').innerHTML = PLANS.map(function (p) {
-      var y = p[c][0], q = p[c][1], e = typeof p.einv === 'string' ? p.einv : p.einv[c];
+      var e = typeof p.einv === 'string' ? p.einv : p.einv[c];
+      var hl = (p.hl || []).map(function (h) { return '<span>✓ ' + h + '</span>'; }).join('');
+      if (p.custom) return '<div class="rounded-2xl p-5 border" style="background: var(--card); border-color: var(--hairline);">' +
+        '<h3 class="display text-lg mb-2" style="color: var(--ink);">' + p.name + '</h3>' +
+        '<p class="text-[18px] font-bold leading-tight mb-3" style="color: var(--ink);">سعر خاص — تواصل معنا</p>' +
+        '<div class="text-[12px] pt-3 border-t flex flex-col gap-1" style="border-color: var(--hairline); color: var(--ink);">' + hl + '<span>' + e + '</span></div></div>';
+      var y = p[c][0], q = p[c][1];
       return '<div class="rounded-2xl p-5 border relative" style="background: var(--card); border-color:' + (p.pro ? 'var(--gold)' : 'var(--hairline)') + ';' + (p.pro ? 'box-shadow:0 0 0 1.5px var(--gold);' : '') + '">' +
         (p.pro ? '<span class="absolute -top-3 right-4 text-[10px] font-bold rounded-full px-2.5 py-1" style="background: var(--gold-bright); color:#2E2113;">الأنسب لأغلب المحلات</span>' : '') +
         '<h3 class="display text-lg mb-2" style="color: var(--ink);">' + p.name + '</h3>' +
         '<p class="text-[22px] font-bold leading-tight" style="color: var(--ink);">' + money(y, c) + ' <span class="text-[12px] font-normal" style="color: var(--ink-soft);">/ سنة</span></p>' +
         '<p class="text-[11.5px]" style="color: var(--ink-soft);">أي ما يعادل نحو ' + money(Math.round(y / 12), c) + ' شهرياً</p>' +
         '<p class="text-[11.5px] mb-3" style="color: var(--ink-soft);">أو ' + money(q, c) + ' كل 3 أشهر</p>' +
-        '<div class="text-[12px] pt-3 border-t flex flex-col gap-1" style="border-color: var(--hairline); color: var(--ink);"><span>' + p.staff + ' موظفين ضمن الباقة</span><span>' + e + '</span></div></div>';
+        '<div class="text-[12px] pt-3 border-t flex flex-col gap-1" style="border-color: var(--hairline); color: var(--ink);"><span>' + p.staff + ' مستخدمين ضمن الباقة</span>' + hl + '<span>' + e + '</span></div></div>';
     }).join('');
   }
   var cur = 'AED';
