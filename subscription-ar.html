@@ -98,7 +98,7 @@
 <div class="flex items-center justify-between gap-3 mb-3">
 <h3 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider">الخطط المتاحة</h3>
 </div>
-<p class="text-[11.5px] text-on-surface-variant mb-3 leading-5">الاشتراك سنوي بالدولار الأمريكي. يمكنك دفع قيمة السنة دفعة واحدة (الأوفر) أو على 4 دفعات كل 3 أشهر. جرّب أي خطة مجاناً لمدة 30 يوماً.</p>
+<p class="text-[11.5px] text-on-surface-variant mb-3 leading-5">الاشتراك سنوي فقط بالدولار الأمريكي، ويُدفع دفعة واحدة عن السنة. جرّب أي خطة مجاناً لمدة 30 يوماً.</p>
 <div id="plans-list" class="flex flex-col gap-3"></div>
 </section>
 
@@ -109,7 +109,6 @@
 <label class="block text-[11px] text-on-surface-variant mb-1">مدة التجديد (أشهر)</label>
 <select id="admin-months-select" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest">
 <option value="1">شهر واحد</option>
-<option value="3">3 أشهر (دفعة تقسيط)</option>
 <option value="12" selected>سنة كاملة</option>
 </select>
 </div>
@@ -123,6 +122,11 @@
 </div>
 <button id="admin-save-btn" class="h-12 gold-accent text-white rounded-lg font-semibold text-[13px] active:scale-[0.98] transition-all">تسجيل الدفعة وتفعيل الاشتراك</button>
 </div>
+</div>
+
+<div id="refund-policy" class="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-3 text-[12px] text-on-surface-variant leading-5">
+<span class="material-symbols-outlined align-middle text-secondary" style="font-size:16px;">undo</span>
+<strong class="text-on-surface">سياسة الاسترجاع:</strong> يحق لك طلب استرجاع قيمة الاشتراك خلال 14 يوماً من تاريخ الاشتراك. بعد انقضاء هذه المدة لا تُسترجَع قيمة الاشتراك.
 </div>
 
 <div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-8 text-[12px] text-on-surface-variant leading-5">
@@ -210,7 +214,6 @@ function renderPlans(plans, currentPlanId) {
         <p class="text-[22px] font-bold text-primary leading-tight">${fmtPrice(pr.yearly, cur)} <span class="text-[12px] font-normal text-on-surface-variant">/ سنة</span></p>
         <p class="text-[11px] text-on-surface-variant mb-1">أو ما يعادلها بعملة بلدك، يحسبها مزوّد الدفع عند الدفع (بالدرهم في الإمارات مثلاً)</p>
         <p class="text-[11.5px] text-on-surface-variant">أي ما يعادل نحو ${fmtPrice(perMonth, cur)} شهرياً</p>
-        <p class="text-[11.5px] text-on-surface-variant mt-1">أو ${fmtPrice(pr.quarterly, cur)} كل 3 أشهر (4 دفعات، التزام لمدة سنة)</p>
       </div>`;
     }
     const overage = pr && pr.einvoice_overage ? `<p>فوق الحد: ${fmtPrice(pr.einvoice_overage, cur)} عن كل فاتورة إلكترونية</p>` : '';
@@ -305,7 +308,7 @@ async function load() {
     if (branchCount && branchCount > 1) {
       const note = document.createElement('div');
       note.className = 'bg-surface-container-low border border-outline-variant rounded-xl p-3 mb-6 text-[11.5px] text-on-surface-variant leading-5';
-      note.textContent = `هذا الفرع أحد ${branchCount} فروع مرتبطة بنفس المنشأة، ولكل فرع اشتراكه وفوترته الضريبية المستقلة.`;
+      note.textContent = `هذا الفرع أحد ${branchCount} فروع مرتبطة بنفس المنشأة، لكل فرع اشتراكه، أما الاسم القانوني والرقم الضريبي فهما للمنشأة كلها.`;
       document.getElementById('usage-section').insertAdjacentElement('afterend', note);
     }
   }
