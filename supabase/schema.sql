@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict T8sc3mnYLxC8XhT4QL4e0C3P6Z9VNeTN9xRhAlUIML0hi8LlikTCg3ryBAMcA2m
+\restrict MSaRNDqyJaXwXITuFF6CHmUej3RdcG9uWgIY6T6JcQo6gZclBnEIuaUCSLPOZ0Y
 
 
 SET statement_timeout = 0;
@@ -105,6 +105,7 @@ begin
          cm.invoice_id, i.invoice_number
   from cash_movements cm join invoices i on i.id = cm.invoice_id
   where cm.store_id = sid and cm.box = 'main' and cm.created_at >= '2026-08-08'
+    and not coalesce(cm.edit_delta, false)
     and not exists (select 1 from daily_cash_log l where l.cash_movement_id = cm.id);
 
   return query
@@ -954,6 +955,19 @@ end $$;
 
 
 --
+-- Name: customer_credit(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.customer_credit(sid uuid, cust uuid) RETURNS numeric
+    LANGUAGE sql STABLE
+    SET search_path TO 'public'
+    AS $$
+  select round(greatest(0, -coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)), 2)
+  from customer_debts where store_id = sid and customer_id = cust;
+$$;
+
+
+--
 -- Name: customer_debt_discount(uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1008,6 +1022,26 @@ begin
   perform gm_unallocate_customer_credit(d.store_id, d.customer_id);
   return jsonb_build_object('ok', true);
 end $$;
+
+
+--
+-- Name: customer_deposit_remaining(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.customer_deposit_remaining(sid uuid) RETURNS TABLE(deposit_id uuid, remaining numeric)
+    LANGUAGE sql STABLE
+    SET search_path TO 'public'
+    AS $$
+  with cred as (
+    select customer_id, greatest(0, -sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end)) c
+    from customer_debts where store_id = sid group by customer_id),
+  d as (
+    select dp.id, dp.amount, coalesce(cr.c, 0) c,
+           sum(dp.amount) over (partition by dp.customer_id order by dp.created_at desc, dp.id) run
+    from customer_deposits dp left join cred cr on cr.customer_id = dp.customer_id
+    where dp.store_id = sid and dp.status = 'active')
+  select id, round(least(amount, greatest(0, c - (run - amount))), 2) from d;
+$$;
 
 
 --
@@ -2930,7 +2964,7 @@ CREATE FUNCTION public.refund_customer_deposit(p_deposit uuid) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare d record; me uuid; cm uuid;
+declare d record; me uuid; cm uuid; left_amt numeric;
 begin
   select dp.*, cu.name cname into d from customer_deposits dp join customers cu on cu.id = dp.customer_id where dp.id = p_deposit for update of dp;
   if d is null then raise exception 'العربون غير موجود'; end if;
@@ -2938,6 +2972,10 @@ begin
     raise exception 'ليس لديك صلاحية' using errcode = '42501';
   end if;
   if d.status <> 'active' then raise exception 'هذا العربون مُسترجَع مسبقاً'; end if;
+  select remaining into left_amt from customer_deposit_remaining(d.store_id) where deposit_id = d.id;
+  if coalesce(left_amt, 0) < d.amount - 0.009 then
+    raise exception 'هذا العربون استُخدم (كلياً أو جزئياً) في فاتورة، فلا يمكن استرجاعه كاملاً. لإعادة ما تبقّى للزبون استخدم «صرف للزبون» من صفحة حسابه.';
+  end if;
   select id into me from staff where user_id = auth.uid() and store_id = d.store_id limit 1;
   update customer_deposits set status = 'refunded', refunded_at = now() where id = d.id;
   insert into cash_movements (store_id, box, direction, amount, description, created_by)
@@ -4057,6 +4095,39 @@ end $_$;
 
 
 --
+-- Name: trg_settlement_lot_sync(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_settlement_lot_sync() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare lt record;
+begin
+  if tg_op = 'UPDATE' and new.weight_grams is not distinct from old.weight_grams and new.karat is not distinct from old.karat
+     and new.gold_24k_equivalent is not distinct from old.gold_24k_equivalent then
+    return new;
+  end if;
+  for lt in select * from gold_stock_lots where trader_movement_id = old.id for update loop
+    if lt.weight_grams_remaining <> lt.weight_grams_total then
+      raise exception 'الذهب المستلم بهذه التسوية استُعمل من المستودع (إنتاج أو بيع) — لا يمكن تعديله أو حذفه. عدّل الحساب بتسوية جديدة.';
+    end if;
+    if tg_op = 'UPDATE' then
+      update gold_stock_lots set
+        weight_grams_total = round(coalesce(new.gold_24k_equivalent, 0) * 24 / lt.karat, 3),
+        weight_grams_remaining = round(coalesce(new.gold_24k_equivalent, 0) * 24 / lt.karat, 3)
+       where id = lt.id;
+    else
+      update gold_stock_lots set weight_grams_remaining = 0,
+        notes = coalesce(notes, '') || ' — أُلغي بإلغاء التسوية'
+       where id = lt.id;
+    end if;
+  end loop;
+  return case when tg_op = 'UPDATE' then new else old end;
+end $$;
+
+
+--
 -- Name: trg_trader_received_sync(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -4669,6 +4740,7 @@ CREATE TABLE public.gold_stock_lots (
     fabrication_pool_total numeric,
     fabrication_pool_remaining numeric,
     box_name text,
+    trader_movement_id uuid,
     CONSTRAINT gold_stock_lots_remaining_check CHECK (((weight_grams_remaining >= (0)::numeric) AND (weight_grams_remaining <= weight_grams_total)))
 );
 
@@ -6553,6 +6625,13 @@ CREATE INDEX gold_stock_lots_trader_id_fk_idx ON public.gold_stock_lots USING bt
 
 
 --
+-- Name: gold_stock_lots_trader_movement_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX gold_stock_lots_trader_movement_id_idx ON public.gold_stock_lots USING btree (trader_movement_id);
+
+
+--
 -- Name: hr_employees_linked_staff_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7369,6 +7448,13 @@ CREATE TRIGGER trg_scrap_price_at_purchase BEFORE INSERT ON public.invoice_items
 --
 
 CREATE TRIGGER trg_seed_default_zebra_label_fields AFTER INSERT ON public.stores FOR EACH ROW EXECUTE FUNCTION public.seed_default_zebra_label_fields();
+
+
+--
+-- Name: trader_movements trg_settlement_lot_sync; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_settlement_lot_sync AFTER DELETE OR UPDATE ON public.trader_movements FOR EACH ROW EXECUTE FUNCTION public.trg_settlement_lot_sync();
 
 
 --
@@ -9805,6 +9891,14 @@ GRANT ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric
 
 
 --
+-- Name: FUNCTION customer_credit(sid uuid, cust uuid); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.customer_credit(sid uuid, cust uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.customer_credit(sid uuid, cust uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -9820,6 +9914,14 @@ GRANT ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount nu
 REVOKE ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.customer_debt_discount_update(p_id uuid, p_amount numeric, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION customer_deposit_remaining(sid uuid); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.customer_deposit_remaining(sid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.customer_deposit_remaining(sid uuid) TO service_role;
 
 
 --
@@ -10582,6 +10684,15 @@ GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO service_role;
 
 
 --
+-- Name: FUNCTION trg_settlement_lot_sync(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.trg_settlement_lot_sync() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.trg_settlement_lot_sync() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_settlement_lot_sync() TO service_role;
+
+
+--
 -- Name: FUNCTION trg_trader_received_sync(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -11320,5 +11431,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict T8sc3mnYLxC8XhT4QL4e0C3P6Z9VNeTN9xRhAlUIML0hi8LlikTCg3ryBAMcA2m
+\unrestrict MSaRNDqyJaXwXITuFF6CHmUej3RdcG9uWgIY6T6JcQo6gZclBnEIuaUCSLPOZ0Y
 
