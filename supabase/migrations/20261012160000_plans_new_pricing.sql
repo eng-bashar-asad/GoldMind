@@ -16,3 +16,7 @@ update public.plans set is_active = false, next_plan_key = null where key = 'bus
 update public.plans set name_ar = 'الخاصة', name_en = 'Custom', sort_order = 3,
   highlights_ar = array['عدد المستخدمين والفروع حسب حاجتك','تركيب وربط الأجهزة بالبرنامج: طابعات الفواتير، طابعات الباركود، مسدس الجرد','الفوترة الإلكترونية مشمولة','تدريب الموظفين ودعم مباشر']
  where key = 'enterprise';
+-- Custom plan: 20 users included (owner's decision)
+update public.plans set included_staff = 20,
+  highlights_ar = array['20 مستخدماً، والفروع حسب حاجتك','تركيب وربط الأجهزة بالبرنامج: طابعات الفواتير، طابعات الباركود، مسدس الجرد','الفوترة الإلكترونية مشمولة','تدريب الموظفين ودعم مباشر']
+ where key = 'enterprise';
