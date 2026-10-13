@@ -492,6 +492,23 @@
 </div>
 
 </details>
+<!-- Overdue debt alert -->
+<details class="mt-2 group space-y-4">
+<summary class="flex items-center justify-between cursor-pointer list-none marker:content-none py-2.5 px-3 rounded-lg bg-surface-container-low">
+<h3 class="font-label-md text-label-md text-secondary font-bold">تنبيه الديون المتأخرة</h3>
+<span class="material-symbols-outlined text-[20px] text-outline transition-transform duration-200 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="pt-4 flex flex-col gap-4">
+<p class="text-[11px] text-outline">يظهر تنبيه ملوّن على الشاشة الرئيسية لكل دين مفتوح مضى عليه عدد الأيام المحدد أو أكثر. الضغط على التنبيه يفتح حساب الزبون أو التاجر كاملاً.</p>
+<label class="flex items-center justify-between gap-3">
+<span class="text-sm font-semibold">عدد الأيام</span>
+<input id="debt-alert-days" type="number" min="1" max="365" step="1" value="15" dir="ltr" class="h-11 w-24 border border-outline-variant rounded-lg px-3 font-data-mono"/>
+</label>
+<label class="flex items-center gap-2 text-sm font-semibold"><input id="debt-alert-customers" type="checkbox" checked class="w-5 h-5"/> تنبيه على الزبائن</label>
+<label class="flex items-center gap-2 text-sm font-semibold"><input id="debt-alert-traders" type="checkbox" checked class="w-5 h-5"/> تنبيه على التجار</label>
+</div>
+</details>
+
 <details class="mt-2 group space-y-4">
 <summary class="flex items-center justify-between cursor-pointer list-none marker:content-none py-2.5 px-3 rounded-lg bg-surface-container-low">
 <h3 class="font-label-md text-label-md text-secondary font-bold">الدخول بالبصمة للموظفين</h3>
@@ -940,6 +957,9 @@
         setShapeStyle(data.invoice_print_shape || 'soft');
         setDiamondsEnabled(data.diamonds_enabled === true);
         setRfidEnabled(data.rfid_enabled === true);
+        document.getElementById('debt-alert-days').value = data.debt_alert_days || 15;
+        document.getElementById('debt-alert-customers').checked = data.debt_alert_customers !== false;
+        document.getElementById('debt-alert-traders').checked = data.debt_alert_traders !== false;
         document.getElementById('rfid-device-key').textContent = data.rfid_device_key || '—';
         setBioAllowed(data.allow_biometric_login !== false);
 
@@ -1127,6 +1147,9 @@
                 invoice_print_shape: selectedShapeStyle,
                 diamonds_enabled: diamondsEnabled,
                 rfid_enabled: rfidEnabled,
+                debt_alert_days: Math.min(365, Math.max(1, parseInt(document.getElementById('debt-alert-days').value, 10) || 15)),
+                debt_alert_customers: document.getElementById('debt-alert-customers').checked,
+                debt_alert_traders: document.getElementById('debt-alert-traders').checked,
                 allow_biometric_login: bioAllowed
             })
             .eq('id', GOLDMIND_STORE_ID);

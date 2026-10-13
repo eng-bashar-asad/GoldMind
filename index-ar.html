@@ -977,6 +977,11 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <span class="flex-1 text-[13px] font-semibold" id="fiscalYearBannerText"></span>
 <span class="material-symbols-outlined text-[18px]">chevron_left</span>
 </a>
+<!-- Overdue debts alert (company settings: تنبيه الديون المتأخرة) -->
+<section id="debtAlertBox" class="hidden mb-4 rounded-2xl p-3.5 text-white shadow-lg" style="background:linear-gradient(135deg,#f97316,#dc2626);">
+<div class="flex items-center gap-2 font-bold text-[14px] mb-2"><span class="material-symbols-outlined">notification_important</span><span id="debtAlertTitle"></span></div>
+<div id="debtAlertList" class="flex flex-col gap-1.5"></div>
+</section>
 <!-- Profile/Welcome -->
 <section class="mb-4 flex items-center justify-between gap-3">
 <div class="flex items-center gap-3 min-w-0">
@@ -1671,7 +1676,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // one-at-a-time on every dashboard load.
             const [{ data: store }, { data: staffRow }] = await Promise.all([
                 goldmindClient
-                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate, logo_url').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate, logo_url, debt_alert_days, debt_alert_customers, debt_alert_traders').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
                 goldmindClient
                     .from('staff').select('full_name, role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle()
             ]);
@@ -1712,12 +1717,108 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (dskRoleLabelEl) dskRoleLabelEl.textContent = roleLabel;
             }
 
+            // ---- Overdue debts alert ----
+            // A debt is "open" while the balance is still owed to the shop. It counts from the day
+            // the balance last went from zero to owed; a payment that clears it restarts the count.
+            async function gmFetchAllRows(build) {
+                const out = [];
+                for (let from = 0; ; from += 1000) {
+                    const { data, error } = await build().range(from, from + 999);
+                    if (error) throw error;
+                    out.push(...(data || []));
+                    if (!data || data.length < 1000) return out;
+                }
+            }
+            // rows: [{ t, d }] in time order, d = signed change (+ owed to the shop)
+            function gmOpenSince(rows, eps) {
+                let bal = 0, since = null, sign = 0;
+                rows.forEach(function (r) {
+                    bal += r.d;
+                    const s = Math.abs(bal) < eps ? 0 : Math.sign(bal);
+                    if (s === 0) { since = null; sign = 0; }
+                    else if (s !== sign) { since = r.t; sign = s; }
+                });
+                return { owed: bal, since: since };
+            }
+            function gmDebtAgeRows(kind, days, nameMap, byParty) {
+                return Object.keys(byParty).map(function (id) {
+                    const cash = gmOpenSince(byParty[id].cash, 0.005);
+                    const gold = gmOpenSince(byParty[id].gold, 0.001);
+                    const ages = [];
+                    if (cash.owed > 0.005 && cash.since) ages.push(Math.floor((Date.now() - new Date(cash.since)) / 86400000));
+                    if (gold.owed > 0.001 && gold.since) ages.push(Math.floor((Date.now() - new Date(gold.since)) / 86400000));
+                    if (!ages.length || Math.max.apply(null, ages) < days) return null;
+                    return { kind: kind, id: id, name: nameMap[id] || '—', days: Math.max.apply(null, ages),
+                        cash: cash.owed > 0.005 ? cash.owed : 0, gold: gold.owed > 0.001 ? gold.owed : 0 };
+                }).filter(Boolean);
+            }
+            async function renderDebtAlerts(storeRow, hasPermFn) {
+                const days = Math.min(365, Math.max(1, Number(storeRow.debt_alert_days) || 15));
+                const wantCustomers = storeRow.debt_alert_customers !== false && hasPermFn('view_customers');
+                const wantTraders = storeRow.debt_alert_traders !== false && hasPermFn('view_traders');
+                if (!wantCustomers && !wantTraders) return;
+                const items = [];
+                if (wantCustomers) {
+                    const [custs, debts] = await Promise.all([
+                        gmFetchAllRows(() => goldmindClient.from('customers').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('id')),
+                        gmFetchAllRows(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, created_at, id')
+                            .eq('store_id', GOLDMIND_STORE_ID).or('source.is.null,source.neq.allocation').order('created_at').order('id'))
+                    ]);
+                    const names = {}; custs.forEach(function (c) { names[c.id] = c.name; });
+                    const byParty = {};
+                    debts.forEach(function (m) {
+                        const sign = m.movement_type === 'debt_increase' ? 1 : -1;
+                        const p = byParty[m.customer_id] || (byParty[m.customer_id] = { cash: [], gold: [] });
+                        p.cash.push({ t: m.created_at, d: sign * Number(m.cash_amount || 0) });
+                        p.gold.push({ t: m.created_at, d: sign * Number(m.gold_grams_24k || 0) });
+                    });
+                    gmDebtAgeRows('customer', days, names, byParty).forEach(function (x) { items.push(x); });
+                }
+                if (wantTraders) {
+                    const [trs, moves] = await Promise.all([
+                        gmFetchAllRows(() => goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('id')),
+                        gmFetchAllRows(() => goldmindClient.from('trader_movements').select('trader_id, movement_type, gold_24k_equivalent, fab_fee_amount, created_at, id')
+                            .eq('store_id', GOLDMIND_STORE_ID).order('created_at').order('id'))
+                    ]);
+                    const names = {}; trs.forEach(function (t) { names[t.id] = t.name; });
+                    const byParty = {};
+                    moves.forEach(function (m) {
+                        const sign = m.movement_type === 'debt_decrease' ? 1 : -1; // + = the trader owes the shop
+                        const p = byParty[m.trader_id] || (byParty[m.trader_id] = { cash: [], gold: [] });
+                        p.cash.push({ t: m.created_at, d: sign * Number(m.fab_fee_amount || 0) });
+                        p.gold.push({ t: m.created_at, d: sign * Number(m.gold_24k_equivalent || 0) });
+                    });
+                    gmDebtAgeRows('trader', days, names, byParty).forEach(function (x) { items.push(x); });
+                }
+                if (!items.length) return;
+                items.sort(function (a, b) { return b.days - a.days; });
+                const esc = function (t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
+                const cur = storeRow.currency || 'AED';
+                const parts = function (x) {
+                    const out = [];
+                    if (x.cash) out.push(x.cash.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur);
+                    if (x.gold) out.push(x.gold.toFixed(2) + ' غ (٢٤)');
+                    return out.join(' + ');
+                };
+                document.getElementById('debtAlertTitle').textContent = items.length === 1
+                    ? 'دين متأخر: مضى عليه ' + items[0].days + ' يوم أو أكثر'
+                    : items.length + ' ديون متأخرة (مضى عليها ' + days + ' يوم أو أكثر)';
+                document.getElementById('debtAlertList').innerHTML = items.slice(0, 6).map(function (x) {
+                    const href = x.kind === 'customer' ? 'customer-debts-ar.html?open=' + encodeURIComponent(x.id) : 'ledger-ar.html?trader=' + encodeURIComponent(x.id);
+                    return '<a href="' + href + '" class="flex items-center justify-between gap-2 bg-white/15 rounded-lg px-3 py-2 text-[12.5px]">'
+                        + '<span class="font-semibold">' + esc(x.name) + ' <span class="opacity-80">(' + (x.kind === 'customer' ? 'زبون' : 'تاجر') + ')</span></span>'
+                        + '<span class="font-data-mono text-end">' + esc(parts(x)) + ' · ' + x.days + ' يوم</span></a>';
+                }).join('') + (items.length > 6 ? '<p class="text-[11.5px] opacity-90 mt-1">و' + (items.length - 6) + ' أخرى — افتح الزبائن أو التجار لعرضها</p>' : '');
+                document.getElementById('debtAlertBox').classList.remove('hidden');
+            }
+
             const isOwner = staffRow && staffRow.role === 'owner';
             const hasPerm = (perm) => isOwner || (staffRow && staffRow.permissions && staffRow.permissions[perm] === true);
             // Exposed so the desktop quick-actions module (a separate
             // script, loaded earlier) can permission-filter its catalog
             // using the exact same rules as everything else on this page.
             window.GOLDMIND_HAS_PERM = hasPerm;
+            if (store) renderDebtAlerts(store, hasPerm).catch(function (e) { console.warn('debt alerts', e); });
             window.__goldmindDiamondsEnabled = !!(store && store.diamonds_enabled);
             if (typeof window.__dskInitQuickActions === 'function') window.__dskInitQuickActions();
             if (typeof window.__mobInitQuickActions === 'function') window.__mobInitQuickActions();
