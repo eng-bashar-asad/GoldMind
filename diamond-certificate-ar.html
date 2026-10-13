@@ -8,7 +8,7 @@
 <title>شهادة ماس | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=37"></script>
+<script src="supabase-config.js?v=38"></script>
 <script src="theme.js?v=60"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -233,7 +233,7 @@
 
         const [{ data: piece, error: pieceError }, { data: store }] = await Promise.all([
             goldmindClient.from('diamond_pieces').select('*').eq('id', pieceId).eq('store_id', GOLDMIND_STORE_ID).maybeSingle(),
-            goldmindClient.from('stores').select('*').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            gmStoreWithLegal(goldmindClient.from('stores').select('*').eq('id', GOLDMIND_STORE_ID).maybeSingle())
         ]);
 
         if (pieceError || !piece) {

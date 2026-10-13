@@ -447,7 +447,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=37"></script>
+<script src="supabase-config.js?v=38"></script>
 </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
 <!-- ============================================================
@@ -1063,8 +1063,8 @@
             // theme itself, it was ~9 database round trips running strictly
             // one-at-a-time on every dashboard load.
             const [{ data: store }, { data: staffRow }] = await Promise.all([
-                goldmindClient
-                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate, logo_url').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+                gmStoreWithLegal(goldmindClient
+                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()),
                 goldmindClient
                     .from('staff').select('full_name, role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle()
             ]);

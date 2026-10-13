@@ -133,7 +133,7 @@
     body { min-height: max(884px, 100dvh); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=37"></script>
+  <script src="supabase-config.js?v=38"></script>
 <script src="theme.js?v=60"></script>
   </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
@@ -361,11 +361,11 @@ function fitStoreName(el) {
     const session = await requireGoldMindSession('login-entry-ar.html');
     if (!session) return;
 
-    const { data: store, error } = await goldmindClient
+    const { data: store, error } = await gmStoreWithLegal(goldmindClient
         .from('stores')
-        .select('name, currency, vat_rate, invoice_prefix, next_invoice_seq, next_invoice_seq_year, logo_url')
+        .select('name, currency, vat_rate, invoice_prefix, next_invoice_seq, next_invoice_seq_year')
         .eq('id', GOLDMIND_STORE_ID)
-        .single();
+        .single());
 
     if (error || !store) return;
 
