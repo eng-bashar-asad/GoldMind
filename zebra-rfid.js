@@ -351,7 +351,14 @@ var GMZebra = (function () {
     return sendZpl('! U1 setvar "zpl.label_orientation" "normal"\r\n');
   }
 
+  // Random 96-bit chip number (24 hex). replace_piece_chip refuses a number already in use.
+  // ponytail: no pre-check against the DB; collisions at 96 bits are not a practical risk.
+  function freshEpcHex() {
+    return Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+  }
+
   return {
+    freshEpcHex: freshEpcHex,
     asciiToHex: asciiToHex,
     hexToAscii: hexToAscii,
     padEvenBytes: padEvenBytes,

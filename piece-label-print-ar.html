@@ -8,7 +8,7 @@
 <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11.5/dist/JsBarcode.all.min.js"></script>
 <script src="supabase-config.js?v=37"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
-<script src="zebra-rfid.js?v=5"></script>
+<script src="zebra-rfid.js?v=6"></script>
 <script src="theme.js?v=60"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -40,6 +40,9 @@
 </button>
 <button id="rfid-btn" class="hidden flex items-center gap-2 bg-amber-600 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap">
 <span class="material-symbols-outlined">wifi_tethering</span> طباعة + برمجة RFID
+</button>
+<button id="rfid-new-btn" class="hidden flex items-center gap-2 bg-amber-800 text-white px-4 py-2 rounded-lg text-sm font-semibold whitespace-nowrap" title="تطبع الملصقة وتكتب شريحة برقم جديد، والباركود نفسه، والرقم القديم يصير ملغى">
+<span class="material-symbols-outlined">autorenew</span> طباعة + شريحة جديدة
 </button>
 <button id="reset-orientation-btn" class="flex items-center gap-2 bg-gray-500 text-white px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap" title="إذا كان دوران الطابعة لا يستجيب لأي إعداد، جرّب هذا الخيار مرة واحدة">
 <span class="material-symbols-outlined text-[16px]">restart_alt</span> إعادة ضبط دوران الطابعة
@@ -146,6 +149,8 @@
         if (store && store.rfid_enabled) {
             document.getElementById('rfid-btn').classList.remove('hidden');
             document.getElementById('rfid-btn').classList.add('flex');
+            document.getElementById('rfid-new-btn').classList.remove('hidden');
+            document.getElementById('rfid-new-btn').classList.add('flex');
         }
 
         label.classList.remove('hidden');
@@ -231,14 +236,16 @@
         }
     });
 
-    document.getElementById('rfid-btn').addEventListener('click', async function () {
+    // Prints the label and writes its chip. newChip=true gives the chip a new number and
+    // cancels the old one in piece_chip_history; the barcode stays the same.
+    async function printRfidLabel(btn, newChip) {
         if (!currentPiece) return;
-        const btn = this;
 
         if (!GMZebra.isAvailable()) {
             showRfidStatus('Zebra Browser Print غير متاح على هذا الجهاز — يجب تثبيت تطبيق Zebra Browser Print أولاً.', true);
             return;
         }
+        if (newChip && !confirm('تأكيد: شريحة القطعة ' + currentPiece.barcode + ' بتصير ملغاة، وبتنطبع ملصقة برقم شريحة جديد. الباركود ما بيتغيّر.\n\nالملصقة القديمة ما رح تنحسب بالجرد، فلازم تتشال من القطعة.')) return;
 
         btn.disabled = true;
         const originalHtml = btn.innerHTML;
@@ -247,7 +254,8 @@
         try {
             const barcodeValue = currentPiece.barcode || currentPiece.id.slice(0, 12).toUpperCase();
             // the piece's current chip number (it may have been replaced); the barcode-based one for older pieces
-            const epcHex = currentPiece.rfid_epc || GMZebra.buildEpcHex(barcodeValue, GOLDMIND_STORE_ID);
+            const oldEpc = currentPiece.rfid_epc || GMZebra.buildEpcHex(barcodeValue, GOLDMIND_STORE_ID);
+            const epcHex = newChip ? GMZebra.freshEpcHex() : oldEpc;
 
             const dpi = (currentStore && currentStore.zebra_label_dpi) || 203;
             const widthDots = GMZebra.mmToDots((currentStore && currentStore.zebra_label_width_mm) || 50, dpi);
@@ -276,16 +284,25 @@
                 darkness: darkness
             });
 
-            const { error: updateError } = await goldmindClient.from('pieces').update({
-                rfid_epc: epcHex,
-                rfid_encoded_at: new Date().toISOString()
-            }).eq('id', currentPiece.id);
-
-            if (updateError) {
-                showRfidStatus('طُبعت الملصقة لكن تعذّر تحديث سجل القطعة: ' + updateError.message, true);
-            } else {
-                showRfidStatus('تم طباعة الملصقة وبرمجة الرقاقة بنجاح.', false);
+            if (newChip) {
+                // the printer already wrote the new chip; save it and cancel the old number
+                const { error } = await goldmindClient.rpc('replace_piece_chip', { p_piece_id: currentPiece.id, p_old_epc: oldEpc, p_new_epc: epcHex });
+                if (error) throw new Error('طُبعت الملصقة وبُرمجت الشريحة لكن تعذّر حفظ الرقم الجديد: ' + error.message);
+                currentPiece.rfid_epc = epcHex;
+                showRfidStatus('تم طباعة الملصقة وبرمجة شريحة جديدة. الرقم القديم صار ملغى.', false);
                 document.getElementById('rfidBadge').classList.remove('hidden');
+            } else {
+                const { error: updateError } = await goldmindClient.from('pieces').update({
+                    rfid_epc: epcHex,
+                    rfid_encoded_at: new Date().toISOString()
+                }).eq('id', currentPiece.id);
+
+                if (updateError) {
+                    showRfidStatus('طُبعت الملصقة لكن تعذّر تحديث سجل القطعة: ' + updateError.message, true);
+                } else {
+                    showRfidStatus('تم طباعة الملصقة وبرمجة الرقاقة بنجاح.', false);
+                    document.getElementById('rfidBadge').classList.remove('hidden');
+                }
             }
         } catch (err) {
             showRfidStatus(err.message || 'فشل غير متوقع أثناء الطباعة.', true);
@@ -293,7 +310,10 @@
             btn.disabled = false;
             btn.innerHTML = originalHtml;
         }
-    });
+    }
+
+    document.getElementById('rfid-btn').addEventListener('click', function () { printRfidLabel(this, false); });
+    document.getElementById('rfid-new-btn').addEventListener('click', function () { printRfidLabel(this, true); });
 
     document.getElementById('reset-orientation-btn').addEventListener('click', async function () {
         const btn = this;
