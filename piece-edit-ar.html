@@ -152,6 +152,10 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="barcode-id">الباركود</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="barcode-id" type="text"/>
 </div>
+<!-- Regenerate: the old number is kept as cancelled and never reused (piece_barcode_history). -->
+<button type="button" id="regen-barcode-btn" onclick="regenerateBarcode(this)" class="w-full h-12 rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 bg-amber-50 text-amber-800 border border-amber-200">
+<span class="material-symbols-outlined text-[18px]">autorenew</span> إعادة توليد رقم باركود جديد
+</button>
 
 <div class="grid grid-cols-2 gap-4">
 <div class="relative">
@@ -809,6 +813,24 @@ async function gmRfidViaDesk(p, epc) {
   await goldmindClient.from('rfid_write_jobs').update({ status: 'cancelled', message: 'انتهت المهلة' }).eq('id', job.id).in('status', ['pending', 'working']);
   throw new Error(seen ? 'لم يرد جهاز البرمجة — تأكد أن الملصقة على ظهره وأعد المحاولة.'
                        : 'جهاز البرمجة لا يستجيب — تأكد أن تطبيق GoldMind مفتوح عليه ومتصل بالإنترنت.');
+}
+// New barcode number for this piece. The old number is cancelled for good (see
+// piece_barcode_history). The label must be printed and the chip programmed again.
+async function regenerateBarcode(btn) {
+  const p = currentPiece; if (!p || !p.barcode) return;
+  if (!confirm('تأكيد: الباركود الحالي (' + p.barcode + ') بيصير ملغى نهائياً، ولا رح ينعاد استخدامه.\n\nبعدها لازم تطبع ملصقة جديدة وتبرمج الشريحة من جديد.\n\nمتأكد؟')) return;
+  btn.disabled = true;
+  try {
+    const { data: newBarcode, error } = await goldmindClient.rpc('regenerate_piece_barcode', { p_piece_id: p.id });
+    if (error) throw new Error(error.message);
+    p.barcode = newBarcode;
+    p.rfid_epc = null;
+    document.getElementById('barcode-id').value = newBarcode;
+    gmRenderPieceView();
+    showMessage('تم توليد الباركود الجديد: ' + newBarcode + '. اطبع الملصقة وبرمج الشريحة.', false);
+  } catch (e) {
+    showMessage('تعذّر توليد باركود جديد: ' + (e.message || e), true);
+  } finally { btn.disabled = false; }
 }
 function gmOpenEdit() {
   const d = document.getElementById('gmEditBox'); d.open = true;

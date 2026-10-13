@@ -239,6 +239,12 @@
 
 <div class="flex flex-col gap-1 max-h-56 overflow-y-auto" id="scan-log"></div>
 
+<!-- Cancelled barcodes (old numbers of pieces that got a new one). Never a match. -->
+<div id="cancelled-wrap" class="hidden flex-col gap-2 border border-red-200 rounded-xl p-2">
+<p class="text-[12px] font-bold text-red-700">باركودات ملغية (<span id="cancelled-count">0</span>) — ملصقات قديمة، ما بتعتبر القطعة موجودة</p>
+<div id="cancelled-list" class="flex flex-col gap-1"></div>
+</div>
+
 <button id="finish-btn" class="w-full h-14 border-2 border-primary text-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2">إنهاء الجلسة وعرض التقرير</button>
 </div>
 
@@ -380,10 +386,12 @@ let selectedCategory = '';
 let selectedBox = '';
 let expectedPool = []; // [{id, source:'gold'|'diamond', barcode, rfid_epc, description, karat, weight_grams}]
 let expectedByField = {};
+let cancelledInfo = Object.create(null); // old barcode (or its EPC) -> {barcode, piece_id, description_ar}
+const cancelledSeen = new Set(); // cancelled values scanned in this session
 let currentCountId = null;
 let countMethod = null;
 let matchField = null;
-let scannedValues = new Set();
+let scannedValues = new Set(); cancelledSeen.clear();
 let stats = { expected: 0, scanned: 0, matched: 0, unexpected: 0 };
 // Several phones can scan one session together: scanBy maps value -> staff id,
 // pendingScans holds scans that couldn't be saved yet (retried by the sync).
@@ -522,12 +530,13 @@ async function resumeSession() {
   }));
   expectedByField = {};
   (expectedRows || []).forEach(r => { expectedByField[r.match_value] = expectedPool.find(p => p.id === r.piece_id && p.source === r.piece_source); });
+  await loadCancelledBarcodes();
 
   const { data: scanRows } = await goldmindClient
     .from('inventory_count_scans').select('*').eq('count_id', countId).order('scanned_at', { ascending: true });
 
   currentCountId = countId;
-  scannedValues = new Set();
+  scannedValues = new Set(); cancelledSeen.clear();
   scanBy = {};
   pendingScans = [];
   stats = { expected: expectedPool.length, scanned: 0, matched: 0, unexpected: 0 };
@@ -728,6 +737,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   expectedPool = poolForMethod(countMethod);
   expectedByField = {};
   expectedPool.forEach(p => { expectedByField[p[matchField]] = p; });
+  await loadCancelledBarcodes();
 
   const scopeArr = [];
   if (scope.gold) scopeArr.push('gold');
@@ -776,7 +786,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   btn.disabled = false;
   btn.textContent = 'بدء جلسة جرد جديدة';
 
-  scannedValues = new Set();
+  scannedValues = new Set(); cancelledSeen.clear();
   scanBy = {};
   pendingScans = [];
   stats = { expected: expectedPool.length, scanned: 0, matched: 0, unexpected: 0 };
@@ -826,9 +836,53 @@ function recalcStats() {
   }
 }
 
+// Old barcode numbers of pieces that got a new one. A scan of one is never a match.
+// ponytail: the whole store history is loaded per session; it stays small (one row per regenerated barcode).
+async function loadCancelledBarcodes() {
+  const { data } = await goldmindClient.from('piece_barcode_history')
+    .select('old_barcode, piece_id, pieces(description_ar)').eq('store_id', GOLDMIND_STORE_ID);
+  cancelledInfo = Object.create(null);
+  (data || []).forEach(r => {
+    const key = matchField === 'rfid_epc' ? GMZebra.buildEpcHex(r.old_barcode, GOLDMIND_STORE_ID) : r.old_barcode;
+    cancelledInfo[key] = { barcode: r.old_barcode, piece_id: r.piece_id, description_ar: r.pieces ? r.pieces.description_ar : '' };
+  });
+  renderCancelledList();
+}
+
+function renderCancelledList() {
+  const items = [...cancelledSeen].map(v => cancelledInfo[v]).filter(Boolean);
+  document.getElementById('cancelled-wrap').classList.toggle('hidden', items.length === 0);
+  document.getElementById('cancelled-wrap').classList.toggle('flex', items.length > 0);
+  document.getElementById('cancelled-count').textContent = items.length;
+  document.getElementById('cancelled-list').innerHTML = items.map(i =>
+    `<div class="flex items-center justify-between bg-red-50 rounded-lg px-3 py-2 text-[12px]"><span class="font-data-mono text-red-700" dir="ltr">${gmEscapeHtml(i.barcode)}</span><span class="font-semibold text-red-700">${gmEscapeHtml(i.description_ar || '')}</span></div>`).join('');
+}
+
+async function handleCancelledScan(value, method) {
+  const info = cancelledInfo[value];
+  const name = info.description_ar || info.barcode;
+  if (cancelledSeen.has(value)) {
+    showLastScan('⛔ باركود ملغى (مكرر): ' + info.barcode, 'duplicate');
+    return;
+  }
+  cancelledSeen.add(value);
+  showLastScan('⛔ باركود ملغى — ' + name + ' (' + info.barcode + ')', 'unexpected');
+  addLogRow('⛔ ملغى: ' + info.barcode + ' — ' + name, 'unexpected');
+  playBeep('unexpected');
+  vibrateDevice([80, 60, 80]);
+  renderCancelledList();
+  const row = {
+    store_id: GOLDMIND_STORE_ID, count_id: currentCountId, rfid_epc: value,
+    piece_id: info.piece_id, piece_source: info.piece_id ? 'gold' : null,
+    match_status: 'cancelled', scan_method: method, scanned_by: GOLDMIND_STAFF_ID
+  };
+  if (await saveScan(row) === 'retry') pendingScans.push(row);
+}
+
 // Add one saved scan row (from resume, sync, or live update). Returns true if new.
 function applyScanRow(r) {
   const v = r.rfid_epc;
+  if (r.match_status === 'cancelled') { if (v) { cancelledSeen.add(v); renderCancelledList(); } return false; }
   if (!v || scannedValues.has(v)) { if (v && r.scanned_by) scanBy[v] = r.scanned_by; return false; }
   scannedValues.add(v);
   scanBy[v] = r.scanned_by || null;
@@ -1047,6 +1101,9 @@ async function handleScan(value, method) {
   // or with spaces; chips are saved in upper case.
   if (matchField === 'rfid_epc') value = String(value).replace(/\s+/g, '').toUpperCase();
   if (!value) return;
+
+  // an old (cancelled) number: never a match, listed on its own
+  if (cancelledInfo[value] && !expectedByField[value]) { handleCancelledScan(value, method); return; }
 
   // a UHF reader sees the same chip many times a second — say "already counted" once, then stay quiet
   if (method === 'rfid' && scannedValues.has(value)) {
@@ -1616,7 +1673,7 @@ function startNewSession() {
   currentCountId = null;
   countMethod = null;
   matchField = null;
-  scannedValues = new Set();
+  scannedValues = new Set(); cancelledSeen.clear();
   document.getElementById('scan-log').innerHTML = '';
   document.getElementById('checklist-wrap').innerHTML = '';
   document.getElementById('checklist-wrap').classList.add('hidden');

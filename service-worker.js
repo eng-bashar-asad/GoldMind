@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goldmind-shell-v165';
+const CACHE_NAME = 'goldmind-shell-v166';
 // Pages and files needed to keep selling with no internet. Each is cached on
 // its own so one missing file can't block the rest.
 const SHELL_ASSETS = [
