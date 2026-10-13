@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict MSaRNDqyJaXwXITuFF6CHmUej3RdcG9uWgIY6T6JcQo6gZclBnEIuaUCSLPOZ0Y
+\restrict YEFR5xMoBINpF5VDZNcWkxedfyj5MXfug2jYmloj5YN6mRXBaLn2aeEriEsba1l
 
 
 SET statement_timeout = 0;
@@ -1198,6 +1198,24 @@ $$;
 
 
 --
+-- Name: ensure_store_organization(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.ensure_store_organization() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                            declare new_org uuid;
+                            begin
+                              insert into organizations (name, primary_store_id, legal_name, tax_number, country, logo_url)
+                                values (new.name, new.id, new.legal_name, new.tax_number, new.country, new.logo_url)
+                                  returning id into new_org;
+                                    update stores set organization_id = new_org where id = new.id;
+                                      return null;
+                                      end $$;
+
+
+--
 -- Name: fill_currency_from_store(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1627,6 +1645,23 @@ end $$;
 
 
 --
+-- Name: gm_pre_request(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_pre_request() RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if coalesce(auth.role(), '') <> 'authenticated' then return; end if;
+  if coalesce(current_setting('request.path', true), '') = '/rpc/gm_session_ok' then return; end if;
+  if not public.gm_session_ok() then
+    raise sqlstate 'PT403' using message = '2FA_REQUIRED', hint = 'أدخل رمز التحقق المرسل إلى بريدك الإلكتروني';
+  end if;
+end $$;
+
+
+--
 -- Name: gm_return_draws(uuid, numeric); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1667,6 +1702,22 @@ begin
   new.gold_price_per_gram := round(pr, 2);
   return new;
 end $$;
+
+
+--
+-- Name: gm_session_ok(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_session_ok() RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select auth.uid() is null
+    or coalesce((select bool_or(a->>'method' <> 'password') from jsonb_array_elements(coalesce(auth.jwt()->'amr', '[]'::jsonb)) a), true)
+    or exists (select 1 from auth.users u where u.id = auth.uid() and u.email like '%@staff.goldmind.app')
+    or exists (select 1 from public.login_2fa l where l.session_id = nullif(auth.jwt()->>'session_id', '')::uuid
+                 and l.user_id = auth.uid() and l.verified_at is not null);
+$$;
 
 
 --
@@ -3719,6 +3770,22 @@ $$;
 
 
 --
+-- Name: store_legal(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.store_legal(p_store_id uuid) RETURNS TABLE(organization_id uuid, organization_name text, legal_name text, tax_number text, country text, logo_url text)
+    LANGUAGE sql STABLE
+    SET search_path TO 'public'
+    AS $$
+                                                                                 select s.organization_id, o.name,
+                                                                                          coalesce(o.legal_name, s.legal_name), coalesce(o.tax_number, s.tax_number),
+                                                                                                   coalesce(o.country, s.country), coalesce(o.logo_url, s.logo_url)
+                                                                                                     from stores s left join organizations o on o.id = s.organization_id
+                                                                                                       where s.id = p_store_id;
+                                                                                                       $$;
+
+
+--
 -- Name: stores_currency_convert_gold(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3803,6 +3870,23 @@ begin
   return new;
 end;
 $$;
+
+
+--
+-- Name: sync_store_legal_to_org(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sync_store_legal_to_org() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                                          begin
+                                            update organizations o
+                                                 set legal_name = new.legal_name, tax_number = new.tax_number,
+                                                          country = new.country, logo_url = new.logo_url
+                                                             where o.id = new.organization_id and o.primary_store_id = new.id;
+                                                               return null;
+                                                               end $$;
 
 
 --
@@ -5036,6 +5120,23 @@ CREATE TABLE public.kyc_screenings (
 
 
 --
+-- Name: login_2fa; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.login_2fa (
+    session_id uuid NOT NULL,
+    user_id uuid NOT NULL,
+    code_hash text,
+    expires_at timestamp with time zone,
+    attempts integer DEFAULT 0 NOT NULL,
+    sent_count integer DEFAULT 0 NOT NULL,
+    last_sent_at timestamp with time zone,
+    verified_at timestamp with time zone,
+    created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
 -- Name: lookup_username_attempts; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -5068,7 +5169,11 @@ CREATE TABLE public.organizations (
     id uuid DEFAULT gen_random_uuid() NOT NULL,
     name text NOT NULL,
     primary_store_id uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    legal_name text,
+    tax_number text,
+    country text,
+    logo_url text
 );
 
 ALTER TABLE ONLY public.organizations FORCE ROW LEVEL SECURITY;
@@ -5263,7 +5368,8 @@ CREATE TABLE public.plans (
     next_plan_key text,
     is_custom boolean DEFAULT false NOT NULL,
     prices jsonb DEFAULT '{}'::jsonb NOT NULL,
-    einvoice_monthly_quota integer
+    einvoice_monthly_quota integer,
+    highlights_ar text[]
 );
 
 
@@ -5271,7 +5377,7 @@ CREATE TABLE public.plans (
 -- Name: COLUMN plans.prices; Type: COMMENT; Schema: public; Owner: -
 --
 
-COMMENT ON COLUMN public.plans.prices IS 'Per-currency price list: {"AED":{yearly,quarterly,extra_staff_yearly,einvoice_addon_monthly,einvoice_overage}, "USD":{...}}. Annual commitment; quarterly = installment (+10%).';
+COMMENT ON COLUMN public.plans.prices IS 'Per-currency price list: {"USD":{yearly,extra_staff_yearly,einvoice_addon_monthly,einvoice_overage}}. Yearly only, paid upfront; refundable within 14 days of subscribing.';
 
 
 --
@@ -6078,6 +6184,14 @@ ALTER TABLE ONLY public.invoices
 
 ALTER TABLE ONLY public.kyc_screenings
     ADD CONSTRAINT kyc_screenings_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: login_2fa login_2fa_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.login_2fa
+    ADD CONSTRAINT login_2fa_pkey PRIMARY KEY (session_id);
 
 
 --
@@ -6933,6 +7047,13 @@ CREATE INDEX kyc_screenings_store_id_fk_idx ON public.kyc_screenings USING btree
 
 
 --
+-- Name: login_2fa_user_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX login_2fa_user_id_idx ON public.login_2fa USING btree (user_id);
+
+
+--
 -- Name: organizations_primary_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7469,6 +7590,20 @@ CREATE TRIGGER trg_stores_currency_convert_gold AFTER UPDATE OF currency ON publ
 --
 
 CREATE TRIGGER trg_stores_currency_usd_reprice BEFORE UPDATE OF currency ON public.stores FOR EACH ROW EXECUTE FUNCTION public.stores_currency_usd_reprice();
+
+
+--
+-- Name: stores trg_stores_ensure_org; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_stores_ensure_org AFTER INSERT ON public.stores FOR EACH ROW WHEN ((new.organization_id IS NULL)) EXECUTE FUNCTION public.ensure_store_organization();
+
+
+--
+-- Name: stores trg_stores_sync_legal; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_stores_sync_legal AFTER UPDATE OF legal_name, tax_number, country, logo_url ON public.stores FOR EACH ROW WHEN (((old.legal_name IS DISTINCT FROM new.legal_name) OR (old.tax_number IS DISTINCT FROM new.tax_number) OR (old.country IS DISTINCT FROM new.country) OR (old.logo_url IS DISTINCT FROM new.logo_url))) EXECUTE FUNCTION public.sync_store_legal_to_org();
 
 
 --
@@ -8085,6 +8220,14 @@ ALTER TABLE ONLY public.kyc_screenings
 
 
 --
+-- Name: login_2fa login_2fa_user_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.login_2fa
+    ADD CONSTRAINT login_2fa_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
 -- Name: organizations organizations_primary_store_fk; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8592,6 +8735,15 @@ ALTER TABLE public.auth_passkeys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.auth_webauthn_challenges ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: organizations branch staff can view their organization; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "branch staff can view their organization" ON public.organizations FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
+   FROM public.stores s
+  WHERE ((s.organization_id = organizations.id) AND public.is_store_member(s.id)))));
+
+
+--
 -- Name: cash_movements; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -9038,6 +9190,12 @@ CREATE POLICY kyc_screenings_select ON public.kyc_screenings FOR SELECT USING (p
 
 CREATE POLICY kyc_screenings_write ON public.kyc_screenings USING ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
 
+
+--
+-- Name: login_2fa; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.login_2fa ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: lookup_username_attempts; Type: ROW SECURITY; Schema: public; Owner: -
@@ -9961,6 +10119,14 @@ GRANT ALL ON FUNCTION public.delete_last_sale_invoice(target_invoice_id uuid) TO
 
 
 --
+-- Name: FUNCTION ensure_store_organization(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.ensure_store_organization() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.ensure_store_organization() TO service_role;
+
+
+--
 -- Name: FUNCTION fill_currency_from_store(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10094,6 +10260,15 @@ GRANT ALL ON FUNCTION public.gm_op_date_stamp() TO service_role;
 
 
 --
+-- Name: FUNCTION gm_pre_request(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_pre_request() TO anon;
+GRANT ALL ON FUNCTION public.gm_pre_request() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_pre_request() TO service_role;
+
+
+--
 -- Name: FUNCTION gm_return_draws(p_piece uuid, p_grams numeric); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10108,6 +10283,15 @@ GRANT ALL ON FUNCTION public.gm_return_draws(p_piece uuid, p_grams numeric) TO s
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO anon;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO service_role;
+
+
+--
+-- Name: FUNCTION gm_session_ok(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_session_ok() TO anon;
+GRANT ALL ON FUNCTION public.gm_session_ok() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_session_ok() TO service_role;
 
 
 --
@@ -10542,6 +10726,15 @@ GRANT ALL ON FUNCTION public.stock_out_to_party(target_party_id uuid, piece_ids 
 
 
 --
+-- Name: FUNCTION store_legal(p_store_id uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.store_legal(p_store_id uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.store_legal(p_store_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.store_legal(p_store_id uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION stores_currency_convert_gold(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10573,6 +10766,14 @@ GRANT ALL ON FUNCTION public.sync_invoice_bank_part(p_invoice uuid) TO service_r
 GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO anon;
 GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO authenticated;
 GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO service_role;
+
+
+--
+-- Name: FUNCTION sync_store_legal_to_org(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.sync_store_legal_to_org() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.sync_store_legal_to_org() TO service_role;
 
 
 --
@@ -11117,6 +11318,15 @@ GRANT ALL ON TABLE public.kyc_screenings TO service_role;
 
 
 --
+-- Name: TABLE login_2fa; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.login_2fa TO anon;
+GRANT ALL ON TABLE public.login_2fa TO authenticated;
+GRANT ALL ON TABLE public.login_2fa TO service_role;
+
+
+--
 -- Name: TABLE lookup_username_attempts; Type: ACL; Schema: public; Owner: -
 --
 
@@ -11431,5 +11641,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict MSaRNDqyJaXwXITuFF6CHmUej3RdcG9uWgIY6T6JcQo6gZclBnEIuaUCSLPOZ0Y
+\unrestrict YEFR5xMoBINpF5VDZNcWkxedfyj5MXfug2jYmloj5YN6mRXBaLn2aeEriEsba1l
 
