@@ -56,6 +56,11 @@
 <div class="text-[20px] font-bold font-data-mono" id="grandTotal">0.00</div>
 <div class="text-[10.5px] text-gray-500" id="grandCount"></div>
 </div>
+<div class="no-print flex flex-wrap gap-3 mb-3 text-[12.5px]">
+<label class="flex items-center gap-1"><input type="radio" name="mode" value="summary" onchange="renderCustomers()"/> مختصر (الرصيد فقط)</label>
+<label class="flex items-center gap-1"><input type="radio" name="mode" value="open" checked onchange="renderCustomers()"/> الديون المفتوحة وأعمارها</label>
+<label class="flex items-center gap-1"><input type="radio" name="mode" value="detail" onchange="renderCustomers()"/> تفصيلي (كل العمليات)</label>
+</div>
 <div id="customers"></div>
 <section class="no-print mt-4 rounded-xl border border-outline-variant p-3">
 <div class="font-bold text-[13px] mb-2">إرسال الكشف (المحددون فقط)</div>
@@ -128,17 +133,25 @@ function openTranches(rows) {
     .sort((a, b) => b.balance - a.balance);
 
   STORE_INFO = store || {};
-  DEBT_ROWS = {};
-  rows.forEach(r => { DEBT_ROWS[r.id] = { ...r, name: names[r.id].name, phone: names[r.id].phone || '' }; });
   const now = new Date().toISOString();
   document.getElementById('storeName').textContent = (store && store.name) || '';
   document.getElementById('stamp').textContent = 'بتاريخ ' + dayOf(now);
   ROWS_CURRENCY = (store && store.currency) || '';
+  DEBT_ROWS = {};
+  rows.forEach(r => { DEBT_ROWS[r.id] = { ...r, name: names[r.id].name, phone: names[r.id].phone || '' }; });
+  DEBT_STATE = { rows, byCust, names, now };
+  renderCustomers();
+  document.getElementById('page-content').classList.remove('hidden');
+  updateTotals();
+})();
 
-  document.getElementById('customers').innerHTML = rows.map(r => {
-    const oldest = r.open[0];
-    const episodeDays = daysBetween(oldest.date, now);
-    const lines = r.open.map((t, i) => `<tr>
+let DEBT_STATE = null;
+// Builds the customer cards for the chosen report view and keeps the ticked customers ticked.
+function renderCustomers() {
+  const { rows, byCust, names, now } = DEBT_STATE;
+  const mode = document.querySelector('input[name=mode]:checked').value;
+  const off = new Set([...document.querySelectorAll('#customers .cust.excluded')].map(s => s.dataset.id));
+  const trancheRows = r => r.open.map((t, i) => `<tr>
         <td>${i + 1}</td>
         <td>${dayOf(t.date)}</td>
         <td class="font-data-mono">${fmt(t.amount)}</td>
@@ -147,24 +160,47 @@ function openTranches(rows) {
         <td>${daysBetween(t.date, now)}</td>
         <td>${i === 0 ? '—' : daysBetween(r.open[i - 1].date, t.date) + ' يوم'}</td>
       </tr>`).join('');
-    return `<section class="cust" data-id="${r.id}" data-balance="${r.balance}">
-      <label class="no-print flex items-center gap-2 text-[12px] mb-1"><input type="checkbox" class="w-4 h-4" checked onchange="togglePick(this)"/> يطلع بالكشف</label>
+  // Every operation on the account, oldest first, with the running balance.
+  const detailRows = moves => {
+    let bal = 0;
+    return moves.map(m => {
+      const amt = Number(m.cash_amount || 0);
+      const inc = m.movement_type === 'debt_increase';
+      bal += inc ? amt : -amt;
+      return `<tr>
+        <td>${dayOf(m.created_at)}</td>
+        <td>${inc ? 'أخذ (صادر)' : 'دفع (وارد)'}</td>
+        <td class="font-data-mono">${inc ? fmt(amt) : ''}</td>
+        <td class="font-data-mono">${inc ? '' : fmt(amt)}</td>
+        <td class="font-data-mono font-bold">${fmt(bal)}</td>
+      </tr>`;
+    }).join('');
+  };
+  document.getElementById('customers').innerHTML = rows.map(r => {
+    const oldest = r.open[0];
+    const episodeDays = daysBetween(oldest.date, now);
+    let body = '';
+    if (mode === 'open') body = `<table class="dt">
+        <thead><tr><th>#</th><th>تاريخ الدين</th><th>المبلغ</th><th>المدفوع منه</th><th>المتبقي</th><th>عمره (يوم)</th><th>بعد كم يوم من السابق</th></tr></thead>
+        <tbody>${trancheRows(r)}</tbody>
+      </table>`;
+    if (mode === 'detail') body = `<table class="dt">
+        <thead><tr><th>التاريخ</th><th>البيان</th><th>صادر (أخذ)</th><th>وارد (دفع)</th><th>الرصيد</th></tr></thead>
+        <tbody>${detailRows(byCust[r.id])}</tbody>
+      </table>`;
+    return `<section class="cust${off.has(r.id) ? ' excluded' : ''}" data-id="${r.id}" data-balance="${r.balance}">
+      <label class="no-print flex items-center gap-2 text-[12px] mb-1"><input type="checkbox" class="w-4 h-4" ${off.has(r.id) ? '' : 'checked'} onchange="togglePick(this)"/> يطلع بالكشف</label>
       <div class="flex items-center justify-between gap-2 mb-1">
         <div class="font-bold text-[14px]">${esc(names[r.id].name)}</div>
         <div class="flex items-center gap-2"><div class="font-data-mono font-bold text-[14px]" style="color:#8A3B32;">${fmt(r.balance)}</div>
         <button onclick="debtReminder('${r.id}')" class="no-print h-8 px-2 rounded-lg text-[11.5px] font-bold border" style="color:#25A244;border-color:#25A244;">إرسال تذكير</button></div>
       </div>
       <div class="text-[11px] text-gray-600 mb-2">عليه منذ: <b>${dayOf(oldest.date)}</b> (${episodeDays} يوم)${names[r.id].phone ? ' — ' + esc(names[r.id].phone) : ''}</div>
-      <table class="dt">
-        <thead><tr><th>#</th><th>تاريخ الدين</th><th>المبلغ</th><th>المدفوع منه</th><th>المتبقي</th><th>عمره (يوم)</th><th>بعد كم يوم من السابق</th></tr></thead>
-        <tbody>${lines}</tbody>
-      </table>
+      ${body}
     </section>`;
   }).join('') || '<p class="py-10 text-center text-gray-500">ما في زبائن عليهم ديون حالياً.</p>';
-
-  document.getElementById('page-content').classList.remove('hidden');
   updateTotals();
-})();
+}
 
 // ---- choosing who is in the report ----
 let STORE_INFO = {}, ROWS_CURRENCY = '', DEBT_ROWS = {};

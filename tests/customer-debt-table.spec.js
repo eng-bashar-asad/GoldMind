@@ -77,3 +77,27 @@ test('reminder button opens WhatsApp with the saved phone and the amount', async
   expect(decodeURIComponent(url.replace(/\+/g, ' '))).toContain('500.00');
   expect(decodeURIComponent(url.replace(/\+/g, ' '))).toContain('40 يوم');
 });
+
+test('report views: summary shows only balances, detail lists every operation with running balance', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'AED', country: 'AE' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ديمة الانصاري' }],
+    customer_debts: [
+      { id: 'a', store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', source: null, cash_amount: 500, created_at: ago(40) },
+      { id: 'p', store_id: STORE, customer_id: 'c1', movement_type: 'debt_decrease', source: 'payment', cash_amount: 200, created_at: ago(10) },
+    ],
+  } });
+  await page.goto('/customer-debt-table-ar.html');
+  await expect(page.locator('#grandTotal')).toHaveText(/300\.00/);
+  await page.locator('input[name=mode][value=summary]').check();
+  await expect(page.locator('#customers table')).toHaveCount(0);
+  await expect(page.locator('#customers')).toContainText('300.00');
+  await page.locator('input[name=mode][value=detail]').check();
+  await expect(page.locator('#customers table tbody tr')).toHaveCount(2);
+  await expect(page.locator('#customers table tbody')).toContainText('أخذ (صادر)');
+  await expect(page.locator('#customers table tbody')).toContainText('دفع (وارد)');
+  const rows = await page.locator('#customers table tbody tr td:last-child').allInnerTexts();
+  expect(rows).toEqual(['500.00', '300.00']);
+});
