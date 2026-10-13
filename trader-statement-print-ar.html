@@ -94,7 +94,7 @@
 <div class="text-[20px] font-bold font-data-mono" id="stGoldNet">0.00 غ</div>
 <div class="text-[10px] text-[#8a7f68] mt-1" id="stGoldHint"></div>
 </div>
-<div id="stCashCards" class="flex flex-col gap-2"></div>
+<div id="stCashCards" class="flex flex-col gap-2 hidden"></div>
 </div>
 
 <!-- Gold movements (grouped per voucher) -->
@@ -111,8 +111,8 @@
 </table>
 </div>
 
-<!-- Cash movements -->
-<div>
+<!-- Cash movements (hidden when there is no cash at all, see loadStatement) -->
+<div id="stCashBlock" class="hidden">
 <div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#3F6B47;">payments</span>حركات النقد</div>
 <table class="w-full stmt-table" style="border-collapse:collapse;">
 <thead><tr><th>التاريخ</th><th></th><th>نوع الحركة</th><th>المبلغ</th><th>الوصف</th></tr></thead>
@@ -329,7 +329,11 @@ async function loadStatement() {
         </tr>`;
     }).join('') || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات نقدية بهذه الفترة</td></tr>';
 
+    // no cash movement in this period: hide the cash table and its card instead of an empty table
+    const hasCash = cashRows.length > 0;
+    document.getElementById('stCashBlock').classList.toggle('hidden', !hasCash);
     const cashCardsEl = document.getElementById('stCashCards');
+    cashCardsEl.classList.toggle('hidden', !hasCash);
     cashCardsEl.innerHTML = `<div class="summary-card flex-1" style="background:#E1EADB;">
         <div class="text-[11px] font-bold text-[#3F6B47] mb-1">صافي حركة النقد (${CUR})</div>
         <div class="text-[20px] font-bold font-data-mono" style="color:${cashNet >= 0 ? '#3F6B47' : '#8A3B32'};">${fmt(cashNet)}</div>

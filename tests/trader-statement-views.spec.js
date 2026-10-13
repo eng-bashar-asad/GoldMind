@@ -58,3 +58,13 @@ test('return one piece to stock from the statement', async ({ page }) => {
   await expect.poll(() => calls.some(c => c.name === 'trader_return_piece')).toBe(true);
   expect(JSON.parse(calls.find(c => c.name === 'trader_return_piece').body)).toEqual({ p_movement: 'm1' });
 });
+
+test('cash section is hidden when the period has no cash movement', async ({ page }) => {
+  const d = db();
+  d.trader_movements = d.trader_movements.filter(m => m.id !== 'm3');
+  await install(page, { db: d });
+  await page.goto('/trader-statement-print-ar.html?trader=t1');
+  await expect(page.locator('#stGoldRows tr.st-v')).toHaveCount(1);
+  await expect(page.locator('#stCashBlock')).toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#stCashCards')).toHaveClass(/\bhidden\b/);
+});
