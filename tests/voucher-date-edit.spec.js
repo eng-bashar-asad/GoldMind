@@ -30,3 +30,36 @@ test('voucher date can be changed; invoice rows are not offered', async ({ page 
   await page.evaluate(() => openEditModal('d2'));
   await page.waitForURL(/invoice-print-ar\.html\?id=inv1/);
 });
+
+test('customer page: change the date of a payment from the row', async ({ page }) => {
+  const calls = await install(page, { generic: true, rpc: { set_voucher_date: () => ({ body: null }) }, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ديمة الانصاري' }], invoices: [],
+    customer_debts: [{ id: 'p1', store_id: STORE, customer_id: 'c1', movement_type: 'debt_decrease', source: 'payment', cash_amount: 300, cash_movement_id: 'cm9', created_at: '2026-10-05T10:00:00Z' }],
+  } });
+  await page.goto('/customer-debts-ar.html?open=c1');
+  await page.click('button:has-text("تعديل التاريخ")');
+  await page.fill('#vd-in-p1', '2026-10-02');
+  await page.click('#vd-p1 button:has-text("حفظ التاريخ")');
+  await expect.poll(() => calls.some(c => c.name === 'set_voucher_date')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'set_voucher_date').body)).toEqual({ p_cash_movement: 'cm9', p_date: '2026-10-02' });
+});
+
+test('trader page: change the date of a cash receipt from the row', async ({ page }) => {
+  const calls = await install(page, { generic: true, rpc: { set_voucher_date: () => ({ body: null }) }, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'جليل' }],
+    trader_movements: [{ id: 'tm1', store_id: STORE, trader_id: 't1', movement_type: 'debt_increase', source: 'cash_in', fab_fee_amount: 100, gold_24k_equivalent: 0, created_at: '2026-10-05T10:00:00Z' }],
+    cash_movements: [{ id: 'cm7', store_id: STORE, trader_movement_id: 'tm1' }],
+  } });
+  await page.goto('/ledger-ar.html?trader=t1');
+  await page.click('button:has-text("تعديل التاريخ")');
+  await page.fill('#vd-in-tm1', '2026-10-03');
+  await page.click('#vd-tm1 button:has-text("حفظ التاريخ")');
+  await expect.poll(() => calls.some(c => c.name === 'set_voucher_date')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'set_voucher_date').body)).toEqual({ p_cash_movement: 'cm7', p_date: '2026-10-03' });
+});

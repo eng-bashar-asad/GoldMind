@@ -1155,6 +1155,7 @@ function showTraderDetail(traderId) {
         </div>
         <p class="text-[12px] font-data-mono">${weightLine}${feeLine}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
+        ${(m.source === 'cash_in' || m.source === 'cash_out') && m.linked_cash_movement_id ? voucherDateBlock(m.id, m.linked_cash_movement_id, m.created_at) : ''}
         ${m.invoice && m.invoice.invoice_number ? `<a href="invoice-print-ar.html?id=${m.invoice_id}" class="text-[11px] text-secondary font-semibold underline mt-1 inline-block" onclick="event.stopPropagation()">عرض فاتورة الشراء: ${gmEscapeHtml(m.invoice.invoice_number)} ←</a>` : ''}
         ${isOpeningBalance ? `
         <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
@@ -1660,6 +1661,28 @@ async function saveEditSettlement(id) {
     }
   }
 
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+}
+
+// Change the date of a voucher from this page (its cash box row and the row it created move together).
+function voucherDateBlock(key, cmId, createdAt) {
+  const fmtDay = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(d);
+  return `<div class="mt-2">
+    <button type="button" onclick="document.getElementById('vd-${key}').classList.toggle('hidden')" class="h-8 px-3 border border-outline-variant rounded-lg text-[11px] font-semibold">تعديل التاريخ</button>
+    <div id="vd-${key}" class="hidden mt-2">
+      <input type="date" id="vd-in-${key}" value="${fmtDay(new Date(createdAt))}" max="${fmtDay(new Date())}" dir="ltr" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono"/>
+      <button type="button" onclick="saveVoucherDateRow('${key}', '${cmId}')" class="h-9 px-3 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التاريخ</button>
+    </div>
+  </div>`;
+}
+
+async function saveVoucherDateRow(key, cmId) {
+  const d = document.getElementById('vd-in-' + key).value;
+  if (!d) return;
+  const { error } = await goldmindClient.rpc('set_voucher_date', { p_cash_movement: cmId, p_date: d });
+  if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
   const traderIdToReopen = currentTraderId;
   await load();
   showTraderDetail(traderIdToReopen);

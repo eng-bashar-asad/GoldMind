@@ -522,6 +522,7 @@ function renderMovementsList() {
         ${m.source === 'discount' ? `<div class="flex gap-2 mt-2">
           <button type="button" onclick="editDiscount('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">تعديل الخصم</button>
           <button type="button" onclick="deleteDiscount('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">حذف الخصم</button></div>` : ''}
+        ${(m.source === 'payment' || m.source === 'cash_out') && canEditCustomers && m.cash_movement_id ? voucherDateBlock(m.id, m.cash_movement_id, m.created_at) : ''}
         ${(m.source === 'payment' || m.source === 'cash_out') && canEditCustomers ? `<div class="flex gap-2 mt-2">
           <button type="button" onclick="togglePaymentEdit('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">${m.source === 'cash_out' ? 'تعديل الصرف' : 'تعديل الدفعة'}</button>
           <button type="button" onclick="deletePayment('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">${m.source === 'cash_out' ? 'حذف الصرف' : 'حذف الدفعة'}</button></div>
@@ -583,6 +584,28 @@ function deleteDiscount(id) {
   const m = (movementsByCustomer[currentCustomerId] || []).find(x => x.id === id);
   if (!m || !confirm('حذف خصم ' + fmt(m.cash_amount) + '؟ سيرجع المبلغ ديناً على العميل.')) return;
   saveDiscountChange(id, 0, null);
+}
+
+// Change the date of a voucher from this page (its cash box row and the row it created move together).
+function voucherDateBlock(key, cmId, createdAt) {
+  const fmtDay = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(d);
+  return `<div class="mt-2">
+    <button type="button" onclick="document.getElementById('vd-${key}').classList.toggle('hidden')" class="h-8 px-3 border border-outline-variant rounded-lg text-[11px] font-semibold">تعديل التاريخ</button>
+    <div id="vd-${key}" class="hidden mt-2">
+      <input type="date" id="vd-in-${key}" value="${fmtDay(new Date(createdAt))}" max="${fmtDay(new Date())}" dir="ltr" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono"/>
+      <button type="button" onclick="saveVoucherDateRow('${key}', '${cmId}')" class="h-9 px-3 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التاريخ</button>
+    </div>
+  </div>`;
+}
+
+async function saveVoucherDateRow(key, cmId) {
+  const d = document.getElementById('vd-in-' + key).value;
+  if (!d) return;
+  const { error } = await goldmindClient.rpc('set_voucher_date', { p_cash_movement: cmId, p_date: d });
+  if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+  const customerIdToReopen = currentCustomerId;
+  await load();
+  showCustomerDetail(customerIdToReopen);
 }
 
 // edit / delete a customer payment — its cash box row changes with it
