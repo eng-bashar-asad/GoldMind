@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>جدول ديون الزبائن | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=37"></script>
+<script src="theme.js?v=60"></script>
+<script src="gm-report.js?v=3"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+  html { font-size: 87.5%; }
+  body { font-family: 'Inter', sans-serif; background: #f4f0e6; color: #2b241a; min-height: max(884px, 100dvh); }
+  .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+  .sheet { background: #fff; border-radius: 12px; box-shadow: 0 4px 18px rgba(0,0,0,.08); }
+  .dt { width: 100%; border-collapse: collapse; }
+  .dt th { font-size: 10.5px; color: #8a7f68; font-weight: 700; padding: 6px 4px; border-bottom: 2px solid #e5ddc8; text-align: center; }
+  .dt td { font-size: 12px; padding: 6px 4px; border-bottom: 1px solid #f0ebdc; text-align: center; }
+  .cust { border: 1px solid #e5ddc8; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; page-break-inside: avoid; }
+  @media print { @page { margin: 0 10mm; } body { background: #fff; } .no-print { display: none !important; } .sheet { box-shadow: none; } }
+  @media (max-width: 640px) { .dt th { font-size: 9px; } .dt td { font-size: 10.5px; padding: 4px 2px; } }
+</style>
+</head>
+<body>
+<header class="no-print border-b sticky top-0 z-50 bg-white">
+<div class="flex justify-between items-center px-4 w-full h-16 max-w-3xl mx-auto">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('customers-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center" aria-label="رجوع">
+<span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="text-lg font-bold whitespace-nowrap">جدول ديون الزبائن</h1>
+</div>
+<div class="flex gap-2">
+<button onclick="gmReportPdf(document.getElementById('page-content'), 'ديون-الزبائن.pdf', this)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold flex items-center gap-1 border border-gray-400"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span><span class="hidden sm:inline">PDF</span></button>
+<button onclick="window.print()" class="h-10 px-4 rounded-lg text-[12.5px] font-bold flex items-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined text-[16px]">print</span><span class="hidden sm:inline">طباعة</span></button>
+</div>
+</div>
+</header>
+
+<main class="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+<div id="loading-state" class="py-16 text-center text-sm text-gray-500">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-sm text-red-600">ليس لديك صلاحية عرض الزبائن.</div>
+<div id="page-content" class="hidden sheet p-4 sm:p-6">
+<div class="flex items-center justify-between mb-3">
+<div class="font-bold text-[16px]" id="storeName"></div>
+<div class="text-[11px] text-gray-500" id="stamp"></div>
+</div>
+<div class="rounded-xl p-3 mb-4" style="background:#F1E9D6;">
+<div class="text-[11px] font-bold text-[#7A6640]">مجموع الديون المفتوحة على الزبائن</div>
+<div class="text-[20px] font-bold font-data-mono" id="grandTotal">0.00</div>
+<div class="text-[10.5px] text-gray-500" id="grandCount"></div>
+</div>
+<div id="customers"></div>
+<p class="text-[10px] text-gray-400 mt-6 text-center">الدين يُخصم من الأقدم أولاً بكل دفعة. عند وصول الرصيد للصفر يبدأ حساب الدين الجديد من جديد. التخصيصات على الفواتير لا تدخل في الحساب (ما بتغيّر الرصيد).</p>
+</div>
+</main>
+
+<script>
+const fmt = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const DAY = 86400000;
+const dayOf = iso => new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(iso));
+const daysBetween = (a, b) => Math.floor((new Date(b) - new Date(a)) / DAY);
+const esc = t => String(t == null ? '' : t).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+// Open debt tranches of one customer, oldest first. Each payment is taken from the oldest
+// open tranche. A payment bigger than the open debt is kept as credit for the next debt.
+function openTranches(rows) {
+  const queue = [];
+  let credit = 0;
+  rows.forEach(m => {
+    const amt = Number(m.cash_amount || 0);
+    if (m.movement_type === 'debt_increase') {
+      let inc = amt;
+      const use = Math.min(credit, inc);
+      credit -= use; inc -= use;
+      if (inc > 0.005) queue.push({ date: m.created_at, amount: inc, remaining: inc });
+    } else {
+      let left = amt;
+      for (const t of queue) {
+        if (left <= 0.005) break;
+        const take = Math.min(t.remaining, left);
+        t.remaining -= take; left -= take;
+      }
+      if (left > 0.005) credit += left;
+    }
+  });
+  const open = queue.filter(t => t.remaining > 0.005);
+  const balance = open.reduce((s, t) => s + t.remaining, 0) - credit;
+  return { open, balance };
+}
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const [{ data: me }, { data: store }, cust, debts] = await Promise.all([
+    goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+    goldmindClient.from('stores').select('name, currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone').eq('store_id', GOLDMIND_STORE_ID).order('name')),
+    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('id, customer_id, movement_type, cash_amount, created_at, source')
+      .eq('store_id', GOLDMIND_STORE_ID).or('source.is.null,source.neq.allocation').order('created_at').order('id'))
+  ]);
+  document.getElementById('loading-state').classList.add('hidden');
+  const perms = (me && me.permissions) || {}, owner = me && me.role === 'owner';
+  if (!(owner || perms.view_customers === true)) { document.getElementById('no-access').classList.remove('hidden'); return; }
+
+  const byCust = {};
+  (debts.data || []).forEach(m => { (byCust[m.customer_id] = byCust[m.customer_id] || []).push(m); });
+  const names = {};
+  (cust.data || []).forEach(c => { names[c.id] = c; });
+
+  const rows = Object.keys(byCust).map(id => ({ id, ...openTranches(byCust[id]) }))
+    .filter(r => r.balance > 0.005 && names[r.id])
+    .sort((a, b) => b.balance - a.balance);
+
+  const now = new Date().toISOString();
+  document.getElementById('storeName').textContent = (store && store.name) || '';
+  document.getElementById('stamp').textContent = 'بتاريخ ' + dayOf(now);
+  document.getElementById('grandTotal').textContent = fmt(rows.reduce((s, r) => s + r.balance, 0)) + ' ' + ((store && store.currency) || '');
+  document.getElementById('grandCount').textContent = rows.length + ' زبون عليه دين';
+
+  document.getElementById('customers').innerHTML = rows.map(r => {
+    const oldest = r.open[0];
+    const episodeDays = daysBetween(oldest.date, now);
+    const lines = r.open.map((t, i) => `<tr>
+        <td>${i + 1}</td>
+        <td>${dayOf(t.date)}</td>
+        <td class="font-data-mono">${fmt(t.amount)}</td>
+        <td class="font-data-mono">${fmt(t.amount - t.remaining)}</td>
+        <td class="font-data-mono font-bold">${fmt(t.remaining)}</td>
+        <td>${daysBetween(t.date, now)}</td>
+        <td>${i === 0 ? '—' : daysBetween(r.open[i - 1].date, t.date) + ' يوم'}</td>
+      </tr>`).join('');
+    return `<section class="cust">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <div class="font-bold text-[14px]">${esc(names[r.id].name)}</div>
+        <div class="font-data-mono font-bold text-[14px]" style="color:#8A3B32;">${fmt(r.balance)}</div>
+      </div>
+      <div class="text-[11px] text-gray-600 mb-2">عليه منذ: <b>${dayOf(oldest.date)}</b> (${episodeDays} يوم)${names[r.id].phone ? ' — ' + esc(names[r.id].phone) : ''}</div>
+      <table class="dt">
+        <thead><tr><th>#</th><th>تاريخ الدين</th><th>المبلغ</th><th>المدفوع منه</th><th>المتبقي</th><th>عمره (يوم)</th><th>بعد كم يوم من السابق</th></tr></thead>
+        <tbody>${lines}</tbody>
+      </table>
+    </section>`;
+  }).join('') || '<p class="py-10 text-center text-gray-500">ما في زبائن عليهم ديون حالياً.</p>';
+
+  document.getElementById('page-content').classList.remove('hidden');
+})();
+</script>
+</body></html>
