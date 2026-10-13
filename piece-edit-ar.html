@@ -152,10 +152,6 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="barcode-id">الباركود</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="barcode-id" type="text"/>
 </div>
-<!-- Regenerate: the old number is kept as cancelled and never reused (piece_barcode_history). -->
-<button type="button" id="regen-barcode-btn" onclick="regenerateBarcode(this)" class="w-full h-12 rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 bg-amber-50 text-amber-800 border border-amber-200">
-<span class="material-symbols-outlined text-[18px]">autorenew</span> إعادة توليد رقم باركود جديد
-</button>
 
 <div class="grid grid-cols-2 gap-4">
 <div class="relative">
@@ -287,6 +283,7 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <div class="gm-bar hidden" id="gmBar">
 <a id="gmSellBtn" href="new-sale-ar.html" data-permission="create_invoice" class="gm-gold flex-1"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined" style="position:relative;">sell</span><span style="position:relative;">بيع القطعة</span></a>
 <button id="gmRfidBtn" onclick="gmWriteRfid(this)" type="button" class="sq hidden" aria-label="برمجة شريحة RFID" title="برمجة شريحة RFID"><span class="material-symbols-outlined">nfc</span></button>
+<button id="gmRechipBtn" onclick="gmReprogramChip(this)" type="button" class="sq hidden" aria-label="تغيير برمجة الشريحة" title="تغيير برمجة الشريحة (رقم جديد، نفس الباركود)"><span class="material-symbols-outlined">autorenew</span></button>
 <button id="gmRfidPrintBtn" onclick="location.href='piece-label-print-ar.html?id=' + encodeURIComponent(currentPiece.id)" type="button" class="sq hidden" aria-label="طباعة وبرمجة بطابعة RFID" title="طباعة وبرمجة بطابعة RFID"><span class="material-symbols-outlined">wifi_tethering</span></button>
 <button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="sq" aria-label="طباعة ملصق القطعة" title="طباعة ملصق القطعة"><span class="material-symbols-outlined">print</span></button>
 <button type="button" class="sq" aria-label="تعديل البيانات" title="تعديل البيانات" onclick="gmOpenEdit()"><span class="material-symbols-outlined">edit</span></button>
@@ -536,7 +533,10 @@ async function load() {
   currentPiece = piece;
   if (storeData && storeData.rfid_enabled) document.getElementById('gmRfidPrintBtn').classList.remove('hidden');
   // chip button: on a Chainway handheld itself, or anywhere once a desk handheld is linked
-  if (storeData && storeData.rfid_enabled && storeData.rfid_device_key) document.getElementById('gmRfidBtn').classList.remove('hidden');
+  if (storeData && storeData.rfid_enabled && storeData.rfid_device_key) {
+    document.getElementById('gmRfidBtn').classList.remove('hidden');
+    document.getElementById('gmRechipBtn').classList.remove('hidden');
+  }
   document.getElementById('barcode-id').value = piece.barcode || '';
   document.getElementById('weight').value = piece.weight_grams;
   document.getElementById('karat').value = piece.karat;
@@ -772,7 +772,7 @@ function gmRenderPieceView() {
 }
 // RFID handheld (Chainway C72...): write this piece's chip from the app.
 // Hold the label against the back of the device, then press the chip button.
-GMUhf.available().then(ok => { if (ok) document.getElementById('gmRfidBtn').classList.remove('hidden'); });
+GMUhf.available().then(ok => { if (ok) { document.getElementById('gmRfidBtn').classList.remove('hidden'); document.getElementById('gmRechipBtn').classList.remove('hidden'); } });
 async function gmWriteRfid(btn) {
   const p = currentPiece; if (!p || !p.barcode) return;
   const local = await GMUhf.available();
@@ -780,7 +780,8 @@ async function gmWriteRfid(btn) {
     ? 'قرّب ملصقة القطعة ' + p.barcode + ' من ظهر الجهاز (بعيداً عن الملصقات الأخرى) ثم اضغط موافق.'
     : 'ضع ملصقة القطعة ' + p.barcode + ' على ظهر جهاز البرمجة (بعيداً عن الملصقات الأخرى) ثم اضغط موافق.')) return;
   btn.disabled = true;
-  const epc = GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID);
+  // the piece's current chip number (it may have been replaced); the barcode-based one for older pieces
+  const epc = p.rfid_epc || GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID);
   try {
     if (local) {
       await GMUhf.writeEpc(epc);
@@ -814,23 +815,33 @@ async function gmRfidViaDesk(p, epc) {
   throw new Error(seen ? 'لم يرد جهاز البرمجة — تأكد أن الملصقة على ظهره وأعد المحاولة.'
                        : 'جهاز البرمجة لا يستجيب — تأكد أن تطبيق GoldMind مفتوح عليه ومتصل بالإنترنت.');
 }
-// New barcode number for this piece. The old number is cancelled for good (see
-// piece_barcode_history). The label must be printed and the chip programmed again.
-async function regenerateBarcode(btn) {
+// A new chip number for this piece. The barcode stays the same; the old chip number is
+// kept as cancelled (piece_chip_history), so a found old chip is not counted as present.
+async function gmReprogramChip(btn) {
   const p = currentPiece; if (!p || !p.barcode) return;
-  if (!confirm('تأكيد: الباركود الحالي (' + p.barcode + ') بيصير ملغى نهائياً، ولا رح ينعاد استخدامه.\n\nبعدها لازم تطبع ملصقة جديدة وتبرمج الشريحة من جديد.\n\nمتأكد؟')) return;
+  const local = await GMUhf.available();
+  if (!confirm('تأكيد: شريحة القطعة ' + p.barcode + ' بتصير ملغاة، وبتتكتب شريحة جديدة برقم جديد. الباركود ما بيتغيّر.\n\n' +
+    (local ? 'قرّب الملصقة من ظهر الجهاز ثم اضغط موافق.' : 'ضع الملصقة على ظهر جهاز البرمجة ثم اضغط موافق.'))) return;
   btn.disabled = true;
   try {
-    const { data: newBarcode, error } = await goldmindClient.rpc('regenerate_piece_barcode', { p_piece_id: p.id });
-    if (error) throw new Error(error.message);
-    p.barcode = newBarcode;
-    p.rfid_epc = null;
-    document.getElementById('barcode-id').value = newBarcode;
-    gmRenderPieceView();
-    showMessage('تم توليد الباركود الجديد: ' + newBarcode + '. اطبع الملصقة وبرمج الشريحة.', false);
-  } catch (e) {
-    showMessage('تعذّر توليد باركود جديد: ' + (e.message || e), true);
-  } finally { btn.disabled = false; }
+    const oldEpc = p.rfid_epc || GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID);
+    const newEpc = await gmFreshEpc();
+    if (local) await GMUhf.writeEpc(newEpc); else await gmRfidViaDesk(p, newEpc);
+    const { error } = await goldmindClient.rpc('replace_piece_chip', { p_piece_id: p.id, p_old_epc: oldEpc, p_new_epc: newEpc });
+    if (error) throw new Error('كُتبت الشريحة لكن تعذّر حفظ الرقم الجديد: ' + error.message);
+    p.rfid_epc = newEpc;
+    alert('تمت برمجة الشريحة برقم جديد للقطعة ' + p.barcode);
+  } catch (e) { alert(e.message || e); }
+  finally { btn.disabled = false; }
+}
+// 96-bit random chip number that no piece uses yet
+async function gmFreshEpc() {
+  for (let i = 0; i < 5; i++) {
+    const hex = Array.from(crypto.getRandomValues(new Uint8Array(12)), b => b.toString(16).padStart(2, '0')).join('').toUpperCase();
+    const { data } = await goldmindClient.from('pieces').select('id').eq('rfid_epc', hex).maybeSingle();
+    if (!data) return hex;
+  }
+  throw new Error('تعذّر توليد رقم شريحة فريد، أعد المحاولة');
 }
 function gmOpenEdit() {
   const d = document.getElementById('gmEditBox'); d.open = true;

@@ -846,6 +846,14 @@ async function loadCancelledBarcodes() {
     const key = matchField === 'rfid_epc' ? GMZebra.buildEpcHex(r.old_barcode, GOLDMIND_STORE_ID) : r.old_barcode;
     cancelledInfo[key] = { barcode: r.old_barcode, piece_id: r.piece_id, description_ar: r.pieces ? r.pieces.description_ar : '' };
   });
+  // replaced chip numbers (the barcode stayed): only the chip count can see them
+  if (matchField === 'rfid_epc') {
+    const { data: chips } = await goldmindClient.from('piece_chip_history')
+      .select('old_epc, piece_id, pieces(barcode, description_ar)').eq('store_id', GOLDMIND_STORE_ID);
+    (chips || []).forEach(r => {
+      cancelledInfo[r.old_epc] = { barcode: r.pieces ? r.pieces.barcode : r.old_epc, piece_id: r.piece_id, description_ar: r.pieces ? r.pieces.description_ar : '' };
+    });
+  }
   renderCancelledList();
 }
 
