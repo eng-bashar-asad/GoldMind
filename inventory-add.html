@@ -15,7 +15,7 @@
 <script src="supabase-config.js?v=37"></script>
 <script src="theme.js?v=59"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
-<script src="zebra-rfid.js?v=3"></script>
+<script src="zebra-rfid.js?v=4"></script>
 <script src="gm-camera.js?v=2"></script>
 <script src="gm-local-folder.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -363,6 +363,14 @@
 </div>
 </div>
 <p class="text-[10px] text-outline -mt-1 px-1">Cs = حجر مركزي كبير مستقل (ألماسة أو حجر كريم)، سعره مختلف عن أحجار Di الصغيرة. عند تعبئة هذه الحقول، يستبدل الباركود خانة نوع القطعة برمز Cs: تلقائياً وقت الطباعة.</p>
+<!-- Zircon (optional, cubic zirconia stones, not diamond). Printed on the label as "Z:x.xxct" when the label design has the zircon field. -->
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="zircon-carat">وزن الزيركون Z (قيراط)</label>
+<div class="flex items-center border border-outline-variant rounded-lg overflow-hidden h-12 focus-within:ring-1 focus-within:ring-primary focus-within:border-primary transition-all">
+<input class="w-full bg-transparent border-none px-4 focus:ring-0 outline-none text-right font-data-mono font-bold text-on-background" id="zircon-carat" min="0" placeholder="0.00" step="0.01" type="number"/>
+</div>
+</div>
+<p class="text-[10px] text-outline -mt-1 px-1">Z = أحجار الزيركون (ليست ألماساً). يظهر على الباركود برمز Z: إذا أُضيف حقل «وزن الزيركون» في تصميم الملصق.</p>
 </section>
 <!-- Save bar: stays on screen (sticky at the bottom) so the button never scrolls away;
      the result message shows inside it, above the button, without pushing anything -->
@@ -855,7 +863,8 @@
                 mc: mcText,
                 description: p.description_en || '',
                 diamondCarat: p.accent_diamond_carat != null ? Number(p.accent_diamond_carat).toFixed(2) : '',
-                centerStoneCarat: p.center_stone_carat != null ? Number(p.center_stone_carat).toFixed(2) : ''
+                centerStoneCarat: p.center_stone_carat != null ? Number(p.center_stone_carat).toFixed(2) : '',
+                zirconCarat: p.zircon_carat != null ? Number(p.zircon_carat).toFixed(2) : ''
             };
             const dpi = (store && store.zebra_label_dpi) || 203;
             const originalHtml = btnEl.innerHTML;
@@ -1057,6 +1066,8 @@
                 accent_diamond_price_per_carat: parseFloat(document.getElementById('accent-diamond-price').value) || null,
                 center_stone_carat: parseFloat(document.getElementById('center-stone-carat').value) || null,
                 center_stone_price_per_carat: parseFloat(document.getElementById('center-stone-price').value) || null,
+                // ponytail: sent only when filled, so saving keeps working on a DB without the column yet.
+                ...(parseFloat(document.getElementById('zircon-carat').value) > 0 ? { zircon_carat: parseFloat(document.getElementById('zircon-carat').value) } : {}),
                 description_ar: document.getElementById('piece-type').value || null,
                 description_en: (classificationCacheEn['type'] || {})[document.getElementById('piece-type').value] || null,
                 piece_type: document.getElementById('piece-type').value || null,
@@ -1098,6 +1109,7 @@
             document.getElementById('accent-diamond-price').value = '';
             document.getElementById('center-stone-carat').value = '';
             document.getElementById('center-stone-price').value = '';
+            document.getElementById('zircon-carat').value = '';
             // Fab cost is intentionally NOT cleared -- it usually stays the
             // same across a run of pieces, so it stays fixed until the
             // employee changes it themselves.

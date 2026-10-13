@@ -197,6 +197,7 @@ var GMZebra = (function () {
           if (values.centerStoneCarat != null && values.centerStoneCarat !== '') return 'Cs:' + values.centerStoneCarat + 'ct';
           return values.description || '';
         case 'diamond_carat': return (values.diamondCarat != null && values.diamondCarat !== '') ? ('Di:' + values.diamondCarat + 'ct') : '';
+        case 'zircon_carat': return (values.zirconCarat != null && values.zirconCarat !== '') ? ('Z:' + values.zirconCarat + 'ct') : '';
         case 'custom_text': return field.custom_text || '';
         default: return '';
       }

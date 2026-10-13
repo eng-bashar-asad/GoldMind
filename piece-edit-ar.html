@@ -15,7 +15,7 @@
 <script src="theme.js?v=59"></script>
 <script src="gm-camera.js?v=2"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
-<script src="zebra-rfid.js?v=3"></script>
+<script src="zebra-rfid.js?v=4"></script>
 <script src="gm-uhf.js?v=1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -202,6 +202,12 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="center-stone-price">سعر قيراط Cs</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="center-stone-price" placeholder="0.00" step="0.01" type="number"/>
 </div>
+</div>
+
+<!-- Z: zircon stones (not diamond), printed as Z:x.xxct when the label design has the zircon field. -->
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="zircon-carat">وزن الزيركون Z (قيراط)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono font-bold" id="zircon-carat" min="0" placeholder="0.00" step="0.01" type="number"/>
 </div>
 
 <!-- Type / Category -->
@@ -456,7 +462,8 @@ async function printLabelDirectly() {
     mc: mcText,
     description: currentPiece.description_en || '',
     diamondCarat: currentPiece.accent_diamond_carat != null ? Number(currentPiece.accent_diamond_carat).toFixed(2) : '',
-    centerStoneCarat: currentPiece.center_stone_carat != null ? Number(currentPiece.center_stone_carat).toFixed(2) : ''
+    centerStoneCarat: currentPiece.center_stone_carat != null ? Number(currentPiece.center_stone_carat).toFixed(2) : '',
+    zirconCarat: currentPiece.zircon_carat != null ? Number(currentPiece.zircon_carat).toFixed(2) : ''
   };
   const dpi = (currentStore && currentStore.zebra_label_dpi) || 203;
 
@@ -535,6 +542,7 @@ async function load() {
   document.getElementById('accent-diamond-price').value = piece.accent_diamond_price_per_carat != null ? piece.accent_diamond_price_per_carat : '';
   document.getElementById('center-stone-carat').value = piece.center_stone_carat != null ? piece.center_stone_carat : '';
   document.getElementById('center-stone-price').value = piece.center_stone_price_per_carat != null ? piece.center_stone_price_per_carat : '';
+  document.getElementById('zircon-carat').value = piece.zircon_carat != null ? piece.zircon_carat : '';
   document.getElementById('status').value = piece.status;
   setColor(piece.color || 'Gold');
   loadClassificationOptions('piece-type', 'type', 'النوع', piece.piece_type || '');
@@ -617,6 +625,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const diamondCarat = diamondCaratInput === '' ? null : parseFloat(diamondCaratInput);
   const diamondPriceInput = document.getElementById('accent-diamond-price').value;
   const diamondPrice = diamondPriceInput === '' ? null : parseFloat(diamondPriceInput);
+  const zirconInput = document.getElementById('zircon-carat').value;
+  const zirconCarat = zirconInput === '' ? null : parseFloat(zirconInput);
   const centerStoneCaratInput = document.getElementById('center-stone-carat').value;
   const centerStoneCarat = centerStoneCaratInput === '' ? null : parseFloat(centerStoneCaratInput);
   const centerStonePriceInput = document.getElementById('center-stone-price').value;
@@ -657,6 +667,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     accent_diamond_price_per_carat: (diamondPrice != null && !isNaN(diamondPrice)) ? diamondPrice : null,
     center_stone_carat: (centerStoneCarat != null && !isNaN(centerStoneCarat)) ? centerStoneCarat : null,
     center_stone_price_per_carat: (centerStonePrice != null && !isNaN(centerStonePrice)) ? centerStonePrice : null,
+    // ponytail: only sent when filled or when the piece already has the column, so editing works before the zircon migration.
+    ...(((zirconCarat != null && !isNaN(zirconCarat)) || 'zircon_carat' in currentPiece) ? { zircon_carat: (zirconCarat != null && !isNaN(zirconCarat) && zirconCarat >= 0) ? zirconCarat : null } : {}),
     accounting_weight_grams: accountingWeight,
     color: selectedColor,
     status: status,
@@ -699,6 +711,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   currentPiece.accent_diamond_price_per_carat = (diamondPrice != null && !isNaN(diamondPrice)) ? diamondPrice : null;
   currentPiece.center_stone_carat = (centerStoneCarat != null && !isNaN(centerStoneCarat)) ? centerStoneCarat : null;
   currentPiece.center_stone_price_per_carat = (centerStonePrice != null && !isNaN(centerStonePrice)) ? centerStonePrice : null;
+  if ((zirconCarat != null && !isNaN(zirconCarat)) || 'zircon_carat' in currentPiece) currentPiece.zircon_carat = (zirconCarat != null && !isNaN(zirconCarat) && zirconCarat >= 0) ? zirconCarat : null;
   currentPiece.color = selectedColor;
   currentPiece.status = status;
   currentPiece.photo_url = photoUrl;
