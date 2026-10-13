@@ -128,6 +128,8 @@ function openTranches(rows) {
     .sort((a, b) => b.balance - a.balance);
 
   STORE_INFO = store || {};
+  DEBT_ROWS = {};
+  rows.forEach(r => { DEBT_ROWS[r.id] = { ...r, name: names[r.id].name, phone: names[r.id].phone || '' }; });
   const now = new Date().toISOString();
   document.getElementById('storeName').textContent = (store && store.name) || '';
   document.getElementById('stamp').textContent = 'بتاريخ ' + dayOf(now);
@@ -149,7 +151,8 @@ function openTranches(rows) {
       <label class="no-print flex items-center gap-2 text-[12px] mb-1"><input type="checkbox" class="w-4 h-4" checked onchange="togglePick(this)"/> يطلع بالكشف</label>
       <div class="flex items-center justify-between gap-2 mb-1">
         <div class="font-bold text-[14px]">${esc(names[r.id].name)}</div>
-        <div class="font-data-mono font-bold text-[14px]" style="color:#8A3B32;">${fmt(r.balance)}</div>
+        <div class="flex items-center gap-2"><div class="font-data-mono font-bold text-[14px]" style="color:#8A3B32;">${fmt(r.balance)}</div>
+        <button onclick="debtReminder('${r.id}')" class="no-print h-8 px-2 rounded-lg text-[11.5px] font-bold border" style="color:#25A244;border-color:#25A244;">إرسال تذكير</button></div>
       </div>
       <div class="text-[11px] text-gray-600 mb-2">عليه منذ: <b>${dayOf(oldest.date)}</b> (${episodeDays} يوم)${names[r.id].phone ? ' — ' + esc(names[r.id].phone) : ''}</div>
       <table class="dt">
@@ -164,7 +167,21 @@ function openTranches(rows) {
 })();
 
 // ---- choosing who is in the report ----
-let STORE_INFO = {}, ROWS_CURRENCY = '';
+let STORE_INFO = {}, ROWS_CURRENCY = '', DEBT_ROWS = {};
+// One customer's short reminder on WhatsApp, to the number saved on his card.
+function debtReminder(id) {
+  const r = DEBT_ROWS[id];
+  if (!r) return;
+  let phone = r.phone;
+  if (!phone) {
+    phone = (prompt('ما في رقم مسجّل للزبون ' + r.name + '. اكتب الرقم:') || '').trim();
+    if (!phone) return;
+  }
+  const days = daysBetween(r.open[0].date, new Date().toISOString());
+  const text = 'مرحبا ' + r.name + '، نذكّركم بأن عليكم مبلغ ' + fmt(r.balance) + ' ' + ROWS_CURRENCY +
+    ' منذ ' + dayOf(r.open[0].date) + ' (' + days + ' يوم). شكراً لتعاملكم معنا - ' + (STORE_INFO.name || '');
+  window.open(gmWhatsAppUrl(phone, STORE_INFO.country, text.trim()), '_blank');
+}
 function togglePick(box) {
   box.closest('.cust').classList.toggle('excluded', !box.checked);
   updateTotals();

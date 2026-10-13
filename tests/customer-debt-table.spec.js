@@ -57,3 +57,23 @@ test('only the customers ticked for the report are counted and sent', async ({ p
   await page.evaluate(() => setAllPicks(true));
   await expect(page.locator('#grandCount')).toHaveText('2 من 2 زبون في الكشف');
 });
+
+test('reminder button opens WhatsApp with the saved phone and the amount', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'محل', currency: 'AED', country: 'AE' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ديمة', phone: '0501234567' }],
+    customer_debts: [{ id: 'a', store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', source: null, cash_amount: 500, created_at: ago(40) }],
+  } });
+  await page.goto('/customer-debt-table-ar.html');
+  await expect(page.locator('#grandTotal')).toHaveText(/500\.00/);
+  const [popup] = await Promise.all([
+    page.waitForEvent('popup'),
+    page.locator('section.cust button', { hasText: 'إرسال تذكير' }).click(),
+  ]);
+  const url = popup.url();
+  expect(url).toContain('phone=971501234567');
+  expect(decodeURIComponent(url.replace(/\+/g, ' '))).toContain('500.00');
+  expect(decodeURIComponent(url.replace(/\+/g, ' '))).toContain('40 يوم');
+});
