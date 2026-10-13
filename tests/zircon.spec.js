@@ -2,7 +2,7 @@
 const { test, expect } = require('@playwright/test');
 const { install, STORE, USER, STAFF } = require('./fake-backend');
 
-test('label prints Z:x.xxct for the zircon field, and nothing when empty', async ({ page }) => {
+test('label prints Z:x.xxg for the zircon field, and nothing when empty', async ({ page }) => {
   await page.setContent('<html><body></body></html>');
   await page.addScriptTag({ path: require('path').join(__dirname, '..', 'zebra-rfid.js') });
   const zpl = await page.evaluate(() => {
@@ -12,7 +12,7 @@ test('label prints Z:x.xxct for the zircon field, and nothing when empty', async
       GMZebra.buildBarcodeZPLFromFields({ fields, values: { zirconCarat: '' } }),
     ];
   });
-  expect(zpl[0]).toContain('Z:0.50ct');
+  expect(zpl[0]).toContain('Z:0.50g');
   expect(zpl[1]).not.toContain('Z:');
 });
 
@@ -28,7 +28,7 @@ test('barcode designer offers the zircon field', async ({ page }) => {
   await page.goto('/zebra-label-designer-ar.html');
   await page.waitForFunction(() => typeof showAddForm === 'function');
   await page.evaluate(() => showAddForm(1));
-  await expect(page.locator('#add-type-1 option[value="zircon_carat"]')).toHaveText('وزن الزيركون Z (قيراط)');
+  await expect(page.locator('#add-type-1 option[value="zircon_carat"]')).toHaveText('وزن الزيركون Z (غرام)');
 });
 
 test('add-piece page shows the zircon field', async ({ page }) => {
