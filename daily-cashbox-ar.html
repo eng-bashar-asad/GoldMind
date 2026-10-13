@@ -443,10 +443,21 @@ async function submitEntry() {
 }
 
 async function loadAll() {
-  const sel = cols => goldmindClient.from('daily_cash_log').select(cols).eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: true });
-  let { data, error } = await sel('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id, trader_movement_id, tm:trader_movement_id(trader_id), cd:customer_debts!customer_debts_cash_movement_id_fkey(customer_id))');
+  // The server returns at most 1000 rows per request. Read in pages, otherwise the newest
+  // entries (sorted last) silently disappear once the box passes 1000 movements.
+  const fetchAll = async cols => {
+    const all = [];
+    for (let from = 0; ; from += 1000) {
+      const r = await goldmindClient.from('daily_cash_log').select(cols).eq('store_id', GOLDMIND_STORE_ID)
+        .order('created_at', { ascending: true }).order('id').range(from, from + 999);
+      if (r.error) return r;
+      all.push(...(r.data || []));
+      if (!r.data || r.data.length < 1000) return { data: all, error: null };
+    }
+  };
+  let { data, error } = await fetchAll('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id, trader_movement_id, tm:trader_movement_id(trader_id), cd:customer_debts!customer_debts_cash_movement_id_fkey(customer_id))');
   // the links to customer/trader are only for tapping a row — never let them hide the box
-  if (error) ({ data, error } = await sel('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id)'));
+  if (error) ({ data, error } = await fetchAll('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id)'));
 
   if (error) {
     document.getElementById('cashbox-table-body').innerHTML = `<tr><td colspan="4" class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</td></tr>`;

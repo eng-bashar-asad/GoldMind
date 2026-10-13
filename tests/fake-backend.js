@@ -60,6 +60,11 @@ async function install(page, { db = {}, rpc = {}, generic = false, realCdn = fal
       });
       const single = (req.headers()['accept'] || '').includes('vnd.pgrst.object');
       if (single) return rows[0] ? route.fulfill({ json: rows[0] }) : route.fulfill({ status: 406, json: { code: 'PGRST116', message: 'none' } });
+      // .range(from, to) arrives as ?offset=&limit=; only that paging is applied (a bare .limit() is not, as before)
+      if (url.searchParams.has('offset')) {
+        const off = Number(url.searchParams.get('offset')), lim = url.searchParams.get('limit');
+        rows = rows.slice(off, lim != null ? off + Number(lim) : undefined);
+      }
       return route.fulfill({ json: rows });
     }
     return route.fulfill({ json: {} });
