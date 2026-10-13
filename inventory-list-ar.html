@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=37"></script>
-<script src="theme.js?v=59"></script>
+<script src="theme.js?v=60"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -371,6 +371,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
 
     let ALL_PIECES = [];
     let ALL_PIECES_RAW = [];
+    let OLD_BARCODES_BY_PIECE = {}; // piece id -> replaced barcode numbers
 
     function populateSearchTypeOptions() {
         const types = [...new Set(ALL_PIECES_RAW.map(p => p.piece_type).filter(Boolean))].sort();
@@ -397,7 +398,8 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         const status = document.getElementById('search-status').value;
 
         const results = ALL_PIECES_RAW.filter(p => {
-            if (barcode && !gmBarcodeMatches(p.barcode, barcode)) return false;
+            if (barcode && !gmBarcodeMatches(p.barcode, barcode)
+                && !(OLD_BARCODES_BY_PIECE[p.id] || []).some(old => gmBarcodeMatches(old, barcode))) return false;
             if (!isNaN(weightFrom) && Number(p.weight_grams || 0) < weightFrom) return false;
             if (!isNaN(weightTo) && Number(p.weight_grams || 0) > weightTo) return false;
             if (type && p.piece_type !== type) return false;
@@ -945,7 +947,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
             // drill-down exactly as before, but search needs to reach sold/
             // reserved/given-to-trader pieces too (status is itself one of
             // the filters), so the raw fetch can no longer exclude them.
-            const [{ data, error }, { data: storeData }, { data: staffPerm2 }] = await Promise.all([
+            const [{ data, error }, { data: storeData }, { data: staffPerm2 }, histRows] = await Promise.all([
                 // The server hands back at most 1000 rows per request, so read
                 // in pages; otherwise pieces past the first 1000 vanish from search.
                 (async () => {
@@ -961,9 +963,13 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
                     }
                 })(),
                 goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
-                goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle()
+                goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+                goldmindClient.from('piece_barcode_history').select('old_barcode, piece_id').eq('store_id', GOLDMIND_STORE_ID)
             ]);
             currentStore = storeData;
+            // Old (replaced) barcode numbers per piece, so searching an old sticker still finds the piece
+            OLD_BARCODES_BY_PIECE = {};
+            (histRows.data || []).forEach(h => { (OLD_BARCODES_BY_PIECE[h.piece_id] = OLD_BARCODES_BY_PIECE[h.piece_id] || []).push(h.old_barcode); });
             // Fetched here (not just from the separate __enforcePermission
             // check above) so it's guaranteed ready before renderKaratBoxes()
             // first runs, rather than racing a second independent request.

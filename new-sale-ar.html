@@ -16,7 +16,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=37"></script>
-<script src="theme.js?v=59"></script>
+<script src="theme.js?v=60"></script>
 <script src="gm-invoice-edit.js?v=1"></script>
 <script id="tailwind-config">
         tailwind.config = {
@@ -1386,12 +1386,24 @@
             return;
         }
 
-        if (!data) {
+        // Old sticker of a piece that got a new barcode: find the piece by its current one
+        let piece = data, cancelledNote = '';
+        if (!piece) {
+            const current = await gmCurrentBarcodeFor(code);
+            if (current) {
+                const r2 = await goldmindClient.from('pieces').select('*')
+                    .eq('store_id', GOLDMIND_STORE_ID).eq('barcode', current).eq('status', 'available').limit(1).maybeSingle();
+                piece = r2.data;
+                cancelledNote = `<div class="text-amber-800 bg-amber-50 text-sm p-2 rounded-lg mb-2">⛔ الباركود ${gmEscapeHtml(code)} ملغى. الباركود الحالي للقطعة: ${gmEscapeHtml(current)}</div>`;
+            }
+        }
+
+        if (!piece) {
             barcodeResult.innerHTML = '<div class="text-error text-sm p-2">لا توجد قطعة متوفرة بهذا الباركود.</div>';
             return;
         }
 
-        barcodeResult.innerHTML = renderBarcodePreview(data);
+        barcodeResult.innerHTML = cancelledNote + renderBarcodePreview(piece);
         document.getElementById('barcode-price-input').focus();
     }
 

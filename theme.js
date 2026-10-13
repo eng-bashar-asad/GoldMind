@@ -1376,6 +1376,13 @@ function gmBarcodeVariants(code) {
   }
   return v.filter(function (x, i) { return x && v.indexOf(x) === i; });
 }
+// A replaced (cancelled) barcode number -> the piece's current barcode, or null.
+// Used by the search screens so an old sticker still finds its piece.
+async function gmCurrentBarcodeFor(code) {
+  var r = await goldmindClient.from('piece_barcode_history').select('new_barcode')
+    .eq('store_id', GOLDMIND_STORE_ID).in('old_barcode', gmBarcodeVariants(code)).limit(1).maybeSingle();
+  return r.data ? r.data.new_barcode : null;
+}
 function gmBarcodeMatches(barcode, query) {
   var norm = function (s) { return String(s || '').toLowerCase().replace(/\s+/g, '').replace(/^0+(?=\d)/, ''); };
   var b = String(barcode || '').toLowerCase(), q = gmCleanCode(query).toLowerCase();
