@@ -20,10 +20,19 @@ test('overdue customer and trader debts are listed; a cleared debt is not', asyn
   await page.goto('/index-ar.html');
   const box = page.locator('#debtAlertBox');
   await expect(box).not.toHaveClass(/\bhidden\b/);
-  const text = await page.locator('#debtAlertList').innerText();
+  const text = await page.locator('#debtAlertBox').innerText();
   expect(text).toContain('ديمة الانصاري');
   expect(text).toContain('جليل');
   expect(text).not.toContain('بيت دولة');
-  await expect(page.locator('#debtAlertList a', { hasText: 'ديمة' })).toHaveAttribute('href', 'customer-debts-ar.html?open=c1');
-  await expect(page.locator('#debtAlertList a', { hasText: 'جليل' })).toHaveAttribute('href', 'ledger-ar.html?trader=t1');
+  await expect(page.locator('#debtAlertBox a', { hasText: 'ديمة' })).toHaveAttribute('href', 'customer-debts-ar.html?open=c1');
+  await expect(page.locator('#debtAlertBox a', { hasText: 'جليل' })).toHaveAttribute('href', 'ledger-ar.html?trader=t1');
+  // each group collapses from its header; the header stays visible
+  const cust = page.locator('#debtAlertBox details', { hasText: 'ديون الزبائن المتأخرة' });
+  await expect(cust).toHaveAttribute('open', '');
+  await cust.locator('summary').click();
+  await expect(cust).not.toHaveAttribute('open', '');
+  await expect(cust.locator('summary')).toContainText('ديون الزبائن المتأخرة');
+  await expect(cust.locator('a')).toBeHidden();
+  await cust.locator('summary').click();
+  await expect(cust).toHaveAttribute('open', '');
 });
