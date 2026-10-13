@@ -188,6 +188,22 @@
 
 <!-- Single reusable edit modal (instead of a per-row hidden panel — keeps
      each table row compact like the Excel sheet this replaces) -->
+<div class="hidden fixed inset-0 bg-black/50 z-[60] items-end lg:items-center justify-center" id="voucherDateModal">
+<div class="bg-surface-container-lowest w-full lg:w-96 lg:rounded-2xl rounded-t-2xl p-4">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-bold text-[15px]">تاريخ السند</h3>
+<button onclick="closeVoucherDate()" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined">close</span></button>
+</div>
+<p class="text-[12px] text-on-surface-variant mb-2">غيّر تاريخ السند فقط. المبلغ ما بيتغيّر، والوقت نفسه بيبقى.</p>
+<input class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-2 font-data-mono" id="voucherDateInput" type="date" dir="ltr"/>
+<p class="text-error text-[12px] hidden mb-2" id="voucherDateError"></p>
+<div class="flex gap-2 mb-2">
+<button onclick="saveVoucherDate()" class="flex-1 h-10 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التاريخ</button>
+<button onclick="closeVoucherDate()" class="flex-1 h-10 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+</div>
+<a id="voucherPartyLink" href="#" class="block text-center text-[12px] text-primary underline hidden">فتح صفحة الحساب</a>
+</div>
+</div>
 <div class="hidden fixed inset-0 bg-black/50 z-[60] items-end lg:items-center justify-center" id="editModal">
 <div class="bg-surface-container-lowest w-full lg:w-96 lg:rounded-2xl rounded-t-2xl p-4 max-h-[85vh] overflow-y-auto">
 <div class="flex items-center justify-between mb-3">
@@ -705,11 +721,7 @@ function openEditModal(id) {
     const op = e.operation_type || '';
     if (e.cm && e.cm.invoice_id) window.location.href = 'invoice-print-ar.html?id=' + e.cm.invoice_id;
     else if (op.includes('عربون')) window.location.href = 'deposits-ar.html';
-    // customer payment / cash-out → that customer's page; trader cash → that trader
-    else if (e.cm && e.cm.tm && e.cm.tm.trader_id) window.location.href = 'ledger-ar.html?trader=' + e.cm.tm.trader_id;
-    else if (e.cm && e.cm.cd && e.cm.cd.length) window.location.href = 'customer-debts-ar.html?open=' + e.cm.cd[0].customer_id;
-    else if (op === 'دفعة من عميل' || op === 'صرف لعميل' || /^(دفعة من|صرف إلى|قبض من) /.test(op)) window.location.href = 'customers-ar.html';
-    else if (op.startsWith('مصروف')) window.location.href = 'expense-entry-ar.html';
+    else openVoucherDate(e); // سند قبض/صرف: تعديل التاريخ
     return;
   }
   modalEntryId = id;
@@ -731,6 +743,50 @@ function openEditModal(id) {
   const modal = document.getElementById('editModal');
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+}
+
+// The page a voucher belongs to (customer, trader or expense), or null.
+function voucherPartyUrl(e) {
+  const op = e.operation_type || '';
+  if (e.cm && e.cm.tm && e.cm.tm.trader_id) return 'ledger-ar.html?trader=' + e.cm.tm.trader_id;
+  if (e.cm && e.cm.cd && e.cm.cd.length) return 'customer-debts-ar.html?open=' + e.cm.cd[0].customer_id;
+  if (op === 'دفعة من عميل' || op === 'صرف لعميل' || /^(دفعة من|صرف إلى|قبض من) /.test(op)) return 'customers-ar.html';
+  if (op.startsWith('مصروف')) return 'expense-entry-ar.html';
+  return null;
+}
+let voucherEntryId = null;
+function openVoucherDate(e) {
+  voucherEntryId = e.cash_movement_id;
+  const today = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date());
+  const inp = document.getElementById('voucherDateInput');
+  inp.max = today;
+  inp.value = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date(e.created_at));
+  document.getElementById('voucherDateError').classList.add('hidden');
+  const link = document.getElementById('voucherPartyLink');
+  const url = voucherPartyUrl(e);
+  link.href = url || '#';
+  link.classList.toggle('hidden', !url);
+  const modal = document.getElementById('voucherDateModal');
+  modal.classList.remove('hidden');
+  modal.classList.add('flex');
+}
+function closeVoucherDate() {
+  const modal = document.getElementById('voucherDateModal');
+  modal.classList.add('hidden');
+  modal.classList.remove('flex');
+  voucherEntryId = null;
+}
+async function saveVoucherDate() {
+  const errEl = document.getElementById('voucherDateError');
+  const d = document.getElementById('voucherDateInput').value;
+  errEl.classList.add('hidden');
+  if (!d) { errEl.textContent = 'اختر التاريخ'; errEl.classList.remove('hidden'); return; }
+  const { error } = await goldmindClient.rpc('set_voucher_date', { p_cash_movement: voucherEntryId, p_date: d });
+  if (error) { errEl.textContent = 'تعذّر الحفظ: ' + error.message; errEl.classList.remove('hidden'); return; }
+  closeVoucherDate();
+  reportPanelLoaded = false;
+  document.getElementById('reportPanel').classList.add('hidden');
+  await loadAll();
 }
 
 function closeEditModal() {
