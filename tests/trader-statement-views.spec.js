@@ -28,7 +28,8 @@ test('vouchers vs details, arrows, photos toggle', async ({ page }) => {
   await expect(rows).toContainText('450.00');   // making total
   await expect(rows).not.toContainText('إعطاء بضاعة');
   await expect(page.locator('#stCashRows')).toContainText('arrow_downward');
-  await expect(page.locator('#stCashRows')).not.toContainText('450'); // making not repeated
+  await expect(page.locator('#stCashRows')).toContainText('+350.00'); // net: 150 + 300 - 100 (cash in)
+  await expect(page.locator('#stCashRows')).toContainText('صافي الرصيد النقدي');
 
   await page.click('#stOpts [data-view=details]');
   await expect(rows.locator('tr.st-p')).toHaveCount(2);
@@ -59,12 +60,11 @@ test('return one piece to stock from the statement', async ({ page }) => {
   expect(JSON.parse(calls.find(c => c.name === 'trader_return_piece').body)).toEqual({ p_movement: 'm1' });
 });
 
-test('cash section is hidden when the period has no cash movement', async ({ page }) => {
+test('cash section is hidden when the period has no money movement at all', async ({ page }) => {
   const d = db();
-  d.trader_movements = d.trader_movements.filter(m => m.id !== 'm3');
+  d.trader_movements = [];
   await install(page, { db: d });
   await page.goto('/trader-statement-print-ar.html?trader=t1');
-  await expect(page.locator('#stGoldRows tr.st-v')).toHaveCount(1);
   await expect(page.locator('#stCashBlock')).toHaveClass(/\bhidden\b/);
   await expect(page.locator('#stCashCards')).toHaveClass(/\bhidden\b/);
 });
