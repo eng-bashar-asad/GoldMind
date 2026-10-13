@@ -22,7 +22,8 @@
   .dt th { font-size: 10.5px; color: #8a7f68; font-weight: 700; padding: 6px 4px; border-bottom: 2px solid #e5ddc8; text-align: center; }
   .dt td { font-size: 12px; padding: 6px 4px; border-bottom: 1px solid #f0ebdc; text-align: center; }
   .cust { border: 1px solid #e5ddc8; border-radius: 10px; padding: 10px 12px; margin-bottom: 12px; page-break-inside: avoid; }
-  @media print { @page { margin: 0 10mm; } body { background: #fff; } .no-print { display: none !important; } .sheet { box-shadow: none; } }
+  .cust.excluded { opacity: .45; }
+  @media print { @page { margin: 0 10mm; } body { background: #fff; } .no-print { display: none !important; } .sheet { box-shadow: none; } .cust.excluded { display: none !important; } }
   @media (max-width: 640px) { .dt th { font-size: 9px; } .dt td { font-size: 10.5px; padding: 4px 2px; } }
 </style>
 </head>
@@ -36,7 +37,7 @@
 <h1 class="text-lg font-bold whitespace-nowrap">جدول ديون الزبائن</h1>
 </div>
 <div class="flex gap-2">
-<button onclick="gmReportPdf(document.getElementById('page-content'), 'ديون-الزبائن.pdf', this)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold flex items-center gap-1 border border-gray-400"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span><span class="hidden sm:inline">PDF</span></button>
+<button onclick="debtPdf(this)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold flex items-center gap-1 border border-gray-400"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span><span class="hidden sm:inline">PDF</span></button>
 <button onclick="window.print()" class="h-10 px-4 rounded-lg text-[12.5px] font-bold flex items-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined text-[16px]">print</span><span class="hidden sm:inline">طباعة</span></button>
 </div>
 </div>
@@ -56,6 +57,15 @@
 <div class="text-[10.5px] text-gray-500" id="grandCount"></div>
 </div>
 <div id="customers"></div>
+<section class="no-print mt-4 rounded-xl border border-outline-variant p-3">
+<div class="font-bold text-[13px] mb-2">إرسال الكشف (المحددون فقط)</div>
+<div class="flex flex-wrap gap-2 items-center">
+<input id="sendPhone" type="tel" dir="ltr" placeholder="رقم واتساب (اختياري للمشاركة)" class="h-10 flex-1 min-w-[180px] border border-outline-variant rounded-lg px-3 text-[13px] font-data-mono"/>
+<button onclick="debtWhatsApp(this)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold border" style="color:#25A244;border-color:#25A244;">إرسال واتساب</button>
+<button onclick="debtPdf(this, true)" class="h-10 px-3 rounded-lg text-[12.5px] font-bold border border-gray-400">مشاركة / تحميل PDF</button>
+</div>
+<p class="text-[11px] text-gray-500 mt-2">لإرسال لأكثر من شخص، أرسل الكشف لكل رقم على حدة.</p>
+</section>
 <p class="text-[10px] text-gray-400 mt-6 text-center">الدين يُخصم من الأقدم أولاً بكل دفعة. عند وصول الرصيد للصفر يبدأ حساب الدين الجديد من جديد. التخصيصات على الفواتير لا تدخل في الحساب (ما بتغيّر الرصيد).</p>
 </div>
 </main>
@@ -99,7 +109,7 @@ function openTranches(rows) {
   if (!session) return;
   const [{ data: me }, { data: store }, cust, debts] = await Promise.all([
     goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
-    goldmindClient.from('stores').select('name, currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+    goldmindClient.from('stores').select('name, currency, country').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
     gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone').eq('store_id', GOLDMIND_STORE_ID).order('name')),
     gmFetchAllRows(() => goldmindClient.from('customer_debts').select('id, customer_id, movement_type, cash_amount, created_at, source')
       .eq('store_id', GOLDMIND_STORE_ID).or('source.is.null,source.neq.allocation').order('created_at').order('id'))
@@ -117,11 +127,11 @@ function openTranches(rows) {
     .filter(r => r.balance > 0.005 && names[r.id])
     .sort((a, b) => b.balance - a.balance);
 
+  STORE_INFO = store || {};
   const now = new Date().toISOString();
   document.getElementById('storeName').textContent = (store && store.name) || '';
   document.getElementById('stamp').textContent = 'بتاريخ ' + dayOf(now);
-  document.getElementById('grandTotal').textContent = fmt(rows.reduce((s, r) => s + r.balance, 0)) + ' ' + ((store && store.currency) || '');
-  document.getElementById('grandCount').textContent = rows.length + ' زبون عليه دين';
+  ROWS_CURRENCY = (store && store.currency) || '';
 
   document.getElementById('customers').innerHTML = rows.map(r => {
     const oldest = r.open[0];
@@ -135,7 +145,8 @@ function openTranches(rows) {
         <td>${daysBetween(t.date, now)}</td>
         <td>${i === 0 ? '—' : daysBetween(r.open[i - 1].date, t.date) + ' يوم'}</td>
       </tr>`).join('');
-    return `<section class="cust">
+    return `<section class="cust" data-id="${r.id}" data-balance="${r.balance}">
+      <label class="no-print flex items-center gap-2 text-[12px] mb-1"><input type="checkbox" class="w-4 h-4" checked onchange="togglePick(this)"/> يطلع بالكشف</label>
       <div class="flex items-center justify-between gap-2 mb-1">
         <div class="font-bold text-[14px]">${esc(names[r.id].name)}</div>
         <div class="font-data-mono font-bold text-[14px]" style="color:#8A3B32;">${fmt(r.balance)}</div>
@@ -149,6 +160,57 @@ function openTranches(rows) {
   }).join('') || '<p class="py-10 text-center text-gray-500">ما في زبائن عليهم ديون حالياً.</p>';
 
   document.getElementById('page-content').classList.remove('hidden');
+  updateTotals();
 })();
+
+// ---- choosing who is in the report ----
+let STORE_INFO = {}, ROWS_CURRENCY = '';
+function togglePick(box) {
+  box.closest('.cust').classList.toggle('excluded', !box.checked);
+  updateTotals();
+}
+function setAllPicks(on) {
+  document.querySelectorAll('#customers .cust').forEach(sec => {
+    sec.querySelector('input[type=checkbox]').checked = on;
+    sec.classList.toggle('excluded', !on);
+  });
+  updateTotals();
+}
+function updateTotals() {
+  const all = [...document.querySelectorAll('#customers .cust')];
+  const picked = all.filter(s => !s.classList.contains('excluded'));
+  const total = picked.reduce((s, sec) => s + Number(sec.dataset.balance || 0), 0);
+  document.getElementById('grandTotal').textContent = fmt(total) + ' ' + ROWS_CURRENCY;
+  document.getElementById('grandCount').textContent = picked.length + ' من ' + all.length + ' زبون في الكشف';
+}
+// The sheet as it goes into a PDF or a WhatsApp message: only the chosen customers.
+function debtReportNode() {
+  const node = gmReportNode(document.getElementById('page-content'));
+  node.querySelectorAll('.cust.excluded').forEach(e => e.remove());
+  return node;
+}
+function ensurePicked() {
+  if (!document.querySelector('#customers .cust:not(.excluded)')) { alert('اختر زبوناً واحداً على الأقل لإدراجه بالكشف.'); return false; }
+  return true;
+}
+async function debtPdf(btn) {
+  if (!ensurePicked()) return;
+  const old = btn.innerHTML;
+  btn.disabled = true;
+  try { await gmPdfFromNodes([debtReportNode()], 'ديون-الزبائن.pdf', 'جدول ديون الزبائن'); }
+  catch (e) { alert('تعذّر إنشاء ملف PDF: ' + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
+async function debtWhatsApp(btn) {
+  if (!ensurePicked()) return;
+  const phone = document.getElementById('sendPhone').value.trim();
+  if (!phone) { alert('اكتب رقم الواتساب اللي بدك ترسل له الكشف.'); return; }
+  const text = 'نرسل لكم جدول ديون الزبائن من ' + (STORE_INFO.name || 'المحل') + '.';
+  const old = btn.innerHTML;
+  btn.disabled = true;
+  try { await gmWhatsAppPdf([debtReportNode()], 'ديون-الزبائن.pdf', 'جدول ديون الزبائن', text, phone, STORE_INFO.country); }
+  catch (e) { alert('تعذّر تجهيز ملف PDF: ' + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; btn.innerHTML = old; }
+}
 </script>
 </body></html>
