@@ -245,7 +245,15 @@ function setPeriod(period) {
   document.getElementById('summary-view').classList.toggle('hidden', period === 'tax');
   document.getElementById('tax-view').classList.toggle('hidden', period !== 'tax');
 
-  if (period === 'custom') return; // wait for "تطبيق"
+  if (period === 'custom') {
+    // Never leave the cards showing another period's numbers: start from this month until the user picks dates.
+    const from = document.getElementById('customFrom'), to = document.getElementById('customTo');
+    const d = new Date(), today = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    if (!from.value) from.value = today.slice(0, 8) + '01';
+    if (!to.value) to.value = today;
+    applyCustomRange();
+    return;
+  }
   const r = computeRange(period === 'tax' ? 'month' : period);
   rangeStart = r.start; rangeEnd = r.end;
   loadReport();
