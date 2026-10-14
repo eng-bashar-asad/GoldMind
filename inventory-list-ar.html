@@ -416,6 +416,19 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         renderTotals(results);
 
         document.getElementById('search-results-list').innerHTML = results.map(pieceCardHtml).join('') || '<p class="col-span-full text-center text-[12px] text-on-surface-variant py-8">لا توجد نتائج مطابقة.</p>';
+        if (barcode && !results.length) findInDiamonds(barcode);
+    }
+
+    // A piece with diamonds is saved in the diamond warehouse, not here: say where it is.
+    async function findInDiamonds(barcode) {
+        const { data } = await goldmindClient.from('diamond_pieces').select('barcode')
+            .eq('store_id', GOLDMIND_STORE_ID).ilike('barcode', '%' + barcode.replace(/[%_]/g, '') + '%').limit(5);
+        if (!data || !data.length || document.getElementById('search-barcode').value.trim().toLowerCase() !== barcode) return;
+        const p = document.createElement('p');
+        p.className = 'col-span-full text-center text-[13px] py-2';
+        p.innerHTML = 'القطعة ' + data.map(d => '<b>' + gmEscapeHtml(d.barcode) + '</b>').join('، ') +
+            ' في مستودع الألماس — <a class="underline font-bold text-primary" href="diamond-inventory-list-ar.html">فتح مستودع الألماس</a>';
+        document.getElementById('search-results-list').appendChild(p);
     }
 
     // Karat "box" cards -- distinct karat/color tints so they scan at a

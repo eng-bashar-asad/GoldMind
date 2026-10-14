@@ -42,6 +42,7 @@ test('Di weight + carat price → saved in the diamond warehouse, not gold stock
     status: 'available', box_name: 'ألماس' });
   expect(calls.some(c => c.method === 'POST' && (c.name === 'pieces' || c.name === 'piece_intake_batches'))).toBe(false);
   await expect(page.locator('#save-message')).toContainText('مستودع الألماس');
+  await expect(page.locator('#save-message a[href="diamond-inventory-list-ar.html"]')).toBeVisible();
 });
 
 for (const [name, enabled, carat, price] of [['diamonds off', false, '0.39', '500'], ['no carat price', true, '0.39', '']]) {

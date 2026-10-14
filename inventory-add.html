@@ -1086,6 +1086,8 @@
                 saveBtn.textContent = 'حفظ القطعة في المخزن';
                 if (dErr) { showMessage('خطأ: ' + dErr.message, true); return; }
                 showMessage('حُفظت القطعة في مستودع الألماس (فيها ألماس بوزن وسعر قيراط). الباركود: ' + barcode, false);
+                clearTimeout(__msgTimer); // stays, with a link to where the piece went
+                messageBox.insertAdjacentHTML('beforeend', ' — <a class="underline font-bold" href="diamond-inventory-list-ar.html">فتح مستودع الألماس</a>');
                 ['barcode-id', 'weight', 'accounting-weight', 'accent-diamond-carat', 'accent-diamond-price',
                     'center-stone-carat', 'center-stone-price', 'zircon-carat'].forEach(id => { document.getElementById(id).value = ''; });
                 document.getElementById('weight').focus();
