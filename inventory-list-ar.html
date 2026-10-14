@@ -265,6 +265,9 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
 <!-- Box/location boxes: only boxes that actually have pieces show up here -->
 <div id="box-boxes" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-2.5 pb-6"></div>
 
+<!-- Diamond pieces live in their own warehouse: a card that leads there -->
+<div id="diamond-card" class="hidden grid grid-cols-1 lg:grid-cols-2 gap-2.5 pb-6"></div>
+
 <!-- Gold held by weight (scrap bought from individuals, bulk lots) -->
 <section id="lots-section" class="hidden pb-8">
 <h2 class="gm-sec" style="margin-top:0;">الذهب بالوزن</h2>
@@ -411,6 +414,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         document.getElementById('karat-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('search-results-view').classList.remove('hidden');
+        document.getElementById('diamond-card').classList.add('hidden');
 
         document.getElementById('piece-count').textContent = results.length + ' نتيجة';
         renderTotals(results);
@@ -572,6 +576,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         renderBoxBoxes();
         document.getElementById('box-boxes').classList.remove('hidden');
         renderLots();
+        document.getElementById('diamond-card').classList.toggle('hidden', !DIAMOND_CARD_HTML);
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('piece-count').textContent = ALL_PIECES.length + ' قطعة';
         renderTotals(ALL_PIECES);
@@ -611,7 +616,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         });
         const prefixes = Object.keys(byPrefix).sort((a, b) => a.localeCompare(b));
 
-        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('diamond-card').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('karat-boxes-back-label').textContent = 'العودة لكل الصناديق';
@@ -653,7 +658,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         document.getElementById('karat-boxes').classList.remove('grid');
         document.getElementById('karat-boxes-back').classList.add('hidden');
         document.getElementById('karat-boxes-back').classList.remove('flex');
-        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('diamond-card').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.remove('hidden');
         document.getElementById('piece-list-title').textContent = boxName + (prefix ? ' — ' + prefix : '');
@@ -672,7 +677,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         currentPrefixScope = null;
         gmViewUrl({ box: boxName });
         const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName);
-        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('diamond-card').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('karat-boxes-back-label').textContent = 'العودة لكل الصناديق';
@@ -688,7 +693,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         currentPrefixScope = prefix;
         gmViewUrl({ box: boxName, pre: prefix });
         const pieces = ALL_PIECES.filter(p => (p.box_name || '').trim() === boxName && prefixOf(p.barcode) === prefix);
-        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('diamond-card').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.add('hidden');
         document.getElementById('karat-boxes-back-label').textContent = 'العودة لدفعات ' + boxName;
@@ -718,7 +723,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         document.getElementById('karat-boxes').classList.remove('grid');
         document.getElementById('karat-boxes-back').classList.add('hidden');
         document.getElementById('karat-boxes-back').classList.remove('flex');
-        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
+        document.getElementById('box-boxes').classList.add('hidden'); document.getElementById('diamond-card').classList.add('hidden'); document.getElementById('lots-section').classList.add('hidden');
         document.getElementById('box-boxes').classList.remove('grid');
         document.getElementById('piece-list-view').classList.remove('hidden');
         document.getElementById('piece-list-title').textContent =
@@ -843,6 +848,22 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
     let LOT_INVOICES = {};
     let openLotBox = null;
     const lotBoxName = (l) => (l.box_name || '').trim() || ('ذهب عيار ' + (l.karat || '—'));
+
+    // Pieces with diamonds are kept in the diamond warehouse (not counted in this page's weight).
+    let DIAMOND_CARD_HTML = '';
+    async function loadDiamondCard() {
+        const { data } = await goldmindClient.from('diamond_pieces').select('diamond_carat')
+            .eq('store_id', GOLDMIND_STORE_ID).eq('status', 'available');
+        if (!data || !data.length) return;
+        const ct = data.reduce((s, d) => s + Number(d.diamond_carat || 0), 0);
+        DIAMOND_CARD_HTML = gmRowCard(`onclick="location.href='diamond-inventory-list-ar.html'"`,
+            '<span class="material-symbols-outlined" style="position:relative;font-size:22px;">diamond</span>',
+            'مستودع الألماس', data.length + ' قطعة — منفصل عن وزن الذهب هنا', ct.toFixed(2) + ' ct');
+        const el = document.getElementById('diamond-card');
+        el.innerHTML = DIAMOND_CARD_HTML;
+        if (currentBoxScope === null && document.getElementById('piece-list-view').classList.contains('hidden')
+            && document.getElementById('search-results-view').classList.contains('hidden')) el.classList.remove('hidden');
+    }
 
     async function loadLots() {
         const { data, error } = await goldmindClient.from('gold_stock_lots')
@@ -1005,6 +1026,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
             if (__q) { document.getElementById('search-barcode').value = __q; setTimeout(runSearch, 0); }
 
             loadLots();
+            loadDiamondCard();
             if (ALL_PIECES.length === 0) {
                 empty.classList.remove('hidden');
                 countLabel.textContent = '0 قطعة';
