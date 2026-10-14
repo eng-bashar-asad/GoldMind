@@ -24,7 +24,12 @@ function matches(row, key, expr) {
     case 'lt': return val(v) < val(raw); case 'lte': return val(v) <= val(raw);
     case 'in': return raw.replace(/[()"]/g, '').split(',').includes(String(v));
     case 'is': return raw === 'null' ? v == null : String(v) === raw;
-    default: return v != null && String(v).toLowerCase().includes(raw.replace(/[*%]/g, '').toLowerCase());
+    default: { // ilike: % (or *) any run, _ one char, like Postgres
+      if (v == null) return false;
+      const re = raw.replace(/\\([%_\\])|([%*])|(_)|([.+?^${}()|[\]\\])/g, (m0, esc, any, one, special) =>
+        esc ? '\\' + esc : any ? '.*' : one ? '.' : '\\' + special);
+      return new RegExp('^' + re + '$', 'is').test(String(v));
+    }
   }
 }
 

@@ -12,7 +12,7 @@
 <title>إضافة قطعة | جولد مايند</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=40"></script>
+<script src="supabase-config.js?v=41"></script>
 <script src="theme.js?v=63"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
 <script src="zebra-rfid.js?v=6"></script>
@@ -988,7 +988,15 @@
             const session = await requireGoldMindSession();
             if (!session) { saveBtn.disabled = false; return; }
 
-            let barcode = document.getElementById('barcode-id').value.trim();
+            let barcode = gmTidyBarcode(document.getElementById('barcode-id').value);
+            if (barcode) {
+                const taken = await gmBarcodeTaken(barcode);
+                if (taken) {
+                    showMessage('هذا الباركود مستخدم لقطعة أخرى: ' + taken.barcode, true);
+                    saveBtn.disabled = false;
+                    return;
+                }
+            }
             const weight = parseFloat(document.getElementById('weight').value);
             const karat = parseInt(document.getElementById('karat').value, 10);
             const boxName = document.getElementById('box-name').value.trim();

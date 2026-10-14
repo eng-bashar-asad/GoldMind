@@ -347,6 +347,18 @@ async function gmStoreWithLegal(query) {
 }
 
 // Name shown in the company list and at the top of the screen; invoices keep stores.name.
+// "M B 459  W" and "MB459W" are the same sticker: spaces and letter case don't count.
+function gmBarcodeKey(s) { return String(s || '').replace(/\s+/g, '').toUpperCase(); }
+function gmTidyBarcode(s) { return String(s || '').trim().replace(/\s+/g, ' '); }
+// Another piece already using this barcode (ignoring spaces/case), or null.
+async function gmBarcodeTaken(barcode, exceptId) {
+  const key = gmBarcodeKey(barcode);
+  if (!key) return null;
+  const pattern = '%' + key.split('').map(c => c.replace(/[%_\\]/g, '\\$&')).join('%') + '%';
+  const { data } = await goldmindClient.from('pieces').select('id, barcode, status').ilike('barcode', pattern).limit(50);
+  return (data || []).find(p => p.id !== exceptId && gmBarcodeKey(p.barcode) === key) || null;
+}
+
 function gmShownName(store) {
     return (store && String(store.display_name || '').trim()) || (store && store.name) || '';
 }
