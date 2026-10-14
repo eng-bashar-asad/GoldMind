@@ -9,7 +9,9 @@ import com.getcapacitor.annotation.CapacitorPlugin;
 import java.lang.reflect.Method;
 
 /**
- * UHF RFID on Chainway handhelds (C72 and similar) through Chainway's DeviceAPI
+ * UHF RFID on Chainway handhelds (C72 and similar) through Chainway's DeviceAPI,
+ * and on Urovo handhelds (DT50P / Tagway THS 3.0) through UrovoUhf — same JS API for both.
+ * Chainway part:
  * (com.rscja.deviceapi.RFIDWithUHFUART). The SDK .aar is downloaded from
  * chainway.net at build time (see build-apk.yml) and is never in the repo, so it
  * is used by reflection: the app still builds and runs without it, and on any
@@ -29,6 +31,8 @@ public class GMUhfPlugin extends Plugin {
     private Class<?> readerClass;
     private volatile boolean running = false;
     private Thread loop;
+    private final UrovoUhf uro = new UrovoUhf();
+    private boolean isUro;
 
     @Override
     public void load() { instance = this; }
@@ -50,6 +54,7 @@ public class GMUhfPlugin extends Plugin {
             Boolean ok = (Boolean) readerClass.getMethod("init", android.content.Context.class).invoke(r, getContext());
             if (ok != null && ok) { reader = r; return true; }
         } catch (Throwable ignored) { /* not a Chainway device, or SDK not bundled */ }
+        if (uro.open(getContext())) { isUro = true; return true; }
         return false;
     }
 
@@ -69,6 +74,17 @@ public class GMUhfPlugin extends Plugin {
         return e == null ? null : e.toString().replaceAll("[^0-9A-Fa-f]", "").toUpperCase();
     }
 
+    // Urovo: same steps as Chainway — read the nearest label at low power, write, read back to verify
+    private void writeUrovo(PluginCall c, String epc) throws Exception {
+        int p = c.getInt("power", 5);
+        String old = uro.readOne(p);
+        if (old == null) { c.reject("لم تُقرأ أي شريحة — قرّب الملصقة من ظهر الجهاز"); return; }
+        if (!uro.writeEpc(old, epc)) { c.reject("فشلت الكتابة على الشريحة — أعد المحاولة"); return; }
+        String now = uro.readOne(p);
+        if (now == null || !now.startsWith(epc)) { c.reject("كُتبت الشريحة لكن تعذّر التحقق منها — أعد المحاولة"); return; }
+        JSObject o = new JSObject(); o.put("oldEpc", old); o.put("epc", now); c.resolve(o);
+    }
+
     @PluginMethod
     public void available(PluginCall c) {
         JSObject o = new JSObject();
@@ -80,8 +96,9 @@ public class GMUhfPlugin extends Plugin {
     public void readOne(PluginCall c) {
         if (!open()) { c.reject("لا يوجد قارئ RFID في هذا الجهاز"); return; }
         try {
-            power(c, 10);
-            String epc = epcOf(call("inventorySingleTag", new Class<?>[]{}));
+            String epc;
+            if (isUro) epc = uro.readOne(c.getInt("power", 10));
+            else { power(c, 10); epc = epcOf(call("inventorySingleTag", new Class<?>[]{})); }
             if (epc == null || epc.isEmpty()) { c.reject("لم تُقرأ أي شريحة — قرّب الملصقة من الجهاز"); return; }
             JSObject o = new JSObject(); o.put("epc", epc); c.resolve(o);
         } catch (Throwable e) { c.reject("تعذّرت القراءة: " + e.getMessage()); }
@@ -94,6 +111,7 @@ public class GMUhfPlugin extends Plugin {
         if (!open()) { c.reject("لا يوجد قارئ RFID في هذا الجهاز"); return; }
         if (running) { c.reject("أوقف القراءة المستمرة أولاً"); return; }
         try {
+            if (isUro) { writeUrovo(c, epc); return; }
             // low power so only the label held against the device is reached
             power(c, 5);
             String old = epcOf(call("inventorySingleTag", new Class<?>[]{}));
@@ -111,6 +129,12 @@ public class GMUhfPlugin extends Plugin {
         if (!open()) { c.reject("لا يوجد قارئ RFID في هذا الجهاز"); return; }
         if (running) { c.resolve(); return; }
         try {
+            if (isUro) {
+                if (!uro.start(c.getInt("power", 0), (epc, rssi) -> {
+                    JSObject o = new JSObject(); o.put("epc", epc); o.put("rssi", String.valueOf(rssi)); notifyListeners("tag", o);
+                })) { c.reject("تعذّر بدء القراءة"); return; }
+                running = true; c.resolve(); return;
+            }
             power(c, 0);
             Boolean ok = (Boolean) call("startInventoryTag", new Class<?>[]{});
             if (ok == null || !ok) { c.reject("تعذّر بدء القراءة"); return; }
@@ -141,6 +165,7 @@ public class GMUhfPlugin extends Plugin {
 
     private void stopReading() {
         running = false;
+        if (isUro) { uro.stop(); return; }
         try { if (reader != null) call("stopInventory", new Class<?>[]{}); } catch (Throwable ignored) { }
     }
 
@@ -148,6 +173,7 @@ public class GMUhfPlugin extends Plugin {
     protected void handleOnDestroy() {
         stopReading();
         try { if (reader != null) call("free", new Class<?>[]{}); } catch (Throwable ignored) { }
+        if (isUro) uro.close();
         reader = null;
         instance = null;
     }

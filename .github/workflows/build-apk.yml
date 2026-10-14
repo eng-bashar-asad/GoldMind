@@ -118,6 +118,17 @@ jobs:
           cp /tmp/cw/*.aar "$GITHUB_WORKSPACE/app/android/app/libs/"
           ls -la "$GITHUB_WORKSPACE/app/android/app/libs/"
 
+      # RFID on Urovo handhelds (DT50P, sold as Tagway THS 3.0): Urovo's URFIDLibrary from their
+      # official sample repo, pinned to a commit and checked by SHA-256. Used by reflection
+      # (UrovoUhf.java), so a failed download only means no Urovo RFID in this build.
+      - name: Urovo RFID SDK
+        continue-on-error: true
+        run: |
+          mkdir -p app/android/app/libs
+          curl -fsSL --retry 3 -o /tmp/urfid.aar "https://raw.githubusercontent.com/urovosamples/RFIDSDKSample/e19fb447c9496df5e37542d161c4eb98ca0ef20e/libs/URFIDLibrary-v2.5.0718.aar"
+          echo "0ae03ee59eb102c5575751cf8ec0950349c9bc486b33ad498c0d4aaab6e381a8  /tmp/urfid.aar" | sha256sum -c -
+          cp /tmp/urfid.aar app/android/app/libs/URFIDLibrary-v2.5.0718.aar
+
       - name: Sync Capacitor Android project
         working-directory: app
         run: npx cap sync android

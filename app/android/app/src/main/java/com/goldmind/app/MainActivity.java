@@ -7,14 +7,15 @@ import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
     // Scan trigger / side keys on Chainway handhelds (C72: 139 on the pistol grip, 280/293/294 side keys)
+    // and Urovo DT50P (515 / 523, as in Urovo's RFID demo)
     static boolean isTrigger(int code) {
-        return code == 139 || code == 280 || code == 291 || code == 293 || code == 294 || code == 311;
+        return code == 139 || code == 280 || code == 291 || code == 293 || code == 294 || code == 311 || code == 515 || code == 523;
     }
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(GMPrintPlugin.class); // printing from the app (see GMPrintPlugin)
-        registerPlugin(GMUhfPlugin.class);   // RFID on Chainway handhelds (see GMUhfPlugin)
+        registerPlugin(GMUhfPlugin.class);   // RFID on Chainway and Urovo handhelds (see GMUhfPlugin)
         super.onCreate(savedInstanceState);
         if (webViewTooOld()) {
             // the pages need a modern WebView; on old handhelds (C72, Android 6,
