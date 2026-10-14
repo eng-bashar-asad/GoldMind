@@ -1280,10 +1280,17 @@ console.assert(gmMoney(1234.5) === '1,234.50' && gmMoney(null) === '0.00');
     var input = e.target;
     if (!input || input.tagName !== 'INPUT' || input.type !== 'file' || !input.hasAttribute('capture')) return;
     if (input.__gmBypass) return;
+    // "Choose from files" in the desktop camera window (gm-camera.js) goes straight to the gallery.
+    // (A nested input.click() here would be ignored by the browser, so let this click go ahead without capture.)
+    if (window.__gmPreferGallery) {
+      window.__gmPreferGallery = false;
+      var cap = input.getAttribute('capture');
+      input.removeAttribute('capture');
+      setTimeout(function () { input.setAttribute('capture', cap); }, 1500);
+      return;
+    }
     e.preventDefault();
     e.stopPropagation();
-    // "Choose from files" in the desktop camera window (gm-camera.js) goes straight to the gallery.
-    if (window.__gmPreferGallery) { window.__gmPreferGallery = false; openInput(input, false); return; }
     showSheet(input);
   }, true);
 })();

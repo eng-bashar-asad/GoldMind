@@ -49,3 +49,4 @@ test('real page: new sale stock photo asks for the source', async ({ page }) => 
   await page.evaluate(() => document.getElementById('stock-photo-input').click());
   await expect(page.locator('#gm-photo-sheet')).toContainText('اختيار صورة من الجهاز');
 });
+

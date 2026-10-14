@@ -26,8 +26,8 @@ var GMCamera = (function () {
   }
 
   // Opens a full-screen live-camera overlay and resolves with a single
-  // captured frame as a File (image/jpeg), or null if the person cancels,
-  // taps "اختيار من الملفات", or the camera can't be opened at all
+  // captured frame as a File (image/jpeg), false if the person closes it (✕, Esc,
+  // tap outside: do nothing), or null when they tap "اختيار صورة من الجهاز" or the camera can't be opened at all
   // (no device, permission denied, already in use by another app, ...).
   // Never rejects — a failed camera is just treated as "use the fallback".
   function capture() {
@@ -46,7 +46,7 @@ var GMCamera = (function () {
         resolve(result);
       }
 
-      function onKeydown(e) { if (e.key === 'Escape') finish(null); }
+      function onKeydown(e) { if (e.key === 'Escape') finish(false); }
       document.addEventListener('keydown', onKeydown, true);
 
       var overlay = document.createElement('div');
@@ -99,14 +99,14 @@ var GMCamera = (function () {
       overlay.appendChild(fallbackBtn);
       document.body.appendChild(overlay);
 
-      cancelBtn.addEventListener('click', function () { finish(null); });
+      cancelBtn.addEventListener('click', function () { finish(false); });
       // The page then opens its file input; theme.js sends it straight to the gallery.
       fallbackBtn.addEventListener('click', function () {
         window.__gmPreferGallery = true;
         setTimeout(function () { window.__gmPreferGallery = false; }, 3000);
         finish(null);
       });
-      overlay.addEventListener('click', function (e) { if (e.target === overlay) finish(null); });
+      overlay.addEventListener('click', function (e) { if (e.target === overlay) finish(false); });
 
       shutterBtn.addEventListener('click', function () {
         if (!video.videoWidth) return; // stream not actually flowing yet
