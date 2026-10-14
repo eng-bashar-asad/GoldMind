@@ -1,4 +1,4 @@
-// Pieces with diamonds are saved in the stock like any piece (Bashar 2026-10-14: no separate diamond warehouse for them).
+// Pieces with diamonds are saved in the stock; a diamond box (قطع الماسية) gives them the D numbering (Bashar 2026-10-14).
 const { test, expect } = require('@playwright/test');
 const { install, STORE, USER, STAFF } = require('./fake-backend');
 
@@ -32,22 +32,28 @@ async function fillAndSave(page, { diCarat, diPrice }) {
   await page.locator('#save-btn').click();
 }
 
-test('Di weight + carat price → stays in the stock as a piece with its diamond', async ({ page }) => {
+test('piece in a diamond box → stays in the stock, with the diamond numbering', async ({ page }) => {
   const calls = await setup(page, true);
   await fillAndSave(page, { diCarat: '0.39', diPrice: '500' });
   await expect.poll(() => calls.find(c => c.method === 'POST' && c.name === 'pieces')).toBeTruthy();
   const row = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'pieces').body);
-  expect(row).toMatchObject({ barcode: 'G-0001', weight_grams: 10, accounting_weight_grams: 9.5, karat: 18,
+  expect(row).toMatchObject({ barcode: 'D-0001', weight_grams: 10, accounting_weight_grams: 9.5, karat: 18,
     accent_diamond_carat: 0.39, accent_diamond_price_per_carat: 500, box_name: 'ألماس' });
   expect(calls.some(c => c.method === 'POST' && c.name === 'diamond_pieces')).toBe(false);
 });
 
-for (const [name, enabled, carat, price] of [['diamonds off', false, '0.39', '500'], ['no carat price', true, '0.39', '']]) {
-  test(`${name} → stays a gold piece`, async ({ page }) => {
-    const calls = await setup(page, enabled);
-    await fillAndSave(page, { diCarat: carat, diPrice: price });
-    await expect.poll(() => calls.find(c => c.method === 'POST' && c.name === 'pieces')).toBeTruthy();
-    expect(JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'pieces').body).barcode).toBe('G-0001');
-    expect(calls.some(c => c.method === 'POST' && c.name === 'diamond_pieces')).toBe(false);
+
+test('piece in a gold box takes the gold numbering even with diamonds', async ({ page }) => {
+  const calls = await setup(page, true);
+  await page.goto('/inventory-add.html');
+  await page.waitForFunction(() => typeof zebraPrintStore !== 'undefined' && zebraPrintStore);
+  await page.locator('#weight').fill('10');
+  await page.evaluate(() => {
+    const k = document.getElementById('karat'); if (![...k.options].some(o => o.value === '18')) k.add(new Option('18', '18')); k.value = '18';
+    const b = document.getElementById('box-name'); b.add(new Option('قطع ذهبية', 'قطع ذهبية')); b.value = 'قطع ذهبية';
   });
-}
+  await page.locator('#accent-diamond-carat').fill('0.2');
+  await page.locator('#save-btn').click();
+  await expect.poll(() => calls.find(c => c.method === 'POST' && c.name === 'pieces')).toBeTruthy();
+  expect(JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'pieces').body).barcode).toBe('G-0001');
+});

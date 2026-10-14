@@ -1012,9 +1012,11 @@
                 return;
             }
 
-            // Pieces with diamonds stay in the stock like any piece (box "قطع الماسية"), Bashar 2026-10-14.
+            // Pieces with diamonds stay in the stock like any piece; a piece in a diamond box ("قطع الماسية")
+            // takes the diamond numbering (D000002...), every other box the gold numbering. Bashar 2026-10-14.
+            const diamondBox = /ألماس|الماس|diamond/i.test(boxName);
             if (!barcode) {
-                const { data: generated, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
+                const { data: generated, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: diamondBox ? 'diamond' : 'gold' });
                 if (bcError) {
                     showMessage('تعذّر توليد رقم القطعة: ' + bcError.message, true);
                     saveBtn.disabled = false;
