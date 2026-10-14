@@ -1012,15 +1012,9 @@
                 return;
             }
 
-            // A piece with both a diamond weight (ct) and a carat price goes to the diamond warehouse
-            // instead of gold stock (Bashar 2026-10-14). Production from a scrap box stays gold: its weight
-            // is drawn from the box against a gold piece. ponytail: existing gold pieces with Di are not converted.
-            const diCarat = parseFloat(document.getElementById('accent-diamond-carat').value) || 0;
-            const diPrice = parseFloat(document.getElementById('accent-diamond-price').value) || 0;
-            const toDiamond = diCarat > 0 && diPrice > 0 && !GM_PROD && !!(zebraPrintStore && zebraPrintStore.diamonds_enabled);
-
+            // Pieces with diamonds stay in the stock like any piece (box "قطع الماسية"), Bashar 2026-10-14.
             if (!barcode) {
-                const { data: generated, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: toDiamond ? 'diamond' : 'gold' });
+                const { data: generated, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
                 if (bcError) {
                     showMessage('تعذّر توليد رقم القطعة: ' + bcError.message, true);
                     saveBtn.disabled = false;
@@ -1059,40 +1053,6 @@
                     .from('piece-photos')
                     .getPublicUrl(path);
                 photoUrl = publicUrlData ? publicUrlData.publicUrl : null;
-            }
-
-            if (toDiamond) {
-                const accWeight = parseFloat(document.getElementById('accounting-weight').value) || weight;
-                const csCost = (parseFloat(document.getElementById('center-stone-carat').value) || 0) * (parseFloat(document.getElementById('center-stone-price').value) || 0);
-                const typeAr = document.getElementById('piece-type').value || null;
-                const { error: dErr } = await goldmindClient.from('diamond_pieces').insert({
-                    store_id: GOLDMIND_STORE_ID,
-                    barcode: barcode,
-                    photo_url: photoUrl,
-                    has_gold: true,
-                    gold_weight_grams: accWeight, // making cost and gold value go on the accounting weight
-                    gold_karat: karat,
-                    gold_cost_fabrication_per_gram: parseFloat(document.getElementById('fab-cost').value) || null,
-                    diamond_carat: diCarat,
-                    diamond_price_per_carat: diPrice,
-                    secondary_stones_cost: csCost > 0 ? csCost : null,
-                    description_ar: typeAr,
-                    description_en: (classificationCacheEn['type'] || {})[typeAr] || null,
-                    status: 'available',
-                    box_name: boxName || null,
-                    created_by: GOLDMIND_STAFF_ID
-                });
-                saveBtn.disabled = false;
-                saveBtn.textContent = 'حفظ القطعة في المخزن';
-                if (dErr) { showMessage('خطأ: ' + dErr.message, true); return; }
-                showMessage('حُفظت القطعة في مستودع الألماس (فيها ألماس بوزن وسعر قيراط). الباركود: ' + barcode, false);
-                clearTimeout(__msgTimer); // stays, with a link to where the piece went
-                messageBox.insertAdjacentHTML('beforeend', ' — <a class="underline font-bold" href="diamond-inventory-list-ar.html">فتح مستودع الألماس</a>');
-                ['barcode-id', 'weight', 'accounting-weight', 'accent-diamond-carat', 'accent-diamond-price',
-                    'center-stone-carat', 'center-stone-price', 'zircon-carat'].forEach(id => { document.getElementById(id).value = ''; });
-                document.getElementById('weight').focus();
-                removePhoto();
-                return;
             }
 
             const batchId = await getOrCreateBatch();

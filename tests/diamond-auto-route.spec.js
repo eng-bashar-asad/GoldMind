@@ -1,4 +1,4 @@
-// A new piece with both a Di weight (ct) and a carat price is saved in the diamond warehouse (Bashar 2026-10-14).
+// Pieces with diamonds are saved in the stock like any piece (Bashar 2026-10-14: no separate diamond warehouse for them).
 const { test, expect } = require('@playwright/test');
 const { install, STORE, USER, STAFF } = require('./fake-backend');
 
@@ -32,17 +32,14 @@ async function fillAndSave(page, { diCarat, diPrice }) {
   await page.locator('#save-btn').click();
 }
 
-test('Di weight + carat price → saved in the diamond warehouse, not gold stock', async ({ page }) => {
+test('Di weight + carat price → stays in the stock as a piece with its diamond', async ({ page }) => {
   const calls = await setup(page, true);
   await fillAndSave(page, { diCarat: '0.39', diPrice: '500' });
-  await expect.poll(() => calls.find(c => c.method === 'POST' && c.name === 'diamond_pieces')).toBeTruthy();
-  const row = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'diamond_pieces').body);
-  expect(row).toMatchObject({ barcode: 'D-0001', has_gold: true, gold_weight_grams: 9.5, gold_karat: 18,
-    gold_cost_fabrication_per_gram: 30, diamond_carat: 0.39, diamond_price_per_carat: 500, secondary_stones_cost: 500,
-    status: 'available', box_name: 'ألماس' });
-  expect(calls.some(c => c.method === 'POST' && (c.name === 'pieces' || c.name === 'piece_intake_batches'))).toBe(false);
-  await expect(page.locator('#save-message')).toContainText('مستودع الألماس');
-  await expect(page.locator('#save-message a[href="diamond-inventory-list-ar.html"]')).toBeVisible();
+  await expect.poll(() => calls.find(c => c.method === 'POST' && c.name === 'pieces')).toBeTruthy();
+  const row = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'pieces').body);
+  expect(row).toMatchObject({ barcode: 'G-0001', weight_grams: 10, accounting_weight_grams: 9.5, karat: 18,
+    accent_diamond_carat: 0.39, accent_diamond_price_per_carat: 500, box_name: 'ألماس' });
+  expect(calls.some(c => c.method === 'POST' && c.name === 'diamond_pieces')).toBe(false);
 });
 
 for (const [name, enabled, carat, price] of [['diamonds off', false, '0.39', '500'], ['no carat price', true, '0.39', '']]) {
