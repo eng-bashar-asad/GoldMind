@@ -12,7 +12,7 @@
 <title>بيانات الشركة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=38"></script>
+<script src="supabase-config.js?v=39"></script>
 <script src="theme.js?v=60"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -62,6 +62,13 @@
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-name">اسم المتجر</label>
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-name" type="text"/>
+<p class="text-[11px] text-on-surface-variant mt-1 px-1">يظهر في رأس الفواتير والمطبوعات.</p>
+</div>
+
+<div class="relative" id="display-name-wrap">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-display-name">الاسم في قائمة الشركات (اختياري)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right" id="store-display-name" type="text" maxlength="60" placeholder="يُستخدم اسم المتجر إذا تُرك فارغاً"/>
+<p class="text-[11px] text-on-surface-variant mt-1 px-1">للاستخدام الداخلي فقط: يظهر في قائمة الشركات وأعلى الشاشة، ولا يظهر على الفواتير.</p>
 </div>
 
 <div class="relative">
@@ -904,6 +911,7 @@
         document.getElementById('org-readonly-note').classList.toggle('hidden', editable);
     }
 
+    let hasDisplayName = false; // column exists once migration 20261014120000 has run
     async function loadStore() {
         const session = await requireGoldMindSession('login-entry-ar.html');
         if (!session) return;
@@ -923,7 +931,10 @@
         }
 
         document.getElementById('store-name').value = data.name || '';
-        document.getElementById('active-store-badge').textContent = data.name || '';
+        document.getElementById('active-store-badge').textContent = gmShownName(data);
+        hasDisplayName = 'display_name' in data;
+        document.getElementById('display-name-wrap').classList.toggle('hidden', !hasDisplayName);
+        document.getElementById('store-display-name').value = data.display_name || '';
         document.getElementById('store-country').value = data.country || '';
         document.getElementById('store-currency').value = data.currency || 'AED';
         document.getElementById('store-secondary-currency').value = data.secondary_currency || '';
@@ -1115,9 +1126,7 @@
         saveBtn.disabled = true;
         saveBtn.textContent = 'جارِ الحفظ...';
 
-        const { error } = await goldmindClient
-            .from('stores')
-            .update({
+        const storeUpdate = {
                 name: name,
                 country: country || null,
                 currency: currency || 'AED',
@@ -1151,7 +1160,11 @@
                 debt_alert_customers: document.getElementById('debt-alert-customers').checked,
                 debt_alert_traders: document.getElementById('debt-alert-traders').checked,
                 allow_biometric_login: bioAllowed
-            })
+            };
+        if (hasDisplayName) storeUpdate.display_name = document.getElementById('store-display-name').value.trim() || null;
+        const { error } = await goldmindClient
+            .from('stores')
+            .update(storeUpdate)
             .eq('id', GOLDMIND_STORE_ID);
 
         let orgError = null;
@@ -1182,6 +1195,9 @@
             return;
         }
 
+        const shown = gmShownName({ name, display_name: hasDisplayName ? document.getElementById('store-display-name').value : null });
+        document.getElementById('active-store-badge').textContent = shown;
+        try { localStorage.setItem('goldmind_store_name', shown); } catch (e) { /* ignore */ }
         showMessage('تم حفظ بيانات الشركة بنجاح!', false);
     });
 

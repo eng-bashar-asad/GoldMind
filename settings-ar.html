@@ -133,7 +133,7 @@
     body { min-height: max(884px, 100dvh); }
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="supabase-config.js?v=38"></script>
+  <script src="supabase-config.js?v=39"></script>
 <script src="theme.js?v=60"></script>
   </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
@@ -363,24 +363,24 @@ function fitStoreName(el) {
 
     const { data: store, error } = await gmStoreWithLegal(goldmindClient
         .from('stores')
-        .select('name, currency, vat_rate, invoice_prefix, next_invoice_seq, next_invoice_seq_year')
+        .select('name, display_name, currency, vat_rate, invoice_prefix, next_invoice_seq, next_invoice_seq_year')
         .eq('id', GOLDMIND_STORE_ID)
         .single());
 
     if (error || !store) return;
 
-    document.getElementById('storeNameLabel').textContent = store.name || '—';
+    document.getElementById('storeNameLabel').textContent = gmShownName(store) || '—';
     fitStoreName(document.getElementById('storeNameLabel'));
-    localStorage.setItem('goldmind_store_name', store.name || '');
+    localStorage.setItem('goldmind_store_name', gmShownName(store));
     const avatarEl = document.getElementById('storeAvatar');
     if (store.logo_url) {
         avatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full rounded-full object-cover"/>';
         localStorage.setItem('goldmind_store_logo', store.logo_url);
     } else {
-        avatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
+        avatarEl.textContent = (gmShownName(store) || '؟').trim().charAt(0) || '؟';
         localStorage.removeItem('goldmind_store_logo');
     }
-    document.getElementById('footerLabel').textContent = 'GoldMind v1.0 • ' + (store.name || '');
+    document.getElementById('footerLabel').textContent = 'GoldMind v1.0 • ' + gmShownName(store);
 
     const currency = store.currency || 'AED';
     document.getElementById('currencyLabel').textContent = 'العربية · ' + currency;

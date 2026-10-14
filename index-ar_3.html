@@ -447,7 +447,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=38"></script>
+<script src="supabase-config.js?v=39"></script>
 </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
 <!-- ============================================================
@@ -1064,28 +1064,28 @@
             // one-at-a-time on every dashboard load.
             const [{ data: store }, { data: staffRow }] = await Promise.all([
                 gmStoreWithLegal(goldmindClient
-                    .from('stores').select('name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()),
+                    .from('stores').select('name, display_name, diamonds_enabled, rfid_enabled, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()),
                 goldmindClient
                     .from('staff').select('full_name, role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).maybeSingle()
             ]);
 
             if (store) {
-                document.getElementById('storeNameEl').textContent = store.name;
+                document.getElementById('storeNameEl').textContent = gmShownName(store);
                 fitStatNumber(document.getElementById('storeNameEl'));
-                localStorage.setItem('goldmind_store_name', store.name);
+                localStorage.setItem('goldmind_store_name', gmShownName(store));
 
                 const avatarEl = document.getElementById('storeAvatarEl');
                 const dskNameEl = document.getElementById('dskStoreNameEl');
                 const dskAvatarEl = document.getElementById('dskStoreAvatarEl');
-                if (dskNameEl) { dskNameEl.textContent = store.name; fitStatNumber(dskNameEl); }
+                if (dskNameEl) { dskNameEl.textContent = gmShownName(store); fitStatNumber(dskNameEl); }
                 if (store.logo_url) {
                     avatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full object-cover"/>';
                     localStorage.setItem('goldmind_store_logo', store.logo_url);
                     if (dskAvatarEl) dskAvatarEl.innerHTML = '<img src="' + store.logo_url + '" alt="" class="w-full h-full object-cover"/>';
                 } else {
-                    avatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
+                    avatarEl.textContent = (gmShownName(store) || '؟').trim().charAt(0) || '؟';
                     localStorage.removeItem('goldmind_store_logo');
-                    if (dskAvatarEl) dskAvatarEl.textContent = (store.name || '؟').trim().charAt(0) || '؟';
+                    if (dskAvatarEl) dskAvatarEl.textContent = (gmShownName(store) || '؟').trim().charAt(0) || '؟';
                 }
                 avatarEl.style.visibility = 'visible';
                 if (dskAvatarEl) dskAvatarEl.style.visibility = 'visible';

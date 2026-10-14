@@ -334,6 +334,11 @@ async function gmStoreWithLegal(query) {
     return res;
 }
 
+// Name shown in the company list and at the top of the screen; invoices keep stores.name.
+function gmShownName(store) {
+    return (store && String(store.display_name || '').trim()) || (store && store.name) || '';
+}
+
 // Checks the store's subscription status (computed live server-side, no
 // background job needed -- safe even if the free-tier project was paused).
 // Call after requireGoldMindSession() on pages that should be locked once a
