@@ -260,8 +260,8 @@ async function applyFilters() {
     goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID),
     gmFetchAllRows(() => goldmindClient.from('expense_entries').select('amount').eq('store_id', GOLDMIND_STORE_ID)
       .gte('created_at', range.from).lt('created_at', range.to)),
-    gmFetchAllRows(() => goldmindClient.from('pieces').select('weight_grams, accounting_weight_grams').eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved'])),
-    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('store_id', GOLDMIND_STORE_ID),
+    gmFetchAllRows(() => goldmindClient.from('pieces').select('weight_grams, accounting_weight_grams, karat').eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved'])),
+    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining, karat').eq('store_id', GOLDMIND_STORE_ID),
     gmFetchAllRows(() => goldmindClient.from('customer_debts').select('cash_amount').eq('store_id', GOLDMIND_STORE_ID).eq('source', 'discount')
       .gte('created_at', range.from).lt('created_at', range.to)),
     goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID).eq('karat', 24).maybeSingle(),
@@ -305,7 +305,7 @@ async function applyFilters() {
     const st = byStaff[inv.created_by] || (byStaff[inv.created_by] = { invoices: new Set(), revenue: 0, profit: 0, gross: 0, acc: 0, makingSold: 0, makingAcc: 0 });
     st.invoices.add(inv.id); st.revenue += p.revenue; st.profit += p.profit; st.gross += gross; st.acc += acc;
     if (!it.diamond && !(it.piece && Number(it.piece.accent_diamond_carat))) { st.makingSold += p.revenue - p.vat - p.goldValue; st.makingAcc += acc; }
-    return { it, inv, isReturn: isReturn || p.neg, exchanged: p.neg, weight: p.weight, displayWeight: p.grossWeight, revenue: p.revenue, goldValue: p.goldValue, vat: p.vat, fabCost: p.fabCost, diamondCost: p.diamondCost, profit: p.profit, isEstimated: p.isEstimated, carats };
+    return { k: pureDiamond ? 'ألماس' : it.karat, g: gross, a: acc, it, inv, isReturn: isReturn || p.neg, exchanged: p.neg, weight: p.weight, displayWeight: p.grossWeight, revenue: p.revenue, goldValue: p.goldValue, vat: p.vat, fabCost: p.fabCost, diamondCost: p.diamondCost, profit: p.profit, isEstimated: p.isEstimated, carats };
   });
   const sum = k => rows.reduce((a, r) => a + (Number(r[k]) || 0), 0);
   const retail = { revenue: sum('revenue'), goldValue: sum('goldValue'), vat: sum('vat'), fabCost: sum('fabCost'), diamondCost: sum('diamondCost'), profit: sum('profit') };
@@ -401,7 +401,36 @@ async function applyFilters() {
       <td style="${B}text-align:left;font-size:13px;" dir="ltr">${nf(a, 3)}</td></tr>`;
   const group = t => `<tr><td colspan="4" style="${B}background:#1F1A12;color:#F3EEDF;font-weight:800;font-size:14px;">${t}</td></tr>`;
   const green = 'background:#E8F3E6;color:#14532d;', red = 'background:#FBEAEA;color:#7f1d1d;';
-  document.getElementById('pr-brief').innerHTML = `<div class="gm-keep" style="background:#fff;border-radius:12px;overflow-x:auto;">
+  // ---- movement summary for the owner: sales by karat (customers / traders), profit, stock by karat now
+  const to24 = (w, k) => (Number(w) || 0) * (Number(k) || 0) / 24;
+  const group2 = (list, keyOf, add) => { const m = {}; list.forEach(x => { const k = keyOf(x); add(m[k] || (m[k] = { g: 0, a: 0, p: 0, amt: 0, profit: 0 }), x); }); return m; };
+  const sortK = m => Object.keys(m).sort((a, b) => (Number(b) || -1) - (Number(a) || -1));
+  const custK = group2(rows, r => r.k == null ? '—' : String(r.k), (t, r) => { t.g += r.g; t.a += r.a; t.p += to24(r.a, r.k); t.amt += r.revenue; t.profit += r.profit; });
+  const trK = group2(wholesale, r => r.m.karat == null ? '—' : String(r.m.karat), (t, r) => { t.g += r.gross; t.a += r.billed; t.p += Number(r.m.gold_24k_equivalent) || to24(r.billed, r.m.karat); t.amt += r.fee; t.profit += r.profit; });
+  const kTable = (title, head, m, note) => { const t = { g: 0, a: 0, p: 0, amt: 0, profit: 0 }; const ks = sortK(m);
+    const out = ks.map(k => { const r = m[k]; Object.keys(t).forEach(f => t[f] += r[f]); return { cells: [escH(k), f3(r.g), f3(r.a), f3(r.p), f2(r.amt), f2(r.profit)] }; });
+    if (ks.length) out.push({ total: true, cells: ['المجموع', f3(t.g), f3(t.a), f3(t.p), f2(t.amt), f2(t.profit)] });
+    return table(title, head, out, note); };
+  const stockK = {};
+  const addS = (k, w, col) => { const r = stockK[k] || (stockK[k] = { pieces: 0, scrap: 0 }); r[col] += Number(w) || 0; };
+  (stockRes.data || []).forEach(p => addS(p.karat, p.weight_grams, 'pieces'));
+  ((lotsRes && lotsRes.data) || []).forEach(l => addS(l.karat, l.weight_grams_remaining, 'scrap'));
+  const sT = { pieces: 0, scrap: 0, p: 0 };
+  const stockRows = sortK(stockK).filter(k => stockK[k].pieces || stockK[k].scrap).map(k => { const r = stockK[k], p = to24(r.pieces + r.scrap, k); sT.pieces += r.pieces; sT.scrap += r.scrap; sT.p += p;
+    return { cells: [escH(k), f3(r.pieces), f3(r.scrap), f3(r.pieces + r.scrap), f3(p)] }; });
+  if (stockRows.length) stockRows.push({ total: true, cells: ['المجموع', f3(sT.pieces), f3(sT.scrap), f3(sT.pieces + sT.scrap), f3(sT.p)] });
+  const summaryHtml = `<div class="flex flex-col gap-3 mb-3">
+    <div class="px-1 font-bold text-[15px]">ملخص الحركة للفترة</div>
+    ${kTable('مبيعات الزبائن حسب العيار', ['العيار', 'الوزن القائم', 'الوزن المحاسبي', 'ما يعادل عيار 24', 'المبلغ', 'الربح'], custK, 'المبلغ شامل الضريبة، والمرتجعات مخصومة.')}
+    ${kTable('بضاعة خرجت للتجار حسب العيار', ['العيار', 'الوزن القائم', 'الوزن المحسوب على التاجر', 'ما يعادل عيار 24', 'قيمة المصنعية', 'الربح'], trK, 'الربح = ربح المصنعية + فرق وزن الذهب، كما في جدول التجار أدناه.')}
+    ${table('صافي ربح المبيعات', ['البند', 'الربح'], [
+      { cells: ['ربح مبيعات الزبائن', f2(retail.profit)] },
+      { cells: ['ربح البضاعة الخارجة للتجار', f2(ws.profit)] },
+      { total: true, cells: ['صافي ربح كل المبيعات', f2(retail.profit + ws.profit)] }
+    ], 'قبل المصاريف والخصومات وربح شراء الكسر. صافي ربح المحل بعدها في الجدول التالي.')}
+    ${table('رصيد الذهب الآن حسب العيار', ['العيار', 'قطع مباركدة', 'كسر بلا باركود', 'المجموع', 'ما يعادل عيار 24'], stockRows, 'الرصيد الحالي وقت فتح التقرير، وليس في نهاية الفترة. القطع تشمل المتوفرة والمحجوزة.')}
+  </div>`;
+  document.getElementById('pr-brief').innerHTML = summaryHtml + `<div class="gm-keep" style="background:#fff;border-radius:12px;overflow-x:auto;">
     <table style="width:100%;border-collapse:collapse;font-size:14px;">
       <thead><tr style="background:#EFE7D2;font-size:13px;">
         <th style="${B}text-align:right;">البند</th><th style="${B}">المبلغ</th><th style="${B}">الوزن القائم (غ)</th><th style="${B}">الوزن المحاسبي (غ)</th></tr></thead>
