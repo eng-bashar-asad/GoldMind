@@ -1007,6 +1007,24 @@ function gmSmartBack(fallbackHref) {
   window.location.href = fallbackHref;
 }
 
+// Android hardware / gesture back (called by MainActivity). Returns 'exit' when the app should go to
+// the background (home or sign-in pages), otherwise steps back exactly like the page's own back button.
+// A page can handle it first (close its own popup) by defining window.gmOnHardwareBack() returning true.
+function gmHardwareBack() {
+  try {
+    if (typeof window.gmOnHardwareBack === 'function' && window.gmOnHardwareBack() === true) return 'done';
+    var dlg = document.querySelector('dialog[open]');
+    if (dlg) { dlg.close(); return 'done'; }
+    var name = location.pathname.split('/').pop() || 'index.html';
+    if (['index-ar.html', 'index.html', 'login-entry-ar.html', 'login-ar-4.html', 'auth-callback-ar.html',
+         'admin-login-ar.html', 'landing-ar.html'].indexOf(name) !== -1) return 'exit';
+    var btn = Array.prototype.find.call(document.querySelectorAll('.gm-back-btn-3d'), function (b) { return b.offsetParent !== null; });
+    if (btn) { btn.click(); return 'done'; }
+    gmSmartBack('index-ar.html');
+    return 'done';
+  } catch (e) { return 'exit'; }
+}
+
 // Ninth shape: every header "back" button across the app used to be a bare
 // flat glyph (a plain unicode arrow or an unstyled Material Symbol) — easy
 // to miss and visually flat/"dry". Give every one of them a consistent,

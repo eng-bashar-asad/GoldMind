@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=40"></script>
-<script src="theme.js?v=61"></script>
+<script src="theme.js?v=62"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
@@ -176,7 +176,7 @@
 <!-- TopAppBar -->
 <header class="w-full top-0 sticky z-40 bg-background border-b border-outline-variant flex flex-row-reverse justify-between items-center px-margin-mobile md:px-margin-desktop h-16">
 <div class="flex items-center gap-4">
-<span class="material-symbols-outlined md:hidden text-primary cursor-pointer active:opacity-80">menu</span>
+<button type="button" onclick="gmSmartBack('index-ar.html')" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button>
 <h1 class="font-headline-md text-headline-md font-bold text-primary">سجل النشاط</h1>
 </div>
 <div class="flex items-center gap-3">
@@ -434,7 +434,7 @@ function applyFilters() {
   const { data: staffRow } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
   const canView = staffRow && staffRow.permissions && staffRow.permissions.view_reports;
   if (!canView) {
-    document.querySelector('main').innerHTML = '<div class="p-10 text-center text-error text-sm">ليس لديك صلاحية لعرض سجل النشاط. تواصل مع مدير الشركة.</div>';
+    document.querySelector('main').innerHTML = '<div class="p-4"><button type="button" onclick="gmSmartBack(\'index-ar.html\')" class="gm-back-btn-3d" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button></div><div class="p-10 text-center text-error text-sm">ليس لديك صلاحية لعرض سجل النشاط. تواصل مع مدير الشركة.</div>';
     return;
   }
   loadActivity();

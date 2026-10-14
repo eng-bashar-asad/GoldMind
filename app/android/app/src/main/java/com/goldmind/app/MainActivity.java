@@ -22,7 +22,23 @@ public class MainActivity extends BridgeActivity {
             // WebView 44 that can't be updated) the app becomes the chip programmer
             startActivity(new android.content.Intent(this, RfidWriterActivity.class));
             finish();
+            return;
         }
+        // Hardware / gesture back used to close the app from any page. Ask the page instead
+        // (gmHardwareBack in theme.js): it steps back like the page's own back button and
+        // answers "exit" only on the home and sign-in pages.
+        getOnBackPressedDispatcher().addCallback(this, new androidx.activity.OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                final android.webkit.WebView web = bridge == null ? null : bridge.getWebView();
+                if (web == null) { moveTaskToBack(true); return; }
+                web.evaluateJavascript("(function(){try{return typeof gmHardwareBack==='function'?gmHardwareBack():'none'}catch(e){return 'none'}})()", r -> {
+                    String v = r == null ? "" : r.replace("\"", "");
+                    if ("exit".equals(v)) moveTaskToBack(true);
+                    else if (!"done".equals(v)) { if (web.canGoBack()) web.goBack(); else moveTaskToBack(true); }
+                });
+            }
+        });
     }
 
     // Capacitor 6 needs WebView 60+; GoldMind's pages need newer (async, CSS variables...)
