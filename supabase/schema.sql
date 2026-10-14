@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YEFR5xMoBINpF5VDZNcWkxedfyj5MXfug2jYmloj5YN6mRXBaLn2aeEriEsba1l
+\restrict S6g4DmJcLHWZxQsQQp59Bg2zR8vEpdncGbjuma0Bb2ZvGN5lryri8PqW6LCUxWo
 
 
 SET statement_timeout = 0;
@@ -1205,14 +1205,16 @@ CREATE FUNCTION public.ensure_store_organization() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                            declare new_org uuid;
-                            begin
-                              insert into organizations (name, primary_store_id, legal_name, tax_number, country, logo_url)
-                                values (new.name, new.id, new.legal_name, new.tax_number, new.country, new.logo_url)
-                                  returning id into new_org;
-                                    update stores set organization_id = new_org where id = new.id;
-                                      return null;
-                                      end $$;
+                                                 declare new_org uuid;
+                                                 begin
+                                                   insert into organizations (name, primary_store_id, legal_name, tax_number, country, logo_url,
+                                                                                commercial_registration_number, legal_registration_id_type, emirate_code, peppol_endpoint_id)
+                                                                                  values (new.name, new.id, new.legal_name, new.tax_number, new.country, new.logo_url,
+                                                                                            new.commercial_registration_number, new.legal_registration_id_type, new.emirate_code, new.peppol_endpoint_id)
+                                                                                              returning id into new_org;
+                                                                                                update stores set organization_id = new_org where id = new.id;
+                                                                                                  return null;
+                                                                                                  end $$;
 
 
 --
@@ -1299,42 +1301,31 @@ CREATE FUNCTION public.get_invoice_receipt(p_id uuid) RETURNS TABLE(invoice_numb
     LANGUAGE sql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  SELECT
-    inv.invoice_number,
-    inv.type,
-    inv.status,
-    inv.payment_method,
-    inv.vat_amount,
-    inv.total_amount,
-    inv.created_at,
-    s.name,
-    s.logo_url,
-    s.address,
-    s.phone,
-    s.email,
-    s.vat_rate,
-    s.tax_number,
-    s.currency,
-    s.secondary_currency,
-    s.secondary_currency_rate,
-    c.name,
-    c.phone,
-    COALESCE((
-      SELECT jsonb_agg(jsonb_build_object(
-        'description', ii.description,
-        'description_en', ii.description_en,
-        'karat', ii.karat,
-        'weight_grams', ii.weight_grams,
-        'line_total', ii.line_total,
-        'quantity', 1
-      ) ORDER BY ii.id)
-      FROM invoice_items ii WHERE ii.invoice_id = inv.id
-    ), '[]'::jsonb)
-  FROM invoices inv
-  JOIN stores s ON s.id = inv.store_id
-  LEFT JOIN customers c ON c.id = inv.customer_id
-  WHERE inv.id = p_id AND inv.status != 'cancelled';
-$$;
+                                                          select
+                                                              inv.invoice_number, inv.type, inv.status, inv.payment_method, inv.vat_amount, inv.total_amount, inv.created_at,
+                                                                  s.name,
+                                                                      coalesce(o.logo_url, s.logo_url),
+                                                                          s.address, s.phone, s.email, s.vat_rate,
+                                                                              coalesce(o.tax_number, s.tax_number),
+                                                                                  s.currency, s.secondary_currency, s.secondary_currency_rate,
+                                                                                      c.name, c.phone,
+                                                                                          coalesce((
+                                                                                                select jsonb_agg(jsonb_build_object(
+                                                                                                        'description', ii.description,
+                                                                                                                'description_en', ii.description_en,
+                                                                                                                        'karat', ii.karat,
+                                                                                                                                'weight_grams', ii.weight_grams,
+                                                                                                                                        'line_total', ii.line_total,
+                                                                                                                                                'quantity', 1
+                                                                                                                                                      ) order by ii.id)
+                                                                                                                                                            from invoice_items ii where ii.invoice_id = inv.id
+                                                                                                                                                                ), '[]'::jsonb)
+                                                                                                                                                                  from invoices inv
+                                                                                                                                                                    join stores s on s.id = inv.store_id
+                                                                                                                                                                      left join organizations o on o.id = s.organization_id
+                                                                                                                                                                        left join customers c on c.id = inv.customer_id
+                                                                                                                                                                          where inv.id = p_id and inv.status != 'cancelled';
+                                                                                                                                                                          $$;
 
 
 --
@@ -1345,31 +1336,20 @@ CREATE FUNCTION public.get_repair_receipt(p_id uuid) RETURNS TABLE(ticket_number
     LANGUAGE sql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-    SELECT
-        rt.ticket_number,
-        rt.piece_description,
-        rt.problem_description,
-        rt.intake_photo_url,
-        rt.ready_photo_url,
-        rt.status,
-        rt.received_at,
-        rt.ready_at,
-        s.name,
-        s.logo_url,
-        s.address,
-        s.phone,
-        st.full_name,
-        s.invoice_print_frame,
-        s.invoice_print_shape,
-        rt.estimated_cost,
-        rt.actual_cost,
-        s.vat_rate,
-        s.tax_number
-    FROM repair_tickets rt
-    JOIN stores s ON s.id = rt.store_id
-    LEFT JOIN staff st ON st.id = rt.received_by
-    WHERE rt.id = p_id;
-$$;
+                                                                                                                                                                                                                                    select
+                                                                                                                                                                                                                                        rt.ticket_number, rt.piece_description, rt.problem_description, rt.intake_photo_url, rt.ready_photo_url,
+                                                                                                                                                                                                                                            rt.status, rt.received_at, rt.ready_at,
+                                                                                                                                                                                                                                                s.name,
+                                                                                                                                                                                                                                                    coalesce(o.logo_url, s.logo_url),
+                                                                                                                                                                                                                                                        s.address, s.phone, st.full_name, s.invoice_print_frame, s.invoice_print_shape,
+                                                                                                                                                                                                                                                            rt.estimated_cost, rt.actual_cost, s.vat_rate,
+                                                                                                                                                                                                                                                                coalesce(o.tax_number, s.tax_number)
+                                                                                                                                                                                                                                                                  from repair_tickets rt
+                                                                                                                                                                                                                                                                    join stores s on s.id = rt.store_id
+                                                                                                                                                                                                                                                                      left join organizations o on o.id = s.organization_id
+                                                                                                                                                                                                                                                                        left join staff st on st.id = rt.received_by
+                                                                                                                                                                                                                                                                          where rt.id = p_id;
+                                                                                                                                                                                                                                                                          $$;
 
 
 --
@@ -1895,6 +1875,20 @@ begin
   end if;
   return new;
 end $$;
+
+
+--
+-- Name: is_org_owner(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.is_org_owner(p_org uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                                     select exists (
+                                         select 1 from staff st join organizations o on o.primary_store_id = st.store_id
+                                             where o.id = p_org and st.user_id = auth.uid() and st.role = 'owner');
+                                             $$;
 
 
 --
@@ -3042,6 +3036,42 @@ end $$;
 
 
 --
+-- Name: regenerate_piece_barcode(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.regenerate_piece_barcode(p_piece_id uuid) RETURNS text
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                declare
+                  p record;
+                    new_bc text;
+                      tries int := 0;
+                      begin
+                        select * into p from public.pieces where id = p_piece_id for update;
+                          if not found then raise exception 'PIECE_NOT_FOUND'; end if;
+                            if not public.has_permission('edit_piece', p.store_id) then raise exception 'NOT_AUTHORIZED'; end if;
+                              if p.barcode is null then raise exception 'NO_BARCODE'; end if;
+
+                                -- next number from the store's sequence; skip any number already used or cancelled
+                                  loop
+                                      new_bc := public.next_piece_barcode(p.store_id, 'gold');
+                                          tries := tries + 1;
+                                              exit when not exists (select 1 from public.pieces where barcode = new_bc)
+                                                        and not exists (select 1 from public.piece_barcode_history where old_barcode = new_bc);
+                                                            if tries >= 20 then raise exception 'BARCODE_COLLISION'; end if;
+                                                              end loop;
+
+                                                                insert into public.piece_barcode_history (store_id, piece_id, old_barcode, new_barcode, changed_by)
+                                                                  values (p.store_id, p.id, p.barcode, new_bc, auth.uid());
+
+                                                                    -- the chip still holds the old EPC until it is programmed again
+                                                                      update public.pieces set barcode = new_bc, rfid_epc = null, rfid_encoded_at = null where id = p.id;
+                                                                        return new_bc;
+                                                                        end $$;
+
+
+--
 -- Name: register_new_company(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3147,6 +3177,34 @@ begin
   return new_store_id;
 end;
 $$;
+
+
+--
+-- Name: replace_piece_chip(uuid, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.replace_piece_chip(p_piece_id uuid, p_old_epc text, p_new_epc text) RETURNS text
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+                declare
+                  p record;
+                  begin
+                    select * into p from public.pieces where id = p_piece_id for update;
+                      if not found then raise exception 'PIECE_NOT_FOUND'; end if;
+                        if not public.has_permission('edit_piece', p.store_id) then raise exception 'NOT_AUTHORIZED'; end if;
+                          if p_new_epc is null or p_new_epc !~ '^[0-9A-F]{24}$' then raise exception 'INVALID_EPC'; end if;
+                            if exists (select 1 from public.pieces where rfid_epc = p_new_epc and id <> p.id)
+                                 or exists (select 1 from public.piece_chip_history where old_epc = p_new_epc) then
+                                     raise exception 'EPC_IN_USE';
+                                       end if;
+
+                                         insert into public.piece_chip_history (store_id, piece_id, old_epc, new_epc, changed_by)
+                                           values (p.store_id, p.id, p_old_epc, p_new_epc, auth.uid());
+
+                                             update public.pieces set rfid_epc = p_new_epc, rfid_encoded_at = now() where id = p.id;
+                                               return p_new_epc;
+                                               end $_$;
 
 
 --
@@ -3559,6 +3617,45 @@ $$;
 
 
 --
+-- Name: set_voucher_date(uuid, date); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_voucher_date(p_cash_movement uuid, p_date date) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  cm record;
+  today date := (now() at time zone 'Asia/Dubai')::date;
+  new_ts timestamptz;
+begin
+  select * into cm from cash_movements where id = p_cash_movement;
+  if cm is null then raise exception 'السند غير موجود'; end if;
+  if cm.invoice_id is not null then raise exception 'هذه الحركة من فاتورة — عدّل تاريخ الفاتورة من صفحتها'; end if;
+  if p_date is null or p_date > today or p_date < today - 3650 then raise exception 'اختر تاريخاً سابقاً أو اليوم'; end if;
+  if not is_store_member(cm.store_id) then raise exception 'ليس لديك صلاحية' using errcode = '42501'; end if;
+  if cm.trader_movement_id is not null and not has_permission('edit_traders', cm.store_id) then
+    raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501';
+  end if;
+  if exists (select 1 from customer_debts where cash_movement_id = cm.id) and not has_permission('edit_customers', cm.store_id) then
+    raise exception 'ليس لديك صلاحية تعديل حسابات الزبائن' using errcode = '42501';
+  end if;
+  if exists (select 1 from expense_entries where cash_movement_id = cm.id) and not gm_can_expense(cm.store_id) then
+    raise exception 'ليس لديك صلاحية تعديل المصاريف' using errcode = '42501';
+  end if;
+
+  new_ts := (p_date + (cm.created_at at time zone 'Asia/Dubai')::time) at time zone 'Asia/Dubai';
+  update cash_movements set created_at = new_ts where id = cm.id;
+  update daily_cash_log set created_at = new_ts where cash_movement_id = cm.id;
+  update customer_debts set created_at = new_ts where cash_movement_id = cm.id;
+  update expense_entries set created_at = new_ts where cash_movement_id = cm.id;
+  if cm.trader_movement_id is not null then
+    update trader_movements set created_at = new_ts where id = cm.trader_movement_id;
+  end if;
+end $$;
+
+
+--
 -- Name: staff_heartbeat(uuid, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3773,16 +3870,20 @@ $$;
 -- Name: store_legal(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.store_legal(p_store_id uuid) RETURNS TABLE(organization_id uuid, organization_name text, legal_name text, tax_number text, country text, logo_url text)
+CREATE FUNCTION public.store_legal(p_store_id uuid) RETURNS TABLE(organization_id uuid, organization_name text, legal_name text, tax_number text, country text, logo_url text, commercial_registration_number text, legal_registration_id_type text, emirate_code text, peppol_endpoint_id text)
     LANGUAGE sql STABLE
     SET search_path TO 'public'
     AS $$
-                                                                                 select s.organization_id, o.name,
-                                                                                          coalesce(o.legal_name, s.legal_name), coalesce(o.tax_number, s.tax_number),
-                                                                                                   coalesce(o.country, s.country), coalesce(o.logo_url, s.logo_url)
-                                                                                                     from stores s left join organizations o on o.id = s.organization_id
-                                                                                                       where s.id = p_store_id;
-                                                                                                       $$;
+                                                                                                                                                                                                                                                                                                                                            select s.organization_id, o.name,
+                                                                                                                                                                                                                                                                                                                                                     coalesce(o.legal_name, s.legal_name), coalesce(o.tax_number, s.tax_number),
+                                                                                                                                                                                                                                                                                                                                                              coalesce(o.country, s.country), coalesce(o.logo_url, s.logo_url),
+                                                                                                                                                                                                                                                                                                                                                                       coalesce(o.commercial_registration_number, s.commercial_registration_number),
+                                                                                                                                                                                                                                                                                                                                                                                coalesce(o.legal_registration_id_type, s.legal_registration_id_type),
+                                                                                                                                                                                                                                                                                                                                                                                         coalesce(s.branch_emirate_code, o.emirate_code, s.emirate_code),
+                                                                                                                                                                                                                                                                                                                                                                                                  coalesce(o.peppol_endpoint_id, s.peppol_endpoint_id)
+                                                                                                                                                                                                                                                                                                                                                                                                    from stores s left join organizations o on o.id = s.organization_id
+                                                                                                                                                                                                                                                                                                                                                                                                      where s.id = p_store_id;
+                                                                                                                                                                                                                                                                                                                                                                                                      $$;
 
 
 --
@@ -3855,6 +3956,27 @@ end $$;
 
 
 --
+-- Name: sync_org_legal_to_stores(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sync_org_legal_to_stores() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                                                                                                                                                                                                       begin
+                                                                                                                                                                                                         if pg_trigger_depth() > 1 then return null; end if;
+                                                                                                                                                                                                           update stores s
+                                                                                                                                                                                                                set legal_name = new.legal_name, tax_number = new.tax_number,
+                                                                                                                                                                                                                         country = new.country, logo_url = new.logo_url,
+                                                                                                                                                                                                                                  commercial_registration_number = new.commercial_registration_number,
+                                                                                                                                                                                                                                           legal_registration_id_type = new.legal_registration_id_type,
+                                                                                                                                                                                                                                                    emirate_code = new.emirate_code, peppol_endpoint_id = new.peppol_endpoint_id
+                                                                                                                                                                                                                                                       where s.organization_id = new.id;
+                                                                                                                                                                                                                                                         return null;
+                                                                                                                                                                                                                                                         end $$;
+
+
+--
 -- Name: sync_staff_to_hr_employee(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3880,13 +4002,17 @@ CREATE FUNCTION public.sync_store_legal_to_org() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                                          begin
-                                            update organizations o
-                                                 set legal_name = new.legal_name, tax_number = new.tax_number,
-                                                          country = new.country, logo_url = new.logo_url
-                                                             where o.id = new.organization_id and o.primary_store_id = new.id;
-                                                               return null;
-                                                               end $$;
+                                                                                                  begin
+                                                                                                    if pg_trigger_depth() > 1 then return null; end if;
+                                                                                                      update organizations o
+                                                                                                           set legal_name = new.legal_name, tax_number = new.tax_number,
+                                                                                                                    country = new.country, logo_url = new.logo_url,
+                                                                                                                             commercial_registration_number = new.commercial_registration_number,
+                                                                                                                                      legal_registration_id_type = new.legal_registration_id_type,
+                                                                                                                                               emirate_code = new.emirate_code, peppol_endpoint_id = new.peppol_endpoint_id
+                                                                                                                                                  where o.id = new.organization_id and o.primary_store_id = new.id;
+                                                                                                                                                    return null;
+                                                                                                                                                    end $$;
 
 
 --
@@ -4915,7 +5041,7 @@ CREATE TABLE public.inventory_count_scans (
     scanned_by uuid,
     piece_source text,
     scan_method text,
-    CONSTRAINT inventory_count_scans_match_status_check CHECK ((match_status = ANY (ARRAY['matched'::text, 'unexpected'::text, 'duplicate'::text])))
+    CONSTRAINT inventory_count_scans_match_status_check CHECK ((match_status = ANY (ARRAY['matched'::text, 'unexpected'::text, 'duplicate'::text, 'cancelled'::text])))
 );
 
 
@@ -5173,7 +5299,11 @@ CREATE TABLE public.organizations (
     legal_name text,
     tax_number text,
     country text,
-    logo_url text
+    logo_url text,
+    commercial_registration_number text,
+    legal_registration_id_type text,
+    emirate_code text,
+    peppol_endpoint_id text
 );
 
 ALTER TABLE ONLY public.organizations FORCE ROW LEVEL SECURITY;
@@ -5203,6 +5333,36 @@ CREATE TABLE public.payroll_payments (
 --
 
 COMMENT ON TABLE public.payroll_payments IS 'Actual salary payment log (base + bonus - deduction = net), one row per payment run; mirrored into expense_entries + cash_movements at insert time by the app';
+
+
+--
+-- Name: piece_barcode_history; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.piece_barcode_history (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    store_id uuid NOT NULL,
+    piece_id uuid,
+    old_barcode text NOT NULL,
+    new_barcode text NOT NULL,
+    changed_by uuid,
+    changed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: piece_chip_history; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.piece_chip_history (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    store_id uuid NOT NULL,
+    piece_id uuid,
+    old_epc text NOT NULL,
+    new_epc text NOT NULL,
+    changed_by uuid,
+    changed_at timestamp with time zone DEFAULT now() NOT NULL
+);
 
 
 --
@@ -5310,7 +5470,9 @@ CREATE TABLE public.pieces (
     center_stone_carat numeric,
     center_stone_price_per_carat numeric,
     purchase_cost numeric,
-    CONSTRAINT pieces_karat_check CHECK ((karat = ANY (ARRAY[18, 21, 22, 24])))
+    zircon_carat numeric,
+    CONSTRAINT pieces_karat_check CHECK ((karat = ANY (ARRAY[18, 21, 22, 24]))),
+    CONSTRAINT pieces_zircon_carat_check CHECK (((zircon_carat IS NULL) OR (zircon_carat >= (0)::numeric)))
 );
 
 
@@ -5340,6 +5502,13 @@ COMMENT ON COLUMN public.pieces.rfid_last_seen_at IS 'Updated whenever this EPC 
 --
 
 COMMENT ON COLUMN public.pieces.box_name IS 'User-chosen destination label a produced/added piece was filed under (e.g. "قطع مجوهرات") -- purely organizational.';
+
+
+--
+-- Name: COLUMN pieces.zircon_carat; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.pieces.zircon_carat IS 'Zircon (cubic zirconia) weight in grams; label symbol Z.';
 
 
 --
@@ -5665,8 +5834,13 @@ CREATE TABLE public.stores (
     address_en text,
     allow_biometric_login boolean DEFAULT true NOT NULL,
     rfid_device_key text,
+    branch_emirate_code text,
+    debt_alert_days integer DEFAULT 15 NOT NULL,
+    debt_alert_customers boolean DEFAULT true NOT NULL,
+    debt_alert_traders boolean DEFAULT true NOT NULL,
     CONSTRAINT invoice_print_frame_check CHECK ((invoice_print_frame = ANY (ARRAY['classic'::text, 'gold'::text, 'double'::text, 'dashed'::text, 'none'::text]))),
-    CONSTRAINT invoice_print_shape_check CHECK ((invoice_print_shape = ANY (ARRAY['square'::text, 'soft'::text, 'round'::text])))
+    CONSTRAINT invoice_print_shape_check CHECK ((invoice_print_shape = ANY (ARRAY['square'::text, 'soft'::text, 'round'::text]))),
+    CONSTRAINT stores_debt_alert_days_check CHECK (((debt_alert_days >= 1) AND (debt_alert_days <= 365)))
 );
 
 
@@ -5910,7 +6084,7 @@ CREATE TABLE public.zebra_label_fields (
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     x_offset_mm numeric DEFAULT 0 NOT NULL,
     CONSTRAINT zebra_label_fields_column_num_check CHECK ((column_num = ANY (ARRAY[1, 2]))),
-    CONSTRAINT zebra_label_fields_content_type_check CHECK ((content_type = ANY (ARRAY['barcode_number'::text, 'barcode_graphic'::text, 'company_name'::text, 'weight'::text, 'karat'::text, 'mc'::text, 'description'::text, 'custom_text'::text, 'blank_line'::text, 'diamond_carat'::text])))
+    CONSTRAINT zebra_label_fields_content_type_check CHECK ((content_type = ANY (ARRAY['barcode_number'::text, 'barcode_graphic'::text, 'company_name'::text, 'weight'::text, 'karat'::text, 'mc'::text, 'description'::text, 'custom_text'::text, 'blank_line'::text, 'diamond_carat'::text, 'zircon_carat'::text])))
 );
 
 
@@ -6216,6 +6390,38 @@ ALTER TABLE ONLY public.organizations
 
 ALTER TABLE ONLY public.payroll_payments
     ADD CONSTRAINT payroll_payments_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: piece_barcode_history piece_barcode_history_old_barcode_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_barcode_history
+    ADD CONSTRAINT piece_barcode_history_old_barcode_key UNIQUE (old_barcode);
+
+
+--
+-- Name: piece_barcode_history piece_barcode_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_barcode_history
+    ADD CONSTRAINT piece_barcode_history_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: piece_chip_history piece_chip_history_old_epc_key; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_chip_history
+    ADD CONSTRAINT piece_chip_history_old_epc_key UNIQUE (old_epc);
+
+
+--
+-- Name: piece_chip_history piece_chip_history_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_chip_history
+    ADD CONSTRAINT piece_chip_history_pkey PRIMARY KEY (id);
 
 
 --
@@ -7075,6 +7281,20 @@ CREATE INDEX payroll_payments_staff_id_fk_idx ON public.payroll_payments USING b
 
 
 --
+-- Name: piece_barcode_history_store_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_barcode_history_store_idx ON public.piece_barcode_history USING btree (store_id);
+
+
+--
+-- Name: piece_chip_history_store_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_chip_history_store_idx ON public.piece_chip_history USING btree (store_id);
+
+
+--
 -- Name: piece_classification_options_created_by_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7544,6 +7764,13 @@ CREATE TRIGGER trg_op_date BEFORE INSERT ON public.trader_movements FOR EACH ROW
 
 
 --
+-- Name: organizations trg_org_sync_legal; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_org_sync_legal AFTER UPDATE OF legal_name, tax_number, country, logo_url, commercial_registration_number, legal_registration_id_type, emirate_code, peppol_endpoint_id ON public.organizations FOR EACH ROW WHEN (((old.legal_name IS DISTINCT FROM new.legal_name) OR (old.tax_number IS DISTINCT FROM new.tax_number) OR (old.country IS DISTINCT FROM new.country) OR (old.logo_url IS DISTINCT FROM new.logo_url) OR (old.commercial_registration_number IS DISTINCT FROM new.commercial_registration_number) OR (old.legal_registration_id_type IS DISTINCT FROM new.legal_registration_id_type) OR (old.emirate_code IS DISTINCT FROM new.emirate_code) OR (old.peppol_endpoint_id IS DISTINCT FROM new.peppol_endpoint_id))) EXECUTE FUNCTION public.sync_org_legal_to_stores();
+
+
+--
 -- Name: pieces trg_piece_draws_delete; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -7603,7 +7830,7 @@ CREATE TRIGGER trg_stores_ensure_org AFTER INSERT ON public.stores FOR EACH ROW 
 -- Name: stores trg_stores_sync_legal; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trg_stores_sync_legal AFTER UPDATE OF legal_name, tax_number, country, logo_url ON public.stores FOR EACH ROW WHEN (((old.legal_name IS DISTINCT FROM new.legal_name) OR (old.tax_number IS DISTINCT FROM new.tax_number) OR (old.country IS DISTINCT FROM new.country) OR (old.logo_url IS DISTINCT FROM new.logo_url))) EXECUTE FUNCTION public.sync_store_legal_to_org();
+CREATE TRIGGER trg_stores_sync_legal AFTER UPDATE OF legal_name, tax_number, country, logo_url, commercial_registration_number, legal_registration_id_type, emirate_code, peppol_endpoint_id ON public.stores FOR EACH ROW WHEN (((old.legal_name IS DISTINCT FROM new.legal_name) OR (old.tax_number IS DISTINCT FROM new.tax_number) OR (old.country IS DISTINCT FROM new.country) OR (old.logo_url IS DISTINCT FROM new.logo_url) OR (old.commercial_registration_number IS DISTINCT FROM new.commercial_registration_number) OR (old.legal_registration_id_type IS DISTINCT FROM new.legal_registration_id_type) OR (old.emirate_code IS DISTINCT FROM new.emirate_code) OR (old.peppol_endpoint_id IS DISTINCT FROM new.peppol_endpoint_id))) EXECUTE FUNCTION public.sync_store_legal_to_org();
 
 
 --
@@ -8257,6 +8484,54 @@ ALTER TABLE ONLY public.payroll_payments
 
 ALTER TABLE ONLY public.payroll_payments
     ADD CONSTRAINT payroll_payments_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: piece_barcode_history piece_barcode_history_changed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_barcode_history
+    ADD CONSTRAINT piece_barcode_history_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: piece_barcode_history piece_barcode_history_piece_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_barcode_history
+    ADD CONSTRAINT piece_barcode_history_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id) ON DELETE SET NULL;
+
+
+--
+-- Name: piece_barcode_history piece_barcode_history_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_barcode_history
+    ADD CONSTRAINT piece_barcode_history_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: piece_chip_history piece_chip_history_changed_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_chip_history
+    ADD CONSTRAINT piece_chip_history_changed_by_fkey FOREIGN KEY (changed_by) REFERENCES auth.users(id) ON DELETE SET NULL;
+
+
+--
+-- Name: piece_chip_history piece_chip_history_piece_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_chip_history
+    ADD CONSTRAINT piece_chip_history_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id) ON DELETE SET NULL;
+
+
+--
+-- Name: piece_chip_history piece_chip_history_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.piece_chip_history
+    ADD CONSTRAINT piece_chip_history_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -9225,6 +9500,13 @@ CREATE POLICY "manage_subscription can edit subscription" ON public.subscription
 
 
 --
+-- Name: organizations org owner can update organization; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "org owner can update organization" ON public.organizations FOR UPDATE TO authenticated USING (public.is_org_owner(id)) WITH CHECK (public.is_org_owner(id));
+
+
+--
 -- Name: organizations; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -9287,13 +9569,6 @@ CREATE POLICY "owner can delete expected snapshot rows" ON public.inventory_coun
 
 
 --
--- Name: organizations owner can update own organization; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "owner can update own organization" ON public.organizations FOR UPDATE USING (public.has_permission('edit_settings'::text, primary_store_id)) WITH CHECK (public.has_permission('edit_settings'::text, primary_store_id));
-
-
---
 -- Name: staff owner or manage_staff can manage staff; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -9321,6 +9596,18 @@ ALTER TABLE public.payroll_payments ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY payroll_payments_rw ON public.payroll_payments USING ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
 
+
+--
+-- Name: piece_barcode_history; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.piece_barcode_history ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: piece_chip_history; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.piece_chip_history ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: piece_classification_options; Type: ROW SECURITY; Schema: public; Owner: -
@@ -9642,6 +9929,20 @@ CREATE POLICY "store members can view expected snapshot" ON public.inventory_cou
 --
 
 CREATE POLICY "store members can view kyc docs" ON public.company_kyc_documents FOR SELECT USING (public.is_store_member(store_id));
+
+
+--
+-- Name: piece_barcode_history store members read barcode history; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "store members read barcode history" ON public.piece_barcode_history FOR SELECT TO authenticated USING (public.is_store_member(store_id));
+
+
+--
+-- Name: piece_chip_history store members read chip history; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "store members read chip history" ON public.piece_chip_history FOR SELECT TO authenticated USING (public.is_store_member(store_id));
 
 
 --
@@ -10375,6 +10676,15 @@ GRANT ALL ON FUNCTION public.invoices_currency_guard() TO service_role;
 
 
 --
+-- Name: FUNCTION is_org_owner(p_org uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.is_org_owner(p_org uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.is_org_owner(p_org uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.is_org_owner(p_org uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION is_platform_admin(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10546,6 +10856,15 @@ GRANT ALL ON FUNCTION public.refund_customer_deposit(p_deposit uuid) TO service_
 
 
 --
+-- Name: FUNCTION regenerate_piece_barcode(p_piece_id uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.regenerate_piece_barcode(p_piece_id uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.regenerate_piece_barcode(p_piece_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.regenerate_piece_barcode(p_piece_id uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION register_new_company(company_name text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10561,6 +10880,15 @@ GRANT ALL ON FUNCTION public.register_new_company(company_name text) TO service_
 REVOKE ALL ON FUNCTION public.register_new_company(company_name text, terms_accepted boolean, terms_version text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.register_new_company(company_name text, terms_accepted boolean, terms_version text) TO authenticated;
 GRANT ALL ON FUNCTION public.register_new_company(company_name text, terms_accepted boolean, terms_version text) TO service_role;
+
+
+--
+-- Name: FUNCTION replace_piece_chip(p_piece_id uuid, p_old_epc text, p_new_epc text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.replace_piece_chip(p_piece_id uuid, p_old_epc text, p_new_epc text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.replace_piece_chip(p_piece_id uuid, p_old_epc text, p_new_epc text) TO authenticated;
+GRANT ALL ON FUNCTION public.replace_piece_chip(p_piece_id uuid, p_old_epc text, p_new_epc text) TO service_role;
 
 
 --
@@ -10690,6 +11018,15 @@ GRANT ALL ON FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce nu
 
 
 --
+-- Name: FUNCTION set_voucher_date(p_cash_movement uuid, p_date date); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.set_voucher_date(p_cash_movement uuid, p_date date) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.set_voucher_date(p_cash_movement uuid, p_date date) TO authenticated;
+GRANT ALL ON FUNCTION public.set_voucher_date(p_cash_movement uuid, p_date date) TO service_role;
+
+
+--
 -- Name: FUNCTION staff_heartbeat(p_store uuid, p_page text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10757,6 +11094,14 @@ GRANT ALL ON FUNCTION public.stores_currency_usd_reprice() TO service_role;
 
 REVOKE ALL ON FUNCTION public.sync_invoice_bank_part(p_invoice uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.sync_invoice_bank_part(p_invoice uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION sync_org_legal_to_stores(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.sync_org_legal_to_stores() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.sync_org_legal_to_stores() TO service_role;
 
 
 --
@@ -11363,6 +11708,24 @@ GRANT ALL ON TABLE public.payroll_payments TO service_role;
 
 
 --
+-- Name: TABLE piece_barcode_history; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.piece_barcode_history TO anon;
+GRANT ALL ON TABLE public.piece_barcode_history TO authenticated;
+GRANT ALL ON TABLE public.piece_barcode_history TO service_role;
+
+
+--
+-- Name: TABLE piece_chip_history; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.piece_chip_history TO anon;
+GRANT ALL ON TABLE public.piece_chip_history TO authenticated;
+GRANT ALL ON TABLE public.piece_chip_history TO service_role;
+
+
+--
 -- Name: TABLE piece_classification_options; Type: ACL; Schema: public; Owner: -
 --
 
@@ -11641,5 +12004,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YEFR5xMoBINpF5VDZNcWkxedfyj5MXfug2jYmloj5YN6mRXBaLn2aeEriEsba1l
+\unrestrict S6g4DmJcLHWZxQsQQp59Bg2zR8vEpdncGbjuma0Bb2ZvGN5lryri8PqW6LCUxWo
 
