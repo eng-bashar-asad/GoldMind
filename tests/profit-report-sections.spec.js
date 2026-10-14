@@ -43,7 +43,7 @@ test('profit report sections and Excel', async ({ page }) => {
   // brief report (default): one table with weights and amounts
   const br = page.locator('#pr-brief');
   await expect(br).not.toHaveClass(/hidden/);
-  const brow = t => br.locator('tr', { hasText: t }).first();
+  const brow = t => br.locator('table[style]').locator('tr', { hasText: t }).first(); // the main brief table (the movement summary sits above it)
   await expect(brow('مبيعات الزبائن')).toContainText('10.000');
   await expect(brow('مبيعات الزبائن')).toContainText('9.500');
   await expect(brow('مبيعات الزبائن')).toContainText('3,300.00');
