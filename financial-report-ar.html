@@ -37,6 +37,7 @@
   .fr-t th { font-size: 11.5px; color: #6B6150; font-weight: 600; border-top: 0; }
   .fr-t td.n, .fr-t th.n { text-align: left; font-variant-numeric: tabular-nums; direction: ltr; white-space: nowrap; }
   .fr-t tr.tot td { font-weight: 700; border-top: 2px solid #C9B98F; }
+  .fr-t.fr-tight { font-size: 12px; } .fr-t.fr-tight td, .fr-t.fr-tight th { padding: 6px 2px; } .fr-t.fr-tight th { font-size: 10.5px; white-space: normal; }
   .fr-note { font-size: 11px; color: #6B6150; margin: 4px 0 8px; }
   .pos { color: #1e7d32; } .neg { color: #b3261e; }
   .gm-print-only { display: none; }
@@ -283,9 +284,12 @@ async function build(from, to) {
   const tBal = tmAllR.data.reduce((a, m) => a + (m.movement_type === 'debt_increase' ? -1 : 1) * Number(m.gold_24k_equivalent || 0), 0);
 
   // ---- stock now
-  let stock24 = 0; const stockByKarat = {};
-  piecesR.data.forEach(p => { const w = Number(p.weight_grams) || 0; stock24 += w * (Number(p.karat) || 0) / 24; stockByKarat[p.karat] = (stockByKarat[p.karat] || 0) + w; });
-  (lotsR.data || []).forEach(l => { const w = Number(l.weight_grams_remaining) || 0; stock24 += w * (Number(l.karat) || 0) / 24; stockByKarat[l.karat] = (stockByKarat[l.karat] || 0) + w; });
+  // pieces (barcoded) and scrap/bulk gold without a barcode are shown apart, so the total matches the stock page + the scrap box
+  let stock24 = 0; const stockByKarat = {}, piecesByKarat = {}, lotsByKarat = {};
+  const addStock = (map, k, w) => { stock24 += w * (Number(k) || 0) / 24; map[k] = (map[k] || 0) + w; stockByKarat[k] = (stockByKarat[k] || 0) + w; };
+  piecesR.data.forEach(p => addStock(piecesByKarat, p.karat, Number(p.weight_grams) || 0));
+  (lotsR.data || []).forEach(l => addStock(lotsByKarat, l.karat, Number(l.weight_grams_remaining) || 0));
+  const sumOf = m => Object.values(m).reduce((a, b) => a + b, 0);
 
   // ---- render
   // scrap bought below the shop's gold price at that moment = profit (report only, not cash)
@@ -374,11 +378,12 @@ async function build(from, to) {
       ${shown.map(d => `<tr><td dir="ltr" style="text-align:right">${esc(d.deposit_number)}</td><td>${esc(d.customer && d.customer.name)}</td><td>${esc((d.items || []).map(i => i.description || i.barcode).join('، '))}</td><td>${d.status === 'refunded' && !(d.left > 0.009) ? 'مُسترجَع' : !(d.left > 0.009) ? 'استُخدم في فاتورة' : d.left < Number(d.amount) - 0.009 ? 'الباقي ' + money(d.left) : 'قائم'}</td><td class="n">${money(d.amount)}</td></tr>`).join('')}
     </table>`, 'العربون القائم مبلغ دفعه العميل لحجز قطعة، ويُخصم من فاتورته عند الشراء.');
   }
-  h += sec('diamond', 'الذهب بالوزن', karats.length ? `<table class="fr-t">
-    <tr><th>العيار</th><th class="n">مباع (قائم)</th><th class="n">مشترى (قائم)</th><th class="n">بالمخزن الآن</th></tr>
-    ${karats.map(k => `<tr><td>${esc(k)}</td><td class="n">${n2((soldByKarat[k] || {}).g)}</td><td class="n">${n2((boughtByKarat[k] || {}).g)}</td><td class="n">${n2(stockByKarat[k])}</td></tr>`).join('')}
-    <tr class="tot"><td>المخزن الآن بعيار 24</td><td></td><td></td><td class="n">${n2(stock24)}</td></tr>
-  </table>` : '<p class="fr-note">لا توجد حركة ذهب.</p>', 'الأوزان بالغرام. عمود "بالمخزن الآن" هو الرصيد الحالي، وليس في تاريخ نهاية الفترة.');
+  h += sec('diamond', 'الذهب بالوزن', karats.length ? `<div class="fr-wide"></div><table class="fr-t fr-tight">
+    <tr><th>العيار</th><th class="n">مباع</th><th class="n">مشترى</th><th class="n">قطع</th><th class="n">كسر بلا باركود</th><th class="n">بالمخزن الآن</th></tr>
+    ${karats.map(k => `<tr><td>${esc(k)}</td><td class="n">${n2((soldByKarat[k] || {}).g)}</td><td class="n">${n2((boughtByKarat[k] || {}).g)}</td><td class="n">${n2(piecesByKarat[k])}</td><td class="n">${n2(lotsByKarat[k])}</td><td class="n">${n2(stockByKarat[k])}</td></tr>`).join('')}
+    <tr class="tot"><td>المجموع</td><td></td><td></td><td class="n">${n2(sumOf(piecesByKarat))}</td><td class="n">${n2(sumOf(lotsByKarat))}</td><td class="n">${n2(sumOf(stockByKarat))}</td></tr>
+    <tr class="tot"><td colspan="5">المخزن الآن بعيار 24</td><td class="n">${n2(stock24)}</td></tr>
+  </table>` : '<p class="fr-note">لا توجد حركة ذهب.</p>', 'الأوزان بالغرام (الوزن القائم). «قطع» = القطع المتوفرة بالباركود (نفس رقم صفحة المخزن)، و«كسر بلا باركود» = ما بقي في صناديق الكسر والذهب غير المقطّع. «بالمخزن الآن» هو الرصيد الحالي، وليس في تاريخ نهاية الفترة.');
 
   if (document.getElementById('fr-show-list').checked && invoices.length) {
     h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<div class="fr-wide"></div><table class="fr-t">

@@ -100,3 +100,20 @@ test('financial report: debts owed to us, owed by us, deposits and their receipt
   await expect(row('DEP-000001')).toContainText('طقم ديور');
   expect(errs).toEqual([]);
 });
+
+test('financial report: stock now split into barcoded pieces and scrap without barcode', async ({ page }) => {
+  db.pieces = [{ store_id: STORE, status: 'available', karat: 18, weight_grams: 100 }, { store_id: STORE, status: 'available', karat: 21, weight_grams: 16 }];
+  db.gold_stock_lots = [{ store_id: STORE, karat: 18, weight_grams_remaining: 25.5 }];
+  try {
+    const errs = await setup(page);
+    await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
+    await page.goto('/financial-report-ar.html');
+    const row = t => page.locator('#fr-body tr', { hasText: t }).first();
+    await expect(row('كسر بلا باركود')).toBeVisible();
+    const cells18 = await page.locator('#fr-body tr').filter({ has: page.locator('td:first-child', { hasText: /^18$/ }) }).first().locator('td').allInnerTexts();
+    expect(cells18.slice(3)).toEqual(['100.00', '25.50', '125.50']); // pieces | scrap | total
+    const tot = await row('المجموع').locator('td').allInnerTexts();
+    expect(tot.slice(3)).toEqual(['116.00', '25.50', '141.50']);
+    expect(errs).toEqual([]);
+  } finally { db.pieces = []; db.gold_stock_lots = []; }
+});
