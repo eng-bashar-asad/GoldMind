@@ -496,8 +496,8 @@
                 // Check EXISTING memberships first -- someone already
                 // belonging to more than one company needs to pick which
                 // to enter now, same as someone with 2+ pending invites.
-                const { data: memberships } = await goldmindClient
-                    .from('staff').select('store_id, stores(name)').eq('user_id', user.id);
+                // my_stores(): the company's list name (or store name), same as the switch-company page
+                const { data: memberships } = await goldmindClient.rpc('my_stores');
 
                 if (memberships && memberships.length > 1) {
                     otpSubmitting = false;
@@ -511,7 +511,7 @@
                         btn.type = 'button';
                         btn.className = 'w-full h-12 rounded-lg font-bold text-black';
                         btn.style.background = 'linear-gradient(135deg, #FFD700 0%, #B4955A 100%)';
-                        btn.textContent = (m.stores && m.stores.name) || m.store_id;
+                        btn.textContent = m.store_name || m.store_id;
                         btn.onclick = () => {
                             localStorage.setItem('goldmind_active_store', m.store_id);
                             sessionStorage.removeItem('goldmind_email');
