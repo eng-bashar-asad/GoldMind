@@ -321,6 +321,18 @@ function goldMindSetActiveStore(storeId) {
     window.location.href = 'index-ar.html';
 }
 
+// The server returns at most 1000 rows per request: read every page. makeQuery() must build a fresh,
+// stably ordered query each time.
+async function gmFetchAllRows(makeQuery) {
+  var all = [];
+  for (var from = 0; ; from += 1000) {
+    var r = await makeQuery().range(from, from + 999);
+    if (r.error) return { data: all, error: r.error };
+    all = all.concat(r.data || []);
+    if (!r.data || r.data.length < 1000) return { data: all, error: null };
+  }
+}
+
 // Legal identity (logo, TRN, legal name, registration, emirate, Peppol) belongs to the
 // organization (multi-branch plan 1.3). Wrap a stores query; store_legal() is laid on top,
 // branch name/address/phone stay the branch's. If the call fails the branch row is returned as-is.

@@ -523,7 +523,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=39"></script>
+<script src="supabase-config.js?v=40"></script>
 <script src="gm-logo.js?v=2" defer></script>
 <script src="gm-biometric.js?v=1"></script>
 <script>window.addEventListener('load', function () { setTimeout(function () { if (window.GMBio) GMBio.maybePrompt(); }, 2500); });</script>
@@ -1724,7 +1724,7 @@ document.addEventListener('DOMContentLoaded', function () {
             // ---- Overdue debts alert ----
             // A debt is "open" while the balance is still owed to the shop. It counts from the day
             // the balance last went from zero to owed; a payment that clears it restarts the count.
-            async function gmFetchAllRows(build) {
+            async function gmAllRowsList(build) {
                 const out = [];
                 for (let from = 0; ; from += 1000) {
                     const { data, error } = await build().range(from, from + 999);
@@ -1764,8 +1764,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 const items = [];
                 if (wantCustomers) {
                     const [custs, debts] = await Promise.all([
-                        gmFetchAllRows(() => goldmindClient.from('customers').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('id')),
-                        gmFetchAllRows(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, created_at, id')
+                        gmAllRowsList(() => goldmindClient.from('customers').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('id')),
+                        gmAllRowsList(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, created_at, id')
                             .eq('store_id', GOLDMIND_STORE_ID).or('source.is.null,source.neq.allocation').order('created_at').order('id'))
                     ]);
                     const names = {}; custs.forEach(function (c) { names[c.id] = c.name; });
@@ -1780,8 +1780,8 @@ document.addEventListener('DOMContentLoaded', function () {
                 }
                 if (wantTraders) {
                     const [trs, moves] = await Promise.all([
-                        gmFetchAllRows(() => goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('id')),
-                        gmFetchAllRows(() => goldmindClient.from('trader_movements').select('trader_id, movement_type, gold_24k_equivalent, fab_fee_amount, created_at, id')
+                        gmAllRowsList(() => goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('id')),
+                        gmAllRowsList(() => goldmindClient.from('trader_movements').select('trader_id, movement_type, gold_24k_equivalent, fab_fee_amount, created_at, id')
                             .eq('store_id', GOLDMIND_STORE_ID).order('created_at').order('id'))
                     ]);
                     const names = {}; trs.forEach(function (t) { names[t.id] = t.name; });
@@ -1907,9 +1907,10 @@ document.addEventListener('DOMContentLoaded', function () {
                 // Daily cashbox balance (all-time running total from the manual
                 // drawer journal) — base currency only in the headline number,
                 // same logic as daily-cashbox-ar.html's "الرصيد الحالي" card.
-                goldmindClient
+                // every row, not only the first 1000 (the server's page size)
+                gmFetchAllRows(() => goldmindClient
                     .from('daily_cash_log').select('direction, amount, currency')
-                    .eq('store_id', GOLDMIND_STORE_ID),
+                    .eq('store_id', GOLDMIND_STORE_ID).order('id')),
                 // Today's sales + invoice count (real invoice type is 'sale', not
                 // 'sell' — fixing a real bug that made this card always read 0.00)
                 goldmindClient

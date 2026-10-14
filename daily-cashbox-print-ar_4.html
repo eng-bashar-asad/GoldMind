@@ -5,7 +5,7 @@
 <title>كشف الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=39"></script>
+<script src="supabase-config.js?v=40"></script>
 <script src="theme.js?v=61"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -151,11 +151,11 @@ async function load() {
   const dayEnd = new Date(selectedDate); dayEnd.setDate(dayEnd.getDate() + 1);
   document.getElementById('dateLabel').textContent = selectedDate.toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
-  const { data: allEntries, error } = await goldmindClient
+  const { data: allEntries, error } = await gmFetchAllRows(() => goldmindClient
     .from('daily_cash_log')
     .select('*')
     .eq('store_id', GOLDMIND_STORE_ID)
-    .order('created_at', { ascending: true });
+    .order('created_at', { ascending: true }).order('id')); // every row, not only the oldest 1000
 
   if (error) {
     document.getElementById('loading').textContent = 'تعذّر التحميل: ' + error.message;

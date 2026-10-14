@@ -64,7 +64,7 @@ async function install(page, { db = {}, rpc = {}, generic = false, realCdn = fal
       if (url.searchParams.has('offset')) {
         const off = Number(url.searchParams.get('offset')), lim = url.searchParams.get('limit');
         rows = rows.slice(off, lim != null ? off + Number(lim) : undefined);
-      }
+      } else rows = rows.slice(0, 1000); // like the real server (max rows per request)
       return route.fulfill({ json: rows });
     }
     return route.fulfill({ json: {} });

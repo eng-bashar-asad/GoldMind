@@ -447,7 +447,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=39"></script>
+<script src="supabase-config.js?v=40"></script>
 </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
 <!-- ============================================================
@@ -1182,9 +1182,10 @@
                 // Daily cashbox balance (all-time running total from the manual
                 // drawer journal) — base currency only in the headline number,
                 // same logic as daily-cashbox-ar.html's "الرصيد الحالي" card.
-                goldmindClient
+                // every row, not only the first 1000 (the server's page size)
+                gmFetchAllRows(() => goldmindClient
                     .from('daily_cash_log').select('direction, amount, currency')
-                    .eq('store_id', GOLDMIND_STORE_ID),
+                    .eq('store_id', GOLDMIND_STORE_ID).order('id')),
                 // Today's sales + invoice count (real invoice type is 'sale', not
                 // 'sell' — fixing a real bug that made this card always read 0.00)
                 goldmindClient

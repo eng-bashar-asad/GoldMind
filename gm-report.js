@@ -33,15 +33,7 @@ function gmRangeISO(fromStr, toStr) {
   return { from: gmDayStartISO(fromStr), to: gmDayStartISO(gmAddDays(toStr, 1)) };
 }
 // Supabase returns at most 1000 rows per request: read every page.
-async function gmFetchAllRows(makeQuery) {
-  var all = [];
-  for (var from = 0; ; from += 1000) {
-    var r = await makeQuery().range(from, from + 999);
-    if (r.error) return { data: all, error: r.error };
-    all = all.concat(r.data || []);
-    if (!r.data || r.data.length < 1000) return { data: all, error: null };
-  }
-}
+// gmFetchAllRows lives in supabase-config.js (shared by every page)
 
 // ---- PDF of a report sheet ----
 // Copies the sheet, drops on-screen-only controls (.no-print), shows the
