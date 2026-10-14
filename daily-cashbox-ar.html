@@ -249,6 +249,7 @@ let allEntries = []; // every entry ever (for computing running balance)
 let todayEntries = []; // entries for the currently selected day
 let canManageDates = false; // owner/manager only: view/add/edit entries on days other than today
 let selectedDate = new Date(); selectedDate.setHours(0, 0, 0, 0);
+let gmHighlightEntry = new URLSearchParams(location.search).get('entry'); // opened from a search result
 let showFullHistory = false; // when true, entries-list shows every entry ever, not just the selected day
 
 function toggleFullHistory() {
@@ -633,11 +634,12 @@ function renderAll() {
   function cellHtml(e) {
     if (!e) return '<td></td><td></td>';
     const color = e.link_group ? groupColorMap.get(e.link_group) : null;
-    const styleAttr = color ? ` style="background:${color};color:#1a1c1e;"` : '';
+    const hl = e.id === gmHighlightEntry ? 'outline:3px solid #D4A017;outline-offset:-3px;' : '';
+    const styleAttr = color || hl ? ` style="${color ? `background:${color};color:#1a1c1e;` : ''}${hl}"` : '';
     const metaClass = color ? 'opacity-70' : 'text-on-surface-variant';
     const dateLabel = showFullHistory ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit' }) + ' ' : '';
     return `
-      <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>
+      <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" data-entry="${e.id}" onclick="openEditModal('${e.id}')"${styleAttr}>
         <div class="font-semibold">${e.cash_movement_id || e.bank_invoice_id ? '<span class="material-symbols-outlined align-middle" style="font-size:13px" title="تلقائي من فاتورة">receipt_long</span> ' : ''}${gmEscapeHtml(e.operation_type)}</div>
         ${e.notes ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(e.notes)}</div>` : ''}
         ${gmSaleNote(e, metaClass)}
@@ -959,7 +961,7 @@ async function runCashboxSearch() {
     data.map(e => {
       const dateStr = localDateStr(new Date(e.created_at));
       const dayLabel = gmFormatDateTime(e.created_at, { day: 'numeric', month: 'short', year: 'numeric' });
-      return `<a href="daily-cashbox-ar.html?date=${dateStr}" class="block bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
+      return `<a href="daily-cashbox-ar.html?date=${dateStr}&entry=${encodeURIComponent(e.id)}" class="block bg-surface-container-lowest border border-outline-variant rounded-lg p-3">
         <div class="flex items-center justify-between gap-2">
           <span class="text-[13px] font-semibold truncate">${gmEscapeHtml(e.operation_type)}</span>
           <span class="text-[12px] font-bold shrink-0 ${e.direction === 'in' ? 'text-success' : 'text-error'}" dir="ltr">${e.direction === 'in' ? '+' : '-'}${fmt(e.amount)} ${gmEscapeHtml(e.currency)}</span>
@@ -1064,7 +1066,23 @@ async function load() {
   const cur = curRow && curRow.currency ? String(curRow.currency).toUpperCase() : null;
   const sel = document.getElementById('currencySelect');
   if (cur && [...sel.options].some(o => o.value === cur)) { sel.value = cur; window.__storeCurrency = cur; }
+  // ?date=YYYY-MM-DD (from a search result): open that day. Other days need the same right as the day arrows.
+  const qs = new URLSearchParams(location.search);
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(qs.get('date') || '');
+  if (m) {
+    const d = new Date(+m[1], +m[2] - 1, +m[3]);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    if (!isNaN(d) && d <= today && (canManageDates || d.getTime() === today.getTime())) {
+      selectedDate = d;
+      updateDayNav();
+      document.getElementById('addFormDate').value = localDateStr(selectedDate);
+    }
+  }
   await loadAll();
+  if (gmHighlightEntry) {
+    const cell = [...document.querySelectorAll('[data-entry]')].find(td => td.dataset.entry === gmHighlightEntry);
+    if (cell) cell.scrollIntoView({ block: 'center' });
+  }
 }
 
 load();
