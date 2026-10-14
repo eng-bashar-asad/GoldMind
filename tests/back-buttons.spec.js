@@ -65,3 +65,16 @@ test('trader opened from another page goes back there', async ({ page }) => {
   await page.waitForTimeout(800);
   await page.click(BACK); await page.waitForURL(/cash-voucher-ar\.html/);
 });
+
+// Opened with nothing behind it (fresh tab): back goes to the fallback page, and the fallback's own
+// back must go on to ITS fallback — not bounce back to the first page (profit report ⇄ gold price loop).
+test('fallback back does not ping-pong between two pages', async ({ page }) => {
+  await install(page, { generic: true });
+  await page.goto('/profit-report-ar.html');
+  await page.waitForFunction(() => typeof gmSmartBack === 'function');
+  await page.evaluate(() => gmSmartBack('gold-price-ar.html')); // old fallback of the report
+  await page.waitForURL(/gold-price-ar\.html/);
+  await page.waitForFunction(() => typeof gmSmartBack === 'function');
+  await page.evaluate(() => gmSmartBack('index-ar.html'));     // what gold price's back button does
+  await page.waitForURL(/index-ar\.html/);
+});

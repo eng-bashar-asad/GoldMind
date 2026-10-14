@@ -1000,6 +1000,9 @@ function gmSmartBack(fallbackHref) {
       window.location.href = target;
       return;
     }
+    // Nothing to go back to: the fallback page becomes the new start. Leaving the current page
+    // in the stack made the fallback's own back button return here — A → back → B → back → A …
+    sessionStorage.setItem('gm_nav_stack', '[]');
   } catch (e) { /* fall through to hard navigation */ }
   window.location.href = fallbackHref;
 }
