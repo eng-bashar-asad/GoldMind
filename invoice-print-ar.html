@@ -820,11 +820,14 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         // NOT a substitute for formal registration with the tax authority
         // (FTA/ZATCA), which requires a trade license and business
         // registration the store doesn't have yet. Shown only when a TRN is
-        // on file, matching the same condition used for the printed "TRN:"
-        // legal line above.
-        if (store.tax_number && window.QRCode) {
+        // on file and the company's country requires the QR.
+        // Only where the law asks for this QR on the printed invoice: Saudi Arabia (ZATCA simplified invoice).
+        // The UAE does not require one. ponytail: Egypt/Jordan QR comes back from the authority after
+        // submission and needs that integration first; add their codes here once it exists.
+        const QR_REQUIRED_COUNTRIES = ['SA'];
+        if (store.tax_number && QR_REQUIRED_COUNTRIES.includes(store.country) && window.QRCode) {
             renderEinvoiceQr({
-                sellerName: store.name || '',
+                sellerName: store.legal_name || store.name || '',
                 trn: store.tax_number,
                 timestampIso: new Date(invoice.created_at).toISOString(),
                 total: sumTotal,
