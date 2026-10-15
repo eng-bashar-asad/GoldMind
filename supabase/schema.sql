@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict S6g4DmJcLHWZxQsQQp59Bg2zR8vEpdncGbjuma0Bb2ZvGN5lryri8PqW6LCUxWo
+\restrict JbJCxgLIytDjCrx3uvSxetcQ2o1ZiFt8trebbdVrZf9fd0VDo7bQ2TSn82EsyAu
 
 
 SET statement_timeout = 0;
@@ -2135,12 +2135,12 @@ CREATE FUNCTION public.my_stores() RETURNS TABLE(store_id uuid, store_name text,
     LANGUAGE sql STABLE SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-  select s.store_id, st.name, s.role
-  from public.staff s
-  join public.stores st on st.id = s.store_id
-  where s.user_id = auth.uid()
-  order by st.name;
-$$;
+  select s.store_id, coalesce(nullif(btrim(st.display_name), ''), st.name), s.role
+    from public.staff s
+      join public.stores st on st.id = s.store_id
+        where s.user_id = auth.uid()
+          order by 2;
+          $$;
 
 
 --
@@ -2197,44 +2197,34 @@ CREATE FUNCTION public.next_piece_barcode(target_store_id uuid, category text) R
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  result_prefix text;
-  result_seq bigint;
-  result_width smallint;
-begin
-  if not is_store_member(target_store_id) then
-    raise exception 'NOT_AUTHORIZED';
-  end if;
-  if category not in ('gold', 'diamond') then
-    raise exception 'INVALID_CATEGORY';
-  end if;
-
-  if category = 'diamond' then
-    update stores
-      set next_piece_seq_diamond = next_piece_seq_diamond + 1
-      where id = target_store_id
-      returning piece_barcode_prefix_diamond, next_piece_seq_diamond - 1, piece_barcode_seq_width_diamond
-      into result_prefix, result_seq, result_width;
-  else
-    update stores
-      set next_piece_seq_gold = next_piece_seq_gold + 1
-      where id = target_store_id
-      returning piece_barcode_prefix_gold, next_piece_seq_gold - 1, piece_barcode_seq_width_gold
-      into result_prefix, result_seq, result_width;
-  end if;
-
-  if result_seq is null then
-    raise exception 'STORE_NOT_FOUND';
-  end if;
-
-  -- lpad(x, 0, ...) truncates to an EMPTY string, not a no-op -- must
-  -- only call lpad at all when a width was actually configured.
-  return coalesce(result_prefix, '') || case
-    when result_width is not null and result_width > 0 then lpad(result_seq::text, result_width, '0')
-    else result_seq::text
-  end;
-end;
-$$;
+           declare
+             result_prefix text; result_seq bigint; result_width smallint; bc text; tries int := 0;
+             begin
+               if not is_store_member(target_store_id) then raise exception 'NOT_AUTHORIZED'; end if;
+                 if category not in ('gold', 'diamond') then raise exception 'INVALID_CATEGORY'; end if;
+                   loop
+                       if category = 'diamond' then
+                             update stores set next_piece_seq_diamond = next_piece_seq_diamond + 1 where id = target_store_id
+                                     returning piece_barcode_prefix_diamond, next_piece_seq_diamond - 1, piece_barcode_seq_width_diamond
+                                             into result_prefix, result_seq, result_width;
+                                                 else
+                                                       update stores set next_piece_seq_gold = next_piece_seq_gold + 1 where id = target_store_id
+                                                               returning piece_barcode_prefix_gold, next_piece_seq_gold - 1, piece_barcode_seq_width_gold
+                                                                       into result_prefix, result_seq, result_width;
+                                                                           end if;
+                                                                               if result_seq is null then raise exception 'STORE_NOT_FOUND'; end if;
+                                                                                   bc := coalesce(result_prefix, '') || case
+                                                                                         when result_width is not null and result_width > 0 then lpad(result_seq::text, result_width, '0')
+                                                                                               else result_seq::text end;
+                                                                                                   tries := tries + 1;
+                                                                                                       exit when not exists (select 1 from pieces where store_id = target_store_id and barcode = bc)
+                                                                                                                 and not exists (select 1 from diamond_pieces where store_id = target_store_id and barcode = bc)
+                                                                                                                           and not exists (select 1 from piece_barcode_history where old_barcode = bc);
+                                                                                                                               if tries >= 1000 then raise exception 'BARCODE_COLLISION'; end if;
+                                                                                                                                 end loop;
+                                                                                                                                   return bc;
+                                                                                                                                   end;
+                                                                                                                                   $$;
 
 
 --
@@ -5838,6 +5828,7 @@ CREATE TABLE public.stores (
     debt_alert_days integer DEFAULT 15 NOT NULL,
     debt_alert_customers boolean DEFAULT true NOT NULL,
     debt_alert_traders boolean DEFAULT true NOT NULL,
+    display_name text,
     CONSTRAINT invoice_print_frame_check CHECK ((invoice_print_frame = ANY (ARRAY['classic'::text, 'gold'::text, 'double'::text, 'dashed'::text, 'none'::text]))),
     CONSTRAINT invoice_print_shape_check CHECK ((invoice_print_shape = ANY (ARRAY['square'::text, 'soft'::text, 'round'::text]))),
     CONSTRAINT stores_debt_alert_days_check CHECK (((debt_alert_days >= 1) AND (debt_alert_days <= 365)))
@@ -12004,5 +11995,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict S6g4DmJcLHWZxQsQQp59Bg2zR8vEpdncGbjuma0Bb2ZvGN5lryri8PqW6LCUxWo
+\unrestrict JbJCxgLIytDjCrx3uvSxetcQ2o1ZiFt8trebbdVrZf9fd0VDo7bQ2TSn82EsyAu
 
