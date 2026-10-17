@@ -1373,12 +1373,14 @@
 
         barcodeResult.innerHTML = '<div class="text-on-surface-variant text-sm p-2">جارِ البحث...</div>';
 
+        // A piece held by a deposit is 'reserved' for that customer only
+        const sellable = 'status.eq.available' + (selectedCustomer ? `,and(status.eq.reserved,reserved_customer_id.eq.${selectedCustomer.id})` : '');
         const { data, error } = await goldmindClient
             .from('pieces')
             .select('*')
             .eq('store_id', GOLDMIND_STORE_ID)
             .in('barcode', gmBarcodeVariants(code))
-            .eq('status', 'available')
+            .or(sellable)
             .limit(1).maybeSingle();
 
         if (error) {
@@ -1392,7 +1394,7 @@
             const current = await gmCurrentBarcodeFor(code);
             if (current) {
                 const r2 = await goldmindClient.from('pieces').select('*')
-                    .eq('store_id', GOLDMIND_STORE_ID).eq('barcode', current).eq('status', 'available').limit(1).maybeSingle();
+                    .eq('store_id', GOLDMIND_STORE_ID).eq('barcode', current).or(sellable).limit(1).maybeSingle();
                 piece = r2.data;
                 cancelledNote = `<div class="text-amber-800 bg-amber-50 text-sm p-2 rounded-lg mb-2">⛔ الباركود ${gmEscapeHtml(code)} ملغى. الباركود الحالي للقطعة: ${gmEscapeHtml(current)}</div>`;
             }

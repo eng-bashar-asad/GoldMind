@@ -4,6 +4,9 @@
 -- Old callers that don't send to_cashbox keep the previous behaviour (cashbox = true).
 
 alter table public.customer_deposits add column if not exists in_cashbox boolean not null default true;
+-- A piece put on a deposit (matched by its barcode) becomes 'reserved' for that customer only:
+-- new sales hide it from everyone else; the depositor can still buy it. Refund releases it.
+alter table public.pieces add column if not exists reserved_customer_id uuid references public.customers(id) on delete set null;
 
 create or replace function public.create_customer_deposit(p jsonb) returns jsonb
 language plpgsql security definer set search_path = public as $$
@@ -38,6 +41,9 @@ begin
   end if;
   insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
     values (c.store_id, c.id, 'debt_decrease', amt, 0, 'عربون ' || num, 'deposit', me);
+  update pieces set status = 'reserved', reserved_customer_id = c.id
+    where store_id = c.store_id and status = 'available'
+      and barcode in (select nullif(trim(x->>'barcode'), '') from jsonb_array_elements(coalesce(p->'items', '[]'::jsonb)) x);
   return jsonb_build_object('id', dep_id, 'deposit_number', num);
 end $$;
 
@@ -57,6 +63,9 @@ begin
   end if;
   select id into me from staff where user_id = auth.uid() and store_id = d.store_id limit 1;
   update customer_deposits set status = 'refunded', refunded_at = now() where id = d.id;
+  update pieces set status = 'available', reserved_customer_id = null
+    where store_id = d.store_id and status = 'reserved' and reserved_customer_id = d.customer_id
+      and barcode in (select nullif(trim(x->>'barcode'), '') from jsonb_array_elements(coalesce(d.items, '[]'::jsonb)) x);
   if d.in_cashbox then
     insert into cash_movements (store_id, box, direction, amount, description, created_by)
       values (d.store_id, case when d.method = 'bank' then 'bank' else 'main' end, 'out', d.amount, 'استرجاع عربون ' || d.deposit_number || ' إلى ' || d.cname, me)
