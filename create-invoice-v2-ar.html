@@ -12,7 +12,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=41"></script>
+<script src="supabase-config.js?v=42"></script>
 <script src="theme.js?v=63"></script>
 <script id="tailwind-config">
         tailwind.config = { darkMode: "class", theme: { extend: {
@@ -858,24 +858,7 @@
         label.textContent = 'جارِ قراءة الفاتورة...';
 
         try {
-            const base64 = await new Promise((resolve, reject) => {
-                const reader = new FileReader();
-                reader.onload = () => resolve(reader.result.split(',')[1]);
-                reader.onerror = reject;
-                reader.readAsDataURL(file);
-            });
-
-            const { data, error } = await goldmindClient.functions.invoke('extract-invoice-ocr', {
-                body: { image_base64: base64, mime_type: file.type || 'image/jpeg' }
-            });
-
-            if (error || !data || data.error) {
-                noteEl.textContent = 'تعذّرت قراءة الفاتورة تلقائياً -- املأ الحقول يدوياً.';
-                noteEl.classList.remove('hidden');
-                return;
-            }
-
-            const ex = data.extracted;
+            const ex = await gmReadInvoicePhoto(file);
             if (ex.description) document.getElementById('manual-desc').value = ex.description;
             if (ex.weight_grams) document.getElementById('manual-weight').value = ex.weight_grams;
             if (ex.karat && ['18', '21', '22', '24'].includes(String(ex.karat))) {
@@ -898,7 +881,7 @@
             noteEl.textContent = note;
             noteEl.classList.remove('hidden');
         } catch (e) {
-            noteEl.textContent = 'تعذّرت قراءة الفاتورة تلقائياً -- املأ الحقول يدوياً.';
+            noteEl.textContent = e.message || 'تعذّرت قراءة الفاتورة تلقائياً -- املأ الحقول يدوياً.';
             noteEl.classList.remove('hidden');
         } finally {
             btn.disabled = false;

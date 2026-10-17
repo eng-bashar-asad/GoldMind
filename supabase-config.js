@@ -359,6 +359,35 @@ async function gmBarcodeTaken(barcode, exceptId) {
   return (data || []).find(p => p.id !== exceptId && gmBarcodeKey(p.barcode) === key) || null;
 }
 
+// Reads a photographed trader invoice (edge function extract-invoice-ocr, Gemini). Shrinks the photo
+// first (phone photos are several MB). Resolves with the extracted fields; throws an Arabic message.
+async function gmReadInvoicePhoto(file) {
+  const dataUrl = await new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const scale = Math.min(1, 1800 / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      URL.revokeObjectURL(url);
+      resolve(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('تعذّر فتح الصورة.')); };
+    img.src = url;
+  });
+  const { data, error } = await goldmindClient.functions.invoke('extract-invoice-ocr', {
+    body: { image_base64: dataUrl.split(',')[1], mime_type: 'image/jpeg' }
+  });
+  let code = data && data.error;
+  if (error && !code) { try { code = (await error.context.json()).error; } catch (e) { code = 'NETWORK'; } }
+  if (code || !data || !data.extracted) {
+    const why = { SERVER_NOT_CONFIGURED: 'خدمة قراءة الفواتير غير مفعّلة على الخادم.', NOT_SIGNED_IN: 'سجّل الدخول من جديد ثم أعد المحاولة.',
+      NO_MODEL_AVAILABLE: 'خدمة القراءة غير متاحة حالياً.', NETWORK: 'لا يوجد اتصال بالإنترنت.' }[code];
+    throw new Error((why || 'تعذّرت قراءة الفاتورة.') + ' املأ الحقول يدوياً.');
+  }
+  return data.extracted;
+}
+
 function gmShownName(store) {
     return (store && String(store.display_name || '').trim()) || (store && store.name) || '';
 }
