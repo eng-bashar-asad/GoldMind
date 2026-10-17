@@ -8,7 +8,7 @@ test('paid currency and barcodes', async ({ page }) => {
     stores: [{ id: STORE, name: 'x', currency: 'USD' }],
     staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'ب' }],
     user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
-    repair_tickets: [],
+    repair_tickets: [], trader_movements: [], stock_vouchers: [], customer_debts: [],
     invoices: [
       { id: 'i1', store_id: STORE, invoice_number: 'INV-26', type: 'sale', status: 'paid', total_amount: 100, currency: 'USD', pay_currency: 'SYP', pay_fx_rate: 13000, created_at: T },
       { id: 'i2', store_id: STORE, invoice_number: 'INV-27', type: 'sale', status: 'paid', total_amount: 50, currency: 'USD', pay_breakdown: [{ currency: 'USD', amount: 20 }, { currency: 'SYP', amount: 390000 }], created_at: T }],
