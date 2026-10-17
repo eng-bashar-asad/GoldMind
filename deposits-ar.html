@@ -91,6 +91,7 @@
 </div>
 </div>
 
+<label class="flex items-center gap-2 text-[13px]"><input type="checkbox" id="to-cashbox" checked class="w-5 h-5 rounded"/> العربون يدخل الصندوق اليومي</label>
 <div>
 <div class="flex items-center justify-between mb-1">
 <span class="text-[11px] font-semibold text-on-surface-variant">القطع المحجوزة</span>
@@ -137,12 +138,34 @@ function addItemRow(it) {
   row.className = 'item-row grid grid-cols-6 gap-1 p-2 rounded-lg bg-surface-container-low';
   row.innerHTML = `
     <input class="col-span-6 h-10 border border-outline-variant rounded-lg px-2 text-right text-[13px]" data-f="description" placeholder="وصف القطعة — مثال: طقم ألماس، سوار حرف س" value="${esc(it.description)}"/>
-    <input class="col-span-2 h-10 border border-outline-variant rounded-lg px-2 font-data-mono text-[12px]" dir="ltr" data-f="barcode" placeholder="الباركود" value="${esc(it.barcode)}"/>
+    <input class="col-span-2 h-10 border border-outline-variant rounded-lg px-2 font-data-mono text-[12px]" dir="ltr" data-f="barcode" placeholder="الباركود" value="${esc(it.barcode)}" onchange="fillDepositItem(this)"/>
     <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="karat" placeholder="عيار" type="number" value="${esc(it.karat)}"/>
     <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="weight" placeholder="غرام" type="number" step="0.01" value="${esc(it.weight)}"/>
     <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="price" placeholder="السعر" type="number" step="0.01" value="${esc(it.price)}"/>
     <button type="button" aria-label="حذف القطعة" onclick="this.parentElement.remove()" class="col-span-1 h-10 text-error flex items-center justify-center"><span class="material-symbols-outlined">delete</span></button>`;
   document.getElementById('items').appendChild(row);
+}
+
+// Barcode typed/scanned: fill what the piece is (description, karat, weight). Price stays optional.
+async function fillDepositItem(input) {
+  const row = input.closest('.item-row'), code = gmTidyBarcode(input.value);
+  if (!code) return;
+  const key = gmBarcodeKey(code);
+  const pattern = '%' + key.split('').map(c => c.replace(/[%_\\]/g, '\\$&')).join('%') + '%';
+  const { data } = await goldmindClient.from('pieces').select('barcode, piece_type, karat, weight_grams, status')
+    .eq('store_id', GOLDMIND_STORE_ID).ilike('barcode', pattern).limit(50);
+  const p = (data || []).find(x => gmBarcodeKey(x.barcode) === key);
+  if (!p) return showDepositNote('لم تُعثر على قطعة بهذا الباركود. اكتب وصفها يدوياً.');
+  input.value = p.barcode;
+  const f = name => row.querySelector(`[data-f="${name}"]`);
+  if (!f('description').value.trim()) f('description').value = [p.piece_type, p.karat ? p.karat + 'K' : '', p.weight_grams ? p.weight_grams + ' غ' : ''].filter(Boolean).join(' · ');
+  f('karat').value = p.karat || '';
+  f('weight').value = p.weight_grams || '';
+  if (p.status !== 'available') showDepositNote('تنبيه: حالة هذه القطعة «' + p.status + '» وليست متوفرة.');
+}
+function showDepositNote(text) {
+  const err = document.getElementById('save-error');
+  err.textContent = text; err.classList.remove('hidden');
 }
 
 function readItems() {
@@ -172,6 +195,7 @@ async function saveDeposit() {
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
   const { data, error } = await goldmindClient.rpc('create_customer_deposit', { p: {
     customer_id: cust.id, amount, method: document.getElementById('method-input').value, items,
+    to_cashbox: document.getElementById('to-cashbox').checked,
     notes: document.getElementById('notes-input').value.trim()
   } });
   btn.disabled = false; btn.textContent = 'حفظ العربون وطباعة السند';
