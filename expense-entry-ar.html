@@ -132,6 +132,9 @@
 </div>
 <p id="repair-preview" class="text-[12px] text-on-surface-variant"></p>
 <input id="repair-desc" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" placeholder="ملاحظة (اختياري) — مثال: تصليح سلسلة زبون"/>
+<label class="block text-[12px] text-on-surface-variant">أجرة التصليح نقداً (اختياري)
+<input id="repair-cash" type="number" step="0.01" min="0" inputmode="decimal" dir="ltr" class="w-full h-12 border border-outline-variant rounded-lg px-3 mt-1 font-data-mono text-right" placeholder="0.00"/></label>
+<label class="flex items-center gap-2 text-[13px]"><input type="checkbox" id="repair-from-cashbox" checked class="w-5 h-5 rounded"/> الأجرة دُفعت من الصندوق اليومي</label>
 </div>
 <button onclick="saveRepairGold()" id="repair-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md" type="button">تسجيل تصليح الذهب</button>
 </div>
@@ -240,13 +243,23 @@ async function saveRepairGold() {
   if (!confirm(`سحب ${grams} غ عيار ${karat} من صندوق الكسر كتصليح؟`)) return;
   const btn = $('repair-btn');
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
-  const { error } = await goldmindClient.rpc('record_repair_gold', { p: {
-    store_id: GOLDMIND_STORE_ID, karat: Number(karat), grams, description: $('repair-desc').value.trim() || null } });
+  const desc = $('repair-desc').value.trim() || null, cash = parseFloat($('repair-cash').value) || 0;
+  const { error } = await goldmindClient.rpc('record_repair_gold', { p: { store_id: GOLDMIND_STORE_ID, karat: Number(karat), grams, description: desc } });
+  if (error) { btn.disabled = false; btn.textContent = 'تسجيل تصليح الذهب'; return msg('save-error', 'تعذّر الحفظ: ' + error.message); }
+  // cash labour is a separate expense in the same category (own cashbox row); gold part is already saved above
+  let cashErr = null;
+  if (cash > 0) {
+    const { data: cat } = await goldmindClient.from('expense_categories').select('id').eq('store_id', GOLDMIND_STORE_ID).eq('name', REPAIR_CAT).maybeSingle();
+    const r = cat ? await goldmindClient.rpc('record_expense', { p: { store_id: GOLDMIND_STORE_ID, category_id: cat.id, amount: cash,
+      description: 'أجرة تصليح ذهب عيار ' + karat + (desc ? ' — ' + desc : ''), from_daily_cashbox: $('repair-from-cashbox').checked, currency: CUR } })
+      : { error: { message: 'نوع «تصاليح ذهب» غير موجود' } };
+    cashErr = r.error;
+  }
   btn.disabled = false; btn.textContent = 'تسجيل تصليح الذهب';
-  if (error) return msg('save-error', 'تعذّر الحفظ: ' + error.message);
-  msg('save-success', 'سُجّل تصليح الذهب مصروفاً وسُحب من صندوق الكسر.');
-  $('repair-grams').value = ''; $('repair-desc').value = ''; updateRepairPreview();
+  $('repair-grams').value = ''; $('repair-desc').value = ''; $('repair-cash').value = ''; updateRepairPreview();
   loadList();
+  if (cashErr) return msg('save-error', 'سُجّل الذهب المصروف، لكن تعذّر تسجيل الأجرة النقدية: ' + cashErr.message + '. سجّلها من المصاريف العادية.');
+  msg('save-success', cash > 0 ? 'سُجّل تصليح الذهب (ذهب من الكسر + أجرة نقدية).' : 'سُجّل تصليح الذهب مصروفاً وسُحب من صندوق الكسر.');
 }
 
 async function saveCategory() {

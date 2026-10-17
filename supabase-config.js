@@ -365,12 +365,13 @@ async function gmReadInvoicePhoto(file) {
   const dataUrl = await new Promise((resolve, reject) => {
     const img = new Image(), url = URL.createObjectURL(file);
     img.onload = () => {
-      const scale = Math.min(1, 1800 / Math.max(img.width, img.height));
+      // 1200px is plenty to read invoice rows; bigger photos hit the edge function's resource limit (HTTP 546).
+      const scale = Math.min(1, 1200 / Math.max(img.width, img.height));
       const c = document.createElement('canvas');
       c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
       c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
       URL.revokeObjectURL(url);
-      resolve(c.toDataURL('image/jpeg', 0.85));
+      resolve(c.toDataURL('image/jpeg', 0.8));
     };
     img.onerror = () => { URL.revokeObjectURL(url); reject(new Error('تعذّر فتح الصورة.')); };
     img.src = url;
@@ -379,10 +380,11 @@ async function gmReadInvoicePhoto(file) {
     body: { image_base64: dataUrl.split(',')[1], mime_type: 'image/jpeg' }
   });
   let code = data && data.error;
-  if (error && !code) { try { code = (await error.context.json()).error; } catch (e) { code = 'NETWORK'; } }
+  if (error && !code) { try { code = (await error.context.json()).error; } catch (e) { code = navigator.onLine === false ? 'NETWORK' : 'NO_RESPONSE'; } }
   if (code || !data || !data.extracted) {
     const why = { SERVER_NOT_CONFIGURED: 'خدمة قراءة الفواتير غير مفعّلة على الخادم.', NOT_SIGNED_IN: 'سجّل الدخول من جديد ثم أعد المحاولة.',
-      NO_MODEL_AVAILABLE: 'خدمة القراءة غير متاحة حالياً.', NETWORK: 'لا يوجد اتصال بالإنترنت.' }[code];
+      NO_MODEL_AVAILABLE: 'خدمة القراءة غير متاحة حالياً.', NETWORK: 'لا يوجد اتصال بالإنترنت.',
+      NO_RESPONSE: 'الخدمة ما ردّت على الطلب (غالباً الصورة كبيرة أو الخدمة مشغولة). جرّب صورة أقل حجماً أو أعد المحاولة.' }[code];
     throw new Error((why || 'تعذّرت قراءة الفاتورة.') + ' املأ الحقول يدوياً.');
   }
   return data.extracted;

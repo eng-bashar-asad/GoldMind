@@ -40,3 +40,29 @@ test('repair gold: grams from the scrap box are recorded as one cost expense, no
   expect(calls.some(c => c.name === 'record_expense')).toBe(false);
   expect(errs).toEqual([]);
 });
+
+test('repair gold with a cash labour fee: two expenses, the cash one in the same category', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  page.on('dialog', d => d.accept());
+  const calls = await install(page, {
+    db: base({
+      expense_categories: [{ id: 'cr', store_id: STORE, name: 'تصاليح ذهب' }],
+      gold_prices: [{ store_id: STORE, karat: 18, price_per_gram: 100 }],
+      expense_entries: []
+    }),
+    rpc: { record_repair_gold: () => ({ body: 'e1' }), record_expense: () => ({ body: 'e2' }) }
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/expense-entry-ar.html');
+  await page.click('.cat-chip:has-text("تصاليح ذهب")');
+  await page.selectOption('#repair-karat', '18');
+  await page.fill('#repair-grams', '0.27');
+  await page.fill('#repair-cash', '15');
+  await page.click('#repair-btn');
+  await expect(page.locator('#save-success')).toContainText('ذهب من الكسر + أجرة نقدية');
+  const gold = JSON.parse(calls.find(c => c.name === 'record_repair_gold').body).p;
+  const cash = JSON.parse(calls.find(c => c.name === 'record_expense').body).p;
+  expect(gold.grams).toBe(0.27);
+  expect(cash).toMatchObject({ store_id: STORE, category_id: 'cr', amount: 15, from_daily_cashbox: true });
+  expect(errs).toEqual([]);
+});
