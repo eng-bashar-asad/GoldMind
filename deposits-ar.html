@@ -150,11 +150,10 @@ function addItemRow(it) {
 async function fillDepositItem(input) {
   const row = input.closest('.item-row'), code = gmTidyBarcode(input.value);
   if (!code) return;
-  const key = gmBarcodeKey(code);
-  const pattern = '%' + key.split('').map(c => c.replace(/[%_\\]/g, '\\$&')).join('%') + '%';
+  // gmBarcodeVariants also tries the zero-padded form, so typing 348 finds 000348
   const { data } = await goldmindClient.from('pieces').select('barcode, piece_type, karat, weight_grams, status')
-    .eq('store_id', GOLDMIND_STORE_ID).ilike('barcode', pattern).limit(50);
-  const p = (data || []).find(x => gmBarcodeKey(x.barcode) === key);
+    .eq('store_id', GOLDMIND_STORE_ID).in('barcode', gmBarcodeVariants(code)).limit(1);
+  const p = (data || [])[0];
   if (!p) return showDepositNote('لم تُعثر على قطعة بهذا الباركود. اكتب وصفها يدوياً.');
   input.value = p.barcode;
   const f = name => row.querySelector(`[data-f="${name}"]`);

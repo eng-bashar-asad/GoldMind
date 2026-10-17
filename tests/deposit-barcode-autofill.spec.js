@@ -27,7 +27,7 @@ test('deposit: barcode fills the piece, price stays empty, cashbox option is sen
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/deposits-ar.html?customer=cu1');
   await page.fill('#amount-input', '200');
-  await page.fill('[data-f="barcode"]', '000709');
+  await page.fill('[data-f="barcode"]', '709');
   await page.locator('[data-f="barcode"]').dispatchEvent('change');
   await expect(page.locator('[data-f="description"]')).toHaveValue('خاتم · 18K · 9.21 غ');
   await expect(page.locator('[data-f="karat"]')).toHaveValue('18');
