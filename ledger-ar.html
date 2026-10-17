@@ -615,6 +615,7 @@ function goToStatementPrint() {
 <script>
 let traders = [];
 let movementsByTrader = {};
+let piecesById = {};
 let linkedCashMovementByTraderMoveId = {};
 let currentTraderId = null;
 let diamondsEnabled = false;
@@ -706,6 +707,13 @@ async function load() {
     if (!movementsByTrader[m.trader_id]) movementsByTrader[m.trader_id] = [];
     movementsByTrader[m.trader_id].push(m);
   });
+  // barcode + photo of every piece that moved, shown in the voucher edit form
+  piecesById = {};
+  const pieceIds = [...new Set((moveRows || []).map(m => m.piece_id).filter(Boolean))];
+  for (let i = 0; i < pieceIds.length; i += 100) {
+    const { data: ps } = await goldmindClient.from('pieces').select('id, barcode, photo_url').in('id', pieceIds.slice(i, i + 100));
+    (ps || []).forEach(x => { piecesById[x.id] = x; });
+  }
 
   // Deep-link support: invoices-archive-ar.html's "مبيعات تجار" rows link
   // here as ?trader=<id> to jump straight to that trader's detail view.
@@ -1146,19 +1154,28 @@ function showTraderDetail(traderId) {
           <button onclick="deleteStockMovementBatch('${group.batchId}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف السند بالكامل</button>
         </div>
         <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-batch-form-${group.batchId}">
-          ${rows.map((r, idx) => `
-            <div class="border border-outline-variant rounded-lg p-2 grid grid-cols-3 gap-2">
-              <input id="edit-batch-weight-${group.batchId}-${idx}" type="number" step="0.001" dir="ltr" placeholder="الوزن القائم" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.weight_grams || ''}"/>
-              <input id="edit-batch-accweight-${group.batchId}-${idx}" type="number" step="0.001" dir="ltr" placeholder="الوزن المحاسبي" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.accounting_weight_grams || ''}"/>
-              <select id="edit-batch-karat-${group.batchId}-${idx}" class="h-9 border border-outline-variant rounded-lg px-1 text-[12px]">
-                <option value="24" ${r.karat == 24 ? 'selected' : ''}>24</option>
-                <option value="22" ${r.karat == 22 ? 'selected' : ''}>22</option>
-                <option value="21" ${r.karat == 21 ? 'selected' : ''}>21</option>
-                <option value="18" ${r.karat == 18 ? 'selected' : ''}>18</option>
-              </select>
-              <input id="edit-batch-fee-${group.batchId}-${idx}" type="number" step="0.01" dir="ltr" placeholder="مصنعية/غ" class="col-span-3 h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.fab_fee_per_gram || ''}"/>
+          ${rows.map((r, idx) => {
+            const pc = piecesById[r.piece_id] || {};
+            return `
+            <div class="border border-outline-variant rounded-lg p-2">
+              <div class="flex items-center gap-2 mb-2">
+                ${pc.photo_url ? `<img src="${gmEscapeHtml(pc.photo_url)}" alt="" class="w-11 h-11 rounded-md object-cover shrink-0"/>` : ''}
+                <span class="font-data-mono text-[12px] font-semibold">${gmEscapeHtml(pc.barcode || 'بالجملة')}</span>
+              </div>
+              <div class="grid grid-cols-3 gap-2">
+                <input id="edit-batch-weight-${group.batchId}-${idx}" type="number" step="0.001" dir="ltr" placeholder="الوزن القائم" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.weight_grams || ''}"/>
+                <input id="edit-batch-accweight-${group.batchId}-${idx}" type="number" step="0.001" dir="ltr" placeholder="الوزن المحاسبي" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.accounting_weight_grams || ''}"/>
+                <select id="edit-batch-karat-${group.batchId}-${idx}" class="h-9 border border-outline-variant rounded-lg px-1 text-[12px]">
+                  <option value="24" ${r.karat == 24 ? 'selected' : ''}>24</option>
+                  <option value="22" ${r.karat == 22 ? 'selected' : ''}>22</option>
+                  <option value="21" ${r.karat == 21 ? 'selected' : ''}>21</option>
+                  <option value="18" ${r.karat == 18 ? 'selected' : ''}>18</option>
+                </select>
+                <input id="edit-batch-fee-${group.batchId}-${idx}" type="number" step="0.01" dir="ltr" placeholder="مصنعية/غ" class="col-span-3 h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.fab_fee_per_gram || ''}"/>
+              </div>
               <input type="hidden" id="edit-batch-id-${group.batchId}-${idx}" value="${r.id}"/>
-            </div>`).join('')}
+            </div>`;
+          }).join('')}
           <textarea id="edit-batch-notes-${group.batchId}" class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]">${gmEscapeHtml(first.notes || '')}</textarea>
           <p class="text-error text-[11px] hidden" id="edit-batch-error-${group.batchId}"></p>
           <div class="flex gap-2">
@@ -1908,7 +1925,7 @@ function toggleGiveStockForm() {
   document.getElementById('trader-opening-balance-form').classList.add('hidden');
   const wasHidden = document.getElementById('give-stock-form').classList.contains('hidden');
   document.getElementById('give-stock-form').classList.toggle('hidden');
-  if (wasHidden) { gsBasisVal = 'accounting'; openGiveStockForm(); }
+  if (wasHidden) openGiveStockForm();
   renderGsPhotoPanel();
 }
 
@@ -2315,7 +2332,7 @@ function giveStockDraftKey() { return 'gm_givestock_draft_' + GOLDMIND_STORE_ID 
 function saveGiveStockDraft() {
   try {
     if (giveStockCart.length === 0) { localStorage.removeItem(giveStockDraftKey()); return; }
-    localStorage.setItem(giveStockDraftKey(), JSON.stringify({ giveStockCart, giveStockCartCounter, savedAt: new Date().toISOString() }));
+    localStorage.setItem(giveStockDraftKey(), JSON.stringify({ giveStockCart, giveStockCartCounter, basis: gsBasisVal, savedAt: new Date().toISOString() }));
   } catch (e) { /* storage unavailable — not critical */ }
 }
 function clearGiveStockDraft() {
@@ -2334,6 +2351,7 @@ function openGiveStockForm() {
     if (confirm('يوجد سند إخراج بضاعة غير محفوظ (' + draft.giveStockCart.length + ' قطعة) من ' + savedLabel + ' — هل تريد استرجاعه؟')) {
       giveStockCart = draft.giveStockCart;
       giveStockCartCounter = draft.giveStockCartCounter || draft.giveStockCart.length;
+      gsBasisVal = draft.basis === 'gross' ? 'gross' : 'accounting';
       document.getElementById('gs-barcode-input').value = '';
       document.getElementById('gs-barcode-result').innerHTML = '';
       document.getElementById('gs-notes').value = '';
@@ -2526,7 +2544,11 @@ function renderGiveStockCart(previewOnly) {
           <label class="block text-[10px] text-on-surface-variant mb-0.5">السعر على التاجر (${currencyUnitLabel()}) — كلفتها علينا الآن ${fmtMoney(gsPieceCost(it))}</label>
           <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.price || ''}" oninput="updateGiveStockCartItem(${it.cartId}, 'price', this.value)"/>
         </div>` : ''}
-      <div class="grid grid-cols-2 gap-2 ${priced ? 'hidden' : ''}">
+      <div class="grid grid-cols-3 gap-2 ${priced ? 'hidden' : ''}">
+        <div>
+          <label class="block text-[10px] text-on-surface-variant mb-0.5">الوزن القائم (غ)</label>
+          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.grossWeight}" oninput="updateGiveStockCartItem(${it.cartId}, 'grossWeight', this.value)"/>
+        </div>
         <div>
           <label class="block text-[10px] text-on-surface-variant mb-0.5">الوزن المحاسبي (غ)</label>
           <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.accountingWeight}" oninput="updateGiveStockCartItem(${it.cartId}, 'accountingWeight', this.value)"/>
