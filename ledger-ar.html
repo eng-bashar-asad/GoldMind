@@ -592,6 +592,7 @@ function goToStatementPrint() {
 <h3 class="font-semibold text-[13px] mt-2">سجل الحركات</h3>
 <div id="movements-list" class="flex flex-col gap-2"></div>
 <p id="empty-movements" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات مسجّلة بعد.</p>
+<div id="trader-other-invoices" class="hidden flex flex-col gap-2"></div>
 </div>
 </div>
 
@@ -974,14 +975,37 @@ function renderTraders() {
   }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد تجار مطابقون. يُضافون تلقائياً عند إنشاء أول فاتورة شراء منهم.</p>';
 }
 
+// Invoices with this trader that left no balance movement (e.g. a purchase paid in full in cash):
+// listed under the movements so the trader's history is never shown as empty while he has invoices.
+async function showTraderOtherInvoices(traderId, moves) {
+  const box = document.getElementById('trader-other-invoices');
+  box.classList.add('hidden'); box.innerHTML = '';
+  const { data } = await goldmindClient.from('invoices').select('id, invoice_number, type, status, total_amount, created_at')
+    .eq('trader_id', traderId).order('created_at', { ascending: false });
+  const withMoves = new Set(moves.map(m => m.invoice_id).filter(Boolean));
+  const rest = (data || []).filter(i => !withMoves.has(i.id));
+  if (currentTraderId !== traderId || !rest.length) return;
+  document.getElementById('empty-movements').classList.add('hidden');
+  box.innerHTML = '<h3 class="font-semibold text-[13px] mt-2">فواتير بلا حركة على الرصيد (مسدّدة)</h3>' + rest.map(i =>
+    `<a href="invoice-print-ar.html?id=${i.id}" class="flex justify-between items-center bg-surface-container-lowest border border-outline-variant rounded-xl px-3 py-2 text-[12px]">
+      <span class="font-semibold">${gmEscapeHtml(i.invoice_number || '')}</span>
+      <span class="text-on-surface-variant">${gmFormatDateTime(i.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+      <span class="font-data-mono" dir="ltr">${fmtMoney(Number(i.total_amount) || 0)}</span></a>`).join('');
+  box.classList.remove('hidden');
+}
+
 // Delete a trader: only when nothing was ever recorded with them (history stays intact)
 async function deleteTrader() {
   const t = traders.find(x => x.id === currentTraderId); if (!t) return;
-  const [{ count: nMv }, { count: nInv }] = await Promise.all([
+  const [{ count: nMv }, { data: invs }] = await Promise.all([
     goldmindClient.from('trader_movements').select('id', { count: 'exact', head: true }).eq('trader_id', t.id),
-    goldmindClient.from('invoices').select('id', { count: 'exact', head: true }).eq('trader_id', t.id)
+    goldmindClient.from('invoices').select('invoice_number').eq('trader_id', t.id)
   ]);
-  if ((nMv || 0) + (nInv || 0) > 0) { alert('لا يمكن حذف «' + t.name + '» لأن له حركات أو فواتير مسجّلة — يمكنك تعديل بياناته فقط.'); return; }
+  if ((nMv || 0) + (invs || []).length > 0) {
+    const nums = (invs || []).map(i => i.invoice_number).filter(Boolean);
+    alert('لا يمكن حذف «' + t.name + '» لأن له ' + (nums.length ? 'فواتير مسجّلة: ' + nums.join('، ') : 'حركات مسجّلة') + ' — يمكنك تعديل بياناته فقط.');
+    return;
+  }
   if (!confirm('حذف التاجر «' + t.name + '» نهائياً؟')) return;
   const { error } = await goldmindClient.from('traders').delete().eq('id', t.id);
   if (error) { alert('تعذّر الحذف: ' + error.message); return; }
@@ -1013,6 +1037,7 @@ function showTraderDetail(traderId) {
   feeEl.className = 'font-bold text-[16px] font-data-mono ' + (feeBal > 0 ? 'text-success' : (feeBal < 0 ? 'text-error' : ''));
 
   const moves = movementsByTrader[traderId] || [];
+  showTraderOtherInvoices(traderId, moves);
   const listEl = document.getElementById('movements-list');
   const emptyEl = document.getElementById('empty-movements');
 

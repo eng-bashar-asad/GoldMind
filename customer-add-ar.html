@@ -480,6 +480,17 @@
             return;
         }
 
+        // Someone who is already a trader is not also a customer: his cash and goods go on his trader account.
+        const { data: sameTrader } = await goldmindClient.from('traders').select('id, name')
+            .eq('store_id', GOLDMIND_STORE_ID).ilike('name', name).limit(1);
+        if (sameTrader && sameTrader.length) {
+            saveBtn.disabled = false;
+            saveBtn.textContent = 'حفظ العميل';
+            showMessage('«' + sameTrader[0].name + '» مسجّل كتاجر — سجّل دفعاته وحركاته من حساب التاجر بدل إضافته كزبون.', true);
+            messageBox.insertAdjacentHTML('beforeend', ' <a class="underline font-bold" href="ledger-ar.html?trader=' + encodeURIComponent(sameTrader[0].id) + '">فتح حساب التاجر</a>');
+            return;
+        }
+
         const insertPayload = {
             store_id: GOLDMIND_STORE_ID,
             name: name,
