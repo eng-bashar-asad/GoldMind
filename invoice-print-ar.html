@@ -597,7 +597,8 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         // Owner-only hard delete, offered only on the latest sale invoice so
         // its number is reused with no gap (server re-checks all of this).
         {
-            const m = String(invoice.invoice_number || '').split('-');
+            // [CODE-]INV-YYYY-NNNNNN: year and sequence are the last two parts
+            const m = String(invoice.invoice_number || '').match(/-(\d{4})-(\d+)$/) || [];
             const isLast = invoice.type === 'sale' && !invoice.is_exchange && Number(m[1]) === Number(store.next_invoice_seq_year)
                 && Number(m[2]) === Number(store.next_invoice_seq) - 1;
             if (isLast) {

@@ -409,6 +409,14 @@
 <input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono" dir="ltr" id="store-license" type="text"/>
 </div>
 
+<div class="hidden" id="branch-code-wrap">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-branch-code">رمز الفرع في رقم الفاتورة (اختياري)</label>
+<input class="w-full h-14 border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary outline-none text-right font-data-mono uppercase" dir="ltr" id="store-branch-code" type="text" maxlength="5" placeholder="DXB" pattern="[A-Za-z]{2,5}" aria-describedby="branch-code-hint" oninput="this.value = this.value.toUpperCase().replace(/[^A-Z]/g, '')"/>
+<p class="text-[11px] text-outline mt-1 px-1" id="branch-code-hint">من 2 إلى 5 أحرف إنجليزية. يظهر في بداية رقم كل فاتورة جديدة لهذا الفرع، مثل DXB-INV-2026-000120، ليبقى الرقم فريداً بين فروع المنشأة. الفواتير السابقة تبقى بأرقامها.</p>
+</div>
+</div>
+
 <div class="hidden" id="branch-emirate-wrap">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="store-branch-emirate">إمارة هذا الفرع (اختياري)</label>
@@ -900,6 +908,7 @@
             ]);
             org = o; isOrgOwner = owner === true;
             document.getElementById('branch-emirate-wrap').classList.toggle('hidden', !(branches > 1) && !store.branch_emirate_code);
+            document.getElementById('branch-code-wrap').classList.toggle('hidden', !('branch_code' in store) || (!(branches > 1) && !store.branch_code));
         }
         // Legal identity lives only on the organization (store copies dropped in plan step 1.3b).
         ORG_FIELDS.forEach(([id, col]) => {
@@ -911,6 +920,7 @@
         document.getElementById('org-readonly-note').classList.toggle('hidden', editable);
     }
 
+    let hasBranchCode = false;
     let hasDisplayName = false; // column exists once migration 20261014120000 has run
     async function loadStore() {
         const session = await requireGoldMindSession('login-entry-ar.html');
@@ -960,6 +970,8 @@
         document.getElementById('store-contact-person').value = data.contact_person_name || '';
         document.getElementById('store-license').value = data.license_number || '';
         document.getElementById('store-branch-emirate').value = data.branch_emirate_code || '';
+        hasBranchCode = 'branch_code' in data; // column exists once migration 20261018240000 has run
+        document.getElementById('store-branch-code').value = data.branch_code || '';
         await loadOrganization(data);
         setEinvoiceDisabled(data.einvoice_disabled === true);
         setNumberingMode(data.invoice_numbering_mode || 'auto');
@@ -1161,6 +1173,15 @@
                 debt_alert_traders: document.getElementById('debt-alert-traders').checked,
                 allow_biometric_login: bioAllowed
             };
+        if (hasBranchCode) {
+            const branchCode = document.getElementById('store-branch-code').value.trim().toUpperCase();
+            if (branchCode && !/^[A-Z]{2,5}$/.test(branchCode)) {
+                saveBtn.disabled = false; saveBtn.textContent = 'حفظ البيانات';
+                showMessage('رمز الفرع يجب أن يكون من 2 إلى 5 أحرف إنجليزية.', true);
+                return;
+            }
+            storeUpdate.branch_code = branchCode || null;
+        }
         if (hasDisplayName) storeUpdate.display_name = document.getElementById('store-display-name').value.trim() || null;
         const { error } = await goldmindClient
             .from('stores')
@@ -1183,6 +1204,10 @@
         saveBtn.disabled = false;
         saveBtn.textContent = 'حفظ البيانات';
 
+        if (error && error.code === '23505' && /branch_code/.test(error.message || '')) {
+            showMessage('رمز الفرع مستخدم لفرع آخر في نفس المنشأة. اختر رمزاً مختلفاً.', true);
+            return;
+        }
         if (error || orgError) {
             showMessage('خطأ: ' + (error || orgError).message, true);
             return;
