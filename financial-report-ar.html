@@ -11,7 +11,7 @@
 <title>التقرير المالي الشامل | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=44"></script>
+<script src="supabase-config.js?v=45"></script>
 <script src="theme.js?v=63"></script>
 <script src="gm-profit.js?v=7"></script>
 <script src="gm-report.js?v=4"></script>
@@ -110,7 +110,7 @@
 // Everything is summed server-data-side here from the same tables the rest of
 // the app uses; profit comes from the shared formula in gm-profit.js and the
 // cash section from the daily cashbox ("الحركة اليومية").
-let FR = { canProfit: false, store: null, cur: '' };
+let FR = { canProfit: false, profitAll: false, store: null, cur: '', scope: null };
 
 const esc = v => gmEscapeHtml(v == null ? '' : String(v));
 const n2 = v => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -175,23 +175,25 @@ async function load(r) {
 }
 
 async function build(from, to) {
-  const S = GOLDMIND_STORE_ID, q = () => goldmindClient;
+  const canProfit = FR.canProfit && (!FR.scope.multi() || FR.profitAll); // profit is secret per branch
+  document.getElementById('fr-store').textContent = FR.scope.multi() ? (FR.store.name || '') + ' — كل الفروع' : FR.scope.ids()[0] === GOLDMIND_STORE_ID ? (FR.store.name || '') : FR.scope.label();
+  const S = FR.scope.ids(), q = () => goldmindClient;
   const inPeriod = (t) => t.gte('created_at', from).lt('created_at', to);
 
   const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR] = await Promise.all([
-    gmFetchAllRows(() => inPeriod(q().from('invoices').select('id, invoice_number, type, payment_method, total_amount, amount_paid, cash_paid_amount, bank_paid_amount, created_at, counterparty_name').eq('store_id', S).neq('status', 'cancelled')).order('created_at')),
-    inPeriod(q().from('invoices').select('id', { count: 'exact', head: true }).eq('store_id', S).eq('status', 'cancelled')),
-    gmFetchAllRows(() => inPeriod(q().from('expense_entries').select('amount, description, category:category_id(name)').eq('store_id', S))),
-    gmFetchAllRows(() => inPeriod(q().from('daily_cash_log').select('direction, amount, currency').eq('store_id', S))),
-    gmFetchAllRows(() => q().from('daily_cash_log').select('direction, amount, currency').eq('store_id', S).lt('created_at', from)),
-    gmFetchAllRows(() => inPeriod(q().from('customer_debts').select('movement_type, cash_amount, gold_grams_24k, source').eq('store_id', S))),
-    gmFetchAllRows(() => q().from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, source').eq('store_id', S).lt('created_at', to)),
-    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('movement_type, source, gold_24k_equivalent, fab_fee_amount').eq('store_id', S))),
-    gmFetchAllRows(() => q().from('trader_movements').select('movement_type, gold_24k_equivalent').eq('store_id', S).lt('created_at', to)),
-    gmFetchAllRows(() => q().from('pieces').select('weight_grams, accounting_weight_grams, karat').eq('store_id', S).eq('status', 'available')),
-    q().from('gold_stock_lots').select('weight_grams_remaining, karat').eq('store_id', S),
-    q().from('gold_prices').select('karat, price_per_gram').eq('store_id', S),
-    gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer_id, customer:customer_id(name)').eq('store_id', S).lt('created_at', to).order('created_at'))
+    gmFetchAllRows(() => inPeriod(q().from('invoices').select('id, store_id, invoice_number, type, payment_method, total_amount, amount_paid, cash_paid_amount, bank_paid_amount, created_at, counterparty_name').in('store_id', S).neq('status', 'cancelled')).order('created_at')),
+    inPeriod(q().from('invoices').select('id', { count: 'exact', head: true }).in('store_id', S).eq('status', 'cancelled')),
+    gmFetchAllRows(() => inPeriod(q().from('expense_entries').select('amount, description, category:category_id(name)').in('store_id', S))),
+    gmFetchAllRows(() => inPeriod(q().from('daily_cash_log').select('direction, amount, currency').in('store_id', S))),
+    gmFetchAllRows(() => q().from('daily_cash_log').select('direction, amount, currency').in('store_id', S).lt('created_at', from)),
+    gmFetchAllRows(() => inPeriod(q().from('customer_debts').select('movement_type, cash_amount, gold_grams_24k, source').in('store_id', S))),
+    gmFetchAllRows(() => q().from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, source').in('store_id', S).lt('created_at', to)),
+    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('movement_type, source, gold_24k_equivalent, fab_fee_amount').in('store_id', S))),
+    gmFetchAllRows(() => q().from('trader_movements').select('movement_type, gold_24k_equivalent').in('store_id', S).lt('created_at', to)),
+    gmFetchAllRows(() => q().from('pieces').select('weight_grams, accounting_weight_grams, karat').in('store_id', S).eq('status', 'available')),
+    q().from('gold_stock_lots').select('weight_grams_remaining, karat').in('store_id', S),
+    q().from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID),
+    gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer_id, customer:customer_id(name)').in('store_id', S).lt('created_at', to).order('created_at'))
   ]);
   for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR]) if (x.error) throw x.error;
 
@@ -304,7 +306,7 @@ async function build(from, to) {
   // profit line: sales → profit − expenses = net. Purchases are their own item
   // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
   const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px]" style="color:#6B6150;">${t[4]}</div>` : ''}</div>`;
-  const tiles = FR.canProfit
+  const tiles = canProfit
     ? [['صافي المبيعات', money(netSales), ''], ['ربح المبيعات', money(P.profit), cls(P.profit)],
        ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات' + (scrapProfit ? ' + ربح الكسر' : '') + ' − المصاريف' + (discTotal ? ' − خصومات الديون' : '') + (trDiscShop || trDiscTrader ? ' ± خصومات التجار' : ''), money(netProfit), cls(netProfit)]]
     : [['صافي المبيعات', money(netSales), ''], ['المصاريف', money(expTotal), '']];
@@ -322,7 +324,7 @@ async function build(from, to) {
     ${cancR.count ? row('فواتير ملغاة (غير محسوبة)', cancR.count) : ''}
   </table>`);
 
-  if (FR.canProfit) {
+  if (canProfit) {
     h += sec('trending_up', 'الأرباح', `<table class="fr-t">
       ${row('صافي قيمة المبيعات', money(P.revenue))}
       ${row('قيمة الذهب (بسعر يوم البيع × الوزن المحاسبي)', money(-P.goldValue))}
@@ -387,8 +389,8 @@ async function build(from, to) {
 
   if (document.getElementById('fr-show-list').checked && invoices.length) {
     h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<div class="fr-wide"></div><table class="fr-t">
-      <tr><th>الرقم</th><th>النوع</th><th>التاريخ</th><th>الدفع</th><th class="n">المبلغ</th></tr>
-      ${invoices.map(i => `<tr style="font-size:11.5px;"><td dir="ltr" style="text-align:right;white-space:nowrap;">${esc(String(i.invoice_number || '').replace(/-20\d\d-0*/, '-'))}</td><td>${TYPE[i.type] || esc(i.type)}</td><td style="white-space:nowrap;" dir="ltr">${gmFormatDateTime(i.created_at, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td><td>${PAY[i.payment_method] || esc(i.payment_method || '')}</td><td class="n">${n2((i.type === 'return' ? -1 : 1) * Number(i.total_amount || 0))}</td></tr>`).join('')}
+      <tr><th>الرقم</th>${FR.scope.multi() ? '<th>الفرع</th>' : ''}<th>النوع</th><th>التاريخ</th><th>الدفع</th><th class="n">المبلغ</th></tr>
+      ${invoices.map(i => `<tr style="font-size:11.5px;"><td dir="ltr" style="text-align:right;white-space:nowrap;">${esc(String(i.invoice_number || '').replace(/-20\d\d-0*/, '-'))}</td>${FR.scope.multi() ? '<td>' + esc(FR.scope.nameOf(i.store_id)) + '</td>' : ''}<td>${TYPE[i.type] || esc(i.type)}</td><td style="white-space:nowrap;" dir="ltr">${gmFormatDateTime(i.created_at, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td><td>${PAY[i.payment_method] || esc(i.payment_method || '')}</td><td class="n">${n2((i.type === 'return' ? -1 : 1) * Number(i.total_amount || 0))}</td></tr>`).join('')}
     </table>`);
   }
   return h;
@@ -407,7 +409,9 @@ async function build(from, to) {
   FR.canProfit = owner || !!perm.view_profit_report;
   FR.store = store || {};
   FR.cur = FR.store.currency || '';
-  document.getElementById('fr-store').textContent = FR.store.name || '';
+  FR.scope = await gmBranchScope(document.getElementById('fr-controls'), 'view_reports', () => load(window.__frRange));
+  const all = await gmReportBranches('view_reports');
+  if (all.length > 1) { const pr = await gmReportBranches('view_profit_report'); FR.profitAll = all.every(b => pr.some(x => x.id === b.id)); }
   document.getElementById('fr-controls').classList.remove('hidden');
   document.getElementById('fr-sheet').classList.remove('hidden');
   document.querySelectorAll('#fr-periods .fr-chip').forEach(b => b.addEventListener('click', () => setPeriod(b.dataset.p)));

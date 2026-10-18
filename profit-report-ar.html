@@ -11,7 +11,7 @@
 <title>تقرير الأرباح | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=44"></script>
+<script src="supabase-config.js?v=45"></script>
 <script src="theme.js?v=63"></script>
 <script src="gm-profit.js?v=7"></script>
 <script src="gm-report.js?v=4"></script>
@@ -88,7 +88,7 @@
 
 <p class="text-[11px] text-outline">الربح = سعر البيع − قيمة الذهب (بسعر السوق وقت البيع نفسه) − الضريبة − كلفة المصنعية المسجّلة على القطعة (وزن القطعة × كلفة المصنعية للغرام). هذا هو صافي ربح المصنعية الفعلي — سعر الذهب نفسه لا يُحتسب ربحاً لأنك تشتري بديله بسعر السوق.</p>
 
-<div class="no-print bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex flex-col gap-3">
+<div id="filters-host" class="no-print bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex flex-col gap-3">
 <div class="grid grid-cols-2 gap-2">
 <div>
 <label class="text-[10px] text-outline block mb-1">من تاريخ</label>
@@ -180,7 +180,8 @@ async function init() {
   (prices || []).forEach(p => livePriceMap[p.karat] = Number(p.price_per_gram));
 
   const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate, name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
-  document.getElementById('pr-store').textContent = (storeRow && storeRow.name) || '';
+  STORE_NAME = (storeRow && storeRow.name) || '';
+  SCOPE = await gmBranchScope(document.getElementById('filters-host'), 'view_profit_report', applyFilters);
   const vatRate = Number((storeRow && storeRow.vat_rate) || 0);
   vatMultiplier = 1 + (vatRate / 100);
 
@@ -196,8 +197,8 @@ async function init() {
 async function loadBoxFilterOptions() {
   const select = document.getElementById('box-filter');
   const [goldRes, diamondRes] = await Promise.all([
-    goldmindClient.from('pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null),
-    goldmindClient.from('diamond_pieces').select('box_name').eq('store_id', GOLDMIND_STORE_ID).not('box_name', 'is', null)
+    goldmindClient.from('pieces').select('box_name').in('store_id', SCOPE.ids()).not('box_name', 'is', null),
+    goldmindClient.from('diamond_pieces').select('box_name').in('store_id', SCOPE.ids()).not('box_name', 'is', null)
   ]);
   const names = new Set();
   (goldRes.data || []).forEach(r => { if (r.box_name) names.add(r.box_name); });
@@ -211,7 +212,7 @@ async function loadBoxFilterOptions() {
 
 const f2 = v => (Number(v) || 0).toFixed(2), f3 = v => (Number(v) || 0).toFixed(3);
 const escH = v => gmEscapeHtml(v == null ? '' : String(v));
-let REPORT = null;
+let REPORT = null, SCOPE = null, STORE_NAME = ''; // multi-branch 3.1
 
 async function fetchByIds(ids, make) {
   let out = [];
@@ -244,6 +245,7 @@ async function applyFilters() {
   const range = gmRangeISO(fromDate || '2000-01-01', toDate || today);
 
   document.getElementById('empty-state').classList.add('hidden');
+  document.getElementById('pr-store').textContent = SCOPE.multi() ? STORE_NAME + ' — كل الفروع' : SCOPE.ids()[0] === GOLDMIND_STORE_ID ? STORE_NAME : SCOPE.label();
   document.getElementById('pr-period').innerHTML = 'الفترة: من <bdi dir="ltr">' + escH(fromDate || '…') + '</bdi> إلى <bdi dir="ltr">' + escH(toDate || today) + '</bdi>';
   document.getElementById('pr-box').textContent = boxFilter ? 'الصندوق: ' + boxFilter : '';
   document.getElementById('pr-printed').textContent = 'تاريخ الطباعة: ' + gmFormatDateTime(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -251,21 +253,21 @@ async function applyFilters() {
   document.getElementById('items-tbody').innerHTML = '';
 
   const [invRes, tmRes, staffRes, expRes, stockRes, lotsRes, discRes, gpRes, tdRes] = await Promise.all([
-    gmFetchAllRows(() => goldmindClient.from('invoices').select('id, invoice_number, created_at, type, created_by, total_amount')
-      .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return', 'buyRetail', 'buyTrader']).neq('status', 'cancelled')
+    gmFetchAllRows(() => goldmindClient.from('invoices').select('id, store_id, invoice_number, created_at, type, created_by, total_amount')
+      .in('store_id', SCOPE.ids()).in('type', ['sale', 'return', 'buyRetail', 'buyTrader']).neq('status', 'cancelled')
       .gte('created_at', range.from).lt('created_at', range.to).order('created_at', { ascending: false })),
     gmFetchAllRows(() => goldmindClient.from('trader_movements').select('id, source, invoice_id, weight_grams, accounting_weight_grams, karat, gold_24k_equivalent, fab_fee_per_gram, fab_fee_amount, cost_fab_per_gram, sale_cost, piece_acc_weight, gold_price_24k, batch_id, created_at, trader:trader_id(name), piece:piece_id(barcode, cost_fabrication_per_gram, accounting_weight_grams, weight_grams, box_name)')
-      .eq('store_id', GOLDMIND_STORE_ID).in('source', ['stock_given', 'stock_received'])
+      .in('store_id', SCOPE.ids()).in('source', ['stock_given', 'stock_received'])
       .gte('created_at', range.from).lt('created_at', range.to)),
-    goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID),
-    gmFetchAllRows(() => goldmindClient.from('expense_entries').select('amount').eq('store_id', GOLDMIND_STORE_ID)
+    goldmindClient.from('staff').select('id, full_name').in('store_id', SCOPE.ids()),
+    gmFetchAllRows(() => goldmindClient.from('expense_entries').select('amount').in('store_id', SCOPE.ids())
       .gte('created_at', range.from).lt('created_at', range.to)),
-    gmFetchAllRows(() => goldmindClient.from('pieces').select('weight_grams, accounting_weight_grams, karat, box_name').eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved'])),
-    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining, karat, box_name').eq('store_id', GOLDMIND_STORE_ID),
-    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('cash_amount').eq('store_id', GOLDMIND_STORE_ID).eq('source', 'discount')
+    gmFetchAllRows(() => goldmindClient.from('pieces').select('weight_grams, accounting_weight_grams, karat, box_name').in('store_id', SCOPE.ids()).in('status', ['available', 'reserved'])),
+    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining, karat, box_name').in('store_id', SCOPE.ids()),
+    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('cash_amount').in('store_id', SCOPE.ids()).eq('source', 'discount')
       .gte('created_at', range.from).lt('created_at', range.to)),
     goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID).eq('karat', 24).maybeSingle(),
-    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('movement_type, fab_fee_amount').eq('store_id', GOLDMIND_STORE_ID).eq('source', 'discount')
+    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('movement_type, fab_fee_amount').in('store_id', SCOPE.ids()).eq('source', 'discount')
       .gte('created_at', range.from).lt('created_at', range.to))
   ]);
   const price24Now = Number(gpRes && gpRes.data && gpRes.data.price_per_gram) || 0;
@@ -493,7 +495,7 @@ async function applyFilters() {
 
   document.getElementById('items-tbody').innerHTML = rows.map(r => `
     <tr class="border-t border-outline-variant ${r.isReturn ? 'bg-error-container/20' : ''}">
-      <td class="px-3 py-2">${escH((r.inv && r.inv.invoice_number) || '—')}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">' + (r.exchanged ? '(مُرجَعة بتبديل)' : '(مرتجع)') + '</span>' : ''}</td>
+      <td class="px-3 py-2">${escH((r.inv && r.inv.invoice_number) || '—')}${SCOPE.multi() && r.inv ? '<div class="text-[10px] text-on-surface-variant">' + escH(SCOPE.nameOf(r.inv.store_id)) + '</div>' : ''}${r.isReturn ? ' <span class="text-[10px] font-bold text-error">' + (r.exchanged ? '(مُرجَعة بتبديل)' : '(مرتجع)') + '</span>' : ''}</td>
       <td class="px-3 py-2">${escH(r.it.barcode || r.it.description || '—')}</td>
       <td class="px-3 py-2 font-data-mono">${r.it.diamond ? (Number(r.it.diamond.diamond_carat).toFixed(2) + ' ct' + (r.it.diamond.has_gold ? ` + ${r.displayWeight}غ/ع${r.it.karat}` : '')) : `${r.displayWeight}غ / ع${r.it.karat}${r.displayWeight !== r.weight ? ` <span class="text-outline">(محاسبة: ${r.weight}غ)</span>` : ''}`}</td>
       <td class="px-3 py-2 font-data-mono">${r.revenue.toFixed(2)}</td>

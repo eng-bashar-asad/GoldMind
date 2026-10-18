@@ -11,7 +11,7 @@
 <title>كشف الضريبة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=44"></script>
+<script src="supabase-config.js?v=45"></script>
 <script src="theme.js?v=63"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -73,6 +73,7 @@
 </div>
 
 <!-- Summary cards -->
+<p id="scope-label" class="text-[11px] font-semibold mb-2" style="color: var(--gm-on-surface-variant);"></p>
 <div class="grid grid-cols-2 gap-2 mb-2">
 <div class="tax-card p-3">
 <p class="text-[10.5px] mb-1" style="color: var(--gm-on-surface-variant);">ضريبة المبيعات المحصّلة</p>
@@ -110,6 +111,50 @@ function gmEscapeHtml(s) {
     return String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 }
 
+let SCOPE = null;
+async function loadRows() {
+    const vatMultiplier = 1 + (VAT_RATE / 100);
+    const ids = SCOPE.ids();
+    const [{ data: salesInvoices, error: e1 }, { data: purchaseInvoices, error: e2 }] = await Promise.all([
+        gmFetchAllRows(() => goldmindClient.from('invoices').select('id, store_id, invoice_number, total_amount, counterparty_name, customer_id, created_at')
+            .in('store_id', ids).eq('type', 'sale').neq('status', 'cancelled').order('created_at', { ascending: false })),
+        gmFetchAllRows(() => goldmindClient.from('invoices').select('id, store_id, invoice_number, total_amount, vat_amount, counterparty_name, trader_id, created_at')
+            .in('store_id', ids).eq('type', 'buyTrader').neq('status', 'cancelled').order('created_at', { ascending: false }))
+    ]);
+    if (e1 || e2) { showLoadError((e1 || e2).message); return; }
+
+    const customerIds = [...new Set((salesInvoices || []).filter(i => i.customer_id).map(i => i.customer_id))];
+    const traderIds = [...new Set((purchaseInvoices || []).filter(i => i.trader_id).map(i => i.trader_id))];
+    const [{ data: customers }, { data: traders }] = await Promise.all([
+        customerIds.length ? goldmindClient.from('customers').select('id, name').in('id', customerIds) : Promise.resolve({ data: [] }),
+        traderIds.length ? goldmindClient.from('traders').select('id, name').in('id', traderIds) : Promise.resolve({ data: [] })
+    ]);
+    const customerById = {}; (customers || []).forEach(c => { customerById[c.id] = c.name; });
+    const traderById = {}; (traders || []).forEach(t => { traderById[t.id] = t.name; });
+    const branchOf = i => SCOPE.multi() ? SCOPE.nameOf(i.store_id) : '';
+
+    ALL_SALES = (salesInvoices || []).map(i => {
+        const total = Number(i.total_amount || 0);
+        const beforeTax = vatMultiplier ? total / vatMultiplier : total;
+        return {
+            id: i.id, invoiceNumber: i.invoice_number, date: i.created_at, branch: branchOf(i),
+            partyName: customerById[i.customer_id] || i.counterparty_name || '—',
+            total, tax: total - beforeTax
+        };
+    });
+
+    ALL_PURCHASES = (purchaseInvoices || []).map(i => ({
+        id: i.id, invoiceNumber: i.invoice_number, date: i.created_at, branch: branchOf(i),
+        partyName: traderById[i.trader_id] || i.counterparty_name || '—',
+        total: Number(i.total_amount || 0), tax: Number(i.vat_amount || 0)
+    }));
+    document.getElementById('scope-label').textContent = SCOPE.multi() ? 'يشمل: كل الفروع' : '';
+    applyFilters();
+}
+function showLoadError(m) {
+    ['salesTaxList', 'purchaseTaxList'].forEach(id => { document.getElementById(id).innerHTML = '<div class="p-6 text-center text-[12.5px] text-red-600">تعذّر التحميل: ' + gmEscapeHtml(m) + '</div>'; });
+}
+
 async function loadTaxReport() {
     const session = await requireGoldMindSession('login-entry-ar.html');
     if (!session) return;
@@ -124,44 +169,11 @@ async function loadTaxReport() {
 
     const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
     VAT_RATE = Number((storeRow && storeRow.vat_rate) || 0);
-    const vatMultiplier = 1 + (VAT_RATE / 100);
-
-    const [{ data: salesInvoices }, { data: purchaseInvoices }] = await Promise.all([
-        goldmindClient.from('invoices').select('id, invoice_number, total_amount, counterparty_name, customer_id, created_at')
-            .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'sale').neq('status', 'cancelled').order('created_at', { ascending: false }),
-        goldmindClient.from('invoices').select('id, invoice_number, total_amount, vat_amount, counterparty_name, trader_id, created_at')
-            .eq('store_id', GOLDMIND_STORE_ID).eq('type', 'buyTrader').neq('status', 'cancelled').order('created_at', { ascending: false })
-    ]);
-
-    const customerIds = [...new Set((salesInvoices || []).filter(i => i.customer_id).map(i => i.customer_id))];
-    const traderIds = [...new Set((purchaseInvoices || []).filter(i => i.trader_id).map(i => i.trader_id))];
-    const [{ data: customers }, { data: traders }] = await Promise.all([
-        customerIds.length ? goldmindClient.from('customers').select('id, name').in('id', customerIds) : Promise.resolve({ data: [] }),
-        traderIds.length ? goldmindClient.from('traders').select('id, name').in('id', traderIds) : Promise.resolve({ data: [] })
-    ]);
-    const customerById = {}; (customers || []).forEach(c => { customerById[c.id] = c.name; });
-    const traderById = {}; (traders || []).forEach(t => { traderById[t.id] = t.name; });
-
-    ALL_SALES = (salesInvoices || []).map(i => {
-        const total = Number(i.total_amount || 0);
-        const beforeTax = vatMultiplier ? total / vatMultiplier : total;
-        return {
-            id: i.id, invoiceNumber: i.invoice_number, date: i.created_at,
-            partyName: customerById[i.customer_id] || i.counterparty_name || '—',
-            total, tax: total - beforeTax
-        };
-    });
-
-    ALL_PURCHASES = (purchaseInvoices || []).map(i => ({
-        id: i.id, invoiceNumber: i.invoice_number, date: i.created_at,
-        partyName: traderById[i.trader_id] || i.counterparty_name || '—',
-        total: Number(i.total_amount || 0), tax: Number(i.vat_amount || 0)
-    }));
-
+    // multi-branch 3.1: one tax statement for the organization (same TRN) or a single branch
+    SCOPE = await gmBranchScope(document.getElementById('filters-block'), 'view_reports', loadRows);
+    await loadRows();
     document.getElementById('loading-state').classList.add('hidden');
     document.getElementById('page-content').classList.remove('hidden');
-
-    applyFilters();
 }
 
 function inRange(dateStr, from, to) {
@@ -199,7 +211,7 @@ function renderTable(elId, rows) {
         <a href="invoice-print-ar.html?id=${r.id}" class="tax-row flex items-center justify-between p-3 hover:bg-gray-50">
             <div class="min-w-0">
                 <div class="text-[13px] font-semibold truncate">${gmEscapeHtml(r.partyName)}</div>
-                <div class="text-[11px] truncate" style="color: var(--gm-on-surface-variant);">${gmEscapeHtml(r.invoiceNumber)} · ${fmtDate(r.date)}</div>
+                <div class="text-[11px] truncate" style="color: var(--gm-on-surface-variant);">${gmEscapeHtml(r.invoiceNumber)} · ${fmtDate(r.date)}${r.branch ? ' · ' + gmEscapeHtml(r.branch) : ''}</div>
             </div>
             <div class="text-left shrink-0 mr-2">
                 <div class="text-[13px] font-bold">${fmt(r.tax)}</div>

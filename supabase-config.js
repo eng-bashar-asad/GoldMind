@@ -345,6 +345,63 @@ async function gmOrgBranches() {
 }
 async function gmOrgStoreIds() { return (await gmOrgBranches()).map(function (b) { return b.id; }); }
 
+// Multi-branch 3.1: the branches a report may cover for this user — this branch, plus every branch
+// of the organization where the user's own staff row is owner or has `perm`, in the same currency
+// (so totals add up). RLS still decides what each query returns.
+async function gmReportBranches(perm) {
+  var branches = await gmOrgBranches();
+  var here = branches.filter(function (b) { return b.id === GOLDMIND_STORE_ID; });
+  if (!here.length) here = [{ id: GOLDMIND_STORE_ID, name: '' }];
+  if (branches.length < 2) return here;
+  try {
+    var sess = (await goldmindClient.auth.getSession()).data.session;
+    var ids = branches.map(function (b) { return b.id; });
+    var res = await Promise.all([
+      goldmindClient.from('staff').select('store_id, role, permissions').eq('user_id', sess.user.id).in('store_id', ids),
+      goldmindClient.from('stores').select('id, currency').in('id', ids)]);
+    var cur = {}; (res[1].data || []).forEach(function (s) { cur[s.id] = String(s.currency || '').toUpperCase(); });
+    var ok = {}; (res[0].data || []).forEach(function (r) { if (r.role === 'owner' || (r.permissions && r.permissions[perm] === true)) ok[r.store_id] = true; });
+    return branches.filter(function (b) { return b.id === GOLDMIND_STORE_ID || (ok[b.id] && cur[b.id] === cur[GOLDMIND_STORE_ID]); });
+  } catch (e) { return here; }
+}
+
+// Puts a «الفرع» select at the start of `host` when the user may see more than one branch.
+// Returns { ids(), label(), multi() }; onChange() runs after the user picks another scope.
+// The choice is kept in the URL (?branch=all|<id>) so print and refresh keep it.
+async function gmBranchScope(host, perm, onChange) {
+  var list = await gmReportBranches(perm);
+  var pick = new URLSearchParams(location.search).get('branch') || GOLDMIND_STORE_ID;
+  if (pick !== 'all' && !list.some(function (b) { return b.id === pick; })) pick = GOLDMIND_STORE_ID;
+  var nameOf = function (id) { var b = list.find(function (x) { return x.id === id; }); return (b && b.name) || 'هذا الفرع'; };
+  var api = {
+    ids: function () { return pick === 'all' ? list.map(function (b) { return b.id; }) : [pick]; },
+    multi: function () { return pick === 'all' && list.length > 1; },
+    label: function () { return pick === 'all' ? 'كل الفروع' : nameOf(pick); },
+    nameOf: nameOf
+  };
+  if (list.length < 2 || !host) return api;
+  var wrap = document.createElement('label');
+  wrap.className = 'gm-branch-scope block mb-3';
+  wrap.innerHTML = '<span class="block text-[10.5px] font-semibold mb-1">الفرع</span>';
+  var sel = document.createElement('select');
+  sel.id = 'gm-branch-scope';
+  sel.className = 'w-full h-10 border rounded-lg px-2 text-[12.5px]';
+  sel.innerHTML = '<option value="all">كل الفروع</option>' + list.map(function (b) {
+    return '<option value="' + b.id + '">' + gmEscapeHtml(b.name || 'فرع') + (b.id === GOLDMIND_STORE_ID ? ' (هذا الفرع)' : '') + '</option>';
+  }).join('');
+  sel.value = pick;
+  sel.addEventListener('change', function () {
+    pick = sel.value;
+    var u = new URL(location.href);
+    if (pick === GOLDMIND_STORE_ID) u.searchParams.delete('branch'); else u.searchParams.set('branch', pick);
+    history.replaceState(null, '', u);
+    if (onChange) onChange();
+  });
+  wrap.appendChild(sel);
+  host.insertBefore(wrap, host.firstChild);
+  return api;
+}
+
 // Customer money RPCs take p_store (the branch taking the money) since migration 20261019010000.
 // Before it runs the old signature has no p_store: retry once without it.
 async function gmCustomerRpc(name, args) {
