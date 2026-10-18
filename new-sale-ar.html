@@ -158,6 +158,7 @@
 </div>
 
 <div id="customer-credit" class="hidden mt-2 rounded-lg p-3 text-[12px] leading-5" style="background:#ECFDF5;color:#065F46"></div>
+<div id="customer-debt-alert" class="hidden mt-2 rounded-lg p-3 text-[12px] leading-5 border" style="background:#FEF3C7;color:#92400E;border-color:#F59E0B" role="alert"></div>
 
 <div id="customer-search-block" class="space-y-3">
 <div class="relative">
@@ -1307,7 +1308,9 @@
     async function gmShowCustomerCredit(c) {
         const box = document.getElementById('customer-credit');
         CUST_CREDIT = 0; box.classList.add('hidden');
+        document.getElementById('customer-debt-alert').classList.add('hidden');
         if (!c || !c.id) return;
+        gmShowCustomerDebt(c);
         const { data } = await goldmindClient.rpc('customer_credit', { sid: GOLDMIND_STORE_ID, cust: c.id });
         if (!selectedCustomer || selectedCustomer.id !== c.id) return;
         CUST_CREDIT = Number(data) || 0;
@@ -1317,6 +1320,26 @@
             box.classList.remove('hidden');
         }
         if (selectedPaymentMethod === 'mixed') onMixedAmountInput();
+    }
+
+    // Warn the seller when the customer still owes money, in this branch or any other branch of
+    // the organization (debts of every branch are readable since multi-branch 2.1). Balance and
+    // dates only: the other branch's invoices stay closed without view_branch_invoices.
+    async function gmShowCustomerDebt(c) {
+        const box = document.getElementById('customer-debt-alert');
+        const { data, error } = await goldmindClient.from('customer_debts')
+            .select('store_id, movement_type, cash_amount, created_at').eq('customer_id', c.id);
+        if (error || !selectedCustomer || selectedCustomer.id !== c.id) return;
+        const net = r => (r.movement_type === 'debt_increase' ? 1 : -1) * (Number(r.cash_amount) || 0);
+        const owed = Math.round((data || []).reduce((a, r) => a + net(r), 0) * 100) / 100;
+        if (!(owed > 0.009)) return;
+        const elsewhere = Math.round((data || []).filter(r => r.store_id !== GOLDMIND_STORE_ID).reduce((a, r) => a + net(r), 0) * 100) / 100;
+        const since = (data || []).filter(r => r.movement_type === 'debt_increase')
+            .map(r => r.created_at).sort()[0];
+        box.innerHTML = '<b>تنبيه: على الزبون دين سابق ' + gmMoney(owed) + ' ' + CUR + '</b>'
+            + (since ? ' — أقدم دين منذ ' + gmEscapeHtml(new Date(since).toLocaleDateString('ar-AE')) : '')
+            + (elsewhere > 0.009 ? '<br>منه ' + gmMoney(elsewhere) + ' ' + CUR + ' في فرع آخر.' : '');
+        box.classList.remove('hidden');
     }
 
     // Offline there's no customer page to go to: take name + phone here and the
@@ -1332,6 +1355,7 @@
     function clearCustomer() {
         selectedCustomer = null;
         CUST_CREDIT = 0; document.getElementById('customer-credit').classList.add('hidden');
+        document.getElementById('customer-debt-alert').classList.add('hidden');
         document.getElementById('customer-selected').classList.add('hidden');
         document.getElementById('customer-selected').classList.remove('flex');
         document.getElementById('customer-search-block').classList.remove('hidden');
