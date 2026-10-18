@@ -30,8 +30,8 @@ function gmLineProfit(it, isReturn, vatMultiplier, livePriceMap) {
   var vat = revenue - revenue / (vatMultiplier || 1);
   var perGram = (it.piece && it.piece.cost_fabrication_per_gram) || (it.lot && it.lot.cost_fabrication_per_gram) ||
     (it.diamond && it.diamond.has_gold && it.diamond.gold_cost_fabrication_per_gram) || 0;
-  // pooled opening-stock lots keep a manually entered fee on the line itself
-  var fabCost = (it.lot && it.fabrication_fee) ? sign * num(it.fabrication_fee) : sign * weight * num(perGram);
+  // a making charge typed on the line (pooled lots, typed gold lines) wins over the per-gram cost
+  var fabCost = (!it.piece && !it.diamond && num(it.fabrication_fee)) ? sign * num(it.fabrication_fee) : sign * weight * num(perGram);
   var diamondCost = it.diamond ? sign * num(it.diamond.diamond_carat) * num(it.diamond.diamond_price_per_carat) : 0;
   var accentCost = it.piece ? sign * num(it.piece.accent_diamond_carat) * num(it.piece.accent_diamond_price_per_carat) : 0;
   // A piece bought for a cash price: its cost is that price (bought for X, sold for Y).
@@ -50,6 +50,8 @@ function gmLineProfit(it, isReturn, vatMultiplier, livePriceMap) {
 // ponytail: self-check — bought 5180, sold 6700, no VAT → profit 1520
 // ponytail: self-check — an exchange line of −6700 exactly undoes that sale
 console.assert(gmLineProfit({ line_total: -6700, weight_grams: 11.72, karat: 18, gold_price_per_gram: 300, piece: { purchase_cost: 5180, cost_fabrication_per_gram: 10 } }, false, 1, {}).profit === -1520, 'gmLineProfit exchange line');
+// ponytail: self-check — typed line 1000, 3 g acc × 300, making 50 → profit 50
+console.assert(gmLineProfit({ line_total: 1000, weight_grams: 3.2, accounting_weight_grams: 3, karat: 18, gold_price_per_gram: 300, fabrication_fee: 50 }, false, 1, {}).profit === 50, 'gmLineProfit typed making');
 console.assert(gmLineProfit({ line_total: 6700, weight_grams: 11.72, karat: 18, gold_price_per_gram: 300, piece: { purchase_cost: 5180, cost_fabrication_per_gram: 10 } }, false, 1, {}).profit === 1520, 'gmLineProfit purchase_cost');
 
 // Profit of one piece given to a wholesale trader (trader_movements row, source 'stock_given',

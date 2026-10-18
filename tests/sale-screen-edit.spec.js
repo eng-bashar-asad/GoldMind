@@ -54,6 +54,7 @@ test('remove a piece → back in stock; add a typed line → new invoice line', 
   await page.locator('#cart-body tr').first().locator('button[onclick^="removeFromCart"]').click();
   await page.click('#sale-tabs [data-tab="manual"]');
   await page.fill('#manual-weight', '5');
+  await page.fill('#manual-acc-weight', '5');
   await page.fill('#manual-price', '800');
   await page.locator('button[onclick="addManualToCart()"]').click();
   await expect(page.locator('#manual-source')).toHaveClass(/border-error/); // source is required

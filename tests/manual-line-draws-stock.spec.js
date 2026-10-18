@@ -26,8 +26,11 @@ test('typed line from the scrap box: 5 g = 3 g from the oldest lot + 2 g from th
   await page.fill('#manual-price', '1000');
   await page.locator('button[onclick="addManualToCart()"]').click();
   await expect(page.locator('#manual-source')).toHaveClass(/border-error/);
+  await expect(page.locator('#manual-acc-weight')).toHaveClass(/border-error/);
   await page.selectOption('#manual-source', 'scrap');
   await page.fill('#manual-weight', '5');
+  await page.fill('#manual-acc-weight', '4.5');
+  await page.fill('#manual-fab-fee', '50');
   await page.fill('#manual-price', '1000');
   await page.locator('button[onclick="addManualToCart()"]').click();
   await expect(page.locator('#cart-body tr')).toHaveCount(2);
@@ -39,6 +42,8 @@ test('typed line from the scrap box: 5 g = 3 g from the oldest lot + 2 g from th
   expect(items.map(i => i.lot_id)).toEqual(['L1', 'L2']);
   expect(items.map(i => i.weight)).toEqual([3, 2]);
   expect(items.map(i => i.price)).toEqual([600, 400]);
+  expect(items.map(i => i.accounting_weight)).toEqual([2.7, 1.8]);
+  expect(items.map(i => i.manual_fab_fee)).toEqual([30, 20]);
 });
 
 test('typed line with stock off: no box needed, no lot is taken', async ({ page }) => {
@@ -53,6 +58,7 @@ test('typed line with stock off: no box needed, no lot is taken', async ({ page 
   await page.uncheck('#manual-from-stock');
   await expect(page.locator('#manual-source-wrap')).toHaveClass(/\bhidden\b/);
   await page.fill('#manual-weight', '5');
+  await page.fill('#manual-acc-weight', '4.8');
   await page.fill('#manual-price', '1000');
   await page.locator('button[onclick="addManualToCart()"]').click();
   await expect(page.locator('#cart-body tr')).toHaveCount(1);
@@ -62,4 +68,6 @@ test('typed line with stock off: no box needed, no lot is taken', async ({ page 
   await expect.poll(() => posted.length).toBe(1);
   expect(posted[0].items[0].lot_id).toBeFalsy();
   expect(posted[0].items[0].weight).toBe(5);
+  expect(posted[0].items[0].accounting_weight).toBe(4.8);
+  expect(posted[0].items[0].manual_fab_fee).toBe(0); // empty making charge = 0
 });

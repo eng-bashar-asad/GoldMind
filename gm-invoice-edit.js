@@ -162,7 +162,7 @@ async function gmSaveInvoiceEdit(s) {
     await goldmindClient.from('invoice_items').insert({
       invoice_id: invoice.id, piece_id: pieceId, barcode: it.barcode,
       karat: it.karat, weight_grams: it.weight_grams, accounting_weight_grams: it.accounting_weight_grams,
-      fabrication_fee: 0, line_total: it.line_total,
+      fabrication_fee: pieceId ? 0 : Math.max(0, Number(it.fabrication_fee) || 0), line_total: it.line_total,
       description: it.description, description_en: it.description_en,
       gold_price_per_gram: it.gold_price_per_gram
     });

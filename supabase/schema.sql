@@ -2640,6 +2640,7 @@ begin
     mode := coalesce(it->>'mode', 'manual');
     price := round((it->>'price')::numeric, 2);
     if price is null or price < 0 then raise exception 'سعر غير صحيح بأحد السطور'; end if;
+    if coalesce(nullif(it->>'manual_fab_fee','')::numeric, 0) < 0 then raise exception 'المصنعية لا تكون بالسالب'; end if;
     k := nullif(it->>'karat','')::int; w := nullif(it->>'weight','')::numeric; aw := coalesce(nullif(it->>'accounting_weight','')::numeric, w);
 
     if mode = 'diamond' then
@@ -2672,7 +2673,8 @@ begin
       'diamond_piece_id', case when mode = 'diamond' then it->>'diamond_piece_id' end,
       'lot_id', case when mode = 'stock' then it->>'lot_id' end,
       'is_pooled', coalesce((it->>'is_pooled')::boolean, false),
-      'fee', case when mode = 'stock' and coalesce((it->>'is_pooled')::boolean, false) then coalesce((it->>'manual_fab_fee')::numeric, 0) else 0 end,
+      'fee', case when mode = 'diamond' or nullif(it->>'piece_id','') is not null then 0
+                  else coalesce(nullif(it->>'manual_fab_fee','')::numeric, 0) end,
       'barcode', it->>'barcode', 'karat', k, 'weight', w, 'aw', aw, 'price', price, 'gp', gp,
       'description', it->>'description', 'description_en', it->>'description_en', 'photo', it->>'photo_url');
   end loop;

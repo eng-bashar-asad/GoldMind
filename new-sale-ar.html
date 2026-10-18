@@ -17,7 +17,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=42"></script>
 <script src="theme.js?v=63"></script>
-<script src="gm-invoice-edit.js?v=1"></script>
+<script src="gm-invoice-edit.js?v=2"></script>
 <script id="tailwind-config">
         tailwind.config = {
           darkMode: "class",
@@ -256,8 +256,16 @@
 </div>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-weight">الوزن (غ)</label>
-<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-weight" step="0.01" type="number"/>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-weight">الوزن القائم (غ)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-weight" step="0.01" type="number" required/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-acc-weight">الوزن المحاسبي (غ)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-acc-weight" step="0.01" type="number" required/>
+</div>
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-fab-fee">المصنعية (اختياري، <span class="cur-label">AED</span>)</label>
+<input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-fab-fee" placeholder="0" min="0" step="0.01" type="number"/>
 </div>
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-karat">العيار</label>
@@ -1659,7 +1667,10 @@
         const karat = parseInt(document.getElementById('manual-karat').value, 10);
         const price = parseFloat(document.getElementById('manual-price').value);
         const source = document.getElementById('manual-source').value;
-        const inputs = ['manual-weight', 'manual-price', 'manual-source'].map(id => document.getElementById(id));
+        const accWeight = parseFloat(document.getElementById('manual-acc-weight').value);
+        const feeRaw = document.getElementById('manual-fab-fee').value.trim();
+        const fee = feeRaw === '' ? 0 : parseFloat(feeRaw); // making charge: empty = 0
+        const inputs = ['manual-weight', 'manual-price', 'manual-source', 'manual-acc-weight', 'manual-fab-fee'].map(id => document.getElementById(id));
         const errEl = document.getElementById('manual-error');
         inputs.forEach(el => el.classList.remove('border-error'));
         errEl.classList.add('hidden');
@@ -1667,17 +1678,24 @@
         let valid = true;
         if (!weight || weight <= 0) { inputs[0].classList.add('border-error'); valid = false; }
         if (!price || price <= 0) { inputs[1].classList.add('border-error'); valid = false; }
+        if (!accWeight || accWeight <= 0) { inputs[3].classList.add('border-error'); valid = false; }
+        if (isNaN(fee) || fee < 0) { inputs[4].classList.add('border-error'); valid = false; }
         const fromStock = document.getElementById('manual-from-stock').checked;
         if (fromStock && !source) { inputs[2].classList.add('border-error'); valid = false; }
-        if (!valid) return;
+        if (!valid) {
+            errEl.textContent = 'الوزن القائم والوزن المحاسبي مطلوبان؛ المصنعية اختيارية (فارغة = صفر).';
+            errEl.classList.remove('hidden');
+            return;
+        }
+        const clearManual = () => ['manual-desc', 'manual-weight', 'manual-acc-weight', 'manual-fab-fee', 'manual-price']
+            .forEach(id => { document.getElementById(id).value = ''; });
 
         if (!fromStock) {
             // not taken from stock (as before): a plain typed line, no lot
-            cart.push({ cartId: ++cartCounter, piece: null, barcode: null, karat: karat, weight: weight, ...gmPriced(price),
+            cart.push({ cartId: ++cartCounter, piece: null, barcode: null, karat: karat, weight: weight,
+                accountingWeight: accWeight, manualFabFee: fee, ...gmPriced(price),
                 description: document.getElementById('manual-desc').value.trim() || null });
-            document.getElementById('manual-desc').value = '';
-            document.getElementById('manual-weight').value = '';
-            document.getElementById('manual-price').value = '';
+            clearManual();
             renderCart();
             return;
         }
@@ -1708,37 +1726,47 @@
             slices.push({ lot: x.lot, w: take });
             left = Math.round((left - take) * 1000) / 1000;
         }
-        let usedPrice = 0;
+        // price, accounting weight and making charge are split by standing weight; the last slice takes the rounding rest
+        const used = { price: 0, acc: 0, fee: 0 };
         slices.forEach((sl, i) => {
-            sl.price = i === slices.length - 1
-                ? Math.round((price - usedPrice) * 100) / 100
-                : Math.round(price * sl.w / weight * 100) / 100;
-            usedPrice += sl.price;
+            const last = i === slices.length - 1;
+            sl.price = last ? Math.round((price - used.price) * 100) / 100 : Math.round(price * sl.w / weight * 100) / 100;
+            sl.acc = last ? Math.round((accWeight - used.acc) * 1000) / 1000 : Math.round(accWeight * sl.w / weight * 1000) / 1000;
+            sl.fee = last ? Math.round((fee - used.fee) * 100) / 100 : Math.round(fee * sl.w / weight * 100) / 100;
+            used.price += sl.price; used.acc += sl.acc; used.fee += sl.fee;
+            sl.isPooled = sl.lot.fabrication_pool_remaining !== null && sl.lot.fabrication_pool_remaining !== undefined;
         });
+        // a pooled lot pays the making charge out of its remaining pool
+        const short = slices.find(sl => sl.isPooled && sl.fee > Number(sl.lot.fabrication_pool_remaining) - (reservedByLot[sl.lot.id + '_fee'] || 0) + 0.005);
+        if (short) {
+            const left = Number(short.lot.fabrication_pool_remaining) - (reservedByLot[short.lot.id + '_fee'] || 0);
+            errEl.textContent = `المصنعية (${short.fee.toFixed(2)}) أكبر من المصنعية المتبقية بالدفعة (${left.toFixed(2)} ${CUR}).`;
+            errEl.classList.remove('hidden');
+            return;
+        }
 
         const description = document.getElementById('manual-desc').value.trim() || null;
         slices.forEach(sl => {
-            const isPooled = sl.lot.fabrication_pool_remaining !== null && sl.lot.fabrication_pool_remaining !== undefined;
+            const isPooled = sl.isPooled;
             reservedByLot[sl.lot.id] = (reservedByLot[sl.lot.id] || 0) + sl.w;
+            if (isPooled) reservedByLot[sl.lot.id + '_fee'] = (reservedByLot[sl.lot.id + '_fee'] || 0) + sl.fee;
             cart.push({
                 cartId: ++cartCounter,
                 mode: 'stock',
                 lotId: sl.lot.id,
                 karat: karat,
                 weight: sl.w,
-                accountingWeight: sl.w,
+                accountingWeight: sl.acc,
                 ...gmPriced(sl.price),
                 isPooled: isPooled,
                 fabPerGram: Number(sl.lot.cost_fabrication_per_gram) || 0,
-                manualFabFee: 0,
+                manualFabFee: sl.fee,
                 description: description,
                 photoFile: null
             });
         });
 
-        document.getElementById('manual-desc').value = '';
-        document.getElementById('manual-weight').value = '';
-        document.getElementById('manual-price').value = '';
+        clearManual();
         renderCart();
         loadStockLots();
     }
@@ -1750,6 +1778,7 @@
             if (removed.line) editRemoved.push(removed.line);
             if (removed.mode === 'stock' && reservedByLot[removed.lotId]) {
                 reservedByLot[removed.lotId] -= removed.weight;
+                if (removed.isPooled) reservedByLot[removed.lotId + '_fee'] -= Number(removed.manualFabFee) || 0;
             }
             cart.splice(idx, 1);
         }
@@ -2002,11 +2031,11 @@
                 diamond_piece_id: item.mode === 'diamond' ? item.diamondPieceId : null,
                 lot_id: item.mode === 'stock' ? item.lotId : null,
                 is_pooled: !!(item.mode === 'stock' && item.isPooled),
-                manual_fab_fee: item.mode === 'stock' && item.isPooled ? item.manualFabFee : 0,
+                manual_fab_fee: Number(item.manualFabFee) || 0,
                 barcode: item.barcode || null,
                 karat: item.karat || null,
                 weight: item.mode === 'diamond' ? null : item.weight,
-                accounting_weight: item.mode === 'stock' ? item.accountingWeight : null,
+                accounting_weight: (item.mode === 'stock' || !item.piece) && item.mode !== 'diamond' ? (item.accountingWeight ?? null) : null,
                 price: item.price,
                 description: (item.piece && item.piece.description_ar) || item.description || null,
                 description_en: item.piece ? item.piece.description_en : null,
@@ -2109,7 +2138,7 @@
             _new: true, piece_id: i.piece ? i.piece.id : null, barcode: i.barcode || null, karat: i.karat || null,
             weight_grams: i.weight, accounting_weight_grams: i.accountingWeight ?? (i.piece ? (i.piece.accounting_weight_grams || i.weight) : i.weight),
             description: (i.piece && i.piece.description_ar) || i.description || null, description_en: i.piece ? i.piece.description_en : null,
-            line_total: i.price, gold_price_per_gram: null
+            line_total: i.price, gold_price_per_gram: null, fabrication_fee: i.piece ? 0 : (Number(i.manualFabFee) || 0)
         });
         const m = getMixedAmounts();
         const res = await gmSaveInvoiceEdit({
