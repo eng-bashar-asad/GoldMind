@@ -59,6 +59,11 @@
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-6">
 
+<div id="orgPriceBox" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<label class="flex items-center gap-2 text-[14px] font-bold"><input type="checkbox" id="ownPrice" class="w-5 h-5 rounded" onchange="toggleOwnPrice(this)"/> سعر خاص لهذا الفرع</label>
+<p class="text-[12px] text-on-surface-variant mt-2" id="orgPriceNote"></p>
+</div>
+
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <h2 class="font-bold text-[14px] mb-3">سعر الأونصة العالمية</h2>
 <div class="relative mb-3">
@@ -221,7 +226,7 @@ async function load() {
 
   const [{ data: staffRow }, { data: storeRow }] = await Promise.all([
     goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
-    goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate, last_gold_ounce_price, last_gold_ounce_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+    goldmindClient.from('stores').select('*').eq('id', GOLDMIND_STORE_ID).maybeSingle()
   ]);
   gmStore = storeRow || null;
   const canManage = staffRow && staffRow.permissions && staffRow.permissions.manage_gold_price;
@@ -234,6 +239,35 @@ async function load() {
   }
 
   document.getElementById('page-content').classList.remove('hidden');
+  await renderOrgPrice();
+  await loadLastUpdated();
+}
+
+// Multi-branch 2.2: one gold price for the organization; a branch may keep its own.
+// Shown only with several branches and once the own_gold_price column exists.
+async function renderOrgPrice() {
+  const branches = await gmOrgBranches();
+  if (!gmStore || !('own_gold_price' in gmStore) || branches.length < 2) return;
+  document.getElementById('orgPriceBox').classList.remove('hidden');
+  document.getElementById('ownPrice').checked = !!gmStore.own_gold_price;
+  document.getElementById('orgPriceNote').textContent = gmStore.own_gold_price
+    ? 'هذا الفرع له سعر خاص: ما تحفظه هنا يطبَّق على هذا الفرع فقط.'
+    : 'السعر موحّد للمنشأة: ما تحفظه هنا يطبَّق على كل الفروع التي تتبع سعر المنشأة (بنفس العملة).';
+}
+
+async function toggleOwnPrice(box) {
+  const own = box.checked;
+  if (!own && !confirm('سيأخذ هذا الفرع سعر المنشأة الحالي بدل سعره الخاص. متابعة؟')) { box.checked = true; return; }
+  box.disabled = true;
+  const { error } = await goldmindClient.rpc('set_branch_own_gold_price', { p_store: GOLDMIND_STORE_ID, p_own: own });
+  box.disabled = false;
+  if (error) { box.checked = !own; alert('تعذّر الحفظ: ' + error.message); return; }
+  gmStore.own_gold_price = own;
+  if (!own) {
+    const { data } = await goldmindClient.from('stores').select('*').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+    if (data) gmStore = data;
+  }
+  await renderOrgPrice();
   await loadLastUpdated();
 }
 
