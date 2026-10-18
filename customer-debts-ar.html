@@ -11,7 +11,7 @@
 <title>ديون العملاء | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=42"></script>
+<script src="supabase-config.js?v=43"></script>
 <script src="theme.js?v=63"></script>
 <script src="gm-profit.js?v=7"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -303,9 +303,12 @@ async function load() {
   const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_customers'] === true));
   if (!__allowed) { window.__permCheckInserted = true; alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; return; }
 
+  // one customer list and one balance for every branch of the organization (multi-branch 2.1)
+  (await gmOrgBranches()).forEach(b => { ORG_BRANCHES[b.id] = b; });
+  const orgIds = Object.keys(ORG_BRANCHES);
   const [{ data: customerRows, error: cErr }, { data: moveRows, error: mErr }] = await Promise.all([
-    goldmindClient.from('customers').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
-    goldmindClient.from('customer_debts').select('*, invoice:invoice_id(invoice_number)').eq('store_id', GOLDMIND_STORE_ID).or('source.is.null,source.neq.allocation').order('created_at', { ascending: false })
+    goldmindClient.from('customers').select('*').in('store_id', orgIds).order('name'),
+    goldmindClient.from('customer_debts').select('*, invoice:invoice_id(invoice_number)').in('store_id', orgIds).or('source.is.null,source.neq.allocation').order('created_at', { ascending: false })
   ]);
 
   document.getElementById('loading-state').classList.add('hidden');
@@ -442,13 +445,17 @@ function clearMovementsMonthFilter() {
 
 // ---- Everything between us and the customer: invoices + account movements ----
 const invoicesByCustomer = {};
+const ORG_BRANCHES = {}; // id -> {name, can_open_invoices}
+// another branch of the organization: its name, and whether this user may open its invoices
+const otherBranch = sid => sid && sid !== GOLDMIND_STORE_ID ? (ORG_BRANCHES[sid] || { name: 'فرع آخر', can_open_invoices: false }) : null;
+const branchTag = sid => { const b = otherBranch(sid); return b ? `<span class="text-[11px] text-on-surface-variant mr-1">(${gmEscapeHtml(b.name || 'فرع آخر')})</span>` : ''; };
 const INV_TYPE = { sale: 'فاتورة بيع', return: 'مرتجع مبيعات', buyRetail: 'شراء من الزبون', buyTrader: 'فاتورة شراء' };
 const PAY_LABEL = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'دفعة جزئية' };
 async function gmLoadCustomerInvoices(customerId) {
   if (!invoicesByCustomer[customerId]) {
     const { data } = await goldmindClient.from('invoices')
-      .select('id, invoice_number, type, status, payment_method, total_amount, amount_paid, created_at, pay_currency, pay_fx_rate')
-      .eq('store_id', GOLDMIND_STORE_ID).eq('customer_id', customerId).order('created_at', { ascending: false });
+      .select('id, store_id, invoice_number, type, status, payment_method, total_amount, amount_paid, created_at, pay_currency, pay_fx_rate')
+      .in('store_id', Object.keys(ORG_BRANCHES).length ? Object.keys(ORG_BRANCHES) : [GOLDMIND_STORE_ID]).eq('customer_id', customerId).order('created_at', { ascending: false });
     invoicesByCustomer[customerId] = data || [];
   }
   if (currentCustomerId === customerId) renderMovementsList();
@@ -493,7 +500,7 @@ function renderMovementsList() {
       return `
       <a href="invoice-print-ar.html?id=${i.id}" class="block bg-surface-container-lowest border border-outline-variant rounded-xl p-4 hover:border-secondary${cancelled ? ' opacity-60' : ''}">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-[13px] font-semibold">${INV_TYPE[i.type] || 'فاتورة'} ${gmEscapeHtml(i.invoice_number || '')}${cancelled ? ' <span class="text-error">(ملغاة)</span>' : ''}</span>
+          <span class="text-[13px] font-semibold">${INV_TYPE[i.type] || 'فاتورة'} ${gmEscapeHtml(i.invoice_number || '')}${cancelled ? ' <span class="text-error">(ملغاة)</span>' : ''}${branchTag(i.store_id)}</span>
           <span class="text-[11px] text-on-surface-variant">${dateOf(i.created_at)}</span>
         </div>
         <p class="text-[13px] font-data-mono font-bold">${fmt(Number(i.total_amount || 0) * rate)}${cur}</p>
@@ -507,23 +514,25 @@ function renderMovementsList() {
     const m = e.m;
     const isIncrease = m.movement_type === 'debt_increase';
     const goldLine = Number(m.gold_grams_24k || 0) !== 0 ? ` <span class="font-data-mono">${isIncrease ? '+' : '-'}${fmt(Math.abs(m.gold_grams_24k))}غ</span>` : '';
-    const href = m.source === 'deposit' || m.source === 'deposit_refund' ? 'deposits-ar.html?customer=' + currentCustomerId
+    // another branch's row: balance and date only, its invoice opens only with view_branch_invoices
+    const other = otherBranch(m.store_id), closed = other && !other.can_open_invoices, mine = !other;
+    const href = closed ? '' : m.source === 'deposit' || m.source === 'deposit_refund' ? (mine ? 'deposits-ar.html?customer=' + currentCustomerId : '')
       : m.invoice_id ? 'invoice-print-ar.html?id=' + m.invoice_id : '';
     const tag = href ? 'a' : 'div';
     return `
       <${tag}${href ? ` href="${href}"` : ''} class="block bg-surface-container-lowest border border-outline-variant rounded-xl p-4${href ? ' hover:border-secondary' : ''}">
         <div class="flex items-center justify-between mb-1">
-          <span class="text-[13px] font-semibold ${isIncrease ? 'text-success' : 'text-error'}">${gmEscapeHtml(movementLabel(m))}</span>
+          <span class="text-[13px] font-semibold ${isIncrease ? 'text-success' : 'text-error'}">${gmEscapeHtml(movementLabel(m))}${branchTag(m.store_id)}</span>
           <span class="text-[11px] text-on-surface-variant">${dateOf(m.created_at)}</span>
         </div>
         <p class="text-[13px] font-data-mono font-bold ${isIncrease ? 'text-success' : 'text-error'}">${Number(m.cash_amount || 0) !== 0 ? (isIncrease ? '+' : '-') + fmt(m.cash_amount) : ''}${goldLine}</p>
-        ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
-        ${m.invoice && m.invoice.invoice_number ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
-        ${m.source === 'discount' ? `<div class="flex gap-2 mt-2">
+        ${m.notes && !closed ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
+        ${m.invoice && m.invoice.invoice_number && !closed ? `<p class="text-[11px] text-outline mt-1">فاتورة: ${gmEscapeHtml(m.invoice.invoice_number)}</p>` : ''}
+        ${m.source === 'discount' && mine ? `<div class="flex gap-2 mt-2">
           <button type="button" onclick="editDiscount('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">تعديل الخصم</button>
           <button type="button" onclick="deleteDiscount('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">حذف الخصم</button></div>` : ''}
-        ${(m.source === 'payment' || m.source === 'cash_out') && canEditCustomers && m.cash_movement_id ? voucherDateBlock(m.id, m.cash_movement_id, m.created_at) : ''}
-        ${(m.source === 'payment' || m.source === 'cash_out') && canEditCustomers ? `<div class="flex gap-2 mt-2">
+        ${(m.source === 'payment' || m.source === 'cash_out') && canEditCustomers && mine && m.cash_movement_id ? voucherDateBlock(m.id, m.cash_movement_id, m.created_at) : ''}
+        ${(m.source === 'payment' || m.source === 'cash_out') && canEditCustomers && mine ? `<div class="flex gap-2 mt-2">
           <button type="button" onclick="togglePaymentEdit('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">${m.source === 'cash_out' ? 'تعديل الصرف' : 'تعديل الدفعة'}</button>
           <button type="button" onclick="deletePayment('${m.id}')" class="flex-1 h-9 border border-error text-error rounded-lg text-[12px] font-semibold">${m.source === 'cash_out' ? 'حذف الصرف' : 'حذف الدفعة'}</button></div>
         <div id="pay-edit-${m.id}" class="hidden mt-2 flex-col gap-2">
@@ -688,7 +697,7 @@ async function submitCashOut() {
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
   const { error } = fx
     ? await cdVoucher('out', amount, fx, document.getElementById('cashout-method').value, document.getElementById('cashout-notes').value.trim())
-    : await goldmindClient.rpc('customer_cash_out', { p_customer: currentCustomerId, p_amount: amount,
+    : await gmCustomerRpc('customer_cash_out', { p_customer: currentCustomerId, p_amount: amount,
     p_method: document.getElementById('cashout-method').value, p_notes: document.getElementById('cashout-notes').value.trim() || null });
   btn.disabled = false; btn.textContent = 'حفظ الصرف';
   if (error) { errEl.textContent = 'تعذّر الحفظ: ' + error.message; errEl.classList.remove('hidden'); return; }
@@ -714,7 +723,7 @@ async function submitDiscount() {
   if (!confirm('تسجيل خصم ' + fmt(amount) + ' على دين العميل؟ يمكنك تعديله أو حذفه لاحقاً من سجل الحركات.')) return;
   const btn = document.getElementById('discount-btn');
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
-  const { error } = await goldmindClient.rpc('customer_debt_discount', { p_customer: currentCustomerId, p_amount: amount, p_notes: notes || null });
+  const { error } = await gmCustomerRpc('customer_debt_discount', { p_customer: currentCustomerId, p_amount: amount, p_notes: notes || null });
   btn.disabled = false; btn.textContent = 'حفظ الخصم';
   if (error) { errEl.textContent = 'تعذّر الحفظ: ' + error.message; errEl.classList.remove('hidden'); return; }
   document.getElementById('discount-amount').value = '';
@@ -840,7 +849,7 @@ async function submitSettlement() {
   if (fx && !(fx.rate > 0)) { errEl.textContent = 'أدخل سعر الصرف'; errEl.classList.remove('hidden'); btn.disabled = false; btn.textContent = 'حفظ الدفعة'; return; }
   const { error } = fx
     ? await cdVoucher('in', amount, fx, document.getElementById('settle-method').value, notes)
-    : await goldmindClient.rpc('record_customer_payment', {
+    : await gmCustomerRpc('record_customer_payment', {
         p_customer: currentCustomerId, p_amount: amount,
         p_method: document.getElementById('settle-method').value, p_notes: notes || null
       });

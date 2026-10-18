@@ -11,7 +11,7 @@
 <title>الزبائن | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=42"></script>
+<script src="supabase-config.js?v=43"></script>
 <script src="theme.js?v=63"></script>
 <script src="gm-report.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -118,11 +118,12 @@ function render() {
 (async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+  const __orgIds = await gmOrgStoreIds(); // customers and their balances are shared by the organization's branches
   const [{ data: me }, { data: store }, cust, debts] = await Promise.all([
     goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
     goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
-    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone, is_company').eq('store_id', GOLDMIND_STORE_ID).order('name')),
-    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount').eq('store_id', GOLDMIND_STORE_ID))
+    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone, is_company').in('store_id', __orgIds).order('name')),
+    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount').in('store_id', __orgIds))
   ]);
   document.getElementById('loading-state').classList.add('hidden');
   const perms = (me && me.permissions) || {}, owner = me && me.role === 'owner';

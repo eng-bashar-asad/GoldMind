@@ -24,6 +24,19 @@ $$;
 revoke all on function public.org_store_ids(uuid) from public, anon;
 grant execute on function public.org_store_ids(uuid) to authenticated;
 
+-- the organization's branches for the screens: id, shown name, and whether this user may open
+-- that branch's invoices (own branch always; others need view_branch_invoices, owners always)
+create or replace function public.org_branches(sid uuid)
+returns table(id uuid, name text, can_open_invoices boolean)
+language sql stable security definer set search_path = public as $$
+  select b.id, coalesce(nullif(btrim(b.display_name), ''), b.name),
+         b.id = sid or has_permission('view_branch_invoices', b.id) or org_can(b.id, 'view_branch_invoices')
+  from stores b where b.id in (select org_store_ids(sid)) and is_store_member(sid)
+  order by b.created_at;
+$$;
+revoke all on function public.org_branches(uuid) from public, anon;
+grant execute on function public.org_branches(uuid) to authenticated;
+
 create or replace function public.customer_credit(sid uuid, cust uuid)
 returns numeric language sql stable set search_path = public as $$
   select round(greatest(0, -coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)), 2)

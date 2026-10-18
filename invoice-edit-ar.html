@@ -11,7 +11,7 @@
 <title>تعديل الفاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=42"></script>
+<script src="supabase-config.js?v=43"></script>
 <script src="theme.js?v=63"></script>
 <script src="gm-invoice-edit.js?v=2"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -298,7 +298,7 @@ document.getElementById('customerSearch').addEventListener('input', e => {
   custTimer = setTimeout(async () => {
     const box = document.getElementById('customerResults');
     if (q.length < 2) { box.innerHTML = ''; return; }
-    const { data } = await goldmindClient.from('customers').select('id, name, phone').eq('store_id', GOLDMIND_STORE_ID)
+    const { data } = await goldmindClient.from('customers').select('id, name, phone').in('store_id', await gmOrgStoreIds())
       .or(`name.ilike.%${q}%,phone.ilike.%${q}%`).order('name').limit(8);
     custResults = (data || []).filter(c => c.id !== invoice.customer_id);
     box.innerHTML = custResults.map((c, i) =>

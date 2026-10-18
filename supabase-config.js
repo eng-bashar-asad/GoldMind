@@ -323,6 +323,31 @@ function goldMindSetActiveStore(storeId) {
 
 // The server returns at most 1000 rows per request: read every page. makeQuery() must build a fresh,
 // stably ordered query each time.
+// Branches of the current store's organization (multi-branch 2.1): [{id, name, can_open_invoices}].
+// Customers, their debts and deposits are shared across these branches. Before the org_branches
+// migration (or offline) it is just the current store, so every screen keeps its old behaviour.
+var __gmOrgBranches = null;
+async function gmOrgBranches() {
+  if (__gmOrgBranches && __gmOrgBranches.sid === GOLDMIND_STORE_ID) return __gmOrgBranches.rows;
+  var rows = null;
+  try {
+    var r = await goldmindClient.rpc('org_branches', { sid: GOLDMIND_STORE_ID });
+    if (!r.error && Array.isArray(r.data) && r.data.length) rows = r.data;
+  } catch (e) { /* offline: fall back below */ }
+  rows = rows || [{ id: GOLDMIND_STORE_ID, name: '', can_open_invoices: true }];
+  __gmOrgBranches = { sid: GOLDMIND_STORE_ID, rows: rows };
+  return rows;
+}
+async function gmOrgStoreIds() { return (await gmOrgBranches()).map(function (b) { return b.id; }); }
+
+// Customer money RPCs take p_store (the branch taking the money) since migration 20261019010000.
+// Before it runs the old signature has no p_store: retry once without it.
+async function gmCustomerRpc(name, args) {
+  var r = await goldmindClient.rpc(name, Object.assign({}, args, { p_store: GOLDMIND_STORE_ID }));
+  if (r.error && (r.error.code === 'PGRST202' || /p_store/.test(r.error.message || ''))) r = await goldmindClient.rpc(name, args);
+  return r;
+}
+
 async function gmFetchAllRows(makeQuery) {
   var all = [];
   for (var from = 0; ; from += 1000) {
