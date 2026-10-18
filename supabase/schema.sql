@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict M1rvOMupIFUlVY7LJOs90O0aQpvRmhHadNxqwyv8fixI7Va0ofQUyHNKAQ0HdMk
+\restrict vQZd8fJngAQX7mNoh31LBdOuKapQvaQkd5gDlq3LbOYabOL1vkLb0eAdI0PNSpD
 
 
 SET statement_timeout = 0;
@@ -865,34 +865,40 @@ CREATE FUNCTION public.create_customer_deposit(p jsonb) RETURNS jsonb
     AS $$
 declare c record; me uuid; amt numeric := round(coalesce(nullif(p->>'amount', '')::numeric, 0), 2);
         meth text := coalesce(nullif(p->>'method', ''), 'cash'); num text; dep_id uuid; cm uuid;
-begin
-  select id, store_id, name into c from customers where id = (p->>'customer_id')::uuid;
-  if c is null then raise exception 'اختر العميل'; end if;
-  if not (has_permission('edit_customers', c.store_id) or has_permission('manage_daily_cashbox', c.store_id)) then
-    raise exception 'ليس لديك صلاحية تسجيل العربون' using errcode = '42501';
-  end if;
-  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
-  if meth not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
-  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
+                to_box boolean := coalesce((p->>'to_cashbox')::boolean, true);
+                begin
+                  select id, store_id, name into c from customers where id = (p->>'customer_id')::uuid;
+                    if c is null then raise exception 'اختر العميل'; end if;
+                      if not (has_permission('edit_customers', c.store_id) or has_permission('manage_daily_cashbox', c.store_id)) then
+                          raise exception 'ليس لديك صلاحية تسجيل العربون' using errcode = '42501';
+                            end if;
+                              if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+                                if meth not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
+                                  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
 
-  perform pg_advisory_xact_lock(hashtext('deposit:' || c.store_id));
-  select 'DEP-' || lpad((coalesce(max(nullif(regexp_replace(deposit_number, '\D', '', 'g'), '')::int), 0) + 1)::text, 6, '0')
-    into num from customer_deposits where store_id = c.store_id;
+                                    perform pg_advisory_xact_lock(hashtext('deposit:' || c.store_id));
+                                      select 'DEP-' || lpad((coalesce(max(nullif(regexp_replace(deposit_number, '\D', '', 'g'), '')::int), 0) + 1)::text, 6, '0')
+                                          into num from customer_deposits where store_id = c.store_id;
 
-  insert into customer_deposits (store_id, deposit_number, customer_id, amount, method, items, notes, created_by)
-    values (c.store_id, num, c.id, amt, meth, coalesce(p->'items', '[]'::jsonb), nullif(trim(p->>'notes'), ''), me)
-    returning id into dep_id;
-  insert into cash_movements (store_id, box, direction, amount, description, created_by)
-    values (c.store_id, case when meth = 'bank' then 'bank' else 'main' end, 'in', amt, 'عربون ' || num || ' من ' || c.name, me)
-    returning id into cm;
-  if meth = 'cash' then
-    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
-      values (c.store_id, 'عربون', 'in', amt, 'عربون ' || num || ' — ' || c.name, me, cm);
-  end if;
-  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
-    values (c.store_id, c.id, 'debt_decrease', amt, 0, 'عربون ' || num, 'deposit', me);
-  return jsonb_build_object('id', dep_id, 'deposit_number', num);
-end $$;
+                                            insert into customer_deposits (store_id, deposit_number, customer_id, amount, method, items, notes, created_by, in_cashbox)
+                                                values (c.store_id, num, c.id, amt, meth, coalesce(p->'items', '[]'::jsonb), nullif(trim(p->>'notes'), ''), me, to_box)
+                                                    returning id into dep_id;
+                                                      if to_box then
+                                                          insert into cash_movements (store_id, box, direction, amount, description, created_by)
+                                                                values (c.store_id, case when meth = 'bank' then 'bank' else 'main' end, 'in', amt, 'عربون ' || num || ' من ' || c.name, me)
+                                                                      returning id into cm;
+                                                                          if meth = 'cash' then
+                                                                                insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+                                                                                        values (c.store_id, 'عربون', 'in', amt, 'عربون ' || num || ' — ' || c.name, me, cm);
+                                                                                            end if;
+                                                                                              end if;
+                                                                                                insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+                                                                                                    values (c.store_id, c.id, 'debt_decrease', amt, 0, 'عربون ' || num, 'deposit', me);
+                                                                                                      update pieces set status = 'reserved', reserved_customer_id = c.id
+                                                                                                          where store_id = c.store_id and status = 'available'
+                                                                                                                and barcode in (select nullif(trim(x->>'barcode'), '') from jsonb_array_elements(coalesce(p->'items', '[]'::jsonb)) x);
+                                                                                                                  return jsonb_build_object('id', dep_id, 'deposit_number', num);
+                                                                                                                  end $$;
 
 
 --
@@ -1088,16 +1094,19 @@ CREATE FUNCTION public.delete_expense(p_id uuid) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare e record;
-begin
-  select * into e from expense_entries where id = p_id;
-    if e is null then raise exception 'المصروف غير موجود'; end if;
-      if not gm_can_expense(e.store_id) or not is_store_member(e.store_id) then raise exception 'ليس لديك صلاحية حذف المصاريف' using errcode = '42501'; end if;
-        if exists (select 1 from inventory_gifts where expense_entry_id = p_id) then raise exception 'هذا مصروف هدية — احذفه بإرجاع الهدية إلى المخزن'; end if;
-          delete from expense_entries where id = p_id;
-            if e.cash_movement_id is not null then delete from cash_movements where id = e.cash_movement_id; end if;
-              return jsonb_build_object('ok', true);
-              end $$;
+                                                                                                                                                                                                                                                                       declare e record;
+                                                                                                                                                                                                                                                                       begin
+                                                                                                                                                                                                                                                                         select * into e from expense_entries where id = p_id;
+                                                                                                                                                                                                                                                                           if e is null then raise exception 'المصروف غير موجود'; end if;
+                                                                                                                                                                                                                                                                             if not gm_can_expense(e.store_id) or not is_store_member(e.store_id) then raise exception 'ليس لديك صلاحية حذف المصاريف' using errcode = '42501'; end if;
+                                                                                                                                                                                                                                                                               if exists (select 1 from inventory_gifts where expense_entry_id = p_id) then raise exception 'هذا مصروف هدية — احذفه بإرجاع الهدية إلى المخزن'; end if;
+                                                                                                                                                                                                                                                                                 update gold_stock_lots l set weight_grams_remaining = round(l.weight_grams_remaining + r.grams, 3)
+                                                                                                                                                                                                                                                                                     from repair_gold_lines r where r.expense_entry_id = p_id and r.lot_id = l.id;
+                                                                                                                                                                                                                                                                                       delete from repair_gold_lines where expense_entry_id = p_id;
+                                                                                                                                                                                                                                                                                         delete from expense_entries where id = p_id;
+                                                                                                                                                                                                                                                                                           if e.cash_movement_id is not null then delete from cash_movements where id = e.cash_movement_id; end if; -- its daily-box row goes with it
+                                                                                                                                                                                                                                                                                             return jsonb_build_object('ok', true);
+                                                                                                                                                                                                                                                                                             end $$;
 
 
 --
@@ -2957,6 +2966,62 @@ end $$;
 
 
 --
+-- Name: record_repair_gold(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_repair_gold(p jsonb) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                declare sid uuid := (p->>'store_id')::uuid;
+                        kt int := (p->>'karat')::int;
+                                w numeric := round(coalesce(nullif(p->>'grams', '')::numeric, 0), 3);
+                                        left_w numeric := w; take numeric; avail numeric; total_cost numeric := 0; today_price numeric := 0;
+                                                lot record; cat_id uuid; me uuid; eid uuid; lines text := ''; head text;
+                                                        descr text := nullif(trim(p->>'description'), '');
+                                                        begin
+                                                          if not gm_can_expense(sid) or not is_store_member(sid) then raise exception 'ليس لديك صلاحية تسجيل المصاريف' using errcode = '42501'; end if;
+                                                            if kt not in (18, 21, 22, 24) then raise exception 'اختر العيار'; end if;
+                                                              if w <= 0 then raise exception 'أدخل الغرامات'; end if;
+                                                                select coalesce(sum(weight_grams_remaining), 0) into avail from gold_stock_lots
+                                                                   where store_id = sid and box_name = 'كسر ' || kt and weight_grams_remaining > 0;
+                                                                     if w > avail + 0.0005 then raise exception 'الوزن أكبر من الموجود في صندوق كسر % (% غ)', kt, round(avail, 3); end if;
+
+                                                                       select price_per_gram into today_price from gold_prices where store_id = sid and karat = kt limit 1;
+                                                                         select id into cat_id from expense_categories where store_id = sid and name = 'تصاليح ذهب' limit 1;
+                                                                           if cat_id is null then cat_id := save_expense_category(sid, 'تصاليح ذهب'); end if;
+                                                                             select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+
+                                                                               insert into expense_entries (store_id, category_id, amount, description, created_by)
+                                                                                   values (sid, cat_id, 0, 'تصليح ذهب', me) returning id into eid;
+
+                                                                                     for lot in select l.id, l.weight_grams_remaining rem, l.created_at ld,
+                                                                                                         coalesce((select sum(ii.line_total) / nullif(sum(ii.weight_grams), 0) from invoice_items ii join invoices iv on iv.id = ii.invoice_id
+                                                                                                                                        where ii.gold_stock_lot_id = l.id and iv.type = 'buyRetail'), 0) per_g
+                                                                                                                                                       from gold_stock_lots l
+                                                                                                                                                                     where l.store_id = sid and l.box_name = 'كسر ' || kt and l.weight_grams_remaining > 0
+                                                                                                                                                                                   order by l.created_at, l.id for update of l
+                                                                                                                                                                                     loop
+                                                                                                                                                                                         exit when left_w <= 0.0005;
+                                                                                                                                                                                             take := least(lot.rem, left_w);
+                                                                                                                                                                                                 update gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining - take, 3) where id = lot.id;
+                                                                                                                                                                                                     insert into repair_gold_lines (expense_entry_id, lot_id, karat, grams, cost, lot_date)
+                                                                                                                                                                                                           values (eid, lot.id, kt, take, round(take * lot.per_g, 2), lot.ld);
+                                                                                                                                                                                                               total_cost := total_cost + take * lot.per_g;
+                                                                                                                                                                                                                   lines := lines || E'\n• ' || to_char(lot.ld at time zone 'Asia/Dubai', 'DD/MM/YYYY') || ': '
+                                                                                                                                                                                                                                || trim(to_char(take, 'FM999990.000')) || ' غ — كلفة ' || trim(to_char(round(take * lot.per_g, 2), 'FM999,999,990.00'));
+                                                                                                                                                                                                                                    left_w := left_w - take;
+                                                                                                                                                                                                                                      end loop;
+
+                                                                                                                                                                                                                                        head := format('تصليح ذهب عيار %s: %s غ — قيمتها بسعر اليوم %s', kt, trim(to_char(w, 'FM999990.000')),
+                                                                                                                                                                                                                                                         trim(to_char(round(w * coalesce(today_price, 0), 2), 'FM999,999,990.00')))
+                                                                                                                                                                                                                                                                   || coalesce(' — ' || descr, '');
+                                                                                                                                                                                                                                                                     update expense_entries set amount = round(total_cost, 2), description = head || lines where id = eid;
+                                                                                                                                                                                                                                                                       return eid;
+                                                                                                                                                                                                                                                                       end $$;
+
+
+--
 -- Name: record_subscription_payment(uuid, integer, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2999,30 +3064,35 @@ CREATE FUNCTION public.refund_customer_deposit(p_deposit uuid) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare d record; me uuid; cm uuid; left_amt numeric;
-begin
-  select dp.*, cu.name cname into d from customer_deposits dp join customers cu on cu.id = dp.customer_id where dp.id = p_deposit for update of dp;
-  if d is null then raise exception 'العربون غير موجود'; end if;
-  if not (has_permission('edit_customers', d.store_id) or has_permission('manage_daily_cashbox', d.store_id)) then
-    raise exception 'ليس لديك صلاحية' using errcode = '42501';
-  end if;
-  if d.status <> 'active' then raise exception 'هذا العربون مُسترجَع مسبقاً'; end if;
-  select remaining into left_amt from customer_deposit_remaining(d.store_id) where deposit_id = d.id;
-  if coalesce(left_amt, 0) < d.amount - 0.009 then
-    raise exception 'هذا العربون استُخدم (كلياً أو جزئياً) في فاتورة، فلا يمكن استرجاعه كاملاً. لإعادة ما تبقّى للزبون استخدم «صرف للزبون» من صفحة حسابه.';
-  end if;
-  select id into me from staff where user_id = auth.uid() and store_id = d.store_id limit 1;
-  update customer_deposits set status = 'refunded', refunded_at = now() where id = d.id;
-  insert into cash_movements (store_id, box, direction, amount, description, created_by)
-    values (d.store_id, case when d.method = 'bank' then 'bank' else 'main' end, 'out', d.amount, 'استرجاع عربون ' || d.deposit_number || ' إلى ' || d.cname, me)
-    returning id into cm;
-  if d.method = 'cash' then
-    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
-      values (d.store_id, 'استرجاع عربون', 'out', d.amount, d.deposit_number || ' — ' || d.cname, me, cm);
-  end if;
-  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
-    values (d.store_id, d.customer_id, 'debt_increase', d.amount, 0, 'استرجاع عربون ' || d.deposit_number, 'deposit_refund', me);
-end $$;
+                                                                                                                  declare d record; me uuid; cm uuid; left_amt numeric;
+                                                                                                                  begin
+                                                                                                                    select dp.*, cu.name cname into d from customer_deposits dp join customers cu on cu.id = dp.customer_id where dp.id = p_deposit for update of dp;
+                                                                                                                      if d is null then raise exception 'العربون غير موجود'; end if;
+                                                                                                                        if not (has_permission('edit_customers', d.store_id) or has_permission('manage_daily_cashbox', d.store_id)) then
+                                                                                                                            raise exception 'ليس لديك صلاحية' using errcode = '42501';
+                                                                                                                              end if;
+                                                                                                                                if d.status <> 'active' then raise exception 'هذا العربون مُسترجَع مسبقاً'; end if;
+                                                                                                                                  select remaining into left_amt from customer_deposit_remaining(d.store_id) where deposit_id = d.id;
+                                                                                                                                    if coalesce(left_amt, 0) < d.amount - 0.009 then
+                                                                                                                                        raise exception 'هذا العربون استُخدم (كلياً أو جزئياً) في فاتورة، فلا يمكن استرجاعه كاملاً. لإعادة ما تبقّى للزبون استخدم «صرف للزبون» من صفحة حسابه.';
+                                                                                                                                          end if;
+                                                                                                                                            select id into me from staff where user_id = auth.uid() and store_id = d.store_id limit 1;
+                                                                                                                                              update customer_deposits set status = 'refunded', refunded_at = now() where id = d.id;
+                                                                                                                                                update pieces set status = 'available', reserved_customer_id = null
+                                                                                                                                                    where store_id = d.store_id and status = 'reserved' and reserved_customer_id = d.customer_id
+                                                                                                                                                          and barcode in (select nullif(trim(x->>'barcode'), '') from jsonb_array_elements(coalesce(d.items, '[]'::jsonb)) x);
+                                                                                                                                                            if d.in_cashbox then
+                                                                                                                                                                insert into cash_movements (store_id, box, direction, amount, description, created_by)
+                                                                                                                                                                      values (d.store_id, case when d.method = 'bank' then 'bank' else 'main' end, 'out', d.amount, 'استرجاع عربون ' || d.deposit_number || ' إلى ' || d.cname, me)
+                                                                                                                                                                            returning id into cm;
+                                                                                                                                                                                if d.method = 'cash' then
+                                                                                                                                                                                      insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+                                                                                                                                                                                              values (d.store_id, 'استرجاع عربون', 'out', d.amount, d.deposit_number || ' — ' || d.cname, me, cm);
+                                                                                                                                                                                                  end if;
+                                                                                                                                                                                                    end if;
+                                                                                                                                                                                                      insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+                                                                                                                                                                                                          values (d.store_id, d.customer_id, 'debt_increase', d.amount, 0, 'استرجاع عربون ' || d.deposit_number, 'deposit_refund', me);
+                                                                                                                                                                                                          end $$;
 
 
 --
@@ -4693,6 +4763,7 @@ CREATE TABLE public.customer_deposits (
     created_by uuid,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     refunded_at timestamp with time zone,
+    in_cashbox boolean DEFAULT true NOT NULL,
     CONSTRAINT customer_deposits_amount_check CHECK ((amount > (0)::numeric)),
     CONSTRAINT customer_deposits_status_check CHECK ((status = ANY (ARRAY['active'::text, 'refunded'::text])))
 );
@@ -5461,6 +5532,7 @@ CREATE TABLE public.pieces (
     center_stone_price_per_carat numeric,
     purchase_cost numeric,
     zircon_carat numeric,
+    reserved_customer_id uuid,
     CONSTRAINT pieces_karat_check CHECK ((karat = ANY (ARRAY[18, 21, 22, 24]))),
     CONSTRAINT pieces_zircon_carat_check CHECK (((zircon_carat IS NULL) OR (zircon_carat >= (0)::numeric)))
 );
@@ -5554,6 +5626,23 @@ CREATE TABLE public.platform_admins (
     id uuid NOT NULL,
     email text NOT NULL,
     created_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: repair_gold_lines; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.repair_gold_lines (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    expense_entry_id uuid NOT NULL,
+    lot_id uuid NOT NULL,
+    karat integer NOT NULL,
+    grams numeric NOT NULL,
+    cost numeric DEFAULT 0 NOT NULL,
+    lot_date timestamp with time zone NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT repair_gold_lines_grams_check CHECK ((grams > (0)::numeric))
 );
 
 
@@ -6496,6 +6585,14 @@ ALTER TABLE ONLY public.platform_admins
 
 
 --
+-- Name: repair_gold_lines repair_gold_lines_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repair_gold_lines
+    ADD CONSTRAINT repair_gold_lines_pkey PRIMARY KEY (id);
+
+
+--
 -- Name: repair_tickets repair_tickets_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -7367,6 +7464,20 @@ CREATE UNIQUE INDEX pieces_rfid_epc_unique ON public.pieces USING btree (rfid_ep
 --
 
 CREATE INDEX pieces_store_id_fk_idx ON public.pieces USING btree (store_id);
+
+
+--
+-- Name: repair_gold_lines_expense_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX repair_gold_lines_expense_idx ON public.repair_gold_lines USING btree (expense_entry_id);
+
+
+--
+-- Name: repair_gold_lines_lot_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX repair_gold_lines_lot_idx ON public.repair_gold_lines USING btree (lot_id);
 
 
 --
@@ -8622,6 +8733,14 @@ ALTER TABLE ONLY public.pieces
 
 
 --
+-- Name: pieces pieces_reserved_customer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.pieces
+    ADD CONSTRAINT pieces_reserved_customer_id_fkey FOREIGN KEY (reserved_customer_id) REFERENCES public.customers(id) ON DELETE SET NULL;
+
+
+--
 -- Name: pieces pieces_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8635,6 +8754,22 @@ ALTER TABLE ONLY public.pieces
 
 ALTER TABLE ONLY public.platform_admins
     ADD CONSTRAINT platform_admins_id_fkey FOREIGN KEY (id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: repair_gold_lines repair_gold_lines_expense_entry_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repair_gold_lines
+    ADD CONSTRAINT repair_gold_lines_expense_entry_id_fkey FOREIGN KEY (expense_entry_id) REFERENCES public.expense_entries(id) ON DELETE CASCADE;
+
+
+--
+-- Name: repair_gold_lines repair_gold_lines_lot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.repair_gold_lines
+    ADD CONSTRAINT repair_gold_lines_lot_id_fkey FOREIGN KEY (lot_id) REFERENCES public.gold_stock_lots(id);
 
 
 --
@@ -9703,6 +9838,12 @@ CREATE POLICY "platform admins read errors" ON public.client_errors FOR SELECT T
 --
 
 ALTER TABLE public.platform_admins ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: repair_gold_lines; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.repair_gold_lines ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: repair_tickets; Type: ROW SECURITY; Schema: public; Owner: -
@@ -10829,6 +10970,15 @@ GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO service_role;
 
 
 --
+-- Name: FUNCTION record_repair_gold(p jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.record_repair_gold(p jsonb) TO anon;
+GRANT ALL ON FUNCTION public.record_repair_gold(p jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.record_repair_gold(p jsonb) TO service_role;
+
+
+--
 -- Name: FUNCTION record_subscription_payment(p_store_id uuid, p_months integer, p_payment_ref text, p_plan_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -11789,6 +11939,15 @@ GRANT ALL ON TABLE public.platform_admins TO service_role;
 
 
 --
+-- Name: TABLE repair_gold_lines; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.repair_gold_lines TO anon;
+GRANT ALL ON TABLE public.repair_gold_lines TO authenticated;
+GRANT ALL ON TABLE public.repair_gold_lines TO service_role;
+
+
+--
 -- Name: TABLE repair_tickets; Type: ACL; Schema: public; Owner: -
 --
 
@@ -11995,5 +12154,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict M1rvOMupIFUlVY7LJOs90O0aQpvRmhHadNxqwyv8fixI7Va0ofQUyHNKAQ0HdMk
+\unrestrict vQZd8fJngAQX7mNoh31LBdOuKapQvaQkd5gDlq3LbOYabOL1vkLb0eAdI0PNSpD
 
