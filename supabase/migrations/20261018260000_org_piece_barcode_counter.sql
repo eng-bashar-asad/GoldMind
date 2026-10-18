@@ -61,7 +61,7 @@ begin
 end;
 $function$;
 
-create or replace function public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint)
+create or replace function public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint default null)
 returns void language plpgsql security definer set search_path = public as $function$
 begin
   perform reset_piece_barcode_sequence(target_store_id, category, new_seq, seq_width,
