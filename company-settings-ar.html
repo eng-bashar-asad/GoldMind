@@ -901,12 +901,12 @@
             org = o; isOrgOwner = owner === true;
             document.getElementById('branch-emirate-wrap').classList.toggle('hidden', !(branches > 1) && !store.branch_emirate_code);
         }
-        // Fall back to the store's copy until the organization row is readable.
+        // Legal identity lives only on the organization (store copies dropped in plan step 1.3b).
         ORG_FIELDS.forEach(([id, col]) => {
-            document.getElementById(id).value = ((org && org[col] != null) ? org[col] : store[col]) || '';
+            document.getElementById(id).value = (org && org[col]) || '';
         });
         updateLogoPreview();
-        const editable = !orgId || isOrgOwner;
+        const editable = !!orgId && isOrgOwner;
         document.querySelectorAll('#org-section input, #org-section select, #org-section button').forEach(el => { el.disabled = !editable; });
         document.getElementById('org-readonly-note').classList.toggle('hidden', editable);
     }
@@ -1178,13 +1178,6 @@
                 peppol_endpoint_id: peppolId || null,
                 logo_url: logo || null
             }).eq('id', orgId));
-        } else if (!error && !orgId) {
-            // Store not linked to an organization (should not happen after 1.1): keep the old behaviour.
-            ({ error: orgError } = await goldmindClient.from('stores').update({
-                legal_name: legalName || null, tax_number: tax || null,
-                commercial_registration_number: cr || null, legal_registration_id_type: legalRegType || null,
-                emirate_code: emirate || null, peppol_endpoint_id: peppolId || null, logo_url: logo || null
-            }).eq('id', GOLDMIND_STORE_ID));
         }
 
         saveBtn.disabled = false;
