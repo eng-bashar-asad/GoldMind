@@ -11,7 +11,7 @@
 <title>سجل التجار | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=43"></script>
+<script src="supabase-config.js?v=44"></script>
 <script src="theme.js?v=63"></script>
 <script src="gm-profit.js?v=7"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -665,13 +665,23 @@ function movementLabel(m) {
   return what ? ('تسوية ' + what + ' / دفعة (تخفيض دين)') : 'تسوية / دفعة (تخفيض دين)';
 }
 
+// Multi-branch 2.3: one trader account for the organization; every branch deals with traders and
+// each movement stays on the branch where it happened. Another branch's rows are shown with its
+// name and cannot be edited or deleted here.
+const LEDGER_BRANCHES = {};
+const gmForeign = r => !!(r && r.store_id && r.store_id !== GOLDMIND_STORE_ID);
+const gmBranchTag = r => gmForeign(r)
+  ? `<p class="text-[11px] text-on-surface-variant mt-2 pt-2 border-t border-outline-variant">سُجّلت في ${gmEscapeHtml((LEDGER_BRANCHES[r.store_id] || {}).name || 'فرع آخر')} — تُعدَّل من هناك.</p>` : '';
+
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+  (await gmOrgBranches()).forEach(b => { LEDGER_BRANCHES[b.id] = b; });
+  const orgIds = Object.keys(LEDGER_BRANCHES);
 
   const [{ data: traderRows, error: tErr }, { data: moveRows, error: mErr }, { data: storeRow }, { data: linkedCashRows }] = await Promise.all([
-    goldmindClient.from('traders').select('*').eq('store_id', GOLDMIND_STORE_ID).order('name'),
-    goldmindClient.from('trader_movements').select('*, invoice:invoice_id(invoice_number)').eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }),
+    goldmindClient.from('traders').select('*').in('store_id', orgIds).order('name'),
+    goldmindClient.from('trader_movements').select('*, invoice:invoice_id(invoice_number)').in('store_id', orgIds).order('created_at', { ascending: false }),
     goldmindClient.from('stores').select('diamonds_enabled, currency, secondary_currency, secondary_currency_rate, vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
     goldmindClient.from('cash_movements').select('id, trader_movement_id').eq('store_id', GOLDMIND_STORE_ID).not('trader_movement_id', 'is', null)
   ]);
@@ -1147,7 +1157,7 @@ function showTraderDetail(traderId) {
           <span class="text-on-surface-variant">مجموع المصنعيات</span><span class="font-data-mono font-semibold text-left">${fmtMoney(totalFee)}</span>
           <span class="text-on-surface-variant">ذهب عيار ٢٤</span><span class="font-data-mono font-semibold text-left">${fmt(totalGold24k)} غ</span>
         </div>
-        <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+        ${gmBranchTag(first)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(first) ? ' hidden' : ''}">
           ${first.source === 'stock_given' ? `<a href="trader-statement-print-ar.html?trader=${first.trader_id}&batch=${group.batchId}" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">photo_library</span> القطع</a>` : ''}
           ${first.source === 'stock_given' ? `<button onclick="gmVoucherProfitPopup('batch_id','${group.batchId}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
           <button onclick="toggleEditStockBatch('${group.batchId}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
@@ -1213,7 +1223,7 @@ function showTraderDetail(traderId) {
         ${(m.source === 'cash_in' || m.source === 'cash_out') && m.linked_cash_movement_id ? voucherDateBlock(m.id, m.linked_cash_movement_id, m.created_at) : ''}
         ${m.invoice && m.invoice.invoice_number ? `<a href="invoice-print-ar.html?id=${m.invoice_id}" class="text-[11px] text-secondary font-semibold underline mt-1 inline-block" onclick="event.stopPropagation()">عرض فاتورة الشراء: ${gmEscapeHtml(m.invoice.invoice_number)} ←</a>` : ''}
         ${isOpeningBalance ? `
-        <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+        ${gmBranchTag(m)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(m) ? ' hidden' : ''}">
           <button onclick="toggleEditOpeningBalance('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
           <button onclick="deleteOpeningBalanceMovement('${m.id}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>
@@ -1241,7 +1251,7 @@ function showTraderDetail(traderId) {
           </div>
         </div>` : ''}
         ${isStockMovement ? `
-        <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+        ${gmBranchTag(m)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(m) ? ' hidden' : ''}">
           ${m.source === 'stock_given' ? `<button onclick="gmVoucherProfitPopup('id','${m.id}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
           <button onclick="toggleEditStockMovement('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
           <button onclick="deleteStockMovement('${m.id}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
@@ -1268,7 +1278,7 @@ function showTraderDetail(traderId) {
           </div>
         </div>` : ''}
         ${isManualSettlement ? `
-        <div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant">
+        ${gmBranchTag(m)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(m) ? ' hidden' : ''}">
           <button onclick="toggleEditSettlement('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
           <button onclick="deleteSettlementMovement('${m.id}', ${settlementIsCash})" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>

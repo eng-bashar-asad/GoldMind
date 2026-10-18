@@ -5,7 +5,7 @@
 <title>كشف أرصدة التجار | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=43"></script>
+<script src="supabase-config.js?v=44"></script>
 <script src="theme.js?v=63"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -135,9 +135,10 @@ async function load() {
 
   document.getElementById('dateLabel').textContent = new Date().toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric' });
 
+  const __orgIds = await gmOrgStoreIds(); // one trader account for the organization
   const [{ data: traders, error: tErr }, { data: moves, error: mErr }] = await Promise.all([
-    goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name', { ascending: true }),
-    goldmindClient.from('trader_movements').select('trader_id, movement_type, gold_24k_equivalent, fab_fee_amount').eq('store_id', GOLDMIND_STORE_ID)
+    goldmindClient.from('traders').select('id, name').in('store_id', __orgIds).order('name', { ascending: true }),
+    goldmindClient.from('trader_movements').select('trader_id, movement_type, gold_24k_equivalent, fab_fee_amount').in('store_id', __orgIds)
   ]);
 
   if (tErr || mErr) {

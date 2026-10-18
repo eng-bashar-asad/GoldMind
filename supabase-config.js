@@ -39,6 +39,11 @@ async function gmFetch(input, init) {
     if (window.gmOpDate && req.method !== 'GET' && req.url.indexOf('/rest/v1/') !== -1) {
         req = new Request(req, { headers: (function (h) { h.set('x-gm-op-date', window.gmOpDate); return h; })(new Headers(req.headers)) });
     }
+    // The branch the user is working in: server functions shared by the organization's branches
+    // (e.g. trader vouchers, multi-branch 2.3) record the movement there. Checked server-side.
+    if (GOLDMIND_STORE_ID && req.method !== 'GET' && req.url.indexOf('/rest/v1/') !== -1) {
+        req = new Request(req, { headers: (function (h) { h.set('x-gm-store', GOLDMIND_STORE_ID); return h; })(new Headers(req.headers)) });
+    }
     const isRead = req.method === 'GET' && req.url.indexOf('/rest/v1/') !== -1;
     try {
         const res = await fetch(req);

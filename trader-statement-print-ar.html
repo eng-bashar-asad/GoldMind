@@ -8,7 +8,7 @@
 <title>كشف حساب تاجر | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=43"></script>
+<script src="supabase-config.js?v=44"></script>
 <script src="theme.js?v=63"></script>
 <script src="gm-report.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -271,7 +271,7 @@ async function loadStatement() {
     const CUR = (typeof gmCurrencySymbol === 'function' ? gmCurrencySymbol(ST_STORE.currency) : null) || ST_STORE.currency || '';
 
     let goldQuery = goldmindClient.from('trader_movements').select('*')
-        .eq('store_id', GOLDMIND_STORE_ID).eq('trader_id', traderId).order('created_at', { ascending: true });
+        .in('store_id', await gmOrgStoreIds()).eq('trader_id', traderId).order('created_at', { ascending: true }); // the trader's account across the organization
     if (fromDate) goldQuery = goldQuery.gte('created_at', fromDate + 'T00:00:00');
     const batchId = params.get('batch');
     if (batchId) goldQuery = goldQuery.eq('batch_id', batchId); // one voucher: its pieces with photos
