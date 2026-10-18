@@ -48,12 +48,16 @@ test('paid invoice: change a price → one cash difference row, invoice total up
 test('remove a piece → back in stock; add a typed line → new invoice line', async ({ page }) => {
   const calls = await install(page, { db: base({ id: 's2', status: 'paid', payment_method: 'cash', total_amount: 6100, amount_paid: 6100,
     items: [{ id: 'l1', invoice_id: 's2', piece_id: 'p1', barcode: '000856', karat: 18, weight_grams: 11.77, line_total: 4900, description: 'خاتم' },
-            { id: 'l2', invoice_id: 's2', karat: 18, weight_grams: 8, line_total: 1200, description: 'حلق' }] }) });
+            { id: 'l2', invoice_id: 's2', karat: 18, weight_grams: 8, line_total: 1200, description: 'حلق' }] },
+    { gold_stock_lots: [{ id: 'lot1', store_id: STORE, karat: 18, box_name: null, weight_grams_total: 50, weight_grams_remaining: 50, cost_fabrication_per_gram: 0, created_at: '2026-01-01T00:00:00Z' }] }) });
   await openEdit(page, 's2');
   await page.locator('#cart-body tr').first().locator('button[onclick^="removeFromCart"]').click();
   await page.click('#sale-tabs [data-tab="manual"]');
   await page.fill('#manual-weight', '5');
   await page.fill('#manual-price', '800');
+  await page.locator('button[onclick="addManualToCart()"]').click();
+  await expect(page.locator('#manual-source')).toHaveClass(/border-error/); // source is required
+  await page.selectOption('#manual-source', 'bulk');
   await page.locator('button[onclick="addManualToCart()"]').click();
   await expect(page.locator('#cart-body tr')).toHaveCount(2);
   await page.click('#save-invoice-btn');

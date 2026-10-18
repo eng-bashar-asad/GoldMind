@@ -270,6 +270,15 @@
 </div>
 </div>
 <div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-source">يُخصم الوزن من</label>
+<select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-source">
+<option value="">اختر المصدر</option>
+<option value="scrap">صندوق الكسر (العيار المختار)</option>
+<option value="bulk">الجملة قبل الإنتاج (الذهب الداخل بالجملة)</option>
+</select>
+</div>
+<div class="hidden text-[11.5px] text-error font-semibold" id="manual-error"></div>
+<div class="relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-price">السعر</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono" id="manual-price" placeholder="السعر" step="0.01" type="number"/>
 </div>
@@ -1640,38 +1649,87 @@
         }
     }
 
-    function addManualToCart() {
+    // A typed gold line comes out of stock: from the scrap box (كسر <karat>) or from the bulk box
+    // (lots with no box name = gold that came in before production). Lots are taken oldest first and
+    // each slice becomes its own stock line, so the existing stock path handles the deduction,
+    // cancellation and returns. The typed price is split by weight.
+    async function addManualToCart() {
         const weight = parseFloat(document.getElementById('manual-weight').value);
         const karat = parseInt(document.getElementById('manual-karat').value, 10);
         const price = parseFloat(document.getElementById('manual-price').value);
-
-        const weightInput = document.getElementById('manual-weight');
-        const priceInput = document.getElementById('manual-price');
-        weightInput.classList.remove('border-error');
-        priceInput.classList.remove('border-error');
+        const source = document.getElementById('manual-source').value;
+        const inputs = ['manual-weight', 'manual-price', 'manual-source'].map(id => document.getElementById(id));
+        const errEl = document.getElementById('manual-error');
+        inputs.forEach(el => el.classList.remove('border-error'));
+        errEl.classList.add('hidden');
 
         let valid = true;
-        if (!weight || weight <= 0) { weightInput.classList.add('border-error'); valid = false; }
-        if (!price || price <= 0) { priceInput.classList.add('border-error'); valid = false; }
+        if (!weight || weight <= 0) { inputs[0].classList.add('border-error'); valid = false; }
+        if (!price || price <= 0) { inputs[1].classList.add('border-error'); valid = false; }
+        if (!source) { inputs[2].classList.add('border-error'); valid = false; }
         if (!valid) return;
 
-        cart.push({
-            cartId: ++cartCounter,
-            piece: null,
-            barcode: null,
-            karat: karat,
-            weight: weight,
-            ...gmPriced(price),
-            description: document.getElementById('manual-desc').value.trim() || null
+        const { data: lots, error } = await goldmindClient.from('gold_stock_lots').select('*')
+            .eq('store_id', GOLDMIND_STORE_ID).eq('karat', karat).gt('weight_grams_remaining', 0)
+            .order('created_at', { ascending: true });
+        if (error) { errEl.textContent = 'تعذّر قراءة المخزون: ' + error.message; errEl.classList.remove('hidden'); return; }
+
+        const boxName = source === 'scrap' ? 'كسر ' + karat : null;
+        const pool = (lots || [])
+            .filter(l => boxName ? l.box_name === boxName : !l.box_name)
+            .map(l => ({ lot: l, free: Number(l.weight_grams_remaining) - (reservedByLot[l.id] || 0) }))
+            .filter(x => x.free > 0.0005);
+        const totalFree = pool.reduce((a, x) => a + x.free, 0);
+        if (totalFree + 0.0005 < weight) {
+            const where = boxName ? 'صندوق ' + boxName : 'الجملة قبل الإنتاج عيار ' + karat;
+            errEl.textContent = `المتوفر في ${where} ${totalFree.toFixed(2)}غ فقط، والمطلوب ${weight}غ.`;
+            errEl.classList.remove('hidden');
+            return;
+        }
+
+        let left = weight;
+        const slices = [];
+        for (const x of pool) {
+            if (left <= 0.0005) break;
+            const take = Math.round(Math.min(left, x.free) * 1000) / 1000;
+            slices.push({ lot: x.lot, w: take });
+            left = Math.round((left - take) * 1000) / 1000;
+        }
+        let usedPrice = 0;
+        slices.forEach((sl, i) => {
+            sl.price = i === slices.length - 1
+                ? Math.round((price - usedPrice) * 100) / 100
+                : Math.round(price * sl.w / weight * 100) / 100;
+            usedPrice += sl.price;
+        });
+
+        const description = document.getElementById('manual-desc').value.trim() || null;
+        slices.forEach(sl => {
+            const isPooled = sl.lot.fabrication_pool_remaining !== null && sl.lot.fabrication_pool_remaining !== undefined;
+            reservedByLot[sl.lot.id] = (reservedByLot[sl.lot.id] || 0) + sl.w;
+            cart.push({
+                cartId: ++cartCounter,
+                mode: 'stock',
+                lotId: sl.lot.id,
+                karat: karat,
+                weight: sl.w,
+                accountingWeight: sl.w,
+                ...gmPriced(sl.price),
+                isPooled: isPooled,
+                fabPerGram: Number(sl.lot.cost_fabrication_per_gram) || 0,
+                manualFabFee: 0,
+                description: description,
+                photoFile: null
+            });
         });
 
         document.getElementById('manual-desc').value = '';
         document.getElementById('manual-weight').value = '';
         document.getElementById('manual-price').value = '';
         renderCart();
+        loadStockLots();
     }
 
-    // ---------- Cart ----------
     function removeFromCart(cartId) {
         const idx = cart.findIndex(item => item.cartId === cartId);
         if (idx !== -1) {
