@@ -240,6 +240,7 @@
 </div>
 </div>
 <p class="text-[10px] text-on-surface-variant -mt-2">اتركه فارغاً إذا كنتم لا تتعاملون بالألماس — رمز الألماس اختياري.</p>
+<p class="hidden text-[12px] font-semibold text-secondary bg-surface-container-low rounded-lg p-3" id="barcode-hq-note" role="note">ترقيم القطع واحد لكل فروع المنشأة ويُدار من المكتب الرئيسي، حتى لا يتكرر رقم بين الفروع وتبقى القطعة برقمها عند نقلها. لتغيير الرمز أو الرقم افتح إعدادات المكتب الرئيسي.</p>
 
 <div class="bg-surface-container-low rounded-lg p-3 flex flex-col gap-2">
 <span class="text-[11px] font-semibold text-outline">رقم قطعة الذهب القادمة</span>
@@ -733,6 +734,20 @@
         document.getElementById('next-diamond-seq-input').value = padSeq(diamondSeq, store.piece_barcode_seq_width_diamond);
     }
 
+    // Decision 13: one piece-barcode counter per organization, on the head office.
+    // On any other branch the fields are read-only and are not saved from here.
+    let barcodeManagedElsewhere = false;
+    async function applyBarcodeCounter() {
+        const { data: counter, error } = await goldmindClient.rpc('barcode_counter_store', { p_store: GOLDMIND_STORE_ID });
+        barcodeManagedElsewhere = !error && !!counter && counter !== GOLDMIND_STORE_ID; // before the migration: old behaviour
+        ['gold-prefix-input', 'diamond-prefix-input', 'next-gold-seq-input', 'next-diamond-seq-input', 'reset-gold-seq-btn', 'reset-diamond-seq-btn']
+            .forEach(id => { document.getElementById(id).disabled = barcodeManagedElsewhere; });
+        document.getElementById('barcode-hq-note').classList.toggle('hidden', !barcodeManagedElsewhere);
+        if (barcodeManagedElsewhere) {
+            ['next-gold-piece-preview', 'next-diamond-piece-preview'].forEach(id => { document.getElementById(id).textContent = '—'; });
+        }
+    }
+
     async function resetPieceSeq(category) {
         const inputId = category === 'diamond' ? 'next-diamond-seq-input' : 'next-gold-seq-input';
         const btnId = category === 'diamond' ? 'reset-diamond-seq-btn' : 'reset-gold-seq-btn';
@@ -993,6 +1008,7 @@
 
         renderNextInvoicePreview(data);
         renderNextPiecePreview(data);
+        applyBarcodeCounter();
 
         form.classList.remove('hidden');
         loadClassificationOptions();
@@ -1166,8 +1182,6 @@
                 license_number: license || null,
                 branch_emirate_code: document.getElementById('store-branch-emirate').value || null,
                 einvoice_disabled: einvoiceDisabled,
-                piece_barcode_prefix_gold: goldPrefix,
-                piece_barcode_prefix_diamond: diamondPrefix,
                 invoice_numbering_mode: numberingMode,
                 invoice_print_frame: selectedFrameStyle,
                 invoice_print_shape: selectedShapeStyle,
@@ -1178,6 +1192,10 @@
                 debt_alert_traders: document.getElementById('debt-alert-traders').checked,
                 allow_biometric_login: bioAllowed
             };
+        if (!barcodeManagedElsewhere) {
+            storeUpdate.piece_barcode_prefix_gold = goldPrefix;
+            storeUpdate.piece_barcode_prefix_diamond = diamondPrefix;
+        }
         if (hasBranchCode) {
             const branchCode = document.getElementById('store-branch-code').value.trim().toUpperCase();
             if (branchCode && !/^[A-Z]{2,5}$/.test(branchCode)) {
