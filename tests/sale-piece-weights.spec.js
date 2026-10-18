@@ -36,3 +36,20 @@ test('without the permission: the weight is shown and cannot be changed', async 
   await addPiece(page);
   await expect(page.locator('button[aria-label^="تعديل وزن القطعة"]')).toHaveCount(0);
 });
+
+test('edit an invoice with a piece line: the weight can be corrected (the page answers permissions after the lines are drawn)', async ({ page }) => {
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await install(page, { db: {
+    stores: [{ id: STORE, name: 'محل', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'staff', permissions: { create_invoice: true, edit_invoice: true, edit_sale_weights: true }, full_name: 'موظف' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    invoices: [{ id: 'inv1', store_id: STORE, invoice_number: 'INV-40', type: 'sale', customer_id: 'c1', total_amount: 1000, amount_paid: 1000, payment_method: 'cash', created_at: '2026-10-11T07:00:00Z',
+      customer: { id: 'c1', name: 'رجاء', phone: '050' },
+      items: [{ id: 'it1', piece_id: 'p1', barcode: 'GM-0001', karat: 18, weight_grams: 10, accounting_weight_grams: 9.5, line_total: 1000, description: 'اسوارة' }] }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'رجاء', phone: '050' }],
+    customer_debts: [], gold_prices: [], gold_stock_lots: [], pieces: [], diamond_pieces: []
+  } });
+  await page.goto('/new-sale-ar.html?edit=inv1');
+  await expect(page.locator('#edit-banner')).toContainText('INV-40');
+  await expect(page.locator('button[aria-label^="تعديل وزن القطعة"]')).toHaveCount(1);
+});
