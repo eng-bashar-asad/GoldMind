@@ -1877,6 +1877,14 @@
             showMessage('أدخل سعر الصرف لكل مبلغ بعملة أخرى', true);
             return;
         }
+        // The customer's deposit (عربون) / credit always pays this invoice first: a full cash sale
+        // is taken as "rest in cash" (total minus the credit), so the credit covers the remainder.
+        if (selectedPaymentMethod === 'cash' && CUST_CREDIT > 0.009 && !PAY.code && fxRows.length === 0) {
+            const fromCredit = Math.min(CUST_CREDIT, total);
+            selectedPaymentMethod = fromCredit >= total - 0.009 ? 'credit' : 'mixed';
+            document.getElementById('mixed-cash-amount').value = Math.max(0, Math.round((total - fromCredit) * 100) / 100) || '';
+            document.getElementById('mixed-bank-amount').value = '';
+        }
         let mixedCashAmt = 0, mixedBankAmt = 0, mixedRemaining = 0;
         if (selectedPaymentMethod === 'mixed') {
             const m = getMixedAmounts();
