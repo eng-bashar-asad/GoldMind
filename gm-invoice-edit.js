@@ -139,7 +139,7 @@ async function gmSaveInvoiceEdit(s) {
   // fields on lines that already existed
   for (const it of items.filter(i => !i._new)) {
     await goldmindClient.from('invoice_items').update({
-      description: it.description, weight_grams: it.weight_grams, karat: it.karat, line_total: it.line_total
+      description: it.description, weight_grams: it.weight_grams, accounting_weight_grams: it.accounting_weight_grams ?? null, karat: it.karat, line_total: it.line_total
     }).eq('id', it.id);
   }
 

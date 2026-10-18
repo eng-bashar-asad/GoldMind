@@ -526,6 +526,7 @@
     // per-karat gold_prices this RPC writes.
     let __canManageOunce = false;
     let __canSeeCost = false; // accounting weight + fabrication cost in the barcode preview
+    let __canEditWeights = false; // correct a piece's weights on the sale (edit_sale_weights)
     function renderOunceChip(price, rate, mode) {
         const el = document.getElementById('ounce-chip-value');
         if (mode && mode !== 'manual_ounce') { el.textContent = 'سعر غرام يدوي'; return; }
@@ -544,6 +545,7 @@
         const has = k => !!(perm && perm.permissions && perm.permissions[k] === true);
         __canManageOunce = isOwner || has('manage_gold_price');
         __canSeeCost = isOwner || has('view_reports');
+        __canEditWeights = isOwner || has('edit_sale_weights');
         if (!(isOwner || has('view_profit_report') || __canManageOunce)) return;
         document.getElementById('ounce-price-section').classList.remove('hidden');
         renderOunceChip(st && st.last_gold_ounce_price, st && st.last_gold_ounce_rate, g24 && g24.mode);
@@ -1468,6 +1470,7 @@
             barcode: piece.barcode,
             karat: piece.karat,
             weight: piece.weight_grams,
+            accountingWeight: piece.accounting_weight_grams,
             ...gmPriced(price),
             description: descInput.value.trim() || null
         });
@@ -1682,6 +1685,53 @@
         loadStockLots();
     }
 
+    // Weight of a gold piece line; with the permission it can be corrected here (tap it).
+    function cartWeightCell(item) {
+        const shown = item.mode === 'diamond' ? item.weight + ' ct' : item.weight;
+        const isPiece = item.mode !== 'diamond' && item.mode !== 'stock' && !!(item.piece || (item.line && item.line.piece_id));
+        if (!__canEditWeights || !isPiece) return gmEscapeHtml(String(shown));
+        return `<button type="button" onclick="editCartWeights(${item.cartId}, this)" aria-label="تعديل وزن القطعة ${gmEscapeHtml(item.barcode || '')}" title="اضغط لتعديل الوزن" class="inline-flex flex-col items-end min-h-[40px] px-1 -mx-1 rounded hover:bg-surface-container-high">
+            <span class="font-data-mono">${gmEscapeHtml(String(shown))} غ</span>
+            <span class="text-[10px] text-outline font-data-mono">محاسبي ${gmEscapeHtml(String(item.accountingWeight ?? '—'))}</span>
+        </button>`;
+    }
+    // Correct a piece line's standing and accounting weight before the sale is saved.
+    // The change is written to the piece at save time (set_piece_weights), not here.
+    function editCartWeights(cartId, btn) {
+        const item = cart.find(i => i.cartId === cartId);
+        if (!item) return;
+        const td = btn.parentElement;
+        td.innerHTML = '';
+        const row = document.createElement('div');
+        row.className = 'flex flex-col gap-1';
+        const mk = (val, label) => {
+            const input = document.createElement('input');
+            input.type = 'number'; input.inputMode = 'decimal'; input.step = '0.001'; input.min = '0';
+            input.value = val; input.placeholder = label;
+            input.setAttribute('aria-label', label);
+            input.className = 'w-24 h-10 border border-primary rounded px-2 text-left font-data-mono';
+            return input;
+        };
+        const gross = mk(item.weight, 'الوزن القائم (غ)');
+        const acc = mk(item.accountingWeight, 'الوزن المحاسبي (غ)');
+        const ok = document.createElement('button');
+        ok.type = 'button'; ok.textContent = 'حفظ الوزن';
+        ok.className = 'h-10 px-3 bg-primary text-on-primary rounded text-[12px] font-semibold';
+        row.append(gross, acc, ok);
+        td.appendChild(row);
+        gross.focus();
+        const finish = () => {
+            const g = parseFloat(gross.value), a = parseFloat(acc.value);
+            if (!(g > 0) || !(a > 0)) { gross.classList.toggle('border-error', !(g > 0)); acc.classList.toggle('border-error', !(a > 0)); return; }
+            if (g !== Number(item.weight) || a !== Number(item.accountingWeight)) {
+                item.weight = g; item.accountingWeight = a; item.weightChanged = true;
+            }
+            renderCart();
+        };
+        ok.addEventListener('click', finish);
+        [gross, acc].forEach(el => el.addEventListener('keydown', e => { if (e.key === 'Enter') finish(); else if (e.key === 'Escape') renderCart(); }));
+    }
+
     // Change a line's price before the invoice is posted (tap the price).
     function editCartPrice(cartId, btn) {
         const item = cart.find(i => i.cartId === cartId);
@@ -1747,7 +1797,7 @@
                     <div class="text-outline text-[10px] font-data-mono">${gmEscapeHtml(item.barcode || '')}</div>
                 </td>
                 <td class="px-2 py-3 text-center">${item.mode === 'diamond' ? (item.karat ? item.karat + 'K' : 'ماس') : item.karat + 'K'}</td>
-                <td class="px-2 py-3 text-left">${item.mode === 'diamond' ? item.weight + ' ct' : item.weight}</td>
+                <td class="px-2 py-3 text-left">${cartWeightCell(item)}</td>
                 <td class="px-2 py-3 text-left font-semibold">
                     <button type="button" onclick="editCartPrice(${item.cartId}, this)" aria-label="تعديل سعر القطعة ${gmEscapeHtml(item.barcode || '')}" title="اضغط لتعديل السعر" class="inline-flex items-center gap-1 min-h-[40px] px-1 -mx-1 rounded hover:bg-surface-container-high underline decoration-dotted decoration-outline underline-offset-4">
                         ${gmMoney(gmItemF(item))}${gmItemCode(item) !== BASE_CODE ? ' ' + gmSymOf(gmItemCode(item)) : ''}<span class="material-symbols-outlined text-[14px] text-outline" aria-hidden="true">edit</span>
@@ -1784,6 +1834,15 @@
         messageBox.textContent = text;
         messageBox.classList.remove('hidden', 'bg-red-100', 'text-red-700', 'bg-green-100', 'text-green-700');
         messageBox.classList.add(isError ? 'bg-red-100' : 'bg-green-100', isError ? 'text-red-700' : 'text-green-700');
+    }
+
+    // Weights corrected on the sale go to the piece first (set_piece_weights checks the permission).
+    async function gmSaveChangedPieceWeights(items) {
+        for (const item of items.filter(i => i.weightChanged && i.piece && i.piece.id)) {
+            const { error } = await goldmindClient.rpc('set_piece_weights', { p_piece: item.piece.id, p_weight: item.weight, p_acc: item.accountingWeight });
+            if (error) { showMessage('تعذّر حفظ وزن ' + (item.barcode || '') + ': ' + gmFriendlyError(error.message), true); return false; }
+        }
+        return true;
     }
 
     saveBtn.addEventListener('click', async () => {
@@ -1874,6 +1933,7 @@
                 photo_url: item.mode === 'stock' ? (stockPhotoUrls[item.cartId] || null) : null
             }))
         };
+        if (!(await gmSaveChangedPieceWeights(cart))) { saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); return; }
         const result = await gmPostSale(payload, { customerName: selectedCustomer.name });
         if (result.error) {
             saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); saveBtn.removeAttribute('aria-busy');
@@ -1932,6 +1992,7 @@
             cartId: ++cartCounter, line: l,
             piece: l.piece_id ? { id: l.piece_id, barcode: l.barcode, description_ar: l.description } : null,
             barcode: l.barcode, karat: l.karat, weight: l.diamond_piece_id ? '' : l.weight_grams,
+            accountingWeight: l.accounting_weight_grams,
             price: Number(l.line_total) || 0, description: l.description,
             mode: l.diamond_piece_id ? 'diamond' : l.gold_stock_lot_id ? 'stock' : undefined
         }));
@@ -1963,9 +2024,10 @@
         if (!confirm('حفظ التعديلات على الفاتورة ' + EDIT.invoice_number + '؟\nالإجمالي الجديد ' + gmMoney(total) + ' ' + CUR
             + (Math.abs(delta) > 0.009 ? ' (الفرق ' + (delta > 0 ? '+' : '') + gmMoney(delta) + ')' : '') + ' — يُسجَّل الفرق بتاريخ اليوم.')) return;
         saveBtn.disabled = true; saveBtn.setAttribute('aria-busy', 'true');
-        const items = cart.map(i => i.line ? { ...i.line, line_total: i.price } : {
+        if (!(await gmSaveChangedPieceWeights(cart))) { saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); return; }
+        const items = cart.map(i => i.line ? { ...i.line, line_total: i.price, ...(i.weightChanged ? { weight_grams: i.weight, accounting_weight_grams: i.accountingWeight } : {}) } : {
             _new: true, piece_id: i.piece ? i.piece.id : null, barcode: i.barcode || null, karat: i.karat || null,
-            weight_grams: i.weight, accounting_weight_grams: i.piece ? (i.piece.accounting_weight_grams || i.weight) : i.weight,
+            weight_grams: i.weight, accounting_weight_grams: i.accountingWeight ?? (i.piece ? (i.piece.accounting_weight_grams || i.weight) : i.weight),
             description: (i.piece && i.piece.description_ar) || i.description || null, description_en: i.piece ? i.piece.description_en : null,
             line_total: i.price, gold_price_per_gram: null
         });
