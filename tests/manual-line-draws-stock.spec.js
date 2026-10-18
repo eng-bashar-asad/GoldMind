@@ -40,3 +40,26 @@ test('typed line from the scrap box: 5 g = 3 g from the oldest lot + 2 g from th
   expect(items.map(i => i.weight)).toEqual([3, 2]);
   expect(items.map(i => i.price)).toEqual([600, 400]);
 });
+
+test('typed line with stock off: no box needed, no lot is taken', async ({ page }) => {
+  const posted = [];
+  await install(page, { db: db(), rpc: {
+    customer_credit: () => ({ body: 0 }),
+    post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-2', invoice_number: 'INV-2' } }; }
+  } });
+  page.on('dialog', d => d.accept());
+  await page.goto('/new-sale-ar.html');
+  await page.click('#sale-tabs [data-tab="manual"]');
+  await page.uncheck('#manual-from-stock');
+  await expect(page.locator('#manual-source-wrap')).toHaveClass(/\bhidden\b/);
+  await page.fill('#manual-weight', '5');
+  await page.fill('#manual-price', '1000');
+  await page.locator('button[onclick="addManualToCart()"]').click();
+  await expect(page.locator('#cart-body tr')).toHaveCount(1);
+  await page.fill('#customer-search', 'زبون');
+  await page.click('#customer-results >> text=زبون');
+  await page.click('#save-invoice-btn');
+  await expect.poll(() => posted.length).toBe(1);
+  expect(posted[0].items[0].lot_id).toBeFalsy();
+  expect(posted[0].items[0].weight).toBe(5);
+});

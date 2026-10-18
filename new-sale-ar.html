@@ -269,7 +269,8 @@
 </select>
 </div>
 </div>
-<div class="relative">
+<label class="flex items-center gap-2 text-[13px]"><input type="checkbox" id="manual-from-stock" checked class="w-5 h-5 rounded" onchange="document.getElementById('manual-source-wrap').classList.toggle('hidden', !this.checked)"/> الوزن يُخصم من المخزون</label>
+<div class="relative" id="manual-source-wrap">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="manual-source">يُخصم الوزن من</label>
 <select class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="manual-source">
 <option value="">اختر المصدر</option>
@@ -1649,7 +1650,7 @@
         }
     }
 
-    // A typed gold line comes out of stock: from the scrap box (كسر <karat>) or from the bulk box
+    // A typed gold line (with the "خصم من المخزون" option on) comes out of stock: from the scrap box (كسر <karat>) or from the bulk box
     // (lots with no box name = gold that came in before production). Lots are taken oldest first and
     // each slice becomes its own stock line, so the existing stock path handles the deduction,
     // cancellation and returns. The typed price is split by weight.
@@ -1666,8 +1667,20 @@
         let valid = true;
         if (!weight || weight <= 0) { inputs[0].classList.add('border-error'); valid = false; }
         if (!price || price <= 0) { inputs[1].classList.add('border-error'); valid = false; }
-        if (!source) { inputs[2].classList.add('border-error'); valid = false; }
+        const fromStock = document.getElementById('manual-from-stock').checked;
+        if (fromStock && !source) { inputs[2].classList.add('border-error'); valid = false; }
         if (!valid) return;
+
+        if (!fromStock) {
+            // not taken from stock (as before): a plain typed line, no lot
+            cart.push({ cartId: ++cartCounter, piece: null, barcode: null, karat: karat, weight: weight, ...gmPriced(price),
+                description: document.getElementById('manual-desc').value.trim() || null });
+            document.getElementById('manual-desc').value = '';
+            document.getElementById('manual-weight').value = '';
+            document.getElementById('manual-price').value = '';
+            renderCart();
+            return;
+        }
 
         const { data: lots, error } = await goldmindClient.from('gold_stock_lots').select('*')
             .eq('store_id', GOLDMIND_STORE_ID).eq('karat', karat).gt('weight_grams_remaining', 0)
