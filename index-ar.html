@@ -983,6 +983,8 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 #debtAlertBox summary::-webkit-details-marker { display: none; }
 #debtAlertBox details[open] .dchev { transform: rotate(180deg); }
 </style>
+<a id="incomingTransferBox" href="branch-transfers-ar.html?tab=in" class="hidden mb-4 rounded-2xl p-3.5 text-white shadow-lg flex items-center justify-between font-semibold" style="background:linear-gradient(135deg,#0f766e,#115e59);" role="alert">
+<span class="flex items-center gap-2"><span class="material-symbols-outlined">local_shipping</span> <span id="incomingTransferText"></span></span><span class="material-symbols-outlined">chevron_left</span></a>
 <section id="debtAlertBox" class="hidden mb-4 rounded-2xl p-3.5 text-white shadow-lg" style="background:linear-gradient(135deg,#f97316,#dc2626);">
 <div id="debtAlertGroups" class="flex flex-col gap-2"></div>
 </section>
@@ -2392,6 +2394,16 @@ if ('serviceWorker' in navigator) {
 </div>
 </div>
 <script>
+    // Pieces sent from another branch and not yet confirmed here (multi-branch 2.4)
+    (async function initIncomingTransfers() {
+        const session = await requireGoldMindSession('login-entry-ar.html');
+        if (!session) return;
+        const { count, error } = await goldmindClient.from('branch_transfers').select('id', { count: 'exact', head: true })
+            .eq('to_store_id', GOLDMIND_STORE_ID).eq('status', 'in_transit');
+        if (error || !count) return;
+        document.getElementById('incomingTransferText').textContent = count === 1 ? 'سند نقل وارد بانتظار تأكيد الاستلام' : count + ' سندات نقل واردة بانتظار تأكيد الاستلام';
+        document.getElementById('incomingTransferBox').classList.remove('hidden');
+    })();
     (async function initStoreSwitcher() {
         const session = await requireGoldMindSession('login-entry-ar.html');
         if (!session) return;

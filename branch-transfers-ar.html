@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>نقل بين الفروع | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=44"></script>
+<script src="theme.js?v=63"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+          "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "outline": "#76777d"
+        },
+        "fontFamily": { "body-md": ["Inter"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; } body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background font-body-md p-4">
+<main class="w-full max-w-md mx-auto flex flex-col gap-4 pb-10">
+<header class="flex items-center gap-2 pt-2">
+<a href="index-ar.html" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></a>
+<h1 class="font-headline-md text-headline-md font-bold">نقل بين الفروع</h1>
+</header>
+
+<div id="loading-state" class="text-center text-on-surface-variant text-sm py-8">جارِ التحميل...</div>
+<p id="no-branches" class="hidden text-center text-[13px] text-on-surface-variant">لا يوجد فرع آخر في هذه المنشأة. أضف فرعاً من صفحة «الفروع».</p>
+<div id="msg" class="hidden text-[13px] font-semibold rounded-lg p-3" role="status" aria-live="polite"></div>
+
+<nav id="tabs" class="hidden grid grid-cols-3 gap-2" role="tablist">
+<button type="button" role="tab" data-tab="in" onclick="showTab('in')" class="h-11 rounded-lg border border-outline-variant text-[13px] font-semibold">وارد <span id="in-count"></span></button>
+<button type="button" role="tab" data-tab="send" onclick="showTab('send')" class="h-11 rounded-lg border border-outline-variant text-[13px] font-semibold">إرسال</button>
+<button type="button" role="tab" data-tab="out" onclick="showTab('out')" class="h-11 rounded-lg border border-outline-variant text-[13px] font-semibold">صادر</button>
+</nav>
+
+<section id="tab-send" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">إلى فرع</span>
+<select id="to-branch" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right"></select>
+</label>
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">باركود القطعة (امسح أو اكتب ثم Enter)</span>
+<input id="send-barcode" type="text" dir="ltr" autocomplete="off" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right font-data-mono"/>
+</label>
+<ul id="send-list" class="flex flex-col gap-1" aria-label="القطع المرسلة"></ul>
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">ملاحظة (اختياري)</span>
+<input id="send-notes" type="text" maxlength="200" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right"/>
+</label>
+<p class="text-[11px] text-on-surface-variant">تخرج القطع من مخزون هذا الفرع فوراً وتبقى «بالطريق» حتى يؤكد الفرع المستلم استلامها. بلا بيع ولا ضريبة.</p>
+<button type="button" id="send-btn" onclick="sendTransfer()" class="h-12 rounded-lg bg-primary text-on-primary font-semibold">إرسال سند النقل</button>
+</section>
+
+<section id="tab-in" class="hidden flex flex-col gap-3"></section>
+<section id="tab-out" class="hidden flex flex-col gap-3"></section>
+</main>
+
+<script>
+const BR = {};
+let sendCodes = [];
+const brName = id => (BR[id] && BR[id].name) || 'فرع آخر';
+const msgEl = document.getElementById('msg');
+function showMsg(text, isError) {
+  msgEl.className = 'text-[13px] font-semibold rounded-lg p-3 ' + (isError ? 'bg-red-50 text-error' : 'bg-green-50 text-green-800');
+  msgEl.textContent = text;
+}
+function showTab(t) {
+  ['in', 'send', 'out'].forEach(x => {
+    document.getElementById('tab-' + x).classList.toggle('hidden', x !== t);
+    const b = document.querySelector(`[data-tab="${x}"]`);
+    b.setAttribute('aria-selected', x === t ? 'true' : 'false');
+    b.classList.toggle('border-primary', x === t);
+  });
+  if (t === 'in') loadIncoming();
+  if (t === 'out') loadOutgoing();
+}
+const dateOf = at => gmFormatDateTime(at, { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+const itemLine = i => `<li class="flex items-center justify-between gap-2 text-[12px] border-b border-outline-variant py-1">
+  <span><span class="font-data-mono" dir="ltr">${gmEscapeHtml(i.barcode || '')}</span> ${gmEscapeHtml(i.description || '')}${i.karat ? ' — ' + i.karat + 'K' : ''}${i.weight_grams != null ? ' — ' + Number(i.weight_grams).toFixed(2) + 'غ' : ''}</span>
+  <span class="${i.received_at ? 'text-green-700' : 'text-on-surface-variant'} font-semibold">${i.received_at ? 'استُلمت' : 'بالطريق'}</span></li>`;
+
+// ---- send
+function renderSendList() {
+  document.getElementById('send-list').innerHTML = sendCodes.map((c, i) => `<li class="flex items-center justify-between bg-surface-container-low rounded-lg px-3 h-9 text-[13px]">
+    <span class="font-data-mono" dir="ltr">${gmEscapeHtml(c)}</span>
+    <button type="button" onclick="sendCodes.splice(${i},1); renderSendList()" class="text-error text-[12px] font-semibold" aria-label="إزالة ${gmEscapeHtml(c)}">إزالة</button></li>`).join('');
+  document.getElementById('send-btn').textContent = 'إرسال سند النقل' + (sendCodes.length ? ' (' + sendCodes.length + ')' : '');
+}
+document.getElementById('send-barcode').addEventListener('keydown', e => {
+  if (e.key !== 'Enter') return;
+  e.preventDefault();
+  const v = e.target.value.trim();
+  if (v && !sendCodes.includes(v)) sendCodes.push(v);
+  e.target.value = '';
+  renderSendList();
+});
+async function sendTransfer() {
+  const to = document.getElementById('to-branch').value;
+  if (!to) { showMsg('اختر الفرع المستلم.', true); return; }
+  if (!sendCodes.length) { showMsg('امسح قطعة واحدة على الأقل.', true); document.getElementById('send-barcode').focus(); return; }
+  if (!confirm('إرسال ' + sendCodes.length + ' قطعة إلى ' + brName(to) + '؟')) return;
+  const btn = document.getElementById('send-btn'); btn.disabled = true;
+  const { data, error } = await goldmindClient.rpc('send_branch_transfer', { p_from: GOLDMIND_STORE_ID, p_to: to, p_barcodes: sendCodes, p_notes: document.getElementById('send-notes').value.trim() || null });
+  btn.disabled = false;
+  if (error) { showMsg('تعذّر الإرسال: ' + error.message, true); return; }
+  showMsg('أُرسل سند النقل ' + data.transfer_number + ' (' + data.items + ' قطعة). تبقى بالطريق حتى يؤكد ' + brName(to) + ' الاستلام.', false);
+  sendCodes = []; renderSendList(); document.getElementById('send-notes').value = '';
+}
+
+// ---- incoming (this branch receives)
+async function loadIncoming() {
+  const box = document.getElementById('tab-in');
+  const { data, error } = await goldmindClient.from('branch_transfers').select('*, items:branch_transfer_items(*)')
+    .eq('to_store_id', GOLDMIND_STORE_ID).eq('status', 'in_transit').order('created_at', { ascending: false });
+  if (error) { box.innerHTML = '<p class="text-error text-[13px]">تعذّر التحميل: ' + gmEscapeHtml(error.message) + '</p>'; return; }
+  document.getElementById('in-count').textContent = data && data.length ? '(' + data.length + ')' : '';
+  if (!data || !data.length) { box.innerHTML = '<p class="text-center text-[13px] text-on-surface-variant py-6">لا يوجد نقل وارد بانتظار الاستلام.</p>'; return; }
+  box.innerHTML = data.map(t => `<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-2">
+    <div class="flex items-center justify-between"><b class="text-[14px]">${gmEscapeHtml(t.transfer_number)}</b><span class="text-[11px] text-on-surface-variant">${dateOf(t.created_at)}</span></div>
+    <p class="text-[12px] text-on-surface-variant">من ${gmEscapeHtml(brName(t.from_store_id))}${t.notes ? ' — ' + gmEscapeHtml(t.notes) : ''}</p>
+    <ul>${(t.items || []).map(itemLine).join('')}</ul>
+    <label class="relative block mt-1"><span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">امسح القطعة لتأكيد استلامها</span>
+    <input type="text" dir="ltr" autocomplete="off" data-transfer="${t.id}" class="recv-scan w-full h-11 border border-outline-variant rounded-lg px-3 text-right font-data-mono"/></label>
+    <button type="button" onclick="receive('${t.id}', null)" class="h-11 rounded-lg bg-primary text-on-primary text-[13px] font-semibold">تأكيد استلام كل القطع</button>
+  </article>`).join('');
+  box.querySelectorAll('.recv-scan').forEach(inp => inp.addEventListener('keydown', e => {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const v = inp.value.trim(); inp.value = '';
+    if (v) receive(inp.dataset.transfer, [v]);
+  }));
+}
+async function receive(id, codes) {
+  if (!codes && !confirm('تأكيد استلام كل قطع هذا السند في هذا الفرع؟')) return;
+  const { data, error } = await goldmindClient.rpc('receive_branch_transfer', { p_transfer: id, p_barcodes: codes });
+  if (error) { showMsg('تعذّر الاستلام: ' + error.message, true); return; }
+  showMsg('استُلمت ' + data.received + ' قطعة' + (data.remaining ? '، وبقي ' + data.remaining + ' بالطريق.' : '. اكتمل السند.'), false);
+  await loadIncoming();
+}
+
+// ---- outgoing (sent from this branch)
+async function loadOutgoing() {
+  const box = document.getElementById('tab-out');
+  const { data, error } = await goldmindClient.from('branch_transfers').select('*, items:branch_transfer_items(*)')
+    .eq('from_store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }).limit(50);
+  if (error) { box.innerHTML = '<p class="text-error text-[13px]">تعذّر التحميل: ' + gmEscapeHtml(error.message) + '</p>'; return; }
+  if (!data || !data.length) { box.innerHTML = '<p class="text-center text-[13px] text-on-surface-variant py-6">لم يُرسل أي سند نقل بعد.</p>'; return; }
+  const ST = { in_transit: 'بالطريق', received: 'مستلم', cancelled: 'ملغى' };
+  box.innerHTML = data.map(t => {
+    const items = t.items || [], got = items.filter(i => i.received_at).length;
+    return `<article class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-2">
+    <div class="flex items-center justify-between"><b class="text-[14px]">${gmEscapeHtml(t.transfer_number)}</b><span class="text-[12px] font-semibold">${ST[t.status] || t.status}</span></div>
+    <p class="text-[12px] text-on-surface-variant">إلى ${gmEscapeHtml(brName(t.to_store_id))} — ${dateOf(t.created_at)} — استُلم ${got} من ${items.length}</p>
+    <ul>${items.map(itemLine).join('')}</ul>
+    ${t.status === 'in_transit' ? `<button type="button" onclick="cancelTransfer('${t.id}')" class="h-10 rounded-lg border border-error text-error text-[12px] font-semibold">إلغاء القطع غير المستلمة وإرجاعها لهذا الفرع</button>` : ''}
+  </article>`; }).join('');
+}
+async function cancelTransfer(id) {
+  if (!confirm('إرجاع القطع التي لم تُستلم بعد إلى مخزون هذا الفرع؟')) return;
+  const { data, error } = await goldmindClient.rpc('cancel_branch_transfer', { p_transfer: id });
+  if (error) { showMsg('تعذّر الإلغاء: ' + error.message, true); return; }
+  showMsg('رجعت ' + data.returned + ' قطعة إلى المخزون.', false);
+  await loadOutgoing();
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const branches = await gmOrgBranches();
+  branches.forEach(b => { BR[b.id] = b; });
+  document.getElementById('loading-state').classList.add('hidden');
+  const others = branches.filter(b => b.id !== GOLDMIND_STORE_ID);
+  if (!others.length) { document.getElementById('no-branches').classList.remove('hidden'); return; }
+  document.getElementById('to-branch').innerHTML = '<option value="">اختر الفرع</option>' + others.map(b => `<option value="${b.id}">${gmEscapeHtml(b.name)}</option>`).join('');
+  document.getElementById('tabs').classList.remove('hidden');
+  showTab(new URLSearchParams(location.search).get('tab') || 'in');
+}
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
