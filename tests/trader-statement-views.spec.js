@@ -1,5 +1,5 @@
-// Trader statement: ↑/↓ arrows instead of long labels, "سندات" (one row per voucher)
-// vs "تفاصيل" (every piece), photos on/off, and short descriptions.
+// Trader statement: one chronological ledger (a line per voucher), "سندات" vs "تفاصيل",
+// photos on/off, the type filter, and running balances (+ trader owes shop, − shop owes trader).
 const { test, expect } = require('@playwright/test');
 const { install, STORE, USER, STAFF } = require('./fake-backend');
 const T = '2026-09-30T10:00:00Z';
@@ -14,38 +14,44 @@ const db = () => ({
     { id: 'm3', store_id: STORE, trader_id: 't1', movement_type: 'debt_increase', source: 'cash_in', gold_24k_equivalent: 0, fab_fee_amount: 100, created_at: T }],
 });
 
-test('vouchers vs details, arrows, photos toggle', async ({ page }) => {
+test('one ledger: a line per voucher, running balances, vouchers vs details, photos toggle', async ({ page }) => {
   const errs = []; page.on('pageerror', e => errs.push(e.message));
   await page.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
   await install(page, { db: db() });
   await page.goto('/trader-statement-print-ar.html?trader=t1');
-  const rows = page.locator('#stGoldRows');
-  await expect(rows.locator('tr.st-v')).toHaveCount(1);
+  const rows = page.locator('#stLedgerRows');
+  // two lines: the voucher b1 (gold given) and the cash payment m3
+  await expect(rows.locator('tr.st-m')).toHaveCount(2);
   await expect(rows.locator('tr.st-p')).toHaveCount(0);
-  await expect(rows).toContainText('arrow_upward');
-  await expect(rows).toContainText('30.00');      // billed weight 10 + 20
-  await expect(rows).toContainText('22.50');        // 24k total
-  await expect(rows).toContainText('450.00');   // making total
-  await expect(rows).not.toContainText('إعطاء بضاعة');
-  await expect(page.locator('#stCashRows')).toContainText('arrow_downward');
-  await expect(page.locator('#stCashRows')).toContainText('+350.00'); // net: 150 + 300 - 100 (cash in)
-  await expect(page.locator('#stCashRows')).toContainText('صافي الرصيد النقدي');
+  await expect(rows).toContainText('إعطاء بضاعة · 2 قطعة · عيار 18');
+  await expect(rows).toContainText('22.50');     // gold 24k, trader owes the shop
+  await expect(rows).toContainText('450.00');    // making
+  await expect(rows).toContainText('-100.00');   // cash the shop paid out: shop owes trader
+  await expect(page.locator('#stLedgerFoot')).toContainText('22.50');
+  await expect(page.locator('#stLedgerFoot')).toContainText('350.00'); // final cash: 450 - 100
+  await expect(page.locator('#stCashRows, #stGoldRows')).toHaveCount(0);
 
   await page.click('#stOpts [data-view=details]');
   await expect(rows.locator('tr.st-p')).toHaveCount(2);
   await expect(rows).toContainText('000436 (خاتم)');
   await expect(rows).not.toContainText('إخراج بضاعة');
-  // totals sit under the pieces: gross weight, 24K, making
-  const last = rows.locator('tr').last();
-  await expect(last).toHaveClass(/st-v/);
-  await expect(last).toContainText('30.00');
-  await expect(page.locator('#stGold, table').first()).not.toContainText('محاسبي');
-  await expect(last).toContainText('22.50');
-  await expect(last).toContainText('450.00');
   await expect(rows.locator('img.st-ph')).toHaveCount(1);
   await page.click('#stOpts [data-photos="0"]');
   await expect(rows.locator('img.st-ph')).toHaveCount(0);
   expect(errs).toEqual([]);
+});
+
+test('type filter hides lines but balances still count every line', async ({ page }) => {
+  await page.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
+  await install(page, { db: db() });
+  await page.goto('/trader-statement-print-ar.html?trader=t1');
+  await page.click('#stKinds [data-kind=cash]');
+  const rows = page.locator('#stLedgerRows');
+  await expect(rows.locator('tr.st-m')).toHaveCount(1);
+  await expect(rows).toContainText('قبض كاش من التاجر');
+  await expect(page.locator('#stLedgerFoot')).toContainText('350.00');
+  await page.click('#stKinds [data-kind=all]');
+  await expect(rows.locator('tr.st-m')).toHaveCount(2);
 });
 
 test('return one piece to stock from the statement', async ({ page }) => {
@@ -53,18 +59,18 @@ test('return one piece to stock from the statement', async ({ page }) => {
   page.on('dialog', d => d.accept());
   await page.goto('/trader-statement-print-ar.html?trader=t1');
   await page.click('#stOpts [data-view=details]');
-  const btn = page.locator('#stGoldRows tr.st-p button.st-ret').first();
+  const btn = page.locator('#stLedgerRows tr.st-p button.st-ret').first();
   await expect(btn).toBeVisible();
   await btn.click();
   await expect.poll(() => calls.some(c => c.name === 'trader_return_piece')).toBe(true);
   expect(JSON.parse(calls.find(c => c.name === 'trader_return_piece').body)).toEqual({ p_movement: 'm1' });
 });
 
-test('cash section is hidden when the period has no money movement at all', async ({ page }) => {
+test('no money at all in the period: the cash card is hidden', async ({ page }) => {
   const d = db();
   d.trader_movements = [];
   await install(page, { db: d });
   await page.goto('/trader-statement-print-ar.html?trader=t1');
-  await expect(page.locator('#stCashBlock')).toHaveClass(/\bhidden\b/);
   await expect(page.locator('#stCashCards')).toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#stLedgerRows')).toContainText('لا توجد حركات بهذه الفترة');
 });

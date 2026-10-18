@@ -51,9 +51,9 @@ test('statement shows the new rows in the store currency', async ({ page }) => {
     { id: 'm4', store_id: STORE, trader_id: 't1', movement_type: 'debt_decrease', source: 'cash_out', gold_24k_equivalent: 0, fab_fee_amount: 11500, created_at: T });
   await install(page, { db: d });
   await page.goto('/trader-statement-print-ar.html?trader=t1');
-  await expect(page.locator('#stCashRows')).toContainText('صرف كاش للتاجر');
-  await expect(page.locator('#stCashRows')).toContainText('تسكير عملات');
-  await expect(page.locator('#stCashRows')).toContainText('USD');
+  await expect(page.locator('#stLedgerRows')).toContainText('صرف كاش للتاجر');
+  await expect(page.locator('#stLedgerRows')).toContainText('تسكير عملات');
+  await expect(page.locator('#stBalCur')).toContainText('USD'); // header shows the currency
   await expect(page.locator('#stGoldNet')).toContainText('0.00');
   await expect(page.locator('#stCashCards')).toContainText('0.00');
   await expect(page.locator('button:has-text("PDF")')).toBeVisible();

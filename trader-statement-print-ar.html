@@ -97,27 +97,21 @@
 <div id="stCashCards" class="flex flex-col gap-2 hidden"></div>
 </div>
 
-<!-- Gold movements (grouped per voucher) -->
+<!-- One chronological ledger: one line per voucher, with a type filter -->
 <div class="mb-6">
 <div class="no-print gm-paper-controls flex flex-wrap gap-2 mb-3" id="stOpts">
 <div class="st-seg"><button type="button" data-view="vouchers">سندات</button><button type="button" data-view="details">تفاصيل</button></div>
 <div class="st-seg"><button type="button" data-photos="1">مع الصور</button><button type="button" data-photos="0">بدون صور</button></div>
+<div class="st-seg" id="stKinds"></div>
 </div>
-<div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">workspace_premium</span>حركات الذهب <span class="text-[10px] font-normal text-gray-500 mr-2"><span class="material-symbols-outlined st-arrow" style="color:#8A3B32;font-size:15px">arrow_upward</span> صادر &nbsp; <span class="material-symbols-outlined st-arrow" style="color:#3F6B47;font-size:15px">arrow_downward</span> وارد</span></div>
-<table class="w-full stmt-table st-gold" style="border-collapse:collapse;">
-<colgroup><col style="width:34%"><col style="width:10%"><col style="width:19%"><col style="width:18%"><col style="width:19%"></colgroup>
-<thead><tr><th>البيان</th><th>العدد</th><th>الوزن القائم (غ)</th><th>عيار ٢٤ (غ)</th><th>المصنعية<span id="stFabCur"></span></th></tr></thead>
-<tbody id="stGoldRows"></tbody>
+<div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">receipt_long</span>سجل الحركات <span class="text-[10px] font-normal text-gray-500 mr-2"><span class="material-symbols-outlined st-arrow" style="color:#8A3B32;font-size:15px">arrow_upward</span> صادر &nbsp; <span class="material-symbols-outlined st-arrow" style="color:#3F6B47;font-size:15px">arrow_downward</span> وارد</span></div>
+<table class="w-full stmt-table" style="border-collapse:collapse;table-layout:fixed;">
+<colgroup><col style="width:13%"><col style="width:28%"><col style="width:11%"><col style="width:11%"><col style="width:11%"><col style="width:13%"><col style="width:13%"></colgroup>
+<thead><tr><th>التاريخ</th><th>البيان</th><th>السند</th><th>ذهب (غ)</th><th>نقد<span id="stFabCur"></span></th><th>رصيد الذهب (غ)</th><th>رصيد النقد<span id="stBalCur"></span></th></tr></thead>
+<tbody id="stLedgerRows"></tbody>
+<tfoot id="stLedgerFoot"></tfoot>
 </table>
-</div>
-
-<!-- Cash movements (hidden when there is no cash at all, see loadStatement) -->
-<div id="stCashBlock" class="hidden">
-<div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#3F6B47;">payments</span>حركات النقد</div>
-<table class="w-full stmt-table" style="border-collapse:collapse;">
-<thead><tr><th>التاريخ</th><th></th><th>نوع الحركة</th><th>المبلغ</th><th>الوصف</th></tr></thead>
-<tbody id="stCashRows"></tbody>
-</table>
+<div class="text-[10.5px] text-gray-500 mt-2">+ يعني التاجر مدين للمحل، − يعني المحل مدين للتاجر. الرصيد يُحسب على كل الحركات حتى لو طبّقت فلتراً.</div>
 </div>
 
 <div class="text-center text-[10px] text-gray-400 mt-8">GoldMind — كشف حساب تم إنشاؤه آلياً</div>
@@ -131,18 +125,33 @@ function gmEscapeHtml(s) {
 function fmt(n) { return (Number(n) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 function fmtDate(d) { return gmFormatDateTime(d, { year: 'numeric', month: 'short', day: 'numeric' }); }
 
-const GOLD_TYPE_LABELS = {
+// one wording per movement type + source (gold and money rows share it)
+const ST_TYPE_LABELS = {
     'debt_increase|stock_received': 'استلام بضاعة',
     'debt_decrease|stock_given': 'إعطاء بضاعة',
     'debt_increase|opening_balance': 'رصيد سابق (دين علينا)',
     'debt_decrease|opening_balance': 'رصيد سابق (دين له)',
-    'debt_increase|settlement': 'تسوية',
-    'debt_decrease|settlement': 'تسوية',
+    'debt_increase|settlement': 'تسوية واردة',
+    'debt_decrease|settlement': 'تسوية صادرة',
+    'debt_decrease|cash_out': 'صرف كاش للتاجر',
+    'debt_increase|cash_in': 'قبض كاش من التاجر',
+    'debt_increase|discount': 'خصم لصالح التاجر',
+    'debt_decrease|discount': 'خصم لصالح المحل',
+    'debt_increase|gold_to_cash': 'تسكير عملات — تسديد ذهب لنا',
     'debt_decrease|gold_to_cash': 'تسكير عملات — تسديد ذهب علينا',
-    'debt_decrease|scrap_given': 'إخراج كسر بالكلفة',
-    'debt_increase|gold_to_cash': 'تسكير عملات — تسديد ذهب لنا'
+    'debt_decrease|scrap_given': 'إخراج كسر بالكلفة'
 };
-let ST_GOLD_GROUPS = [], ST_PIECES = {}, ST_CUR = '', ST_CAN_RETURN = false;
+const ST_SRC = { stock_given: 'بضاعة', stock_received: 'بضاعة', opening_balance: 'رصيد سابق', settlement: 'تسوية', gold_to_cash: 'تسكير عملات', scrap_given: 'كسر بالكلفة' };
+const ST_KIND_LABELS = { all: 'الكل', receive: 'استلام', give: 'إعطاء', cash: 'نقد', other: 'تسويات وأخرى' };
+// filter chips: what kind of line it is (the balances always count every line)
+function stKindOf(f) {
+    if (f.source === 'stock_received') return 'receive';
+    if (f.source === 'stock_given') return 'give';
+    if (f.source === 'cash_in' || f.source === 'cash_out') return 'cash';
+    return 'other';
+}
+let ST_LINES = [], ST_PIECES = {}, ST_CUR = '', ST_CAN_RETURN = false;
+let ST_TRADER = null, ST_STORE = {};
 // "إرجاع للمخزن": the piece goes back to stock as it was (gross & accounting weight, making cost)
 // and leaves the trader's account; the statement reloads.
 async function stReturnPiece(movementId, btn) {
@@ -155,7 +164,7 @@ async function stReturnPiece(movementId, btn) {
 }
 function stGet(k, d) { try { return localStorage.getItem(k) || d; } catch (e) { return d; } }
 function stSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
-let ST_VIEW = stGet('gm_stmt_view', 'vouchers'), ST_PHOTOS = stGet('gm_stmt_photos', '1') === '1';
+let ST_VIEW = stGet('gm_stmt_view', 'vouchers'), ST_PHOTOS = stGet('gm_stmt_photos', '1') === '1', ST_KIND = stGet('gm_stmt_kind', 'all');
 // ↑ صادر = goods/gold going out to the trader; ↓ وارد = coming in from him
 function stArrow(type) {
     return type === 'debt_increase'
@@ -166,54 +175,65 @@ function stArrow(type) {
 function stShort(n) {
     return String(n || '').replace(/^\s*(إخراج|إعطاء|استلام|إدخال)\s+(بضاعة|قطع|قطعة)\s*[—–-]\s*/, '').replace(/باركود\s*/g, '').trim();
 }
-const ST_SRC = { stock_given: 'بضاعة', stock_received: 'بضاعة', opening_balance: 'رصيد سابق', settlement: 'تسوية', gold_to_cash: 'تسكير عملات', scrap_given: 'كسر بالكلفة' };
 // only the gross (قائم) weight is shown; older rows without it fall back to the billed weight
 const stGross = m => Number(m.weight_grams) > 0 ? Number(m.weight_grams) : stBilled(m);
 const stBilled = m => Number(m.karat) ? Number(m.gold_24k_equivalent || 0) * 24 / Number(m.karat) : Number(m.weight_grams || 0);
-function stRenderGold() {
+function stLineTitle(l) {
+    const f = l.f, base = ST_TYPE_LABELS[f.movement_type + '|' + f.source] || ST_SRC[f.source] || '';
+    const karats = [...new Set(l.g.rows.map(m => m.karat).filter(Boolean))].join('/');
+    const pcs = l.g.rows.filter(m => m.piece_id).length;
+    const note = l.g.rows.length === 1 && !f.piece_id ? stShort(f.notes) : '';
+    return [base, note && note !== base ? note : '', pcs ? pcs + ' قطعة' : '', karats ? 'عيار ' + karats : ''].filter(Boolean).join(' · ');
+}
+function stRenderLedger() {
     document.querySelectorAll('#stOpts [data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === ST_VIEW));
     document.querySelectorAll('#stOpts [data-photos]').forEach(b => b.classList.toggle('on', (b.dataset.photos === '1') === ST_PHOTOS));
-    const sgn = m => m.movement_type === 'debt_increase' ? -1 : 1;
+    document.querySelectorAll('#stKinds [data-kind]').forEach(b => b.classList.toggle('on', b.dataset.kind === ST_KIND));
     const col = v => v >= 0 ? '#3F6B47' : '#8A3B32';
-    const html = ST_GOLD_GROUPS.map(g => {
-        const f = g.rows[0], s = sgn(f);
-        const gold = g.rows.reduce((a, m) => a + sgn(m) * Number(m.gold_24k_equivalent || 0), 0);
-        const fab = g.rows.reduce((a, m) => a + sgn(m) * Number(m.fab_fee_amount || 0), 0);
-        const gross = g.rows.reduce((a, m) => a + stGross(m), 0); // الوزن القائم
-        const pcs = g.rows.filter(m => m.piece_id).length;
-        const karats = [...new Set(g.rows.map(m => m.karat).filter(Boolean))].join('/');
-        let title = (ST_SRC[f.source] || '') + (f.batch_ref ? ' ' + f.batch_ref : '');
-        if (g.rows.length === 1 && !f.piece_id && f.notes) title = stShort(f.notes);
-        const dateRow = `<tr class="st-d"><td colspan="5">${stArrow(f.movement_type)} ${fmtDate(f.created_at)} <span class="font-normal text-gray-600">· ${gmEscapeHtml(title.trim() || '—')}${karats ? ' · عيار ' + karats : ''}</span></td></tr>`;
-        // totals: gross (قائم) weight, 24K, making
-        const total = `<tr class="st-v">
-            <td>المجموع</td>
-            <td>${pcs || '—'}</td>
-            <td class="font-data-mono">${fmt(gross)}</td>
-            <td class="font-data-mono" style="color:${col(gold)}">${gold >= 0 ? '+' : ''}${fmt(gold)}</td>
-            <td class="font-data-mono" style="color:${col(fab)}">${fab ? fmt(fab) : '—'}</td></tr>`;
-        if (ST_VIEW !== 'details' || g.rows.length < 2 && !f.piece_id) return dateRow + total;
-        // with the pieces listed, the totals go underneath them
-        return dateRow + g.rows.map(m => {
+    const mv = v => Math.abs(v) < 0.005 ? '—' : (v > 0 ? '+' : '') + fmt(v);
+    const sgn = m => m.movement_type === 'debt_increase' ? -1 : 1;
+    const lines = ST_LINES.filter(l => ST_KIND === 'all' || l.kind === ST_KIND);
+    const html = lines.map(l => {
+        const f = l.f;
+        const main = `<tr class="st-m">
+            <td>${fmtDate(f.created_at)}</td>
+            <td>${stArrow(f.movement_type)} ${gmEscapeHtml(stLineTitle(l))}</td>
+            <td class="font-data-mono">${gmEscapeHtml(f.batch_ref || '—')}</td>
+            <td class="font-data-mono" style="color:${col(l.gold)}">${mv(l.gold)}</td>
+            <td class="font-data-mono" style="color:${col(l.cash)}">${mv(l.cash)}</td>
+            <td class="font-data-mono font-bold" style="color:${col(l.balG)}">${fmt(l.balG)}</td>
+            <td class="font-data-mono font-bold" style="color:${col(l.balC)}">${fmt(l.balC)}</td></tr>`;
+        if (ST_VIEW !== 'details' || !l.g.rows.some(m => m.piece_id)) return main;
+        // details view: every piece under its voucher, with photo and the return button
+        const subs = l.g.rows.map(m => {
             const p = ST_PIECES[m.piece_id] || {};
             const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph" src="${gmEscapeHtml(p.photo_url)}" alt=""/>` : '';
+            const ret = ST_CAN_RETURN && m.source === 'stock_given' && m.piece_id ? `<button type="button" class="st-ret no-print" onclick="stReturnPiece('${m.id}', this)">↩ إرجاع للمخزن</button>` : '';
             return `<tr class="st-p">
-                <td><div class="st-pc">${ph}<span>${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}${ST_CAN_RETURN && m.source === 'stock_given' && m.piece_id ? `<button type="button" class="st-ret no-print" onclick="stReturnPiece('${m.id}', this)">↩ إرجاع للمخزن</button>` : ''}</span></div></td>
+                <td></td>
+                <td><div class="st-pc">${ph}<span>${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}<small> · ${fmt(stGross(m))} غ</small>${ret}</span></div></td>
                 <td>${m.karat ? 'ع' + m.karat : ''}</td>
-                <td class="font-data-mono">${fmt(stGross(m))}</td>
-                <td class="font-data-mono">${fmt(m.gold_24k_equivalent)}</td>
-                <td class="font-data-mono">${Number(m.fab_fee_amount) ? fmt(m.fab_fee_amount) : ''}</td></tr>`;
-        }).join('') + total;
+                <td class="font-data-mono">${mv(sgn(m) * Number(m.gold_24k_equivalent || 0))}</td>
+                <td class="font-data-mono">${mv(sgn(m) * Number(m.fab_fee_amount || 0))}</td>
+                <td></td><td></td></tr>`;
+        }).join('');
+        return main + subs;
     }).join('');
-    document.getElementById('stGoldRows').innerHTML = html || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات ذهب بهذه الفترة</td></tr>';
+    const last = ST_LINES[ST_LINES.length - 1];
+    document.getElementById('stLedgerRows').innerHTML = html ||
+        `<tr><td colspan="7" class="text-gray-400 py-6">${ST_LINES.length ? 'لا توجد حركات من هذا النوع' : 'لا توجد حركات بهذه الفترة'}</td></tr>`;
+    document.getElementById('stLedgerFoot').innerHTML = last ? `<tr class="st-v">
+        <td colspan="5">الرصيد النهائي (كل الحركات)</td>
+        <td class="font-data-mono" style="color:${col(last.balG)}">${fmt(last.balG)}</td>
+        <td class="font-data-mono" style="color:${col(last.balC)}">${fmt(last.balC)}</td></tr>` : '';
 }
 document.addEventListener('click', e => {
     const b = e.target.closest('#stOpts button'); if (!b) return;
     if (b.dataset.view) { ST_VIEW = b.dataset.view; stSet('gm_stmt_view', ST_VIEW); }
     if (b.dataset.photos) { ST_PHOTOS = b.dataset.photos === '1'; stSet('gm_stmt_photos', ST_PHOTOS ? '1' : '0'); }
-    stRenderGold();
+    if (b.dataset.kind) { ST_KIND = b.dataset.kind; stSet('gm_stmt_kind', ST_KIND); }
+    stRenderLedger();
 });
-let ST_TRADER = null, ST_STORE = {};
 const stPdfName = () => 'كشف حساب ' + (ST_TRADER ? ST_TRADER.name : '') + '.pdf';
 async function stWhatsApp(btn) {
     const text = `مرحباً ${ST_TRADER.name}،\nنرسل لكم كشف الحساب من ${ST_STORE.name || 'المحل'}.\n\nشكراً لتعاملكم معنا.`;
@@ -266,78 +286,48 @@ async function loadStatement() {
         ? ('من ' + fmtDate(fromDate + 'T00:00:00') + ' إلى اليوم')
         : 'كل الحركات منذ بداية الحساب';
 
-    // ---- Gold: same sign convention used everywhere else in ledger-ar.html ----
-    // debt_increase -> shop owes the trader more (subtracts from "trader owes shop" balance)
-    // debt_decrease -> trader owes the shop more / settles up (adds to that balance)
-    let goldNet = 0;
-    (allMoves || []).forEach(m => { goldNet += m.movement_type === 'debt_increase' ? -Number(m.gold_24k_equivalent || 0) : Number(m.gold_24k_equivalent || 0); });
-    // one voucher = one batch (all pieces given/received together)
+    // ---- One line per voucher (batch) in time order; gold and money side by side ----
+    // Sign: debt_increase -> shop owes the trader more (negative); debt_decrease -> trader owes the shop (positive).
+    // Balances are running totals over every line, so a filter only hides lines.
+    const sgn = m => m.movement_type === 'debt_increase' ? -1 : 1;
     const groups = [], byKey = {};
     (allMoves || []).forEach(m => {
         const k = m.batch_id || m.id;
         if (!byKey[k]) { byKey[k] = { key: k, rows: [] }; groups.push(byKey[k]); }
         byKey[k].rows.push(m);
     });
-    ST_GOLD_GROUPS = groups.filter(g => g.rows.some(m => Number(m.gold_24k_equivalent || 0) !== 0));
-    const goldIds = new Set(); ST_GOLD_GROUPS.forEach(g => g.rows.forEach(m => goldIds.add(m.id)));
-    const pieceIds = [...new Set(ST_GOLD_GROUPS.flatMap(g => g.rows.map(m => m.piece_id)).filter(Boolean))];
+    const lines = groups.map(g => {
+        const f = g.rows[0];
+        const gold = g.rows.reduce((a, m) => a + sgn(m) * Number(m.gold_24k_equivalent || 0), 0);
+        const cash = g.rows.reduce((a, m) => a + sgn(m) * Number(m.fab_fee_amount || 0), 0);
+        return { g, f, gold, cash, kind: stKindOf(f) };
+    }).filter(l => Math.abs(l.gold) > 0.0001 || Math.abs(l.cash) > 0.0001);
+    let balG = 0, balC = 0;
+    lines.forEach(l => { balG += l.gold; balC += l.cash; l.balG = balG; l.balC = balC; });
+    ST_LINES = lines;
+
+    const pieceIds = [...new Set(lines.flatMap(l => l.g.rows.map(m => m.piece_id)).filter(Boolean))];
     if (pieceIds.length) {
         const { data: pcs } = await goldmindClient.from('pieces').select('id, barcode, photo_url').in('id', pieceIds);
         (pcs || []).forEach(p => { ST_PIECES[p.id] = p; });
     }
     ST_CUR = CUR;
     document.getElementById('stFabCur').textContent = CUR ? ' (' + CUR + ')' : '';
-    stRenderGold();
+    document.getElementById('stBalCur').textContent = CUR ? ' (' + CUR + ')' : '';
+
+    // filter chips only for the kinds this statement actually has
+    const present = new Set(lines.map(l => l.kind));
+    document.getElementById('stKinds').innerHTML = ['all', 'receive', 'give', 'cash', 'other'].filter(k => k === 'all' || present.has(k))
+        .map(k => `<button type="button" data-kind="${k}">${ST_KIND_LABELS[k]}</button>`).join('');
+    if (ST_KIND !== 'all' && !present.has(ST_KIND)) ST_KIND = 'all';
+    stRenderLedger();
+
+    // ---- Summary: gold and cash kept strictly separate ----
+    const cashNet = balC, goldNet = balG;
     document.getElementById('stGoldNet').textContent = fmt(goldNet) + ' غ';
     document.getElementById('stGoldNet').style.color = goldNet >= 0 ? '#3F6B47' : '#8A3B32';
     document.getElementById('stGoldHint').textContent = goldNet >= 0 ? '(التاجر مديون للمحل)' : '(المحل مديون للتاجر)';
-
-    // ---- Cash: sourced from trader_movements.fab_fee_amount, same as the
-    // live "دين نقدي" figure on ledger-ar.html — NOT from cash_movements,
-    // which only records money that actually crossed the register and
-    // completely misses debt-only entries (opening balance, stock
-    // given/received) that never touch the cash box. Sourcing from
-    // cash_movements alone made this statement's cash total wildly
-    // understate the real debt.
-    const CASH_TYPE_LABELS = {
-        'debt_increase|opening_balance': 'رصيد سابق (دين علينا)',
-        'debt_decrease|opening_balance': 'رصيد سابق (دين له)',
-        'debt_increase|stock_received': 'استلام بضاعة (مصنعية)',
-        'debt_decrease|stock_given': 'إعطاء بضاعة (مصنعية)',
-        'debt_increase|settlement': 'تسوية واردة',
-        'debt_decrease|settlement': 'تسوية صادرة',
-        'debt_decrease|cash_out': 'صرف كاش للتاجر',
-        'debt_increase|cash_in': 'قبض كاش من التاجر',
-        'debt_increase|discount': 'خصم لصالح التاجر',
-        'debt_decrease|discount': 'خصم لصالح المحل',
-        'debt_increase|gold_to_cash': 'تسكير عملات — قيمة الذهب لصالح التاجر',
-        'debt_decrease|gold_to_cash': 'تسكير عملات — قيمة الذهب لصالح المحل'
-    };
-    let cashNet = 0;
-    (allMoves || []).forEach(m => { cashNet += m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0); });
-    // every money row, so the rows add up to the net cash balance printed under them
-    // (making of goods vouchers are included here too; the gold table shows their total as well)
-    const cashRows = (allMoves || []).filter(m => Number(m.fab_fee_amount || 0) !== 0);
-    document.getElementById('stCashRows').innerHTML = cashRows.map(m => {
-        const signed = m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0);
-        const label = CASH_TYPE_LABELS[m.movement_type + '|' + m.source] || (signed >= 0 ? 'تخفيض دين' : 'زيادة دين');
-        return `<tr>
-            <td>${fmtDate(m.created_at)}</td>
-            <td>${stArrow(m.movement_type)}</td>
-            <td>${gmEscapeHtml(label)}</td>
-            <td class="font-data-mono font-bold" style="color:${signed >= 0 ? '#3F6B47' : '#8A3B32'};">${signed >= 0 ? '+' : ''}${fmt(signed)} ${CUR}</td>
-            <td class="text-[11px]">${gmEscapeHtml(stShort(m.notes) === label ? '' : stShort(m.notes))}</td>
-        </tr>`;
-    }).join('') || '<tr><td colspan="5" class="text-gray-400 py-6">لا توجد حركات نقدية بهذه الفترة</td></tr>';
-    document.getElementById('stCashRows').insertAdjacentHTML('beforeend', `<tr class="font-bold" style="background:#F1E9D6;">
-        <td colspan="3">صافي الرصيد النقدي</td>
-        <td class="font-data-mono" style="color:${cashNet >= 0 ? '#3F6B47' : '#8A3B32'};">${cashNet >= 0 ? '+' : ''}${fmt(cashNet)} ${CUR}</td>
-        <td class="text-[11px]">${cashNet >= 0 ? '(التاجر مديون للمحل)' : '(المحل مديون للتاجر)'}</td>
-    </tr>`);
-
-    // no cash movement in this period: hide the cash table and its card instead of an empty table
-    const hasCash = cashRows.length > 0;
-    document.getElementById('stCashBlock').classList.toggle('hidden', !hasCash);
+    const hasCash = lines.some(l => Math.abs(l.cash) > 0.0001);
     const cashCardsEl = document.getElementById('stCashCards');
     cashCardsEl.classList.toggle('hidden', !hasCash);
     cashCardsEl.innerHTML = `<div class="summary-card flex-1" style="background:#E1EADB;">
