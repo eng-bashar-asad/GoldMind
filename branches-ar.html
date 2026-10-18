@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>الفروع | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=42"></script>
+<script src="theme.js?v=63"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+          "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "outline": "#76777d"
+        },
+        "fontFamily": { "body-md": ["Inter"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; } body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background font-body-md p-4">
+<main class="w-full max-w-md mx-auto flex flex-col gap-5 pb-10">
+<header class="flex items-center gap-2 pt-2">
+<a href="company-settings-ar.html" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></a>
+<h1 class="font-headline-md text-headline-md font-bold">الفروع</h1>
+</header>
+
+<div id="loading-state" class="text-center text-on-surface-variant text-sm py-8">جارِ التحميل...</div>
+<div id="msg" class="hidden text-[13px] font-semibold rounded-lg p-3" role="status" aria-live="polite"></div>
+
+<section id="branches-section" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+<h2 class="font-label-md text-label-md font-bold text-secondary">فروع المنشأة</h2>
+<p class="text-[12px] text-on-surface-variant">المكتب الرئيسي هو الفرع الذي يتعامل مع التجار وتدخله البضاعة أولاً، وقد يكون مستودعاً بلا مبيعات.</p>
+<fieldset id="branches-list" class="flex flex-col gap-2"><legend class="sr-only">اختر المكتب الرئيسي</legend></fieldset>
+<button type="button" id="save-head-btn" onclick="saveHeadOffice()" class="hidden h-11 rounded-lg border border-primary text-primary font-semibold">حفظ المكتب الرئيسي</button>
+</section>
+
+<section id="add-branch-section" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+<h2 class="font-label-md text-label-md font-bold text-secondary">إضافة فرع لمنشأتي</h2>
+<p class="text-[12px] text-on-surface-variant">نفس الاسم القانوني والرقم الضريبي. تُنسخ الإعدادات وأسعار الذهب من هذا الفرع، ويبدأ الفرع بمخزون وصندوق وزبائن فارغة. اشتراكه ينتهي مع اشتراك المنشأة.</p>
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">اسم الفرع</span>
+<input id="branch-name" type="text" maxlength="80" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" placeholder="مثل: فرع ديرة"/>
+</label>
+<button type="button" id="add-branch-btn" onclick="addBranch()" class="h-12 rounded-lg bg-primary text-on-primary font-semibold">إضافة الفرع</button>
+</section>
+
+<section id="new-company-section" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
+<h2 class="font-label-md text-label-md font-bold text-secondary">شركة جديدة مستقلة</h2>
+<p class="text-[12px] text-on-surface-variant">منشأة منفصلة تماماً ببياناتها القانونية وحركاتها واشتراكها (تجربة 30 يوماً)، حتى لو كان رقمها الضريبي مثل منشأة أخرى.</p>
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">اسم الشركة</span>
+<input id="company-name" type="text" maxlength="80" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right"/>
+</label>
+<label class="flex items-center gap-2 text-[13px]"><input id="company-terms" type="checkbox" class="w-5 h-5 rounded"/> أوافق على <a href="terms-ar.html" target="_blank" class="underline text-primary">الشروط والأحكام</a></label>
+<button type="button" id="add-company-btn" onclick="addCompany()" class="h-12 rounded-lg border border-primary text-primary font-semibold">إنشاء الشركة</button>
+</section>
+
+<p id="not-owner" class="hidden text-center text-[13px] text-on-surface-variant">إدارة الفروع متاحة لمالك المنشأة فقط.</p>
+</main>
+
+<script>
+let orgId = null, headId = null;
+const msgEl = document.getElementById('msg');
+function showMsg(text, isError, switchTo) {
+  msgEl.className = 'text-[13px] font-semibold rounded-lg p-3 ' + (isError ? 'bg-red-50 text-error' : 'bg-green-50 text-green-800');
+  msgEl.textContent = text;
+  if (switchTo) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'underline mr-2'; b.textContent = 'انتقل إليه الآن';
+    b.onclick = () => goldMindSetActiveStore(switchTo);
+    msgEl.appendChild(b);
+  }
+  msgEl.scrollIntoView({ block: 'nearest' });
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const { data: store } = await goldmindClient.from('stores').select('id, organization_id').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  orgId = store && store.organization_id;
+  const [{ data: owner }, { data: org }, { data: branches }] = orgId ? await Promise.all([
+    goldmindClient.rpc('is_org_owner', { p_org: orgId }),
+    goldmindClient.from('organizations').select('*').eq('id', orgId).maybeSingle(),
+    goldmindClient.from('stores').select('id, name, display_name, branch_code').eq('organization_id', orgId).order('created_at')
+  ]) : [{}, {}, {}];
+  document.getElementById('loading-state').classList.add('hidden');
+  if (!orgId || owner !== true) { document.getElementById('not-owner').classList.remove('hidden'); return; }
+
+  headId = (org && (org.head_office_store_id || org.primary_store_id)) || null;
+  const hasHeadCol = !!org && 'head_office_store_id' in org; // column exists once migration 20261018250000 has run
+  document.getElementById('branches-list').insertAdjacentHTML('beforeend', (branches || []).map(b => `
+    <label class="flex items-center justify-between gap-3 border border-outline-variant rounded-lg p-3">
+      <span>
+        <span class="font-semibold text-[14px]">${gmEscapeHtml(gmShownName(b))}</span>
+        ${b.branch_code ? `<span class="text-[11px] text-on-surface-variant font-data-mono mr-1" dir="ltr">${gmEscapeHtml(b.branch_code)}</span>` : ''}
+        ${b.id === GOLDMIND_STORE_ID ? '<span class="text-[11px] text-on-surface-variant mr-1">(الفرع الحالي)</span>' : ''}
+      </span>
+      ${hasHeadCol ? `<span class="flex items-center gap-1 text-[12px]"><input type="radio" name="head-office" value="${b.id}" class="w-5 h-5" ${b.id === headId ? 'checked' : ''} aria-label="المكتب الرئيسي: ${gmEscapeHtml(gmShownName(b))}"/> رئيسي</span>` : ''}
+    </label>`).join(''));
+  document.getElementById('save-head-btn').classList.toggle('hidden', !hasHeadCol || (branches || []).length < 2);
+  ['branches-section', 'add-branch-section', 'new-company-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+}
+
+async function saveHeadOffice() {
+  const picked = document.querySelector('input[name="head-office"]:checked');
+  if (!picked || picked.value === headId) return;
+  const { error } = await goldmindClient.from('organizations').update({ head_office_store_id: picked.value }).eq('id', orgId);
+  if (error) { showMsg('تعذّر الحفظ: ' + error.message, true); return; }
+  headId = picked.value;
+  showMsg('تم تعيين المكتب الرئيسي.', false);
+}
+
+async function addBranch() {
+  const input = document.getElementById('branch-name');
+  const name = input.value.trim();
+  if (!name) { input.classList.add('border-error'); input.focus(); return; }
+  input.classList.remove('border-error');
+  const btn = document.getElementById('add-branch-btn');
+  btn.disabled = true; btn.textContent = 'جارِ الإضافة...';
+  const { data: newId, error } = await goldmindClient.rpc('create_branch', { p_from_store: GOLDMIND_STORE_ID, p_name: name });
+  btn.disabled = false; btn.textContent = 'إضافة الفرع';
+  if (error) { showMsg('تعذّرت الإضافة: ' + error.message, true); return; }
+  input.value = '';
+  showMsg('تمت إضافة الفرع «' + name + '».', false, newId);
+}
+
+async function addCompany() {
+  const input = document.getElementById('company-name');
+  const name = input.value.trim();
+  const terms = document.getElementById('company-terms');
+  if (!name) { input.classList.add('border-error'); input.focus(); return; }
+  input.classList.remove('border-error');
+  if (!terms.checked) { showMsg('يجب الموافقة على الشروط والأحكام.', true); return; }
+  const btn = document.getElementById('add-company-btn');
+  btn.disabled = true; btn.textContent = 'جارِ الإنشاء...';
+  const { data: newId, error } = await goldmindClient.rpc('register_new_company', { company_name: name, terms_accepted: true, terms_version: '1.2' });
+  btn.disabled = false; btn.textContent = 'إنشاء الشركة';
+  if (error) {
+    showMsg(/ALREADY_HAS_THIS_COMPANY/.test(error.message) ? 'لديك شركة بنفس الاسم.' : 'تعذّر الإنشاء: ' + error.message, true);
+    return;
+  }
+  input.value = ''; terms.checked = false;
+  showMsg('تم إنشاء الشركة «' + name + '».', false, newId);
+}
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
