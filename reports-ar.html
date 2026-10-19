@@ -43,6 +43,33 @@
     .period-tab:not(.active) { color: #45464d; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
+<style>
+.rp-dot{display:inline-block;width:10px;height:10px;border-radius:3px;vertical-align:middle}
+.rp-chart{display:flex;align-items:flex-end;gap:6px;height:150px;margin-top:14px;border-bottom:1px solid var(--gm-outline-variant);overflow-x:auto}
+.rp-day{flex:1 0 22px;height:100%;display:flex;flex-direction:column;justify-content:flex-end;background:none;border:0;padding:0 1px;cursor:pointer;border-radius:4px;position:relative}
+.rp-day .bars{display:flex;gap:2px;align-items:flex-end;height:calc(100% - 18px)}
+.rp-day .bars i{flex:1;border-radius:4px 4px 0 0;min-height:2px}
+.rp-day b{font-size:10.5px;font-weight:400;color:var(--gm-on-surface-variant);height:18px;line-height:18px;font-family:"Times New Roman",Times,serif}
+.rp-day.on{outline:2px solid #1C1A16;outline-offset:2px}
+.rp-day.on b{font-weight:700;color:#211D17}
+.rp-kv{display:flex;justify-content:space-between;font-size:13.5px;padding:7px 0;border-bottom:1px solid var(--gm-outline-variant)}
+.rp-kv>span:first-child{color:var(--gm-on-surface-variant)}
+.rp-lk{display:flex;align-items:center;gap:10px;min-height:44px;font-size:13.5px;border-bottom:1px solid var(--gm-outline-variant);color:var(--gm-on-surface)}
+.rp-lk .material-symbols-outlined{color:#7A6640}
+.rp-wide{display:none}
+@media (min-width:1024px){
+  main.lg\:max-w-5xl{max-width:1400px!important}
+  .rp-wide{display:table-cell}
+  .rp-fin-link{display:none!important}
+  #rp-kpis{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:12px!important}
+  #rp-kpis>div{padding:14px 16px!important}
+  #rp-kpis>div>div:first-child{display:none}
+  #rp-kpis h2{font-size:22px!important;line-height:1.2!important}
+  .rp-grid{display:grid;grid-template-columns:minmax(0,2fr) minmax(300px,1fr);gap:18px;align-items:start}
+  .rp-side{position:sticky;top:84px}
+  #invoices-tbody tr:hover td{background:#FBF8F1}
+}
+</style>
 </head>
 <body class="bg-background text-on-background font-body-md">
 <header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
@@ -71,12 +98,15 @@
 </div>
 <div id="invoiceSearchResult" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4"></div>
 
-<a href="financial-report-ar.html" class="flex items-center justify-between gap-2 px-4 h-12 rounded-xl font-bold text-[14px]" style="background:#1F1A12;color:#F3EEDF;"><span class="flex items-center gap-2"><span class="material-symbols-outlined">summarize</span>التقرير المالي الشامل — للطباعة</span><span class="material-symbols-outlined">chevron_left</span></a>
+<a href="financial-report-ar.html" class="rp-fin-link flex items-center justify-between gap-2 px-4 h-12 rounded-xl font-bold text-[14px]" style="background:#1F1A12;color:#F3EEDF;"><span class="flex items-center gap-2"><span class="material-symbols-outlined">summarize</span>التقرير المالي الشامل — للطباعة</span><span class="material-symbols-outlined">chevron_left</span></a>
 <!-- Period tabs -->
 <div class="flex gap-1 p-1 bg-surface-container-low rounded-lg overflow-x-auto">
 <button class="period-tab active px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="today" onclick="setPeriod('today')">اليوم</button>
-<button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="week" onclick="setPeriod('week')">أسبوع</button>
-<button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="month" onclick="setPeriod('month')">شهر</button>
+<button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="yesterday" onclick="setPeriod('yesterday')">أمس</button>
+<button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="week" onclick="setPeriod('week')">7 أيام</button>
+<button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="month" onclick="setPeriod('month')">هذا الشهر</button>
+<button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="lastMonth" onclick="setPeriod('lastMonth')">الشهر الماضي</button>
+<button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="year" onclick="setPeriod('year')">هذه السنة</button>
 <button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap flex items-center gap-1" data-period="custom" onclick="setPeriod('custom')">
 <span class="material-symbols-outlined text-[16px]">calendar_today</span> مخصص
 </button>
@@ -98,12 +128,17 @@
 
 <!-- Regular summary view -->
 <div id="summary-view">
-<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6 rp-kpis" id="rp-kpis">
 <div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl">
 <div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-secondary-container">payments</span></div>
 <p class="text-[12px] text-on-surface-variant mb-1">إجمالي المبيعات (صافي)</p>
 <h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-total-sales">0</h2>
 <p class="text-[10px] text-outline mt-1" id="returns-note"></p>
+</div>
+<div class="bg-surface-container-lowest border border-outline-variant p-5 rounded-xl rp-exp">
+<div class="p-2.5 bg-surface-container-low rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-surface-variant">receipt</span></div>
+<p class="text-[12px] text-on-surface-variant mb-1">المصاريف</p>
+<h2 class="font-headline-lg text-headline-lg font-data-mono" id="stat-expenses" style="color:#B45309">0</h2>
 </div>
 <div class="hidden bg-surface-container-lowest border border-outline-variant p-5 rounded-xl" id="profit-card">
 <div class="p-2.5 bg-secondary-container rounded-lg w-fit mb-3"><span class="material-symbols-outlined stat-icon text-on-secondary-container">trending_up</span></div>
@@ -134,20 +169,49 @@
 </div>
 </div>
 
-<h3 class="font-bold text-[15px] mb-3">فواتير البيع بالفترة (<span id="invoices-count">0</span>)</h3>
+<div class="rp-grid">
+<div class="rp-main">
+<!-- sales and profit day by day; a day filters the table below (design "التقارير") -->
+<section id="rp-chart-box" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-6">
+<div class="flex flex-wrap items-baseline gap-2"><h3 class="font-bold text-[15px]">المبيعات يوماً بيوم</h3><span class="text-[11.5px] text-on-surface-variant">اضغط على يوم لعرض فواتيره فقط</span>
+<span class="ms-auto text-[12px] text-on-surface-variant"><i class="rp-dot" style="background:#C8952E"></i> مبيعات <span id="rp-leg-profit">· <i class="rp-dot" style="background:#1E7D32"></i> ربح</span></span></div>
+<div id="rp-chart" class="rp-chart" role="group" aria-label="المبيعات يوماً بيوم"></div>
+</section>
+<div class="flex items-center gap-2 mb-3"><h3 class="font-bold text-[15px]">فواتير البيع بالفترة (<span id="invoices-count">0</span>)</h3><span id="rp-day-note" class="text-[12px] text-on-surface-variant"></span>
+<button type="button" id="rp-day-clear" class="hidden ms-auto h-9 px-3 rounded-full border border-outline-variant text-[12px] font-semibold" onclick="rpPickDay(null)">إلغاء فلتر اليوم ×</button></div>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden mb-6">
 <table class="w-full text-right text-[12px]">
 <thead class="bg-surface-container-low text-on-surface-variant"><tr>
-<th class="px-3 py-2">الفاتورة</th><th class="px-3 py-2">التاريخ</th><th class="px-3 py-2">طريقة الدفع</th><th class="px-3 py-2">المبلغ</th>
+<th class="px-3 py-2">الفاتورة</th><th class="px-3 py-2">التاريخ</th><th class="px-3 py-2 rp-wide">الزبون</th><th class="px-3 py-2">طريقة الدفع</th><th class="px-3 py-2 rp-wide">الوزن</th><th class="px-3 py-2 rp-wide rp-profit-col">الربح</th><th class="px-3 py-2">المبلغ</th>
 </tr></thead>
 <tbody id="invoices-tbody"></tbody>
+<tfoot id="invoices-tfoot"></tfoot>
 </table>
 <p id="invoices-empty" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد فواتير بيع بهذه الفترة.</p>
 </div>
 
+</div>
+<aside class="rp-side">
 <h3 class="font-bold text-[15px] mb-3">تحليل المصاريف بالفترة (<span id="expenses-total">0</span>)</h3>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="expenses-breakdown">
 <p class="text-center text-on-surface-variant text-sm py-4" id="expenses-empty">لا توجد مصاريف مسجّلة بهذه الفترة.</p>
+</div>
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mt-6">
+<h3 class="font-bold text-[15px] mb-2">ضريبة القيمة المضافة</h3>
+<div class="rp-kv"><span>ضريبة المبيعات</span><span class="font-data-mono" id="rp-vat-out">0.00</span></div>
+<div class="rp-kv"><span>ضريبة المشتريات</span><span class="font-data-mono" id="rp-vat-in">0.00</span></div>
+<div class="rp-kv" style="border:0;font-weight:700"><span>الصافي المستحق</span><span class="font-data-mono" id="rp-vat-net" style="color:#7A6640">0.00</span></div>
+<button type="button" class="text-[12.5px] font-bold mt-1" style="color:#7A6640" onclick="setPeriod('tax')">تفاصيل الإقرار الضريبي ←</button>
+</section>
+<section class="bg-surface-container-lowest border border-outline-variant rounded-xl px-4 py-2 mt-6">
+<h3 class="font-bold text-[15px] my-2">تقارير أخرى</h3>
+<a class="rp-lk" href="financial-report-ar.html"><span class="material-symbols-outlined">summarize</span>التقرير المالي الشامل</a>
+<a class="rp-lk rp-profit-link" href="profit-report-ar.html"><span class="material-symbols-outlined">trending_up</span>تقرير الربح التفصيلي</a>
+<a class="rp-lk" href="tax-report-ar.html"><span class="material-symbols-outlined">account_balance</span>الإقرار الضريبي</a>
+<a class="rp-lk" href="main-cashbox-ar.html"><span class="material-symbols-outlined">savings</span>الصندوق الرئيسي</a>
+<a class="rp-lk" href="invoices-archive-ar.html" style="border:0"><span class="material-symbols-outlined">inventory</span>الأرشيف الشامل</a>
+</section>
+</aside>
 </div>
 </div>
 
@@ -233,6 +297,14 @@ function computeRange(period) {
     start = new Date(now); start.setDate(now.getDate() - 7); start.setHours(0, 0, 0, 0);
   } else if (period === 'month') {
     start = new Date(now.getFullYear(), now.getMonth(), 1);
+  } else if (period === 'yesterday') {
+    start = new Date(now); start.setDate(now.getDate() - 1); start.setHours(0, 0, 0, 0);
+    end = new Date(start); end.setHours(23, 59, 59, 999);
+  } else if (period === 'lastMonth') {
+    start = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    end = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+  } else if (period === 'year') {
+    start = new Date(now.getFullYear(), 0, 1);
   } else {
     start = new Date(now); start.setHours(0, 0, 0, 0);
   }
@@ -277,7 +349,7 @@ async function loadReport() {
   const vatMultiplier = 1 + (vatRate / 100);
 
   const { data: invoices } = await goldmindClient
-    .from('invoices').select('id, store_id, invoice_number, type, payment_method, total_amount, created_at')
+    .from('invoices').select('id, store_id, invoice_number, type, payment_method, total_amount, created_at, customer:customer_id(name)')
     .in('store_id', SCOPE.ids()).eq('type', 'sale').neq('status', 'cancelled')
     .gte('created_at', rangeStart.toISOString()).lte('created_at', rangeEnd.toISOString())
     .order('created_at', { ascending: false });
@@ -294,6 +366,7 @@ async function loadReport() {
 
   // Weight sold + rough profit estimate, same methodology as profit-report-ar.html
   let totalWeight = 0, totalProfit = 0;
+  const perInv = {}; // invoice -> { w, p } for the table and the day chart
   if (salesInvoices.length > 0) {
     const invIds = salesInvoices.map(i => i.id);
     const { data: items } = await goldmindClient
@@ -306,6 +379,8 @@ async function loadReport() {
       const lp = gmLineProfit(it, false, vatMultiplier, priceMap); // shared formula (gm-profit.js); exchange lines come back negative
       totalWeight += lp.sign * (Number(it.weight_grams) || 0);
       totalProfit += lp.profit;
+      const pi = perInv[it.invoice_id] || (perInv[it.invoice_id] = { w: 0, p: 0 });
+      pi.w += lp.sign * (Number(it.weight_grams) || 0); pi.p += lp.profit;
     });
   }
 
@@ -365,21 +440,9 @@ async function loadReport() {
 
   document.getElementById('invoices-count').textContent = salesInvoices.length;
 
-  const PAYMENT_LABELS = { cash: 'نقدي', bank: 'فيزا/بنك', credit: 'دين', mixed: 'جزئي' };
-  const invTbody = document.getElementById('invoices-tbody');
-  if (salesInvoices.length === 0) {
-    invTbody.innerHTML = '';
-    document.getElementById('invoices-empty').classList.remove('hidden');
-  } else {
-    document.getElementById('invoices-empty').classList.add('hidden');
-    invTbody.innerHTML = salesInvoices.map(i => `
-      <tr class="border-t border-outline-variant">
-        <td class="px-3 py-2 font-data-mono">${gmEscapeHtml(i.invoice_number)}${SCOPE.multi() ? '<div class="text-[10px] text-on-surface-variant font-body-md">' + gmEscapeHtml(SCOPE.nameOf(i.store_id)) + '</div>' : ''}</td>
-        <td class="px-3 py-2">${gmFormatDateTime(i.created_at)}</td>
-        <td class="px-3 py-2">${PAYMENT_LABELS[i.payment_method] || i.payment_method}</td>
-        <td class="px-3 py-2 font-data-mono font-bold">${fmt(i.total_amount)}</td>
-      </tr>`).join('');
-  }
+  RP = { invoices: salesInvoices, perInv, day: null, showProfit: PROFIT_OK && (!SCOPE.multi() || PROFIT_ALL) };
+  rpChart();
+  rpTable();
 
   // Real expenses for the period
   const { data: expenses } = await goldmindClient
@@ -397,6 +460,7 @@ async function loadReport() {
 
   if (run !== REP_RUN) return;
   document.getElementById('expenses-total').textContent = fmt(totalExpenses);
+  document.getElementById('stat-expenses').textContent = fmt(totalExpenses);
   const expEl = document.getElementById('expenses-breakdown');
   const catNames = Object.keys(byCategory);
   if (catNames.length === 0) {
@@ -436,6 +500,9 @@ async function loadReport() {
   document.getElementById('tax-input').textContent = fmt(totalInputTax);
   document.getElementById('tax-input').classList.remove('text-outline');
   document.getElementById('tax-net').textContent = fmt(totalTax - totalInputTax);
+  document.getElementById('rp-vat-out').textContent = fmt(totalTax);
+  document.getElementById('rp-vat-in').textContent = fmt(totalInputTax);
+  document.getElementById('rp-vat-net').textContent = fmt(totalTax - totalInputTax);
 
   // Kept for the CSV export button
   window.__lastTaxExport = { taxRows, totalInputTax, totalTax, period: window.__currentPeriod || 'today' };
@@ -455,6 +522,68 @@ async function loadReport() {
       </tr>`).join('');
   }
 }
+
+// ---- period table + day chart (design "التقارير") ----
+let RP = null;
+const PAYMENT_LABELS = { cash: 'نقدي', bank: 'فيزا/بنك', credit: 'دين', mixed: 'جزئي' };
+const PAY_CHIP = { cash: ['#E3F1E4', '#1B5E20'], bank: ['#E3EDF8', '#1A4F8C'], credit: ['#FBE4E1', '#8A1D17'], mixed: ['#FDF0DC', '#8A4B08'] };
+// local day key (or month key for long periods) of a timestamp
+function rpKey(at, byMonth) { const d = new Date(at); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + (byMonth ? '' : '-' + String(d.getDate()).padStart(2, '0')); }
+function rpByMonth() { return (rangeEnd - rangeStart) / 86400000 > 62; }
+function rpTable() {
+  const byMonth = rpByMonth();
+  const list = RP.invoices.filter(i => !RP.day || rpKey(i.created_at, byMonth) === RP.day);
+  document.getElementById('invoices-count').textContent = list.length;
+  document.getElementById('rp-day-note').textContent = RP.day ? '· ' + (byMonth ? 'شهر ' : 'يوم ') + RP.day : '';
+  document.getElementById('rp-day-clear').classList.toggle('hidden', !RP.day);
+  document.querySelectorAll('.rp-profit-col').forEach(e => e.style.display = RP.showProfit ? '' : 'none');
+  const tbody = document.getElementById('invoices-tbody'), tfoot = document.getElementById('invoices-tfoot');
+  document.getElementById('invoices-empty').classList.toggle('hidden', list.length > 0);
+  if (!list.length) { tbody.innerHTML = ''; tfoot.innerHTML = ''; return; }
+  let sw = 0, sp = 0, sa = 0;
+  tbody.innerHTML = list.map(i => {
+    const x = RP.perInv[i.id] || { w: 0, p: 0 }, c = PAY_CHIP[i.payment_method] || ['#EFE7D2', '#5E4E30'];
+    sw += x.w; sp += x.p; sa += Number(i.total_amount || 0);
+    return `
+      <tr class="border-t border-outline-variant" style="box-shadow:inset -4px 0 0 #1E7D32">
+        <td class="px-3 py-2 font-data-mono"><a href="invoice-print-ar.html?id=${i.id}" class="underline decoration-dotted">${gmEscapeHtml(i.invoice_number)}</a>${SCOPE.multi() ? '<div class="text-[10px] text-on-surface-variant font-body-md">' + gmEscapeHtml(SCOPE.nameOf(i.store_id)) + '</div>' : ''}</td>
+        <td class="px-3 py-2">${gmFormatDateTime(i.created_at)}</td>
+        <td class="px-3 py-2 rp-wide">${gmEscapeHtml((i.customer && i.customer.name) || '—')}</td>
+        <td class="px-3 py-2"><span style="background:${c[0]};color:${c[1]};border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700">${PAYMENT_LABELS[i.payment_method] || gmEscapeHtml(i.payment_method || '')}</span></td>
+        <td class="px-3 py-2 font-data-mono rp-wide">${fmt(x.w)} غ</td>
+        <td class="px-3 py-2 font-data-mono rp-wide rp-profit-col" style="color:#1E7D32${RP.showProfit ? '' : ';display:none'}">${fmt(x.p)}</td>
+        <td class="px-3 py-2 font-data-mono font-bold">${fmt(i.total_amount)}</td>
+      </tr>`;
+  }).join('');
+  tfoot.innerHTML = `<tr class="border-t border-outline-variant" style="background:var(--gm-surface-low,#F7F2E6);font-weight:700">
+    <td class="px-3 py-2" colspan="2">المجموع</td><td class="rp-wide"></td><td></td>
+    <td class="px-3 py-2 font-data-mono rp-wide">${fmt(sw)} غ</td><td class="px-3 py-2 font-data-mono rp-wide rp-profit-col"${RP.showProfit ? '' : ' style="display:none"'}>${fmt(sp)}</td>
+    <td class="px-3 py-2 font-data-mono">${fmt(sa)}</td></tr>`;
+}
+function rpChart() {
+  const box = document.getElementById('rp-chart-box');
+  const days = (rangeEnd - rangeStart) / 86400000;
+  box.classList.toggle('hidden', days <= 1.01);
+  document.getElementById('rp-leg-profit').style.display = RP.showProfit ? '' : 'none';
+  if (days <= 1.01) return;
+  const byMonth = rpByMonth(), keys = [];
+  const d = new Date(rangeStart);
+  while (d <= rangeEnd) { const k = rpKey(d, byMonth); if (!keys.includes(k)) keys.push(k); if (byMonth) d.setMonth(d.getMonth() + 1, 1); else d.setDate(d.getDate() + 1); }
+  const sum = {};
+  RP.invoices.forEach(i => { const k = rpKey(i.created_at, byMonth), x = RP.perInv[i.id] || { p: 0 }; const b = sum[k] || (sum[k] = { s: 0, p: 0 }); b.s += Number(i.total_amount || 0); b.p += x.p; });
+  const max = Math.max(1, ...keys.map(k => (sum[k] || { s: 0 }).s));
+  document.getElementById('rp-chart').innerHTML = keys.map(k => {
+    const b = sum[k] || { s: 0, p: 0 }, label = byMonth ? k.slice(5) : String(Number(k.slice(8)));
+    return `<button type="button" class="rp-day${RP.day === k ? ' on' : ''}" data-k="${k}" onclick="rpPickDay('${k}')" aria-label="${k}: ${fmt(b.s)}" title="${k} — ${fmt(b.s)}">
+      <span class="bars"><i style="height:${(b.s / max * 100).toFixed(1)}%;background:#C8952E"></i>${RP.showProfit ? `<i style="height:${(Math.max(0, b.p) / max * 100).toFixed(1)}%;background:#1E7D32"></i>` : ''}</span><b>${label}</b></button>`;
+  }).join('');
+}
+function rpPickDay(k) {
+  RP.day = RP.day === k ? null : k;
+  document.querySelectorAll('.rp-day').forEach(b => b.classList.toggle('on', b.dataset.k === RP.day));
+  rpTable();
+}
+console.assert(rpKey('2026-10-05T10:00:00', false) === '2026-10-05' && rpKey('2026-10-05T10:00:00', true) === '2026-10', 'rpKey');
 
 function exportTaxCsv() {
   const data = window.__lastTaxExport;
@@ -502,6 +631,7 @@ async function load() {
   if (all.length > 1) { const pr = await gmReportBranches('view_profit_report'); PROFIT_ALL = all.every(b => pr.some(x => x.id === b.id)); }
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
+  document.querySelectorAll('.rp-profit-link').forEach(a => a.classList.toggle('hidden', !PROFIT_OK));
   setPeriod('today');
 }
 

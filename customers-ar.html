@@ -38,6 +38,35 @@
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
     .cat-chip { height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--gm-outline-variant); font-size: 13px; font-weight: 600; white-space: nowrap; }
     @media (max-width:1023px) { #add-btn { display: none !important; } }
+    .cu-side { display: none; }
+    @media (min-width:1024px) {
+      #page-content:not(.hidden) { display: grid !important; grid-template-columns: minmax(0,1fr) minmax(300px,360px); gap: 12px 18px; align-items: start; }
+      #page-content > * { grid-column: 1; }
+      #page-content > #cuSide { grid-column: 2; grid-row: 1 / span 20; position: sticky; top: 84px; display: flex; flex-direction: column; gap: 12px; }
+      #page-content > #cuSide.hidden { display: none; }
+      #sums { max-width: none; }
+      #list { background: var(--gm-surface-lowest,#fff); border: 1px solid var(--gm-outline-variant); border-radius: 14px; overflow: hidden; }
+    }
+    .cu-t { width: 100%; border-collapse: collapse; }
+    .cu-t th { padding: 9px 12px; text-align: right; font-size: 12px; font-weight: 700; color: var(--gm-on-surface-variant); background: #F7F2E6; border-bottom: 1px solid #E4DAC0; white-space: nowrap; }
+    .cu-t td { padding: 8px 12px; font-size: 13.5px; border-bottom: 1px solid #EFE7D2; white-space: nowrap; }
+    .cu-t tr[data-id] { cursor: pointer; }
+    .cu-t tr[data-id]:hover td { background: #FBF8F1; }
+    .cu-t tr.on td { background: #FBF8F1; }
+    .cu-t tr.on td:first-child { box-shadow: inset -4px 0 0 #1C1A16; }
+    .cu-tag { font-size: 10.5px; background: #EFE7D2; border-radius: 999px; padding: 2px 7px; }
+    .cu-age { border-radius: 999px; padding: 2px 8px; font-size: 11.5px; font-weight: 700; background: #FDF0DC; color: #8A4B08; }
+    .cu-age.old { background: #FBE4E1; color: #8A1D17; }
+    .cu-card { background: var(--gm-surface-lowest,#fff); border: 1px solid var(--gm-outline-variant); border-radius: 14px; padding: 14px 16px; }
+    .cu-card h2 { margin: 0 0 4px; font-size: 14px; font-weight: 700; }
+    .cu-tile { background: #F7F2E6; border-radius: 12px; padding: 8px 12px; }
+    .cu-tile span { display: block; font-size: 11px; color: #6B6355; }
+    .cu-tile b { display: block; font-size: 19px; }
+    .cu-tile.owe { background: #E8F3EA; } .cu-tile.owe span, .cu-tile.owe b { color: #1B5E20; }
+    .cu-tile.due { background: #FBE9E7; } .cu-tile.due span, .cu-tile.due b { color: #8A2A1E; }
+    .cu-act { height: 40px; border-radius: 10px; border: 1px solid #CBBF9E; background: #fff; font-size: 13px; font-weight: 700; color: #211D17; display: flex; align-items: center; justify-content: center; }
+    .cu-act.dark { background: #1C1A16; color: #FBF8F1; border-color: #1C1A16; }
+    .cu-kv { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #EFE7D2; }
     .cu-sum { background: var(--gm-surface-lowest,#fff); border: 1px solid var(--gm-outline-variant); border-radius: 14px; padding: 10px 12px; }
     .cu-sum span { display: block; font-size: 11.5px; color: var(--gm-on-surface-variant); }
     .cu-sum b { display: block; font-size: 19px; }
@@ -81,9 +110,12 @@
 <button type="button" data-b="debt" class="bal h-9 px-4 rounded-full border border-outline-variant font-semibold">عليهم دين</button>
 <button type="button" data-b="credit" class="bal h-9 px-4 rounded-full border border-outline-variant font-semibold">لهم رصيد</button>
 <button type="button" data-b="open" class="bal h-9 px-4 rounded-full border border-outline-variant font-semibold">لهم أو عليهم</button>
+<button type="button" data-b="old" class="bal h-9 px-4 rounded-full border border-outline-variant font-semibold">دين أقدم من 15 يوماً</button>
 </div>
 <div class="text-[12px] text-on-surface-variant" id="count"></div>
-<div id="list" class="flex flex-col gap-2 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-3"></div>
+<div id="list" class="flex flex-col gap-2"></div>
+<!-- computer: the picked customer beside the list (design "قائمة الزبائن") -->
+<aside id="cuSide" class="cu-side hidden" aria-live="polite"></aside>
 </div>
 </main>
 <nav class="gm-bottom-tabs"></nav>
@@ -101,7 +133,11 @@ document.querySelectorAll('.bal').forEach(b => b.addEventListener('click', () =>
 // tab = individuals or companies; chip = balance filter inside that tab
 // (balance > 0 = owes the shop, < 0 = the shop owes them)
 const KIND_OK = { person: c => !c.is_company, company: c => !!c.is_company };
-const BAL_OK = { all: () => true, debt: b => b > 0.005, credit: b => b < -0.005, open: b => Math.abs(b) > 0.005 };
+const BAL_OK = { all: () => true, debt: b => b > 0.005, credit: b => b < -0.005, open: b => Math.abs(b) > 0.005,
+  old: (b, c) => b > 0.005 && SINCE[c.id] && (Date.now() - new Date(SINCE[c.id])) / 86400000 >= 15 };
+let GOLD = {}, LAST = {}, MOVES = {}, PICK = null;
+const isDesk = () => window.matchMedia('(min-width:1024px)').matches;
+window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (CUSTOMERS.length) render(); });
 
 function render() {
   document.querySelectorAll('.kind, .bal').forEach(b => {
@@ -111,7 +147,7 @@ function render() {
   });
   const q = document.getElementById('q').value.trim().toLowerCase(), qd = digits(q);
   const list = CUSTOMERS.filter(c =>
-    KIND_OK[KIND](c) && BAL_OK[BALF](BAL[c.id] || 0) &&
+    KIND_OK[KIND](c) && BAL_OK[BALF](BAL[c.id] || 0, c) &&
     (!q || (c.name || '').toLowerCase().includes(q) || (qd.length >= 3 && digits(c.phone).includes(qd))));
   document.getElementById('count').textContent = list.length + (KIND === 'company' ? ' شركة' : ' زبون');
   // totals for this kind (individuals or companies), whatever the chip
@@ -119,6 +155,8 @@ function render() {
   CUSTOMERS.filter(KIND_OK[KIND]).forEach(c => { const b = BAL[c.id] || 0; if (b > 0.005) owed += b; else if (b < -0.005) credit -= b; });
   document.getElementById('sumOwed').textContent = fmt(owed) + ' ' + CUR;
   document.getElementById('sumCredit').textContent = fmt(credit) + ' ' + CUR;
+  if (isDesk()) { renderTable(list); return; }
+  document.getElementById('cuSide').classList.add('hidden');
   document.getElementById('list').innerHTML = list.slice(0, 300).map(c => {
     const b = BAL[c.id] || 0;
     const age = b > 0.005 && SINCE[c.id] ? Math.floor((Date.now() - new Date(SINCE[c.id])) / 86400000) : null;
@@ -153,6 +191,72 @@ function gmDebtSince(rows) {
 console.assert(JSON.stringify(gmDebtSince([{ customer_id: 'x', movement_type: 'debt_increase', cash_amount: 100, created_at: 'd1' },
   { customer_id: 'x', movement_type: 'debt_increase', cash_amount: 50, created_at: 'd2' }, { customer_id: 'x', movement_type: 'debt_decrease', cash_amount: 120, created_at: 'd3' }])) === '{"x":"d2"}', 'gmDebtSince FIFO');
 
+// computer: one table, largest debt first; a click shows the customer beside it, a double click opens the account
+function ageOf(c) { return (BAL[c.id] || 0) > 0.005 && SINCE[c.id] ? Math.floor((Date.now() - new Date(SINCE[c.id])) / 86400000) : null; }
+const dm = at => at ? new Date(at).toLocaleDateString('en-GB', { day: '2-digit', month: '2-digit' }) : '—';
+function balCell(b) {
+  return Math.abs(b) > 0.005
+    ? `<b class="font-data-mono ${b > 0 ? 'text-success' : 'text-error'}">${fmt(Math.abs(b))}</b> <span class="text-[11px] ${b > 0 ? 'text-success' : 'text-error'}">${b > 0 ? 'لنا' : 'علينا'}</span>`
+    : '<span class="font-data-mono text-on-surface-variant">0.00</span> <span class="text-[11px] text-on-surface-variant">مسدَّد</span>';
+}
+function renderTable(list) {
+  const rows = list.slice().sort((a, b) => (BAL[b.id] || 0) - (BAL[a.id] || 0)).slice(0, 500);
+  if (!rows.length) { document.getElementById('list').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد زبائن مطابقون.</p>'; document.getElementById('cuSide').classList.add('hidden'); return; }
+  if (!PICK || !rows.some(c => c.id === PICK)) PICK = rows[0].id;
+  document.getElementById('list').innerHTML = `<table class="cu-t"><thead><tr><th>الزبون</th><th>الهاتف</th><th>آخر حركة</th><th>عمر الدين</th><th>ذهب</th><th style="text-align:left">الرصيد</th></tr></thead><tbody>` +
+    rows.map(c => {
+      const a = ageOf(c), g = GOLD[c.id] || 0;
+      return `<tr data-id="${c.id}" class="${c.id === PICK ? 'on' : ''}" tabindex="0">
+        <td><span class="flex items-center gap-2.5"><span class="cu-av" style="width:34px;height:34px;font-size:13px">${esc(gmInitials(c.name))}</span><b>${esc(c.name)}</b>${c.is_company ? ' <span class="cu-tag">شركة</span>' : ''}</span></td>
+        <td class="font-data-mono" dir="ltr" style="text-align:right">${esc(c.phone || '')}</td>
+        <td class="font-data-mono">${dm(LAST[c.id])}</td>
+        <td>${a != null ? `<span class="cu-age${a >= 30 ? ' old' : ''}">${a} يوماً</span>` : '—'}</td>
+        <td class="font-data-mono">${Math.abs(g) > 0.0005 ? fmt(Math.abs(g)) + ' غ' : '—'}</td>
+        <td style="text-align:left">${balCell(BAL[c.id] || 0)}</td></tr>`;
+    }).join('') + '</tbody></table><p class="text-[12px] text-on-surface-variant px-3 py-2">الضغط على السطر يعرض الزبون بالجنب؛ الضغط مرتين يفتح حسابه الكامل.</p>';
+  renderSide();
+}
+function renderSide() {
+  const c = CUSTOMERS.find(x => x.id === PICK), el = document.getElementById('cuSide');
+  if (!c) { el.classList.add('hidden'); return; }
+  const b = BAL[c.id] || 0, g = GOLD[c.id] || 0;
+  const wa = c.phone ? gmWhatsAppUrl(c.phone, null, 'مرحباً ' + c.name + '، رصيد حسابكم لدينا: ' + fmt(Math.abs(b)) + ' ' + CUR) : '';
+  const LBL = { payment: 'دفعة', discount: 'خصم على الدين', cash_out: 'صرف مبلغ', deposit: 'عربون', deposit_refund: 'استرجاع عربون', opening_balance: 'رصيد سابق' };
+  const moves = (MOVES[c.id] || []).slice(-3).reverse();
+  el.innerHTML = `<section class="cu-card">
+      <div class="flex items-center gap-3"><span class="cu-av" style="width:48px;height:48px;font-size:19px">${esc(gmInitials(c.name))}</span>
+      <div class="min-w-0"><div class="font-bold text-[17px] truncate">${esc(c.name)}</div><div class="font-data-mono text-[12.5px] text-on-surface-variant" dir="ltr" style="text-align:right">${esc(c.phone || '')}</div></div></div>
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        <div class="cu-tile ${b > 0.005 ? 'owe' : b < -0.005 ? 'due' : ''}"><span>نقدي${b > 0.005 ? ' — لنا عنده' : b < -0.005 ? ' — علينا له' : ''}</span><b class="font-data-mono">${fmt(Math.abs(b))}</b></div>
+        <div class="cu-tile"><span>ذهب (عيار 24)</span><b class="font-data-mono">${fmt(Math.abs(g))} غ</b></div>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        <a class="cu-act dark" href="customer-debts-ar.html?open=${c.id}&pay=1">+ دفعة</a>
+        <a class="cu-act" href="new-sale-ar.html?customer=${c.id}">فاتورة بيع</a>
+        <a class="cu-act" href="customer-debts-print-ar.html?id=${c.id}">كشف حساب</a>
+        ${wa ? `<a class="cu-act" href="${esc(wa)}" target="_blank" rel="noopener">واتساب</a>` : '<span class="cu-act" aria-disabled="true" style="opacity:.45">واتساب</span>'}
+      </div>
+      <a href="customer-debts-ar.html?open=${c.id}" class="block text-center mt-3 text-[13px] font-bold" style="color:#7A6640">فتح الحساب الكامل ←</a>
+    </section>
+    <section class="cu-card"><h2>آخر الحركات</h2>${moves.length ? moves.map(m => `<div class="cu-kv"><span><span class="font-data-mono text-on-surface-variant">${dm(m.created_at)}</span> ${esc(m.source && LBL[m.source] ? LBL[m.source] : m.movement_type === 'debt_increase' ? 'بيع / دين' : 'دفعة')}</span><span class="font-data-mono ${m.movement_type === 'debt_increase' ? '' : 'text-success'}">${m.movement_type === 'debt_increase' ? '+' : '−'}${fmt(m.cash_amount)}</span></div>`).join('') : '<p class="text-[12.5px] text-on-surface-variant py-1">لا توجد حركات على الحساب.</p>'}</section>
+    <section class="cu-card"><h2>البيانات</h2>
+      ${c.id_number ? `<div class="cu-kv"><span class="text-on-surface-variant">الهوية</span><span class="font-data-mono">${esc(c.id_number)}${c.id_expiry_date ? ' · تنتهي ' + esc(c.id_expiry_date) : ''}</span></div>` : ''}
+      ${c.nationality ? `<div class="cu-kv"><span class="text-on-surface-variant">الجنسية</span><span>${esc(c.nationality)}</span></div>` : ''}
+      ${c.tax_number ? `<div class="cu-kv"><span class="text-on-surface-variant">الرقم الضريبي</span><span class="font-data-mono" dir="ltr">${esc(c.tax_number)}</span></div>` : ''}
+      <div class="cu-kv" style="border:0"><span class="text-on-surface-variant">زبون منذ</span><span class="font-data-mono">${c.created_at ? new Date(c.created_at).getFullYear() : '—'}</span></div>
+      ${CAN_EDIT ? `<a href="customer-edit-ar.html?id=${c.id}" class="text-[12.5px] font-bold" style="color:#7A6640">تعديل البيانات</a>` : ''}
+    </section>`;
+  el.classList.remove('hidden');
+}
+document.getElementById('list').addEventListener('click', e => {
+  const tr = e.target.closest('tr[data-id]'); if (!tr) return;
+  PICK = tr.dataset.id;
+  document.querySelectorAll('.cu-t tr[data-id]').forEach(r => r.classList.toggle('on', r.dataset.id === PICK));
+  renderSide();
+});
+document.getElementById('list').addEventListener('dblclick', e => { const tr = e.target.closest('tr[data-id]'); if (tr) location.href = 'customer-debts-ar.html?open=' + tr.dataset.id; });
+document.getElementById('list').addEventListener('keydown', e => { const tr = e.target.closest('tr[data-id]'); if (tr && e.key === 'Enter') location.href = 'customer-debts-ar.html?open=' + tr.dataset.id; });
+
 (async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
@@ -160,8 +264,8 @@ console.assert(JSON.stringify(gmDebtSince([{ customer_id: 'x', movement_type: 'd
   const [{ data: me }, { data: store }, cust, debts] = await Promise.all([
     goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
     goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
-    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone, is_company').in('store_id', __orgIds).order('name')),
-    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount, created_at').in('store_id', __orgIds).order('created_at'))
+    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone, is_company, id_number, id_expiry_date, nationality, tax_number, created_at').in('store_id', __orgIds).order('name')),
+    gmFetchAllRows(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, source, created_at').or('source.is.null,source.neq.allocation').in('store_id', __orgIds).order('created_at'))
   ]);
   document.getElementById('loading-state').classList.add('hidden');
   const perms = (me && me.permissions) || {}, owner = me && me.role === 'owner';
@@ -172,6 +276,11 @@ console.assert(JSON.stringify(gmDebtSince([{ customer_id: 'x', movement_type: 'd
   CUR = ({ AED: 'AED', USD: 'USD', SAR: 'SAR', SYP: 'SYP' })[code] || code;
   CUSTOMERS = cust.data || [];
   SINCE = gmDebtSince(debts.data || []);
+  (debts.data || []).forEach(m => {
+    GOLD[m.customer_id] = (GOLD[m.customer_id] || 0) + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.gold_grams_24k || 0);
+    if (!LAST[m.customer_id] || m.created_at > LAST[m.customer_id]) LAST[m.customer_id] = m.created_at;
+    (MOVES[m.customer_id] || (MOVES[m.customer_id] = [])).push(m);
+  });
   (debts.data || []).forEach(m => { BAL[m.customer_id] = (BAL[m.customer_id] || 0) + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0); });
   document.getElementById('page-content').classList.remove('hidden');
   render();

@@ -395,6 +395,8 @@ async function load() {
   const openId = new URLSearchParams(window.location.search).get('open');
   if (openId && customers.some(c => c.id === openId)) {
     showCustomerDetail(openId);
+    // "+ دفعة" from the customers list opens the payment form straight away
+    if (new URLSearchParams(window.location.search).get('pay') === '1') { toggleSettleForm(); document.getElementById('settle-amount').focus(); }
   } else {
     gmReplace('customers-ar.html');
   }

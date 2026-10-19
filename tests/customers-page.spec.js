@@ -117,3 +117,29 @@ test('customers list: totals for us / for them, and how old the oldest unpaid de
   await expect(page.locator('#add-fab')).not.toHaveClass(/\bhidden\b/);
   await expect(page.locator('nav.gm-bottom-tabs a.gm-tab-on')).toHaveText(/الزبائن/);
 });
+
+test('customers on the computer: a table (largest debt first) and the picked customer beside it', async ({ page }) => {
+  const ago = d => new Date(Date.now() - d * 86400000).toISOString();
+  await install(page, { db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ريما', phone: '0944', is_company: false, nationality: 'سورية' },
+                { id: 'c2', store_id: STORE, name: 'هلا', phone: '0955', is_company: false }],
+    customer_debts: [
+      { store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', cash_amount: 100, created_at: ago(20) },
+      { store_id: STORE, customer_id: 'c2', movement_type: 'debt_increase', cash_amount: 900, created_at: ago(3) }],
+  } });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/customers-ar.html');
+  const rows = page.locator('#list tr[data-id]');
+  await expect(rows).toHaveCount(2);
+  await expect(rows.first()).toHaveAttribute('data-id', 'c2');               // 900 before 100
+  await expect(page.locator('#cuSide')).toContainText('هلا');
+  await rows.nth(1).click();
+  await expect(page.locator('#cuSide')).toContainText('سورية');
+  await expect(page.locator('#cuSide a', { hasText: 'فاتورة بيع' })).toHaveAttribute('href', 'new-sale-ar.html?customer=c1');
+  await page.click('.bal[data-b="old"]');                                   // only debts older than 15 days
+  await expect(rows).toHaveCount(1);
+  await expect(rows.first()).toContainText('20 يوماً');
+});
