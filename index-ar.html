@@ -537,21 +537,18 @@
   .dsk-action.gold::after{display:none}
   
   .dsk-action .dsk-action-label,.dsk-action.primary .dsk-action-label,.dsk-action.gold .dsk-action-label{color:var(--dsk-ink,#211D17);font-size:13px}
-  /* glossy icon tile (phone + computer): gradient, gloss, moving shine, mirror reflection */
-  .gm-gi{position:relative;width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;flex:none;border:0;
-    box-shadow:0 0 0 1px rgba(255,255,255,.55) inset,0 12px 20px -10px rgba(0,0,0,.6),0 2px 0 rgba(255,255,255,.35) inset,0 -10px 16px rgba(0,0,0,.28) inset,0 0 0 1px rgba(0,0,0,.08);
-    -webkit-box-reflect:below 2px linear-gradient(transparent 62%,rgba(255,255,255,.45));
-    backface-visibility:hidden;will-change:transform;animation:gmFloat 4.5s ease-in-out infinite}
-  .gm-gi::before{content:'';position:absolute;left:6%;right:6%;top:3%;height:48%;border-radius:20px 20px 50% 50%/20px 20px 14px 14px;background:linear-gradient(rgba(255,255,255,.95),rgba(255,255,255,.35) 55%,rgba(255,255,255,0));z-index:1;pointer-events:none}
-  .gm-gi::after{content:'';position:absolute;top:-30%;bottom:-30%;width:40%;left:-80%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.95) 50%,transparent);transform:skewX(-20deg);animation:gmShine 3.2s cubic-bezier(.65,0,.35,1) infinite;z-index:2;pointer-events:none}
-  .gm-gi .spec{position:absolute;width:9px;height:9px;border-radius:50%;background:#fff;top:16%;right:18%;box-shadow:0 0 8px 3px rgba(255,255,255,.9);z-index:3;animation:gmTwinkle 3.2s ease-in-out infinite}
+  /* icon tile (approved style 5, 2026-10-20): charcoal 3D square, the symbol glows in its own colour, a coloured line under it, mirror reflection */
+  .gm-gi{position:relative;width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center;flex:none;border:0;
+    color:color-mix(in srgb,var(--c,#C8952E) 55%,#fff);
+    background:radial-gradient(120% 90% at 50% 0%,#36312A,#171410 60%,#0C0A08);
+    box-shadow:0 0 0 1px color-mix(in srgb,var(--c,#C8952E) 55%,transparent) inset,0 1px 0 rgba(255,255,255,.14) inset,0 -10px 14px color-mix(in srgb,var(--c,#C8952E) 22%,transparent) inset,0 12px 18px -10px rgba(0,0,0,.7);
+    -webkit-box-reflect:below 3px linear-gradient(transparent 58%,rgba(255,255,255,.42));backface-visibility:hidden}
+  .gm-gi::before{content:'';position:absolute;inset:2px 7px auto;height:40%;border-radius:16px 16px 50% 50%/16px 16px 10px 10px;background:linear-gradient(rgba(255,255,255,.10),rgba(255,255,255,0));pointer-events:none}
+  .gm-gi::after{content:'';position:absolute;bottom:7px;inset-inline:30%;height:2px;border-radius:2px;background:var(--c,#C8952E);box-shadow:0 0 8px var(--c,#C8952E);pointer-events:none}
   .gm-gi svg{shape-rendering:geometricPrecision}
-  .gm-gi svg,.gm-gi .material-symbols-outlined{position:relative;z-index:2;filter:drop-shadow(0 1px 1px rgba(0,0,0,.45)) drop-shadow(0 0 6px rgba(255,255,255,.35))}
+  .gm-gi svg,.gm-gi .material-symbols-outlined{position:relative;z-index:1;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--c,#C8952E) 70%,transparent))}
   .gm-gi .material-symbols-outlined{font-size:28px!important}
-  @keyframes gmTwinkle{0%,100%{opacity:.35;transform:scale(.7)}50%{opacity:1;transform:scale(1.1)}}
   @keyframes gmShine{0%,60%{left:-70%}100%{left:140%}}
-  @keyframes gmFloat{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-3px,0)}}
-  @media (prefers-reduced-motion:reduce){.gm-gi,.gm-gi::after,.gm-gi .spec{animation:none!important}}
   /* today's movements, coloured by kind */
   .dsk-mv{width:100%;border-collapse:collapse}
   .dsk-mv th{padding:9px 12px;text-align:right;font-size:12px;font-weight:700;color:#6B6355;background:#F7F2E6;border-bottom:1px solid #E4DAC0}
@@ -921,18 +918,6 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 // Actions without their own entry get the champagne tile with their Material icon.
 (function () {
   var S = function (p) { return '<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' + p + '</svg>'; };
-  var G = {
-    gold: 'linear-gradient(150deg,#F6DE9A,#C8952E 55%,#7E5A14)',
-    rose: 'linear-gradient(150deg,#F9DCCF,#C9836B 52%,#7A4635)',
-    blue: 'linear-gradient(150deg,#8FC2F2,#1F64B0 55%,#0E3866)',
-    red: 'linear-gradient(150deg,#F3A59B,#C0392B 55%,#6E1C14)',
-    chrome: 'linear-gradient(160deg,#FFFFFF 0%,#C9CFD6 30%,#6B737D 58%,#D8DDE3 78%,#8E969F 100%)',
-    teal: 'linear-gradient(150deg,#86E0D4,#0F8478 55%,#064942)',
-    amber: 'linear-gradient(150deg,#FFC98A,#D9731A 55%,#7A3A06)',
-    steel: 'linear-gradient(150deg,#C7CED8,#56657A 55%,#252E3B)',
-    champagne: 'linear-gradient(150deg,#FFF3D1,#D9B97A 50%,#8C6A2E)',
-    navy: 'linear-gradient(150deg,#9DB4E0,#26457F 52%,#0D1F42)'
-  };
   var SVG = {
     cart: S('<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l3 12h11l2-8H6"/>'),
     cash: S('<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 9.5v.01M18 14.5v.01"/>'),
@@ -950,8 +935,10 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
     merchantLedger: ['chrome', 'store', true], addCustomer: ['teal', 'person'], repairs: ['amber', 'wrench'], inventoryCount: ['steel', 'count'],
     customize: ['champagne', 'sliders']
   };
+  // each icon's own colour (style 5: it glows on a charcoal square)
+  var BASE = { gold: '#C8952E', rose: '#C27A5E', blue: '#2F7BD1', red: '#D2453A', chrome: '#8A94A3', teal: '#14A394', amber: '#D9731A', steel: '#5B7BA6', champagne: '#C9AE7C', navy: '#3E66B3' };
   // soft tint of each icon's colour for the frame around icon + name
-  var TINT = { gold: '#F6EBD0', rose: '#F6E3DB', blue: '#E1EBF7', red: '#F7E0DC', chrome: '#ECEEF1', teal: '#DDF1EE', amber: '#FBEBD9', steel: '#E5E9EF', champagne: '#F5EEDD', navy: '#E2E7F2' };
+  var TINT = { gold: '#F4EFE4', rose: '#F4EFE4', blue: '#F4EFE4', red: '#F4EFE4', chrome: '#F4EFE4', teal: '#F4EFE4', amber: '#F4EFE4', steel: '#F4EFE4', champagne: '#F4EFE4', navy: '#F4EFE4' };
   window.GM_TINT = function (id, phone) {
     var m = MAP[id] || ['champagne'];
     return TINT[m[0]];
@@ -960,7 +947,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
     var m = MAP[id] || ['champagne', null];
     // same colours on the phone and the computer
     var sym = m[1] ? SVG[m[1]] : '<span class="material-symbols-outlined">' + materialIcon + '</span>';
-    return '<span class="gm-gi" style="background:' + G[m[0]] + ';color:' + (m[2] ? '#2A2F36' : '#fff') + '"><span class="spec" aria-hidden="true"></span>' + sym + '</span>';
+    return '<span class="gm-gi" style="--c:' + BASE[m[0]] + '">' + sym + '</span>';
   };
 })();
 (function () {
