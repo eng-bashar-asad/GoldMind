@@ -528,15 +528,20 @@
   .dsk-stat-dark .dsk-stat-ic{background:rgba(255,255,255,.1);color:#E9CF8B;box-shadow:none}
   .dsk-sub-num{display:inline-block;font-weight:700}
   /* quick actions: one white card with glossy icons */
-  .dsk-action-strip{background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:18px;padding:20px 16px 34px;grid-template-columns:repeat(auto-fill,minmax(96px,1fr));gap:18px 10px}
-  .dsk-action,.dsk-action.primary,.dsk-action.gold{background:transparent;border:0;box-shadow:none;padding:4px;gap:22px}
+  .dsk-action-strip{background:var(--dsk-surface);border:1px solid var(--dsk-line-soft);border-radius:18px;padding:16px;grid-template-columns:repeat(auto-fill,minmax(112px,1fr));gap:12px}
+  /* every quick action sits in the same frame (icon + name), tinted with its icon colour */
+  .dsk-action,.dsk-action.primary,.dsk-action.gold,html[data-gm-theme] .dsk-action.gold{
+    background:linear-gradient(180deg,#FFFFFF 0%,var(--qa-tint,#F7F2E6) 100%)!important;border:1px solid rgba(28,26,22,.08);border-radius:20px;
+    box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 8px 18px -10px rgba(28,26,22,.35);padding:16px 8px 14px;gap:20px}
+  .dsk-action:hover{transform:translateY(-2px)!important;box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 14px 24px -12px rgba(28,26,22,.4)!important}
   .dsk-action.gold::after{display:none}
-  .dsk-action:hover{transform:none;box-shadow:none}
+  
   .dsk-action .dsk-action-label,.dsk-action.primary .dsk-action-label,.dsk-action.gold .dsk-action-label{color:var(--dsk-ink,#211D17);font-size:13px}
   /* glossy icon tile (phone + computer): gradient, gloss, moving shine, mirror reflection */
   .gm-gi{position:relative;width:64px;height:64px;border-radius:20px;display:flex;align-items:center;justify-content:center;color:#fff;overflow:hidden;flex:none;border:1px solid rgba(255,255,255,.55);
     box-shadow:0 12px 20px -10px rgba(0,0,0,.6),0 2px 0 rgba(255,255,255,.35) inset,0 -10px 16px rgba(0,0,0,.28) inset,0 0 0 1px rgba(0,0,0,.08);
-    -webkit-box-reflect:below 2px linear-gradient(transparent 62%,rgba(255,255,255,.45));animation:gmFloat 4.5s ease-in-out infinite}
+    -webkit-box-reflect:below 2px linear-gradient(transparent 62%,rgba(255,255,255,.45));
+    backface-visibility:hidden;will-change:transform;animation:gmFloat 4.5s ease-in-out infinite}
   .gm-gi::before{content:'';position:absolute;left:6%;right:6%;top:3%;height:48%;border-radius:20px 20px 50% 50%/20px 20px 14px 14px;background:linear-gradient(rgba(255,255,255,.95),rgba(255,255,255,.35) 55%,rgba(255,255,255,0));z-index:1;pointer-events:none}
   .gm-gi::after{content:'';position:absolute;top:-30%;bottom:-30%;width:40%;left:-80%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.95) 50%,transparent);transform:skewX(-20deg);animation:gmShine 3.2s cubic-bezier(.65,0,.35,1) infinite;z-index:2;pointer-events:none}
   .gm-gi .spec{position:absolute;width:9px;height:9px;border-radius:50%;background:#fff;top:16%;right:18%;box-shadow:0 0 8px 3px rgba(255,255,255,.9);z-index:3;animation:gmTwinkle 3.2s ease-in-out infinite}
@@ -544,7 +549,7 @@
   .gm-gi .material-symbols-outlined{font-size:28px!important}
   @keyframes gmTwinkle{0%,100%{opacity:.35;transform:scale(.7)}50%{opacity:1;transform:scale(1.1)}}
   @keyframes gmShine{0%,60%{left:-70%}100%{left:140%}}
-  @keyframes gmFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-3px)}}
+  @keyframes gmFloat{0%,100%{transform:translate3d(0,0,0)}50%{transform:translate3d(0,-3px,0)}}
   @media (prefers-reduced-motion:reduce){.gm-gi,.gm-gi::after,.gm-gi .spec{animation:none!important}}
   /* today's movements, coloured by kind */
   .dsk-mv{width:100%;border-collapse:collapse}
@@ -618,8 +623,10 @@
 .gm-chip-btn{display:flex;align-items:center;gap:6px;height:36px;padding:0 14px;border-radius:18px;border:1px solid #C9B98F;font-size:13px;font-weight:600;color:#1F1A12;background:transparent}
 /* dark-canvas themes (الخمري، الفولاذي): text sitting straight on the page background turns light */
 /* phone home (design "MHome"): glossy quick actions, shine on the dark cash card */
-.gm-qg{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;font-size:11.5px;font-weight:700;line-height:1.25;color:#211D17;background:transparent;border:0;padding:0;min-width:0}
+.gm-qg{display:flex;flex-direction:column;align-items:center;gap:16px;text-align:center;font-size:11.5px;font-weight:700;line-height:1.25;color:#211D17;background:transparent;border:0;padding:0;min-width:0}
 .gm-qg .gm-gi{width:56px;height:56px;border-radius:18px}
+.gm-qg{background:linear-gradient(180deg,#FFFFFF 0%,var(--qa-tint,#F7F2E6) 100%);border:1px solid rgba(28,26,22,.08);border-radius:18px;padding:10px 2px 9px;box-shadow:0 1px 0 rgba(255,255,255,.9) inset,0 6px 14px -9px rgba(28,26,22,.35)}
+html:not(.gm-light-canvas) .gm-qg{color:#211D17}
 .gm-qg{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
 #mobActionStrip.gm-arrange .gm-qg[data-id]{touch-action:none;animation:gmWiggle .28s ease-in-out infinite alternate}
 #mobActionStrip.gm-arrange .gm-qg[data-id]:nth-child(2n){animation-delay:.14s}
@@ -629,7 +636,6 @@
 @keyframes gmWiggle{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
 @media (prefers-reduced-motion: reduce){#mobActionStrip.gm-arrange .gm-qg[data-id]{animation:none;outline:2px dashed #C9B98F;outline-offset:2px;border-radius:14px}}
 .gm-qg .gm-gi svg{width:24px;height:24px}
-html:not(.gm-light-canvas) .gm-qg{color:#F7EFE9}
 .gm-hero{position:relative;overflow:hidden}
 
 .gm-hero::after{content:'';position:absolute;top:-40%;bottom:-40%;width:30%;left:-60%;background:linear-gradient(100deg,transparent,rgba(233,207,139,.22) 50%,transparent);transform:skewX(-18deg);animation:gmShine 7s ease-in-out infinite;pointer-events:none}
@@ -905,7 +911,8 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
     teal: 'linear-gradient(150deg,#86E0D4,#0F8478 55%,#064942)',
     amber: 'linear-gradient(150deg,#FFC98A,#D9731A 55%,#7A3A06)',
     steel: 'linear-gradient(150deg,#C7CED8,#56657A 55%,#252E3B)',
-    champagne: 'linear-gradient(150deg,#FFF3D1,#D9B97A 50%,#8C6A2E)'
+    champagne: 'linear-gradient(150deg,#FFF3D1,#D9B97A 50%,#8C6A2E)',
+    navy: 'linear-gradient(150deg,#9DB4E0,#26457F 52%,#0D1F42)'
   };
   var SVG = {
     cart: S('<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l3 12h11l2-8H6"/>'),
@@ -920,9 +927,16 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
   };
   // id -> [gradient, svg key or null, dark symbol?]
   var MAP = {
-    newSale: ['gold', 'cart'], cashbox: ['rose', 'cash'], stockIn: ['blue', 'stockIn'], salesReturn: ['red', 'ret'],
+    newSale: ['navy', 'cart'], cashbox: ['rose', 'cash'], stockIn: ['blue', 'stockIn'], salesReturn: ['red', 'ret'],
     merchantLedger: ['chrome', 'store', true], addCustomer: ['teal', 'person'], repairs: ['amber', 'wrench'], inventoryCount: ['steel', 'count'],
     customize: ['champagne', 'sliders']
+  };
+  // soft tint of each icon's colour for the frame around icon + name
+  var TINT = { gold: '#F6EBD0', rose: '#F6E3DB', blue: '#E1EBF7', red: '#F7E0DC', chrome: '#ECEEF1', teal: '#DDF1EE', amber: '#FBEBD9', steel: '#E5E9EF', champagne: '#F5EEDD', navy: '#E2E7F2' };
+  window.GM_TINT = function (id, phone) {
+    var m = MAP[id] || ['champagne'];
+    if (phone && id === 'cashbox') m = ['gold']; if (phone && id === 'addCustomer') m = ['rose'];
+    return TINT[m[0]];
   };
   window.GM_GLOSS = function (id, materialIcon, phone) {
     var m = MAP[id] || ['champagne', null];
@@ -997,7 +1011,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
       if (!a) return '';
       var permAttr = a.permission ? ' data-permission="' + a.permission + '"' : '';
       var cls = 'dsk-action quick-action-icon' + (a.primary ? ' primary' : '') + (a.gold ? ' gold' : '');
-      var style = (a.primary || a.gold) ? '' : ' style="--dsk-act-tint:' + a.tint + ';--dsk-act-ink:' + a.ink + ';"';
+      var style = ' style="--qa-tint:' + window.GM_TINT(a.id) + '"';
       return '<a class="' + cls + '" href="' + a.href + '"' + permAttr + style + '>'
         + window.GM_GLOSS(a.id, a.icon)
         + '<span class="dsk-action-label">' + a.label + '</span></a>';
@@ -1212,7 +1226,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <button type="button" id="mobArrangeDone" class="gm-chip-btn hidden" style="background:#1C1A16;color:#FBF8F1;border-color:#1C1A16">تم الترتيب</button>
 <button type="button" id="mobCustomizeBtn" class="gm-chip-btn hidden"><span class="material-symbols-outlined" style="font-size:18px;">tune</span>تخصيص</button>
 </div>
-<div class="grid grid-cols-4 gap-x-1.5 gap-y-6 pb-3" id="mobActionStrip"></div>
+<div class="grid grid-cols-4 gap-2 pb-3" id="mobActionStrip"></div>
 <p class="text-[11.5px] text-on-surface-variant mt-1" id="mobArrangeHint">اضغط مطوّلاً على أيقونة واسحبها لتغيير مكانها.</p>
 </section>
 
@@ -1290,13 +1304,14 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 
   // glossy tile (design "MHome"); the last tile opens «تخصيص»
   function tileHtml(a) {
-    return '<a class="quick-action-icon gm-qg" draggable="false" data-id="' + a.id + '" href="' + a.href + '"' + (a.permission ? ' data-permission="' + a.permission + '"' : '') + '>'
+    return '<a class="quick-action-icon gm-qg" draggable="false" style="--qa-tint:' + window.GM_TINT(a.id, true) + '" data-id="' + a.id + '" href="' + a.href + '"' + (a.permission ? ' data-permission="' + a.permission + '"' : '') + '>'
       + window.GM_GLOSS(a.id, a.icon, true) + '<span>' + a.label + '</span></a>';
   }
 
   function renderStrip() {
     stripEl.innerHTML = allowedIds(selection).map(function (id) { return tileHtml(byId(id)); }).join('')
       + '<button type="button" class="gm-qg gm-qg-cust" onclick="document.getElementById(\'mobCustomizeBtn\').click()">' + window.GM_GLOSS('customize', 'tune', true) + '<span>تخصيص</span></button>';
+    stripEl.lastElementChild.style.setProperty('--qa-tint', window.GM_TINT('customize', true));
   }
 
   // ---- press and hold an icon, then drag it to a new place (each staff member keeps his own order) ----
