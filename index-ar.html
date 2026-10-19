@@ -574,6 +574,24 @@
   .dsk-pend{display:flex;gap:10px;align-items:center;padding:9px 14px;border-bottom:1px solid var(--dsk-line-soft);color:#211D17;font-size:13px;text-decoration:none}
   .dsk-pend:last-child{border-bottom:0}
   .dsk-pend b{width:32px;height:32px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex:none}
+  /* cursor spotlight on the computer cards (idea from React Bits "Spotlight Card") */
+  .dsk-stat,.dsk-action{position:relative;overflow:hidden}
+  .dsk-stat::before,.dsk-action::before{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none;opacity:0;transition:opacity .25s;
+    background:radial-gradient(220px circle at var(--mx,50%) var(--my,50%),rgba(217,180,90,.22),transparent 60%)}
+  .dsk-stat:hover::before,.dsk-action:hover::before{opacity:1}
+  .dsk-stat-dark::before{background:radial-gradient(240px circle at var(--mx,50%) var(--my,50%),rgba(233,207,139,.18),transparent 60%)}
+  .dsk-stat>*,.dsk-action>*{position:relative}
+  /* rows and tiles come in one after another (idea from React Bits "Animated List") */
+  .dsk-action-strip>*,#mobActionStrip>*,.dsk-mv tbody tr{animation:dskRiseIn .4s cubic-bezier(.22,1,.36,1) both}
+  .dsk-action-strip>*:nth-child(2),#mobActionStrip>*:nth-child(2),.dsk-mv tbody tr:nth-child(2){animation-delay:.04s}
+  .dsk-action-strip>*:nth-child(3),#mobActionStrip>*:nth-child(3),.dsk-mv tbody tr:nth-child(3){animation-delay:.08s}
+  .dsk-action-strip>*:nth-child(4),#mobActionStrip>*:nth-child(4),.dsk-mv tbody tr:nth-child(4){animation-delay:.12s}
+  .dsk-action-strip>*:nth-child(5),#mobActionStrip>*:nth-child(5),.dsk-mv tbody tr:nth-child(5){animation-delay:.16s}
+  .dsk-action-strip>*:nth-child(6),#mobActionStrip>*:nth-child(6),.dsk-mv tbody tr:nth-child(6){animation-delay:.2s}
+  .dsk-action-strip>*:nth-child(7),#mobActionStrip>*:nth-child(7),.dsk-mv tbody tr:nth-child(7){animation-delay:.24s}
+  .dsk-action-strip>*:nth-child(n+8),#mobActionStrip>*:nth-child(n+8),.dsk-mv tbody tr:nth-child(n+8){animation-delay:.28s}
+  #mobActionStrip.gm-arrange>*{animation:none}
+  @media (prefers-reduced-motion: reduce){.dsk-action-strip>*,#mobActionStrip>*,.dsk-mv tbody tr{animation:none!important}.dsk-stat::before,.dsk-action::before{display:none}}
   @keyframes dskRiseIn{from{opacity:0;transform:translateY(6px);}to{opacity:1;transform:translateY(0);}}
 
   @media (prefers-reduced-motion: reduce){
@@ -1332,7 +1350,15 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
   window.gmQaMoveTo = function (dragged, target) {
     if (!target || target === dragged || !target.dataset.id) return false;
     var tiles = Array.prototype.slice.call(stripEl.querySelectorAll('.gm-qg[data-id]'));
+    // FLIP (the idea behind GSAP Flip): remember where each icon was, move it, then slide it from there
+    var before = tiles.map(function (t) { return t.getBoundingClientRect(); });
     stripEl.insertBefore(dragged, tiles.indexOf(target) > tiles.indexOf(dragged) ? target.nextSibling : target);
+    if (!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) tiles.forEach(function (t, i) {
+      if (t === dragged) return;
+      var r = t.getBoundingClientRect(), dx = before[i].left - r.left, dy = before[i].top - r.top;
+      if (!dx && !dy) return;
+      t.animate([{ translate: dx + 'px ' + dy + 'px' }, { translate: '0 0' }], { duration: 220, easing: 'cubic-bezier(.22,1,.36,1)' });
+    });
     return true;
   };
   function startDrag(tile, x, y) {
@@ -2458,6 +2484,13 @@ document.addEventListener('DOMContentLoaded', function () {
         { label: 'تواصل مع الدعم', href: 'support-contact-ar.html', icon: 'support_agent', keywords: 'دعم مساعدة support help' }
     ];
 
+    // spotlight follows the cursor on the computer cards
+    document.addEventListener('pointermove', e => {
+        const c = e.target.closest && e.target.closest('.dsk-stat, .dsk-action');
+        if (!c) return;
+        const r = c.getBoundingClientRect();
+        c.style.setProperty('--mx', (e.clientX - r.left) + 'px'); c.style.setProperty('--my', (e.clientY - r.top) + 'px');
+    }, { passive: true });
     // Ctrl+K / ⌘K opens the quick search (computer)
     document.addEventListener('keydown', e => {
         if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openQuickSearch(); }
