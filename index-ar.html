@@ -620,6 +620,14 @@
 /* phone home (design "MHome"): glossy quick actions, shine on the dark cash card */
 .gm-qg{display:flex;flex-direction:column;align-items:center;gap:18px;text-align:center;font-size:11.5px;font-weight:700;line-height:1.25;color:#211D17;background:transparent;border:0;padding:0;min-width:0}
 .gm-qg .gm-gi{width:56px;height:56px;border-radius:18px}
+.gm-qg{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+#mobActionStrip.gm-arrange .gm-qg[data-id]{touch-action:none;animation:gmWiggle .28s ease-in-out infinite alternate}
+#mobActionStrip.gm-arrange .gm-qg[data-id]:nth-child(2n){animation-delay:.14s}
+#mobActionStrip.gm-arrange .gm-qg-cust{opacity:.4;pointer-events:none}
+.gm-qg-hole{opacity:.25}
+.gm-qg-ghost{position:fixed;z-index:200;pointer-events:none;transform:scale(1.12);filter:drop-shadow(0 12px 18px rgba(0,0,0,.3))}
+@keyframes gmWiggle{from{transform:rotate(-2.5deg)}to{transform:rotate(2.5deg)}}
+@media (prefers-reduced-motion: reduce){#mobActionStrip.gm-arrange .gm-qg[data-id]{animation:none;outline:2px dashed #C9B98F;outline-offset:2px;border-radius:14px}}
 .gm-qg .gm-gi svg{width:24px;height:24px}
 html:not(.gm-light-canvas) .gm-qg{color:#F7EFE9}
 .gm-hero{position:relative;overflow:hidden}
@@ -1201,9 +1209,11 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <section class="mb-5 lg:hidden">
 <div class="flex justify-between items-center mb-3">
 <h3 class="gm-on-canvas" style="margin:0;font-size:15px;font-weight:700;color:#1F1A12;">الوصول السريع</h3>
+<button type="button" id="mobArrangeDone" class="gm-chip-btn hidden" style="background:#1C1A16;color:#FBF8F1;border-color:#1C1A16">تم الترتيب</button>
 <button type="button" id="mobCustomizeBtn" class="gm-chip-btn hidden"><span class="material-symbols-outlined" style="font-size:18px;">tune</span>تخصيص</button>
 </div>
 <div class="grid grid-cols-4 gap-x-1.5 gap-y-6 pb-3" id="mobActionStrip"></div>
+<p class="text-[11.5px] text-on-surface-variant mt-1" id="mobArrangeHint">اضغط مطوّلاً على أيقونة واسحبها لتغيير مكانها.</p>
 </section>
 
 <!-- Mobile "تخصيص" panel: same idea as the desktop customize panel, own
@@ -1280,14 +1290,81 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 
   // glossy tile (design "MHome"); the last tile opens «تخصيص»
   function tileHtml(a) {
-    return '<a class="quick-action-icon gm-qg" href="' + a.href + '"' + (a.permission ? ' data-permission="' + a.permission + '"' : '') + '>'
+    return '<a class="quick-action-icon gm-qg" draggable="false" data-id="' + a.id + '" href="' + a.href + '"' + (a.permission ? ' data-permission="' + a.permission + '"' : '') + '>'
       + window.GM_GLOSS(a.id, a.icon, true) + '<span>' + a.label + '</span></a>';
   }
 
   function renderStrip() {
     stripEl.innerHTML = allowedIds(selection).map(function (id) { return tileHtml(byId(id)); }).join('')
-      + '<button type="button" class="gm-qg" onclick="document.getElementById(\'mobCustomizeBtn\').click()">' + window.GM_GLOSS('customize', 'tune', true) + '<span>تخصيص</span></button>';
+      + '<button type="button" class="gm-qg gm-qg-cust" onclick="document.getElementById(\'mobCustomizeBtn\').click()">' + window.GM_GLOSS('customize', 'tune', true) + '<span>تخصيص</span></button>';
   }
+
+  // ---- press and hold an icon, then drag it to a new place (each staff member keeps his own order) ----
+  var KEY = function () { return 'goldmind_mobile_quick_actions_v4_' + (window.GOLDMIND_STAFF_ID || 'default'); };
+  var drag = null, hold = null, startX = 0, startY = 0, justDragged = false;
+  var doneBtn = document.getElementById('mobArrangeDone');
+  function setEditing(on) {
+    stripEl.classList.toggle('gm-arrange', on);
+    doneBtn.classList.toggle('hidden', !on);
+  }
+  function saveOrder() {
+    var shown = Array.prototype.map.call(stripEl.querySelectorAll('.gm-qg[data-id]'), function (t) { return t.dataset.id; });
+    // ids not shown (no permission right now) keep their place at the end
+    selection = shown.concat(selection.filter(function (id) { return shown.indexOf(id) < 0; }));
+    draft = selection.slice();
+    try { localStorage.setItem(KEY(), JSON.stringify(selection)); } catch (e) {}
+  }
+  // the new place for the dragged icon: the tile under the finger
+  window.gmQaMoveTo = function (dragged, target) {
+    if (!target || target === dragged || !target.dataset.id) return false;
+    var tiles = Array.prototype.slice.call(stripEl.querySelectorAll('.gm-qg[data-id]'));
+    stripEl.insertBefore(dragged, tiles.indexOf(target) > tiles.indexOf(dragged) ? target.nextSibling : target);
+    return true;
+  };
+  function startDrag(tile, x, y) {
+    setEditing(true);
+    var r = tile.getBoundingClientRect();
+    var ghost = tile.cloneNode(true);
+    ghost.classList.add('gm-qg-ghost');
+    ghost.style.width = r.width + 'px'; ghost.style.left = r.left + 'px'; ghost.style.top = r.top + 'px';
+    document.body.appendChild(ghost);
+    tile.classList.add('gm-qg-hole');
+    drag = { tile: tile, ghost: ghost, dx: x - r.left, dy: y - r.top };
+    if (navigator.vibrate) { try { navigator.vibrate(15); } catch (e) {} }
+  }
+  function moveDrag(x, y) {
+    drag.ghost.style.left = (x - drag.dx) + 'px'; drag.ghost.style.top = (y - drag.dy) + 'px';
+    var el = document.elementFromPoint(x, y), t = el && el.closest && el.closest('#mobActionStrip .gm-qg[data-id]');
+    if (t) window.gmQaMoveTo(drag.tile, t);
+  }
+  function endDrag() {
+    if (!drag) return;
+    drag.ghost.remove(); drag.tile.classList.remove('gm-qg-hole');
+    drag = null; justDragged = true; saveOrder();
+    setTimeout(function () { justDragged = false; }, 50);
+  }
+  stripEl.addEventListener('pointerdown', function (e) {
+    var tile = e.target.closest('.gm-qg[data-id]'); if (!tile || e.button > 0) return;
+    startX = e.clientX; startY = e.clientY;
+    clearTimeout(hold);
+    if (stripEl.classList.contains('gm-arrange')) { startDrag(tile, e.clientX, e.clientY); return; }
+    hold = setTimeout(function () { startDrag(tile, startX, startY); }, 450);
+  });
+  window.addEventListener('pointermove', function (e) {
+    if (drag) { moveDrag(e.clientX, e.clientY); return; }
+    if (hold && Math.hypot(e.clientX - startX, e.clientY - startY) > 8) { clearTimeout(hold); hold = null; } // it is a scroll
+  });
+  window.addEventListener('pointerup', function () { clearTimeout(hold); hold = null; endDrag(); });
+  window.addEventListener('pointercancel', function () { clearTimeout(hold); hold = null; endDrag(); });
+  // while dragging the page must not scroll
+  stripEl.addEventListener('touchmove', function (e) { if (drag) e.preventDefault(); }, { passive: false });
+  stripEl.addEventListener('dragstart', function (e) { e.preventDefault(); }); // no native link dragging
+  stripEl.addEventListener('contextmenu', function (e) { if (e.target.closest('.gm-qg')) e.preventDefault(); });
+  // in arrange mode a tap does not open the page
+  stripEl.addEventListener('click', function (e) {
+    if (justDragged || stripEl.classList.contains('gm-arrange')) { var t = e.target.closest('a.gm-qg'); if (t) e.preventDefault(); }
+  }, true);
+  doneBtn.addEventListener('click', function () { setEditing(false); });
 
   function renderGrid() {
     var choices = MOBILE_CATALOG.filter(allowed);

@@ -87,3 +87,31 @@ test('phone home: the page has no white strips (the small-menu class on <html> m
   await expect(page.locator('html')).toHaveClass(/\bgm-mini\b/);
   expect(await page.evaluate(() => getComputedStyle(document.documentElement).paddingLeft)).toBe('0px');
 });
+
+test('phone home: press and hold an icon, drag it onto another, the new order is kept', async ({ page }) => {
+  await install(page, { db: db(), generic: true, realCdn: true }); // real CSS: the icons sit in a 4-column grid
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/index-ar.html');
+  const tiles = page.locator('#mobActionStrip .gm-qg[data-id]');
+  await expect(tiles.first()).toBeVisible();
+  await page.waitForTimeout(2000); // the strip is drawn again once the staff permissions are in
+  await tiles.first().scrollIntoViewIfNeeded();
+  await page.waitForTimeout(300);
+  const before = await tiles.evaluateAll(t => t.map(x => x.dataset.id));
+  const a = await tiles.nth(0).boundingBox(), b = await tiles.nth(2).boundingBox();
+  await page.mouse.move(a.x + a.width / 2, a.y + 20);
+  await page.mouse.down();
+  await page.waitForTimeout(600);                                          // hold
+  await page.mouse.move(b.x + b.width / 2, b.y + 20, { steps: 8 });
+  await page.mouse.up();
+  const after = await tiles.evaluateAll(t => t.map(x => x.dataset.id));
+  expect(after).toEqual([before[1], before[2], before[0], ...before.slice(3)]);
+  await expect(page.locator('#mobActionStrip')).toHaveClass(/\bgm-arrange\b/);
+  const saved = await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('goldmind_mobile_quick_actions_v4_')).map(k => JSON.parse(localStorage[k]))[0]);
+  expect(saved.slice(0, 3)).toEqual(after.slice(0, 3));
+  // in arrange mode a tap does not leave the page; «تم الترتيب» ends it
+  await tiles.nth(1).click();
+  await expect(page).toHaveURL(/index-ar\.html/);
+  await page.click('#mobArrangeDone');
+  await expect(page.locator('#mobActionStrip')).not.toHaveClass(/\bgm-arrange\b/);
+});
