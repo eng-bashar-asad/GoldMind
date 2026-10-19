@@ -17,6 +17,7 @@ test('paid currency and barcodes', async ({ page }) => {
       { id: 'b', invoice_id: 'i1', barcode: '000648', weight_grams: 5, karat: 21 },
       { id: 'c', invoice_id: 'i2', barcode: '000900', weight_grams: 5, karat: 21 }]
   } });
+  await page.setViewportSize({ width: 390, height: 844 }); // phone: cards
   await page.goto('/invoices-list-ar.html');
   await expect(page.locator('.inv-day')).toHaveCount(1);
   await expect(page.locator('.inv-day')).toContainText('01/10/2026');
@@ -29,4 +30,9 @@ test('paid currency and barcodes', async ({ page }) => {
   await page.fill('#searchInput', '000648');
   await expect(page.locator('#results-list a')).toHaveCount(1);
   await expect(page.locator('#results-list a')).toContainText('INV-26');
+  await page.setViewportSize({ width: 1440, height: 900 }); // computer: one table, coloured by kind
+  await page.fill('#searchInput', '');
+  await expect(page.locator('#results-list tr.inv-row')).toHaveCount(2);
+  await expect(page.locator('#results-list tr.inv-row', { hasText: 'INV-26' }).locator('.inv-amount')).toHaveText('1,300,000 SYP');
+  await expect(page.locator('#kind-chips button', { hasText: 'بيع' })).toContainText('2');
 });
