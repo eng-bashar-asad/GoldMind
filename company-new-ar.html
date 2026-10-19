@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إنشاء شركة جديدة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=45"></script>
+<script src="theme.js?v=63"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+          "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "outline": "#76777d"
+        },
+        "fontSize": { "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}], "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}] }
+      } } }
+    </script>
+<style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; } body { min-height: max(884px, 100dvh); } </style>
+</head>
+<body class="bg-background text-on-background p-4">
+<main class="w-full max-w-md lg:max-w-3xl mx-auto flex flex-col gap-5 pb-10">
+<header class="flex items-center gap-2 pt-2">
+<a href="settings-ar.html" class="w-11 h-11 flex items-center justify-center rounded-full hover:bg-surface-container-low" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></a>
+<h1 class="text-headline-md font-bold">إنشاء شركة جديدة</h1>
+</header>
+
+<div id="loading-state" class="text-center text-on-surface-variant text-sm py-8">جارِ التحميل...</div>
+<p id="not-owner" class="hidden text-center text-[13px] text-on-surface-variant">إنشاء شركة جديدة متاح لمالك الشركة فقط.</p>
+<div id="msg" class="hidden text-[13px] font-semibold rounded-lg p-3" role="status" aria-live="polite"></div>
+
+<form id="company-form" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 lg:p-6 flex flex-col gap-4" novalidate>
+<div class="text-[12.5px] text-on-surface-variant leading-relaxed bg-surface-container-low rounded-lg p-3">
+شركة منفصلة تماماً عن شركتك الحالية: بياناتها القانونية ومخزونها وصندوقها وزبائنها وتجارها واشتراكها (تجربة مجانية 30 يوماً) خاصة بها، حتى لو كان رقمها الضريبي مثل شركة أخرى.
+تُربط بحسابك الحالي وتكون أنت مالكها، وتنتقل بينها وبين شركتك من «تبديل الشركة / الفرع» بدون تسجيل خروج.
+<br/>لإضافة فرع لشركتك الحالية (نفس الزبائن والتجار والرقم الضريبي) استخدم صفحة <a href="branches-ar.html" class="underline font-semibold">الفروع</a>.
+</div>
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">اسم الشركة / المحل *</span>
+<input id="f-name" type="text" maxlength="100" required class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right"/>
+</label>
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">الاسم القانوني (اختياري)</span>
+<input id="f-legal" type="text" maxlength="150" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right"/>
+</label>
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">الدولة *</span>
+<select id="f-country" required class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right">
+<option value="">اختر الدولة...</option>
+<option value="AE">الإمارات العربية المتحدة</option>
+<option value="SA">المملكة العربية السعودية</option>
+<option value="KW">الكويت</option>
+<option value="QA">قطر</option>
+<option value="BH">البحرين</option>
+<option value="OM">عُمان</option>
+<option value="EG">مصر</option>
+<option value="JO">الأردن</option>
+<option value="LB">لبنان</option>
+<option value="IQ">العراق</option>
+<option value="SY">سوريا</option>
+<option value="US">الولايات المتحدة</option>
+<option value="OTHER">دولة أخرى</option>
+</select>
+</label>
+<label class="relative block">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">العملة *</span>
+<input id="f-currency" type="text" maxlength="3" dir="ltr" required placeholder="AED" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right uppercase"/>
+</label>
+<label class="relative block lg:col-span-2">
+<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">الرقم الضريبي (اختياري)</span>
+<input id="f-trn" type="text" maxlength="30" dir="ltr" inputmode="numeric" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right"/>
+</label>
+</div>
+<label class="flex items-center gap-2 text-[13px]"><input id="f-terms" type="checkbox" class="w-5 h-5 rounded"/> أوافق على <a href="terms-ar.html" target="_blank" class="underline text-primary">الشروط والأحكام</a></label>
+<button type="submit" id="submit-btn" class="h-12 rounded-lg bg-primary text-on-primary font-semibold lg:w-64 lg:self-start">إنشاء الشركة</button>
+</form>
+</main>
+
+<script>
+const CURRENCY = { AE: 'AED', SA: 'SAR', KW: 'KWD', QA: 'QAR', BH: 'BHD', OM: 'OMR', EG: 'EGP', JO: 'JOD', LB: 'LBP', IQ: 'IQD', SY: 'USD', US: 'USD' };
+const $ = id => document.getElementById(id);
+function showMsg(text, isError, switchTo) {
+  const m = $('msg');
+  m.className = 'text-[13px] font-semibold rounded-lg p-3 ' + (isError ? 'bg-red-50 text-error' : 'bg-green-50 text-green-800');
+  m.textContent = text;
+  if (switchTo) {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'underline mr-2 font-bold'; b.textContent = 'انتقل إلى الشركة الجديدة';
+    b.onclick = () => goldMindSetActiveStore(switchTo);
+    m.appendChild(b);
+  }
+  m.scrollIntoView({ block: 'nearest' });
+}
+$('f-country').addEventListener('change', e => { if (CURRENCY[e.target.value]) $('f-currency').value = CURRENCY[e.target.value]; });
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const { data: me } = await goldmindClient.from('staff').select('role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  $('loading-state').classList.add('hidden');
+  // only an owner opens new companies from inside the app (the account becomes their owner)
+  if (!me || me.role !== 'owner') { $('not-owner').classList.remove('hidden'); return; }
+  $('company-form').classList.remove('hidden');
+}
+
+$('company-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('f-name').value.trim(), country = $('f-country').value, currency = $('f-currency').value.trim().toUpperCase();
+  const legal = $('f-legal').value.trim(), trn = $('f-trn').value.trim();
+  const bad = [];
+  if (!name) bad.push('f-name');
+  if (!country) bad.push('f-country');
+  if (!/^[A-Z]{3}$/.test(currency)) bad.push('f-currency');
+  if (trn && !/^[0-9A-Za-z-]{5,30}$/.test(trn)) bad.push('f-trn');
+  ['f-name', 'f-country', 'f-currency', 'f-trn'].forEach(id => $(id).classList.toggle('border-error', bad.includes(id)));
+  if (bad.length) { showMsg('أكمل الحقول المطلوبة بشكل صحيح.', true); $(bad[0]).focus(); return; }
+  if (!$('f-terms').checked) { showMsg('يجب الموافقة على الشروط والأحكام.', true); return; }
+
+  const btn = $('submit-btn');
+  btn.disabled = true; btn.textContent = 'جارِ الإنشاء...';
+  const { data: newId, error } = await goldmindClient.rpc('register_new_company', { company_name: name, terms_accepted: true, terms_version: '1.2' });
+  if (error) {
+    btn.disabled = false; btn.textContent = 'إنشاء الشركة';
+    showMsg(/ALREADY_HAS_THIS_COMPANY/.test(error.message) ? 'لديك شركة بنفس الاسم.' : 'تعذّر الإنشاء: ' + error.message, true);
+    return;
+  }
+  // the company exists now; its country, currency and legal data are filled in right after
+  const r1 = await goldmindClient.from('stores').update({ country, currency }).eq('id', newId);
+  const { data: st } = await goldmindClient.from('stores').select('organization_id').eq('id', newId).maybeSingle();
+  const orgPatch = { country };
+  if (legal) orgPatch.legal_name = legal;
+  if (trn) orgPatch.tax_number = trn;
+  const r2 = st && st.organization_id ? await goldmindClient.from('organizations').update(orgPatch).eq('id', st.organization_id) : { error: true };
+  $('company-form').classList.add('hidden');
+  showMsg('تم إنشاء الشركة «' + name + '» وربطها بحسابك.' + (r1.error || r2.error ? ' أكمل بياناتها من «بيانات الشركة» بعد الانتقال إليها.' : ''), false, newId);
+});
+
+load();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => { navigator.serviceWorker.register('service-worker.js').catch(() => {}); });
+}
+</script>
+</body></html>

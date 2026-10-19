@@ -40,17 +40,57 @@ test('owner moves the head office to another branch', async ({ page }) => {
   expect(JSON.parse(calls.find(c => c.method === 'PATCH' && c.name === 'organizations').body)).toEqual({ head_office_store_id: 'b2' });
 });
 
-test('new independent company needs the terms and uses register_new_company', async ({ page }) => {
-  const calls = await setup(page, { rpc: { register_new_company: () => ({ body: 'new-co' }) } });
+test('branches page no longer creates companies, it links to the new-company page', async ({ page }) => {
+  await setup(page);
   await page.goto('/branches-ar.html');
-  await page.fill('#company-name', 'شركة ثانية');
-  await page.click('#add-company-btn');
+  await expect(page.locator('#new-company-hint')).not.toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#new-company-hint a')).toHaveAttribute('href', 'company-new-ar.html');
+  await expect(page.locator('#add-company-btn')).toHaveCount(0);
+});
+
+test('new company page: required fields and terms, then register_new_company + country/currency/legal data', async ({ page }) => {
+  const calls = await install(page, {
+    db: {
+      stores: [{ id: STORE, name: 'المحل الرئيسي', organization_id: ORG }, { id: 'new-co', name: 'شركة ثانية', organization_id: 'org-2' }],
+      organizations: [{ id: ORG, name: 'المنشأة', primary_store_id: STORE }, { id: 'org-2', name: 'شركة ثانية', primary_store_id: 'new-co' }],
+      staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {} }],
+      user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    },
+    rpc: { register_new_company: () => ({ body: 'new-co' }) },
+  });
+  await page.goto('/company-new-ar.html');
+  await page.click('#submit-btn');
+  await expect(page.locator('#f-name')).toHaveClass(/border-error/);
+  await page.fill('#f-name', 'شركة ثانية');
+  await page.selectOption('#f-country', 'SY');
+  await expect(page.locator('#f-currency')).toHaveValue('USD');
+  await page.fill('#f-trn', '100200300400003');
+  await page.click('#submit-btn');
   await expect(page.locator('#msg')).toContainText('الشروط');
   expect(calls.some(c => c.name === 'register_new_company')).toBe(false);
-  await page.check('#company-terms');
-  await page.click('#add-company-btn');
+  await page.check('#f-terms');
+  await page.click('#submit-btn');
   await expect(page.locator('#msg')).toContainText('شركة ثانية');
-  expect(JSON.parse(calls.find(c => c.name === 'register_new_company').body).terms_accepted).toBe(true);
+  await expect(page.locator('#msg button')).toHaveText('انتقل إلى الشركة الجديدة');
+  expect(JSON.parse(calls.find(c => c.name === 'register_new_company').body)).toEqual({ company_name: 'شركة ثانية', terms_accepted: true, terms_version: '1.2' });
+  expect(JSON.parse(calls.find(c => c.method === 'PATCH' && c.name === 'stores').body)).toEqual({ country: 'SY', currency: 'USD' });
+  expect(JSON.parse(calls.find(c => c.method === 'PATCH' && c.name === 'organizations').body)).toEqual({ country: 'SY', tax_number: '100200300400003' });
+});
+
+test('switch page groups branches under their company', async ({ page }) => {
+  await install(page, {
+    db: {
+      stores: [{ id: STORE, organization_id: ORG }, { id: 'b2', organization_id: ORG }, { id: 'c2', organization_id: 'org-2' }],
+      organizations: [{ id: ORG, name: 'المنشأة', legal_name: 'الخياط للمجوهرات' }, { id: 'org-2', name: 'شركة سوريا' }],
+      staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {} }],
+      user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    },
+    rpc: { my_stores: () => ({ body: [{ store_id: STORE, store_name: 'الشارقة', role: 'owner' }, { store_id: 'b2', store_name: 'ديرة', role: 'owner' }, { store_id: 'c2', store_name: 'دمشق', role: 'owner' }] }) },
+  });
+  await page.goto('/switch-branch-ar.html');
+  await expect(page.locator('#stores-list section')).toHaveCount(2);
+  await expect(page.locator('#stores-list section').first()).toContainText('الخياط للمجوهرات — 2 فروع');
+  await expect(page.locator('#stores-list section').nth(1)).toContainText('دمشق');
 });
 
 test('not the owner: nothing to manage', async ({ page }) => {

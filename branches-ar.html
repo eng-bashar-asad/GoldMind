@@ -36,8 +36,8 @@
 <body class="bg-background text-on-background font-body-md p-4">
 <main class="w-full max-w-md mx-auto flex flex-col gap-5 pb-10">
 <header class="flex items-center gap-2 pt-2">
-<a href="company-settings-ar.html" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></a>
-<h1 class="font-headline-md text-headline-md font-bold">الفروع</h1>
+<a href="settings-ar.html" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></a>
+<h1 class="font-headline-md text-headline-md font-bold">فروع الشركة</h1>
 </header>
 
 <div id="loading-state" class="text-center text-on-surface-variant text-sm py-8">جارِ التحميل...</div>
@@ -62,16 +62,7 @@
 <button type="button" id="add-branch-btn" onclick="addBranch()" class="h-12 rounded-lg bg-primary text-on-primary font-semibold">إضافة الفرع</button>
 </section>
 
-<section id="new-company-section" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-3">
-<h2 class="font-label-md text-label-md font-bold text-secondary">شركة جديدة مستقلة</h2>
-<p class="text-[12px] text-on-surface-variant">منشأة منفصلة تماماً ببياناتها القانونية وحركاتها واشتراكها (تجربة 30 يوماً)، حتى لو كان رقمها الضريبي مثل منشأة أخرى.</p>
-<label class="relative block">
-<span class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline">اسم الشركة</span>
-<input id="company-name" type="text" maxlength="80" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right"/>
-</label>
-<label class="flex items-center gap-2 text-[13px]"><input id="company-terms" type="checkbox" class="w-5 h-5 rounded"/> أوافق على <a href="terms-ar.html" target="_blank" class="underline text-primary">الشروط والأحكام</a></label>
-<button type="button" id="add-company-btn" onclick="addCompany()" class="h-12 rounded-lg border border-primary text-primary font-semibold">إنشاء الشركة</button>
-</section>
+<p class="hidden text-center text-[12px] text-on-surface-variant" id="new-company-hint">تريد شركة منفصلة تماماً ببيانات واشتراك خاص؟ <a href="company-new-ar.html" class="underline font-semibold">إنشاء شركة جديدة</a></p>
 
 <p id="not-owner" class="hidden text-center text-[13px] text-on-surface-variant">إدارة الفروع متاحة لمالك المنشأة فقط.</p>
 </main>
@@ -116,7 +107,7 @@ async function load() {
       ${hasHeadCol ? `<span class="flex items-center gap-1 text-[12px]"><input type="radio" name="head-office" value="${b.id}" class="w-5 h-5" ${b.id === headId ? 'checked' : ''} aria-label="المكتب الرئيسي: ${gmEscapeHtml(gmShownName(b))}"/> رئيسي</span>` : ''}
     </label>`).join(''));
   document.getElementById('save-head-btn').classList.toggle('hidden', !hasHeadCol || (branches || []).length < 2);
-  ['branches-section', 'add-branch-section', 'new-company-section'].forEach(id => document.getElementById(id).classList.remove('hidden'));
+  ['branches-section', 'add-branch-section', 'new-company-hint'].forEach(id => document.getElementById(id).classList.remove('hidden'));
 }
 
 async function saveHeadOffice() {
@@ -140,25 +131,6 @@ async function addBranch() {
   if (error) { showMsg('تعذّرت الإضافة: ' + error.message, true); return; }
   input.value = '';
   showMsg('تمت إضافة الفرع «' + name + '».', false, newId);
-}
-
-async function addCompany() {
-  const input = document.getElementById('company-name');
-  const name = input.value.trim();
-  const terms = document.getElementById('company-terms');
-  if (!name) { input.classList.add('border-error'); input.focus(); return; }
-  input.classList.remove('border-error');
-  if (!terms.checked) { showMsg('يجب الموافقة على الشروط والأحكام.', true); return; }
-  const btn = document.getElementById('add-company-btn');
-  btn.disabled = true; btn.textContent = 'جارِ الإنشاء...';
-  const { data: newId, error } = await goldmindClient.rpc('register_new_company', { company_name: name, terms_accepted: true, terms_version: '1.2' });
-  btn.disabled = false; btn.textContent = 'إنشاء الشركة';
-  if (error) {
-    showMsg(/ALREADY_HAS_THIS_COMPANY/.test(error.message) ? 'لديك شركة بنفس الاسم.' : 'تعذّر الإنشاء: ' + error.message, true);
-    return;
-  }
-  input.value = ''; terms.checked = false;
-  showMsg('تم إنشاء الشركة «' + name + '».', false, newId);
 }
 
 load();

@@ -62,6 +62,7 @@
 <div class="hidden text-error text-[12.5px] p-3 rounded-lg" style="background: #FBEAEA;" id="error-box"></div>
 
 <button onclick="registerCompany()" id="submit-btn" class="btn-gold w-full h-12 font-bold rounded-lg" style="color: #2E2113;">إنشاء الحساب</button>
+<p class="text-[12px] text-center leading-relaxed p-3 rounded-lg border" style="color: var(--ink-soft); border-color: var(--hairline); background: var(--card);">لديك حساب في GoldMind وتريد شركة أخرى؟ <a href="login-entry-ar.html" class="underline font-semibold">سجّل الدخول</a> ثم أنشئها من «الإعدادات ← الشركات والفروع ← إنشاء شركة جديدة»، فتُربط بحسابك وتنتقل بين شركاتك بدون تسجيل خروج.</p>
 <p class="text-[11px] text-center leading-relaxed" style="color: var(--ink-soft);">بالمتابعة أنت موافق على <a href="terms-ar.html" class="underline">الشروط والأحكام</a> و<a href="privacy-policy-ar.html" class="underline">سياسة الخصوصية</a>.</p>
 </div>
 </div>
@@ -115,6 +116,7 @@ async function registerCompany() {
 
         if (error || !data || data.error) {
             errBox.textContent = (data && data.error) || 'تعذّر إنشاء الحساب، حاول مرة أخرى.';
+            if (/مسجّل مسبقاً/.test(errBox.textContent)) errBox.textContent += ' لإضافة شركة أخرى لنفس الحساب: بعد الدخول افتح «الإعدادات ← الشركات والفروع ← إنشاء شركة جديدة».';
             errBox.classList.remove('hidden');
             btn.disabled = false;
             btn.textContent = 'إنشاء الحساب';

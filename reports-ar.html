@@ -269,7 +269,9 @@ function applyCustomRange() {
   loadReport();
 }
 
+let REP_RUN = 0; // only the latest period may paint
 async function loadReport() {
+  const run = ++REP_RUN;
   const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
   const vatRate = Number((storeRow && storeRow.vat_rate) || 0);
   const vatMultiplier = 1 + (vatRate / 100);
@@ -307,6 +309,7 @@ async function loadReport() {
     });
   }
 
+  if (run !== REP_RUN) return;
   document.getElementById('stat-total-sales').textContent = fmt(netSales);
   const returnsNoteEl = document.getElementById('returns-note');
   if (returnsNoteEl) {
@@ -332,6 +335,7 @@ async function loadReport() {
       if (it.weight_grams && it.karat) goldIn24k += Number(it.weight_grams) * (Number(it.karat) / 24);
     });
   }
+  if (run !== REP_RUN) return;
   document.getElementById('stat-gold-in').textContent = fmt(goldIn24k) + ' جم';
 
   // Gold weight currently in stock (individual pieces + bulk lots), same
@@ -343,6 +347,7 @@ async function loadReport() {
   let goldAvailable24k = 0;
   (availablePieces || []).forEach(p => { if (p.weight_grams && p.karat) goldAvailable24k += Number(p.weight_grams) * (Number(p.karat) / 24); });
   (stockLots || []).forEach(l => { if (l.weight_grams_remaining && l.karat) goldAvailable24k += Number(l.weight_grams_remaining) * (Number(l.karat) / 24); });
+  if (run !== REP_RUN) return;
   document.getElementById('stat-gold-available').textContent = fmt(goldAvailable24k) + ' جم';
 
   // Comprehensive net gold position: in-shop stock (pieces + bulk lots)
@@ -355,6 +360,7 @@ async function loadReport() {
   (allTraderMoves || []).forEach(m => {
     netTraderGold24k += (m.movement_type === 'debt_decrease' ? 1 : -1) * Number(m.gold_24k_equivalent || 0);
   });
+  if (run !== REP_RUN) return;
   document.getElementById('stat-gold-total-with-traders').textContent = fmt(goldAvailable24k + netTraderGold24k) + ' جم';
 
   document.getElementById('invoices-count').textContent = salesInvoices.length;
@@ -389,6 +395,7 @@ async function loadReport() {
     totalExpenses += Number(e.amount || 0);
   });
 
+  if (run !== REP_RUN) return;
   document.getElementById('expenses-total').textContent = fmt(totalExpenses);
   const expEl = document.getElementById('expenses-breakdown');
   const catNames = Object.keys(byCategory);
@@ -424,6 +431,7 @@ async function loadReport() {
 
   const totalInputTax = (purchaseInvoices || []).reduce((sum, p) => sum + Number(p.vat_amount || 0), 0);
 
+  if (run !== REP_RUN) return;
   document.getElementById('tax-output').textContent = fmt(totalTax);
   document.getElementById('tax-input').textContent = fmt(totalInputTax);
   document.getElementById('tax-input').classList.remove('text-outline');

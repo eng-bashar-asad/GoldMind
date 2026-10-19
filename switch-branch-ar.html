@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>اختر الفرع | GoldMind</title>
+<title>اختر الشركة أو الفرع | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=45"></script>
@@ -37,14 +37,15 @@
 <div class="w-full max-w-sm">
 <div class="text-center mb-8">
 <span class="material-symbols-outlined text-secondary" style="font-size:40px;">storefront</span>
-<h1 class="font-headline-md text-headline-md font-bold mt-2">اختر الفرع</h1>
-<p class="text-sm text-on-surface-variant mt-1">هذا الحساب مسجّل في أكثر من فرع</p>
+<h1 class="font-headline-md text-headline-md font-bold mt-2">اختر الشركة أو الفرع</h1>
+<p class="text-sm text-on-surface-variant mt-1">هذا الحساب مسجّل في أكثر من شركة أو فرع</p>
 </div>
 
 <div id="loading-state" class="text-center text-on-surface-variant text-sm py-8">جارِ التحميل...</div>
 <div id="stores-list" class="flex flex-col gap-3"></div>
 
-<button onclick="goldMindSignOut()" class="w-full mt-8 text-error text-sm font-semibold">تسجيل الخروج</button>
+<a href="settings-ar.html" id="back-link" class="hidden block w-full mt-8 text-center text-sm font-semibold text-secondary">رجوع</a>
+<button onclick="goldMindSignOut()" class="w-full mt-4 text-error text-sm font-semibold">تسجيل الخروج</button>
 </div>
 
 <script>
@@ -53,6 +54,7 @@ async function load() {
   if (!session) { window.location.href = 'login-entry-ar.html'; return; }
   if (await gmTwoFactorNeeded(session)) { gmGoTwoFactor(); return; }
 
+  try { if (localStorage.getItem('goldmind_active_store')) document.getElementById('back-link').classList.remove('hidden'); } catch (e) { /* ignore */ }
   const { data, error } = await goldmindClient.rpc('my_stores');
   document.getElementById('loading-state').classList.add('hidden');
 
@@ -62,15 +64,42 @@ async function load() {
   }
 
   const roleLabel = { owner: 'مالك', staff: 'موظف' };
-
-  document.getElementById('stores-list').innerHTML = data.map(s => `
-    <button onclick="goldMindSetActiveStore('${s.store_id}')" class="w-full text-right bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex items-center justify-between active:scale-[0.98] transition-all hover:border-primary">
+  // group the branches under their company (organization); a flat list if that can't be read
+  const groups = await gmGroupByCompany(data);
+  const btn = s => `
+    <button onclick="goldMindSetActiveStore('${s.store_id}')" class="w-full text-right bg-surface-container-lowest border ${s.store_id === localStorage.getItem('goldmind_active_store') ? 'border-primary' : 'border-outline-variant'} rounded-xl p-4 flex items-center justify-between active:scale-[0.98] transition-all hover:border-primary">
       <div>
         <p class="font-semibold text-[15px]">${gmEscapeHtml(s.store_name)}</p>
-        <p class="text-[12px] text-on-surface-variant">${roleLabel[s.role] || s.role}</p>
+        <p class="text-[12px] text-on-surface-variant">${roleLabel[s.role] || gmEscapeHtml(s.role)}</p>
       </div>
       <span class="material-symbols-outlined text-outline">chevron_left</span>
-    </button>`).join('');
+    </button>`;
+  document.getElementById('stores-list').innerHTML = groups.length > 1 || (groups[0] && groups[0].stores.length > 1 && groups[0].name)
+    ? groups.map(g => `<section class="flex flex-col gap-2" aria-label="${gmEscapeHtml(g.name || 'شركة')}">
+        <h2 class="text-[12px] font-bold text-on-surface-variant flex items-center gap-1 mt-2"><span class="material-symbols-outlined" style="font-size:16px;">domain</span>${gmEscapeHtml(g.name || 'شركة')}${g.stores.length > 1 ? ' — ' + g.stores.length + ' فروع' : ''}</h2>
+        ${g.stores.map(btn).join('')}</section>`).join('')
+    : data.map(btn).join('');
+}
+
+async function gmGroupByCompany(rows) {
+  try {
+    const ids = rows.map(r => r.store_id);
+    const { data: st, error } = await goldmindClient.from('stores').select('id, organization_id').in('id', ids);
+    if (error || !st) throw error;
+    const orgOf = {}; st.forEach(x => { orgOf[x.id] = x.organization_id || x.id; });
+    const orgIds = [...new Set(Object.values(orgOf))];
+    const { data: orgs } = await goldmindClient.from('organizations').select('id, name, legal_name').in('id', orgIds);
+    const nameOf = {}; (orgs || []).forEach(o => { nameOf[o.id] = o.legal_name || o.name; });
+    const out = [];
+    rows.forEach(r => {
+      const k = orgOf[r.store_id] || r.store_id;
+      let g = out.find(x => x.id === k);
+      if (!g) out.push(g = { id: k, name: nameOf[k] || '', stores: [] });
+      g.stores.push(r);
+    });
+    out.forEach(g => { if (!g.name) g.name = g.stores[0].store_name; });
+    return out;
+  } catch (e) { return [{ id: null, name: '', stores: rows }]; }
 }
 
 load();

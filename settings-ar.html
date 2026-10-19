@@ -177,6 +177,27 @@
 <span class="material-symbols-outlined text-outline mr-auto shrink-0">chevron_right</span>
 </a>
 </section>
+<!-- Companies and branches (owner only) -->
+<section class="mb-6 hidden" id="companiesSection">
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">الشركات والفروع</h3>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow divide-y divide-outline-variant overflow-hidden">
+<a href="branches-ar.html" class="p-4 flex justify-between items-center active:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3"><span class="material-symbols-outlined text-secondary">store</span>
+<span><span class="block font-label-md text-label-md text-on-surface">فروع الشركة</span><span class="block text-[11px] text-on-surface-variant">نفس الزبائن والتجار والرقم الضريبي</span></span></div>
+<span class="material-symbols-outlined text-outline">chevron_left</span>
+</a>
+<a href="switch-branch-ar.html" class="p-4 flex justify-between items-center active:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3"><span class="material-symbols-outlined text-secondary">swap_horiz</span>
+<span class="font-label-md text-label-md text-on-surface">تبديل الشركة / الفرع</span></div>
+<span class="material-symbols-outlined text-outline">chevron_left</span>
+</a>
+<a href="company-new-ar.html" class="p-4 flex justify-between items-center active:bg-surface-container-low transition-colors">
+<div class="flex items-center gap-3"><span class="material-symbols-outlined text-secondary">domain_add</span>
+<span><span class="block font-label-md text-label-md text-on-surface">إنشاء شركة جديدة</span><span class="block text-[11px] text-on-surface-variant">شركة منفصلة تماماً، تُربط بحسابك</span></span></div>
+<span class="material-symbols-outlined text-outline">chevron_left</span>
+</a>
+</div>
+</section>
 <!-- Preferences -->
 <section class="mb-6">
 <h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">التفضيلات</h3>
@@ -355,6 +376,7 @@ function fitStoreName(el) {
         .from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
     const canView = staffRow && (staffRow.role === 'owner' || staffRow.permissions?.view_profit_report);
     if (canView) document.getElementById('mainCashboxLink').classList.remove('hidden');
+    if (staffRow && staffRow.role === 'owner') document.getElementById('companiesSection').classList.remove('hidden');
 })();
 
 (async function loadStoreSummary() {

@@ -27,6 +27,7 @@ test('movement summary: by karat, total sales profit, stock now split', async ({
   await page.fill('#date-to', '2026-09-30');
   await page.click('#apply-filters-btn');
   const br = page.locator('#pr-brief');
+  await expect(br).toContainText('1300.00'); // the September run has painted
   const cells = async (section, rowText) => br.locator('div.gm-keep', { hasText: section }).locator('tr', { hasText: rowText }).first().locator('td').allInnerTexts();
 
   // customers 18k: 10 g gross, 9 acc → 6.75 g 24k, 1000; profit 1000 − 9×80 − 9×5 = 235

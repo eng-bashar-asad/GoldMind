@@ -232,7 +232,9 @@ function table(title, head, rows, note, half) {
     ${note ? `<p class="px-3 py-2 text-[11px] text-on-surface-variant">${note}</p>` : ''}</div>`;
 }
 
+let RUN = 0; // only the latest filter run may paint (an older, slower one is dropped)
 async function applyFilters() {
+  const run = ++RUN;
   let fromDate = document.getElementById('date-from').value;
   let toDate = document.getElementById('date-to').value;
   const boxFilter = document.getElementById('box-filter').value;
@@ -270,6 +272,7 @@ async function applyFilters() {
     gmFetchAllRows(() => goldmindClient.from('trader_movements').select('movement_type, fab_fee_amount').in('store_id', SCOPE.ids()).eq('source', 'discount')
       .gte('created_at', range.from).lt('created_at', range.to))
   ]);
+  if (run !== RUN) return;
   const price24Now = Number(gpRes && gpRes.data && gpRes.data.price_per_gram) || 0;
   const err = invRes.error || tmRes.error;
   if (err) { document.getElementById('pr-sections').innerHTML = `<p class="text-error text-sm">تعذّر التحميل: ${escH(err.message)}</p>`; return; }
@@ -278,6 +281,7 @@ async function applyFilters() {
   const invoiceMap = {}; invoices.forEach(i => { invoiceMap[i.id] = i; });
 
   const itemsRes = await fetchByIds(invoices.map(i => i.id), ids => goldmindClient.from('invoice_items').select(GM_PROFIT_ITEM_SELECT).in('invoice_id', ids));
+  if (run !== RUN) return;
   if (itemsRes.error) { document.getElementById('pr-sections').innerHTML = `<p class="text-error text-sm">تعذّر التحميل: ${escH(itemsRes.error.message)}</p>`; return; }
   const allItems = itemsRes.data;
 
