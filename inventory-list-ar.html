@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=45"></script>
-<script src="theme.js?v=66"></script>
+<script src="theme.js?v=67"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -121,6 +121,9 @@
     }
   </style>
 <style id="gm-inv-v2">
+.gm-inv-q{margin:4px 0 12px;display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #CBBF9E;border-radius:14px;padding:0 4px 0 0;height:50px;padding-inline-start:12px;color:#6B6355}
+.gm-inv-q input{border:0;outline:0;flex:1;min-width:0;background:transparent;font-size:15px;color:#211D17;box-shadow:none}
+.gm-inv-q button{width:44px;height:44px;border:0;border-inline-start:1px solid #E4DAC0;background:transparent;color:#211D17;display:flex;align-items:center;justify-content:center}
 .gm-gold{background:linear-gradient(125deg,#7a5a16 0%,#c89a3c 18%,#f6e2a6 30%,#d4a64a 42%,#8a6a1f 58%,#e2bd67 76%,#fff0bf 88%,#b58a33 100%);background-size:220% 220%;animation:gmGoldShift 9s ease-in-out infinite alternate;color:#2A1F08}
 @keyframes gmGoldShift{from{background-position:0% 50%}to{background-position:100% 50%}}
 .gm-sweep{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
@@ -171,14 +174,21 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
 <h1 class="gm-on-canvas" style="margin:0;font-size:19px;font-weight:700;color:#1F1A12;">المخزن</h1>
 </div>
 <div class="flex items-center gap-2">
-<button onclick="toggleSearch()" class="gm-hbtn" title="بحث بالمخزون"><span class="material-symbols-outlined text-[20px]">search</span>بحث</button>
+<button onclick="toggleSearch()" class="gm-hbtn hidden lg:inline-flex" title="بحث بالمخزون"><span class="material-symbols-outlined text-[20px]">search</span>بحث</button>
 <button onclick="window.location.href='intake-batches-ar.html'" class="gm-hbtn" title="سندات الإدخال والإنتاج"><span class="material-symbols-outlined text-[20px]">receipt_long</span>السندات</button>
-<button onclick="window.location.href='inventory-add.html'" class="gm-gold relative flex items-center gap-1 h-10 px-3 rounded-full text-[13px] font-bold"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined text-[20px]" style="position:relative;">add</span><span style="position:relative;">قطعة</span></button>
+<button onclick="window.location.href='inventory-add.html'" class="gm-gold relative hidden lg:flex items-center gap-1 h-10 px-3 rounded-full text-[13px] font-bold"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined text-[20px]" style="position:relative;">add</span><span style="position:relative;">قطعة</span></button>
 </div>
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-6xl mx-auto px-margin-mobile lg:px-8">
 
+<!-- phone: search always at the top (design "MStock"); Enter searches by barcode, the tune button opens the full filters -->
+<div class="gm-inv-q lg:hidden">
+<span class="material-symbols-outlined" aria-hidden="true">search</span>
+<input id="invQuick" type="search" dir="auto" enterkeyhint="search" placeholder="امسح أو اكتب الباركود" aria-label="بحث بالباركود"
+  onkeydown="if (event.key === 'Enter') { event.preventDefault(); document.getElementById('search-barcode').value = this.value.trim(); runSearch(); }"/>
+<button type="button" onclick="toggleSearch()" aria-label="فلاتر البحث" title="فلاتر البحث"><span class="material-symbols-outlined">tune</span></button>
+</div>
 <!-- Summary -->
 <div class="gm-inv-hero" id="inv-summary">
 <div class="flex justify-between items-end gap-3">
@@ -298,29 +308,9 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
 </button>
 </div>
 
-<!-- Bottom Navigation Bar -->
-<nav class="fixed bottom-0 w-full flex justify-around items-center px-margin-mobile py-2 bg-surface-container-lowest text-primary docked full-width z-50 border-t border-outline-variant shadow-sm h-16">
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="index-ar.html">
-<span class="material-symbols-outlined">dashboard</span>
-<span class="font-label-md text-[10px] mt-1">الرئيسية</span>
-</a>
-<a class="flex flex-col items-center justify-center text-primary font-bold active:scale-90 duration-150" href="inventory-list-ar.html">
-<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 1;">inventory_2</span>
-<span class="font-label-md text-[10px] mt-1">المخزن</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="new-sale-ar.html">
-<span class="material-symbols-outlined">receipt_long</span>
-<span class="font-label-md text-[10px] mt-1">الفواتير</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="ledger-ar.html">
-<span class="material-symbols-outlined">account_balance_wallet</span>
-<span class="font-label-md text-[10px] mt-1">الصندوق</span>
-</a>
-<a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all active:scale-90 duration-150" href="settings-ar.html">
-<span class="material-symbols-outlined">settings</span>
-<span class="font-label-md text-[10px] mt-1">الإعدادات</span>
-</a>
-</nav>
+<!-- Bottom tabs (shared, gm-nav.js) + add-piece button (design "MStock") -->
+<nav class="gm-bottom-tabs"></nav>
+<a class="gm-fab" href="inventory-add.html" aria-label="إضافة قطعة" title="إضافة قطعة"><span class="material-symbols-outlined">add</span></a>
 
 <script>
     let currentStore = null;

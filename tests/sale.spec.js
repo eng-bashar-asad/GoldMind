@@ -158,3 +158,22 @@ test('partial payment in two currencies: dollars + Syrian pounds, rest is debt',
     { currency: 'USD', amount: 500, rate: 1, method: 'cash' },
     { currency: 'SYP', amount: 6500000, rate: 13000, method: 'cash' }]);
 });
+
+test('phone: total bar at the bottom, «الدفع» opens the payment sheet with the change for cash', async ({ page }) => {
+  const posted = [];
+  await install(page, { db: db(), rpc: { post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-9', invoice_number: 'INV-2026-000009' } }; } } });
+  page.on('dialog', d => d.accept());
+  await page.setViewportSize({ width: 390, height: 844 });
+  await fillSale(page);
+  await expect(page.locator('#nsBarTotal')).toContainText('1,500.00');
+  await expect(page.locator('#ns-pay')).not.toHaveClass(/\bns-open\b/);
+  await page.click('#nsPayBar button');
+  await expect(page.locator('#ns-pay')).toHaveClass(/\bns-open\b/);
+  await page.fill('#nsReceived', '2000');
+  await expect(page.locator('#nsChangeOut')).toHaveText('500.00 USD');
+  await page.click('#pay-bank');
+  await expect(page.locator('#nsChangeBox')).toHaveClass(/\bhidden\b/);       // change only for cash
+  await page.click('#save-invoice-btn');
+  await page.waitForURL(/invoice-print-ar\.html\?id=inv-9/);
+  expect(posted[0]).toMatchObject({ payment_method: 'bank' });
+});

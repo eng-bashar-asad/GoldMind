@@ -165,12 +165,40 @@
       .gm-dsplit>.gm-side{grid-column:1;grid-row:1/span 30;position:sticky;top:84px}
       .gm-dsplit>.gm-full{grid-column:1/-1}
     }
+    /* phone bottom tabs (designs MHome / MStock / MCustomers): الرئيسية، المخزن، [بيع]، الزبائن، الفواتير.
+       A page puts <nav class="gm-bottom-tabs"></nav>; it is filled below. */
+    .gm-bottom-tabs{position:fixed;bottom:0;inset-inline:0;z-index:50;display:flex;align-items:center;padding:0 6px env(safe-area-inset-bottom);height:calc(68px + env(safe-area-inset-bottom));background:var(--gm-bg-elevated,#fff);background:#FFFFFF;border-top:1px solid #E4DAC0;box-shadow:0 -2px 10px rgba(28,26,22,.05)}
+    .gm-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;font-size:10.5px;color:#6B6355;text-decoration:none}
+    .gm-tab.gm-tab-on{color:#211D17;font-weight:700}
+    .gm-tab.gm-tab-on .material-symbols-outlined{font-variation-settings:'FILL' 1}
+    .gm-tab-sale{flex:none;width:62px;height:62px;margin-top:-30px;border-radius:20px;background:#1C1A16;color:#E9CF8B;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:10.5px;font-weight:700;text-decoration:none;box-shadow:0 8px 18px rgba(28,26,22,.25)}
+    .gm-tab-sale .material-symbols-outlined{font-size:26px}
+    /* phone floating add button */
+    .gm-fab{position:fixed;inset-inline-end:16px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:49;width:58px;height:58px;border-radius:18px;background:#7A6640;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(28,26,22,.25)}
+    .gm-fab .material-symbols-outlined{font-size:28px}
+    @media screen and (min-width:1024px){.gm-fab{display:none!important}}
     #gmNav .gn-mini{width:38px;height:38px;border-radius:12px;border:0;background:#2A251C;color:#F3EEDF;align-items:center;justify-content:center;cursor:pointer}
     @media (prefers-reduced-motion:reduce){#gmNav,#gmNav .gn-b,#gmNav .gn-chev{transition:none!important}}
   `;
   document.head.appendChild(css);
 
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
+
+  var TABS = [['index-ar.html', 'dashboard', 'الرئيسية'], ['inventory-list-ar.html', 'inventory_2', 'المخزن'], null,
+    ['customers-ar.html', 'person', 'الزبائن'], ['invoices-list-ar.html', 'receipt_long', 'الفواتير']];
+  function fillTabs() {
+    document.querySelectorAll('nav.gm-bottom-tabs').forEach(function (n) {
+      if (n.children.length) return;
+      if (!n.getAttribute('aria-label')) n.setAttribute('aria-label', 'التنقل');
+      n.innerHTML = TABS.map(function (t) {
+        if (!t) return '<a class="gm-tab-sale" href="new-sale-ar.html" aria-label="بيع جديد"><span class="material-symbols-outlined">add</span>بيع</a>';
+        var on = t[0] === page;
+        return '<a class="gm-tab' + (on ? ' gm-tab-on' : '') + '" href="' + t[0] + '"' + (on ? ' aria-current="page"' : '') + '><span class="material-symbols-outlined">' + t[1] + '</span>' + t[2] + '</a>';
+      }).join('');
+    });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillTabs); else fillTabs();
+  window.gmFillTabs = fillTabs;
 
   function build() {
     var ov = document.createElement('div'); ov.id = 'gmNavOverlay';

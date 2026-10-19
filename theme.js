@@ -1133,7 +1133,7 @@ function gmHardwareBack() {
 (function () {
   if (window.GM_NAV_DISABLED || document.querySelector('script[src^="gm-nav.js"]')) return;
   var sc = document.createElement('script');
-  sc.src = 'gm-nav.js?v=12';
+  sc.src = 'gm-nav.js?v=13';
   document.head.appendChild(sc);
 })();
 

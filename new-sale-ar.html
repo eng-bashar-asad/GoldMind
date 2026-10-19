@@ -16,7 +16,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=45"></script>
-<script src="theme.js?v=66"></script>
+<script src="theme.js?v=67"></script>
 <script src="gm-invoice-edit.js?v=2"></script>
 <script id="tailwind-config">
         tailwind.config = {
@@ -93,6 +93,32 @@
       #save-invoice-btn[data-total]::after { content: attr(data-total); padding-inline-start: 12px; border-inline-start: 1px solid rgba(255,255,255,.55); unicode-bidi: isolate; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
+<style>
+/* phone sale screen (approved designs MSale / MPay) */
+.ns-paybar,.ns-sheet-head,.ns-shade{display:none}
+@media (max-width:1023px){
+  body{padding-bottom:96px}
+  .ns-paybar{display:flex;position:fixed;inset-inline:0;bottom:0;z-index:55;background:#1C1A16;color:#FBF8F1;border-radius:22px 22px 0 0;padding:14px 16px calc(16px + env(safe-area-inset-bottom));align-items:center;gap:12px;box-shadow:0 -8px 24px rgba(28,26,22,.25)}
+  .ns-pb-s{font-size:12px;color:#D8CDB3}
+  .ns-pb-t{font-size:24px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ns-pb-btn{height:52px;padding:0 26px;border-radius:16px;border:0;background:#E9CF8B;color:#1C1A16;font-weight:700;font-size:16px;flex:none}
+  #ns-pay{position:fixed;inset-inline:0;bottom:0;z-index:70;max-height:88vh;overflow-y:auto;background:#F3EEDF;border-radius:26px 26px 0 0;padding:10px 16px calc(22px + env(safe-area-inset-bottom))!important;margin:0!important;
+    transform:translateY(105%);transition:transform .3s cubic-bezier(.22,1,.36,1);box-shadow:0 -12px 40px rgba(0,0,0,.25)}
+  #ns-pay.ns-open{transform:none}
+  .ns-shade{position:fixed;inset:0;z-index:65;background:rgba(28,26,22,.45)}
+  .ns-shade.ns-open{display:block}
+  .ns-sheet-head{display:flex;align-items:center;justify-content:space-between;position:relative;padding-top:12px;font-size:18px}
+  .ns-grip{position:absolute;top:0;left:50%;width:44px;height:5px;margin-left:-22px;border-radius:3px;background:#CBBF9E}
+  .ns-x{width:44px;height:44px;border-radius:12px;border:1px solid #E4DAC0;background:#fff;display:flex;align-items:center;justify-content:center}
+  #save-invoice-btn{position:static!important;background:#7A6640!important;border-radius:16px!important}
+  .ns-change{background:#fff;border:1px solid #E4DAC0;border-radius:14px;padding:4px 14px 10px}
+  .ns-change label{display:flex;align-items:center;justify-content:space-between;gap:10px;height:48px;font-size:14px}
+  .ns-change input{border:0;outline:0;text-align:left;font-size:18px;width:150px;background:transparent;border-bottom:1px dashed #CBBF9E}
+  .ns-change div{display:flex;justify-content:space-between;font-size:13.5px;color:#6B6355}
+  .ns-change b{color:#211D17}
+}
+@media (max-width:1023px) and (prefers-reduced-motion:reduce){#ns-pay{transition:none}}
+</style>
 </head>
 <body class="bg-background font-body-md text-on-background antialiased min-h-screen flex flex-col md:flex-row-reverse overflow-x-hidden">
 <!-- Navigation Drawer (Desktop) -->
@@ -396,8 +422,10 @@
 </div>
 </section>
 
-<!-- Totals & Payment -->
-<section class="space-y-4 pb-8">
+<!-- Totals & Payment (phone: a bottom sheet opened from the «الدفع» bar — design "MPay") -->
+<div id="nsPayShade" class="ns-shade" onclick="nsPaySheet(false)"></div>
+<section id="ns-pay" class="space-y-4 pb-8" aria-label="الدفع">
+<div class="ns-sheet-head"><span class="ns-grip" aria-hidden="true"></span><b>الدفع</b><button type="button" class="ns-x" aria-label="إغلاق" onclick="nsPaySheet(false)"><span class="material-symbols-outlined">close</span></button></div>
 <div class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm space-y-2">
 <div class="flex justify-between items-center text-[14px] text-on-surface-variant">
 <span>مجموع الوزن</span>
@@ -463,6 +491,10 @@
 </div>
 </div>
 
+<div id="nsChangeBox" class="ns-change hidden">
+<label>المبلغ المستلم<input id="nsReceived" type="number" inputmode="decimal" step="0.01" min="0" dir="ltr" class="font-data-mono" aria-label="المبلغ المستلم" oninput="nsChange()"/></label>
+<div><span>الباقي للزبون</span><b id="nsChangeOut" class="font-data-mono">—</b></div>
+</div>
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
 <button id="save-invoice-btn" class="sticky bottom-[76px] md:bottom-4 z-30 w-full py-4 bg-[#B4955A] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
@@ -476,7 +508,12 @@
 </div>
 </main>
 
-<nav class="md:hidden fixed bottom-0 w-full flex justify-around items-center px-4 py-2 bg-surface-container-lowest border-t border-outline-variant shadow-sm z-50">
+<!-- phone: total + «الدفع» (design "MSale") -->
+<div id="nsPayBar" class="ns-paybar">
+<div class="min-w-0 flex-1"><div class="ns-pb-s">الإجمالي · <span id="nsBarWeight" class="font-data-mono">0.00 غ</span></div><div class="ns-pb-t font-data-mono" id="nsBarTotal">0.00</div></div>
+<button type="button" class="ns-pb-btn" onclick="nsPaySheet(true)">الدفع</button>
+</div>
+<nav class="hidden fixed bottom-0 w-full flex justify-around items-center px-4 py-2 bg-surface-container-lowest border-t border-outline-variant shadow-sm z-50">
 <a class="flex flex-col items-center justify-center text-on-surface-variant hover:text-primary transition-all cursor-pointer active:scale-90 duration-150" href="index-ar.html">
 <span class="material-symbols-outlined">dashboard</span>
 <span class="font-label-md text-label-md">الشاشة الرئيسية</span>
@@ -785,8 +822,15 @@
         const draft = wanted && readDrafts().find(d => d.id === wanted);
         // Came from a piece page ("بيع القطعة"): start a fresh sale with that barcode looked up.
         const fromPiece = new URLSearchParams(location.search).get('barcode');
+        // Came from "حفظ وبيع" on the new-customer form: a fresh sale for that customer.
+        const forCustomer = new URLSearchParams(location.search).get('customer');
+        if (forCustomer && !draft) {
+            requireGoldMindSession('login-entry-ar.html').then(s => s ? gmOrgStoreIds() : null)
+                .then(ids => ids ? goldmindClient.from('customers').select('*').eq('id', forCustomer).in('store_id', ids).maybeSingle() : {})
+                .then(({ data }) => { if (data) pickCustomer(data); });
+        }
         if (draft) loadDraft(draft);
-        else if (!fromPiece) openDraftsModal();
+        else if (!fromPiece && !forCustomer) openDraftsModal();
         refreshHeldButton();
         if (fromPiece && !draft) {
             showSaleTab('barcode', false);
@@ -1950,6 +1994,27 @@
         document.getElementById('save-invoice-btn').setAttribute('data-total', totalText); // total stays visible on the sticky save button
         saveDraftToLocalStorage();
     }
+
+    // ---------- phone: payment sheet ----------
+    let nsPayMode = 'cash';
+    function nsPaySheet(open) {
+        document.getElementById('ns-pay').classList.toggle('ns-open', open);
+        document.getElementById('nsPayShade').classList.toggle('ns-open', open);
+        if (open) nsChange();
+    }
+    // change for cash: what the customer handed over minus the total (shown only, nothing is saved)
+    function nsChange() {
+        const box = document.getElementById('nsChangeBox');
+        box.classList.toggle('hidden', nsPayMode !== 'cash' || !cart.length);
+        const total = cart.reduce((s, i) => s + (Number(i.price) || 0), 0);
+        const got = parseFloat(document.getElementById('nsReceived').value);
+        document.getElementById('nsChangeOut').textContent = got > 0 ? gmMoney(got - total) + ' ' + CUR : '—';
+    }
+    ['cash', 'bank', 'mixed', 'credit'].forEach(m => document.getElementById('pay-' + m).addEventListener('click', () => { nsPayMode = m; nsChange(); }));
+    new MutationObserver(() => {
+        document.getElementById('nsBarTotal').textContent = document.getElementById('grand-total').textContent;
+        document.getElementById('nsBarWeight').textContent = document.getElementById('grand-weight').textContent;
+    }).observe(document.getElementById('grand-total'), { childList: true, characterData: true, subtree: true });
 
     // ---------- Save invoice ----------
     const saveBtn = document.getElementById('save-invoice-btn');

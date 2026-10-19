@@ -95,3 +95,25 @@ test('customer page on the computer: statement table with running balance, a cli
   await expect(extra).toContainText('تعديل الدفعة');
   expect(errs).toEqual([]);
 });
+
+test('customers list: totals for us / for them, and how old the oldest unpaid debt is', async ({ page }) => {
+  const ago = d => new Date(Date.now() - d * 86400000).toISOString();
+  await install(page, { db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ريما', phone: '0944', is_company: false }, { id: 'c2', store_id: STORE, name: 'هلا', phone: '0955', is_company: false }],
+    customer_debts: [
+      { store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', cash_amount: 300, created_at: ago(40) },
+      { store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', cash_amount: 200, created_at: ago(10) },
+      { store_id: STORE, customer_id: 'c1', movement_type: 'debt_decrease', cash_amount: 300, created_at: ago(5) },
+      { store_id: STORE, customer_id: 'c2', movement_type: 'debt_decrease', cash_amount: 80, created_at: ago(2) }],
+  } });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/customers-ar.html');
+  await expect(page.locator('#sumOwed')).toHaveText('200.00 USD');
+  await expect(page.locator('#sumCredit')).toHaveText('80.00 USD');
+  await expect(page.locator('#list')).toContainText('منذ 10 يوماً');   // the 40-day debt was paid first
+  await expect(page.locator('#add-fab')).not.toHaveClass(/\bhidden\b/);
+  await expect(page.locator('nav.gm-bottom-tabs a.gm-tab-on')).toHaveText(/الزبائن/);
+});
