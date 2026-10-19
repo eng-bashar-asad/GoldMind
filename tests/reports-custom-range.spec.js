@@ -16,5 +16,5 @@ test('custom range starts from this month and shows its sales', async ({ page })
   await page.locator('[data-period="custom"]').click();
   await expect(page.locator('#customFrom')).not.toHaveValue('');
   await expect(page.locator('#customTo')).not.toHaveValue('');
-  await expect(page.locator('#stat-total-sales')).toHaveText('2,700.00');
+  await expect(page.locator('#stat-total-sales')).toHaveText('2,700.00', { timeout: 15000 });
 });

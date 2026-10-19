@@ -71,6 +71,17 @@
       ['rfid-guide-ar.html', 'nfc', 'دليل RFID: البرمجة والجرد'] ] }
   ];
   window.GM_NAV_GROUPS = GROUPS;
+  // computer layout on for every page with the menu; the sale screen starts with the small bar
+  document.documentElement.classList.add('gm-desk');
+  // below 1280px (small laptops) the bar is always the small one so the page keeps its width
+  function gmMiniPref() {
+    var mini = null;
+    try { mini = localStorage.getItem('gm_nav_mini'); } catch (e) { /* ignore */ }
+    var narrow = window.matchMedia && window.matchMedia('(max-width: 1279px)').matches;
+    document.documentElement.classList.toggle('gm-mini', narrow || mini === '1' || (mini === null && page === 'new-sale-ar.html'));
+  }
+  gmMiniPref();
+  window.addEventListener('resize', gmMiniPref);
 
   var css = document.createElement('style');
   css.textContent = `
@@ -103,6 +114,58 @@
     .gm-nav-btn .material-symbols-outlined{font-size:22px}
     body.gm-nav-open{overflow:hidden}
     @media print{#gmNav,#gmNavOverlay,.gm-nav-btn{display:none!important}}
+    /* computer (>=1024px): the menu is a fixed side bar on the right, the page sits beside it,
+       and the phone's bottom tab bar and menu buttons go away (design "GoldMind — تصميم الكمبيوتر") */
+    #gmNav .gn-mini{display:none}
+    @media screen and (min-width:1024px){
+      html.gm-desk body{padding-right:var(--gm-side,264px)!important}
+      html.gm-desk #gmNav{transform:none;width:var(--gm-side,264px);max-width:none;border-radius:0;box-shadow:none;z-index:45;transition:width .25s}
+      html.gm-desk #gmNav .gn-x{display:none}
+      html.gm-desk #gmNav .gn-mini{display:flex}
+      html.gm-desk #gmNavOverlay{display:none!important}
+      html.gm-desk .gm-nav-btn,html.gm-desk [onclick*="openNavDrawer"]{display:none!important}
+      html.gm-desk body.gm-nav-open{overflow:auto}
+      html.gm-desk nav.fixed.bottom-0.justify-around,html.gm-desk .gm-bottom-tabs{display:none!important}
+      html.gm-desk .fixed.w-full:not(.inset-0),html.gm-desk .fixed.inset-x-0:not(.inset-0){right:var(--gm-side,264px)!important;left:0!important;width:auto!important}
+      html.gm-desk body.pb-24,html.gm-desk main.pb-24,html.gm-desk main.pb-32{padding-bottom:32px}
+      html.gm-desk.gm-mini{--gm-side:76px}
+      html.gm-desk.gm-mini #gmNav .gn-head b,html.gm-desk.gm-mini #gmNav .gn-h>span:not(.gn-ic),html.gm-desk.gm-mini #gmNav a.gn-a>span:not(.material-symbols-outlined),html.gm-desk.gm-mini #gmNav .gn-out span+*{display:none}
+      html.gm-desk.gm-mini #gmNav .gn-head{justify-content:center;padding:18px 0 12px}
+      html.gm-desk.gm-mini #gmNav .gn-h{justify-content:center;padding:0}
+      html.gm-desk.gm-mini #gmNav a.gn-a{justify-content:center;margin:2px 8px;padding:10px 0}
+      html.gm-desk.gm-mini #gmNav .gn-out{justify-content:center;font-size:0}
+    }
+    /* desktop form grid: add class gm-dform to a form's column; wrap inner groups with gm-group,
+       mark rows that must span the whole width with gm-full (textareas, titles, toggles, buttons do it on their own) */
+    @media screen and (min-width:1024px){
+      .gm-dform:not(.hidden){display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px 18px;align-items:start}
+      .gm-dform.gm-cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+      .gm-dform>.gm-group:not(.hidden){display:contents!important}
+      .gm-dform .gm-full,.gm-dform .gm-section-title,.gm-dform>h2,.gm-dform>h3,.gm-dform>.gm-group>h2,.gm-dform>.gm-group>h3,.gm-dform>p,.gm-dform>.gm-group>p,.gm-dform>:has(textarea),.gm-dform>.gm-group>:has(textarea),
+      .gm-dform>label:has(input[type=checkbox]),.gm-dform>.gm-group>label:has(input[type=checkbox]),
+      .gm-dform>:has(>button.w-full),.gm-dform>[id$=message],.gm-dform>[id$=msg]{grid-column:1/-1}
+      .gm-dform>details,.gm-dform>fieldset,.gm-dform>.gm-box{grid-column:1/-1}
+      .gm-dform>details>div.flex-col{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:20px 18px;align-items:start}
+      .gm-dform>details>div.flex-col>p,.gm-dform>details>div.flex-col>.grid,.gm-dform>details>div.flex-col>:has(textarea),.gm-dform>details>div.flex-col>[id$=list]{grid-column:1/-1}
+      .gm-dform>button.w-full,.gm-dform>a.w-full{grid-column:1/-1;max-width:360px}
+      .gm-dform .gm-span2{grid-column:span 2}
+      .gm-dform input,.gm-dform select,.gm-dform>*,.gm-dform>.gm-group>*{min-width:0}
+      .gm-dform>:has(>button.w-full)>button.w-full{max-width:360px}
+      .gm-dform .gm-section-title{margin-top:6px}
+      /* desktop card columns: add gm-dcols to a page's stack of cards (gm-c3 for three); gm-full spans the row */
+      .gm-dcols:not(.hidden){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:20px;align-items:start}
+      .gm-dcols.gm-c3:not(.hidden){grid-template-columns:repeat(3,minmax(0,1fr))}
+      .gm-dcols>.gm-full,.gm-dcols>h1,.gm-dcols>h2,.gm-dcols>p:first-child{grid-column:1/-1}
+      .gm-dcols>*{margin-top:0!important}
+      .gm-dcols>button.w-full,.gm-dcols>p[id]{grid-column:1/-1}
+      .gm-dcols>button.w-full{max-width:360px}
+      /* desktop split: the gm-side card (a form or summary) on the right, everything else beside it */
+      .gm-dsplit:not(.hidden){display:grid!important;grid-template-columns:minmax(340px,420px) minmax(0,1fr);gap:16px 24px;align-items:start;grid-auto-flow:row dense}
+      .gm-dsplit>*{grid-column:2;margin-top:0!important;min-width:0}
+      .gm-dsplit>.gm-side{grid-column:1;grid-row:1/span 30;position:sticky;top:84px}
+      .gm-dsplit>.gm-full{grid-column:1/-1}
+    }
+    #gmNav .gn-mini{width:38px;height:38px;border-radius:12px;border:0;background:#2A251C;color:#F3EEDF;align-items:center;justify-content:center;cursor:pointer}
     @media (prefers-reduced-motion:reduce){#gmNav,#gmNav .gn-b,#gmNav .gn-chev{transition:none!important}}
   `;
   document.head.appendChild(css);
@@ -112,10 +175,10 @@
   function build() {
     var ov = document.createElement('div'); ov.id = 'gmNavOverlay';
     var d = document.createElement('aside'); d.id = 'gmNav'; d.setAttribute('aria-label', 'القائمة'); d.setAttribute('aria-hidden', 'true');
-    var html = '<div class="gn-head"><b>GoldMind</b><button type="button" class="gn-x" aria-label="إغلاق القائمة"><span class="material-symbols-outlined">close</span></button></div><nav>';
+    var html = '<div class="gn-head"><b>GoldMind</b><button type="button" class="gn-mini" aria-label="تصغير القائمة" title="تصغير / توسيع القائمة"><span class="material-symbols-outlined">dock_to_left</span></button><button type="button" class="gn-x" aria-label="إغلاق القائمة"><span class="material-symbols-outlined">close</span></button></div><nav>';
     GROUPS.forEach(function (g) {
       var here = g.l.some(function (x) { return x[0] === page; });
-      html += '<div class="gn-g' + (here ? ' open' : '') + '"><button type="button" class="gn-h" aria-expanded="' + here + '"><span class="material-symbols-outlined gn-ic">' + g.i + '</span><span>' + esc(g.t) + '</span><span class="material-symbols-outlined gn-chev">expand_more</span></button><div class="gn-b"><div>';
+      html += '<div class="gn-g' + (here ? ' open here-g' : '') + '"><button type="button" class="gn-h" aria-expanded="' + here + '"><span class="material-symbols-outlined gn-ic">' + g.i + '</span><span>' + esc(g.t) + '</span><span class="material-symbols-outlined gn-chev">expand_more</span></button><div class="gn-b"><div>';
       g.l.forEach(function (x) {
         html += '<a class="gn-a' + (x[0] === page ? ' here' : '') + '" href="' + x[0] + '"' + (x[3] ? ' data-nav-perm="' + x[3] + '"' : '') + '><span class="material-symbols-outlined">' + x[1] + '</span><span>' + esc(x[2]) + '</span></a>';
       });
@@ -126,6 +189,13 @@
     document.body.appendChild(ov); document.body.appendChild(d);
 
     ov.addEventListener('click', close);
+    d.querySelector('.gn-mini').addEventListener('click', function () {
+      var mini = !document.documentElement.classList.contains('gm-mini');
+      document.documentElement.classList.toggle('gm-mini', mini);
+      try { localStorage.setItem('gm_nav_mini', mini ? '1' : ''); } catch (e) { /* ignore */ }
+    });
+    // in the small bar a link shows its name on hover
+    d.querySelectorAll('a.gn-a').forEach(function (a) { a.title = a.textContent.trim(); });
     d.querySelector('.gn-x').addEventListener('click', close);
     d.querySelector('.gn-out').addEventListener('click', function () { if (typeof goldMindSignOut === 'function') goldMindSignOut(); });
     d.querySelectorAll('.gn-h').forEach(function (b) {
