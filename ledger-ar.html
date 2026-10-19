@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=46"></script>
-<script src="theme.js?v=70"></script>
+<script src="theme.js?v=71"></script>
 <script src="gm-profit.js?v=7"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -57,6 +57,36 @@
   #trader-individual-legal-fields:not(.hidden), #trader-company-fields:not(.hidden) { display: grid !important; grid-template-columns: 1fr 1fr; column-gap: 16px; }
   #trader-company-fields > p { grid-column: 1 / -1; }
 }
+/* computer: toolbar in one line, traders as one table, the picked trader in a side panel */
+#ldSide{display:none}
+@media (min-width:1024px){
+  #traders-list-view:not(.hidden){display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,350px);gap:14px 20px;align-items:start}
+  #traders-list-view>*{grid-column:1;min-width:0}
+  #traders-list-view>#ldSide:not(.hidden){grid-column:2;grid-row:1/span 20;display:flex;flex-direction:column;gap:12px;position:sticky;top:84px}
+  #ldBar{display:flex;flex-wrap:wrap;align-items:center;gap:10px}
+  #ldBar>*{margin:0!important;width:auto!important}
+  #ldBar>#ldSearch{flex:1 1 220px;max-width:320px}
+  #ldBar>#tradersTotalCard{padding:6px 14px;display:flex;align-items:center;gap:12px}
+  #ldBar>#tradersTotalCard>p{margin:0!important}
+  #ldBar>button{padding:0 14px}
+  #traders-list{background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant);border-radius:14px;overflow:hidden;gap:0!important}
+}
+.ld-t{width:100%;border-collapse:collapse}
+.ld-t th{padding:9px 12px;text-align:right;font-size:12px;font-weight:700;color:var(--gm-on-surface-variant);background:#F7F2E6;border-bottom:1px solid #E4DAC0;white-space:nowrap}
+.ld-t td{padding:8px 12px;font-size:13.5px;border-bottom:1px solid #EFE7D2;white-space:nowrap;color:var(--gm-on-surface)}
+.ld-t tr[data-id]{cursor:pointer}.ld-t tr[data-id]:hover td,.ld-t tr.on td{background:#FBF8F1}
+.ld-t tr.on td:first-child{box-shadow:inset -4px 0 0 #1C1A16}
+.ld-t .l{text-align:left}
+.ld-chip{height:32px;padding:0 12px;border-radius:999px;border:1px solid #CBBF9E;background:#fff;font-size:12.5px;font-weight:600;color:#211D17}
+.ld-chip.on{background:#1C1A16;color:#FBF8F1;border-color:#1C1A16}
+.ld-card{background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant);border-radius:14px;padding:14px 16px;color:var(--gm-on-surface)}
+.ld-card h2{margin:0 0 4px;font-size:14px;font-weight:700}
+.ld-tile{background:#F7F2E6;border-radius:12px;padding:8px 12px}.ld-tile span{display:block;font-size:11px;color:#6B6355}.ld-tile b{display:block;font-size:18px;text-align:right}
+.ld-tile.owe{background:#E8F3EA}.ld-tile.owe span,.ld-tile.owe b{color:#1B5E20}
+.ld-tile.due{background:#FBE9E7}.ld-tile.due span,.ld-tile.due b{color:#8A2A1E}
+.ld-act{height:40px;border-radius:10px;border:1px solid #CBBF9E;background:#fff;font-size:13px;font-weight:700;color:#211D17;display:flex;align-items:center;justify-content:center;gap:4px;text-decoration:none}
+.ld-act.dark{background:#1C1A16;color:#FBF8F1;border-color:#1C1A16}
+.ld-kv{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:6px 0;border-bottom:1px solid #EFE7D2}.ld-kv:last-child{border-bottom:0}
 </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
@@ -79,7 +109,8 @@
 
 <!-- Traders list -->
 <div id="traders-list-view" class="hidden py-6">
-<div class="lg:max-w-xl relative mb-4">
+<div id="ldBar">
+<div class="lg:max-w-xl relative mb-4" id="ldSearch">
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant text-[18px]">search</span>
 <input id="traderFilterInput" oninput="renderTraders()" placeholder="ابحث باسم التاجر..." class="w-full h-11 border border-outline-variant rounded-lg pr-10 pl-3 text-[13px] bg-surface-container-lowest"/>
 </div>
@@ -100,6 +131,7 @@
 <button onclick="toggleAddTraderForm()" class="lg:max-w-sm w-full h-11 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 mb-4">
 <span class="material-symbols-outlined">person_add</span> إضافة تاجر جديد
 </button>
+</div>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4 mb-4 lg:max-w-3xl" id="addTraderForm">
 
 <div class="hidden">
@@ -238,7 +270,9 @@
 <p class="text-error text-[12px] hidden mt-2" id="newTraderError"></p>
 </div>
 
-<div id="traders-list" class="flex flex-col gap-3 lg:grid lg:grid-cols-2 xl:grid-cols-3 lg:gap-4"></div>
+<div id="traders-list" class="flex flex-col gap-3"></div>
+<!-- computer: the picked trader beside the table (design "التجار: جدول + لوحة جانبية") -->
+<aside id="ldSide" class="hidden" aria-live="polite"></aside>
 </div>
 
 <!-- Trader detail -->
@@ -975,9 +1009,67 @@ async function submitNewTrader() {
   await load();
 }
 
+const ldIsDesk = () => window.matchMedia('(min-width:1024px)').matches;
+window.matchMedia('(min-width:1024px)').addEventListener('change', () => { if (traders.length && !currentTraderId) renderTraders(); });
+const LD = { pick: null, bal: 'all' };
+// shop's view: positive = the trader owes us (لنا), negative = we owe him (علينا)
+const ldSide = v => v > 0.004 ? 'لنا' : v < -0.004 ? 'علينا' : '';
+function ldCell(v, unit) {
+  if (Math.abs(v) < 0.005) return '<span class="text-on-surface-variant">0.00</span>';
+  return `<b dir="ltr" class="${v > 0 ? 'text-success' : 'text-error'}">${unit === 'g' ? fmt(Math.abs(v)) + ' غ' : fmtMoney(Math.abs(v))}</b> <span class="text-[11px] ${v > 0 ? 'text-success' : 'text-error'}">${ldSide(v)}</span>`;
+}
+function ldSetBal(b) { LD.bal = b; renderTraders(); }
+function ldPick(id) { LD.pick = id; renderTraders(); }
+function ldRenderTable(list) {
+  const rows = list.map(t => ({ t, g: traderGoldBalance(t.id), c: traderFeeBalance(t.id), last: ((movementsByTrader[t.id] || [])[0] || {}).created_at }))
+    .filter(r => LD.bal === 'all' || (LD.bal === 'weg' ? r.g < -0.004 : LD.bal === 'wec' ? r.c < -0.004 : LD.bal === 'they' ? (r.g > 0.004 || r.c > 0.004) : (Math.abs(r.g) < 0.005 && Math.abs(r.c) < 0.005)))
+    .sort((a, b) => Math.abs(b.g) - Math.abs(a.g) || Math.abs(b.c) - Math.abs(a.c));
+  const chips = [['all', 'الكل'], ['weg', 'علينا ذهب'], ['wec', 'علينا نقدي'], ['they', 'لنا عندهم'], ['zero', 'مسدَّد']]
+    .map(([k, l]) => `<button type="button" class="ld-chip${LD.bal === k ? ' on' : ''}" onclick="ldSetBal('${k}')">${l}</button>`).join('');
+  if (!rows.some(r => r.t.id === LD.pick)) LD.pick = rows.length ? rows[0].t.id : null;
+  const day = iso => iso ? gmFormatDateTime(iso, { day: '2-digit', month: '2-digit', year: '2-digit' }) : '—';
+  document.getElementById('traders-list').innerHTML = `<div class="flex flex-wrap items-center gap-2 p-3">${chips}<span class="ms-auto text-[12.5px] text-on-surface-variant">${rows.length} تاجر · ترتيب: <b>الأكبر ذهباً</b></span></div>`
+    + (rows.length ? `<table class="ld-t"><thead><tr><th>التاجر</th><th>الهاتف</th><th>آخر حركة</th><th class="l" style="text-align:left">ذهب (معادل 24)</th><th class="l" style="text-align:left">نقدي</th></tr></thead><tbody>`
+      + rows.map(r => `<tr data-id="${r.t.id}" class="${r.t.id === LD.pick ? 'on' : ''}" tabindex="0" onclick="ldPick('${r.t.id}')" ondblclick="showTraderDetail('${r.t.id}')" onkeydown="if(event.key==='Enter')showTraderDetail('${r.t.id}')">
+          <td><span class="flex items-center gap-2"><span class="w-8 h-8 rounded-full gm-avatar-grad flex items-center justify-center font-bold text-[12px] shrink-0">${gmEscapeHtml(gmInitials(r.t.name))}</span><b>${gmEscapeHtml(r.t.name)}</b></span></td>
+          <td class="font-data-mono text-on-surface-variant" dir="ltr" style="text-align:right">${gmEscapeHtml(r.t.phone || '—')}</td>
+          <td class="font-data-mono text-on-surface-variant">${day(r.last)}</td>
+          <td class="l font-data-mono">${ldCell(r.g, 'g')}</td><td class="l font-data-mono">${ldCell(r.c, 'c')}</td></tr>`).join('') + '</tbody></table>'
+      : '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد تجار مطابقون.</p>')
+    + '<p class="px-3 py-2 text-[12px] text-on-surface-variant">الضغط على السطر يعرض التاجر على الجنب؛ الضغط مرتين يفتح حسابه الكامل.</p>';
+  ldRenderSide();
+}
+function ldRenderSide() {
+  const el = document.getElementById('ldSide');
+  const t = traders.find(x => x.id === LD.pick);
+  if (!t) { el.classList.add('hidden'); el.innerHTML = ''; return; }
+  const g = traderGoldBalance(t.id), c = traderFeeBalance(t.id);
+  const tile = (v, label, txt) => `<div class="ld-tile ${v > 0.004 ? 'owe' : v < -0.004 ? 'due' : ''}"><span>${label}${ldSide(v) ? ' — ' + ldSide(v) : ''}</span><b class="font-data-mono" dir="ltr">${txt}</b></div>`;
+  const moves = (movementsByTrader[t.id] || []).slice(0, 5);
+  const id = encodeURIComponent(t.id);
+  el.innerHTML = `<section class="ld-card">
+      <div class="flex items-center gap-3"><span class="w-12 h-12 rounded-full gm-avatar-grad flex items-center justify-center font-bold text-[16px] shrink-0">${gmEscapeHtml(gmInitials(t.name))}</span>
+      <div class="min-w-0"><div class="text-[16px] font-bold truncate">${gmEscapeHtml(t.name)}</div><div class="font-data-mono text-[12.5px] text-on-surface-variant" dir="ltr" style="text-align:right">${gmEscapeHtml(t.phone || '')}</div></div></div>
+      <div class="grid grid-cols-2 gap-2 mt-3">${tile(g, 'ذهب', fmt(Math.abs(g)) + ' غ')}${tile(c, 'نقدي', fmtMoney(Math.abs(c)))}</div>
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        <button type="button" class="ld-act dark" onclick="showTraderDetail('${t.id}')"><span class="material-symbols-outlined">account_balance_wallet</span>فتح الحساب</button>
+        <a class="ld-act" href="trader-statement-print-ar.html?trader=${id}"><span class="material-symbols-outlined">receipt_long</span>كشف حساب</a>
+        <a class="ld-act" href="cash-voucher-ar.html?party=trader&id=${id}&kind=in"><span class="material-symbols-outlined">south_west</span>سند قبض</a>
+        <a class="ld-act" href="cash-voucher-ar.html?party=trader&id=${id}&kind=out"><span class="material-symbols-outlined">north_east</span>سند صرف</a>
+      </div></section>
+    <section class="ld-card"><h2>آخر الحركات</h2>${moves.length ? moves.map(m => {
+        const inc = m.movement_type === 'debt_increase', gw = Number(m.gold_24k_equivalent || 0), fee = Number(m.fab_fee_amount || 0);
+        const amt = [gw ? fmt(gw) + ' غ' : '', fee ? fmtMoney(fee) : ''].filter(Boolean).join(' · ') || '—';
+        return `<div class="ld-kv"><span class="min-w-0"><span class="font-data-mono text-on-surface-variant">${gmFormatDateTime(m.created_at, { day: '2-digit', month: '2-digit' })}</span> ${gmEscapeHtml(movementLabel(m))}</span><span class="font-data-mono whitespace-nowrap ${inc ? 'text-error' : 'text-success'}" dir="ltr">${inc ? '+' : '−'}${amt}</span></div>`;
+      }).join('') : '<p class="text-[12px] text-on-surface-variant py-1">لا توجد حركات بعد.</p>'}</section>`;
+  el.classList.remove('hidden');
+}
+
 function renderTraders() {
   const q = (document.getElementById('traderFilterInput').value || '').trim().toLowerCase();
   const list = q ? traders.filter(t => t.name.toLowerCase().includes(q)) : traders;
+  if (ldIsDesk()) return ldRenderTable(list);
+  document.getElementById('ldSide').classList.add('hidden');
 
   document.getElementById('traders-list').innerHTML = list.map((t, idx) => {
     const goldBal = traderGoldBalance(t.id);

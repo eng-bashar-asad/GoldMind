@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=46"></script>
-<script src="theme.js?v=70"></script>
+<script src="theme.js?v=71"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -36,6 +36,40 @@
     html { font-size: 87.5%; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
     .period-tab.active { background: #000; color: #fff; }
+    /* computer (design "الصندوق الرئيسي: أرقام + جدول حركات + ملخص") */
+    .mc-desk, #mcHeadActs { display: none; }
+    @media (min-width:1024px) {
+      .mc-phone { display: none !important; }
+      .mc-desk { display: flex; flex-direction: column; gap: 16px; }
+      #mcHeadActs { display: flex; gap: 8px; }
+      #page-content > p.text-outline { order: 9; }
+    }
+    .mc-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; }
+    .mc-kpi { background: var(--gm-surface-lowest,#fff); border: 1px solid var(--gm-outline-variant); border-radius: 14px; padding: 12px 16px; min-width: 0; }
+    .mc-kpi small { display: block; font-size: 12px; color: var(--gm-on-surface-variant); }
+    .mc-kpi b { display: block; text-align: right; font-size: 22px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .mc-kpi i { font-style: normal; font-size: 11.5px; color: var(--gm-on-surface-variant); }
+    .mc-kpi.dark { background: #1C1A16; border-color: #1C1A16; color: #FBF8F1; }
+    .mc-kpi.dark small, .mc-kpi.dark i { color: #CFC4AA; }
+    .mc-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(280px,340px); gap: 16px; align-items: start; }
+    .mc-card { background: var(--gm-surface-lowest,#fff); border: 1px solid var(--gm-outline-variant); border-radius: 14px; }
+    .mc-card h2 { margin: 0; font-size: 15px; font-weight: 700; }
+    .mc-t { width: 100%; border-collapse: collapse; }
+    .mc-t th { padding: 9px 12px; text-align: right; font-size: 12px; font-weight: 700; color: var(--gm-on-surface-variant); background: #F7F2E6; border-bottom: 1px solid #E4DAC0; white-space: nowrap; }
+    .mc-t td { padding: 8px 12px; font-size: 13.5px; border-bottom: 1px solid #EFE7D2; }
+    .mc-t tr[data-href] { cursor: pointer; } .mc-t tr[data-href]:hover td { background: #FBF8F1; }
+    .mc-t .l { text-align: left; direction: ltr; white-space: nowrap; }
+    .mc-tag { border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 700; background: #F7F2E6; color: #6B6355; white-space: nowrap; }
+    .mc-tag.in { background: #E8F3EA; color: #1B5E20; } .mc-tag.out { background: #FBE9E7; color: #8A2A1E; } .mc-tag.amb { background: #FDF0DC; color: #8A4B08; }
+    .mc-chip { height: 34px; padding: 0 13px; border-radius: 999px; border: 1px solid #CBBF9E; background: #fff; font-size: 13px; font-weight: 600; color: #211D17; }
+    .mc-chip.on { background: #1C1A16; color: #FBF8F1; border-color: #1C1A16; }
+    .mc-kv { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #EFE7D2; }
+    .mc-kv:last-child { border-bottom: 0; }
+    .mc-bars { display: flex; align-items: flex-end; gap: 4px; height: 110px; border-bottom: 1px solid #E4DAC0; }
+    .mc-bars span { flex: 1; min-height: 2px; background: #D9C9A0; border-radius: 4px 4px 0 0; }
+    .mc-bars span.hi { background: #C8952E; }
+    .mc-act { height: 38px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBBF9E; background: #fff; font-size: 13px; font-weight: 700; color: #211D17; display: inline-flex; align-items: center; gap: 4px; }
+    .mc-act.dark { background: #1C1A16; color: #FBF8F1; border-color: #1C1A16; }
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 </head>
@@ -48,37 +82,136 @@
 </button>
 <h1 class="font-headline-md text-headline-md font-bold">الصندوق الرئيسي</h1>
 </div>
+<div class="flex items-center gap-2">
+<div id="mcHeadActs">
+<a href="cash-voucher-ar.html?kind=out" class="mc-act"><span class="material-symbols-outlined">north_east</span>سند صرف</a>
+<a href="cash-voucher-ar.html?kind=in" class="mc-act dark"><span class="material-symbols-outlined">south_west</span>سند قبض</a>
+</div>
 <button onclick="gmOpenTimezonePicker()" class="w-9 h-9 rounded-full border border-outline-variant flex items-center justify-center active:scale-90 transition-all" title="المنطقة الزمنية للعرض">
 <span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
 </button>
 </div>
+</div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-6xl mx-auto px-4 lg:px-8">
+<main class="pb-32 max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">هذه الشاشة متاحة فقط لمن لديه صلاحية "عرض تقرير الأرباح" (المدير أو المحاسب المالي).</div>
 
-<div id="page-content" class="gm-dsplit hidden py-6 flex flex-col gap-4">
+<div id="page-content" class="hidden py-6 flex flex-col gap-4">
 
 <p class="text-[11px] text-outline">هذا هو الصندوق الحقيقي المرتبط تلقائياً بالفواتير (مبيعات، مشتريات، ديون، تسويات) — منفصل تماماً عن دفتر "الحركة اليومية" البسيط المتاح لكل الموظفين.</p>
 
-<div class="flex gap-1 p-1 bg-surface-container-low rounded-lg overflow-x-auto">
+<div class="flex gap-1 p-1 bg-surface-container-low rounded-lg overflow-x-auto lg:w-fit">
 <button class="period-tab active px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="today" onclick="setPeriod('today')">اليوم</button>
 <button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="week" onclick="setPeriod('week')">أسبوع</button>
 <button class="period-tab px-4 py-2 text-[13px] font-semibold rounded-md whitespace-nowrap" data-period="month" onclick="setPeriod('month')">شهر</button>
 </div>
 
-<div id="balances-by-currency" class="gm-side flex flex-col gap-2"></div>
+<div class="mc-phone flex flex-col gap-4">
+<div id="balances-by-currency" class="flex flex-col gap-2"></div>
 
 <h2 class="font-semibold text-[13px] mt-2">الحركات (<span id="entries-count">0</span>)</h2>
 <div id="entries-list" class="flex flex-col gap-2"></div>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات بهذه الفترة.</p>
+</div>
+
+<!-- computer: numbers on top, one movements table, summaries beside it -->
+<div class="mc-desk">
+<div class="mc-kpis" id="mcKpis"></div>
+<div class="mc-grid">
+<section class="mc-card" style="overflow:hidden">
+<div class="flex flex-wrap items-center gap-2 p-3">
+<h2>الحركات</h2>
+<div class="flex flex-wrap gap-1.5 ms-2" id="mcTypes" role="group" aria-label="نوع الحركة"></div>
+<label class="ms-auto flex items-center gap-2 h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest" style="flex:0 1 240px">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+<input id="mcQ" type="search" aria-label="بحث بالحركات" placeholder="بحث بالبيان" class="border-0 p-0 flex-1 min-w-0 text-[13px] bg-transparent focus:ring-0" oninput="mcRender()"/>
+</label>
+</div>
+<div id="mcTable"></div>
+</section>
+<aside class="flex flex-col gap-3" style="position:sticky;top:84px">
+<section class="mc-card p-4"><h2 class="mb-2" id="mcBarsTitle">الحركة بالساعة</h2><div class="mc-bars" id="mcBars" aria-hidden="true"></div><div class="flex justify-between text-[11px] text-on-surface-variant mt-1 font-data-mono" id="mcBarsAxis"></div></section>
+<section class="mc-card px-4 py-3"><h2 class="mb-1">حسب العملة</h2><div id="mcByCur"></div></section>
+<section class="mc-card px-4 py-3"><h2 class="mb-1">حسب النوع</h2><div id="mcByType"></div></section>
+</aside>
+</div>
+</div>
 
 </div>
 </main>
 
 <script>
 let currentPeriod = 'today';
+const MC = { entries: [], store: null, base: 'AED', type: 'all' };
+// what kind of movement a cash_movements row is (from its links and its description)
+function mcType(m) {
+  const d = m.description || '';
+  if (m.trader_movement_id || /التاجر/.test(d)) return 'trader';
+  if (/^مصروف/.test(d)) return 'expense';
+  if (/^عربون/.test(d)) return 'deposit';
+  if (m.invoice_id) return /شراء/.test(d) ? 'purchase' : 'sale';
+  if (/العميل|الزبون/.test(d)) return 'customer';
+  return 'other';
+}
+const MC_TYPES = { sale: ['بيع', 'in'], purchase: ['شراء', 'out'], customer: ['زبون', 'in'], trader: ['تاجر', 'out'], expense: ['مصروف', 'out'], deposit: ['عربون', 'amb'], other: ['أخرى', ''] };
+console.assert(mcType({ description: 'مصروف اكل' }) === 'expense' && mcType({ invoice_id: 'x', description: 'دفع فاتورة شراء INV-1' }) === 'purchase'
+  && mcType({ description: 'قبض كاش من التاجر جليل' }) === 'trader' && mcType({ invoice_id: 'x', description: 'تحصيل فاتورة بيع' }) === 'sale', 'mcType');
+function mcAmt(m, signed) {
+  const cur = m.currency || MC.base, sign = signed ? (m.direction === 'in' ? '+' : '−') : '';
+  return sign + fmt(m.amount) + ' ' + cur;
+}
+function mcSetType(t) { MC.type = t; mcRender(); }
+function mcRender() {
+  const all = MC.entries, base = MC.base;
+  // numbers on top: base currency in / out / net, then one tile per other currency
+  const tot = {};
+  all.forEach(m => { const c = m.currency || base; tot[c] = tot[c] || { in: 0, out: 0, nIn: 0, nOut: 0 }; if (m.direction === 'in') { tot[c].in += Number(m.amount); tot[c].nIn++; } else { tot[c].out += Number(m.amount); tot[c].nOut++; } });
+  const b = tot[base] || { in: 0, out: 0, nIn: 0, nOut: 0 };
+  const pl = { today: 'اليوم', week: 'الأسبوع', month: 'الشهر' }[currentPeriod];
+  const others = Object.keys(tot).filter(c => c !== base);
+  document.getElementById('mcKpis').innerHTML =
+    `<div class="mc-kpi dark"><small>صافي ${pl} · ${base}</small><b dir="ltr" class="font-data-mono">${fmt(b.in - b.out)}</b><i>${all.length} حركة</i></div>`
+    + `<div class="mc-kpi"><small>داخل ${pl}</small><b dir="ltr" class="font-data-mono text-success">+${fmt(b.in)}</b><i>${b.nIn} حركة · ${base}</i></div>`
+    + `<div class="mc-kpi"><small>خارج ${pl}</small><b dir="ltr" class="font-data-mono text-error">−${fmt(b.out)}</b><i>${b.nOut} حركة · ${base}</i></div>`
+    + others.map(c => `<div class="mc-kpi"><small>صافي ${c}</small><b dir="ltr" class="font-data-mono">${fmt(tot[c].in - tot[c].out)}</b><i>داخل ${fmt(tot[c].in)} · خارج ${fmt(tot[c].out)}</i></div>`).join('');
+  // type chips with counts
+  const cnt = {}; all.forEach(m => { const t = mcType(m); cnt[t] = (cnt[t] || 0) + 1; });
+  const chips = [['all', 'الكل', all.length], ['in', 'داخل', all.filter(m => m.direction === 'in').length], ['out', 'خارج', all.filter(m => m.direction !== 'in').length]]
+    .concat(Object.keys(MC_TYPES).filter(t => cnt[t]).map(t => [t, MC_TYPES[t][0], cnt[t]]));
+  document.getElementById('mcTypes').innerHTML = chips.map(([k, l, n]) => `<button type="button" class="mc-chip${MC.type === k ? ' on' : ''}" onclick="mcSetType('${k}')">${l} <span class="font-data-mono">${n}</span></button>`).join('');
+  // the table
+  const q = (document.getElementById('mcQ').value || '').trim();
+  const rows = all.filter(m => MC.type === 'all' || (MC.type === 'in' ? m.direction === 'in' : MC.type === 'out' ? m.direction !== 'in' : mcType(m) === MC.type))
+    .filter(m => !q || (m.description || '').includes(q) || ((m.staff && m.staff.full_name) || '').includes(q));
+  const tEl = document.getElementById('mcTable');
+  if (!rows.length) { tEl.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد حركات بهذه الفترة.</p>'; }
+  else {
+    const net = {}; rows.forEach(m => { const c = m.currency || base; net[c] = (net[c] || 0) + (m.direction === 'in' ? 1 : -1) * Number(m.amount); });
+    const time = m => gmFormatDateTime(m.created_at, currentPeriod === 'today' ? { hour: '2-digit', minute: '2-digit' } : { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+    tEl.innerHTML = `<table class="mc-t"><thead><tr><th>الوقت</th><th>النوع</th><th>البيان</th><th>الموظف</th><th class="l">المبلغ</th></tr></thead><tbody>`
+      + rows.map(m => { const t = MC_TYPES[mcType(m)]; const href = m.invoice_id ? `invoice-print-ar.html?id=${m.invoice_id}` : '';
+          return `<tr${href ? ` data-href="${href}" onclick="location.href=this.dataset.href" tabindex="0" onkeydown="if(event.key==='Enter')location.href=this.dataset.href"` : ''}><td class="font-data-mono whitespace-nowrap">${time(m)}</td><td><span class="mc-tag ${t[1]}">${t[0]}</span></td><td>${gmEscapeHtml(m.description) || '—'}${href ? ' <span class="material-symbols-outlined text-on-surface-variant" style="font-size:15px;vertical-align:middle">open_in_new</span>' : ''}</td><td class="whitespace-nowrap text-on-surface-variant">${gmEscapeHtml((m.staff && m.staff.full_name) || '—')}</td><td dir="ltr" class="l font-data-mono font-bold ${m.direction === 'in' ? 'text-success' : 'text-error'}">${mcAmt(m, true)}</td></tr>`; }).join('')
+      + `</tbody><tfoot><tr><td colspan="4" class="font-bold" style="background:#F7F2E6">المجموع (${rows.length} حركة)</td><td dir="ltr" class="l font-data-mono font-bold" style="background:#F7F2E6">${Object.keys(net).map(c => fmt(net[c]) + ' ' + c).join('<br>')}</td></tr></tfoot></table>`;
+  }
+  // side: activity by hour (today) or by day (week / month), base currency volume
+  const byHour = currentPeriod === 'today', slots = {};
+  all.forEach(m => { const d = new Date(m.created_at); const k = byHour ? d.getHours() : new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10); slots[k] = (slots[k] || 0) + Number(m.amount); });
+  let keys;
+  if (byHour) { const hs = Object.keys(slots).map(Number); const lo = Math.min(9, ...hs), hi = Math.max(21, ...hs); keys = []; for (let h = lo; h <= hi; h++) keys.push(h); }
+  else { const { start } = computeRange(currentPeriod); keys = []; for (let d = new Date(start); d <= new Date(); d.setDate(d.getDate() + 1)) keys.push(new Date(d.getTime() - d.getTimezoneOffset() * 6e4).toISOString().slice(0, 10)); }
+  const max = Math.max(1, ...keys.map(k => slots[k] || 0)), top = [...keys].sort((a, c) => (slots[c] || 0) - (slots[a] || 0)).slice(0, 2);
+  document.getElementById('mcBarsTitle').textContent = byHour ? 'الحركة بالساعة' : 'الحركة باليوم';
+  document.getElementById('mcBars').innerHTML = keys.map(k => `<span class="${slots[k] && top.includes(k) ? 'hi' : ''}" style="height:${Math.round((slots[k] || 0) / max * 100)}%" title="${k}"></span>`).join('');
+  const ax = byHour ? [keys[0], keys[Math.floor(keys.length / 2)], keys[keys.length - 1]] : [keys[0].slice(5), keys[keys.length - 1].slice(5)];
+  document.getElementById('mcBarsAxis').innerHTML = ax.map(x => `<span>${x}</span>`).join('');
+  const curs = Object.keys(tot);
+  document.getElementById('mcByCur').innerHTML = curs.length ? curs.map(c => `<div class="mc-kv"><span>${c}</span><span dir="ltr" class="font-data-mono"><span class="text-success">+${fmt(tot[c].in)}</span> · <span class="text-error">−${fmt(tot[c].out)}</span> · <b>${fmt(tot[c].in - tot[c].out)}</b></span></div>`).join('') : '<p class="text-[12px] text-on-surface-variant py-2">لا توجد حركات.</p>';
+  const bt = {}; all.filter(m => (m.currency || base) === base).forEach(m => { const t = mcType(m); bt[t] = (bt[t] || 0) + (m.direction === 'in' ? 1 : -1) * Number(m.amount); });
+  document.getElementById('mcByType').innerHTML = Object.keys(bt).length ? Object.keys(bt).map(t => `<div class="mc-kv"><span>${MC_TYPES[t][0]}</span><span dir="ltr" class="font-data-mono ${bt[t] >= 0 ? 'text-success' : 'text-error'}">${bt[t] >= 0 ? '+' : '−'}${fmt(Math.abs(bt[t]))} ${base}</span></div>`).join('') : '<p class="text-[12px] text-on-surface-variant py-2">لا توجد حركات.</p>';
+  if (window.gmTick) document.querySelectorAll('#mcKpis b').forEach(el => gmTick(el));
+}
 
 function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
@@ -103,7 +236,7 @@ async function loadEntries() {
   const [{ data, error }, { data: store }] = await Promise.all([
     goldmindClient
       .from('cash_movements')
-      .select('id, direction, amount, currency, description, created_at, invoice_id, staff:created_by(full_name)')
+      .select('id, direction, amount, currency, description, created_at, invoice_id, trader_movement_id, staff:created_by(full_name)')
       .eq('store_id', GOLDMIND_STORE_ID)
       .eq('box', 'main')
       .gte('created_at', start.toISOString()).lte('created_at', end.toISOString())
@@ -117,6 +250,8 @@ async function loadEntries() {
   }
 
   const entries = gmCollapseMovements(data);
+  MC.entries = entries; MC.store = store; MC.base = (store && store.currency) || 'AED';
+  mcRender();
   document.getElementById('entries-count').textContent = entries.length;
 
   const byCurrency = {};

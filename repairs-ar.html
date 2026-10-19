@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=46"></script>
-<script src="theme.js?v=70"></script>
+<script src="theme.js?v=71"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -34,6 +34,29 @@
       } } }
     </script>
 <style> html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; } body { min-height: max(884px, 100dvh); } </style>
+<style>
+/* computer (design "الصيانة: أعمدة حسب الحالة"): one column per status; a card is dragged to another column
+   (or moved with its arrow button) to change its status */
+#rpBoard, #rpTools { display: none; }
+@media (min-width:1024px) {
+  #ticketsList { display: none !important; }
+  #rpBoard { display: grid; grid-template-columns: repeat(var(--cols,4), minmax(0,1fr)); gap: 12px; align-items: start; }
+  #rpTools { display: flex; }
+}
+.rp-col { background: #EFE7D2; border-radius: 14px; padding: 10px; display: flex; flex-direction: column; gap: 8px; min-height: 160px; transition: box-shadow .15s, background .15s; }
+.rp-col.over { background: #E6DBBE; box-shadow: inset 0 0 0 2px #C8952E; }
+.rp-col h2 { margin: 0; font-size: 14.5px; font-weight: 700; display: flex; align-items: center; gap: 6px; }
+.rp-dot { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+.rp-n { background: #fff; border-radius: 999px; padding: 1px 9px; font-size: 12px; font-weight: 700; }
+.rp-card { background: #fff; border: 1px solid #E4DAC0; border-radius: 12px; padding: 10px 12px; display: flex; flex-direction: column; gap: 5px; color: #211D17; text-decoration: none; cursor: pointer; }
+.rp-card[draggable=true] { cursor: grab; }
+.rp-card.drag { opacity: .45; }
+.rp-card:hover { border-color: #CBBF9E; }
+.rp-tag { border-radius: 999px; padding: 2px 9px; font-size: 11.5px; font-weight: 700; background: #F7F2E6; color: #6B6355; white-space: nowrap; }
+.rp-tag.late { background: #FBE9E7; color: #8A2A1E; } .rp-tag.soon { background: #FDF0DC; color: #8A4B08; } .rp-tag.ok { background: #E8F3EA; color: #1B5E20; }
+.rp-mini { width: 30px; height: 30px; border-radius: 8px; border: 1px solid #E4DAC0; background: #fff; display: inline-flex; align-items: center; justify-content: center; color: #6B6355; }
+.rp-mini:hover { color: #211D17; border-color: #CBBF9E; }
+</style>
 </head>
 <body class="bg-background text-on-background font-body-md">
 <header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
@@ -43,6 +66,14 @@
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
 </button>
 <h1 class="font-headline-md text-headline-md font-bold">الصيانة والتصليح</h1>
+</div>
+<div id="rpTools" class="items-center gap-2 ms-auto me-3">
+<label class="flex items-center gap-2 h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest" style="width:280px">
+<span class="material-symbols-outlined text-on-surface-variant">search</span>
+<input id="rpQ" type="search" aria-label="بحث بالصيانة" placeholder="رقم التذكرة، الزبون، الهاتف" class="border-0 p-0 flex-1 min-w-0 text-[13px] bg-transparent focus:ring-0" oninput="rpRender()"/>
+</label>
+<span id="rpLate" class="hidden rp-tag late"></span>
+<button type="button" id="rpCancelBtn" class="hidden h-9 px-3 rounded-full border border-outline-variant text-[12.5px] font-semibold" onclick="RP.showCancelled=!RP.showCancelled;rpRender()"></button>
 </div>
 <button onclick="gmOpenTimezonePicker()" class="w-9 h-9 rounded-full border border-outline-variant flex items-center justify-center active:scale-90 transition-all" title="المنطقة الزمنية للعرض">
 <span class="material-symbols-outlined text-primary text-[18px]">schedule</span>
@@ -58,7 +89,8 @@
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">ليست لديك صلاحية عرض قطع الصيانة.</div>
 
 <div id="page-content" class="hidden py-6">
-<div id="ticketsList" class="flex flex-col gap-3 lg:grid lg:grid-cols-2 xl:grid-cols-3"></div>
+<div id="ticketsList" class="flex flex-col gap-3"></div>
+<div id="rpBoard" aria-label="قطع الصيانة حسب الحالة"></div>
 </div>
 
 </main>
@@ -191,6 +223,96 @@ document.getElementById('addForm').addEventListener('input', saveRepairDraft);
 const STATUS_LABELS = { received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة للاستلام', delivered: 'تم التسليم', cancelled: 'ملغاة' };
 const STATUS_COLORS = { received: 'bg-surface-container-low text-on-surface-variant', in_progress: 'bg-amber-100 text-amber-800', ready: 'bg-success-container text-success', delivered: 'bg-gray-200 text-gray-600', cancelled: 'bg-error-container text-on-error-container' };
 
+const RP = { tickets: [], canEdit: false, showCancelled: false, showAllDone: false };
+const RP_COLS = [['received', '#8A94A3'], ['in_progress', '#D9731A'], ['ready', '#1B5E20'], ['delivered', '#6B6355'], ['cancelled', '#8A2A1E']];
+const RP_NEXT = { received: 'in_progress', in_progress: 'ready', ready: 'delivered' };
+const rpToday = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
+// a ticket still at the shop whose promised date has passed
+const rpIsLate = t => (t.status === 'received' || t.status === 'in_progress') && t.expected_ready_at && t.expected_ready_at < rpToday();
+console.assert(rpIsLate({ status: 'received', expected_ready_at: '2000-01-01' }) && !rpIsLate({ status: 'ready', expected_ready_at: '2000-01-01' }) && !rpIsLate({ status: 'received' }), 'rpIsLate');
+function rpDays(iso) { const n = Math.floor((Date.now() - Date.parse(iso)) / 864e5); return n <= 0 ? 'اليوم' : n === 1 ? 'منذ يوم' : n === 2 ? 'منذ يومين' : 'منذ ' + n + ' أيام'; }
+function rpCard(t) {
+  const dm = d => d ? d.slice(8, 10) + '/' + d.slice(5, 7) : '';
+  let tag = '';
+  if (rpIsLate(t)) tag = `<span class="rp-tag late">متأخرة · موعدها ${dm(t.expected_ready_at)}</span>`;
+  else if ((t.status === 'received' || t.status === 'in_progress') && t.expected_ready_at) tag = `<span class="rp-tag soon">موعدها ${dm(t.expected_ready_at)}</span>`;
+  else if (t.status === 'ready') tag = `<span class="rp-tag ok">${t.actual_cost || t.estimated_cost ? 'الأجرة ' + gmEscapeHtml(String(t.actual_cost || t.estimated_cost)) : 'جاهزة'}</span>`;
+  else if (t.status === 'delivered' && t.delivered_at) tag = `<span class="rp-tag">سُلّمت ${dm(new Date(t.delivered_at).toISOString().slice(0, 10))}</span>`;
+  const next = RP.canEdit && RP_NEXT[t.status];
+  const wa = t.status === 'ready' && t.customer_phone ? `<button type="button" class="rp-mini" aria-label="إشعار واتساب: القطعة جاهزة" title="إشعار واتساب: القطعة جاهزة" onclick="event.stopPropagation();rpNotify('${t.id}')"><span class="material-symbols-outlined">chat</span></button>` : '';
+  return `<article class="rp-card" data-id="${t.id}" ${RP.canEdit && t.status !== 'cancelled' ? 'draggable="true"' : ''} tabindex="0" onclick="location.href='repair-detail-ar.html?id=${t.id}'" onkeydown="if(event.key==='Enter')location.href='repair-detail-ar.html?id=${t.id}'">
+    <div class="flex justify-between gap-2"><b class="text-[13.5px] truncate">${gmEscapeHtml(t.piece_description || '—')}</b><span class="font-data-mono text-[11.5px] text-on-surface-variant" dir="ltr">${gmEscapeHtml(t.ticket_number || '')}</span></div>
+    <div class="text-[12.5px] text-on-surface-variant truncate">${gmEscapeHtml(t.customer_name || '')}${t.problem_description ? ' · ' + gmEscapeHtml(t.problem_description) : ''}</div>
+    <div class="flex justify-between items-center gap-2"><span>${tag}</span><span class="flex items-center gap-1"><span class="text-[11.5px] text-on-surface-variant whitespace-nowrap">${rpDays(t.received_at || t.created_at)}</span>${wa}${next ? `<button type="button" class="rp-mini" aria-label="نقل إلى: ${STATUS_LABELS[next]}" title="نقل إلى: ${STATUS_LABELS[next]}" onclick="event.stopPropagation();rpMove('${t.id}','${next}')"><span class="material-symbols-outlined">arrow_back</span></button>` : ''}</span></div>
+  </article>`;
+}
+function rpRender() {
+  const board = document.getElementById('rpBoard');
+  if (!board) return;
+  const q = (document.getElementById('rpQ').value || '').trim();
+  const all = RP.tickets.filter(t => !q || [t.ticket_number, t.customer_name, t.customer_phone, t.piece_description].some(v => (v || '').includes(q)));
+  const weekAgo = Date.now() - 7 * 864e5;
+  const nCancel = all.filter(t => t.status === 'cancelled').length;
+  const cols = RP_COLS.filter(([k]) => k !== 'cancelled' || RP.showCancelled);
+  board.style.setProperty('--cols', cols.length);
+  board.innerHTML = cols.map(([k, color]) => {
+    let items = all.filter(t => t.status === k);
+    let more = '';
+    if (k === 'delivered' && !RP.showAllDone) {
+      const recent = items.filter(t => Date.parse(t.delivered_at || t.created_at) >= weekAgo);
+      if (recent.length < items.length) more = `<button type="button" class="text-[12.5px] font-bold" style="color:#7A6640" onclick="RP.showAllDone=true;rpRender()">عرض الكل (${items.length}) ←</button>`;
+      items = recent;
+    }
+    if (k === 'received' || k === 'in_progress') items.sort((a, b) => rpIsLate(b) - rpIsLate(a));
+    const title = k === 'delivered' && !RP.showAllDone ? 'تم التسليم (آخر أسبوع)' : STATUS_LABELS[k];
+    return `<section class="rp-col" data-status="${k}"><div class="flex justify-between items-center px-1"><h2><span class="rp-dot" style="background:${color}"></span>${title}</h2><span class="rp-n font-data-mono">${items.length}</span></div>
+      ${items.map(rpCard).join('') || '<p class="text-center text-[12px] text-on-surface-variant py-4">لا يوجد</p>'}${more}</section>`;
+  }).join('');
+  const late = all.filter(rpIsLate).length;
+  const lateEl = document.getElementById('rpLate');
+  lateEl.textContent = 'متأخرة ' + late; lateEl.classList.toggle('hidden', !late);
+  const cb = document.getElementById('rpCancelBtn');
+  cb.textContent = (RP.showCancelled ? 'إخفاء الملغاة' : 'الملغاة') + ' (' + nCancel + ')'; cb.classList.toggle('hidden', !nCancel);
+  rpWireDrag(board);
+}
+function rpWireDrag(board) {
+  if (!RP.canEdit) return;
+  board.querySelectorAll('.rp-card[draggable=true]').forEach(c => {
+    c.addEventListener('dragstart', e => { e.dataTransfer.setData('text/plain', c.dataset.id); e.dataTransfer.effectAllowed = 'move'; c.classList.add('drag'); });
+    c.addEventListener('dragend', () => c.classList.remove('drag'));
+  });
+  board.querySelectorAll('.rp-col').forEach(col => {
+    if (col.dataset.status === 'cancelled') return;
+    col.addEventListener('dragover', e => { e.preventDefault(); col.classList.add('over'); });
+    col.addEventListener('dragleave', e => { if (!col.contains(e.relatedTarget)) col.classList.remove('over'); });
+    col.addEventListener('drop', e => { e.preventDefault(); col.classList.remove('over'); rpMove(e.dataTransfer.getData('text/plain'), col.dataset.status); });
+  });
+}
+// same fields the ticket page writes for each status
+async function rpMove(id, status) {
+  const t = RP.tickets.find(x => x.id === id);
+  if (!t || t.status === status) return;
+  if (status === 'delivered' && !confirm('تأكيد تسليم القطعة «' + (t.piece_description || '') + '» للزبون؟')) return;
+  const updates = { status };
+  if (status === 'ready') updates.ready_at = new Date().toISOString();
+  if (status === 'delivered') { updates.delivered_at = new Date().toISOString(); updates.delivered_by = GOLDMIND_STAFF_ID; }
+  const before = { ...t };
+  Object.assign(t, updates); rpRender();
+  const { error } = await goldmindClient.from('repair_tickets').update(updates).eq('id', id).eq('store_id', GOLDMIND_STORE_ID);
+  if (error) { Object.assign(t, before); rpRender(); gmNotify('تعذّر تغيير الحالة: ' + error.message, 'err'); return; }
+  gmNotify('صارت «' + STATUS_LABELS[status] + '».', 'ok');
+  if (status === 'ready' && t.customer_phone && confirm('إرسال إشعار واتساب للزبون إنو القطعة جاهزة؟')) rpNotify(id);
+}
+async function rpNotify(id) {
+  const t = RP.tickets.find(x => x.id === id);
+  if (!t || !t.customer_phone) return;
+  const { data: st } = await goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  const cost = t.actual_cost || '';
+  let msg = `مرحباً ${t.customer_name}،\nقطعتك جاهزة للاستلام من ${(st && st.name) || 'المحل'}.\nرقم التذكرة: ${t.ticket_number}\nوصف القطعة: ${t.piece_description}\nالإيصال: ${location.origin}${location.pathname.replace('repairs-ar.html', '')}repair-receipt-ar.html?id=${t.id}`;
+  if (cost) msg += `\nالتكلفة: ${cost}`;
+  window.open(`https://wa.me/${t.customer_phone}?text=${encodeURIComponent(msg)}`, '_blank');
+}
+
 function fmtDate(iso) {
   return gmFormatDateTime(iso, { year: 'numeric', month: 'short', day: 'numeric' });
 }
@@ -201,6 +323,8 @@ async function loadTickets() {
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('created_at', { ascending: false });
 
+  RP.tickets = data || [];
+  rpRender();
   const list = document.getElementById('ticketsList');
   if (error || !data || data.length === 0) {
     list.innerHTML = '<p class="text-center text-on-background/70 text-sm py-10">لا توجد قطع صيانة بعد.</p>';
@@ -310,6 +434,7 @@ async function init() {
   }
 
   if (canAdd) document.getElementById('addBtn').classList.remove('hidden');
+  RP.canEdit = !!(staffPerm && (staffPerm.role === 'owner' || (staffPerm.permissions && staffPerm.permissions['edit_repair'] === true)));
 
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');

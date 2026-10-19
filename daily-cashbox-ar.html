@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=46"></script>
-<script src="theme.js?v=70"></script>
+<script src="theme.js?v=71"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -38,12 +38,50 @@
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <style>
-/* computer: controls on the right, the day's operations fill the rest */
+/* computer (design "الصندوق اليومي"): a number strip on top, the quick entry line above the day's table,
+   tools and the drawer count in a side column */
+#dcKpis, #dcSide { display: none; }
 @media (min-width:1024px){
-  #page-content:not(.hidden){display:grid;grid-template-columns:minmax(0,400px) minmax(0,1fr);column-gap:28px;align-items:start}
-  #page-content > *:not(#gm-entries-col){grid-column:1}
-  #page-content > #gm-entries-col{grid-column:2;grid-row:1 / span 40}
+  #page-content:not(.hidden){display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,330px);gap:14px 22px;align-items:start}
+  #page-content > *{grid-column:2;margin:0!important}
+  #page-content > #dcKpis{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
+  #page-content > #gm-entries-col{grid-column:1;grid-row:2 / span 40}
+  #page-content > #dcSide{display:flex}
+  #balances-by-currency, #dcAddToggle{display:none!important}
+  #page-content > p.text-outline{order:9}
+  #addForm.dc-inline{display:grid!important;grid-template-columns:max-content minmax(0,1fr) minmax(0,1fr) 130px 150px;gap:8px;align-items:center;padding:12px 14px;border-radius:14px}
+  #addForm.dc-inline > *{margin:0!important}
+  #addForm.dc-inline > .dc-dir{order:1}
+  #addForm.dc-inline > .dc-dir button{flex:none;padding:0 14px}
+  #addForm.dc-inline > #opTypeInput{order:2;grid-column:span 2;height:44px}
+  #addForm.dc-inline > #amountInput{order:3;height:44px}
+  #addForm.dc-inline > #currencySelect{order:4;height:44px}
+  #addForm.dc-inline > #addFormDateWrap{order:5}
+  #addForm.dc-inline > #addFormDateWrap > label{display:none}
+  #addForm.dc-inline > #addFormDateWrap > input{height:40px}
+  #addForm.dc-inline > #notesInput{order:6;grid-column:span 2;height:40px;resize:vertical}
+  #addForm.dc-inline > #addFormDateWrap.hidden ~ #notesInput{grid-column:span 3}
+  #addForm.dc-inline > .dc-link{order:7}
+  #addForm.dc-inline > .dc-link label{display:none}
+  #addForm.dc-inline > .dc-link select{height:40px}
+  #addForm.dc-inline > #submitBtn{order:8;height:40px}
+  #addForm.dc-inline > #extraRowsContainer{order:9;grid-column:1/-1}
+  #addForm.dc-inline > #extraRowsContainer:empty{display:none}
+  #addForm.dc-inline > .dc-extra{order:10;grid-column:1/3;justify-self:start;width:auto;height:34px;padding:0 12px}
+  #addForm.dc-inline > #addFormError{order:11;grid-column:1/-1}
+  #addForm.dc-inline > #addFormError.hidden{display:none}
 }
+.dc-kpi{background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant);border-radius:14px;padding:12px 16px;min-width:0}
+.dc-kpi small{display:block;font-size:12px;color:var(--gm-on-surface-variant)}
+.dc-kpi b{display:block;font-size:22px;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+.dc-kpi i{font-style:normal;font-size:11.5px;color:var(--gm-on-surface-variant)}
+.dc-kpi.dark{background:#1C1A16;border-color:#1C1A16;color:#FBF8F1}.dc-kpi.dark small,.dc-kpi.dark i{color:#CFC4AA}
+.dc-card{background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant);border-radius:14px;padding:14px 16px}
+.dc-card h2{margin:0;font-size:14px;font-weight:700}
+.dc-kv{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid #EFE7D2}
+.dc-kv:last-child{border-bottom:0}
+.dc-tag{border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;background:#F7F2E6;color:#6B6355;white-space:nowrap}
+.dc-tag.ok{background:#E8F3EA;color:#1B5E20}.dc-tag.warn{background:#FDF0DC;color:#8A4B08}
 </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
@@ -67,6 +105,20 @@
 
 <div id="page-content" class="hidden py-6 flex flex-col gap-4">
 
+<div id="dcKpis" aria-label="أرصدة الدرج"></div>
+<aside id="dcSide" class="flex-col gap-3">
+<section class="dc-card">
+<h2>عدّ الدرج</h2>
+<p class="text-[12px] text-on-surface-variant mt-1 mb-2">اكتب المبلغ يلي عدّيته فعلاً، والفرق بيطلع لحاله. هذا حساب للمقارنة فقط وما بيتسجّل.</p>
+<div id="dcCount"></div>
+</section>
+<section class="dc-card">
+<h2 class="mb-1">آخر الأيام</h2>
+<div id="dcDays"></div>
+</section>
+</aside>
+
+
 <p class="text-[11px] text-outline">هذا دفتر يدوي بسيط لمتابعة نقد الدرج فقط — وليس جزءاً من الحسابات الرسمية (المبيعات/الديون/الضريبة موجودة في مكان آخر). يُرحَّل الرصيد تلقائياً كل يوم كقيد افتتاحي لليوم التالي.</p>
 
 <div id="day-nav" class="hidden items-center justify-between bg-surface-container-lowest border border-outline-variant rounded-xl p-2">
@@ -77,7 +129,7 @@
 
 <div id="balances-by-currency" class="flex flex-col gap-2"></div>
 
-<button onclick="toggleAddForm()" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2">
+<button onclick="toggleAddForm()" id="dcAddToggle" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">add</span> إضافة عملية
 </button>
 
@@ -86,7 +138,7 @@
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-1">تاريخ العملية</label>
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="addFormDate" type="date"/>
 </div>
-<div class="flex gap-2 mb-3">
+<div class="dc-dir flex gap-2 mb-3">
 <button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirInBtn" onclick="setDirection('in')">دخول نقدي</button>
 <button class="flex-1 h-11 rounded-lg text-sm font-semibold border" id="dirOutBtn" onclick="setDirection('out')">خروج نقدي</button>
 </div>
@@ -102,13 +154,13 @@
 <option value="GBP">جنيه إسترليني (GBP)</option>
 </select>
 <div id="extraRowsContainer" class="flex flex-col gap-2 mb-2"></div>
-<button type="button" onclick="addExtraRow()" class="w-full h-9 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-secondary flex items-center justify-center gap-1 mb-3">
+<button type="button" onclick="addExtraRow()" class="dc-extra w-full h-9 border border-dashed border-outline-variant rounded-lg text-[12px] font-semibold text-secondary flex items-center justify-center gap-1 mb-3">
 <span class="material-symbols-outlined text-[16px]">add</span> عملة/اتجاه إضافي لنفس العملية
 </button>
 <textarea class="w-full h-16 border border-outline-variant rounded-lg px-3 py-2 text-sm mb-3" id="notesInput" placeholder="ملاحظة / وصف إضافي (اختياري)"></textarea>
-<div class="mb-3">
+<div class="dc-link mb-3">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-1">اربط بعملية موجودة (اختياري) — تأخذان لون الخلفية نفسه في الجدول</label>
-<select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="linkTargetSelect">
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm" id="linkTargetSelect" aria-label="اربط بعملية موجودة (اختياري)">
 <option value="">بدون ربط</option>
 </select>
 </div>
@@ -354,6 +406,63 @@ function buildLinkOptionsHtml(excludeId) {
   }).join('');
 }
 
+const dcIsDesk = () => window.matchMedia('(min-width:1024px)').matches;
+// computer: the add form is always open as one line above the table; phone: it folds back under its button
+function dcPrepForm() {
+  if (canManageDates) {
+    document.getElementById('addFormDateWrap').classList.remove('hidden');
+    document.getElementById('addFormDate').value = localDateStr(selectedDate);
+    document.getElementById('addFormDate').max = localDateStr(new Date());
+  }
+  document.getElementById('linkTargetSelect').innerHTML = '<option value="">بدون ربط</option>' + buildLinkOptionsHtml(null);
+}
+function dcPlaceForm() {
+  const f = document.getElementById('addForm'), col = document.getElementById('gm-entries-col');
+  if (dcIsDesk()) {
+    if (f.parentNode !== col) { col.insertBefore(f, col.firstChild); f.classList.add('dc-inline'); f.classList.remove('hidden'); dcPrepForm(); }
+  } else if (f.parentNode === col) {
+    document.getElementById('dcAddToggle').after(f); f.classList.remove('dc-inline'); f.classList.add('hidden');
+  }
+}
+window.matchMedia('(min-width:1024px)').addEventListener('change', dcPlaceForm);
+// computer: Enter in the line saves it
+['opTypeInput', 'amountInput'].forEach(id => document.getElementById(id).addEventListener('keydown', e => {
+  if (e.key === 'Enter' && dcIsDesk() && !e.isComposing) { e.preventDefault(); document.getElementById('submitBtn').click(); }
+}));
+// number strip (computer): one tile per currency with what the drawer should hold now
+function dcRenderKpis(bals) {
+  const base = window.__storeCurrency || 'AED';
+  const el = document.getElementById('dcKpis');
+  if (!bals.length) { el.innerHTML = '<div class="dc-kpi"><small>الدرج</small><b>0.00</b><i>لا يوجد رصيد مسجّل بعد</i></div>'; }
+  else el.innerHTML = [...bals].sort((a, b) => (b.cur === base) - (a.cur === base)).map(({ cur, opening, todayNet, closing }, i) =>
+    `<div class="dc-kpi${i === 0 ? ' dark' : ''}"><small>${cur} · المفروض بالدرج</small><b dir="ltr" class="font-data-mono">${fmt(closing)}</b><i>افتتاحي <span class="font-data-mono">${fmt(opening)}</span> · صافي اليوم <span class="font-data-mono" dir="ltr">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</span></i></div>`).join('');
+  if (dcIsDesk() && canManageDates) document.getElementById('addFormDate').value = localDateStr(selectedDate);
+  // drawer count: what was counted vs what the book says
+  const cnt = document.getElementById('dcCount');
+  const keep = {}; cnt.querySelectorAll('input[data-cur]').forEach(i => keep[i.dataset.cur] = i.value);
+  cnt.innerHTML = bals.length ? bals.map(({ cur, closing }) => `<div class="dc-kv"><span>${cur} المفروض</span><b class="font-data-mono" dir="ltr">${fmt(closing)}</b></div>
+    <div class="dc-kv"><label for="dcc-${cur}">${cur} المعدود</label><input id="dcc-${cur}" data-cur="${cur}" data-expect="${closing}" type="number" step="0.01" dir="ltr" inputmode="decimal" placeholder="0.00" value="${gmEscapeHtml(keep[cur] || '')}" oninput="dcDiff(this)" class="w-28 h-9 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono"/></div>
+    <div class="dc-kv"><span>الفرق</span><span class="dc-tag" id="dcd-${cur}">—</span></div>`).join('') : '<p class="text-[12px] text-on-surface-variant">ما في رصيد لتعدّه.</p>';
+  cnt.querySelectorAll('input[data-cur]').forEach(dcDiff);
+  // last days: closing balance of the base currency at the end of each of the last 5 days that had activity
+  const days = [...new Set(allEntries.map(e => localDateStr(new Date(e.created_at))))].sort().reverse().slice(0, 5);
+  document.getElementById('dcDays').innerHTML = days.length ? days.map(d => {
+    const end = new Date(d + 'T00:00:00'); end.setDate(end.getDate() + 1);
+    const upTo = allEntries.filter(e => (e.currency || base) === base && new Date(e.created_at) < end);
+    const close = upTo.reduce((s, e) => s + (e.direction === 'in' ? 1 : -1) * Number(e.amount), 0);
+    const n = allEntries.filter(e => localDateStr(new Date(e.created_at)) === d).length;
+    return `<div class="dc-kv"><span class="font-data-mono">${d.slice(8)}/${d.slice(5, 7)}</span><span><span class="text-[11.5px] text-on-surface-variant">${n} عملية · </span><b class="font-data-mono" dir="ltr">${fmt(close)}</b> <span class="text-[11px] text-on-surface-variant">${base}</span></span></div>`;
+  }).join('') : '<p class="text-[12px] text-on-surface-variant">لا توجد عمليات بعد.</p>';
+}
+function dcDiff(inp) {
+  const tag = document.getElementById('dcd-' + inp.dataset.cur);
+  if (!tag) return;
+  if (inp.value === '') { tag.textContent = '—'; tag.className = 'dc-tag'; return; }
+  const d = Math.round((parseFloat(inp.value) - Number(inp.dataset.expect)) * 100) / 100;
+  tag.textContent = Math.abs(d) < 0.005 ? 'مطابق' : (d > 0 ? 'زيادة ' : 'نقص ') + fmt(Math.abs(d));
+  tag.className = 'dc-tag ' + (Math.abs(d) < 0.005 ? 'ok' : 'warn');
+}
+
 function toggleAddForm() {
   document.getElementById('addForm').classList.toggle('hidden');
   if (canManageDates) {
@@ -453,7 +562,7 @@ async function submitEntry() {
   document.getElementById('notesInput').value = '';
   document.getElementById('linkTargetSelect').value = '';
   resetExtraRows();
-  document.getElementById('addForm').classList.add('hidden');
+  if (!dcIsDesk()) document.getElementById('addForm').classList.add('hidden'); else dcPrepForm();
   reportPanelLoaded = false;
   document.getElementById('reportPanel').classList.add('hidden');
   await loadAll();
@@ -529,6 +638,7 @@ function renderAll() {
     return { cur, opening, todayNet, closing };
   }).filter(b => Math.abs(b.opening) > 0.0001 || Math.abs(b.todayNet) > 0.0001 || Math.abs(b.closing) > 0.0001);
 
+  dcRenderKpis(currencyBalances);
   if (currencyBalances.length === 0) {
     balancesEl.innerHTML = '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-center text-on-surface-variant text-sm">لا يوجد رصيد مسجّل بعد.</div>';
   } else if (currencyBalances.length === 1) {
@@ -1061,6 +1171,7 @@ async function load() {
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
   setDirection('in');
+  dcPlaceForm();
   // New entries default to the store's own currency (the list starts with AED).
   const { data: curRow } = await goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle();
   const cur = curRow && curRow.currency ? String(curRow.currency).toUpperCase() : null;
