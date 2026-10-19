@@ -16,6 +16,7 @@ test('invoice profit button and customer period profit', async ({ page }) => {
     invoice_items: [{ id: 'it1', invoice_id: 'i1', barcode: '000001', karat: 18, weight_grams: 10, accounting_weight_grams: 10, line_total: 1300, gold_price_per_gram: 100, piece: { cost_fabrication_per_gram: 2 } }],
     customer_debts: [{ id: 'd1', store_id: STORE, customer_id: 'c1', movement_type: 'debt_decrease', source: 'discount', cash_amount: 30, created_at: T }]
   } });
+  await page.setViewportSize({ width: 390, height: 844 }); // phone cards (the computer shows a statement table)
   await page.goto('/customer-debts-ar.html?open=c1');
   const card = page.locator('a[href="invoice-print-ar.html?id=i1"]');
   await expect(card).toBeVisible();

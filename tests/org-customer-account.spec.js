@@ -17,6 +17,7 @@ const branches = [{ id: STORE, name: 'فرع ب', can_open_invoices: true }, { i
 
 test('another branch: balance, date and branch shown; invoice number, notes and link hidden', async ({ page }) => {
   await install(page, { db: db(), rpc: { org_branches: () => ({ body: branches }) } });
+  await page.setViewportSize({ width: 390, height: 844 }); // phone cards (the computer shows a statement table)
   await page.goto('/customer-debts-ar.html?open=cu1');
   const row = page.locator('#movements-list > *').first();
   await expect(row).toContainText('فرع أ');
@@ -27,6 +28,7 @@ test('another branch: balance, date and branch shown; invoice number, notes and 
 
 test('a payment taken here is sent with this branch', async ({ page }) => {
   const calls = await install(page, { db: db(), rpc: { org_branches: () => ({ body: branches }), record_customer_payment: () => ({ body: { ok: true } }) } });
+  await page.setViewportSize({ width: 390, height: 844 }); // phone cards (the computer shows a statement table)
   await page.goto('/customer-debts-ar.html?open=cu1');
   await expect(page.locator('#detail-customer-name')).not.toBeEmpty();
   await page.evaluate(() => toggleSettleForm());

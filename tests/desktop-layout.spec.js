@@ -44,3 +44,20 @@ test('sale screen: items table under the entry boxes on the computer, back in pl
   await expect(page.locator('#ns-main > #ns-customer')).toHaveCount(1);
   await expect(page.locator('#ns-side > #ns-cart')).toHaveCount(1);
 });
+
+test('piece page on the computer: compact specs, suggested price, transfer link, log as a table', async ({ page }) => {
+  const d = db();
+  d.gold_prices = [{ store_id: STORE, karat: 21, price_per_gram: 300 }];
+  d.pieces = [{ id: 'p1', store_id: STORE, barcode: '000120', karat: 21, weight_grams: 5.4, accounting_weight_grams: 5, cost_fabrication_per_gram: 10, color: 'Gold', status: 'available', piece_type: 'خاتم', box_name: 'قطع ذهبية' }];
+  d.piece_movements = [{ id: 'm1', store_id: STORE, piece_id: 'p1', event_type: 'created', note: 'إدخال', created_at: '2026-10-10T10:00:00Z' }];
+  d.piece_classification_options = []; d.zebra_label_fields = [];
+  await install(page, { db: d });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/piece-edit-ar.html?id=p1');
+  await expect(page.locator('#pcAcc')).toHaveText('5.00 غ');
+  await expect(page.locator('#pcBranch')).toHaveText('محل');
+  await expect(page.locator('#pcSuggest')).toHaveText('1,550.00');          // 5 × 300 + 5 × 10
+  await expect(page.locator('#pcStones')).toHaveClass(/\bhidden\b/);        // no stones → no card
+  await expect(page.locator('#pcMoveBtn')).toHaveAttribute('href', 'branch-transfers-ar.html?barcode=000120');
+  await expect(page.locator('#piece-log-list table.pc-log tbody tr')).toHaveCount(1);
+});

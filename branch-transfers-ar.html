@@ -244,7 +244,11 @@ async function load() {
   if (!others.length) { document.getElementById('no-branches').classList.remove('hidden'); return; }
   document.getElementById('to-branch').innerHTML = '<option value="">اختر الفرع</option>' + others.map(b => `<option value="${b.id}">${gmEscapeHtml(b.name)}</option>`).join('');
   document.getElementById('tabs').classList.remove('hidden');
-  showTab(new URLSearchParams(location.search).get('tab') || 'in');
+  const qs = new URLSearchParams(location.search);
+  // opened from a piece page ("نقل لفرع"): that piece is already in the send list
+  const pre = gmTidyBarcode(qs.get('barcode') || '');
+  if (pre) { sendCodes.push(pre); renderSendList(); }
+  showTab(qs.get('tab') || (pre ? 'send' : 'in'));
 }
 load();
 </script>

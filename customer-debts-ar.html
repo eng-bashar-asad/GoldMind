@@ -39,10 +39,50 @@
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <style>
+.cd-pc{display:none!important}
 @media (min-width:1024px){
-  #customer-detail-view:not(.hidden){display:grid;grid-template-columns:minmax(0,440px) minmax(0,1fr);column-gap:28px;align-items:start}
-  #customer-detail-view > *:not(#gm-moves-col){grid-column:1}
-  #customer-detail-view > #gm-moves-col{grid-column:2;grid-row:1 / span 40}
+  #customer-detail-view:not(.hidden){display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,340px);gap:14px 20px;align-items:start;grid-auto-flow:row dense}
+  #customer-detail-view > *{grid-column:2;min-width:0}
+  #customer-detail-view > .cd-wide,#customer-detail-view > #backToCustomers{grid-column:1/-1}
+  #customer-detail-view > #gm-moves-col{grid-column:1;grid-row:4 / span 40}
+  .cd-pc:not(.hidden){display:block!important}
+  #customer-detail-view .cd-phone,#cdCard{display:none!important}
+  #cdHead:not(.hidden){display:flex!important;flex-wrap:wrap;align-items:center;gap:16px;background:#fff;border:1px solid #E4DAC0;border-radius:14px;padding:14px 18px}
+  .cd-av{width:56px;height:56px;border-radius:50%;background:#7A6640;color:#fff;display:flex;align-items:center;justify-content:center;font-size:22px;font-weight:700;flex-shrink:0}
+  .cd-name{font-size:22px;font-weight:700;color:#211D17}
+  .cd-sub{font-size:13px;color:#6B6355;display:flex;gap:8px;flex-wrap:wrap}
+  .cd-tiles{display:flex;gap:10px;margin-inline-start:auto;flex-wrap:wrap}
+  .cd-tile{background:#F7F2E6;border-radius:12px;padding:8px 16px;color:#211D17}
+  .cd-tile span{display:block;font-size:11.5px;color:#6B6355}
+  .cd-tile b{display:block;font-size:22px}
+  .cd-tile.cd-owe{background:#E8F3EA}.cd-tile.cd-owe span,.cd-tile.cd-owe b{color:#1B5E20}
+  .cd-tile.cd-due{background:#FBE9E7}.cd-tile.cd-due span,.cd-tile.cd-due b{color:#8A2A1E}
+  #cdBar:not(.hidden){display:flex!important;flex-wrap:wrap;gap:8px;background:#fff;border:1px solid #E4DAC0;border-radius:14px;padding:10px 14px}
+  .cd-act{height:38px;padding:0 12px;border-radius:10px;border:1px solid #CBBF9E;background:#fff;font-size:13px;font-weight:700;color:#211D17;display:inline-flex;align-items:center;gap:6px;text-decoration:none}
+  .cd-act .material-symbols-outlined{font-size:18px}
+  .cd-act.cd-dark{background:#1C1A16;color:#FBF8F1;border-color:#1C1A16}
+  .cd-card{background:#fff;border:1px solid #E4DAC0;border-radius:14px;padding:12px 16px}
+  .cd-card h2{margin:0 0 4px;font-size:14px;font-weight:700}
+  .cd-card-h{display:flex;justify-content:space-between;align-items:center}
+  .cd-card-h a{font-size:12.5px;font-weight:700;color:#7A6640}
+  .cd-kv{display:flex;justify-content:space-between;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid #EFE7D2}
+  .cd-kv:last-child{border-bottom:0}
+  .cd-kv>span:first-child{color:#6B6355}
+  #deleteCustomerBtn{order:1;border:0!important;justify-content:flex-start;height:36px}
+  #gm-moves-col{background:#fff;border:1px solid #E4DAC0;border-radius:14px;padding:4px 0 10px;overflow:hidden}
+  #gm-moves-col>div:first-child{padding:0 14px}
+  #gm-moves-col>p{padding:0 14px}
+  .cd-st{width:100%;border-collapse:collapse}
+  .cd-st th{padding:9px 12px;text-align:right;font-size:12px;font-weight:700;color:#6B6355;background:#F7F2E6;border-bottom:1px solid #E4DAC0;white-space:nowrap}
+  .cd-st td{padding:9px 12px;font-size:13.5px;border-bottom:1px solid #EFE7D2;white-space:nowrap}
+  .cd-st td.cd-desc{white-space:normal}
+  .cd-st tr.cd-row{cursor:pointer}.cd-st tr.cd-row:hover td{background:#FBF8F1}
+  .cd-st tr.cd-row.cd-off td{opacity:.55}
+  .cd-st .cd-n{text-align:left;font-weight:700}
+  .cd-st tfoot td{background:#F7F2E6;font-weight:700}
+  .cd-st tr.cd-x>td{background:#FBF8F1;white-space:normal;padding:6px 12px 12px}
+  .cd-t{border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;margin-inline-end:4px}
+  .cd-st a{color:#7A6640;font-weight:700}
 }
 </style>
 </head>
@@ -77,7 +117,27 @@
 <div id="customer-detail-view" class="hidden py-6 flex flex-col gap-4">
 <a id="backToCustomers" href="customers-ar.html" class="text-[12px] text-secondary font-semibold self-start">→ كل الزبائن</a>
 
-<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
+<!-- computer (approved design "DCustomer"): one header row with the balances, a compact action bar -->
+<div id="cdHead" class="cd-pc cd-wide">
+<div class="cd-av" id="cdAvatar"></div>
+<div class="min-w-0"><div class="cd-name" id="cdName"></div><div class="cd-sub"><span dir="ltr" class="font-data-mono" id="cdPhone"></span><span id="cdKind"></span></div></div>
+<div class="cd-tiles">
+<div class="cd-tile" id="cdCashTile"><span id="cdCashLbl">الرصيد النقدي</span><b class="font-data-mono" id="cdCash">0.00</b></div>
+<div class="cd-tile" id="cdGoldTile"><span id="cdGoldLbl">رصيد الذهب (عيار 24)</span><b class="font-data-mono" id="cdGold">0.00 غ</b></div>
+</div>
+</div>
+<div id="cdBar" class="cd-pc cd-wide" role="toolbar" aria-label="عمليات الحساب">
+<button type="button" class="cd-act cd-dark" onclick="toggleSettleForm()"><span class="material-symbols-outlined">payments</span>دفعة من الزبون</button>
+<button type="button" class="cd-act" onclick="toggleCashOutForm()"><span class="material-symbols-outlined">output</span>صرف مبلغ</button>
+<button type="button" class="cd-act" onclick="toggleDiscountForm()"><span class="material-symbols-outlined">sell</span>خصم على الدين</button>
+<a class="cd-act" id="cdDepositLink" href="deposits-ar.html"><span class="material-symbols-outlined">bookmark_added</span>سند عربون</a>
+<button type="button" class="cd-act" onclick="toggleOpeningBalanceForm()"><span class="material-symbols-outlined">history</span>رصيد سابق</button>
+<span style="flex:1"></span>
+<a class="cd-act" id="cdPrintLink" href="#" target="_blank"><span class="material-symbols-outlined">print</span>كشف حساب</a>
+<a class="cd-act" id="cdWhatsLink" href="#" target="_blank" rel="noopener"><span class="material-symbols-outlined">chat</span>واتساب</a>
+</div>
+
+<div id="cdCard" class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <div class="flex items-start justify-between gap-2">
 <div>
 <h2 class="font-bold text-[16px]" id="detail-customer-name"></h2>
@@ -146,7 +206,7 @@
 <p class="text-error text-[12px] hidden" id="editCustomerError"></p>
 </div>
 
-<div class="grid grid-cols-2 gap-2">
+<div class="grid grid-cols-2 gap-2 cd-phone">
 <button onclick="toggleSettleForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
 <span class="material-symbols-outlined text-[19px]">payments</span> تسجيل دفعة من العميل
 </button>
@@ -163,18 +223,21 @@
 <span class="material-symbols-outlined text-[19px]">output</span> صرف مبلغ للعميل
 </button>
 </div>
-<button type="button" onclick="gmPartyProfitPopup('customer', currentCustomerId, document.getElementById('detail-customer-name').textContent)" class="gm-profit-btn w-full h-11 border rounded-xl items-center justify-center gap-2 text-[13px] font-semibold" style="color:#3F6B47;border-color:#3F6B47">
+<button type="button" onclick="gmPartyProfitPopup('customer', currentCustomerId, document.getElementById('detail-customer-name').textContent)" class="gm-profit-btn cd-phone w-full h-11 border rounded-xl items-center justify-center gap-2 text-[13px] font-semibold" style="color:#3F6B47;border-color:#3F6B47">
 <span class="material-symbols-outlined text-[18px]">trending_up</span> أرباحي مع هذا الزبون
 </button>
-<a id="printStatementLink" href="#" target="_blank" class="w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
+<a id="printStatementLink" href="#" target="_blank" class="cd-phone w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">print</span> طباعة كشف حساب
 </a>
-<a id="editCustomerLink" href="#" class="w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
+<a id="editCustomerLink" href="#" class="cd-phone w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">edit</span> تعديل بيانات العميل / تحويله لشركة (TRN)
 </a>
 <button type="button" id="deleteCustomerBtn" onclick="deleteCustomer()" class="w-full h-11 border border-error text-error rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">delete</span> حذف العميل
 </button>
+
+<section id="cdInfo" class="cd-pc cd-card"><div class="cd-card-h"><h2>البيانات</h2><a id="cdEditLink" href="#">تعديل</a></div><div id="cdInfoRows"></div></section>
+<section id="cdSum" class="cd-pc cd-card"><h2>ملخص التعامل</h2><div id="cdSumRows"></div></section>
 
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="settle-form" data-gm-opdate>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">المبلغ المدفوع</label>
@@ -258,6 +321,7 @@
 </div>
 </div>
 <div id="movements-list" class="flex flex-col gap-2"></div>
+<p class="cd-pc text-[11.5px] text-on-surface-variant">اضغط على السطر لعرض أزرار تعديله.</p>
 <p id="empty-movements" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد حركات مسجّلة بعد.</p>
 </div>
 
@@ -435,6 +499,7 @@ function showCustomerDetail(customerId) {
 
   document.getElementById('movementsMonthFilter').value = '';
   document.getElementById('clearMonthFilterBtn').classList.add('hidden');
+  cdFillDesk(customer);
   renderMovementsList();
 }
 
@@ -458,7 +523,7 @@ async function gmLoadCustomerInvoices(customerId) {
       .in('store_id', Object.keys(ORG_BRANCHES).length ? Object.keys(ORG_BRANCHES) : [GOLDMIND_STORE_ID]).eq('customer_id', customerId).order('created_at', { ascending: false });
     invoicesByCustomer[customerId] = data || [];
   }
-  if (currentCustomerId === customerId) renderMovementsList();
+  if (currentCustomerId === customerId) { renderMovementsList(); cdFillSummary(customerId); }
 }
 
 function renderMovementsList() {
@@ -477,6 +542,15 @@ function renderMovementsList() {
   const moves = (movementsByCustomer[currentCustomerId] || []).filter(m => !(m.invoice_id && invIds.has(m.invoice_id) && (!m.source || m.source === 'invoice_edit')) && !movedAway(m.invoice_id));
   let entries = invs.map(i => ({ kind: 'inv', at: i.created_at, i })).concat(moves.map(m => ({ kind: 'mv', at: m.created_at, m })));
   entries.sort((x, y) => String(y.at).localeCompare(String(x.at)));
+  // running balance (computer statement): newest row = the account balance, each older row = minus the newer row's effect.
+  // An invoice's effect = its own debt rows that the invoice entry hides.
+  const sgn = m => (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0);
+  const invNet = {};
+  (movementsByCustomer[currentCustomerId] || []).forEach(m => {
+    if (m.invoice_id && invIds.has(m.invoice_id) && (!m.source || m.source === 'invoice_edit')) invNet[m.invoice_id] = (invNet[m.invoice_id] || 0) + sgn(m);
+  });
+  let run = customerBalance(currentCustomerId);
+  entries.forEach(e => { e.net = e.kind === 'inv' ? (invNet[e.i.id] || 0) : sgn(e.m); e.bal = run; run -= e.net; });
   if (monthVal) entries = entries.filter(e => (e.at || '').slice(0, 7) === monthVal);
   const listEl = document.getElementById('movements-list');
   const emptyEl = document.getElementById('empty-movements');
@@ -490,7 +564,7 @@ function renderMovementsList() {
   emptyEl.classList.add('hidden');
   const dateOf = at => gmFormatDateTime(at, { day: 'numeric', month: 'short', year: 'numeric' });
 
-  listEl.innerHTML = entries.map(e => {
+  const cardHtml = e => {
     if (e.kind === 'inv') {
       const i = e.i, cancelled = i.status === 'cancelled';
       const rate = i.pay_currency && Number(i.pay_fx_rate) > 0 ? Number(i.pay_fx_rate) : 1;
@@ -545,7 +619,91 @@ function renderMovementsList() {
           <p class="text-[11px] text-on-surface-variant">يتعدّل المبلغ بصندوق الحركة اليومية أيضاً.</p>
         </div>` : ''}
       </${tag}>`;
+  };
+  if (window.matchMedia('(min-width:1024px)').matches) listEl.innerHTML = cdStatementHtml(entries, cardHtml, dateOf);
+  else listEl.innerHTML = entries.map(cardHtml).join('');
+}
+
+// Computer statement: one table row per entry (عليه / له / running balance); a click shows the row's own buttons.
+const CD_TAG = { sale: ['#E3F1E4', '#1B5E20'], return: ['#FBE9E7', '#8A2A1E'], buyRetail: ['#E6ECF5', '#1F5FA8'], buyTrader: ['#E6ECF5', '#3B4C9B'], mv: ['#EFE7D2', '#5E4E30'] };
+function cdSplit(e) {
+  const net = e.net;
+  if (e.kind === 'inv' && e.i.status !== 'cancelled') {
+    const T = Number(e.i.total_amount || 0);
+    const r = e.i.type === 'sale' ? [T, T - net] : [T + net, T];
+    if (r[0] >= -0.005 && r[1] >= -0.005) return r;
+  }
+  return [net > 0 ? net : 0, net < 0 ? -net : 0];
+}
+function cdStatementHtml(entries, cardHtml, dateOf) {
+  const cell = v => Math.abs(v) > 0.005 ? fmt(v) : '';
+  const bal = v => `<span style="color:${v > 0.005 ? '#1B5E20' : v < -0.005 ? '#8A2A1E' : 'inherit'}">${fmt(Math.abs(v))}${v > 0.005 ? ' لنا' : v < -0.005 ? ' علينا' : ''}</span>`;
+  let sumOn = 0, sumFor = 0;
+  const rows = entries.map(e => {
+    const [on, forHim] = cdSplit(e); sumOn += on; sumFor += forHim;
+    const sid = e.kind === 'inv' ? e.i.store_id : e.m.store_id;
+    const br = (ORG_BRANCHES[sid] && ORG_BRANCHES[sid].name) || (sid === GOLDMIND_STORE_ID && CD_FX.storeName) || '—';
+    let desc, doc = '—', off = false;
+    if (e.kind === 'inv') {
+      const i = e.i, c = CD_TAG[i.type] || CD_TAG.mv; off = i.status === 'cancelled';
+      desc = `<span class="cd-t" style="background:${c[0]};color:${c[1]}">${INV_TYPE[i.type] || 'فاتورة'}</span>${PAY_LABEL[i.payment_method] || ''}${off ? ' <span class="text-error">(ملغاة)</span>' : ''}`;
+      doc = `<a href="invoice-print-ar.html?id=${i.id}" dir="ltr">${gmEscapeHtml(i.invoice_number || 'فتح')}</a>`;
+    } else {
+      const m = e.m, other = otherBranch(m.store_id), closed = other && !other.can_open_invoices;
+      const g = Number(m.gold_grams_24k || 0) !== 0 ? ` · <span class="font-data-mono">${m.movement_type === 'debt_increase' ? '+' : '-'}${fmt(Math.abs(m.gold_grams_24k))}غ</span>` : '';
+      desc = `<span class="cd-t" style="background:${CD_TAG.mv[0]};color:${CD_TAG.mv[1]}">${gmEscapeHtml(movementLabel(m))}</span>${m.notes && !closed ? gmEscapeHtml(m.notes) : ''}${g}`;
+      if (m.invoice && m.invoice.invoice_number && !closed) doc = m.invoice_id ? `<a href="invoice-print-ar.html?id=${m.invoice_id}" dir="ltr">${gmEscapeHtml(m.invoice.invoice_number)}</a>` : gmEscapeHtml(m.invoice.invoice_number);
+    }
+    return `<tr class="cd-row${off ? ' cd-off' : ''}"><td class="font-data-mono">${dateOf(e.at)}</td><td class="cd-desc">${desc}</td><td>${gmEscapeHtml(br)}</td><td>${doc}</td>
+      <td class="font-data-mono" style="color:#8A2A1E">${cell(on)}</td><td class="font-data-mono" style="color:#1B5E20">${cell(forHim)}</td><td class="font-data-mono cd-n">${bal(e.bal)}</td></tr>
+      <tr class="cd-x hidden"><td colspan="7">${cardHtml(e)}</td></tr>`;
   }).join('');
+  return `<table class="cd-st"><thead><tr><th>التاريخ</th><th>البيان</th><th>الفرع</th><th>المستند</th><th>عليه</th><th>له</th><th style="text-align:left">الرصيد</th></tr></thead>
+    <tbody>${rows}</tbody><tfoot><tr><td colspan="4">المجموع</td><td class="font-data-mono">${fmt(sumOn)}</td><td class="font-data-mono">${fmt(sumFor)}</td><td class="font-data-mono cd-n">${bal(entries[0].bal)}</td></tr></tfoot></table>`;
+}
+document.getElementById('movements-list').addEventListener('click', e => {
+  const tr = e.target.closest('tr.cd-row');
+  if (!tr || e.target.closest('a,button,input')) return;
+  tr.nextElementSibling.classList.toggle('hidden');
+});
+// computer header, action bar and side cards
+function cdFillDesk(customer) {
+  const id = customer.id, bal = customerBalance(id), gold = customerGoldBalance(id);
+  const set = (k, v) => { document.getElementById(k).textContent = v; };
+  set('cdAvatar', gmInitials(customer.name)); set('cdName', customer.name); set('cdPhone', customer.phone || '');
+  set('cdKind', customer.is_company ? '· شركة' : '· فرد');
+  const tile = (t, l, v, lbl0) => {
+    document.getElementById(t).className = 'cd-tile' + (v > 0.0005 ? ' cd-owe' : v < -0.0005 ? ' cd-due' : '');
+    set(l, lbl0 + (v > 0.0005 ? ' — لنا عنده' : v < -0.0005 ? ' — علينا له' : ''));
+  };
+  tile('cdCashTile', 'cdCashLbl', bal, 'الرصيد النقدي'); set('cdCash', fmt(Math.abs(bal)));
+  tile('cdGoldTile', 'cdGoldLbl', gold, 'رصيد الذهب (عيار 24)'); set('cdGold', fmt(Math.abs(gold)) + ' غ');
+  document.getElementById('cdPrintLink').href = 'customer-debts-print-ar.html?id=' + id;
+  document.getElementById('cdDepositLink').href = 'deposits-ar.html?customer=' + id;
+  document.getElementById('cdEditLink').href = 'customer-edit-ar.html?id=' + id;
+  document.getElementById('cdEditLink').classList.toggle('hidden', !canEditCustomers);
+  const wa = document.getElementById('cdWhatsLink');
+  wa.href = gmWhatsAppUrl(customer.phone, customer.country, 'مرحباً ' + customer.name + '، رصيد حسابكم لدينا: ' + fmt(Math.abs(bal)) + (bal > 0.005 ? ' (مستحق عليكم)' : bal < -0.005 ? ' (لكم عندنا)' : ''));
+  wa.classList.toggle('hidden', !customer.phone);
+  const kv = (k, v) => v ? `<div class="cd-kv"><span>${k}</span><span>${v}</span></div>` : '';
+  document.getElementById('cdInfoRows').innerHTML =
+    kv('الهوية', customer.id_number ? `<span class="font-data-mono">${gmEscapeHtml(customer.id_number)}</span>${customer.id_expiry_date ? ' · تنتهي <span class="font-data-mono">' + gmEscapeHtml(customer.id_expiry_date) + '</span>' : ''}` : '')
+    + kv('الجنسية', gmEscapeHtml(customer.nationality || ''))
+    + kv('الرقم الضريبي', customer.tax_number ? `<span class="font-data-mono" dir="ltr">${gmEscapeHtml(customer.tax_number)}</span>` : '')
+    + kv('البريد', customer.email ? `<span dir="ltr">${gmEscapeHtml(customer.email)}</span>` : '')
+    + `<div class="cd-kv" id="cdExtraPhones" style="display:none"><span>أرقام إضافية</span><span dir="ltr" class="font-data-mono"></span></div>`;
+  if (!customer.id_number && !customer.nationality && !customer.tax_number && !customer.email)
+    document.getElementById('cdInfoRows').insertAdjacentHTML('afterbegin', '<p class="text-[12px] text-on-surface-variant py-1">لا توجد بيانات هوية مسجّلة.</p>');
+  cdFillSummary(id);
+}
+function cdFillSummary(id) {
+  const sales = (invoicesByCustomer[id] || []).filter(i => i.type === 'sale' && i.status !== 'cancelled');
+  const last = (invoicesByCustomer[id] || [])[0];
+  document.getElementById('cdSumRows').innerHTML =
+    `<div class="cd-kv"><span>عدد فواتير البيع</span><span class="font-data-mono">${sales.length}</span></div>
+     <div class="cd-kv"><span>مجموع المشتريات</span><span class="font-data-mono">${fmt(sales.reduce((a, i) => a + Number(i.total_amount || 0), 0))}</span></div>
+     <div class="cd-kv"><span>آخر فاتورة</span><span class="font-data-mono">${last ? gmFormatDateTime(last.created_at, { day: 'numeric', month: 'short', year: 'numeric' }) : '—'}</span></div>
+     <div class="cd-kv"><span>ربحي معه</span><a href="#" onclick="event.preventDefault(); gmPartyProfitPopup('customer', currentCustomerId, document.getElementById('detail-customer-name').textContent)" style="font-weight:700;color:#3F6B47">عرض</a></div>`;
 }
 
 // Delete a customer: only when nothing was ever recorded with them (history stays intact)
@@ -652,7 +810,8 @@ const CD_FX = { base: null, secondary: null };
 const cdRateKey = code => 'gm_fx_' + GOLDMIND_STORE_ID + '_' + code; // same remembered rates as the sale page
 const cdMoney = (n, c) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + c;
 async function cdInitCur() {
-  const { data } = await goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  const { data } = await goldmindClient.from('stores').select('name, currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+  CD_FX.storeName = data && data.name;
   CD_FX.base = ((data && data.currency) || 'AED').toUpperCase();
   if (data && data.secondary_currency) CD_FX.secondary = { code: data.secondary_currency.toUpperCase(), rate: Number(data.secondary_currency_rate) || 0 };
   const codes = [CD_FX.base, CD_FX.secondary && CD_FX.secondary.code, 'USD', 'SYP', 'EUR', 'AED', 'TRY', 'SAR'].filter((c, i, a) => c && a.indexOf(c) === i);
@@ -888,6 +1047,8 @@ async function loadExtraPhonesForDetail(customerId) {
     chip.textContent = row.phone;
     wrap.appendChild(chip);
   });
+  const side = document.getElementById('cdExtraPhones');
+  if (side && data && data.length) { side.style.display = ''; side.lastElementChild.textContent = data.map(r => r.phone).join('، '); }
 }
 
 const DOC_CATEGORY_LABELS = { id_document: 'هوية/جواز سفر', kyc: 'مستند KYC' };

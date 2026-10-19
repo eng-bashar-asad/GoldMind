@@ -91,6 +91,52 @@ html:not(.gm-light-canvas) #gmPieceBarcode{color:#C9CED8!important}
 html:not(.gm-light-canvas) #piece-log-list{background:#FFFDF8!important;border-radius:20px;padding:12px 26px 12px 12px}
 html:not(.gm-light-canvas) #piece-log-list.gm-tl:before{right:13px}
 html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
+/* computer layout (approved design "DPiece"): photo + actions on the side, compact specs, log as a table */
+.pc-side,.pc-main{display:contents}
+.pc-only,.pc-lbl{display:none!important}
+@media (min-width:1024px){
+  #page-main{max-width:1400px;padding-right:32px!important}
+  #form-wrap:not(.hidden){display:grid!important;grid-template-columns:minmax(280px,340px) minmax(0,1fr);gap:22px;align-items:start}
+  .pc-side{display:flex;flex-direction:column;gap:12px;position:sticky;top:76px}
+  .pc-main{display:flex;flex-direction:column;gap:16px;min-width:0}
+  .pc-phone{display:none!important}
+  .pc-only:not(.hidden){display:block!important}
+  .pc-lbl{display:inline!important}
+  .gm-photo{max-width:none;width:100%;border-radius:18px}
+  .gm-bar{position:static;padding:0;background:none;-webkit-backdrop-filter:none;backdrop-filter:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+  .gm-bar.hidden{display:none}
+  .gm-bar #gmSellBtn{grid-column:1/-1;height:50px}
+  .gm-bar .sq,.gm-bar a.sq{width:auto;height:42px;border-radius:10px;background:#fff;color:#211D17;border:1px solid #CBBF9E;font-size:13px;justify-content:flex-start;padding:0 12px;text-decoration:none}
+  .gm-bar .sq.hidden{display:none}
+  .pc-specs:not(.hidden){display:grid!important;grid-template-columns:repeat(4,minmax(0,1fr));background:#fff;border:1px solid #E4DAC0;border-radius:14px}
+  .pc-specs>div{padding:10px 14px;border-inline-start:1px solid #EFE7D2;min-width:0}
+  .pc-specs>div:nth-child(4n+1){border-inline-start:0}
+  .pc-specs>div:nth-child(n+5){border-top:1px solid #EFE7D2}
+  .pc-specs span,.pc-card span{display:block;font-size:11.5px;color:#6B6355}
+  .pc-specs b{display:block;font-size:16px;color:#211D17;margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .pc-cards:not(.hidden){display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+  .pc-card{background:#fff;border:1px solid #E4DAC0;border-radius:14px;padding:12px 16px}
+  .pc-card.hidden{display:none}
+  .pc-card h2{margin:0 0 8px;font-size:14px;font-weight:700;color:#211D17}
+  .pc-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;font-size:13px}
+  .pc-3 b{color:#211D17}
+  /* edit: the same fields in place, four per row, only while editing */
+  .gm-edit>summary{display:none}
+  .gm-edit:not([open]){display:none}
+  .gm-bar .pc-only:not(.hidden){display:flex!important}
+  .gm-edit{background:#fff;border:1px solid #E4DAC0;border-radius:14px;padding:16px}
+  #gmEditBox>div.flex-col{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:20px 14px;align-items:end}
+  #gmEditBox>div.flex-col>div.grid{display:contents}
+  #gmEditBox>div.flex-col>div.flex-wrap{grid-column:span 2}
+  #gmEditBox input,#gmEditBox select{min-width:0;height:48px}
+  #gmEditActions{flex-direction:row!important;justify-content:flex-start;margin-top:12px}
+  #gmEditActions button{min-width:160px;padding:0 18px}
+  #piece-log-list.gm-tl{padding:0;background:#fff!important;border:1px solid #E4DAC0;border-radius:14px;overflow:hidden}
+  #piece-log-list.gm-tl:before,#piece-log-list.gm-tl>div:before{display:none}
+  .pc-log{width:100%;border-collapse:collapse}
+  .pc-log th{padding:8px 12px;text-align:right;font-size:12px;font-weight:700;color:#6B6355;background:#F7F2E6;border-bottom:1px solid #E4DAC0}
+  .pc-log td{padding:8px 12px;font-size:13px;border-bottom:1px solid #EFE7D2;color:#211D17;vertical-align:top}
+}
 @media (prefers-reduced-motion: reduce){.gm-gold,.gm-sweep::after,.gm-age-bar i{animation:none!important}}
 </style>
 </head>
@@ -110,6 +156,7 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 
 <div id="form-wrap" class="hidden py-6 flex flex-col gap-6">
 
+<div id="pcSide" class="pc-side">
 <!-- Photo hero -->
 <input accept="image/*" capture="environment" class="hidden" id="photo-input" type="file"/>
 <div class="gm-photo" onclick="triggerPhotoCapture()">
@@ -121,6 +168,17 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <button class="hidden absolute top-3 left-3 w-9 h-9 bg-black/60 text-white rounded-full items-center justify-center" id="photo-remove-btn" aria-label="إزالة الصورة" onclick="event.stopPropagation(); removePhoto();" type="button"><span class="material-symbols-outlined text-[18px]">close</span></button>
 <button type="button" class="gm-cam"><span class="material-symbols-outlined text-[18px]">photo_camera</span>تغيير الصورة</button>
 </div>
+<div class="gm-bar hidden" id="gmBar">
+<a id="gmSellBtn" href="new-sale-ar.html" data-permission="create_invoice" class="gm-gold flex-1"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined" style="position:relative;">sell</span><span style="position:relative;">بيع القطعة</span></a>
+<button id="gmRfidBtn" onclick="gmWriteRfid(this)" type="button" class="sq hidden" aria-label="برمجة شريحة RFID" title="برمجة شريحة RFID"><span class="material-symbols-outlined">nfc</span><span class="pc-lbl">برمجة RFID</span></button>
+<button id="gmRechipBtn" onclick="gmReprogramChip(this)" type="button" class="sq hidden" aria-label="تغيير برمجة الشريحة" title="تغيير برمجة الشريحة (رقم جديد، نفس الباركود)"><span class="material-symbols-outlined">autorenew</span><span class="pc-lbl">شريحة جديدة</span></button>
+<button id="gmRfidPrintBtn" onclick="location.href='piece-label-print-ar.html?id=' + encodeURIComponent(currentPiece.id)" type="button" class="sq hidden" aria-label="طباعة وبرمجة بطابعة RFID" title="طباعة وبرمجة بطابعة RFID"><span class="material-symbols-outlined">wifi_tethering</span><span class="pc-lbl">طابعة RFID</span></button>
+<a id="pcMoveBtn" href="branch-transfers-ar.html" class="sq pc-only hidden" aria-label="نقل لفرع" title="نقل لفرع"><span class="material-symbols-outlined">swap_horiz</span><span class="pc-lbl">نقل لفرع</span></a>
+<button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="sq" aria-label="طباعة ملصق القطعة" title="طباعة ملصق القطعة"><span class="material-symbols-outlined">print</span><span class="pc-lbl">طباعة ملصق</span></button>
+<button type="button" class="sq" aria-label="تعديل البيانات" title="تعديل البيانات" onclick="gmOpenEdit()"><span class="material-symbols-outlined">edit</span><span class="pc-lbl">تعديل</span></button>
+</div>
+</div>
+<div id="pcMain" class="pc-main">
 
 <div class="flex items-start justify-between gap-3">
 <div class="min-w-0">
@@ -130,13 +188,25 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <span id="gmPieceStatus" class="gm-chipst"></span>
 </div>
 
-<div class="grid grid-cols-3 gap-2.5">
+<!-- computer: one compact spec grid (4 per row) instead of the big cards -->
+<section id="pcSpecs" class="pc-specs pc-only" aria-label="المواصفات">
+<div><span>العيار</span><b id="pcKarat">—</b></div>
+<div><span>الوزن القائم</span><b id="pcWeight" class="font-data-mono">—</b></div>
+<div><span>الوزن المحاسبي</span><b id="pcAcc" class="font-data-mono">—</b></div>
+<div><span>مصنعية الغرام</span><b id="pcFab" class="font-data-mono">—</b></div>
+<div><span>النوع / الصنف</span><b id="pcType">—</b></div>
+<div><span>اللون</span><b id="pcColor">—</b></div>
+<div><span>الصندوق</span><b id="pcBox">—</b></div>
+<div><span>الفرع</span><b id="pcBranch">—</b></div>
+</section>
+
+<div class="grid grid-cols-3 gap-2.5 pc-phone">
 <div class="gm-spec"><b id="gmSpecKarat">—</b><span>العيار</span></div>
 <div class="gm-spec"><b id="gmSpecWeight" class="font-data-mono">—</b><span>الوزن القائم (غ)</span></div>
 <div class="gm-spec"><b id="gmSpecAcc" class="font-data-mono">—</b><span>وزن المحاسبة (غ)</span></div>
 </div>
 
-<div class="gm-age">
+<div class="gm-age pc-phone">
 <dl style="margin-top:0">
 <div><dt>المصنعية / غرام</dt><dd id="gmAgeFab" class="font-data-mono">—</dd></div>
 <div><dt>اللون</dt><dd id="gmAgeColor">—</dd></div>
@@ -266,9 +336,19 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 
 <div class="flex flex-col gap-3" id="gmEditActions">
 <button id="save-btn" class="gm-gold h-12 rounded-2xl font-bold text-[14px] active:scale-[0.98] transition-all" style="position:relative;">حفظ التعديلات</button>
+<button type="button" class="pc-only h-12 rounded-2xl border border-outline-variant font-bold text-[13px]" onclick="document.getElementById('gmEditBox').open=false">إلغاء</button>
 <button id="delete-btn" class="hidden h-11 rounded-2xl border-2 border-error text-error font-bold text-[13px] active:scale-[0.98] transition-all">حذف القطعة</button>
 </div>
 </details>
+
+<div class="pc-only pc-cards">
+<section id="pcStones" class="pc-card hidden"><h2>الأحجار</h2>
+<div class="pc-3"><div><span>ألماس Di</span><b id="pcDi" class="font-data-mono">—</b></div><div><span>حجر مركزي Cs</span><b id="pcCs" class="font-data-mono">—</b></div><div><span>زيركون Z</span><b id="pcZ" class="font-data-mono">—</b></div></div>
+</section>
+<section id="pcPrice" class="pc-card"><h2>السعر الآن</h2>
+<div class="pc-3"><div><span>قيمة الذهب</span><b id="pcGoldVal" class="font-data-mono">—</b></div><div><span>المصنعية</span><b id="pcFabVal" class="font-data-mono">—</b></div><div><span>سعر البيع المقترح</span><b id="pcSuggest" class="font-data-mono" style="color:#1B5E20">—</b></div></div>
+</section>
+</div>
 
 <!-- Per-piece movement/audit log -->
 <div class="mt-2">
@@ -279,15 +359,9 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 </div>
 
 </div>
-</main>
-<div class="gm-bar hidden" id="gmBar">
-<a id="gmSellBtn" href="new-sale-ar.html" data-permission="create_invoice" class="gm-gold flex-1"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined" style="position:relative;">sell</span><span style="position:relative;">بيع القطعة</span></a>
-<button id="gmRfidBtn" onclick="gmWriteRfid(this)" type="button" class="sq hidden" aria-label="برمجة شريحة RFID" title="برمجة شريحة RFID"><span class="material-symbols-outlined">nfc</span></button>
-<button id="gmRechipBtn" onclick="gmReprogramChip(this)" type="button" class="sq hidden" aria-label="تغيير برمجة الشريحة" title="تغيير برمجة الشريحة (رقم جديد، نفس الباركود)"><span class="material-symbols-outlined">autorenew</span></button>
-<button id="gmRfidPrintBtn" onclick="location.href='piece-label-print-ar.html?id=' + encodeURIComponent(currentPiece.id)" type="button" class="sq hidden" aria-label="طباعة وبرمجة بطابعة RFID" title="طباعة وبرمجة بطابعة RFID"><span class="material-symbols-outlined">wifi_tethering</span></button>
-<button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="sq" aria-label="طباعة ملصق القطعة" title="طباعة ملصق القطعة"><span class="material-symbols-outlined">print</span></button>
-<button type="button" class="sq" aria-label="تعديل البيانات" title="تعديل البيانات" onclick="gmOpenEdit()"><span class="material-symbols-outlined">edit</span></button>
 </div>
+</main>
+
 
 <script>
 let currentPiece = null;
@@ -604,6 +678,11 @@ async function loadPieceLog() {
     const href = 'trader-statement-print-ar.html?trader=' + m.trader_id + (m.batch_id ? '&batch=' + m.batch_id : '');
     return ` <a class="gm-log-link" href="${href}" style="color:var(--gm-secondary);font-weight:700;text-decoration:underline">فتح السند${m.trader && m.trader.name ? ' — ' + escH(m.trader.name) : ''}</a>`;
   };
+  if (window.matchMedia('(min-width:1024px)').matches) {
+    el.innerHTML = '<table class="pc-log"><thead><tr><th>التاريخ</th><th>الحدث</th><th>المستند / الملاحظة</th><th>بواسطة</th></tr></thead><tbody>' +
+      logs.map(l => `<tr><td class="font-data-mono" style="white-space:nowrap">${fmtLogDate(l.created_at)}</td><td style="font-weight:700">${EVENT_LABELS[l.event_type] || escH(l.event_type)}</td><td>${linkNote(l.note)}${traderLink(l)}</td><td>${l.staff && l.staff.full_name ? escH(l.staff.full_name) : '—'}</td></tr>`).join('') + '</tbody></table>';
+    return;
+  }
   el.innerHTML = logs.map(l => `
     <div>
       <div class="flex items-center justify-between mb-0.5">
@@ -774,6 +853,50 @@ function gmRenderPieceView() {
   sell.href = 'new-sale-ar.html' + (p.barcode ? '?barcode=' + encodeURIComponent(p.barcode) : '');
   sell.classList.toggle('hidden', p.status !== 'available');
   document.getElementById('gmBar').classList.remove('hidden');
+  gmRenderDesk(p);
+}
+// computer cards (hidden on the phone by CSS)
+let gmGoldPerGram = null;
+function gmRenderDesk(p) {
+  const set = (id, v) => { document.getElementById(id).textContent = v; };
+  set('pcKarat', p.karat ? p.karat + 'K' : '—');
+  set('pcWeight', gmN(p.weight_grams) + ' غ');
+  const acc = p.accounting_weight_grams != null ? Number(p.accounting_weight_grams) : Number(p.weight_grams || 0);
+  set('pcAcc', gmN(acc) + ' غ');
+  set('pcFab', gmN(p.cost_fabrication_per_gram));
+  set('pcType', [p.piece_type, p.category1, p.category2].filter(Boolean).join(' · ') || '—');
+  set('pcColor', GM_COLORS[p.color] || p.color || '—');
+  set('pcBox', p.box_name || '—');
+  set('pcBranch', (currentStore && currentStore.name) || '—');
+  const has = v => v != null && Number(v) > 0;
+  set('pcDi', has(p.accent_diamond_carat) ? gmN(p.accent_diamond_carat) + ' ct' : '—');
+  set('pcCs', has(p.center_stone_carat) ? gmN(p.center_stone_carat) : '—');
+  set('pcZ', has(p.zircon_carat) ? gmN(p.zircon_carat) + ' غ' : '—');
+  document.getElementById('pcStones').classList.toggle('hidden', !(has(p.accent_diamond_carat) || has(p.center_stone_carat) || has(p.zircon_carat)));
+  const mv = document.getElementById('pcMoveBtn');
+  mv.href = 'branch-transfers-ar.html' + (p.barcode ? '?barcode=' + encodeURIComponent(p.barcode) : '');
+  mv.classList.toggle('hidden', p.status !== 'available');
+  // ponytail: suggested price = gold value + label making charge (same multiplier/addend as the printed label) + stones,
+  // all on the accounting weight. The sale screen stays the real price.
+  gmLoadDeskPrices();
+  const price = gmGoldPerGram && gmGoldPerGram[p.karat];
+  if (!price) { ['pcGoldVal', 'pcFabVal', 'pcSuggest'].forEach(id => set(id, '—')); return; }
+  const mult = currentStore && currentStore.label_mc_multiplier != null ? Number(currentStore.label_mc_multiplier) : 1;
+  const add = currentStore && currentStore.label_mc_addend != null ? Number(currentStore.label_mc_addend) : 0;
+  const gold = acc * price;
+  const fab = p.cost_fabrication_per_gram != null ? acc * (Number(p.cost_fabrication_per_gram) * mult + add) : 0;
+  const stones = (Number(p.accent_diamond_carat) || 0) * (Number(p.accent_diamond_price_per_carat) || 0)
+    + (Number(p.center_stone_carat) || 0) * (Number(p.center_stone_price_per_carat) || 0);
+  set('pcGoldVal', gmMoney(gold)); set('pcFabVal', gmMoney(fab)); set('pcSuggest', gmMoney(gold + fab + stones));
+}
+function gmLoadDeskPrices() {
+  if (gmGoldPerGram || !window.matchMedia('(min-width:1024px)').matches) return;
+  gmGoldPerGram = {};
+  goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID).then(({ data }) => {
+    gmGoldPerGram = {};
+    (data || []).forEach(r => { gmGoldPerGram[r.karat] = Number(r.price_per_gram); });
+    if (currentPiece) gmRenderDesk(currentPiece);
+  });
 }
 // RFID handheld (Chainway C72...): write this piece's chip from the app.
 // Hold the label against the back of the device, then press the chip button.
@@ -840,7 +963,7 @@ async function gmReprogramChip(btn) {
   finally { btn.disabled = false; }
 }
 function gmOpenEdit() {
-  const d = document.getElementById('gmEditBox'); d.open = true;
+  const d = document.getElementById('gmEditBox'); d.open = !(d.open && window.matchMedia('(min-width:1024px)').matches);
   d.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 

@@ -126,6 +126,7 @@ test('discount on a customer debt goes through the server function, no cash', as
     rpc: { customer_debt_discount: () => ({ body: { ok: true } }), customer_debt_discount_update: () => ({ body: { ok: true } }) }
   });
   page.on('dialog', d => d.accept().catch(() => {}));
+  await page.setViewportSize({ width: 390, height: 844 }); // phone cards (on the computer the buttons open with the row)
   await page.goto('/customer-debts-ar.html?open=cu1');
   await expect(page.locator('#detail-customer-name')).not.toBeEmpty();
   await page.evaluate(() => toggleDiscountForm());
@@ -168,6 +169,7 @@ test('cash paid out to a customer goes through the server function', async ({ pa
     rpc: { customer_cash_out: () => ({ body: { ok: true } }) }
   });
   page.on('dialog', d => d.accept().catch(() => {}));
+  await page.setViewportSize({ width: 390, height: 844 }); // phone cards (the computer shows a statement table)
   await page.goto('/customer-debts-ar.html?open=cu1');
   await expect(page.locator('#detail-customer-name')).not.toBeEmpty();
   await page.getByText('صرف مبلغ للعميل').click();
@@ -183,6 +185,7 @@ test('customer payout and payment in another currency go through cash_voucher', 
     rpc: { cash_voucher: () => ({ body: { ok: true } }) }
   });
   page.on('dialog', d => d.accept().catch(() => {}));
+  await page.setViewportSize({ width: 390, height: 844 }); // phone cards (the computer shows a statement table)
   await page.goto('/customer-debts-ar.html?open=cu1');
   await expect(page.locator('#detail-customer-name')).not.toBeEmpty();
   await page.getByText('صرف مبلغ للعميل').click();
