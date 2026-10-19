@@ -549,6 +549,21 @@
   .gm-gi svg,.gm-gi .material-symbols-outlined{position:relative;z-index:1;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--c,#C8952E) 70%,transparent))}
   .gm-gi .material-symbols-outlined{font-size:28px!important}
   @keyframes gmShine{0%,60%{left:-70%}100%{left:140%}}
+  /* «تخصيص»: colour dots per icon */
+  .gm-qc{margin:12px 0 4px}
+  .gm-qc-h{font-size:12px;font-weight:700;color:#6B6355;margin-bottom:6px}
+  .gm-qc-row{display:flex;flex-direction:column;align-items:stretch;gap:8px;padding:4px 0;border-top:1px solid #EFE7D2}
+  .gm-qc-pick{display:flex;align-items:center;gap:10px;min-height:40px;background:none;border:0;padding:0;cursor:pointer;text-align:start;font:inherit}
+  .gm-qc-cur{width:22px;height:22px;border-radius:7px;background:var(--c);box-shadow:0 0 0 1px rgba(0,0,0,.12)}
+  .gm-qc-chev{margin-inline-start:auto;color:#6B6355;font-size:12px}
+  .gm-qc-row.open .gm-qc-chev{transform:rotate(180deg)}
+  .gm-qc-row.open{padding-bottom:10px}
+  .gm-qc-name{font-size:12.5px;font-weight:600;min-width:96px;color:#211D17}
+  .gm-qc-dots{display:flex;flex-wrap:wrap;gap:6px}
+  .gm-qc-dots button{width:26px;height:26px;border-radius:50%;border:2px solid #fff;background:var(--c);box-shadow:0 0 0 1px rgba(0,0,0,.12);cursor:pointer;padding:0}
+  .gm-qc-dots button[aria-checked="true"]{box-shadow:0 0 0 2px #1C1A16}
+  .gm-qc-dots .gm-qc-reset{background:#fff;color:#6B6355;font-size:13px;line-height:1}
+  @media (max-width:1023px){.gm-qc-dots button{width:30px;height:30px}}
   /* today's movements, coloured by kind */
   .dsk-mv{width:100%;border-collapse:collapse}
   .dsk-mv th{padding:9px 12px;text-align:right;font-size:12px;font-weight:700;color:#6B6355;background:#F7F2E6;border-bottom:1px solid #E4DAC0}
@@ -842,6 +857,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
           <div class="dsk-customize-note">يُحفظ لحسابك أنت فقط — لا يتغيّر عند باقي الموظفين</div>
         </div>
         <div class="dsk-customize-grid" id="dskCustomizeGrid"></div>
+        <div id="dskColorRows" class="gm-qc"></div>
         <div class="dsk-customize-actions">
           <div class="dsk-customize-count" id="dskCustomizeCount"></div>
           <div class="dsk-customize-buttons">
@@ -943,11 +959,40 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
     var m = MAP[id] || ['champagne'];
     return TINT[m[0]];
   };
+  // colour each staff member picked for an icon (same on the phone and the computer)
+  window.GM_QA_COLORS = ['#3E66B3', '#2F7BD1', '#5B7BA6', '#14A394', '#3FA35B', '#C8952E', '#C9AE7C', '#D9731A', '#C27A5E', '#D2453A', '#D9538C', '#8E5BD9', '#8A94A3'];
+  function colorKey() { return 'goldmind_qa_colors_' + (window.GOLDMIND_STAFF_ID || 'default'); }
+  function picked() { try { return JSON.parse(localStorage.getItem(colorKey()) || '{}') || {}; } catch (e) { return {}; } }
+  window.gmQaColor = function (id) { var m = MAP[id] || ['champagne']; return picked()[id] || BASE[m[0]]; };
+  window.gmQaSetColor = function (id, c) {
+    var all = picked(); if (c) all[id] = c; else delete all[id];
+    try { localStorage.setItem(colorKey(), JSON.stringify(all)); } catch (e) {}
+  };
+  // one line per chosen icon with its colour; tapping it opens the colour dots (used by both «تخصيص» panels)
+  var openColor = null;
+  window.gmQaColorRows = function (box, items, onChange) {
+    if (!box) return;
+    box.innerHTML = items.length ? '<div class="gm-qc-h">لون كل أيقونة — اضغط على الأيقونة لتغيير لونها</div>' + items.map(function (a) {
+      var cur = window.gmQaColor(a.id), open = openColor === a.id;
+      return '<div class="gm-qc-row' + (open ? ' open' : '') + '" data-id="' + a.id + '">'
+        + '<button type="button" class="gm-qc-pick" aria-expanded="' + open + '"><span class="gm-qc-cur" style="--c:' + cur + '"></span><span class="gm-qc-name">' + a.label + '</span><span class="gm-qc-chev" aria-hidden="true">▾</span></button>'
+        + (open ? '<span class="gm-qc-dots" role="radiogroup" aria-label="لون ' + a.label + '">'
+          + window.GM_QA_COLORS.map(function (c) { return '<button type="button" role="radio" aria-checked="' + (c.toLowerCase() === cur.toLowerCase()) + '" aria-label="' + c + '" data-c="' + c + '" style="--c:' + c + '"></button>'; }).join('')
+          + '<button type="button" class="gm-qc-reset" data-c="" aria-label="اللون الأصلي" title="اللون الأصلي">↺</button></span>' : '')
+        + '</div>';
+    }).join('') : '';
+    box.onclick = function (e) {
+      var row = e.target.closest('.gm-qc-row'); if (!row) return;
+      var b = e.target.closest('button[data-c]');
+      if (b) { window.gmQaSetColor(row.dataset.id, b.dataset.c || null); if (onChange) onChange(); }
+      else if (e.target.closest('.gm-qc-pick')) openColor = openColor === row.dataset.id ? null : row.dataset.id;
+      window.gmQaColorRows(box, items, onChange);
+    };
+  };
   window.GM_GLOSS = function (id, materialIcon, phone) {
     var m = MAP[id] || ['champagne', null];
-    // same colours on the phone and the computer
     var sym = m[1] ? SVG[m[1]] : '<span class="material-symbols-outlined">' + materialIcon + '</span>';
-    return '<span class="gm-gi" style="--c:' + BASE[m[0]] + '">' + sym + '</span>';
+    return '<span class="gm-gi" style="--c:' + window.gmQaColor(id) + '">' + sym + '</span>';
   };
 })();
 (function () {
@@ -1031,6 +1076,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
         + '<span>' + a.label + '</span></div>';
     }).join('');
     countEl.textContent = draft.length + ' / ' + MAX_ACTIONS + ' مختارة';
+    window.gmQaColorRows(document.getElementById('dskColorRows'), draft.map(byId).filter(Boolean), renderStrip);
     var chips = gridEl.querySelectorAll('.dsk-chip');
     for (var i = 0; i < chips.length; i++) {
       chips[i].addEventListener('click', function () {
@@ -1244,6 +1290,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 </div>
 <div class="text-[11px] text-on-surface-variant mb-4">يُحفظ لحسابك أنت فقط — لا يتغيّر عند باقي الموظفين</div>
 <div class="grid grid-cols-2 gap-2" id="mobCustomizeGrid"></div>
+<div id="mobColorRows" class="gm-qc"></div>
 <div class="flex items-center justify-between mt-4">
 <div class="text-[11px] text-on-surface-variant" id="mobCustomizeCount"></div>
 <div class="flex gap-2">
@@ -1402,6 +1449,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
         + '<span class="text-[12.5px] font-semibold">' + a.label + '</span></div>';
     }).join('');
     countEl.textContent = draft.length + ' / ' + MAX_ACTIONS + ' مختارة';
+    window.gmQaColorRows(document.getElementById('mobColorRows'), draft.map(byId).filter(Boolean), renderStrip);
     var chips = gridEl.querySelectorAll('[data-id]');
     for (var i = 0; i < chips.length; i++) {
       chips[i].addEventListener('click', function () {

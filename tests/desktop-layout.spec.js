@@ -134,3 +134,20 @@ test('an empty list gets the small drawing', async ({ page }) => {
   await page.evaluate(() => { const p = document.createElement('p'); p.className = 'text-center py-8'; p.textContent = 'لا يوجد زبائن مطابقون.'; p.id = 'emp'; document.body.appendChild(p); });
   await expect(page.locator('#emp')).toHaveClass(/\bgm-empty\b/);
 });
+
+test('«تخصيص»: each icon can get its own colour, kept for this staff member', async ({ page }) => {
+  await install(page, { db: db(), generic: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/index-ar.html');
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => document.getElementById('mobCustomizeBtn').click());
+  const row = page.locator('#mobColorRows .gm-qc-row[data-id="cashbox"]');
+  await row.locator('.gm-qc-pick').click();                                  // opens the colour dots
+  await row.locator('button[data-c="#8E5BD9"]').click();
+  await expect(row.locator('button[data-c="#8E5BD9"]')).toHaveAttribute('aria-checked', 'true');
+  expect(await page.locator('#mobActionStrip .gm-qg[data-id="cashbox"] .gm-gi').getAttribute('style')).toContain('#8E5BD9');
+  await page.reload(); await page.waitForTimeout(1500);
+  expect(await page.locator('#mobActionStrip .gm-qg[data-id="cashbox"] .gm-gi').getAttribute('style')).toContain('#8E5BD9');
+  await page.setViewportSize({ width: 1440, height: 900 });                 // same colour on the computer
+  expect(await page.locator('#dskActionStrip a[href="daily-cashbox-ar.html"] .gm-gi').getAttribute('style')).toContain('#8E5BD9');
+});
