@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vQZd8fJngAQX7mNoh31LBdOuKapQvaQkd5gDlq3LbOYabOL1vkLb0eAdI0PNSpD
+\restrict 2NkH8w42ahGBmOZBYcUDkNZlWAITOXhSjAnP6hnFv0LL5NbPKyJttznDXVPQO6A
 
 
 SET statement_timeout = 0;
@@ -504,6 +504,68 @@ $$;
 
 
 --
+-- Name: barcode_counter_store(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.barcode_counter_store(p_store uuid) RETURNS uuid
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select coalesce(o.head_office_store_id, s.id)
+    from stores s left join organizations o on o.id = s.organization_id
+      where s.id = p_store;
+      $$;
+
+
+--
+-- Name: cancel_branch_transfer(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.cancel_branch_transfer(p_transfer uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         declare tr record; it record; d jsonb; me uuid; back int := 0; got int; cm uuid;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         begin
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           select * into tr from branch_transfers where id = p_transfer for update;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             if tr is null then raise exception 'سند النقل غير موجود'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               if not has_permission('stock_transfers', tr.from_store_id) then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   raise exception 'ليس لديك صلاحية إلغاء سند النقل' using errcode = '42501';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       if tr.status <> 'in_transit' then raise exception 'هذا السند ليس بالطريق (حالته: %)', tr.status; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         select id into me from staff where user_id = auth.uid() and store_id = tr.from_store_id limit 1;
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           for it in select * from branch_transfer_items where transfer_id = tr.id and received_at is null for update loop
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               if it.kind = 'scrap' then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     for d in select * from jsonb_array_elements(coalesce(it.lot_draws, '[]'::jsonb)) loop
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             update gold_stock_lots set weight_grams_remaining = weight_grams_remaining + (d->>'w')::numeric
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      where id = (d->>'lot_id')::uuid;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            end loop;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                elsif it.kind = 'cash' then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      insert into cash_movements (store_id, box, direction, amount, description, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              values (tr.from_store_id, it.cash_box, 'in', it.amount, 'إلغاء نقل نقد بسند ' || tr.transfer_number, me) returning id into cm;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    if it.cash_box = 'main' then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      values (tr.from_store_id, 'إلغاء نقل نقد لفرع آخر', 'in', it.amount, 'سند ' || tr.transfer_number, me, cm);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                elsif it.piece_id is not null then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      update pieces set status = 'available' where id = it.piece_id and status = 'in_transit' and store_id = tr.from_store_id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    values (tr.from_store_id, it.piece_id, 'transfer_cancelled', 'إلغاء سند النقل ' || tr.transfer_number, me);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        elsif it.diamond_piece_id is not null then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              update diamond_pieces set status = 'available' where id = it.diamond_piece_id and status = 'in_transit' and store_id = tr.from_store_id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      delete from branch_transfer_items where id = it.id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          back := back + 1;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            end loop;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              select count(*) into got from branch_transfer_items where transfer_id = tr.id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                -- what was already received stays there; the voucher keeps only that
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  update branch_transfers set status = case when got > 0 then 'received' else 'cancelled' end where id = tr.id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    return jsonb_build_object('returned', back, 'kept', got);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    end $$;
+
+
+--
 -- Name: cancel_invoice(uuid, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -595,7 +657,7 @@ begin
   select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
 
   if party = 'customer' then
-    select id, store_id, name into c from customers where id = pid and store_id = sid;
+    select id, store_id, name into c from customers where id = pid and store_id in (select org_store_ids(sid));
     if c is null then raise exception 'اختر الزبون'; end if;
     if not (has_permission('edit_customers', sid) or has_permission('manage_daily_cashbox', sid)) then raise exception 'ليس لديك صلاحية سندات الزبائن' using errcode = '42501'; end if;
     note := coalesce(descr, case when kind = 'in' then 'دفعة من العميل' else 'صرف للعميل' end) || fxnote;
@@ -612,7 +674,7 @@ begin
               case when kind = 'in' then 'payment' else 'cash_out' end, me, cm);
 
   elsif party = 'trader' then
-    select id, store_id, name into t from traders where id = pid and store_id = sid;
+    select id, store_id, name into t from traders where id = pid and store_id in (select org_store_ids(sid));
     if t is null then raise exception 'اختر التاجر'; end if;
     if not has_permission('edit_traders', sid) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
     note := coalesce(descr, case when kind = 'out' then 'صرف كاش للتاجر' else 'قبض كاش من التاجر' end) || fxnote;
@@ -648,6 +710,23 @@ begin
   end if;
   return jsonb_build_object('ok', true, 'cash_movement_id', cm, 'base_amount', base_amt, 'base_currency', base_cur);
 end $$;
+
+
+--
+-- Name: check_head_office_in_org(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.check_head_office_in_org() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.head_office_store_id is not null
+       and not exists (select 1 from stores where id = new.head_office_store_id and organization_id = new.id) then
+           raise exception 'المكتب الرئيسي يجب أن يكون أحد فروع نفس المنشأة';
+             end if;
+               return new;
+               end $$;
 
 
 --
@@ -856,6 +935,74 @@ $$;
 
 
 --
+-- Name: create_branch(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.create_branch(p_from_store uuid, p_name text) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                 declare
+                   org uuid;
+                     me record;
+                       src record;
+                         new_id uuid;
+                           nm text := btrim(coalesce(p_name, ''));
+                           begin
+                             if auth.uid() is null then raise exception 'NOT_AUTHENTICATED'; end if;
+                               select organization_id into org from stores where id = p_from_store;
+                                 if org is null or not is_org_owner(org) then
+                                     raise exception 'إضافة فرع متاحة لمالك المنشأة فقط' using errcode = '42501';
+                                       end if;
+                                         if nm = '' then raise exception 'اكتب اسم الفرع'; end if;
+                                           if exists (select 1 from stores where organization_id = org and lower(btrim(name)) = lower(nm)) then
+                                               raise exception 'يوجد فرع بنفس الاسم في هذه المنشأة';
+                                                 end if;
+                                                   select * into me from staff where store_id = p_from_store and user_id = auth.uid() limit 1;
+                                                     select * into src from stores where id = p_from_store;
+
+                                                       -- settings only: address, phone, licence, branch code and emirate, devices and counters start fresh
+                                                         insert into stores (name, organization_id, currency, vat_rate, country, gold_price_source, invoice_numbering_mode,
+                                                               invoice_print_frame, invoice_print_shape, diamonds_enabled, einvoice_disabled,
+                                                                     piece_barcode_prefix_gold, piece_barcode_prefix_diamond, piece_barcode_seq_width_gold, piece_barcode_seq_width_diamond,
+                                                                           secondary_currency, secondary_currency_rate, secondary_currency_rate_updated_at, rfid_enabled, auto_capture_photo_enabled,
+                                                                                 last_gold_ounce_price, last_gold_ounce_rate, fab_rate_retail, fab_rate_wholesale, fab_rate_wholesale2,
+                                                                                       label_mc_multiplier, label_mc_addend, zebra_label_width_mm, zebra_label_height_mm, zebra_label_dpi,
+                                                                                             zebra_label_x_offset_mm, zebra_label_y_offset_mm, zebra_barcode_height_mm, zebra_label_rotate_180, zebra_darkness,
+                                                                                                   zebra_field_spacing_mm, zebra_barcode_module_width, allow_biometric_login, debt_alert_days, debt_alert_customers,
+                                                                                                         debt_alert_traders, terms_accepted_at, terms_accepted_version)
+                                                                                                           values (nm, org, src.currency, src.vat_rate, src.country, src.gold_price_source, src.invoice_numbering_mode,
+                                                                                                                 src.invoice_print_frame, src.invoice_print_shape, src.diamonds_enabled, src.einvoice_disabled,
+                                                                                                                       src.piece_barcode_prefix_gold, src.piece_barcode_prefix_diamond, src.piece_barcode_seq_width_gold, src.piece_barcode_seq_width_diamond,
+                                                                                                                             src.secondary_currency, src.secondary_currency_rate, src.secondary_currency_rate_updated_at, src.rfid_enabled, src.auto_capture_photo_enabled,
+                                                                                                                                   src.last_gold_ounce_price, src.last_gold_ounce_rate, src.fab_rate_retail, src.fab_rate_wholesale, src.fab_rate_wholesale2,
+                                                                                                                                         src.label_mc_multiplier, src.label_mc_addend, src.zebra_label_width_mm, src.zebra_label_height_mm, src.zebra_label_dpi,
+                                                                                                                                               src.zebra_label_x_offset_mm, src.zebra_label_y_offset_mm, src.zebra_barcode_height_mm, src.zebra_label_rotate_180, src.zebra_darkness,
+                                                                                                                                                     src.zebra_field_spacing_mm, src.zebra_barcode_module_width, src.allow_biometric_login, src.debt_alert_days, src.debt_alert_customers,
+                                                                                                                                                           src.debt_alert_traders, src.terms_accepted_at, src.terms_accepted_version)
+                                                                                                                                                             returning id into new_id;
+
+                                                                                                                                                               insert into gold_prices (store_id, karat, price_per_gram, mode)
+                                                                                                                                                                   select new_id, karat, price_per_gram, mode from gold_prices where store_id = p_from_store;
+
+                                                                                                                                                                     -- same plan and end date as the organization's primary store
+                                                                                                                                                                       insert into subscriptions (store_id, plan_id, status, trial_end, current_period_end, grace_period_days)
+                                                                                                                                                                           select new_id, s.plan_id, s.status, s.trial_end, s.current_period_end, s.grace_period_days
+                                                                                                                                                                               from subscriptions s join organizations o on o.primary_store_id = s.store_id
+                                                                                                                                                                                   where o.id = org limit 1;
+
+                                                                                                                                                                                     insert into staff (user_id, store_id, full_name, role, permissions, contact_phone, whatsapp_phone)
+                                                                                                                                                                                         values (auth.uid(), new_id, coalesce(me.full_name, split_part((select email from auth.users where id = auth.uid()), '@', 1)),
+                                                                                                                                                                                                     'owner', me.permissions, me.contact_phone, me.whatsapp_phone);
+
+                                                                                                                                                                                                       insert into audit_log (store_id, staff_id, action_type, description)
+                                                                                                                                                                                                           values (p_from_store, me.id, 'branch_created', 'إضافة فرع جديد: ' || nm);
+
+                                                                                                                                                                                                             return new_id;
+                                                                                                                                                                                                             end $$;
+
+
+--
 -- Name: create_customer_deposit(jsonb); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -867,7 +1014,8 @@ declare c record; me uuid; amt numeric := round(coalesce(nullif(p->>'amount', ''
         meth text := coalesce(nullif(p->>'method', ''), 'cash'); num text; dep_id uuid; cm uuid;
                 to_box boolean := coalesce((p->>'to_cashbox')::boolean, true);
                 begin
-                  select id, store_id, name into c from customers where id = (p->>'customer_id')::uuid;
+                  select id, coalesce(nullif(p->>'store_id', '')::uuid, store_id) as store_id, store_id as home_store, name into c from customers where id = (p->>'customer_id')::uuid;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               if c is not null and c.store_id not in (select org_store_ids(c.home_store)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
                     if c is null then raise exception 'اختر العميل'; end if;
                       if not (has_permission('edit_customers', c.store_id) or has_permission('manage_daily_cashbox', c.store_id)) then
                           raise exception 'ليس لديك صلاحية تسجيل العربون' using errcode = '42501';
@@ -928,36 +1076,38 @@ $$;
 
 
 --
--- Name: customer_cash_out(uuid, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: customer_cash_out(uuid, numeric, text, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text DEFAULT 'cash'::text, p_notes text DEFAULT NULL::text) RETURNS jsonb
+CREATE FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text DEFAULT 'cash'::text, p_notes text DEFAULT NULL::text, p_store uuid DEFAULT NULL::uuid) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare c record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text;
-begin
-  select id, store_id, name into c from customers where id = p_customer;
-  if c is null then raise exception 'العميل غير موجود'; end if;
-  if not (has_permission('edit_customers', c.store_id) or has_permission('manage_daily_cashbox', c.store_id)) then
-    raise exception 'ليس لديك صلاحية صرف مبالغ للعملاء' using errcode = '42501';
-  end if;
-  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
-  if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
-  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
-  note := coalesce(nullif(trim(p_notes), ''), 'صرف للعميل');
-  insert into cash_movements (store_id, box, direction, amount, description, created_by)
-    values (c.store_id, case when p_method = 'bank' then 'bank' else 'main' end, 'out', amt,
-            'صرف للعميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
-    returning id into cm;
-  if coalesce(p_method, 'cash') = 'cash' then
-    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
-      values (c.store_id, 'صرف لعميل', 'out', amt, c.name || ' — ' || note, me, cm);
-  end if;
-  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
-    values (c.store_id, c.id, 'debt_increase', amt, 0, note, 'cash_out', me, cm);
-  return jsonb_build_object('ok', true);
-end $$;
+                                                                                                                                                                                                                                                                                                                                                                                                                         declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text;
+                                                                                                                                                                                                                                                                                                                                                                                                                         begin
+                                                                                                                                                                                                                                                                                                                                                                                                                           select id, store_id, name into c from customers where id = p_customer;
+                                                                                                                                                                                                                                                                                                                                                                                                                             if c is null then raise exception 'العميل غير موجود'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                               st := coalesce(p_store, c.store_id);
+                                                                                                                                                                                                                                                                                                                                                                                                                                 if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                   if not (has_permission('edit_customers', st) or has_permission('manage_daily_cashbox', st)) then
+                                                                                                                                                                                                                                                                                                                                                                                                                                       raise exception 'ليس لديك صلاحية صرف مبالغ للعملاء' using errcode = '42501';
+                                                                                                                                                                                                                                                                                                                                                                                                                                         end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                           if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                             if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                               select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                 note := coalesce(nullif(trim(p_notes), ''), 'صرف للعميل');
+                                                                                                                                                                                                                                                                                                                                                                                                                                                   insert into cash_movements (store_id, box, direction, amount, description, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                       values (st, case when p_method = 'bank' then 'bank' else 'main' end, 'out', amt,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'صرف للعميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                       returning id into cm;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                         if coalesce(p_method, 'cash') = 'cash' then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                             insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   values (st, 'صرف لعميل', 'out', amt, c.name || ' — ' || note, me, cm);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           values (st, c.id, 'debt_increase', amt, 0, note, 'cash_out', me, cm);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             return jsonb_build_object('ok', true);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             end $$;
 
 
 --
@@ -968,36 +1118,39 @@ CREATE FUNCTION public.customer_credit(sid uuid, cust uuid) RETURNS numeric
     LANGUAGE sql STABLE
     SET search_path TO 'public'
     AS $$
-  select round(greatest(0, -coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)), 2)
-  from customer_debts where store_id = sid and customer_id = cust;
-$$;
+                     select round(greatest(0, -coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)), 2)
+                       from customer_debts where store_id in (select org_store_ids(sid)) and customer_id = cust;
+                       $$;
 
 
 --
--- Name: customer_debt_discount(uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: customer_debt_discount(uuid, numeric, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text DEFAULT NULL::text) RETURNS jsonb
+CREATE FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text DEFAULT NULL::text, p_store uuid DEFAULT NULL::uuid) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare c record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); owed numeric;
-begin
-  select id, store_id, name into c from customers where id = p_customer;
-  if c is null then raise exception 'العميل غير موجود'; end if;
-  if not has_permission('edit_customers', c.store_id) then
-    raise exception 'ليس لديك صلاحية تسجيل خصم على دين العميل' using errcode = '42501';
-  end if;
-  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
-  select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0) into owed
-    from customer_debts where customer_id = c.id and store_id = c.store_id;
-  if amt > round(owed, 2) + 0.009 then raise exception 'الخصم (%) أكبر من دين العميل (%)', amt, round(owed, 2); end if;
-  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
-  -- Balance-only: no cash moves. Settles the oldest open invoices like a payment.
-  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
-    values (c.store_id, c.id, 'debt_decrease', amt, 0, coalesce(nullif(trim(p_notes), ''), 'خصم على الدين'), 'discount', me);
-  return jsonb_build_object('ok', true);
-end $$;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); owed numeric;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             begin
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               select id, store_id, name into c from customers where id = p_customer;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 if c is null then raise exception 'العميل غير موجود'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   st := coalesce(p_store, c.store_id);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       if not has_permission('edit_customers', st) then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           raise exception 'ليس لديك صلاحية تسجيل خصم على دين العميل' using errcode = '42501';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 -- the customer's whole debt across the organization
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0) into owed
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       from customer_debts where customer_id = c.id and store_id in (select org_store_ids(st));
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         if amt > round(owed, 2) + 0.009 then raise exception 'الخصم (%) أكبر من دين العميل (%)', amt, round(owed, 2); end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             -- Balance-only: no cash moves. Settles the oldest open invoices like a payment.
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   values (st, c.id, 'debt_decrease', amt, 0, coalesce(nullif(trim(p_notes), ''), 'خصم على الدين'), 'discount', me);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     return jsonb_build_object('ok', true);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     end $$;
 
 
 --
@@ -1038,16 +1191,16 @@ CREATE FUNCTION public.customer_deposit_remaining(sid uuid) RETURNS TABLE(deposi
     LANGUAGE sql STABLE
     SET search_path TO 'public'
     AS $$
-  with cred as (
-    select customer_id, greatest(0, -sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end)) c
-    from customer_debts where store_id = sid group by customer_id),
-  d as (
-    select dp.id, dp.amount, coalesce(cr.c, 0) c,
-           sum(dp.amount) over (partition by dp.customer_id order by dp.created_at desc, dp.id) run
-    from customer_deposits dp left join cred cr on cr.customer_id = dp.customer_id
-    where dp.store_id = sid and dp.status = 'active')
-  select id, round(least(amount, greatest(0, c - (run - amount))), 2) from d;
-$$;
+                         with cred as (
+                             select customer_id, greatest(0, -sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end)) c
+                                 from customer_debts where store_id in (select org_store_ids(sid)) group by customer_id),
+                                   d as (
+                                       select dp.id, dp.store_id, dp.amount, coalesce(cr.c, 0) c,
+                                                  sum(dp.amount) over (partition by dp.customer_id order by dp.created_at desc, dp.id) run
+                                                      from customer_deposits dp left join cred cr on cr.customer_id = dp.customer_id
+                                                          where dp.store_id in (select org_store_ids(sid)) and dp.status = 'active')
+                                                            select id, round(least(amount, greatest(0, c - (run - amount))), 2) from d where store_id = sid;
+                                                            $$;
 
 
 --
@@ -1137,73 +1290,75 @@ end $$;
 CREATE FUNCTION public.delete_last_sale_invoice(target_invoice_id uuid) RETURNS text
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
-    AS $$
-declare
-  inv record;
-  st record;
-  inv_seq integer;
-  inv_year integer;
-  actor uuid;
-begin
-  select * into inv from public.invoices where id = target_invoice_id for update;
-  if inv is null then raise exception 'الفاتورة غير موجودة'; end if;
+    AS $_$
+                                                                                                                                                                                   declare
+                                                                                                                                                                                     inv record;
+                                                                                                                                                                                       st record;
+                                                                                                                                                                                         inv_seq integer;
+                                                                                                                                                                                           inv_year integer;
+                                                                                                                                                                                             actor uuid;
+                                                                                                                                                                                               parts text[];
+                                                                                                                                                                                               begin
+                                                                                                                                                                                                 select * into inv from public.invoices where id = target_invoice_id for update;
+                                                                                                                                                                                                   if inv is null then raise exception 'الفاتورة غير موجودة'; end if;
 
-  if not exists (select 1 from public.staff where user_id = auth.uid() and store_id = inv.store_id and role = 'owner') then
-    raise exception 'حذف الفواتير متاح للمالك فقط' using errcode = '42501';
-  end if;
-  if inv.type <> 'sale' then raise exception 'الحذف متاح لفواتير المبيعات فقط'; end if;
-  if exists (select 1 from public.invoices where related_invoice_id = inv.id) then
-    raise exception 'عليها فاتورة مرتجع، ولا يمكن حذفها';
-  end if;
-  if exists (select 1 from public.invoice_items where invoice_id = inv.id and diamond_stock_lot_id is not null) then
-    raise exception 'فيها ماس من رصيد جملة — استخدم الإلغاء بدل الحذف';
-  end if;
+                                                                                                                                                                                                     if not exists (select 1 from public.staff where user_id = auth.uid() and store_id = inv.store_id and role = 'owner') then
+                                                                                                                                                                                                         raise exception 'حذف الفواتير متاح للمالك فقط' using errcode = '42501';
+                                                                                                                                                                                                           end if;
+                                                                                                                                                                                                             if inv.type <> 'sale' then raise exception 'الحذف متاح لفواتير المبيعات فقط'; end if;
+                                                                                                                                                                                                               if exists (select 1 from public.invoices where related_invoice_id = inv.id) then
+                                                                                                                                                                                                                   raise exception 'عليها فاتورة مرتجع، ولا يمكن حذفها';
+                                                                                                                                                                                                                     end if;
+                                                                                                                                                                                                                       if exists (select 1 from public.invoice_items where invoice_id = inv.id and diamond_stock_lot_id is not null) then
+                                                                                                                                                                                                                           raise exception 'فيها ماس من رصيد جملة — استخدم الإلغاء بدل الحذف';
+                                                                                                                                                                                                                             end if;
 
-  -- number format PREFIX-YYYY-NNNNNN; must be the last one issued
-  inv_year := nullif(split_part(inv.invoice_number, '-', 2), '')::integer;
-  inv_seq  := nullif(split_part(inv.invoice_number, '-', 3), '')::integer;
-  select next_invoice_seq, next_invoice_seq_year into st from public.stores where id = inv.store_id for update;
-  if inv_seq is null or inv_year is distinct from st.next_invoice_seq_year or inv_seq <> st.next_invoice_seq - 1 then
-    raise exception 'يمكن حذف آخر فاتورة فقط (لتجنّب حدوث فراغ في الترقيم). يمكنك إلغاء هذه الفاتورة بدلاً من حذفها.';
-  end if;
+                                                                                                                                                                                                                               -- number format [CODE-]PREFIX-YYYY-NNNNNN; must be the last one issued
+                                                                                                                                                                                                                                 parts := regexp_match(inv.invoice_number, '-([0-9]{4})-([0-9]+)$');
+                                                                                                                                                                                                                                   inv_year := parts[1]::integer;
+                                                                                                                                                                                                                                     inv_seq  := parts[2]::integer;
+                                                                                                                                                                                                                                       select next_invoice_seq, next_invoice_seq_year into st from public.stores where id = inv.store_id for update;
+                                                                                                                                                                                                                                         if inv_seq is null or inv_year is distinct from st.next_invoice_seq_year or inv_seq <> st.next_invoice_seq - 1 then
+                                                                                                                                                                                                                                             raise exception 'يمكن حذف آخر فاتورة فقط (لتجنّب حدوث فراغ في الترقيم). يمكنك إلغاء هذه الفاتورة بدلاً من حذفها.';
+                                                                                                                                                                                                                                               end if;
 
-  select id into actor from public.staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
+                                                                                                                                                                                                                                                 select id into actor from public.staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
 
-  -- pieces back to stock
-  update public.pieces set status = 'available'
-   where status = 'sold' and id in (select piece_id from public.invoice_items where invoice_id = inv.id and piece_id is not null);
-  delete from public.piece_movements
-   where store_id = inv.store_id and event_type = 'sold' and note = 'بيع بفاتورة ' || inv.invoice_number
-     and piece_id in (select piece_id from public.invoice_items where invoice_id = inv.id and piece_id is not null);
-  update public.diamond_pieces set status = 'available'
-   where status = 'sold' and id in (select diamond_piece_id from public.invoice_items where invoice_id = inv.id and diamond_piece_id is not null);
+                                                                                                                                                                                                                                                   -- pieces back to stock
+                                                                                                                                                                                                                                                     update public.pieces set status = 'available'
+                                                                                                                                                                                                                                                        where status = 'sold' and id in (select piece_id from public.invoice_items where invoice_id = inv.id and piece_id is not null);
+                                                                                                                                                                                                                                                          delete from public.piece_movements
+                                                                                                                                                                                                                                                             where store_id = inv.store_id and event_type = 'sold' and note = 'بيع بفاتورة ' || inv.invoice_number
+                                                                                                                                                                                                                                                                  and piece_id in (select piece_id from public.invoice_items where invoice_id = inv.id and piece_id is not null);
+                                                                                                                                                                                                                                                                    update public.diamond_pieces set status = 'available'
+                                                                                                                                                                                                                                                                       where status = 'sold' and id in (select diamond_piece_id from public.invoice_items where invoice_id = inv.id and diamond_piece_id is not null);
 
-  -- bulk gold sold from lots goes back to the lot (weight, and pooled fee)
-  update public.gold_stock_lots l
-     set weight_grams_remaining = l.weight_grams_remaining + x.w,
-         fabrication_pool_remaining = case when l.fabrication_pool_remaining is null then null
-                                           else l.fabrication_pool_remaining + x.f end
-    from (select gold_stock_lot_id, sum(coalesce(weight_grams, 0)) w, sum(coalesce(fabrication_fee, 0)) f
-            from public.invoice_items where invoice_id = inv.id and gold_stock_lot_id is not null
-           group by gold_stock_lot_id) x
-   where l.id = x.gold_stock_lot_id;
+                                                                                                                                                                                                                                                                         -- bulk gold sold from lots goes back to the lot (weight, and pooled fee)
+                                                                                                                                                                                                                                                                           update public.gold_stock_lots l
+                                                                                                                                                                                                                                                                                set weight_grams_remaining = l.weight_grams_remaining + x.w,
+                                                                                                                                                                                                                                                                                         fabrication_pool_remaining = case when l.fabrication_pool_remaining is null then null
+                                                                                                                                                                                                                                                                                                                                    else l.fabrication_pool_remaining + x.f end
+                                                                                                                                                                                                                                                                                                                                        from (select gold_stock_lot_id, sum(coalesce(weight_grams, 0)) w, sum(coalesce(fabrication_fee, 0)) f
+                                                                                                                                                                                                                                                                                                                                                    from public.invoice_items where invoice_id = inv.id and gold_stock_lot_id is not null
+                                                                                                                                                                                                                                                                                                                                                               group by gold_stock_lot_id) x
+                                                                                                                                                                                                                                                                                                                                                                  where l.id = x.gold_stock_lot_id;
 
-  -- money / debt movements created by (or reversing) this invoice
-  delete from public.cash_movements where invoice_id = inv.id;
-  delete from public.customer_debts where invoice_id = inv.id;
-  delete from public.trader_movements where invoice_id = inv.id;
+                                                                                                                                                                                                                                                                                                                                                                    -- money / debt movements created by (or reversing) this invoice
+                                                                                                                                                                                                                                                                                                                                                                      delete from public.cash_movements where invoice_id = inv.id;
+                                                                                                                                                                                                                                                                                                                                                                        delete from public.customer_debts where invoice_id = inv.id;
+                                                                                                                                                                                                                                                                                                                                                                          delete from public.trader_movements where invoice_id = inv.id;
 
-  delete from public.invoices where id = inv.id; -- invoice_items cascade
+                                                                                                                                                                                                                                                                                                                                                                            delete from public.invoices where id = inv.id; -- invoice_items cascade
 
-  update public.stores set next_invoice_seq = inv_seq where id = inv.store_id;
+                                                                                                                                                                                                                                                                                                                                                                              update public.stores set next_invoice_seq = inv_seq where id = inv.store_id;
 
-  insert into public.audit_log (store_id, staff_id, action_type, description)
-  values (inv.store_id, actor, 'invoice_deleted',
-          'حذف فاتورة مبيعات ' || inv.invoice_number || ' بقيمة ' || coalesce(inv.total_amount, 0) || ' — الرقم رجع متاح للفاتورة الجاية');
+                                                                                                                                                                                                                                                                                                                                                                                insert into public.audit_log (store_id, staff_id, action_type, description)
+                                                                                                                                                                                                                                                                                                                                                                                  values (inv.store_id, actor, 'invoice_deleted',
+                                                                                                                                                                                                                                                                                                                                                                                            'حذف فاتورة مبيعات ' || inv.invoice_number || ' بقيمة ' || coalesce(inv.total_amount, 0) || ' — الرقم رجع متاح للفاتورة الجاية');
 
-  return inv.invoice_number;
-end;
-$$;
+                                                                                                                                                                                                                                                                                                                                                                                              return inv.invoice_number;
+                                                                                                                                                                                                                                                                                                                                                                                              end;
+                                                                                                                                                                                                                                                                                                                                                                                              $_$;
 
 
 --
@@ -1214,16 +1369,13 @@ CREATE FUNCTION public.ensure_store_organization() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                                                 declare new_org uuid;
-                                                 begin
-                                                   insert into organizations (name, primary_store_id, legal_name, tax_number, country, logo_url,
-                                                                                commercial_registration_number, legal_registration_id_type, emirate_code, peppol_endpoint_id)
-                                                                                  values (new.name, new.id, new.legal_name, new.tax_number, new.country, new.logo_url,
-                                                                                            new.commercial_registration_number, new.legal_registration_id_type, new.emirate_code, new.peppol_endpoint_id)
-                                                                                              returning id into new_org;
-                                                                                                update stores set organization_id = new_org where id = new.id;
-                                                                                                  return null;
-                                                                                                  end $$;
+                                     declare new_org uuid;
+                                     begin
+                                       insert into organizations (name, primary_store_id, country) values (new.name, new.id, new.country)
+                                           returning id into new_org;
+                                             update stores set organization_id = new_org where id = new.id;
+                                               return null;
+                                               end $$;
 
 
 --
@@ -1310,31 +1462,22 @@ CREATE FUNCTION public.get_invoice_receipt(p_id uuid) RETURNS TABLE(invoice_numb
     LANGUAGE sql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                                                          select
-                                                              inv.invoice_number, inv.type, inv.status, inv.payment_method, inv.vat_amount, inv.total_amount, inv.created_at,
-                                                                  s.name,
-                                                                      coalesce(o.logo_url, s.logo_url),
-                                                                          s.address, s.phone, s.email, s.vat_rate,
-                                                                              coalesce(o.tax_number, s.tax_number),
-                                                                                  s.currency, s.secondary_currency, s.secondary_currency_rate,
-                                                                                      c.name, c.phone,
-                                                                                          coalesce((
-                                                                                                select jsonb_agg(jsonb_build_object(
-                                                                                                        'description', ii.description,
-                                                                                                                'description_en', ii.description_en,
-                                                                                                                        'karat', ii.karat,
-                                                                                                                                'weight_grams', ii.weight_grams,
-                                                                                                                                        'line_total', ii.line_total,
-                                                                                                                                                'quantity', 1
-                                                                                                                                                      ) order by ii.id)
-                                                                                                                                                            from invoice_items ii where ii.invoice_id = inv.id
-                                                                                                                                                                ), '[]'::jsonb)
-                                                                                                                                                                  from invoices inv
-                                                                                                                                                                    join stores s on s.id = inv.store_id
-                                                                                                                                                                      left join organizations o on o.id = s.organization_id
-                                                                                                                                                                        left join customers c on c.id = inv.customer_id
-                                                                                                                                                                          where inv.id = p_id and inv.status != 'cancelled';
-                                                                                                                                                                          $$;
+                                                                                 select inv.invoice_number, inv.type, inv.status, inv.payment_method, inv.vat_amount, inv.total_amount, inv.created_at,
+                                                                                     s.name, o.logo_url, s.address, s.phone, s.email, s.vat_rate, o.tax_number,
+                                                                                         s.currency, s.secondary_currency, s.secondary_currency_rate,
+                                                                                             c.name, c.phone,
+                                                                                                 coalesce((
+                                                                                                       select jsonb_agg(jsonb_build_object(
+                                                                                                               'description', ii.description, 'description_en', ii.description_en, 'karat', ii.karat,
+                                                                                                                       'weight_grams', ii.weight_grams, 'line_total', ii.line_total, 'quantity', 1) order by ii.id)
+                                                                                                                             from invoice_items ii where ii.invoice_id = inv.id
+                                                                                                                                 ), '[]'::jsonb)
+                                                                                                                                   from invoices inv
+                                                                                                                                     join stores s on s.id = inv.store_id
+                                                                                                                                       left join organizations o on o.id = s.organization_id
+                                                                                                                                         left join customers c on c.id = inv.customer_id
+                                                                                                                                           where inv.id = p_id and inv.status != 'cancelled';
+                                                                                                                                           $$;
 
 
 --
@@ -1345,20 +1488,16 @@ CREATE FUNCTION public.get_repair_receipt(p_id uuid) RETURNS TABLE(ticket_number
     LANGUAGE sql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                                                                                                                                                                                                                                    select
-                                                                                                                                                                                                                                        rt.ticket_number, rt.piece_description, rt.problem_description, rt.intake_photo_url, rt.ready_photo_url,
-                                                                                                                                                                                                                                            rt.status, rt.received_at, rt.ready_at,
-                                                                                                                                                                                                                                                s.name,
-                                                                                                                                                                                                                                                    coalesce(o.logo_url, s.logo_url),
-                                                                                                                                                                                                                                                        s.address, s.phone, st.full_name, s.invoice_print_frame, s.invoice_print_shape,
-                                                                                                                                                                                                                                                            rt.estimated_cost, rt.actual_cost, s.vat_rate,
-                                                                                                                                                                                                                                                                coalesce(o.tax_number, s.tax_number)
-                                                                                                                                                                                                                                                                  from repair_tickets rt
-                                                                                                                                                                                                                                                                    join stores s on s.id = rt.store_id
-                                                                                                                                                                                                                                                                      left join organizations o on o.id = s.organization_id
-                                                                                                                                                                                                                                                                        left join staff st on st.id = rt.received_by
-                                                                                                                                                                                                                                                                          where rt.id = p_id;
-                                                                                                                                                                                                                                                                          $$;
+                                                                                                                                                   select rt.ticket_number, rt.piece_description, rt.problem_description, rt.intake_photo_url, rt.ready_photo_url,
+                                                                                                                                                       rt.status, rt.received_at, rt.ready_at,
+                                                                                                                                                           s.name, o.logo_url, s.address, s.phone, st.full_name, s.invoice_print_frame, s.invoice_print_shape,
+                                                                                                                                                               rt.estimated_cost, rt.actual_cost, s.vat_rate, o.tax_number
+                                                                                                                                                                 from repair_tickets rt
+                                                                                                                                                                   join stores s on s.id = rt.store_id
+                                                                                                                                                                     left join organizations o on o.id = s.organization_id
+                                                                                                                                                                       left join staff st on st.id = rt.received_by
+                                                                                                                                                                         where rt.id = p_id;
+                                                                                                                                                                         $$;
 
 
 --
@@ -1448,7 +1587,7 @@ CREATE FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_we
 declare t record; me uuid; w numeric := round(coalesce(p_weight, 0), 3); left_w numeric; take numeric;
         cost numeric := 0; lot record; avail numeric; note text; mid uuid;
 begin
-  select id, store_id, name into t from traders where id = p_trader;
+  select id, gm_acting_store(store_id) as store_id, name into t from traders where id = p_trader;
   if t is null then raise exception 'التاجر غير موجود'; end if;
   if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
   if w <= 0 then raise exception 'أدخل الوزن'; end if;
@@ -1483,6 +1622,25 @@ end $$;
 
 
 --
+-- Name: gm_acting_store(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_acting_store(home uuid) RETURNS uuid
+    LANGUAGE plpgsql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare h uuid;
+begin
+  begin
+      h := nullif(current_setting('request.headers', true)::json ->> 'x-gm-store', '')::uuid;
+        exception when others then h := null;
+          end;
+            if h is not null and h <> home and h in (select org_store_ids(home)) then return h; end if;
+              return home;
+              end $$;
+
+
+--
 -- Name: gm_allocate_customer_credit(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1490,33 +1648,33 @@ CREATE FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) RETURNS 
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare owed numeric; open_rem numeric; credit numeric; r record; a numeric; me uuid;
-begin
-  if cust is null then return; end if;
-  select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)
-    into owed from customer_debts where store_id = sid and customer_id = cust;
-  select coalesce(sum(total_amount - coalesce(amount_paid, 0)), 0) into open_rem
-    from invoices where store_id = sid and customer_id = cust and type = 'sale' and status <> 'cancelled'
-     and total_amount - coalesce(amount_paid, 0) > 0.009;
-  credit := round(open_rem - owed, 2);
-  if credit <= 0.009 then return; end if;
-  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
-  for r in select id, invoice_number, total_amount - coalesce(amount_paid, 0) rem
-             from invoices where store_id = sid and customer_id = cust and type = 'sale' and status <> 'cancelled'
-              and total_amount - coalesce(amount_paid, 0) > 0.009
-            order by created_at, invoice_number for update
-  loop
-    exit when credit <= 0.009;
-    a := least(credit, r.rem);
-    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
-      (sid, cust, r.id, 'debt_decrease', a, 0, 'دفعة مخصّصة للفاتورة ' || r.invoice_number, 'allocation', me),
-      (sid, cust, null, 'debt_increase', a, 0, 'تخصيص دفعة للفاتورة ' || r.invoice_number, 'allocation', me);
-    update invoices set amount_paid = coalesce(amount_paid, 0) + a,
-                        status = case when total_amount - coalesce(amount_paid, 0) - a <= 0.009 then 'paid' else status end
-     where id = r.id;
-    credit := credit - a;
-  end loop;
-end $$;
+                                                            declare owed numeric; open_rem numeric; credit numeric; r record; a numeric; me uuid;
+                                                            begin
+                                                              if cust is null then return; end if;
+                                                                select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)
+                                                                    into owed from customer_debts where store_id in (select org_store_ids(sid)) and customer_id = cust;
+                                                                      select coalesce(sum(total_amount - coalesce(amount_paid, 0)), 0) into open_rem
+                                                                          from invoices where store_id in (select org_store_ids(sid)) and customer_id = cust and type = 'sale' and status <> 'cancelled'
+                                                                               and total_amount - coalesce(amount_paid, 0) > 0.009;
+                                                                                 credit := round(open_rem - owed, 2);
+                                                                                   if credit <= 0.009 then return; end if;
+                                                                                     select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+                                                                                       for r in select id, store_id, invoice_number, total_amount - coalesce(amount_paid, 0) rem
+                                                                                                    from invoices where store_id in (select org_store_ids(sid)) and customer_id = cust and type = 'sale' and status <> 'cancelled'
+                                                                                                                  and total_amount - coalesce(amount_paid, 0) > 0.009
+                                                                                                                              order by created_at, invoice_number for update
+                                                                                                                                loop
+                                                                                                                                    exit when credit <= 0.009;
+                                                                                                                                        a := least(credit, r.rem);
+                                                                                                                                            insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
+                                                                                                                                                  (r.store_id, cust, r.id, 'debt_decrease', a, 0, 'دفعة مخصّصة للفاتورة ' || r.invoice_number, 'allocation', me),
+                                                                                                                                                        (r.store_id, cust, null, 'debt_increase', a, 0, 'تخصيص دفعة للفاتورة ' || r.invoice_number, 'allocation', me);
+                                                                                                                                                            update invoices set amount_paid = coalesce(amount_paid, 0) + a,
+                                                                                                                                                                                    status = case when total_amount - coalesce(amount_paid, 0) - a <= 0.009 then 'paid' else status end
+                                                                                                                                                                                         where id = r.id;
+                                                                                                                                                                                             credit := credit - a;
+                                                                                                                                                                                               end loop;
+                                                                                                                                                                                               end $$;
 
 
 --
@@ -1738,34 +1896,34 @@ CREATE FUNCTION public.gm_unallocate_customer_credit(sid uuid, cust uuid) RETURN
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare owed numeric; open_rem numeric; deficit numeric; r record; a numeric; me uuid;
-begin
-  select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)
-    into owed from customer_debts where store_id = sid and customer_id = cust;
-  select coalesce(sum(total_amount - coalesce(amount_paid, 0)), 0) into open_rem
-    from invoices where store_id = sid and customer_id = cust and type = 'sale' and status <> 'cancelled'
-     and total_amount - coalesce(amount_paid, 0) > 0.009;
-  deficit := round(owed - open_rem, 2);
-  if deficit <= 0.009 then return; end if;
-  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
-  for r in select d.invoice_id, i.invoice_number, sum(case when d.movement_type = 'debt_decrease' then d.cash_amount else -d.cash_amount end) alloc, max(d.created_at) last_at
-             from customer_debts d join invoices i on i.id = d.invoice_id
-            where d.store_id = sid and d.customer_id = cust and d.source = 'allocation' and i.status <> 'cancelled'
-            group by d.invoice_id, i.invoice_number
-           having sum(case when d.movement_type = 'debt_decrease' then d.cash_amount else -d.cash_amount end) > 0.009
-            order by max(d.created_at) desc
-  loop
-    exit when deficit <= 0.009;
-    a := least(deficit, r.alloc);
-    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
-      (sid, cust, r.invoice_id, 'debt_increase', a, 0, 'إلغاء تخصيص للفاتورة ' || r.invoice_number, 'allocation', me),
-      (sid, cust, null, 'debt_decrease', a, 0, 'إلغاء تخصيص للفاتورة ' || r.invoice_number, 'allocation', me);
-    update invoices set amount_paid = greatest(coalesce(amount_paid, 0) - a, 0),
-                        status = case when status = 'paid' then 'unpaid' else status end
-     where id = r.invoice_id;
-    deficit := deficit - a;
-  end loop;
-end $$;
+                                                                                                                                                                                               declare owed numeric; open_rem numeric; deficit numeric; r record; a numeric; me uuid;
+                                                                                                                                                                                               begin
+                                                                                                                                                                                                 select coalesce(sum(case when movement_type = 'debt_increase' then cash_amount else -cash_amount end), 0)
+                                                                                                                                                                                                     into owed from customer_debts where store_id in (select org_store_ids(sid)) and customer_id = cust;
+                                                                                                                                                                                                       select coalesce(sum(total_amount - coalesce(amount_paid, 0)), 0) into open_rem
+                                                                                                                                                                                                           from invoices where store_id in (select org_store_ids(sid)) and customer_id = cust and type = 'sale' and status <> 'cancelled'
+                                                                                                                                                                                                                and total_amount - coalesce(amount_paid, 0) > 0.009;
+                                                                                                                                                                                                                  deficit := round(owed - open_rem, 2);
+                                                                                                                                                                                                                    if deficit <= 0.009 then return; end if;
+                                                                                                                                                                                                                      select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+                                                                                                                                                                                                                        for r in select d.invoice_id, i.store_id, i.invoice_number, sum(case when d.movement_type = 'debt_decrease' then d.cash_amount else -d.cash_amount end) alloc, max(d.created_at) last_at
+                                                                                                                                                                                                                                     from customer_debts d join invoices i on i.id = d.invoice_id
+                                                                                                                                                                                                                                                 where d.store_id in (select org_store_ids(sid)) and d.customer_id = cust and d.source = 'allocation' and i.status <> 'cancelled'
+                                                                                                                                                                                                                                                             group by d.invoice_id, i.store_id, i.invoice_number
+                                                                                                                                                                                                                                                                        having sum(case when d.movement_type = 'debt_decrease' then d.cash_amount else -d.cash_amount end) > 0.009
+                                                                                                                                                                                                                                                                                    order by max(d.created_at) desc
+                                                                                                                                                                                                                                                                                      loop
+                                                                                                                                                                                                                                                                                          exit when deficit <= 0.009;
+                                                                                                                                                                                                                                                                                              a := least(deficit, r.alloc);
+                                                                                                                                                                                                                                                                                                  insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
+                                                                                                                                                                                                                                                                                                        (r.store_id, cust, r.invoice_id, 'debt_increase', a, 0, 'إلغاء تخصيص للفاتورة ' || r.invoice_number, 'allocation', me),
+                                                                                                                                                                                                                                                                                                              (r.store_id, cust, null, 'debt_decrease', a, 0, 'إلغاء تخصيص للفاتورة ' || r.invoice_number, 'allocation', me);
+                                                                                                                                                                                                                                                                                                                  update invoices set amount_paid = greatest(coalesce(amount_paid, 0) - a, 0),
+                                                                                                                                                                                                                                                                                                                                          status = case when status = 'paid' then 'unpaid' else status end
+                                                                                                                                                                                                                                                                                                                                               where id = r.invoice_id;
+                                                                                                                                                                                                                                                                                                                                                   deficit := deficit - a;
+                                                                                                                                                                                                                                                                                                                                                     end loop;
+                                                                                                                                                                                                                                                                                                                                                     end $$;
 
 
 --
@@ -2162,40 +2320,42 @@ CREATE FUNCTION public.next_invoice_number(target_store_id uuid, prefix text) RE
     AS $_$
 declare
   pfx text := $2;  -- the parameter name clashes with invoice_number_counters.prefix
-  seq integer;
-  yr integer := extract(year from now())::integer;
-  stored_year integer;
-begin
-  if not public.is_store_member(target_store_id) then
-    raise exception 'NOT_AUTHORIZED';
-  end if;
-  if pfx is null or pfx !~ '^[A-Z]{2,6}$' then
-    raise exception 'INVALID_PREFIX';
-  end if;
+    seq integer;
+      yr integer := extract(year from now())::integer;
+        stored_year integer;
+          code text;
+          begin
+            if not public.is_store_member(target_store_id) then
+                raise exception 'NOT_AUTHORIZED';
+                  end if;
+                    if pfx is null or pfx !~ '^[A-Z]{2,6}$' then
+                        raise exception 'INVALID_PREFIX';
+                          end if;
 
-  if pfx = 'INV' then
-    select next_invoice_seq_year into stored_year from public.stores where id = target_store_id for update;
-    if stored_year is null or stored_year <> yr then
-      update public.stores set next_invoice_seq = 2, next_invoice_seq_year = yr where id = target_store_id;
-      seq := 1;
-    else
-      update public.stores set next_invoice_seq = next_invoice_seq + 1
-       where id = target_store_id returning next_invoice_seq - 1 into seq;
-    end if;
-  else
-    insert into public.invoice_number_counters as c (store_id, prefix, year, next_seq)
-    values (target_store_id, pfx, yr,
-            coalesce((select max(nullif(split_part(i.invoice_number, '-', 3), '')::integer)
-                        from public.invoices i
-                       where i.store_id = target_store_id
-                         and i.invoice_number ~ ('^' || pfx || '-' || yr || '-[0-9]+$')), 0) + 2)
-    on conflict on constraint invoice_number_counters_pkey do update set next_seq = c.next_seq + 1
-    returning c.next_seq - 1 into seq;
-  end if;
+                            if pfx = 'INV' then
+                                select next_invoice_seq_year, branch_code into stored_year, code from public.stores where id = target_store_id for update;
+                                    if stored_year is null or stored_year <> yr then
+                                          update public.stores set next_invoice_seq = 2, next_invoice_seq_year = yr where id = target_store_id;
+                                                seq := 1;
+                                                    else
+                                                          update public.stores set next_invoice_seq = next_invoice_seq + 1
+                                                                 where id = target_store_id returning next_invoice_seq - 1 into seq;
+                                                                     end if;
+                                                                       else
+                                                                           select branch_code into code from public.stores where id = target_store_id;
+                                                                               insert into public.invoice_number_counters as c (store_id, prefix, year, next_seq)
+                                                                                   values (target_store_id, pfx, yr,
+                                                                                               coalesce((select max((regexp_match(i.invoice_number, '-([0-9]+)$'))[1]::integer)
+                                                                                                                       from public.invoices i
+                                                                                                                                              where i.store_id = target_store_id
+                                                                                                                                                                       and i.invoice_number ~ ('^([A-Z]{2,5}-)?' || pfx || '-' || yr || '-[0-9]+$')), 0) + 2)
+                                                                                                                                                                           on conflict on constraint invoice_number_counters_pkey do update set next_seq = c.next_seq + 1
+                                                                                                                                                                               returning c.next_seq - 1 into seq;
+                                                                                                                                                                                 end if;
 
-  return pfx || '-' || yr::text || '-' || lpad(seq::text, 6, '0');
-end;
-$_$;
+                                                                                                                                                                                   return coalesce(code || '-', '') || pfx || '-' || yr::text || '-' || lpad(seq::text, 6, '0');
+                                                                                                                                                                                   end;
+                                                                                                                                                                                   $_$;
 
 
 --
@@ -2206,34 +2366,40 @@ CREATE FUNCTION public.next_piece_barcode(target_store_id uuid, category text) R
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-           declare
-             result_prefix text; result_seq bigint; result_width smallint; bc text; tries int := 0;
-             begin
-               if not is_store_member(target_store_id) then raise exception 'NOT_AUTHORIZED'; end if;
-                 if category not in ('gold', 'diamond') then raise exception 'INVALID_CATEGORY'; end if;
-                   loop
-                       if category = 'diamond' then
-                             update stores set next_piece_seq_diamond = next_piece_seq_diamond + 1 where id = target_store_id
-                                     returning piece_barcode_prefix_diamond, next_piece_seq_diamond - 1, piece_barcode_seq_width_diamond
-                                             into result_prefix, result_seq, result_width;
-                                                 else
-                                                       update stores set next_piece_seq_gold = next_piece_seq_gold + 1 where id = target_store_id
-                                                               returning piece_barcode_prefix_gold, next_piece_seq_gold - 1, piece_barcode_seq_width_gold
-                                                                       into result_prefix, result_seq, result_width;
-                                                                           end if;
-                                                                               if result_seq is null then raise exception 'STORE_NOT_FOUND'; end if;
-                                                                                   bc := coalesce(result_prefix, '') || case
-                                                                                         when result_width is not null and result_width > 0 then lpad(result_seq::text, result_width, '0')
-                                                                                               else result_seq::text end;
-                                                                                                   tries := tries + 1;
-                                                                                                       exit when not exists (select 1 from pieces where store_id = target_store_id and barcode = bc)
-                                                                                                                 and not exists (select 1 from diamond_pieces where store_id = target_store_id and barcode = bc)
-                                                                                                                           and not exists (select 1 from piece_barcode_history where old_barcode = bc);
-                                                                                                                               if tries >= 1000 then raise exception 'BARCODE_COLLISION'; end if;
-                                                                                                                                 end loop;
-                                                                                                                                   return bc;
-                                                                                                                                   end;
-                                                                                                                                   $$;
+      declare
+        result_prefix text; result_seq bigint; result_width smallint; bc text; tries int := 0;
+          counter uuid; org uuid;
+          begin
+            if not is_store_member(target_store_id) then raise exception 'NOT_AUTHORIZED'; end if;
+              if category not in ('gold', 'diamond') then raise exception 'INVALID_CATEGORY'; end if;
+                counter := barcode_counter_store(target_store_id);
+                  select organization_id into org from stores where id = target_store_id;
+                    loop
+                        -- the update locks the counter row, so two branches never get the same number
+                            if category = 'diamond' then
+                                  update stores set next_piece_seq_diamond = next_piece_seq_diamond + 1 where id = counter
+                                          returning piece_barcode_prefix_diamond, next_piece_seq_diamond - 1, piece_barcode_seq_width_diamond
+                                                  into result_prefix, result_seq, result_width;
+                                                      else
+                                                            update stores set next_piece_seq_gold = next_piece_seq_gold + 1 where id = counter
+                                                                    returning piece_barcode_prefix_gold, next_piece_seq_gold - 1, piece_barcode_seq_width_gold
+                                                                            into result_prefix, result_seq, result_width;
+                                                                                end if;
+                                                                                    if result_seq is null then raise exception 'STORE_NOT_FOUND'; end if;
+                                                                                        bc := coalesce(result_prefix, '') || case
+                                                                                              when result_width is not null and result_width > 0 then lpad(result_seq::text, result_width, '0')
+                                                                                                    else result_seq::text end;
+                                                                                                        tries := tries + 1;
+                                                                                                            -- gold barcodes are unique across the whole database; diamonds within the organization
+                                                                                                                exit when not exists (select 1 from pieces where barcode = bc)
+                                                                                                                          and not exists (select 1 from diamond_pieces d join stores s on s.id = d.store_id
+                                                                                                                                                    where d.barcode = bc and (s.id = target_store_id or s.organization_id = org))
+                                                                                                                                                              and not exists (select 1 from piece_barcode_history where old_barcode = bc);
+                                                                                                                                                                  if tries >= 1000 then raise exception 'BARCODE_COLLISION'; end if;
+                                                                                                                                                                    end loop;
+                                                                                                                                                                      return bc;
+                                                                                                                                                                      end;
+                                                                                                                                                                      $$;
 
 
 --
@@ -2259,6 +2425,48 @@ BEGIN
   RETURN 'REP-' || yr || '-' || lpad(seq::text, 6, '0');
 END;
 $$;
+
+
+--
+-- Name: org_branches(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.org_branches(sid uuid) RETURNS TABLE(id uuid, name text, can_open_invoices boolean)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+      select b.id, coalesce(nullif(btrim(b.display_name), ''), b.name),
+               b.id = sid or has_permission('view_branch_invoices', b.id) or org_can(b.id, 'view_branch_invoices')
+                 from stores b where b.id in (select org_store_ids(sid)) and is_store_member(sid)
+                   order by b.created_at;
+                   $$;
+
+
+--
+-- Name: org_can(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.org_can(p_store uuid, perm text) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (
+      select 1 from stores a join stores b on b.organization_id = a.organization_id
+          where a.id = p_store and has_permission(perm, b.id));
+          $$;
+
+
+--
+-- Name: org_store_ids(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.org_store_ids(sid uuid) RETURNS SETOF uuid
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select b.id from stores a join stores b on b.organization_id = a.organization_id where a.id = sid
+    union select sid;
+    $$;
 
 
 --
@@ -2294,7 +2502,7 @@ begin
   if typ is null or typ not in ('buyTrader', 'buyRetail') then raise exception 'نوع فاتورة الشراء غير معروف'; end if;
   if pm is null or pm not in ('cash', 'credit') then raise exception 'طريقة دفع غير معروفة'; end if;
   if typ = 'buyTrader' then
-    if tid is null or not exists (select 1 from traders where id = tid and store_id = sid) then
+    if tid is null or not exists (select 1 from traders where id = tid and store_id in (select org_store_ids(sid))) then
       raise exception 'الرجاء اختيار تاجر من نفس المحل';
     end if;
   else
@@ -2591,175 +2799,175 @@ CREATE FUNCTION public.post_sale_invoice(p jsonb) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  sid uuid := nullif(p->>'store_id','')::uuid;
-  ref uuid := nullif(p->>'client_ref','')::uuid;
-  pm text := p->>'payment_method';
-  cust uuid := nullif(p->>'customer_id','')::uuid;
-  allow_low boolean := coalesce((p->>'confirm_low_price')::boolean, false);
-  cash_amt numeric := round(coalesce(nullif(p->>'cash_paid','')::numeric, 0), 2);
-  bank_amt numeric := round(coalesce(nullif(p->>'bank_paid','')::numeric, 0), 2);
-  sold_at timestamptz := coalesce(nullif(p->>'sold_at','')::timestamptz, now());
-  me uuid; inv_id uuid; inv_no text; ex record;
-  it jsonb; mode text; price numeric; total numeric := 0; paid numeric; remaining numeric := 0;
-  pc record; dp record; lot record;
-  k int; w numeric; aw numeric; gp numeric; lows text := '';
-  lines jsonb := '[]'::jsonb;
-  chk numeric;
-begin
-  if sid is null then raise exception 'المحل غير محدد'; end if;
-  if not has_permission('create_invoice', sid) then
-    raise exception 'ليس لديك صلاحية إنشاء فاتورة بيع' using errcode = '42501';
-  end if;
-  if ref is not null then
-    select id, invoice_number into ex from invoices where client_ref = ref and store_id = sid;
-    if found then return jsonb_build_object('id', ex.id, 'invoice_number', ex.invoice_number, 'duplicate', true); end if;
-  end if;
-  if pm is null or pm not in ('cash','bank','credit','mixed') then raise exception 'طريقة دفع غير معروفة'; end if;
-  -- a customer added on the sale screen while offline is created with the sale
-  if cust is null and nullif(trim(p->'new_customer'->>'name'), '') is not null then
-    select id into cust from customers where store_id = sid and name = trim(p->'new_customer'->>'name')
-      and coalesce(phone, '') = coalesce(nullif(trim(p->'new_customer'->>'phone'), ''), '') limit 1;
-  end if;
-  if cust is null and nullif(trim(p->'new_customer'->>'name'), '') is not null then
-    insert into customers (store_id, name, phone) values (sid, trim(p->'new_customer'->>'name'), nullif(trim(p->'new_customer'->>'phone'), ''))
-    returning id into cust;
-  end if;
-  if cust is null or not exists (select 1 from customers where id = cust and store_id = sid) then
-    raise exception 'الرجاء اختيار عميل من نفس المحل';
-  end if;
-  if jsonb_typeof(p->'items') <> 'array' or jsonb_array_length(p->'items') = 0 then
-    raise exception 'الفاتورة فاضية — ضيف قطعة وحدة على الأقل';
-  end if;
-  -- offline sales keep their real time, but never in the future or older than 14 days
-  if sold_at > now() + interval '5 minutes' or sold_at < now() - interval '14 days' then sold_at := now(); end if;
-  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+            declare
+              sid uuid := nullif(p->>'store_id','')::uuid;
+                ref uuid := nullif(p->>'client_ref','')::uuid;
+                  pm text := p->>'payment_method';
+                    cust uuid := nullif(p->>'customer_id','')::uuid;
+                      allow_low boolean := coalesce((p->>'confirm_low_price')::boolean, false);
+                        cash_amt numeric := round(coalesce(nullif(p->>'cash_paid','')::numeric, 0), 2);
+                          bank_amt numeric := round(coalesce(nullif(p->>'bank_paid','')::numeric, 0), 2);
+                            sold_at timestamptz := coalesce(nullif(p->>'sold_at','')::timestamptz, now());
+                              me uuid; inv_id uuid; inv_no text; ex record;
+                                it jsonb; mode text; price numeric; total numeric := 0; paid numeric; remaining numeric := 0;
+                                  pc record; dp record; lot record;
+                                    k int; w numeric; aw numeric; gp numeric; lows text := '';
+                                      lines jsonb := '[]'::jsonb;
+                                        chk numeric;
+                                        begin
+                                          if sid is null then raise exception 'المحل غير محدد'; end if;
+                                            if not has_permission('create_invoice', sid) then
+                                                raise exception 'ليس لديك صلاحية إنشاء فاتورة بيع' using errcode = '42501';
+                                                  end if;
+                                                    if ref is not null then
+                                                        select id, invoice_number into ex from invoices where client_ref = ref and store_id = sid;
+                                                            if found then return jsonb_build_object('id', ex.id, 'invoice_number', ex.invoice_number, 'duplicate', true); end if;
+                                                              end if;
+                                                                if pm is null or pm not in ('cash','bank','credit','mixed') then raise exception 'طريقة دفع غير معروفة'; end if;
+                                                                  -- a customer added on the sale screen while offline is created with the sale
+                                                                    if cust is null and nullif(trim(p->'new_customer'->>'name'), '') is not null then
+                                                                        select id into cust from customers where store_id in (select org_store_ids(sid)) and name = trim(p->'new_customer'->>'name')
+                                                                              and coalesce(phone, '') = coalesce(nullif(trim(p->'new_customer'->>'phone'), ''), '') limit 1;
+                                                                                end if;
+                                                                                  if cust is null and nullif(trim(p->'new_customer'->>'name'), '') is not null then
+                                                                                      insert into customers (store_id, name, phone) values (sid, trim(p->'new_customer'->>'name'), nullif(trim(p->'new_customer'->>'phone'), ''))
+                                                                                          returning id into cust;
+                                                                                            end if;
+                                                                                              if cust is null or not exists (select 1 from customers where id = cust and store_id in (select org_store_ids(sid))) then
+                                                                                                  raise exception 'الرجاء اختيار عميل من نفس المحل';
+                                                                                                    end if;
+                                                                                                      if jsonb_typeof(p->'items') <> 'array' or jsonb_array_length(p->'items') = 0 then
+                                                                                                          raise exception 'الفاتورة فاضية — ضيف قطعة وحدة على الأقل';
+                                                                                                            end if;
+                                                                                                              -- offline sales keep their real time, but never in the future or older than 14 days
+                                                                                                                if sold_at > now() + interval '5 minutes' or sold_at < now() - interval '14 days' then sold_at := now(); end if;
+                                                                                                                  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
 
-  -- 1) validate + lock every line, build the rows to insert
-  for it in select * from jsonb_array_elements(p->'items') loop
-    mode := coalesce(it->>'mode', 'manual');
-    price := round((it->>'price')::numeric, 2);
-    if price is null or price < 0 then raise exception 'سعر غير صحيح بأحد السطور'; end if;
-    if coalesce(nullif(it->>'manual_fab_fee','')::numeric, 0) < 0 then raise exception 'المصنعية لا تكون بالسالب'; end if;
-    k := nullif(it->>'karat','')::int; w := nullif(it->>'weight','')::numeric; aw := coalesce(nullif(it->>'accounting_weight','')::numeric, w);
+                                                                                                                    -- 1) validate + lock every line, build the rows to insert
+                                                                                                                      for it in select * from jsonb_array_elements(p->'items') loop
+                                                                                                                          mode := coalesce(it->>'mode', 'manual');
+                                                                                                                              price := round((it->>'price')::numeric, 2);
+                                                                                                                                  if price is null or price < 0 then raise exception 'سعر غير صحيح بأحد السطور'; end if;
+                                                                                                                                      if coalesce(nullif(it->>'manual_fab_fee','')::numeric, 0) < 0 then raise exception 'المصنعية لا تكون بالسالب'; end if;
+                                                                                                                                          k := nullif(it->>'karat','')::int; w := nullif(it->>'weight','')::numeric; aw := coalesce(nullif(it->>'accounting_weight','')::numeric, w);
 
-    if mode = 'diamond' then
-      select * into dp from diamond_pieces where id = (it->>'diamond_piece_id')::uuid and store_id = sid for update;
-      if not found then raise exception 'قطعة الماس غير موجودة'; end if;
-      if dp.status <> 'available' then raise exception 'القطعة % غير متاحة للبيع (حالتها: %)', coalesce(dp.barcode, dp.id::text), dp.status; end if;
-      if lines @> jsonb_build_array(jsonb_build_object('diamond_piece_id', dp.id::text)) then raise exception 'القطعة % مكررة بنفس الفاتورة', coalesce(dp.barcode, dp.id::text); end if;
-      k := case when dp.has_gold then dp.gold_karat end;
-      w := case when dp.has_gold then dp.gold_weight_grams end; aw := w;
-    elsif it ? 'piece_id' and nullif(it->>'piece_id','') is not null then
-      select * into pc from pieces where id = (it->>'piece_id')::uuid and store_id = sid for update;
-      if not found then raise exception 'القطعة غير موجودة بهالمحل'; end if;
-      if pc.status <> 'available' then raise exception 'القطعة % غير متاحة للبيع (حالتها: %)', pc.barcode, pc.status; end if;
-      if lines @> jsonb_build_array(jsonb_build_object('piece_id', pc.id::text)) then raise exception 'القطعة % مكررة بنفس الفاتورة', pc.barcode; end if;
-      k := pc.karat; w := pc.weight_grams; aw := coalesce(pc.accounting_weight_grams, pc.weight_grams);
-    end if;
-    if mode = 'stock' then
-      select * into lot from gold_stock_lots where id = (it->>'lot_id')::uuid and store_id = sid;
-      if not found then raise exception 'رصيد الجملة غير موجود'; end if;
-    end if;
+                                                                                                                                              if mode = 'diamond' then
+                                                                                                                                                    select * into dp from diamond_pieces where id = (it->>'diamond_piece_id')::uuid and store_id = sid for update;
+                                                                                                                                                          if not found then raise exception 'قطعة الماس غير موجودة'; end if;
+                                                                                                                                                                if dp.status <> 'available' then raise exception 'القطعة % غير متاحة للبيع (حالتها: %)', coalesce(dp.barcode, dp.id::text), dp.status; end if;
+                                                                                                                                                                      if lines @> jsonb_build_array(jsonb_build_object('diamond_piece_id', dp.id::text)) then raise exception 'القطعة % مكررة بنفس الفاتورة', coalesce(dp.barcode, dp.id::text); end if;
+                                                                                                                                                                            k := case when dp.has_gold then dp.gold_karat end;
+                                                                                                                                                                                  w := case when dp.has_gold then dp.gold_weight_grams end; aw := w;
+                                                                                                                                                                                      elsif it ? 'piece_id' and nullif(it->>'piece_id','') is not null then
+                                                                                                                                                                                            select * into pc from pieces where id = (it->>'piece_id')::uuid and store_id = sid for update;
+                                                                                                                                                                                                  if not found then raise exception 'القطعة غير موجودة بهالمحل'; end if;
+                                                                                                                                                                                                        if pc.status <> 'available' then raise exception 'القطعة % غير متاحة للبيع (حالتها: %)', pc.barcode, pc.status; end if;
+                                                                                                                                                                                                              if lines @> jsonb_build_array(jsonb_build_object('piece_id', pc.id::text)) then raise exception 'القطعة % مكررة بنفس الفاتورة', pc.barcode; end if;
+                                                                                                                                                                                                                    k := pc.karat; w := pc.weight_grams; aw := coalesce(pc.accounting_weight_grams, pc.weight_grams);
+                                                                                                                                                                                                                        end if;
+                                                                                                                                                                                                                            if mode = 'stock' then
+                                                                                                                                                                                                                                  select * into lot from gold_stock_lots where id = (it->>'lot_id')::uuid and store_id = sid;
+                                                                                                                                                                                                                                        if not found then raise exception 'رصيد الجملة غير موجود'; end if;
+                                                                                                                                                                                                                                            end if;
 
-    gp := case when k is null then null else (select price_per_gram from gold_prices where store_id = sid and karat = k) end;
-    -- currency-mistake guard: a gold line sold under half its gold value
-    if gp is not null and aw is not null and aw > 0 and price < gp * aw * 0.5 then
-      lows := lows || format(E'\n• %s: %s بدل قيمة ذهب تقريبية %s', coalesce(it->>'barcode', it->>'description', k || 'K'), price, round(gp * aw, 2));
-    end if;
-    total := total + price;
-    lines := lines || jsonb_build_object(
-      'piece_id', case when mode <> 'diamond' then nullif(it->>'piece_id','') end,
-      'diamond_piece_id', case when mode = 'diamond' then it->>'diamond_piece_id' end,
-      'lot_id', case when mode = 'stock' then it->>'lot_id' end,
-      'is_pooled', coalesce((it->>'is_pooled')::boolean, false),
-      'fee', case when mode = 'diamond' or nullif(it->>'piece_id','') is not null then 0
-                  else coalesce(nullif(it->>'manual_fab_fee','')::numeric, 0) end,
-      'barcode', it->>'barcode', 'karat', k, 'weight', w, 'aw', aw, 'price', price, 'gp', gp,
-      'description', it->>'description', 'description_en', it->>'description_en', 'photo', it->>'photo_url');
-  end loop;
+                                                                                                                                                                                                                                                gp := case when k is null then null else (select price_per_gram from gold_prices where store_id = sid and karat = k) end;
+                                                                                                                                                                                                                                                    -- currency-mistake guard: a gold line sold under half its gold value
+                                                                                                                                                                                                                                                        if gp is not null and aw is not null and aw > 0 and price < gp * aw * 0.5 then
+                                                                                                                                                                                                                                                              lows := lows || format(E'\n• %s: %s بدل قيمة ذهب تقريبية %s', coalesce(it->>'barcode', it->>'description', k || 'K'), price, round(gp * aw, 2));
+                                                                                                                                                                                                                                                                  end if;
+                                                                                                                                                                                                                                                                      total := total + price;
+                                                                                                                                                                                                                                                                          lines := lines || jsonb_build_object(
+                                                                                                                                                                                                                                                                                'piece_id', case when mode <> 'diamond' then nullif(it->>'piece_id','') end,
+                                                                                                                                                                                                                                                                                      'diamond_piece_id', case when mode = 'diamond' then it->>'diamond_piece_id' end,
+                                                                                                                                                                                                                                                                                            'lot_id', case when mode = 'stock' then it->>'lot_id' end,
+                                                                                                                                                                                                                                                                                                  'is_pooled', coalesce((it->>'is_pooled')::boolean, false),
+                                                                                                                                                                                                                                                                                                        'fee', case when mode = 'diamond' or nullif(it->>'piece_id','') is not null then 0
+                                                                                                                                                                                                                                                                                                                          else coalesce(nullif(it->>'manual_fab_fee','')::numeric, 0) end,
+                                                                                                                                                                                                                                                                                                                                'barcode', it->>'barcode', 'karat', k, 'weight', w, 'aw', aw, 'price', price, 'gp', gp,
+                                                                                                                                                                                                                                                                                                                                      'description', it->>'description', 'description_en', it->>'description_en', 'photo', it->>'photo_url');
+                                                                                                                                                                                                                                                                                                                                        end loop;
 
-  if lows <> '' and not allow_low then
-    raise exception 'LOW_PRICE:%', lows using errcode = 'P0001';
-  end if;
+                                                                                                                                                                                                                                                                                                                                          if lows <> '' and not allow_low then
+                                                                                                                                                                                                                                                                                                                                              raise exception 'LOW_PRICE:%', lows using errcode = 'P0001';
+                                                                                                                                                                                                                                                                                                                                                end if;
 
-  total := round(total, 2);
-  if pm = 'mixed' then
-    if cash_amt < 0 or bank_amt < 0 then raise exception 'مبلغ دفع غير صحيح'; end if;
-    if cash_amt + bank_amt > total + 0.01 then raise exception 'المبلغ المدفوع أكبر من إجمالي الفاتورة'; end if;
-    remaining := greatest(0, total - cash_amt - bank_amt);
-    paid := cash_amt + bank_amt;
-  else
-    paid := case when pm = 'credit' then 0 else total end;
-    remaining := case when pm = 'credit' then total else 0 end;
-  end if;
+                                                                                                                                                                                                                                                                                                                                                  total := round(total, 2);
+                                                                                                                                                                                                                                                                                                                                                    if pm = 'mixed' then
+                                                                                                                                                                                                                                                                                                                                                        if cash_amt < 0 or bank_amt < 0 then raise exception 'مبلغ دفع غير صحيح'; end if;
+                                                                                                                                                                                                                                                                                                                                                            if cash_amt + bank_amt > total + 0.01 then raise exception 'المبلغ المدفوع أكبر من إجمالي الفاتورة'; end if;
+                                                                                                                                                                                                                                                                                                                                                                remaining := greatest(0, total - cash_amt - bank_amt);
+                                                                                                                                                                                                                                                                                                                                                                    paid := cash_amt + bank_amt;
+                                                                                                                                                                                                                                                                                                                                                                      else
+                                                                                                                                                                                                                                                                                                                                                                          paid := case when pm = 'credit' then 0 else total end;
+                                                                                                                                                                                                                                                                                                                                                                              remaining := case when pm = 'credit' then total else 0 end;
+                                                                                                                                                                                                                                                                                                                                                                                end if;
 
-  -- 2) write everything
-  inv_no := next_invoice_number(sid, 'INV');
-  insert into invoices (store_id, invoice_number, type, customer_id, payment_method, cash_paid_amount, bank_paid_amount,
-      gold_value, fabrication_fees, vat_amount, total_amount, amount_paid, status, created_by, created_at, client_ref)
-    values (sid, inv_no, 'sale', cust, pm, case when pm = 'mixed' then cash_amt end, case when pm = 'mixed' then bank_amt end,
-      0, 0, 0, total, paid, case when remaining > 0.01 then 'unpaid' else 'paid' end, me, sold_at, ref)
-    returning id into inv_id;
+                                                                                                                                                                                                                                                                                                                                                                                  -- 2) write everything
+                                                                                                                                                                                                                                                                                                                                                                                    inv_no := next_invoice_number(sid, 'INV');
+                                                                                                                                                                                                                                                                                                                                                                                      insert into invoices (store_id, invoice_number, type, customer_id, payment_method, cash_paid_amount, bank_paid_amount,
+                                                                                                                                                                                                                                                                                                                                                                                            gold_value, fabrication_fees, vat_amount, total_amount, amount_paid, status, created_by, created_at, client_ref)
+                                                                                                                                                                                                                                                                                                                                                                                                values (sid, inv_no, 'sale', cust, pm, case when pm = 'mixed' then cash_amt end, case when pm = 'mixed' then bank_amt end,
+                                                                                                                                                                                                                                                                                                                                                                                                      0, 0, 0, total, paid, case when remaining > 0.01 then 'unpaid' else 'paid' end, me, sold_at, ref)
+                                                                                                                                                                                                                                                                                                                                                                                                          returning id into inv_id;
 
-  -- paid in several currencies: [{currency, amount, rate (per 1 shop currency), method cash|bank}]
-  if jsonb_typeof(p->'pay_breakdown') = 'array' and jsonb_array_length(p->'pay_breakdown') > 0 then
-    if pm = 'credit' then raise exception 'الدين لا يُقسّم على عملات'; end if;
-    if abs(coalesce((select sum((b->>'amount')::numeric / (b->>'rate')::numeric) from jsonb_array_elements(p->'pay_breakdown') b where b->>'method' = 'cash'), 0) - case pm when 'cash' then total when 'mixed' then cash_amt else 0 end) > 0.05
-       or abs(coalesce((select sum((b->>'amount')::numeric / (b->>'rate')::numeric) from jsonb_array_elements(p->'pay_breakdown') b where b->>'method' = 'bank'), 0) - case pm when 'bank' then total when 'mixed' then bank_amt else 0 end) > 0.05 then
-      raise exception 'مبالغ العملات لا تطابق المدفوع';
-    end if;
-    update invoices set pay_breakdown = p->'pay_breakdown' where id = inv_id;
-  end if;
-  if nullif(upper(p->>'pay_currency'), '') is not null and (p->>'pay_fx_rate')::numeric > 0 then
-    update invoices set pay_currency = upper(p->>'pay_currency'), pay_fx_rate = (p->>'pay_fx_rate')::numeric where id = inv_id;
-  end if;
+                                                                                                                                                                                                                                                                                                                                                                                                            -- paid in several currencies: [{currency, amount, rate (per 1 shop currency), method cash|bank}]
+                                                                                                                                                                                                                                                                                                                                                                                                              if jsonb_typeof(p->'pay_breakdown') = 'array' and jsonb_array_length(p->'pay_breakdown') > 0 then
+                                                                                                                                                                                                                                                                                                                                                                                                                  if pm = 'credit' then raise exception 'الدين لا يُقسّم على عملات'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                      if abs(coalesce((select sum((b->>'amount')::numeric / (b->>'rate')::numeric) from jsonb_array_elements(p->'pay_breakdown') b where b->>'method' = 'cash'), 0) - case pm when 'cash' then total when 'mixed' then cash_amt else 0 end) > 0.05
+                                                                                                                                                                                                                                                                                                                                                                                                                             or abs(coalesce((select sum((b->>'amount')::numeric / (b->>'rate')::numeric) from jsonb_array_elements(p->'pay_breakdown') b where b->>'method' = 'bank'), 0) - case pm when 'bank' then total when 'mixed' then bank_amt else 0 end) > 0.05 then
+                                                                                                                                                                                                                                                                                                                                                                                                                                   raise exception 'مبالغ العملات لا تطابق المدفوع';
+                                                                                                                                                                                                                                                                                                                                                                                                                                       end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                           update invoices set pay_breakdown = p->'pay_breakdown' where id = inv_id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                             end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                               if nullif(upper(p->>'pay_currency'), '') is not null and (p->>'pay_fx_rate')::numeric > 0 then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                   update invoices set pay_currency = upper(p->>'pay_currency'), pay_fx_rate = (p->>'pay_fx_rate')::numeric where id = inv_id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                     end if;
 
-  insert into invoice_items (invoice_id, piece_id, diamond_piece_id, gold_stock_lot_id, barcode, karat, weight_grams,
-      accounting_weight_grams, fabrication_fee, line_total, description, description_en, item_photo_url, gold_price_per_gram)
-  select inv_id, (l->>'piece_id')::uuid, (l->>'diamond_piece_id')::uuid, (l->>'lot_id')::uuid, l->>'barcode', (l->>'karat')::int,
-      (l->>'weight')::numeric, (l->>'aw')::numeric, (l->>'fee')::numeric, (l->>'price')::numeric, l->>'description',
-      l->>'description_en', l->>'photo', (l->>'gp')::numeric
-  from jsonb_array_elements(lines) l;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                       insert into invoice_items (invoice_id, piece_id, diamond_piece_id, gold_stock_lot_id, barcode, karat, weight_grams,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                             accounting_weight_grams, fabrication_fee, line_total, description, description_en, item_photo_url, gold_price_per_gram)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                               select inv_id, (l->>'piece_id')::uuid, (l->>'diamond_piece_id')::uuid, (l->>'lot_id')::uuid, l->>'barcode', (l->>'karat')::int,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                     (l->>'weight')::numeric, (l->>'aw')::numeric, (l->>'fee')::numeric, (l->>'price')::numeric, l->>'description',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                           l->>'description_en', l->>'photo', (l->>'gp')::numeric
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                             from jsonb_array_elements(lines) l;
 
-  update pieces set status = 'sold' where id in (select (l->>'piece_id')::uuid from jsonb_array_elements(lines) l where l->>'piece_id' is not null);
-  insert into piece_movements (store_id, piece_id, event_type, note, created_by)
-    select sid, (l->>'piece_id')::uuid, 'sold', 'بيع بفاتورة ' || inv_no, me from jsonb_array_elements(lines) l where l->>'piece_id' is not null;
-  update diamond_pieces set status = 'sold' where id in (select (l->>'diamond_piece_id')::uuid from jsonb_array_elements(lines) l where l->>'diamond_piece_id' is not null);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                               update pieces set status = 'sold' where id in (select (l->>'piece_id')::uuid from jsonb_array_elements(lines) l where l->>'piece_id' is not null);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     select sid, (l->>'piece_id')::uuid, 'sold', 'بيع بفاتورة ' || inv_no, me from jsonb_array_elements(lines) l where l->>'piece_id' is not null;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       update diamond_pieces set status = 'sold' where id in (select (l->>'diamond_piece_id')::uuid from jsonb_array_elements(lines) l where l->>'diamond_piece_id' is not null);
 
-  for it in select * from jsonb_array_elements(lines) l where l->>'lot_id' is not null loop
-    if (it->>'is_pooled')::boolean then
-      perform consume_gold_stock_lot_pooled((it->>'lot_id')::uuid, (it->>'weight')::numeric, (it->>'fee')::numeric);
-    else
-      perform consume_gold_stock_lot((it->>'lot_id')::uuid, (it->>'weight')::numeric);
-    end if;
-  end loop;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         for it in select * from jsonb_array_elements(lines) l where l->>'lot_id' is not null loop
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             if (it->>'is_pooled')::boolean then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   perform consume_gold_stock_lot_pooled((it->>'lot_id')::uuid, (it->>'weight')::numeric, (it->>'fee')::numeric);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       else
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             perform consume_gold_stock_lot((it->>'lot_id')::uuid, (it->>'weight')::numeric);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   end loop;
 
-  if paid > 0 then
-    insert into cash_movements (store_id, box, direction, amount, description, created_by, invoice_id, created_at)
-    values (sid, 'main', 'in', paid,
-      case when pm = 'mixed' then format('تحصيل جزئي لفاتورة بيع %s (%s)', inv_no, concat_ws(' + ', case when cash_amt > 0 then cash_amt || ' نقداً' end, case when bank_amt > 0 then bank_amt || ' فيزا/بنك' end))
-           else 'تحصيل فاتورة بيع ' || inv_no end, me, inv_id, sold_at);
-  end if;
-  if remaining > 0.01 then
-    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
-    values (sid, cust, inv_id, 'debt_increase', remaining, 0,
-      case when pm = 'credit' then 'فاتورة بيع ' || inv_no else format('متبقي فاتورة بيع %s (دُفع %s من %s)', inv_no, paid, total) end, me);
-  end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     if paid > 0 then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         insert into cash_movements (store_id, box, direction, amount, description, created_by, invoice_id, created_at)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             values (sid, 'main', 'in', paid,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   case when pm = 'mixed' then format('تحصيل جزئي لفاتورة بيع %s (%s)', inv_no, concat_ws(' + ', case when cash_amt > 0 then cash_amt || ' نقداً' end, case when bank_amt > 0 then bank_amt || ' فيزا/بنك' end))
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              else 'تحصيل فاتورة بيع ' || inv_no end, me, inv_id, sold_at);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  if remaining > 0.01 then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          values (sid, cust, inv_id, 'debt_increase', remaining, 0,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                case when pm = 'credit' then 'فاتورة بيع ' || inv_no else format('متبقي فاتورة بيع %s (دُفع %s من %s)', inv_no, paid, total) end, me);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  end if;
 
-  -- 3) self-check before commit: lines = total, paid + debt = total
-  select coalesce(sum(line_total), 0) into chk from invoice_items where invoice_id = inv_id;
-  if abs(chk - total) > 0.01 then raise exception 'فحص محاسبي فشل: مجموع السطور % ≠ الإجمالي %', chk, total; end if;
-  if abs(paid + remaining - total) > 0.01 then raise exception 'فحص محاسبي فشل: المدفوع + الدين ≠ الإجمالي'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    -- 3) self-check before commit: lines = total, paid + debt = total
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      select coalesce(sum(line_total), 0) into chk from invoice_items where invoice_id = inv_id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        if abs(chk - total) > 0.01 then raise exception 'فحص محاسبي فشل: مجموع السطور % ≠ الإجمالي %', chk, total; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          if abs(paid + remaining - total) > 0.01 then raise exception 'فحص محاسبي فشل: المدفوع + الدين ≠ الإجمالي'; end if;
 
-  return jsonb_build_object('id', inv_id, 'invoice_number', inv_no, 'total', total, 'duplicate', false);
-exception when unique_violation then
-  if ref is not null then
-    select id, invoice_number into ex from invoices where client_ref = ref and store_id = sid;
-    if found then return jsonb_build_object('id', ex.id, 'invoice_number', ex.invoice_number, 'duplicate', true); end if;
-  end if;
-  raise;
-end $$;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            return jsonb_build_object('id', inv_id, 'invoice_number', inv_no, 'total', total, 'duplicate', false);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                            exception when unique_violation then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              if ref is not null then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  select id, invoice_number into ex from invoices where client_ref = ref and store_id = sid;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      if found then return jsonb_build_object('id', ex.id, 'invoice_number', ex.invoice_number, 'duplicate', true); end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                        end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          raise;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          end $$;
 
 
 --
@@ -2892,36 +3100,97 @@ end $$;
 
 
 --
--- Name: record_customer_payment(uuid, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
+-- Name: receive_branch_transfer(uuid, text[], uuid[]); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text DEFAULT 'cash'::text, p_notes text DEFAULT NULL::text) RETURNS jsonb
+CREATE FUNCTION public.receive_branch_transfer(p_transfer uuid, p_barcodes text[] DEFAULT NULL::text[], p_items uuid[] DEFAULT NULL::uuid[]) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare c record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text;
-begin
-  select id, store_id, name into c from customers where id = p_customer;
-  if c is null then raise exception 'العميل غير موجود'; end if;
-  if not (has_permission('edit_customers', c.store_id) or has_permission('manage_daily_cashbox', c.store_id)) then
-    raise exception 'ليس لديك صلاحية تسجيل دفعات العملاء' using errcode = '42501';
-  end if;
-  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
-  if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
-  select id into me from staff where user_id = auth.uid() and store_id = c.store_id limit 1;
-  note := coalesce(nullif(trim(p_notes), ''), 'دفعة من العميل');
-  insert into cash_movements (store_id, box, direction, amount, description, created_by)
-    values (c.store_id, case when p_method = 'bank' then 'bank' else 'main' end, 'in', amt,
-            'دفعة من العميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
-    returning id into cm;
-  if coalesce(p_method, 'cash') = 'cash' then
-    insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
-      values (c.store_id, 'دفعة من عميل', 'in', amt, c.name || ' — ' || note, me, cm);
-  end if;
-  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
-    values (c.store_id, c.id, 'debt_decrease', amt, 0, note, 'payment', me, cm);
-  return jsonb_build_object('ok', true);
-end $$;
+                                                                                                                                                                                                                                                                                                                                                                       declare tr record; it record; me uuid; got int := 0; left_n int; cm uuid;
+                                                                                                                                                                                                                                                                                                                                                                       begin
+                                                                                                                                                                                                                                                                                                                                                                         select * into tr from branch_transfers where id = p_transfer for update;
+                                                                                                                                                                                                                                                                                                                                                                           if tr is null then raise exception 'سند النقل غير موجود'; end if;
+                                                                                                                                                                                                                                                                                                                                                                             if not (has_permission('stock_transfers', tr.to_store_id) or has_permission('add_piece', tr.to_store_id)) then
+                                                                                                                                                                                                                                                                                                                                                                                 raise exception 'ليس لديك صلاحية استلام البضاعة في هذا الفرع' using errcode = '42501';
+                                                                                                                                                                                                                                                                                                                                                                                   end if;
+                                                                                                                                                                                                                                                                                                                                                                                     if tr.status <> 'in_transit' then raise exception 'هذا السند ليس بالطريق (حالته: %)', tr.status; end if;
+                                                                                                                                                                                                                                                                                                                                                                                       select id into me from staff where user_id = auth.uid() and store_id = tr.to_store_id limit 1;
+
+                                                                                                                                                                                                                                                                                                                                                                                         for it in select * from branch_transfer_items
+                                                                                                                                                                                                                                                                                                                                                                                                      where transfer_id = tr.id and received_at is null
+                                                                                                                                                                                                                                                                                                                                                                                                                     and ((p_barcodes is null and p_items is null)
+                                                                                                                                                                                                                                                                                                                                                                                                                                         or barcode = any(coalesce(p_barcodes, array[]::text[]))
+                                                                                                                                                                                                                                                                                                                                                                                                                                                             or id = any(coalesce(p_items, array[]::uuid[]))) for update
+                                                                                                                                                                                                                                                                                                                                                                                                                                                               loop
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                   if it.kind = 'scrap' then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                         insert into gold_stock_lots (store_id, karat, weight_grams_total, weight_grams_remaining, cost_fabrication_per_gram, notes, created_by, box_name)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 values (tr.to_store_id, it.karat, it.weight_grams, it.weight_grams, it.fab_per_gram, 'استلام كسر من فرع آخر بسند ' || tr.transfer_number, me, it.box_name);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     elsif it.kind = 'cash' then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           insert into cash_movements (store_id, box, direction, amount, description, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   values (tr.to_store_id, it.cash_box, 'in', it.amount, 'استلام نقد من فرع آخر بسند ' || tr.transfer_number, me) returning id into cm;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         if it.cash_box = 'main' then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           values (tr.to_store_id, 'استلام نقد من فرع آخر', 'in', it.amount, 'سند ' || tr.transfer_number, me, cm);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     elsif it.piece_id is not null then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           update pieces set store_id = tr.to_store_id, status = 'available' where id = it.piece_id and status = 'in_transit';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         values (tr.to_store_id, it.piece_id, 'transfer_in', 'استلام من فرع آخر بسند ' || tr.transfer_number, me);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             elsif it.diamond_piece_id is not null then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   if exists (select 1 from diamond_pieces where store_id = tr.to_store_id and barcode = it.barcode and id <> it.diamond_piece_id) then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           raise exception 'يوجد في هذا الفرع قطعة ألماس أخرى بنفس الباركود %', it.barcode;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       update diamond_pieces set store_id = tr.to_store_id, status = 'available' where id = it.diamond_piece_id and status = 'in_transit';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               update branch_transfer_items set received_at = now(), received_by = me where id = it.id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   got := got + 1;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     end loop;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       if (p_barcodes is not null or p_items is not null) and got = 0 then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           raise exception 'غير موجود في هذا السند أو استُلم من قبل';
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             end if;
+
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               select count(*) into left_n from branch_transfer_items where transfer_id = tr.id and received_at is null;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 if left_n = 0 then
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     update branch_transfers set status = 'received', received_by = me, received_at = now() where id = tr.id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         return jsonb_build_object('received', got, 'remaining', left_n);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         end $$;
+
+
+--
+-- Name: record_customer_payment(uuid, numeric, text, text, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text DEFAULT 'cash'::text, p_notes text DEFAULT NULL::text, p_store uuid DEFAULT NULL::uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                                                                                                                                                                                                                                                                                                                                                     declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text;
+                                                                                                                                                                                                                                                                                                                                                     begin
+                                                                                                                                                                                                                                                                                                                                                       select id, store_id, name into c from customers where id = p_customer;
+                                                                                                                                                                                                                                                                                                                                                         if c is null then raise exception 'العميل غير موجود'; end if;
+                                                                                                                                                                                                                                                                                                                                                           st := coalesce(p_store, c.store_id);
+                                                                                                                                                                                                                                                                                                                                                             if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
+                                                                                                                                                                                                                                                                                                                                                               if not (has_permission('edit_customers', st) or has_permission('manage_daily_cashbox', st)) then
+                                                                                                                                                                                                                                                                                                                                                                   raise exception 'ليس لديك صلاحية تسجيل دفعات العملاء' using errcode = '42501';
+                                                                                                                                                                                                                                                                                                                                                                     end if;
+                                                                                                                                                                                                                                                                                                                                                                       if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+                                                                                                                                                                                                                                                                                                                                                                         if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
+                                                                                                                                                                                                                                                                                                                                                                           select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
+                                                                                                                                                                                                                                                                                                                                                                             note := coalesce(nullif(trim(p_notes), ''), 'دفعة من العميل');
+                                                                                                                                                                                                                                                                                                                                                                               insert into cash_movements (store_id, box, direction, amount, description, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                   values (st, case when p_method = 'bank' then 'bank' else 'main' end, 'in', amt,
+                                                                                                                                                                                                                                                                                                                                                                                               'دفعة من العميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
+                                                                                                                                                                                                                                                                                                                                                                                                   returning id into cm;
+                                                                                                                                                                                                                                                                                                                                                                                                     if coalesce(p_method, 'cash') = 'cash' then
+                                                                                                                                                                                                                                                                                                                                                                                                         insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+                                                                                                                                                                                                                                                                                                                                                                                                               values (st, 'دفعة من عميل', 'in', amt, c.name || ' — ' || note, me, cm);
+                                                                                                                                                                                                                                                                                                                                                                                                                 end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                   insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+                                                                                                                                                                                                                                                                                                                                                                                                                       values (st, c.id, 'debt_decrease', amt, 0, note, 'payment', me, cm);
+                                                                                                                                                                                                                                                                                                                                                                                                                         return jsonb_build_object('ok', true);
+                                                                                                                                                                                                                                                                                                                                                                                                                         end $$;
 
 
 --
@@ -3302,28 +3571,12 @@ CREATE FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, catego
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  is_owner boolean;
-begin
-  select (role = 'owner') into is_owner from staff
-    where store_id = target_store_id and user_id = auth.uid() limit 1;
-  if not coalesce(is_owner, false) then
-    raise exception 'NOT_AUTHORIZED';
-  end if;
-  if category not in ('gold', 'diamond') then
-    raise exception 'INVALID_CATEGORY';
-  end if;
-  if new_seq < 1 then
-    raise exception 'INVALID_SEQ';
-  end if;
-
-  if category = 'diamond' then
-    update stores set next_piece_seq_diamond = new_seq where id = target_store_id;
-  else
-    update stores set next_piece_seq_gold = new_seq where id = target_store_id;
-  end if;
-end;
-$$;
+                                                                                                                                                                      begin
+                                                                                                                                                                        perform reset_piece_barcode_sequence(target_store_id, category, new_seq, null::smallint,
+                                                                                                                                                                            (select case when category = 'diamond' then piece_barcode_prefix_diamond else piece_barcode_prefix_gold end
+                                                                                                                                                                                   from stores where id = barcode_counter_store(target_store_id)));
+                                                                                                                                                                                   end;
+                                                                                                                                                                                   $$;
 
 
 --
@@ -3334,28 +3587,12 @@ CREATE FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, catego
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  is_owner boolean;
-begin
-  select (role = 'owner') into is_owner from staff
-    where store_id = target_store_id and user_id = auth.uid() limit 1;
-  if not coalesce(is_owner, false) then
-    raise exception 'NOT_AUTHORIZED';
-  end if;
-  if category not in ('gold', 'diamond') then
-    raise exception 'INVALID_CATEGORY';
-  end if;
-  if new_seq < 1 then
-    raise exception 'INVALID_SEQ';
-  end if;
-
-  if category = 'diamond' then
-    update stores set next_piece_seq_diamond = new_seq, piece_barcode_seq_width_diamond = seq_width where id = target_store_id;
-  else
-    update stores set next_piece_seq_gold = new_seq, piece_barcode_seq_width_gold = seq_width where id = target_store_id;
-  end if;
-end;
-$$;
+                                                                                                                                                                                   begin
+                                                                                                                                                                                     perform reset_piece_barcode_sequence(target_store_id, category, new_seq, seq_width,
+                                                                                                                                                                                         (select case when category = 'diamond' then piece_barcode_prefix_diamond else piece_barcode_prefix_gold end
+                                                                                                                                                                                                from stores where id = barcode_counter_store(target_store_id)));
+                                                                                                                                                                                                end;
+                                                                                                                                                                                                $$;
 
 
 --
@@ -3366,42 +3603,38 @@ CREATE FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, catego
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  is_owner boolean;
-begin
-  select (role = 'owner') into is_owner from staff
-    where store_id = target_store_id and user_id = auth.uid() limit 1;
-  if not coalesce(is_owner, false) then
-    raise exception 'NOT_AUTHORIZED';
-  end if;
-  if category not in ('gold', 'diamond') then
-    raise exception 'INVALID_CATEGORY';
-  end if;
-  if new_seq < 1 then
-    raise exception 'INVALID_SEQ';
-  end if;
+                                                                                                                                                                                                declare
+                                                                                                                                                                                                  is_owner boolean;
+                                                                                                                                                                                                    counter uuid := barcode_counter_store(target_store_id);
+                                                                                                                                                                                                    begin
+                                                                                                                                                                                                      -- the owner of the counter's branch (the head office) manages the organization's barcodes
+                                                                                                                                                                                                        select (role = 'owner') into is_owner from staff
+                                                                                                                                                                                                            where store_id = counter and user_id = auth.uid() limit 1;
+                                                                                                                                                                                                              if not coalesce(is_owner, false) then
+                                                                                                                                                                                                                  raise exception 'NOT_AUTHORIZED';
+                                                                                                                                                                                                                    end if;
+                                                                                                                                                                                                                      if category not in ('gold', 'diamond') then
+                                                                                                                                                                                                                          raise exception 'INVALID_CATEGORY';
+                                                                                                                                                                                                                            end if;
+                                                                                                                                                                                                                              if new_seq < 1 then
+                                                                                                                                                                                                                                  raise exception 'INVALID_SEQ';
+                                                                                                                                                                                                                                    end if;
 
-  -- Updating the sequence used to always re-fetch the store row afterward
-  -- (loadStore()), which would silently overwrite an in-progress, not-yet
-  -- -saved prefix edit sitting in the input with whatever was still in
-  -- the DB. Now the prefix the user currently has typed is saved in the
-  -- SAME update, atomically with the sequence number, so this button
-  -- fully commits both instead of quietly reverting one of them.
-  if category = 'diamond' then
-    update stores set
-      next_piece_seq_diamond = new_seq,
-      piece_barcode_seq_width_diamond = seq_width,
-      piece_barcode_prefix_diamond = nullif(upper(trim(new_prefix)), '')
-      where id = target_store_id;
-  else
-    update stores set
-      next_piece_seq_gold = new_seq,
-      piece_barcode_seq_width_gold = seq_width,
-      piece_barcode_prefix_gold = nullif(upper(trim(new_prefix)), '')
-      where id = target_store_id;
-  end if;
-end;
-$$;
+                                                                                                                                                                                                                                      if category = 'diamond' then
+                                                                                                                                                                                                                                          update stores set
+                                                                                                                                                                                                                                                next_piece_seq_diamond = new_seq,
+                                                                                                                                                                                                                                                      piece_barcode_seq_width_diamond = seq_width,
+                                                                                                                                                                                                                                                            piece_barcode_prefix_diamond = nullif(upper(trim(new_prefix)), '')
+                                                                                                                                                                                                                                                                  where id = counter;
+                                                                                                                                                                                                                                                                    else
+                                                                                                                                                                                                                                                                        update stores set
+                                                                                                                                                                                                                                                                              next_piece_seq_gold = new_seq,
+                                                                                                                                                                                                                                                                                    piece_barcode_seq_width_gold = seq_width,
+                                                                                                                                                                                                                                                                                          piece_barcode_prefix_gold = nullif(upper(trim(new_prefix)), '')
+                                                                                                                                                                                                                                                                                                where id = counter;
+                                                                                                                                                                                                                                                                                                  end if;
+                                                                                                                                                                                                                                                                                                  end;
+                                                                                                                                                                                                                                                                                                  $$;
 
 
 --
@@ -3566,7 +3799,7 @@ begin
   if inv is null then raise exception 'الفاتورة غير موجودة'; end if;
   if not has_permission('edit_invoice', inv.store_id) then raise exception 'ليس لديك صلاحية تعديل الفواتير' using errcode = '42501'; end if;
   if inv.type <> 'sale' or inv.status = 'cancelled' then raise exception 'يمكن تغيير الزبون لفواتير البيع غير الملغاة فقط'; end if;
-  select id, name into newc from customers where id = p_customer and store_id = inv.store_id;
+  select id, name into newc from customers where id = p_customer and store_id in (select org_store_ids(inv.store_id));
   if newc is null then raise exception 'الزبون غير موجود'; end if;
   if inv.customer_id = newc.id then return; end if;
   select name into oldname from customers where id = inv.customer_id;
@@ -3646,6 +3879,131 @@ $$;
 
 
 --
+-- Name: send_branch_transfer(uuid, uuid, text[], text, jsonb, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.send_branch_transfer(p_from uuid, p_to uuid, p_barcodes text[] DEFAULT NULL::text[], p_notes text DEFAULT NULL::text, p_scrap jsonb DEFAULT NULL::jsonb, p_cash jsonb DEFAULT NULL::jsonb) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                                            declare org uuid; me uuid; tid uuid; num text; bc text; pc record; dp record; n int := 0;
+                                              s jsonb; k int; w numeric; left_w numeric; take numeric; lot record; draws jsonb; fab_sum numeric; box text;
+                                                amt numeric; cbox text; cm uuid; cur_from text; cur_to text;
+                                                begin
+                                                  if not has_permission('stock_transfers', p_from) then
+                                                      raise exception 'ليس لديك صلاحية نقل البضاعة بين الفروع' using errcode = '42501';
+                                                        end if;
+                                                          if p_to is null or p_to = p_from or p_to not in (select org_store_ids(p_from)) then
+                                                              raise exception 'اختر فرعاً آخر من نفس المنشأة';
+                                                                end if;
+                                                                  select organization_id, upper(currency) into org, cur_from from stores where id = p_from;
+                                                                    select upper(currency) into cur_to from stores where id = p_to;
+                                                                      select id into me from staff where user_id = auth.uid() and store_id = p_from limit 1;
+
+                                                                        perform pg_advisory_xact_lock(hashtext('branch_transfer:' || coalesce(org, p_from)::text));
+                                                                          select 'TRF-' || lpad((coalesce(max(nullif(regexp_replace(transfer_number, '\D', '', 'g'), '')::int), 0) + 1)::text, 6, '0')
+                                                                              into num from branch_transfers where coalesce(organization_id, from_store_id) = coalesce(org, p_from);
+                                                                                insert into branch_transfers (organization_id, from_store_id, to_store_id, transfer_number, notes, created_by)
+                                                                                    values (org, p_from, p_to, num, nullif(trim(p_notes), ''), me) returning id into tid;
+
+                                                                                      -- pieces
+                                                                                        foreach bc in array coalesce(p_barcodes, array[]::text[]) loop
+                                                                                            bc := nullif(trim(bc), '');
+                                                                                                continue when bc is null;
+                                                                                                    select * into pc from pieces where store_id = p_from and barcode = bc for update;
+                                                                                                        if found then
+                                                                                                              if pc.status <> 'available' then raise exception 'القطعة % غير متاحة للنقل (حالتها: %)', bc, pc.status; end if;
+                                                                                                                    update pieces set status = 'in_transit' where id = pc.id;
+                                                                                                                          insert into branch_transfer_items (transfer_id, kind, piece_id, barcode, description, karat, weight_grams, photo_url)
+                                                                                                                                  values (tid, 'piece', pc.id, pc.barcode, coalesce(pc.description_ar, pc.piece_type), pc.karat, pc.weight_grams, pc.photo_url);
+                                                                                                                                        insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+                                                                                                                                                values (p_from, pc.id, 'transfer_out', 'نقل إلى فرع آخر بسند ' || num, me);
+                                                                                                                                                    else
+                                                                                                                                                          select * into dp from diamond_pieces where store_id = p_from and barcode = bc for update;
+                                                                                                                                                                if not found then raise exception 'القطعة % غير موجودة في هذا الفرع', bc; end if;
+                                                                                                                                                                      if dp.status <> 'available' then raise exception 'القطعة % غير متاحة للنقل (حالتها: %)', bc, dp.status; end if;
+                                                                                                                                                                            update diamond_pieces set status = 'in_transit' where id = dp.id;
+                                                                                                                                                                                  insert into branch_transfer_items (transfer_id, kind, diamond_piece_id, barcode, description, karat, weight_grams, photo_url)
+                                                                                                                                                                                          values (tid, 'piece', dp.id, dp.barcode, dp.description_ar, dp.gold_karat, dp.gold_weight_grams, dp.photo_url);
+                                                                                                                                                                                              end if;
+                                                                                                                                                                                                  n := n + 1;
+                                                                                                                                                                                                    end loop;
+
+                                                                                                                                                                                                      -- scrap: [{karat, weight}] from «كسر <karat>», oldest lot first
+                                                                                                                                                                                                        for s in select * from jsonb_array_elements(coalesce(p_scrap, '[]'::jsonb)) loop
+                                                                                                                                                                                                            k := (s->>'karat')::int; w := round((s->>'weight')::numeric, 3);
+                                                                                                                                                                                                                if k is null or w is null or w <= 0 then raise exception 'وزن كسر غير صحيح'; end if;
+                                                                                                                                                                                                                    box := 'كسر ' || k; left_w := w; draws := '[]'::jsonb; fab_sum := 0;
+                                                                                                                                                                                                                        for lot in select * from gold_stock_lots where store_id = p_from and box_name = box and weight_grams_remaining > 0
+                                                                                                                                                                                                                                       order by created_at, id for update loop
+                                                                                                                                                                                                                                             exit when left_w <= 0;
+                                                                                                                                                                                                                                                   take := least(left_w, lot.weight_grams_remaining);
+                                                                                                                                                                                                                                                         update gold_stock_lots set weight_grams_remaining = weight_grams_remaining - take where id = lot.id;
+                                                                                                                                                                                                                                                               draws := draws || jsonb_build_object('lot_id', lot.id, 'w', take);
+                                                                                                                                                                                                                                                                     fab_sum := fab_sum + take * coalesce(lot.cost_fabrication_per_gram, 0);
+                                                                                                                                                                                                                                                                           left_w := left_w - take;
+                                                                                                                                                                                                                                                                               end loop;
+                                                                                                                                                                                                                                                                                   if left_w > 0.0005 then raise exception 'المتوفر في صندوق % أقل من %غ', box, w; end if;
+                                                                                                                                                                                                                                                                                       insert into branch_transfer_items (transfer_id, kind, description, karat, weight_grams, box_name, fab_per_gram, lot_draws)
+                                                                                                                                                                                                                                                                                             values (tid, 'scrap', box, k, w, box, round(fab_sum / w, 4), draws);
+                                                                                                                                                                                                                                                                                                 n := n + 1;
+                                                                                                                                                                                                                                                                                                   end loop;
+
+                                                                                                                                                                                                                                                                                                     -- cash: {amount, box: main|bank}
+                                                                                                                                                                                                                                                                                                       if p_cash is not null and coalesce((p_cash->>'amount')::numeric, 0) > 0 then
+                                                                                                                                                                                                                                                                                                           amt := round((p_cash->>'amount')::numeric, 2);
+                                                                                                                                                                                                                                                                                                               cbox := case when p_cash->>'box' = 'bank' then 'bank' else 'main' end;
+                                                                                                                                                                                                                                                                                                                   if cur_from is distinct from cur_to then raise exception 'لا يمكن نقل النقد بين فرعين بعملتين مختلفتين'; end if;
+                                                                                                                                                                                                                                                                                                                       insert into cash_movements (store_id, box, direction, amount, description, created_by)
+                                                                                                                                                                                                                                                                                                                             values (p_from, cbox, 'out', amt, 'نقل نقد إلى فرع آخر بسند ' || num, me) returning id into cm;
+                                                                                                                                                                                                                                                                                                                                 if cbox = 'main' then
+                                                                                                                                                                                                                                                                                                                                       insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
+                                                                                                                                                                                                                                                                                                                                               values (p_from, 'نقل نقد لفرع آخر', 'out', amt, 'سند ' || num, me, cm);
+                                                                                                                                                                                                                                                                                                                                                   end if;
+                                                                                                                                                                                                                                                                                                                                                       insert into branch_transfer_items (transfer_id, kind, description, amount, cash_box)
+                                                                                                                                                                                                                                                                                                                                                             values (tid, 'cash', case when cbox = 'bank' then 'نقد (بنك)' else 'نقد' end, amt, cbox);
+                                                                                                                                                                                                                                                                                                                                                                 n := n + 1;
+                                                                                                                                                                                                                                                                                                                                                                   end if;
+
+                                                                                                                                                                                                                                                                                                                                                                     if n = 0 then raise exception 'أضف قطعة أو كسراً أو نقداً'; end if;
+                                                                                                                                                                                                                                                                                                                                                                       return jsonb_build_object('id', tid, 'transfer_number', num, 'items', n);
+                                                                                                                                                                                                                                                                                                                                                                       end $$;
+
+
+--
+-- Name: set_branch_own_gold_price(uuid, boolean); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_branch_own_gold_price(p_store uuid, p_own boolean) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                                                                                              declare src uuid; cur text;
+                                                                                              begin
+                                                                                                if not public.has_permission('manage_gold_price', p_store) then
+                                                                                                    raise exception 'ليس لديك صلاحية تعديل سعر الذهب' using errcode = '42501';
+                                                                                                      end if;
+                                                                                                        update public.stores set own_gold_price = coalesce(p_own, false) where id = p_store returning upper(currency) into cur;
+                                                                                                          if coalesce(p_own, false) then return; end if;
+                                                                                                            -- back to the organization's price: take it from the head office, else another following branch
+                                                                                                              select b.id into src from public.stores b
+                                                                                                                  left join public.organizations o on o.id = b.organization_id
+                                                                                                                     where b.id in (select org_store_ids(p_store)) and b.id <> p_store
+                                                                                                                          and not b.own_gold_price and upper(b.currency) = cur
+                                                                                                                             order by (b.id = o.head_office_store_id) desc, b.created_at
+                                                                                                                                limit 1;
+                                                                                                                                  if src is null then return; end if;
+                                                                                                                                    insert into public.gold_prices (store_id, karat, price_per_gram, mode, updated_at)
+                                                                                                                                      select p_store, karat, price_per_gram, mode, now() from public.gold_prices where store_id = src
+                                                                                                                                        on conflict (store_id, karat) do update
+                                                                                                                                            set price_per_gram = excluded.price_per_gram, mode = excluded.mode, updated_at = now();
+                                                                                                                                              update public.stores d set last_gold_ounce_price = s.last_gold_ounce_price, last_gold_ounce_rate = s.last_gold_ounce_rate
+                                                                                                                                                  from public.stores s where s.id = src and d.id = p_store;
+                                                                                                                                                  end;
+                                                                                                                                                  $$;
+
+
+--
 -- Name: set_gold_ounce_price(uuid, numeric, numeric); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3653,29 +4011,70 @@ CREATE FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce numeric,
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare g24 numeric;
+declare g24 numeric; cur text; own boolean; s uuid;
 begin
   if not public.has_permission('manage_gold_price', target_store_id) then
-    raise exception 'ليس لديك صلاحية تعديل سعر الذهب' using errcode = '42501';
-  end if;
-  if (select upper(currency) from public.stores where id = target_store_id) = 'USD' then
-    rate := 1;
-  end if;
-  if ounce is null or ounce <= 0 or ounce > 1000000 then raise exception 'سعر أونصة غير صحيح'; end if;
-  if rate is null or rate <= 0 or rate > 1000000 then raise exception 'سعر صرف غير صحيح'; end if;
+      raise exception 'ليس لديك صلاحية تعديل سعر الذهب' using errcode = '42501';
+        end if;
+          select upper(currency), own_gold_price into cur, own from public.stores where id = target_store_id;
+            if cur = 'USD' then
+                rate := 1;
+                  end if;
+                    if ounce is null or ounce <= 0 or ounce > 1000000 then raise exception 'سعر أونصة غير صحيح'; end if;
+                      if rate is null or rate <= 0 or rate > 1000000 then raise exception 'سعر صرف غير صحيح'; end if;
 
-  g24 := ounce / 31.1034768 * rate;
-  insert into public.gold_prices (store_id, karat, price_per_gram, mode, updated_at)
-  select target_store_id, k, round(g24 * k / 24.0, 2), 'manual_ounce', now()
-  from unnest(array[24, 22, 21, 18]) as k
-  on conflict (store_id, karat) do update
-    set price_per_gram = excluded.price_per_gram, mode = excluded.mode, updated_at = now();
+                        g24 := ounce / 31.1034768 * rate;
+                          -- this branch, plus (when it follows the organization) every following branch in the same currency
+                            for s in
+                                select target_store_id
+                                    union
+                                        select b.id from public.stores b
+                                             where not coalesce(own, false) and not b.own_gold_price and upper(b.currency) = cur
+                                                    and b.id in (select org_store_ids(target_store_id))
+                                                      loop
+                                                          insert into public.gold_prices (store_id, karat, price_per_gram, mode, updated_at)
+                                                              select s, k, round(g24 * k / 24.0, 2), 'manual_ounce', now()
+                                                                  from unnest(array[24, 22, 21, 18]) as k
+                                                                      on conflict (store_id, karat) do update
+                                                                            set price_per_gram = excluded.price_per_gram, mode = excluded.mode, updated_at = now();
 
-  update public.stores
-     set last_gold_ounce_price = ounce, last_gold_ounce_rate = rate
-   where id = target_store_id;
-end;
-$$;
+                                                                                update public.stores
+                                                                                       set last_gold_ounce_price = ounce, last_gold_ounce_rate = rate
+                                                                                            where id = s;
+                                                                                              end loop;
+                                                                                              end;
+                                                                                              $$;
+
+
+--
+-- Name: set_piece_weights(uuid, numeric, numeric); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_piece_weights(p_piece uuid, p_weight numeric, p_acc numeric) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare pc record; me uuid; cut numeric;
+begin
+  select id, store_id, barcode, karat, weight_grams into pc from pieces where id = p_piece for update;
+    if pc is null then raise exception 'القطعة غير موجودة'; end if;
+      if not has_permission('edit_sale_weights', pc.store_id) then
+          raise exception 'ليس لديك صلاحية تعديل أوزان القطع' using errcode = '42501';
+            end if;
+              if p_weight is null or p_weight <= 0 then raise exception 'الوزن القائم يجب أن يكون أكبر من صفر'; end if;
+                if p_acc is null or p_acc <= 0 then raise exception 'الوزن المحاسبي يجب أن يكون أكبر من صفر'; end if;
+
+                  cut := round(coalesce(pc.weight_grams, 0) - p_weight, 3);
+                    if cut > 0 then
+                        if pc.karat is null then raise exception 'القطعة بدون عيار، ما بنقدر نضيف الفرق لصندوق الكسر'; end if;
+                            select id into me from staff where user_id = auth.uid() and store_id = pc.store_id limit 1;
+                                insert into gold_stock_lots (store_id, karat, weight_grams_total, weight_grams_remaining, cost_fabrication_per_gram,
+                                        notes, box_name, created_by)
+                                              values (pc.store_id, pc.karat, cut, cut, 0, 'من تقصير القطعة ' || pc.barcode, 'كسر ' || pc.karat, me);
+                                                end if;
+
+                                                  update pieces set weight_grams = round(p_weight, 3), accounting_weight_grams = round(p_acc, 3) where id = pc.id;
+                                                  end $$;
 
 
 --
@@ -3936,16 +4335,12 @@ CREATE FUNCTION public.store_legal(p_store_id uuid) RETURNS TABLE(organization_i
     LANGUAGE sql STABLE
     SET search_path TO 'public'
     AS $$
-                                                                                                                                                                                                                                                                                                                                            select s.organization_id, o.name,
-                                                                                                                                                                                                                                                                                                                                                     coalesce(o.legal_name, s.legal_name), coalesce(o.tax_number, s.tax_number),
-                                                                                                                                                                                                                                                                                                                                                              coalesce(o.country, s.country), coalesce(o.logo_url, s.logo_url),
-                                                                                                                                                                                                                                                                                                                                                                       coalesce(o.commercial_registration_number, s.commercial_registration_number),
-                                                                                                                                                                                                                                                                                                                                                                                coalesce(o.legal_registration_id_type, s.legal_registration_id_type),
-                                                                                                                                                                                                                                                                                                                                                                                         coalesce(s.branch_emirate_code, o.emirate_code, s.emirate_code),
-                                                                                                                                                                                                                                                                                                                                                                                                  coalesce(o.peppol_endpoint_id, s.peppol_endpoint_id)
-                                                                                                                                                                                                                                                                                                                                                                                                    from stores s left join organizations o on o.id = s.organization_id
-                                                                                                                                                                                                                                                                                                                                                                                                      where s.id = p_store_id;
-                                                                                                                                                                                                                                                                                                                                                                                                      $$;
+                                                   select s.organization_id, o.name, o.legal_name, o.tax_number, coalesce(o.country, s.country), o.logo_url,
+                                                            o.commercial_registration_number, o.legal_registration_id_type,
+                                                                     coalesce(s.branch_emirate_code, o.emirate_code), o.peppol_endpoint_id
+                                                                       from stores s left join organizations o on o.id = s.organization_id
+                                                                         where s.id = p_store_id;
+                                                                         $$;
 
 
 --
@@ -4018,27 +4413,6 @@ end $$;
 
 
 --
--- Name: sync_org_legal_to_stores(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.sync_org_legal_to_stores() RETURNS trigger
-    LANGUAGE plpgsql SECURITY DEFINER
-    SET search_path TO 'public'
-    AS $$
-                                                                                                                                                                                                       begin
-                                                                                                                                                                                                         if pg_trigger_depth() > 1 then return null; end if;
-                                                                                                                                                                                                           update stores s
-                                                                                                                                                                                                                set legal_name = new.legal_name, tax_number = new.tax_number,
-                                                                                                                                                                                                                         country = new.country, logo_url = new.logo_url,
-                                                                                                                                                                                                                                  commercial_registration_number = new.commercial_registration_number,
-                                                                                                                                                                                                                                           legal_registration_id_type = new.legal_registration_id_type,
-                                                                                                                                                                                                                                                    emirate_code = new.emirate_code, peppol_endpoint_id = new.peppol_endpoint_id
-                                                                                                                                                                                                                                                       where s.organization_id = new.id;
-                                                                                                                                                                                                                                                         return null;
-                                                                                                                                                                                                                                                         end $$;
-
-
---
 -- Name: sync_staff_to_hr_employee(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -4057,24 +4431,17 @@ $$;
 
 
 --
--- Name: sync_store_legal_to_org(); Type: FUNCTION; Schema: public; Owner: -
+-- Name: sync_store_country_to_org(); Type: FUNCTION; Schema: public; Owner: -
 --
 
-CREATE FUNCTION public.sync_store_legal_to_org() RETURNS trigger
+CREATE FUNCTION public.sync_store_country_to_org() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                                                                                                  begin
-                                                                                                    if pg_trigger_depth() > 1 then return null; end if;
-                                                                                                      update organizations o
-                                                                                                           set legal_name = new.legal_name, tax_number = new.tax_number,
-                                                                                                                    country = new.country, logo_url = new.logo_url,
-                                                                                                                             commercial_registration_number = new.commercial_registration_number,
-                                                                                                                                      legal_registration_id_type = new.legal_registration_id_type,
-                                                                                                                                               emirate_code = new.emirate_code, peppol_endpoint_id = new.peppol_endpoint_id
-                                                                                                                                                  where o.id = new.organization_id and o.primary_store_id = new.id;
-                                                                                                                                                    return null;
-                                                                                                                                                    end $$;
+                               begin
+                                 update organizations set country = new.country where id = new.organization_id and primary_store_id = new.id;
+                                   return null;
+                                   end $$;
 
 
 --
@@ -4087,7 +4454,7 @@ CREATE FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amoun
     AS $$
 declare t record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); mid uuid; cm uuid; note text;
 begin
-  select id, store_id, name into t from traders where id = p_trader;
+  select id, gm_acting_store(store_id) as store_id, name into t from traders where id = p_trader;
   if t is null then raise exception 'التاجر غير موجود'; end if;
   if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
   if p_direction not in ('out', 'in') then raise exception 'اتجاه غير معروف'; end if;
@@ -4124,7 +4491,7 @@ CREATE FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numer
 --  for = 'shop'  : in the shop's favour  (he owes more / we owe him less) → shop profit goes up
 declare t record; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); mid uuid;
 begin
-  select id, store_id, name into t from traders where id = p_trader;
+  select id, gm_acting_store(store_id) as store_id, name into t from traders where id = p_trader;
   if t is null then raise exception 'التاجر غير موجود'; end if;
   if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
   if p_for not in ('trader', 'shop') then raise exception 'اختر لصالح من الخصم'; end if;
@@ -4149,7 +4516,7 @@ CREATE FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_ka
 declare t record; me uuid; w numeric := round(coalesce(p_weight, 0), 3); pr numeric := coalesce(p_price, 0);
         k int := coalesce(p_karat, 24); g24 numeric; cash numeric; note text; ref text := gen_random_uuid()::text;
 begin
-  select id, store_id, name into t from traders where id = p_trader;
+  select id, gm_acting_store(store_id) as store_id, name into t from traders where id = p_trader;
   if t is null then raise exception 'التاجر غير موجود'; end if;
   if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
   if p_direction not in ('we_owe_gold', 'they_owe_gold') then raise exception 'اتجاه غير معروف'; end if;
@@ -4178,7 +4545,7 @@ declare t record; me uuid; ln jsonb; k int; wt numeric; aw numeric; fab numeric;
         bid uuid := case when jsonb_array_length(coalesce(p_lines, '[]')) > 1 then gen_random_uuid() end;
         codes jsonb := '[]'; vat numeric := coalesce(p_vat_rate, 0);
 begin
-  select id, store_id, name into t from traders where id = p_trader;
+  select id, gm_acting_store(store_id) as store_id, name into t from traders where id = p_trader;
   if t is null then raise exception 'التاجر غير موجود'; end if;
   if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
   if jsonb_array_length(coalesce(p_lines, '[]')) = 0 then raise exception 'أضف سطراً واحداً على الأقل'; end if;
@@ -4587,6 +4954,52 @@ CREATE TABLE public.auth_webauthn_challenges (
 );
 
 ALTER TABLE ONLY public.auth_webauthn_challenges FORCE ROW LEVEL SECURITY;
+
+
+--
+-- Name: branch_transfer_items; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.branch_transfer_items (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    transfer_id uuid NOT NULL,
+    piece_id uuid,
+    diamond_piece_id uuid,
+    barcode text,
+    description text,
+    karat integer,
+    weight_grams numeric,
+    photo_url text,
+    received_at timestamp with time zone,
+    received_by uuid,
+    kind text DEFAULT 'piece'::text NOT NULL,
+    amount numeric,
+    cash_box text,
+    box_name text,
+    fab_per_gram numeric,
+    lot_draws jsonb,
+    CONSTRAINT branch_transfer_items_kind_check CHECK ((kind = ANY (ARRAY['piece'::text, 'scrap'::text, 'cash'::text])))
+);
+
+
+--
+-- Name: branch_transfers; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.branch_transfers (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    organization_id uuid,
+    from_store_id uuid NOT NULL,
+    to_store_id uuid NOT NULL,
+    transfer_number text NOT NULL,
+    status text DEFAULT 'in_transit'::text NOT NULL,
+    notes text,
+    created_by uuid,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    received_by uuid,
+    received_at timestamp with time zone,
+    CONSTRAINT branch_transfers_status_check CHECK ((status = ANY (ARRAY['in_transit'::text, 'received'::text, 'cancelled'::text])))
+);
 
 
 --
@@ -5366,7 +5779,8 @@ CREATE TABLE public.organizations (
     commercial_registration_number text,
     legal_registration_id_type text,
     emirate_code text,
-    peppol_endpoint_id text
+    peppol_endpoint_id text,
+    head_office_store_id uuid
 );
 
 ALTER TABLE ONLY public.organizations FORCE ROW LEVEL SECURITY;
@@ -5855,12 +6269,9 @@ CREATE TABLE public.stores (
     created_at timestamp with time zone DEFAULT now(),
     address text,
     phone text,
-    logo_url text,
     email text,
     manager_name text,
     contact_person_name text,
-    commercial_registration_number text,
-    tax_number text,
     license_number text,
     social_instagram text,
     social_facebook text,
@@ -5879,10 +6290,6 @@ CREATE TABLE public.stores (
     social_snapchat text,
     diamonds_enabled boolean DEFAULT false NOT NULL,
     organization_id uuid,
-    legal_name text,
-    legal_registration_id_type text,
-    emirate_code text,
-    peppol_endpoint_id text,
     einvoice_disabled boolean DEFAULT false NOT NULL,
     piece_barcode_prefix_gold text DEFAULT 'G'::text,
     piece_barcode_prefix_diamond text DEFAULT 'D'::text,
@@ -5920,8 +6327,11 @@ CREATE TABLE public.stores (
     debt_alert_customers boolean DEFAULT true NOT NULL,
     debt_alert_traders boolean DEFAULT true NOT NULL,
     display_name text,
+    branch_code text,
+    own_gold_price boolean DEFAULT false NOT NULL,
     CONSTRAINT invoice_print_frame_check CHECK ((invoice_print_frame = ANY (ARRAY['classic'::text, 'gold'::text, 'double'::text, 'dashed'::text, 'none'::text]))),
     CONSTRAINT invoice_print_shape_check CHECK ((invoice_print_shape = ANY (ARRAY['square'::text, 'soft'::text, 'round'::text]))),
+    CONSTRAINT stores_branch_code_format CHECK (((branch_code IS NULL) OR (branch_code ~ '^[A-Z]{2,5}$'::text))),
     CONSTRAINT stores_debt_alert_days_check CHECK (((debt_alert_days >= 1) AND (debt_alert_days <= 365)))
 );
 
@@ -6200,6 +6610,22 @@ ALTER TABLE ONLY public.auth_passkeys
 
 ALTER TABLE ONLY public.auth_webauthn_challenges
     ADD CONSTRAINT auth_webauthn_challenges_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: branch_transfer_items branch_transfer_items_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfer_items
+    ADD CONSTRAINT branch_transfer_items_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: branch_transfers branch_transfers_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfers
+    ADD CONSTRAINT branch_transfers_pkey PRIMARY KEY (id);
 
 
 --
@@ -6787,6 +7213,27 @@ CREATE INDEX auth_passkeys_user_idx ON public.auth_passkeys USING btree (user_id
 --
 
 CREATE INDEX auth_webauthn_challenges_user_id_fk_idx ON public.auth_webauthn_challenges USING btree (user_id);
+
+
+--
+-- Name: branch_transfer_items_transfer_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfer_items_transfer_idx ON public.branch_transfer_items USING btree (transfer_id);
+
+
+--
+-- Name: branch_transfers_from_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfers_from_idx ON public.branch_transfers USING btree (from_store_id, created_at DESC);
+
+
+--
+-- Name: branch_transfers_to_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfers_to_idx ON public.branch_transfers USING btree (to_store_id, status);
 
 
 --
@@ -7616,6 +8063,13 @@ CREATE UNIQUE INDEX store_invites_unique_pending ON public.store_invites USING b
 
 
 --
+-- Name: stores_org_branch_code_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX stores_org_branch_code_key ON public.stores USING btree (organization_id, branch_code) WHERE (branch_code IS NOT NULL);
+
+
+--
 -- Name: stores_organization_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -7868,10 +8322,10 @@ CREATE TRIGGER trg_op_date BEFORE INSERT ON public.trader_movements FOR EACH ROW
 
 
 --
--- Name: organizations trg_org_sync_legal; Type: TRIGGER; Schema: public; Owner: -
+-- Name: organizations trg_org_head_office_check; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trg_org_sync_legal AFTER UPDATE OF legal_name, tax_number, country, logo_url, commercial_registration_number, legal_registration_id_type, emirate_code, peppol_endpoint_id ON public.organizations FOR EACH ROW WHEN (((old.legal_name IS DISTINCT FROM new.legal_name) OR (old.tax_number IS DISTINCT FROM new.tax_number) OR (old.country IS DISTINCT FROM new.country) OR (old.logo_url IS DISTINCT FROM new.logo_url) OR (old.commercial_registration_number IS DISTINCT FROM new.commercial_registration_number) OR (old.legal_registration_id_type IS DISTINCT FROM new.legal_registration_id_type) OR (old.emirate_code IS DISTINCT FROM new.emirate_code) OR (old.peppol_endpoint_id IS DISTINCT FROM new.peppol_endpoint_id))) EXECUTE FUNCTION public.sync_org_legal_to_stores();
+CREATE TRIGGER trg_org_head_office_check BEFORE INSERT OR UPDATE OF head_office_store_id ON public.organizations FOR EACH ROW EXECUTE FUNCTION public.check_head_office_in_org();
 
 
 --
@@ -7931,10 +8385,10 @@ CREATE TRIGGER trg_stores_ensure_org AFTER INSERT ON public.stores FOR EACH ROW 
 
 
 --
--- Name: stores trg_stores_sync_legal; Type: TRIGGER; Schema: public; Owner: -
+-- Name: stores trg_stores_sync_country; Type: TRIGGER; Schema: public; Owner: -
 --
 
-CREATE TRIGGER trg_stores_sync_legal AFTER UPDATE OF legal_name, tax_number, country, logo_url, commercial_registration_number, legal_registration_id_type, emirate_code, peppol_endpoint_id ON public.stores FOR EACH ROW WHEN (((old.legal_name IS DISTINCT FROM new.legal_name) OR (old.tax_number IS DISTINCT FROM new.tax_number) OR (old.country IS DISTINCT FROM new.country) OR (old.logo_url IS DISTINCT FROM new.logo_url) OR (old.commercial_registration_number IS DISTINCT FROM new.commercial_registration_number) OR (old.legal_registration_id_type IS DISTINCT FROM new.legal_registration_id_type) OR (old.emirate_code IS DISTINCT FROM new.emirate_code) OR (old.peppol_endpoint_id IS DISTINCT FROM new.peppol_endpoint_id))) EXECUTE FUNCTION public.sync_store_legal_to_org();
+CREATE TRIGGER trg_stores_sync_country AFTER UPDATE OF country ON public.stores FOR EACH ROW WHEN ((old.country IS DISTINCT FROM new.country)) EXECUTE FUNCTION public.sync_store_country_to_org();
 
 
 --
@@ -7996,6 +8450,78 @@ ALTER TABLE ONLY public.auth_passkeys
 
 ALTER TABLE ONLY public.auth_webauthn_challenges
     ADD CONSTRAINT auth_webauthn_challenges_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: branch_transfer_items branch_transfer_items_diamond_piece_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfer_items
+    ADD CONSTRAINT branch_transfer_items_diamond_piece_id_fkey FOREIGN KEY (diamond_piece_id) REFERENCES public.diamond_pieces(id) ON DELETE SET NULL;
+
+
+--
+-- Name: branch_transfer_items branch_transfer_items_piece_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfer_items
+    ADD CONSTRAINT branch_transfer_items_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id) ON DELETE SET NULL;
+
+
+--
+-- Name: branch_transfer_items branch_transfer_items_received_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfer_items
+    ADD CONSTRAINT branch_transfer_items_received_by_fkey FOREIGN KEY (received_by) REFERENCES public.staff(id);
+
+
+--
+-- Name: branch_transfer_items branch_transfer_items_transfer_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfer_items
+    ADD CONSTRAINT branch_transfer_items_transfer_id_fkey FOREIGN KEY (transfer_id) REFERENCES public.branch_transfers(id) ON DELETE CASCADE;
+
+
+--
+-- Name: branch_transfers branch_transfers_created_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfers
+    ADD CONSTRAINT branch_transfers_created_by_fkey FOREIGN KEY (created_by) REFERENCES public.staff(id);
+
+
+--
+-- Name: branch_transfers branch_transfers_from_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfers
+    ADD CONSTRAINT branch_transfers_from_store_id_fkey FOREIGN KEY (from_store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: branch_transfers branch_transfers_organization_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfers
+    ADD CONSTRAINT branch_transfers_organization_id_fkey FOREIGN KEY (organization_id) REFERENCES public.organizations(id);
+
+
+--
+-- Name: branch_transfers branch_transfers_received_by_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfers
+    ADD CONSTRAINT branch_transfers_received_by_fkey FOREIGN KEY (received_by) REFERENCES public.staff(id);
+
+
+--
+-- Name: branch_transfers branch_transfers_to_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.branch_transfers
+    ADD CONSTRAINT branch_transfers_to_store_id_fkey FOREIGN KEY (to_store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -8556,6 +9082,14 @@ ALTER TABLE ONLY public.kyc_screenings
 
 ALTER TABLE ONLY public.login_2fa
     ADD CONSTRAINT login_2fa_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id) ON DELETE CASCADE;
+
+
+--
+-- Name: organizations organizations_head_office_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.organizations
+    ADD CONSTRAINT organizations_head_office_store_id_fkey FOREIGN KEY (head_office_store_id) REFERENCES public.stores(id) ON DELETE SET NULL;
 
 
 --
@@ -9147,6 +9681,34 @@ CREATE POLICY "branch staff can view their organization" ON public.organizations
 
 
 --
+-- Name: branch_transfer_items; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.branch_transfer_items ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: branch_transfer_items branch_transfer_items_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY branch_transfer_items_select ON public.branch_transfer_items FOR SELECT TO authenticated USING ((transfer_id IN ( SELECT t.id
+   FROM public.branch_transfers t
+  WHERE (public.is_store_member(t.from_store_id) OR public.is_store_member(t.to_store_id)))));
+
+
+--
+-- Name: branch_transfers; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.branch_transfers ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: branch_transfers branch_transfers_select; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY branch_transfers_select ON public.branch_transfers FOR SELECT TO authenticated USING ((public.is_store_member(from_store_id) OR public.is_store_member(to_store_id)));
+
+
+--
 -- Name: cash_movements; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -9204,6 +9766,13 @@ CREATE POLICY customer_debts_select ON public.customer_debts FOR SELECT USING ((
 
 
 --
+-- Name: customer_debts customer_debts_select_org; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customer_debts_select_org ON public.customer_debts FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_customers'::text));
+
+
+--
 -- Name: customer_debts customer_debts_write; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -9221,6 +9790,13 @@ ALTER TABLE public.customer_deposits ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY customer_deposits_select ON public.customer_deposits FOR SELECT USING ((public.is_store_member(store_id) AND (public.has_permission('view_customers'::text, store_id) OR public.has_permission('manage_daily_cashbox'::text, store_id))));
+
+
+--
+-- Name: customer_deposits customer_deposits_select_org; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customer_deposits_select_org ON public.customer_deposits FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_customers'::text));
 
 
 --
@@ -9268,6 +9844,13 @@ CREATE POLICY customers_insert ON public.customers FOR INSERT WITH CHECK ((publi
 --
 
 CREATE POLICY customers_select ON public.customers FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
+
+
+--
+-- Name: customers customers_select_org; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customers_select_org ON public.customers FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_customers'::text));
 
 
 --
@@ -9542,6 +10125,15 @@ ALTER TABLE public.inventory_gifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: invoice_items invoice_items_select_org; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY invoice_items_select_org ON public.invoice_items FOR SELECT TO authenticated USING ((invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE public.org_can(i.store_id, 'view_branch_invoices'::text))));
+
+
+--
 -- Name: invoice_number_counters; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -9565,6 +10157,13 @@ CREATE POLICY invoices_insert ON public.invoices FOR INSERT WITH CHECK ((public.
 --
 
 CREATE POLICY invoices_select ON public.invoices FOR SELECT USING (public.is_store_member(store_id));
+
+
+--
+-- Name: invoices invoices_select_org; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY invoices_select_org ON public.invoices FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_branch_invoices'::text));
 
 
 --
@@ -10187,6 +10786,13 @@ CREATE POLICY trader_movements_select ON public.trader_movements FOR SELECT USIN
 
 
 --
+-- Name: trader_movements trader_movements_select_org; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY trader_movements_select_org ON public.trader_movements FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_traders'::text));
+
+
+--
 -- Name: trader_movements trader_movements_write; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -10218,6 +10824,13 @@ CREATE POLICY traders_insert ON public.traders FOR INSERT WITH CHECK ((public.is
 --
 
 CREATE POLICY traders_select ON public.traders FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_traders'::text, store_id)));
+
+
+--
+-- Name: traders traders_select_org; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY traders_select_org ON public.traders FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_traders'::text));
 
 
 --
@@ -10385,6 +10998,24 @@ GRANT ALL ON FUNCTION public.auto_upgrade_on_staff_change() TO service_role;
 
 
 --
+-- Name: FUNCTION barcode_counter_store(p_store uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.barcode_counter_store(p_store uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.barcode_counter_store(p_store uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.barcode_counter_store(p_store uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION cancel_branch_transfer(p_transfer uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.cancel_branch_transfer(p_transfer uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.cancel_branch_transfer(p_transfer uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.cancel_branch_transfer(p_transfer uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION cancel_invoice(target_invoice_id uuid, reason text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10400,6 +11031,15 @@ GRANT ALL ON FUNCTION public.cancel_invoice(target_invoice_id uuid, reason text)
 GRANT ALL ON FUNCTION public.cash_voucher(p jsonb) TO anon;
 GRANT ALL ON FUNCTION public.cash_voucher(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.cash_voucher(p jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION check_head_office_in_org(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.check_head_office_in_org() TO anon;
+GRANT ALL ON FUNCTION public.check_head_office_in_org() TO authenticated;
+GRANT ALL ON FUNCTION public.check_head_office_in_org() TO service_role;
 
 
 --
@@ -10448,6 +11088,15 @@ GRANT ALL ON FUNCTION public.consume_gold_stock_lot_pooled(target_lot_id uuid, w
 
 
 --
+-- Name: FUNCTION create_branch(p_from_store uuid, p_name text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.create_branch(p_from_store uuid, p_name text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.create_branch(p_from_store uuid, p_name text) TO authenticated;
+GRANT ALL ON FUNCTION public.create_branch(p_from_store uuid, p_name text) TO service_role;
+
+
+--
 -- Name: FUNCTION create_customer_deposit(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10475,12 +11124,12 @@ GRANT ALL ON FUNCTION public.current_store_id() TO service_role;
 
 
 --
--- Name: FUNCTION customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text); Type: ACL; Schema: public; Owner: -
+-- Name: FUNCTION customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid); Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO authenticated;
-GRANT ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO service_role;
+REVOKE ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid) TO service_role;
 
 
 --
@@ -10492,12 +11141,12 @@ GRANT ALL ON FUNCTION public.customer_credit(sid uuid, cust uuid) TO service_rol
 
 
 --
--- Name: FUNCTION customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
+-- Name: FUNCTION customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text, p_store uuid); Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text) FROM PUBLIC;
-GRANT ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text) TO authenticated;
-GRANT ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text) TO service_role;
+REVOKE ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text, p_store uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text, p_store uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.customer_debt_discount(p_customer uuid, p_amount numeric, p_notes text, p_store uuid) TO service_role;
 
 
 --
@@ -10639,6 +11288,15 @@ GRANT ALL ON FUNCTION public.gift_out_piece(target_piece_id uuid, p_recipient te
 REVOKE ALL ON FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_weight numeric, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_weight numeric, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_weight numeric, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_acting_store(home uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_acting_store(home uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_acting_store(home uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_acting_store(home uuid) TO service_role;
 
 
 --
@@ -10909,6 +11567,33 @@ GRANT ALL ON FUNCTION public.next_repair_number(p_store_id uuid) TO service_role
 
 
 --
+-- Name: FUNCTION org_branches(sid uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.org_branches(sid uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.org_branches(sid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.org_branches(sid uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION org_can(p_store uuid, perm text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.org_can(p_store uuid, perm text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.org_can(p_store uuid, perm text) TO authenticated;
+GRANT ALL ON FUNCTION public.org_can(p_store uuid, perm text) TO service_role;
+
+
+--
+-- Name: FUNCTION org_store_ids(sid uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.org_store_ids(sid uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.org_store_ids(sid uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.org_store_ids(sid uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION post_purchase_invoice(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
@@ -10954,12 +11639,21 @@ GRANT ALL ON FUNCTION public.production_take(p_piece uuid, p_box text, p_lot uui
 
 
 --
--- Name: FUNCTION record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text); Type: ACL; Schema: public; Owner: -
+-- Name: FUNCTION receive_branch_transfer(p_transfer uuid, p_barcodes text[], p_items uuid[]); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO anon;
-GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO authenticated;
-GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text) TO service_role;
+REVOKE ALL ON FUNCTION public.receive_branch_transfer(p_transfer uuid, p_barcodes text[], p_items uuid[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.receive_branch_transfer(p_transfer uuid, p_barcodes text[], p_items uuid[]) TO authenticated;
+GRANT ALL ON FUNCTION public.receive_branch_transfer(p_transfer uuid, p_barcodes text[], p_items uuid[]) TO service_role;
+
+
+--
+-- Name: FUNCTION record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid) TO service_role;
 
 
 --
@@ -11152,12 +11846,39 @@ GRANT ALL ON FUNCTION public.seed_default_zebra_label_fields() TO service_role;
 
 
 --
+-- Name: FUNCTION send_branch_transfer(p_from uuid, p_to uuid, p_barcodes text[], p_notes text, p_scrap jsonb, p_cash jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.send_branch_transfer(p_from uuid, p_to uuid, p_barcodes text[], p_notes text, p_scrap jsonb, p_cash jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.send_branch_transfer(p_from uuid, p_to uuid, p_barcodes text[], p_notes text, p_scrap jsonb, p_cash jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.send_branch_transfer(p_from uuid, p_to uuid, p_barcodes text[], p_notes text, p_scrap jsonb, p_cash jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION set_branch_own_gold_price(p_store uuid, p_own boolean); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.set_branch_own_gold_price(p_store uuid, p_own boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.set_branch_own_gold_price(p_store uuid, p_own boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.set_branch_own_gold_price(p_store uuid, p_own boolean) TO service_role;
+
+
+--
 -- Name: FUNCTION set_gold_ounce_price(target_store_id uuid, ounce numeric, rate numeric); Type: ACL; Schema: public; Owner: -
 --
 
 REVOKE ALL ON FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce numeric, rate numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce numeric, rate numeric) TO authenticated;
 GRANT ALL ON FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce numeric, rate numeric) TO service_role;
+
+
+--
+-- Name: FUNCTION set_piece_weights(p_piece uuid, p_weight numeric, p_acc numeric); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.set_piece_weights(p_piece uuid, p_weight numeric, p_acc numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.set_piece_weights(p_piece uuid, p_weight numeric, p_acc numeric) TO authenticated;
+GRANT ALL ON FUNCTION public.set_piece_weights(p_piece uuid, p_weight numeric, p_acc numeric) TO service_role;
 
 
 --
@@ -11240,14 +11961,6 @@ GRANT ALL ON FUNCTION public.sync_invoice_bank_part(p_invoice uuid) TO service_r
 
 
 --
--- Name: FUNCTION sync_org_legal_to_stores(); Type: ACL; Schema: public; Owner: -
---
-
-REVOKE ALL ON FUNCTION public.sync_org_legal_to_stores() FROM PUBLIC;
-GRANT ALL ON FUNCTION public.sync_org_legal_to_stores() TO service_role;
-
-
---
 -- Name: FUNCTION sync_staff_to_hr_employee(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -11257,11 +11970,13 @@ GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO service_role;
 
 
 --
--- Name: FUNCTION sync_store_legal_to_org(); Type: ACL; Schema: public; Owner: -
+-- Name: FUNCTION sync_store_country_to_org(); Type: ACL; Schema: public; Owner: -
 --
 
-REVOKE ALL ON FUNCTION public.sync_store_legal_to_org() FROM PUBLIC;
-GRANT ALL ON FUNCTION public.sync_store_legal_to_org() TO service_role;
+REVOKE ALL ON FUNCTION public.sync_store_country_to_org() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.sync_store_country_to_org() TO anon;
+GRANT ALL ON FUNCTION public.sync_store_country_to_org() TO authenticated;
+GRANT ALL ON FUNCTION public.sync_store_country_to_org() TO service_role;
 
 
 --
@@ -11526,6 +12241,24 @@ GRANT SELECT(last_used_at) ON TABLE public.auth_passkeys TO authenticated;
 --
 
 GRANT ALL ON TABLE public.auth_webauthn_challenges TO service_role;
+
+
+--
+-- Name: TABLE branch_transfer_items; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.branch_transfer_items TO anon;
+GRANT ALL ON TABLE public.branch_transfer_items TO authenticated;
+GRANT ALL ON TABLE public.branch_transfer_items TO service_role;
+
+
+--
+-- Name: TABLE branch_transfers; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.branch_transfers TO anon;
+GRANT ALL ON TABLE public.branch_transfers TO authenticated;
+GRANT ALL ON TABLE public.branch_transfers TO service_role;
 
 
 --
@@ -12156,5 +12889,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vQZd8fJngAQX7mNoh31LBdOuKapQvaQkd5gDlq3LbOYabOL1vkLb0eAdI0PNSpD
+\unrestrict 2NkH8w42ahGBmOZBYcUDkNZlWAITOXhSjAnP6hnFv0LL5NbPKyJttznDXVPQO6A
 
