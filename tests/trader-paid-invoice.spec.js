@@ -18,8 +18,8 @@ test('paid invoice shows in an otherwise empty trader history; delete names it',
   await expect(box).toContainText('PINV-2026-000007');
   await expect(box).toContainText('5');
   await expect(page.locator('#empty-movements')).toHaveClass(/hidden/);
-  const msg = new Promise(r => page.once('dialog', d => { r(d.message()); d.dismiss(); }));
+  page.on('dialog', d => d.dismiss());
   await page.evaluate(() => deleteTrader());
-  expect(await msg).toContain('PINV-2026-000007');
+  await expect(page.locator('#gmToasts')).toContainText('PINV-2026-000007'); // shown as a notification
   expect(errs).toEqual([]);
 });

@@ -25,7 +25,7 @@ test('finish: slow network gives a message and the button comes back', async ({ 
   await page.click('#finish-btn');
   await expect(page.locator('#finish-btn')).toContainText('جارِ');
   await expect(page.locator('#finish-btn')).toHaveText('إنهاء الجلسة وعرض التقرير', { timeout: 40000 });
-  expect(dialogs.some(m => m.includes('الاتصال بطيء'))).toBe(true);
+  await expect(page.locator('#gmToasts')).toContainText('الاتصال بطيء'); // messages show as a notification now, not a blocking box
 });
 
 test('finish works when the camera is not running (stop() throws)', async ({ page }) => {

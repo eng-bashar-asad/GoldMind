@@ -675,6 +675,7 @@ async function gmRunSync() {
 }
 
 function gmToast(text) {
+    if (window.gmNotify) { window.gmNotify(text); return; } // the shared notifications (gm-nav.js)
     const t = document.createElement('div');
     t.setAttribute('role', 'status');
     t.style.cssText = 'position:fixed;left:50%;bottom:88px;transform:translateX(-50%);z-index:9999;background:#1f2937;color:#fff;padding:10px 16px;border-radius:12px;font-size:13px;font-weight:600;box-shadow:0 6px 20px rgba(0,0,0,.25);max-width:90vw;text-align:center;';

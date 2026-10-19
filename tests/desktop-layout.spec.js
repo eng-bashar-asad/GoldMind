@@ -115,3 +115,22 @@ test('phone home: press and hold an icon, drag it onto another, the new order is
   await page.click('#mobArrangeDone');
   await expect(page.locator('#mobActionStrip')).not.toHaveClass(/\bgm-arrange\b/);
 });
+
+test('alert() shows a notification that does not block, and it carries over to the next page', async ({ page }) => {
+  await install(page, { db: db(), generic: true });
+  await page.goto('/customers-ar.html');
+  await page.waitForFunction(() => !!window.gmNotify);
+  await page.evaluate(() => alert('تعذّر الحفظ: تجربة'));
+  await expect(page.locator('#gmToasts .gm-toast.err')).toContainText('تعذّر الحفظ');
+  await page.evaluate(() => alert('تم الحفظ'));
+  await expect(page.locator('#gmToasts .gm-toast.ok')).toContainText('تم الحفظ');
+  await page.goto('/invoices-list-ar.html');
+  await expect(page.locator('#gmToasts')).toContainText('تعذّر الحفظ');
+});
+
+test('an empty list gets the small drawing', async ({ page }) => {
+  await install(page, { db: db() });
+  await page.goto('/customers-ar.html');
+  await page.evaluate(() => { const p = document.createElement('p'); p.className = 'text-center py-8'; p.textContent = 'لا يوجد زبائن مطابقون.'; p.id = 'emp'; document.body.appendChild(p); });
+  await expect(page.locator('#emp')).toHaveClass(/\bgm-empty\b/);
+});

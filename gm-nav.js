@@ -181,6 +181,23 @@
     #loading-state:not(.hidden)::after{top:110px;height:48px;inset-inline-end:30%}
     @keyframes gmSkel{from{background-position:100% 0}to{background-position:0 0}}
     @media (prefers-reduced-motion:reduce){#loading-state::before,#loading-state::after{animation:none!important}}
+    /* notifications instead of alert() boxes (idea from 21st.dev toasts) */
+    #gmToasts{position:fixed;z-index:10050;top:calc(12px + env(safe-area-inset-top));inset-inline:0;margin:0 auto;width:min(440px,calc(100vw - 24px));display:flex;flex-direction:column;gap:8px;pointer-events:none;direction:rtl}
+    @media screen and (min-width:1024px){#gmToasts{top:auto;bottom:24px;inset-inline-end:24px;inset-inline-start:auto;margin:0}}
+    .gm-toast{pointer-events:auto;display:flex;align-items:flex-start;gap:10px;background:#1C1A16;color:#FBF8F1;border-radius:14px;padding:12px 12px 12px 14px;box-shadow:0 12px 32px -8px rgba(0,0,0,.45);font-size:13.5px;line-height:1.55;border-inline-start:4px solid #D9B45A;animation:gmToastIn .28s cubic-bezier(.22,1,.36,1) both}
+    .gm-toast.err{border-inline-start-color:#E5533D}.gm-toast.ok{border-inline-start-color:#3FA35B}
+    .gm-toast .material-symbols-outlined{font-size:20px;flex:none;margin-top:1px}
+    .gm-toast.err .material-symbols-outlined{color:#F08A78}.gm-toast.ok .material-symbols-outlined{color:#7BD08F}.gm-toast.info .material-symbols-outlined{color:#E9CF8B}
+    .gm-toast p{margin:0;flex:1;white-space:pre-line;word-break:break-word}
+    .gm-toast button{flex:none;width:28px;height:28px;border:0;border-radius:8px;background:rgba(255,255,255,.08);color:#E6DECB;display:flex;align-items:center;justify-content:center;cursor:pointer}
+    .gm-toast.out{animation:gmToastOut .22s ease-in both}
+    @keyframes gmToastIn{from{opacity:0;transform:translateY(-10px) scale(.98)}to{opacity:1;transform:none}}
+    @keyframes gmToastOut{to{opacity:0;transform:translateY(-6px)}}
+    @media (prefers-reduced-motion:reduce){.gm-toast,.gm-toast.out{animation:none}}
+    /* empty lists: a small drawing above the message (idea from 21st.dev empty states) */
+    .gm-empty{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:28px 12px!important;text-align:center;color:var(--gm-on-surface-variant,#6B6355)}
+    td.gm-empty{display:table-cell!important}
+    .gm-empty::before{content:'';width:72px;height:60px;flex:none;display:block;margin:0 auto 10px;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 60' fill='none'%3E%3Cellipse cx='36' cy='54' rx='24' ry='4' fill='%23E4DAC0'/%3E%3Crect x='14' y='18' width='44' height='30' rx='6' fill='%23FBF8F1' stroke='%23C9B98F' stroke-width='2'/%3E%3Cpath d='M14 26h44' stroke='%23C9B98F' stroke-width='2'/%3E%3Cpath d='M26 36h20M30 41h12' stroke='%23D9C79C' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M22 18l5-9h18l5 9' stroke='%23C9B98F' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='58' cy='10' r='3' fill='%23D9B45A'/%3E%3Cpath d='M10 9v6M7 12h6' stroke='%23D9B45A' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")}
     /* phone floating add button */
     .gm-fab{position:fixed;inset-inline-end:16px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:49;width:58px;height:58px;border-radius:18px;background:#7A6640;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(28,26,22,.25)}
     .gm-fab .material-symbols-outlined{font-size:28px}
@@ -207,6 +224,64 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillTabs); else fillTabs();
   window.gmFillTabs = fillTabs;
+
+  // ---- notifications (replace the blocking alert() boxes) ----
+  // kind: 'err' | 'ok' | 'info'. A message still on screen when the page changes is shown again on the next page.
+  var TOAST_KEY = 'gm_toasts_carry';
+  function toastBox() {
+    var b = document.getElementById('gmToasts');
+    if (!b) { b = document.createElement('div'); b.id = 'gmToasts'; b.setAttribute('aria-live', 'polite'); (document.body || document.documentElement).appendChild(b); }
+    return b;
+  }
+  function kindOf(t) {
+    if (/تعذّر|تعذر|خطأ|فشل|لا يمكن|ليس لديك|الرجاء|فضلاً|غير صحيح|غير كاف|مطلوب|انتهت|لا يوجد|لا توجد|لم ت|error/i.test(t)) return 'err';
+    if (/تم |تمت |نجاح|حُفظ|حفظت|بنجاح/.test(t)) return 'ok';
+    return 'info';
+  }
+  window.gmNotify = function (text, kind, ms) {
+    text = String(text == null ? '' : text); if (!text) return;
+    kind = kind || kindOf(text);
+    var el = document.createElement('div');
+    el.className = 'gm-toast ' + kind; el.setAttribute('role', kind === 'err' ? 'alert' : 'status');
+    el.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">' + (kind === 'err' ? 'error' : kind === 'ok' ? 'check_circle' : 'info') + '</span><p></p><button type="button" aria-label="إغلاق"><span class="material-symbols-outlined" style="font-size:17px;margin:0">close</span></button>';
+    el.querySelector('p').textContent = text;
+    el._gmText = text; el._gmKind = kind;
+    var box = toastBox(); box.appendChild(el);
+    while (box.children.length > 4) box.firstChild.remove();
+    var close = function () { if (!el.isConnected) return; el.classList.add('out'); setTimeout(function () { el.remove(); }, 220); };
+    el.querySelector('button').onclick = close;
+    setTimeout(close, ms || (kind === 'err' ? 8000 : 4500));
+    return el;
+  };
+  window.addEventListener('pagehide', function () {
+    var b = document.getElementById('gmToasts'); if (!b || !b.children.length) return;
+    try { sessionStorage.setItem(TOAST_KEY, JSON.stringify(Array.prototype.map.call(b.children, function (t) { return [t._gmText, t._gmKind]; }))); } catch (e) {}
+  });
+  function carryToasts() {
+    var list = null;
+    try { list = JSON.parse(sessionStorage.getItem(TOAST_KEY) || 'null'); sessionStorage.removeItem(TOAST_KEY); } catch (e) {}
+    (list || []).forEach(function (x) { window.gmNotify(x[0], x[1]); });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', carryToasts); else carryToasts();
+  // alert() keeps its words but no longer blocks the page; confirm() stays a real question
+  if (!window.__gmNativeAlert) { window.__gmNativeAlert = window.alert; window.alert = function (m) { window.gmNotify(m); }; }
+
+  // ---- empty lists get a small drawing ----
+  var EMPTY_RE = /^(لا توجد|لا يوجد|لم تُضف|لم يتم|لا شيء)/;
+  function markEmpty(root) {
+    (root.querySelectorAll ? root : document).querySelectorAll('p, div, td, li').forEach(function (el) {
+      if (el.classList.contains('gm-empty') || el.children.length || el.closest('#gmToasts, select, .gm-toast, button, a, label')) return;
+      var t = (el.textContent || '').trim();
+      if (t.length && t.length < 90 && EMPTY_RE.test(t) && /text-center|py-8|py-6|py-4|dsk-empty/.test(el.className)) el.classList.add('gm-empty');
+    });
+  }
+  var emptyTimer = null;
+  function watchEmpty() {
+    markEmpty(document);
+    new MutationObserver(function () { clearTimeout(emptyTimer); emptyTimer = setTimeout(function () { markEmpty(document); }, 60); })
+      .observe(document.body, { childList: true, subtree: true });
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchEmpty); else watchEmpty();
 
   // count a number up to its value once (idea from 21st.dev "number ticker"); keeps the text around the number (currency, units).
   // If the page writes a new value meanwhile, the count stops and the new value stays.
