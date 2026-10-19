@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=67"></script>
+<script src="theme.js?v=68"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -761,7 +761,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
         <button type="button" class="dsk-icon-btn" aria-label="فتح القائمة" title="القائمة" onclick="openNavDrawer()"><span class="material-symbols-outlined">menu</span></button>
         <div class="dsk-greet"><div class="dsk-greet-h" id="dskGreet">الشاشة الرئيسية</div><div class="dsk-greet-s" id="dskGreetSub"></div></div>
         <button type="button" class="dsk-search" onclick="openQuickSearch()">
-          <span class="material-symbols-outlined dsk-ic">search</span>بحث عن فاتورة، عميل، أو شاشة...
+          <span class="material-symbols-outlined dsk-ic">search</span>بحث عن فاتورة، عميل، أو شاشة... <kbd style="margin-inline-start:auto;font-size:10.5px;border:1px solid var(--dsk-line-soft);border-radius:5px;padding:1px 5px;font-family:inherit" dir="ltr">Ctrl K</kbd>
         </button>
         <div class="dsk-topbar-spacer"></div>
         <button type="button" id="dskGoldTick" class="dsk-gold-tick hidden" onclick="gmOpenKaratPicker()" title="سعر الذهب اللحظي — يتحدّث تلقائيًا">
@@ -1804,8 +1804,10 @@ document.addEventListener('DOMContentLoaded', function () {
         // (e.g. a very large balance with the "AED" prefix), it wraps onto
         // a second line instead of shrinking further or getting cut off
         // with "...".
+        const GM_TICK_IDS = ['dailyCashboxBalanceEl', 'todaySalesEl', 'todayInvoiceCountEl', 'dskDailyCashboxBalanceEl', 'dskTodaySalesEl', 'dskTodayInvoiceCountEl'];
         function fitStatNumber(el) {
             if (!el) return;
+            if (GM_TICK_IDS.includes(el.id) && window.gmTick && !el.__gmTicking) setTimeout(() => gmTick(el), 0); // after the size is fitted to the final number
             el.style.fontSize = '';
             el.style.whiteSpace = '';
             el.style.overflow = '';
@@ -2456,6 +2458,10 @@ document.addEventListener('DOMContentLoaded', function () {
         { label: 'تواصل مع الدعم', href: 'support-contact-ar.html', icon: 'support_agent', keywords: 'دعم مساعدة support help' }
     ];
 
+    // Ctrl+K / ⌘K opens the quick search (computer)
+    document.addEventListener('keydown', e => {
+        if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) { e.preventDefault(); openQuickSearch(); }
+    });
     function openQuickSearch() {
         document.getElementById('quickSearchOverlay').classList.remove('hidden');
         const panel = document.getElementById('quickSearchPanel');

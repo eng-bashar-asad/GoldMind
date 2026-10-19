@@ -110,7 +110,7 @@ test('phone home: press and hold an icon, drag it onto another, the new order is
   const saved = await page.evaluate(() => Object.keys(localStorage).filter(k => k.startsWith('goldmind_mobile_quick_actions_v4_')).map(k => JSON.parse(localStorage[k]))[0]);
   expect(saved.slice(0, 3)).toEqual(after.slice(0, 3));
   // in arrange mode a tap does not leave the page; «تم الترتيب» ends it
-  await tiles.nth(1).click();
+  await tiles.nth(1).click({ force: true }); // the icons wiggle while arranging
   await expect(page).toHaveURL(/index-ar\.html/);
   await page.click('#mobArrangeDone');
   await expect(page.locator('#mobActionStrip')).not.toHaveClass(/\bgm-arrange\b/);

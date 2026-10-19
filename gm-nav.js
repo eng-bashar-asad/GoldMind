@@ -173,6 +173,14 @@
     .gm-tab.gm-tab-on .material-symbols-outlined{font-variation-settings:'FILL' 1}
     .gm-tab-sale{flex:none;width:62px;height:62px;margin-top:-30px;border-radius:20px;background:#1C1A16;color:#E9CF8B;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px;font-size:10.5px;font-weight:700;text-decoration:none;box-shadow:0 8px 18px rgba(28,26,22,.25)}
     .gm-tab-sale .material-symbols-outlined{font-size:26px}
+    /* loading placeholder (idea from 21st.dev skeletons): every page's #loading-state shows shimmering bars, the text stays for screen readers */
+    #loading-state:not(.hidden){position:relative;color:transparent!important;min-height:180px;padding:24px 0!important}
+    #loading-state:not(.hidden)::before,#loading-state:not(.hidden)::after{content:'';position:absolute;inset-inline:0;border-radius:16px;
+      background:linear-gradient(100deg,rgba(201,185,143,.18) 30%,rgba(255,255,255,.65) 50%,rgba(201,185,143,.18) 70%);background-size:300% 100%;animation:gmSkel 1.4s ease-in-out infinite}
+    #loading-state:not(.hidden)::before{top:20px;height:74px}
+    #loading-state:not(.hidden)::after{top:110px;height:48px;inset-inline-end:30%}
+    @keyframes gmSkel{from{background-position:100% 0}to{background-position:0 0}}
+    @media (prefers-reduced-motion:reduce){#loading-state::before,#loading-state::after{animation:none!important}}
     /* phone floating add button */
     .gm-fab{position:fixed;inset-inline-end:16px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:49;width:58px;height:58px;border-radius:18px;background:#7A6640;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(28,26,22,.25)}
     .gm-fab .material-symbols-outlined{font-size:28px}
@@ -199,6 +207,28 @@
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', fillTabs); else fillTabs();
   window.gmFillTabs = fillTabs;
+
+  // count a number up to its value once (idea from 21st.dev "number ticker"); keeps the text around the number (currency, units).
+  // If the page writes a new value meanwhile, the count stops and the new value stays.
+  window.gmTick = function (el, ms) {
+    if (!el || !el.textContent || el.__gmTicking) return;
+    var txt = el.textContent, m = txt.match(/-?[\d,]+(\.\d+)?/);
+    if (!m || el.dataset.gmTicked === txt) return;
+    el.dataset.gmTicked = txt;
+    var end = parseFloat(m[0].replace(/,/g, '')), dec = m[1] ? m[1].length - 1 : 0;
+    if (!isFinite(end) || Math.abs(end) < 1 || (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) return;
+    var t0 = null, d = ms || 700, pre = txt.slice(0, m.index), post = txt.slice(m.index + m[0].length), last = txt;
+    function f(v) { return v.toLocaleString('en-US', { minimumFractionDigits: dec, maximumFractionDigits: dec }); }
+    function step(t) {
+      if (el.textContent !== last) { el.__gmTicking = false; return; } // the page wrote a newer value
+      t0 = t0 || t; var k = Math.min(1, (t - t0) / d); k = 1 - Math.pow(1 - k, 3);
+      last = k < 1 ? pre + f(end * k) + post : txt;
+      el.textContent = last;
+      if (k < 1) requestAnimationFrame(step); else el.__gmTicking = false;
+    }
+    el.__gmTicking = true;
+    requestAnimationFrame(step);
+  };
 
   function build() {
     var ov = document.createElement('div'); ov.id = 'gmNavOverlay';
