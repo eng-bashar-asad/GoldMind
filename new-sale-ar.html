@@ -141,12 +141,12 @@
 <div class="px-margin-mobile md:px-margin-desktop py-6 md:py-8 max-w-container-max mx-auto w-full">
 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 <!-- Item-entry column -->
-<div class="lg:col-span-2 flex flex-col gap-6">
+<div id="ns-main" class="lg:col-span-2 flex flex-col gap-6">
 
 <div id="edit-banner" class="hidden rounded-xl p-3 text-[13px] leading-6" style="background:#FFF7E6;color:#5C3D00;border:1px solid #E8C77A"></div>
 
 <!-- Client Info Section -->
-<section class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm">
+<section id="ns-customer" class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-4">معلومات العميل</h2>
 
 <div id="customer-selected" class="hidden items-center justify-between bg-surface-container-low rounded-lg p-3">
@@ -371,10 +371,10 @@
 
 </div>
 <!-- Cart + checkout column (sticky on desktop) -->
-<div class="lg:col-span-1 flex flex-col gap-6 lg:sticky lg:top-24">
+<div id="ns-side" class="lg:col-span-1 flex flex-col gap-6 lg:sticky lg:top-24 lg:max-h-[calc(100vh-7rem)] lg:overflow-y-auto">
 
 <!-- Cart / Invoice Items Table -->
-<section class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
+<section id="ns-cart" class="bg-surface-container-lowest border border-outline-variant rounded-xl shadow-sm overflow-hidden">
 <div class="px-4 py-3 bg-secondary">
 <h2 class="font-label-md text-label-md text-white font-bold">جدول المواد بالفاتورة</h2>
 </div>
@@ -2198,5 +2198,24 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
   });
 }
+</script>
+<script>
+// Computer layout (design "GoldMind — تصميم الكمبيوتر", screen 3): the items table sits under the entry
+// boxes in the wide column, the customer goes to the top of the side column with the totals and payment.
+// The same elements move (their handlers stay); on a phone everything stays in its usual order.
+(function () {
+  var mq = window.matchMedia('(min-width: 1024px)');
+  var main = document.getElementById('ns-main'), side = document.getElementById('ns-side');
+  var cust = document.getElementById('ns-customer'), cart = document.getElementById('ns-cart');
+  if (!main || !side || !cust || !cart) return;
+  var custMark = document.createComment('ns-customer'), cartMark = document.createComment('ns-cart');
+  cust.parentNode.insertBefore(custMark, cust); cart.parentNode.insertBefore(cartMark, cart);
+  function place() {
+    if (mq.matches) { side.insertBefore(cust, side.firstChild); main.appendChild(cart); }
+    else { custMark.parentNode.insertBefore(cust, custMark.nextSibling); cartMark.parentNode.insertBefore(cart, cartMark.nextSibling); }
+  }
+  place();
+  if (mq.addEventListener) mq.addEventListener('change', place); else mq.addListener(place);
+})();
 </script>
 </body></html>

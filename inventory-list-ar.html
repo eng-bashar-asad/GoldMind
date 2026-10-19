@@ -374,6 +374,33 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         </a>`;
     }
 
+    // Computer (>=1024px): one wide table with every column instead of cards (design screen 2);
+    // a row opens the piece like the card does. Empty list -> '' so each caller keeps its message.
+    function piecesHtml(pieces) {
+        if (!pieces.length) return '';
+        if (!(window.matchMedia && window.matchMedia('(min-width: 1024px)').matches)) return pieces.map(pieceCardHtml).join('');
+        const th = t => `<th class="px-3 py-2.5 text-right text-[12px] font-bold whitespace-nowrap" style="color:#6B6150;background:#F7F2E6;border-bottom:1px solid #E4DAC0">${t}</th>`;
+        const td = (v, extra) => `<td class="px-3 py-2.5 text-[13px] whitespace-nowrap" style="border-bottom:1px solid #EFE7D2" ${extra || ''}>${v}</td>`;
+        const rows = pieces.map(piece => {
+            const chip = { available: ['#E3F1E6', '#2E7D46'], reserved: ['#FFF1D6', '#8A5A00'], sold: ['#EFE9DD', '#6B6150'], given_to_trader: ['#E8EEF9', '#33517E'] }[piece.status] || ['#EFE9DD', '#6B6150'];
+            const typeLabel = [piece.piece_type, piece.category1, piece.category2].filter(Boolean).join(' · ') || piece.description_ar || 'قطعة';
+            const photo = piece.photo_url
+                ? `<img src="${gmEscapeHtml(piece.photo_url)}" alt="" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:8px" onclick="event.stopPropagation(); openPhotoLightbox('${gmEscapeHtml(piece.photo_url)}')"/>`
+                : '<span style="display:inline-block;width:40px;height:40px;border-radius:8px;background:#EFE7D2"></span>';
+            const href = 'piece-edit-ar.html?id=' + encodeURIComponent(piece.id);
+            return `<tr class="cursor-pointer hover:bg-[#FBF6E8]" onclick="location.href='${href}'">` +
+                td(photo) + td(`<a href="${href}" dir="ltr" class="font-data-mono font-semibold" onclick="event.stopPropagation()">${gmEscapeHtml(piece.barcode || 'بدون باركود')}</a>`) +
+                td(gmEscapeHtml(typeLabel)) + td(gmEscapeHtml(String(piece.karat || '')) + 'K') +
+                td(`<span class="font-data-mono">${Number(piece.weight_grams || 0).toFixed(2)}</span>`) +
+                (canViewAccWeight ? td(`<span class="font-data-mono">${piece.accounting_weight_grams != null ? Number(piece.accounting_weight_grams).toFixed(2) : '—'}</span>`) : '') +
+                td(gmEscapeHtml(piece.box_name || '—')) +
+                td(`<span class="gm-chip" style="background:${chip[0]};color:${chip[1]};">${gmEscapeHtml(statusNames[piece.status] || piece.status || '')}</span>`) + '</tr>';
+        }).join('');
+        return `<div class="col-span-full bg-white border rounded-xl overflow-x-auto" style="border-color:#E4DAC0"><table class="w-full border-collapse">
+            <thead><tr>${th('<span class="sr-only">الصورة</span>')}${th('الباركود')}${th('الوصف')}${th('العيار')}${th('الوزن القائم')}${canViewAccWeight ? th('الوزن المحاسبي') : ''}${th('الصندوق')}${th('الحالة')}</tr></thead>
+            <tbody>${rows}</tbody></table></div>`;
+    }
+
     let ALL_PIECES = [];
     let ALL_PIECES_RAW = [];
     let OLD_BARCODES_BY_PIECE = {}; // piece id -> replaced barcode numbers
@@ -421,7 +448,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         document.getElementById('piece-count').textContent = results.length + ' نتيجة';
         renderTotals(results);
 
-        document.getElementById('search-results-list').innerHTML = results.map(pieceCardHtml).join('') || '<p class="col-span-full text-center text-[12px] text-on-surface-variant py-8">لا توجد نتائج مطابقة.</p>';
+        document.getElementById('search-results-list').innerHTML = piecesHtml(results) || '<p class="col-span-full text-center text-[12px] text-on-surface-variant py-8">لا توجد نتائج مطابقة.</p>';
         if (barcode && !results.length) findInDiamonds(barcode);
     }
 
@@ -668,7 +695,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
         renderTotals(pieces);
 
-        document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
+        document.getElementById('pieces-list').innerHTML = piecesHtml(pieces);
         gmScopeChanged();
     }
 
@@ -734,7 +761,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
         renderTotals(pieces);
 
-        document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('');
+        document.getElementById('pieces-list').innerHTML = piecesHtml(pieces);
     }
 
     // The piece-list "back" button: return to wherever we drilled in from.
@@ -840,7 +867,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
             document.getElementById('piece-list-title').textContent = currentBoxScope + (currentPrefixScope ? ' — ' + currentPrefixScope : '') + ' — ' + GM_STATUS_LABEL[st];
             document.getElementById('piece-count').textContent = pieces.length + ' قطعة';
             renderTotals(pieces);
-            document.getElementById('pieces-list').innerHTML = pieces.map(pieceCardHtml).join('') || '<p class="col-span-full text-center text-[12px] text-on-surface-variant py-8">لا توجد قطع بهذه الحالة في هذا الصندوق.</p>';
+            document.getElementById('pieces-list').innerHTML = piecesHtml(pieces) || '<p class="col-span-full text-center text-[12px] text-on-surface-variant py-8">لا توجد قطع بهذه الحالة في هذا الصندوق.</p>';
         }
         gmRenderStatusTiles();
     }
