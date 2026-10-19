@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=69"></script>
+<script src="theme.js?v=70"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -549,6 +549,22 @@
   .gm-gi svg,.gm-gi .material-symbols-outlined{position:relative;z-index:1;filter:drop-shadow(0 0 6px color-mix(in srgb,var(--c,#C8952E) 70%,transparent))}
   .gm-gi .material-symbols-outlined{font-size:28px!important}
   @keyframes gmShine{0%,60%{left:-70%}100%{left:140%}}
+  /* icon size / shape / names (from «تخصيص») */
+  #mobActionStrip.qa-s{grid-template-columns:repeat(5,minmax(0,1fr))!important}
+  #mobActionStrip.qa-l{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+  #mobActionStrip.qa-s .gm-gi{width:46px;height:46px;border-radius:15px}#mobActionStrip.qa-s .gm-gi svg{width:21px;height:21px}#mobActionStrip.qa-s .gm-qg{font-size:10.5px;gap:12px}
+  #mobActionStrip.qa-l .gm-gi{width:74px;height:74px;border-radius:23px}#mobActionStrip.qa-l .gm-gi svg{width:32px;height:32px}#mobActionStrip.qa-l .gm-qg{font-size:13px;gap:20px}
+  .dsk-action-strip.qa-s{grid-template-columns:repeat(auto-fill,minmax(94px,1fr))}.dsk-action-strip.qa-s .gm-gi{width:50px;height:50px;border-radius:16px}
+  .dsk-action-strip.qa-l{grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.dsk-action-strip.qa-l .gm-gi{width:80px;height:80px;border-radius:25px}.dsk-action-strip.qa-l .gm-gi svg{width:34px;height:34px}
+  .qa-circle .gm-gi,.qa-circle .gm-gi::before{border-radius:50%!important}
+  .qa-soft .gm-gi{border-radius:12px!important}.qa-soft .gm-gi::before{border-radius:10px 10px 50% 50%/10px 10px 8px 8px}
+  .qa-nolabel .gm-qg>span:not(.gm-gi),.qa-nolabel .dsk-action-label{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+  .qa-nolabel .gm-qg,.qa-nolabel .dsk-action{padding-bottom:26px}
+  .gm-ql-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-top:1px solid #EFE7D2;font-size:12.5px;font-weight:600;color:#211D17}
+  .gm-ql-row>span{min-width:56px}
+  .gm-ql-seg{display:flex;gap:4px;background:#EFE7D2;border-radius:11px;padding:3px;flex-wrap:wrap}
+  .gm-ql-seg button{min-height:36px;padding:0 12px;border:0;border-radius:9px;background:transparent;font:inherit;font-size:12.5px;color:#211D17;cursor:pointer}
+  .gm-ql-seg button[aria-checked="true"]{background:#1C1A16;color:#FBF8F1}
   /* «تخصيص»: colour dots per icon */
   .gm-qc{margin:12px 0 4px}
   .gm-qc-h{font-size:12px;font-weight:700;color:#6B6355;margin-bottom:6px}
@@ -857,6 +873,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
           <div class="dsk-customize-note">يُحفظ لحسابك أنت فقط — لا يتغيّر عند باقي الموظفين</div>
         </div>
         <div class="dsk-customize-grid" id="dskCustomizeGrid"></div>
+        <div id="dskLookRows" class="gm-qc"></div>
         <div id="dskColorRows" class="gm-qc"></div>
         <div class="dsk-customize-actions">
           <div class="dsk-customize-count" id="dskCustomizeCount"></div>
@@ -989,6 +1006,38 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
       window.gmQaColorRows(box, items, onChange);
     };
   };
+  // size, shape and names of the icons (per staff member, phone and computer)
+  function lookKey() { return 'goldmind_qa_look_' + (window.GOLDMIND_STAFF_ID || 'default'); }
+  window.gmQaLook = function () { var d = { size: 'm', shape: 'sq', labels: true }; try { var v = JSON.parse(localStorage.getItem(lookKey()) || 'null'); if (v) { d.size = v.size || d.size; d.shape = v.shape || d.shape; d.labels = v.labels !== false; } } catch (e) {} return d; };
+  window.gmQaLookApply = function () {
+    var l = window.gmQaLook();
+    ['mobActionStrip', 'dskActionStrip'].forEach(function (id) {
+      var el = document.getElementById(id); if (!el) return;
+      el.classList.remove('qa-s', 'qa-l', 'qa-circle', 'qa-soft', 'qa-nolabel');
+      if (l.size !== 'm') el.classList.add('qa-' + l.size);
+      if (l.shape !== 'sq') el.classList.add('qa-' + l.shape);
+      if (!l.labels) el.classList.add('qa-nolabel');
+    });
+  };
+  window.gmQaLookControls = function (box) {
+    if (!box) return;
+    var l = window.gmQaLook();
+    var seg = function (key, opts) {
+      return '<div class="gm-ql-seg" role="radiogroup" data-k="' + key + '">' + opts.map(function (o) {
+        return '<button type="button" role="radio" aria-checked="' + (String(l[key]) === String(o[0])) + '" data-v="' + o[0] + '">' + o[1] + '</button>'; }).join('') + '</div>';
+    };
+    box.innerHTML = '<div class="gm-qc-h">شكل الأيقونات</div>'
+      + '<div class="gm-ql-row"><span>الحجم</span>' + seg('size', [['s', 'صغير'], ['m', 'متوسط'], ['l', 'كبير']]) + '</div>'
+      + '<div class="gm-ql-row"><span>الشكل</span>' + seg('shape', [['sq', 'مربع منحني'], ['circle', 'دائرة'], ['soft', 'مربع']]) + '</div>'
+      + '<div class="gm-ql-row"><span>الأسماء</span>' + seg('labels', [['true', 'ظاهرة'], ['false', 'مخفية']]) + '</div>';
+    box.onclick = function (e) {
+      var b = e.target.closest('button[data-v]'); if (!b) return;
+      var cur = window.gmQaLook(), k = b.parentNode.dataset.k;
+      cur[k] = k === 'labels' ? b.dataset.v === 'true' : b.dataset.v;
+      try { localStorage.setItem(lookKey(), JSON.stringify(cur)); } catch (x) {}
+      window.gmQaLookApply(); window.gmQaLookControls(box);
+    };
+  };
   window.GM_GLOSS = function (id, materialIcon, phone) {
     var m = MAP[id] || ['champagne', null];
     var sym = m[1] ? SVG[m[1]] : '<span class="material-symbols-outlined">' + materialIcon + '</span>';
@@ -1065,6 +1114,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
         + window.GM_GLOSS(a.id, a.icon)
         + '<span class="dsk-action-label">' + a.label + '</span></a>';
     }).join('');
+    window.gmQaLookApply();
   }
 
   function renderGrid() {
@@ -1076,6 +1126,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
         + '<span>' + a.label + '</span></div>';
     }).join('');
     countEl.textContent = draft.length + ' / ' + MAX_ACTIONS + ' مختارة';
+    window.gmQaLookControls(document.getElementById('dskLookRows'));
     window.gmQaColorRows(document.getElementById('dskColorRows'), draft.map(byId).filter(Boolean), renderStrip);
     var chips = gridEl.querySelectorAll('.dsk-chip');
     for (var i = 0; i < chips.length; i++) {
@@ -1290,6 +1341,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 </div>
 <div class="text-[11px] text-on-surface-variant mb-4">يُحفظ لحسابك أنت فقط — لا يتغيّر عند باقي الموظفين</div>
 <div class="grid grid-cols-2 gap-2" id="mobCustomizeGrid"></div>
+<div id="mobLookRows" class="gm-qc"></div>
 <div id="mobColorRows" class="gm-qc"></div>
 <div class="flex items-center justify-between mt-4">
 <div class="text-[11px] text-on-surface-variant" id="mobCustomizeCount"></div>
@@ -1363,6 +1415,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
     stripEl.innerHTML = allowedIds(selection).map(function (id) { return tileHtml(byId(id)); }).join('')
       + '<button type="button" class="gm-qg gm-qg-cust" onclick="document.getElementById(\'mobCustomizeBtn\').click()">' + window.GM_GLOSS('customize', 'tune', true) + '<span>تخصيص</span></button>';
     stripEl.lastElementChild.style.setProperty('--qa-tint', window.GM_TINT('customize', true));
+    window.gmQaLookApply();
   }
 
   // ---- press and hold an icon, then drag it to a new place (each staff member keeps his own order) ----
@@ -1449,6 +1502,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
         + '<span class="text-[12.5px] font-semibold">' + a.label + '</span></div>';
     }).join('');
     countEl.textContent = draft.length + ' / ' + MAX_ACTIONS + ' مختارة';
+    window.gmQaLookControls(document.getElementById('mobLookRows'));
     window.gmQaColorRows(document.getElementById('mobColorRows'), draft.map(byId).filter(Boolean), renderStrip);
     var chips = gridEl.querySelectorAll('[data-id]');
     for (var i = 0; i < chips.length; i++) {

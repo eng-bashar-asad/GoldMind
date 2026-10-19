@@ -151,3 +151,28 @@ test('«تخصيص»: each icon can get its own colour, kept for this staff memb
   await page.setViewportSize({ width: 1440, height: 900 });                 // same colour on the computer
   expect(await page.locator('#dskActionStrip a[href="daily-cashbox-ar.html"] .gm-gi').getAttribute('style')).toContain('#8E5BD9');
 });
+
+test('«تخصيص»: icon size, shape and names are kept and applied on the phone and the computer', async ({ page }) => {
+  await install(page, { db: db(), generic: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/index-ar.html');
+  await page.waitForTimeout(1500);
+  await page.evaluate(() => document.getElementById('mobCustomizeBtn').click());
+  await page.click('#mobLookRows [data-k="size"] button[data-v="l"]');
+  await page.click('#mobLookRows [data-k="shape"] button[data-v="circle"]');
+  await page.click('#mobLookRows [data-k="labels"] button[data-v="false"]');
+  await expect(page.locator('#mobActionStrip')).toHaveClass(/\bqa-l\b.*\bqa-circle\b.*\bqa-nolabel\b/);
+  await page.reload(); await page.waitForTimeout(1500);
+  await expect(page.locator('#mobActionStrip')).toHaveClass(/\bqa-l\b/);
+  await expect(page.locator('#dskActionStrip')).toHaveClass(/\bqa-circle\b/);
+});
+
+test('a button whose text says «جارِ …» shows a spinner', async ({ page }) => {
+  await install(page, { db: db() });
+  await page.goto('/customers-ar.html');
+  await page.waitForFunction(() => !!window.gmNotify);
+  await page.evaluate(() => { const b = document.createElement('button'); b.id = 'bb'; b.textContent = 'حفظ'; document.body.appendChild(b); setTimeout(() => { b.textContent = 'جارِ الحفظ...'; }, 50); });
+  await expect(page.locator('#bb')).toHaveClass(/\bgm-busy\b/);
+  await page.evaluate(() => { document.getElementById('bb').textContent = 'حفظ'; });
+  await expect(page.locator('#bb')).not.toHaveClass(/\bgm-busy\b/);
+});

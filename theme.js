@@ -953,6 +953,7 @@ goldmindLoadSavedFont();
     var here = location.pathname + location.search;
     var pageName = location.pathname.split('/').pop();
     var wasBack = sessionStorage.getItem('gm_nav_going_back') === '1';
+    window.__gmCameBack = wasBack; // read by the page-transition code below
     sessionStorage.removeItem('gm_nav_going_back');
     // Auth pages themselves never get pushed (there's nothing to "go back
     // to" there), and any that are ALREADY sitting in an existing stack
@@ -974,6 +975,44 @@ goldmindLoadSavedFont();
     }
     sessionStorage.setItem(STACK_KEY, JSON.stringify(stack.slice(-30)));
   } catch (e) { /* sessionStorage unavailable (private mode etc.) -- gmSmartBack falls back to fallbackHref every time */ }
+})();
+
+// ---- moving between pages (View Transitions): a new page slides in from the start side,
+// going back slides the other way. Browsers without support just open the page.
+(function () {
+  try {
+    var css = document.createElement('style');
+    css.textContent =
+      '@view-transition{navigation:auto}' +
+      '::view-transition-old(root){animation:gmVtOut .2s cubic-bezier(.4,0,1,1) both}' +
+      '::view-transition-new(root){animation:gmVtIn .28s cubic-bezier(.22,1,.36,1) both}' +
+      'html:active-view-transition-type(back)::view-transition-old(root){animation-name:gmVtOutBack}' +
+      'html:active-view-transition-type(back)::view-transition-new(root){animation-name:gmVtInBack}' +
+      /* RTL: forward = the new page comes from the left */
+      '@keyframes gmVtOut{to{opacity:0;transform:translateX(24px)}}@keyframes gmVtIn{from{opacity:0;transform:translateX(-36px)}}' +
+      '@keyframes gmVtOutBack{to{opacity:0;transform:translateX(-24px)}}@keyframes gmVtInBack{from{opacity:0;transform:translateX(36px)}}' +
+      /* the computer side menu and the phone tabs stay still */
+      '#gmNav{view-transition-name:gm-nav}nav.gm-bottom-tabs{view-transition-name:gm-tabs}' +
+      '::view-transition-group(gm-nav),::view-transition-group(gm-tabs){animation:none}' +
+      '::view-transition-old(gm-nav),::view-transition-old(gm-tabs){display:none}::view-transition-new(gm-nav),::view-transition-new(gm-tabs){animation:none}' +
+      '@media (prefers-reduced-motion:reduce){@view-transition{navigation:none}}';
+    document.head.appendChild(css);
+    var isBack = function (e, fromFlag) {
+      if (fromFlag) return true;
+      try { var a = window.navigation && navigation.activation; return !!(a && a.navigationType === 'traverse' && a.from && a.entry && a.from.index > a.entry.index); } catch (x) { return false; }
+    };
+    // old page: leaving through gmSmartBack (flag set just before) or the browser's back
+    window.addEventListener('pageswap', function (e) {
+      if (!e.viewTransition) return;
+      var back = sessionStorage.getItem('gm_nav_going_back') === '1' ||
+        (e.activation && e.activation.navigationType === 'traverse' && e.activation.from && e.activation.entry && e.activation.from.index > e.activation.entry.index);
+      if (back) e.viewTransition.types.add('back');
+    });
+    // new page: theme.js runs in <head>, before the first paint (window.__gmCameBack is set by the back-stack code above)
+    window.addEventListener('pagereveal', function (e) {
+      if (e.viewTransition && isBack(e, window.__gmCameBack)) e.viewTransition.types.add('back');
+    });
+  } catch (e) { /* ignore */ }
 })();
 
 // A page that only forwards somewhere else must not stay in the back-stack,
@@ -1133,7 +1172,7 @@ function gmHardwareBack() {
 (function () {
   if (window.GM_NAV_DISABLED || document.querySelector('script[src^="gm-nav.js"]')) return;
   var sc = document.createElement('script');
-  sc.src = 'gm-nav.js?v=15';
+  sc.src = 'gm-nav.js?v=16';
   document.head.appendChild(sc);
 })();
 

@@ -198,6 +198,21 @@
     .gm-empty{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:28px 12px!important;text-align:center;color:var(--gm-on-surface-variant,#6B6355)}
     td.gm-empty{display:table-cell!important}
     .gm-empty::before{content:'';width:72px;height:60px;flex:none;display:block;margin:0 auto 10px;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 60' fill='none'%3E%3Cellipse cx='36' cy='54' rx='24' ry='4' fill='%23E4DAC0'/%3E%3Crect x='14' y='18' width='44' height='30' rx='6' fill='%23FBF8F1' stroke='%23C9B98F' stroke-width='2'/%3E%3Cpath d='M14 26h44' stroke='%23C9B98F' stroke-width='2'/%3E%3Cpath d='M26 36h20M30 41h12' stroke='%23D9C79C' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M22 18l5-9h18l5 9' stroke='%23C9B98F' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='58' cy='10' r='3' fill='%23D9B45A'/%3E%3Cpath d='M10 9v6M7 12h6' stroke='%23D9B45A' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")}
+    /* press feel: buttons sink a little when pressed */
+    .gm-qg,.dsk-action,.gm-tab,.gm-tab-sale,.gm-fab,.cd-act,.cu-act,.ns-pb-btn,#save-invoice-btn,#save-btn,.gm-cta,.gm-chip-btn,.gm-hbtn,.qa-tile{transition:transform .12s ease,filter .12s ease}
+    .gm-qg:active,.dsk-action:active,.gm-tab:active,.gm-tab-sale:active,.gm-fab:active,.cd-act:active,.cu-act:active,.ns-pb-btn:active,#save-invoice-btn:active,#save-btn:active,.gm-cta:active,.gm-chip-btn:active,.gm-hbtn:active{transform:scale(.96)!important;filter:brightness(.97)}
+    .gm-qg:active .gm-gi,.dsk-action:active .gm-gi{transform:translateY(2px);box-shadow:0 0 0 1px color-mix(in srgb,var(--c,#C8952E) 55%,transparent) inset,0 -6px 10px color-mix(in srgb,var(--c,#C8952E) 22%,transparent) inset,0 4px 8px -6px rgba(0,0,0,.6)!important}
+    /* a button busy saving shows a spinner (its text already says «جارِ …») */
+    button.gm-busy{position:relative;opacity:.85;cursor:progress}
+    button.gm-busy::after{content:'';display:inline-block;width:15px;height:15px;margin-inline-start:8px;vertical-align:-3px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:gmSpin .7s linear infinite}
+    @keyframes gmSpin{to{transform:rotate(360deg)}}
+    /* phone: swipe from the edge to go back, pull down to refresh */
+    #gmEdgeBack,#gmPull{position:fixed;z-index:10040;pointer-events:none;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:#1C1A16;color:#E9CF8B;box-shadow:0 8px 20px rgba(0,0,0,.3);opacity:0;transition:opacity .15s}
+    #gmEdgeBack{top:50%;right:6px;margin-top:-22px}
+    #gmPull{top:10px;left:50%;margin-left:-22px}
+    #gmEdgeBack.on,#gmPull.on{opacity:1}
+    #gmPull.go .material-symbols-outlined{animation:gmSpin .7s linear infinite}
+    @media (prefers-reduced-motion:reduce){.gm-qg,.dsk-action,.gm-tab,.gm-tab-sale{transition:none}button.gm-busy::after,#gmPull.go .material-symbols-outlined{animation:none}}
     /* phone floating add button */
     .gm-fab{position:fixed;inset-inline-end:16px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:49;width:58px;height:58px;border-radius:18px;background:#7A6640;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(28,26,22,.25)}
     .gm-fab .material-symbols-outlined{font-size:28px}
@@ -266,8 +281,76 @@
   // alert() keeps its words but no longer blocks the page; confirm() stays a real question
   if (!window.__gmNativeAlert) { window.__gmNativeAlert = window.alert; window.alert = function (m) { window.gmNotify(m); }; }
 
+  // ---- a tiny vibration on the main buttons (Android; iPhone has no web vibration) ----
+  document.addEventListener('pointerdown', function (e) {
+    if (e.pointerType !== 'touch' || !navigator.vibrate) return;
+    if (e.target.closest && e.target.closest('.gm-qg, .gm-tab-sale, .gm-fab, .ns-pb-btn, #save-invoice-btn, #save-btn, .cd-act, .cu-act')) { try { navigator.vibrate(8); } catch (x) {} }
+  }, { passive: true });
+
+  // ---- phone gestures ----
+  var phone = function () { return window.matchMedia && matchMedia('(max-width: 1023px)').matches; };
+  function bubble(id, icon) {
+    var b = document.getElementById(id);
+    if (!b) { b = document.createElement('div'); b.id = id; b.setAttribute('aria-hidden', 'true'); b.innerHTML = '<span class="material-symbols-outlined">' + icon + '</span>'; document.body.appendChild(b); }
+    return b;
+  }
+  var busyUi = function () { return document.querySelector('.ns-shade.ns-open, #mobActionStrip.gm-arrange, .gm-qg-ghost, #gmNav[aria-hidden="false"], [role="dialog"]:not(.hidden)'); };
+  // swipe in from the right edge (the start side in Arabic) → back
+  var eb = null;
+  document.addEventListener('touchstart', function (e) {
+    if (!phone() || e.touches.length !== 1 || page === 'index-ar.html' || busyUi()) return;
+    var t = e.touches[0];
+    if (t.clientX > window.innerWidth - 22) eb = { x: t.clientX, y: t.clientY, dx: 0 };
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!eb) return;
+    var t = e.touches[0]; eb.dx = eb.x - t.clientX;
+    if (Math.abs(t.clientY - eb.y) > 60) { eb = null; bubble('gmEdgeBack', 'arrow_forward').classList.remove('on'); return; }
+    var b = bubble('gmEdgeBack', 'arrow_forward');
+    b.classList.toggle('on', eb.dx > 24);
+    b.style.transform = 'translateX(' + (-Math.min(eb.dx, 90) / 2) + 'px) scale(' + (eb.dx > 80 ? 1.1 : 1) + ')';
+  }, { passive: true });
+  document.addEventListener('touchend', function () {
+    if (!eb) return;
+    var go = eb.dx > 80; eb = null;
+    var b = document.getElementById('gmEdgeBack'); if (b) b.classList.remove('on');
+    if (!go) return;
+    // the page's own back button knows where "back" is; otherwise the shared back
+    var own = document.querySelector('header [onclick*="gmSmartBack"], header [onclick*="goBack"], header [aria-label="رجوع"], [onclick*="gmSmartBack"]');
+    if (own) own.click(); else if (typeof window.gmSmartBack === 'function') window.gmSmartBack('index-ar.html'); else history.back();
+  });
+  // pull down at the top of a list page → refresh (only on pages that just show data)
+  var PULL_PAGES = ['index-ar.html', 'invoices-list-ar.html', 'customers-ar.html', 'inventory-list-ar.html', 'customer-debts-ar.html', 'reports-ar.html', 'ledger-ar.html', 'daily-cashbox-ar.html', 'branch-transfers-ar.html', 'repairs-ar.html'];
+  var pl = null;
+  document.addEventListener('touchstart', function (e) {
+    if (!phone() || e.touches.length !== 1 || PULL_PAGES.indexOf(page) < 0 || window.scrollY > 0 || busyUi()) return;
+    if (e.target.closest('input, textarea, select, #mobActionStrip, [contenteditable], .overflow-x-auto, .rp-chart')) return;
+    pl = { y: e.touches[0].clientY, dy: 0 };
+  }, { passive: true });
+  document.addEventListener('touchmove', function (e) {
+    if (!pl) return;
+    pl.dy = e.touches[0].clientY - pl.y;
+    if (pl.dy < 0 || window.scrollY > 0) { pl.dy = 0; bubble('gmPull', 'refresh').classList.remove('on'); return; }
+    var b = bubble('gmPull', 'refresh');
+    b.classList.toggle('on', pl.dy > 20);
+    b.style.transform = 'translateY(' + Math.min(pl.dy * .5, 60) + 'px) rotate(' + Math.min(pl.dy * 2, 300) + 'deg)';
+  }, { passive: true });
+  document.addEventListener('touchend', function () {
+    if (!pl) return;
+    var go = pl.dy > 110; pl = null;
+    var b = document.getElementById('gmPull'); if (!b) return;
+    if (go) { b.classList.add('go'); b.style.transform = 'translateY(50px)'; setTimeout(function () { location.reload(); }, 150); }
+    else b.classList.remove('on');
+  });
+
   // ---- empty lists get a small drawing ----
   var EMPTY_RE = /^(لا توجد|لا يوجد|لم تُضف|لم يتم|لا شيء)/;
+  function markBusy() {
+    document.querySelectorAll('button').forEach(function (b) {
+      var busy = /^\s*جار[ِ]?\s/.test(b.textContent || '') && !b.querySelector('.animate-spin');
+      if (busy !== b.classList.contains('gm-busy')) b.classList.toggle('gm-busy', busy);
+    });
+  }
   function markEmpty(root) {
     (root.querySelectorAll ? root : document).querySelectorAll('p, div, td, li').forEach(function (el) {
       if (el.classList.contains('gm-empty') || el.children.length || el.closest('#gmToasts, select, .gm-toast, button, a, label')) return;
@@ -278,8 +361,11 @@
   var emptyTimer = null;
   function watchEmpty() {
     markEmpty(document);
-    new MutationObserver(function () { clearTimeout(emptyTimer); emptyTimer = setTimeout(function () { markEmpty(document); }, 60); })
-      .observe(document.body, { childList: true, subtree: true });
+    var busyQueued = false;
+    new MutationObserver(function () {
+      if (!busyQueued) { busyQueued = true; requestAnimationFrame(function () { busyQueued = false; markBusy(); }); }
+      clearTimeout(emptyTimer); emptyTimer = setTimeout(function () { markEmpty(document); }, 60); })
+      .observe(document.body, { childList: true, subtree: true, characterData: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchEmpty); else watchEmpty();
 
