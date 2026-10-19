@@ -26,13 +26,19 @@ test('overdue customer and trader debts are listed; a cleared debt is not', asyn
   expect(text).not.toContain('بيت دولة');
   await expect(page.locator('#debtAlertBox a', { hasText: 'ديمة' })).toHaveAttribute('href', 'customer-debts-ar.html?open=c1');
   await expect(page.locator('#debtAlertBox a', { hasText: 'جليل' })).toHaveAttribute('href', 'ledger-ar.html?trader=t1');
-  // each group collapses from its header; the header stays visible
-  const cust = page.locator('#debtAlertBox details', { hasText: 'ديون الزبائن المتأخرة' });
-  await expect(cust).toHaveAttribute('open', '');
-  await cust.locator('summary').click();
-  await expect(cust).not.toHaveAttribute('open', '');
-  await expect(cust.locator('summary')).toContainText('ديون الزبائن المتأخرة');
-  await expect(cust.locator('a')).toBeHidden();
-  await cust.locator('summary').click();
-  await expect(cust).toHaveAttribute('open', '');
+  // one card that collapses from its header (counts stay visible)
+  const card = page.locator('#debtAlertBox details');
+  await expect(card).toHaveAttribute('open', '');
+  await expect(card.locator('summary')).toContainText('ديون تجاوزت 15 يوماً');
+  await expect(card.locator('summary')).toContainText('1 زبائن · 1 تجار');
+  await card.locator('summary').click();
+  await expect(card).not.toHaveAttribute('open', '');
+  await expect(card.locator('a', { hasText: 'ديمة' })).toBeHidden();
+  await card.locator('summary').click();
+  await expect(card).toHaveAttribute('open', '');
+  // computer: the same list in the side card, and the customers' total debt in the top numbers
+  await expect(page.locator('#dskDebtCard')).not.toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#dskDebtRows a', { hasText: 'ديمة' })).toHaveAttribute('href', 'customer-debts-ar.html?open=c1');
+  await expect(page.locator('#dskDebtTotalEl')).toHaveText('500.00');
+  await expect(page.locator('#dskDebtSubEl')).toHaveText('كل الفروع · 1 زبون');
 });

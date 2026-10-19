@@ -61,3 +61,21 @@ test('piece page on the computer: compact specs, suggested price, transfer link,
   await expect(page.locator('#pcMoveBtn')).toHaveAttribute('href', 'branch-transfers-ar.html?barcode=000120');
   await expect(page.locator('#piece-log-list table.pc-log tbody tr')).toHaveCount(1);
 });
+
+test('home on the computer: today\'s movements as a table coloured by kind; glossy quick actions', async ({ page }) => {
+  const d = db();
+  const now = new Date().toISOString();
+  d.invoices = [{ id: 'i1', store_id: STORE, invoice_number: 'INV-1', type: 'sale', status: 'paid', total_amount: 500, created_at: now, customer: { name: 'رامي' } }];
+  d.cash_movements = [{ id: 'm1', store_id: STORE, direction: 'in', amount: 500, description: 'مبيعات', invoice_id: 'i1', created_at: now },
+    { id: 'm2', store_id: STORE, direction: 'in', amount: 80, description: 'دفعة من العميل', created_at: now }];
+  await install(page, { db: d, generic: true });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/index-ar.html');
+  const rows = page.locator('#dskMovesTable tbody tr');
+  await expect(rows).toHaveCount(2);
+  await expect(page.locator('#dskMovesTable tr[data-href="invoice-print-ar.html?id=i1"]')).toContainText('رامي');
+  await expect(page.locator('#dskMovesTable tr[data-href="invoice-print-ar.html?id=i1"] .t')).toHaveText('بيع');
+  await expect(rows.filter({ hasText: 'دفعة من العميل' }).locator('.t')).toHaveText('دفعة زبون');
+  await expect(page.locator('#dskActionStrip .gm-gi').first()).toBeVisible();
+  await expect(page.locator('#mobActionStrip .gm-gi').last()).toBeAttached(); // the «تخصيص» tile
+});
