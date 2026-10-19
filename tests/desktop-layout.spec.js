@@ -79,3 +79,11 @@ test('home on the computer: today\'s movements as a table coloured by kind; glos
   await expect(page.locator('#dskActionStrip .gm-gi').first()).toBeVisible();
   await expect(page.locator('#mobActionStrip .gm-gi').last()).toBeAttached(); // the «تخصيص» tile
 });
+
+test('phone home: the page has no white strips (the small-menu class on <html> must not pick up card styles)', async ({ page }) => {
+  await install(page, { db: db(), generic: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/index-ar.html');
+  await expect(page.locator('html')).toHaveClass(/\bgm-mini\b/);
+  expect(await page.evaluate(() => getComputedStyle(document.documentElement).paddingLeft)).toBe('0px');
+});
