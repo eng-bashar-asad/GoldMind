@@ -11,8 +11,8 @@
 <title>الأرشيف الشامل | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
-<script src="theme.js?v=75"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
     html { font-size: 87.5%; }
@@ -110,15 +110,19 @@ async function loadArchive() {
         return;
     }
 
-    const [{ data: invoices }, { data: traderMoves }, { data: staffList }] = await Promise.all([
-        goldmindClient.from('invoices').select('id, invoice_number, type, total_amount, counterparty_name, customer_id, trader_id, created_by, created_at, status')
+    // employees: today only without 'view_past_days', no trader documents without 'view_traders'
+    const scope = await gmStaffScope();
+    const since = q => scope.pastDays ? q : q.gte('created_at', gmTodayStartISO());
+    let [{ data: invoices }, { data: traderMoves }, { data: staffList }] = await Promise.all([
+        since(goldmindClient.from('invoices').select('id, invoice_number, type, total_amount, counterparty_name, customer_id, trader_id, created_by, created_at, status')
             .eq('store_id', GOLDMIND_STORE_ID).neq('status', 'cancelled')
-            .in('type', ['sale', 'buyRetail', 'buyTrader']).order('created_at', { ascending: false }),
-        goldmindClient.from('trader_movements').select('id, trader_id, gold_24k_equivalent, fab_fee_amount, currency, notes, created_by, created_at')
-            .eq('store_id', GOLDMIND_STORE_ID).eq('source', 'stock_given').order('created_at', { ascending: false }),
+            .in('type', scope.traders ? ['sale', 'buyRetail', 'buyTrader'] : ['sale', 'buyRetail'])).order('created_at', { ascending: false }),
+        scope.traders ? since(goldmindClient.from('trader_movements').select('id, trader_id, gold_24k_equivalent, fab_fee_amount, currency, notes, created_by, created_at')
+            .eq('store_id', GOLDMIND_STORE_ID).eq('source', 'stock_given')).order('created_at', { ascending: false }) : Promise.resolve({ data: [] }),
         goldmindClient.from('staff').select('id, full_name').eq('store_id', GOLDMIND_STORE_ID)
     ]);
 
+    if (!scope.traders) invoices = (invoices || []).filter(i => !i.trader_id);
     const staffById = {};
     (staffList || []).forEach(s => { staffById[s.id] = s.full_name; });
 

@@ -4,7 +4,7 @@ const { install, STORE, USER, STAFF } = require('./fake-backend');
 
 const db = () => ({
   stores: [{ id: STORE, currency: 'AED', name: 'فرع ب' }],
-  staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'staff', permissions: { view_customers: true, edit_customers: true } }],
+  staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'staff', permissions: { view_customers: true, edit_customers: true, view_past_days: true } }],
   user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
   customers: [{ id: 'cu1', store_id: 'branch-a', name: 'راما مملوك', phone: '0501' }],
   customer_debts: [

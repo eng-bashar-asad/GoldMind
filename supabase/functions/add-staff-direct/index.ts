@@ -53,7 +53,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { store_id, full_name, username: rawUsername, email: rawEmail, password: chosenPassword, whatsapp_phone, permissions } = await req.json();
+    const { store_id, full_name, username: rawUsername, email: rawEmail, password: chosenPassword, whatsapp_phone, permissions, staff_id } = await req.json();
 
     const givenUsername = rawUsername ? String(rawUsername).trim() : '';
     const givenEmail = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
@@ -84,6 +84,14 @@ serve(async (req) => {
       .eq('user_id', callerUser.id).eq('store_id', store_id).maybeSingle();
     const canManageStaff = callerStaff?.role === 'owner' || callerStaff?.permissions?.manage_staff === true;
     if (!canManageStaff) return json({ error: 'ليس لديك صلاحية إضافة موظفين' }, 403);
+
+    // Creating the login of a staff member added earlier without one (kept by name, e.g. as a seller):
+    // the same staff row gets the account, so everything already recorded in his name stays his.
+    if (staff_id) {
+      const { data: target } = await admin.from('staff').select('id, user_id').eq('id', staff_id).eq('store_id', store_id).maybeSingle();
+      if (!target) return json({ error: 'الموظف غير موجود في هذا المتجر' }, 400);
+      if (target.user_id) return json({ error: 'هذا الموظف لديه حساب دخول مسبقاً' }, 400);
+    }
 
     // Username: as given (must be free), or derived from the email and made unique.
     let username = givenUsername;
@@ -126,14 +134,17 @@ serve(async (req) => {
       return json({ error: 'تعذّر حفظ اسم المستخدم: ' + profileErr.message }, 400);
     }
 
-    const { error: staffErr } = await admin.from('staff').insert({
-      store_id,
-      user_id: userId,
-      full_name,
-      role: 'staff',
-      permissions: permissions || {},
-      whatsapp_phone: whatsapp_phone || null,
-    });
+    const { error: staffErr } = staff_id
+      ? await admin.from('staff').update({ user_id: userId, full_name, permissions: permissions || {}, whatsapp_phone: whatsapp_phone || null })
+          .eq('id', staff_id).eq('store_id', store_id).is('user_id', null)
+      : await admin.from('staff').insert({
+          store_id,
+          user_id: userId,
+          full_name,
+          role: 'staff',
+          permissions: permissions || {},
+          whatsapp_phone: whatsapp_phone || null,
+        });
     if (staffErr) {
       await admin.auth.admin.deleteUser(userId);
       return json({ error: 'تعذّر حفظ بيانات الموظف: ' + staffErr.message }, 400);

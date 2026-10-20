@@ -11,8 +11,8 @@
 <title>الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
-<script src="theme.js?v=75"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -174,10 +174,10 @@
 <button onclick="openPrintView()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">receipt_long</span> عرض كشف قابل للطباعة
 </button>
-<button onclick="toggleRangePanel()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
+<button onclick="toggleRangePanel()" id="dcRangeBtn" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">date_range</span> تحميل كشف بفترة محددة
 </button>
-<button onclick="toggleSearchPanel()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
+<button onclick="toggleSearchPanel()" id="dcSearchBtn" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
 <span class="material-symbols-outlined">search</span> بحث بالحركات
 </button>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="searchPanel">
@@ -300,6 +300,7 @@ let currentDirection = 'in';
 let allEntries = []; // every entry ever (for computing running balance)
 let todayEntries = []; // entries for the currently selected day
 let canManageDates = false; // owner/manager only: view/add/edit entries on days other than today
+let canSeeDays = false; // view other days (and the full list, the search, period statements): canManageDates or 'view_past_days'
 let selectedDate = new Date(); selectedDate.setHours(0, 0, 0, 0);
 let gmHighlightEntry = new URLSearchParams(location.search).get('entry'); // opened from a search result
 let showFullHistory = false; // when true, entries-list shows every entry ever, not just the selected day
@@ -307,7 +308,7 @@ let showFullHistory = false; // when true, entries-list shows every entry ever, 
 function toggleFullHistory() {
   showFullHistory = !showFullHistory;
   document.getElementById('fullHistoryToggle').textContent = showFullHistory ? 'عرض عمليات اليوم فقط' : 'عرض كل العمليات';
-  const navVisible = canManageDates && !showFullHistory;
+  const navVisible = canSeeDays && !showFullHistory;
   document.getElementById('day-nav').classList.toggle('hidden', !navVisible);
   document.getElementById('day-nav').classList.toggle('flex', navVisible);
   renderAll();
@@ -445,6 +446,7 @@ function dcRenderKpis(bals) {
     <div class="dc-kv"><span>الفرق</span><span class="dc-tag" id="dcd-${cur}">—</span></div>`).join('') : '<p class="text-[12px] text-on-surface-variant">ما في رصيد لتعدّه.</p>';
   cnt.querySelectorAll('input[data-cur]').forEach(dcDiff);
   // last days: closing balance of the base currency at the end of each of the last 5 days that had activity
+  document.getElementById('dcDays').closest('section').classList.toggle('hidden', !canSeeDays);
   const days = [...new Set(allEntries.map(e => localDateStr(new Date(e.created_at))))].sort().reverse().slice(0, 5);
   document.getElementById('dcDays').innerHTML = days.length ? days.map(d => {
     const end = new Date(d + 'T00:00:00'); end.setDate(end.getDate() + 1);
@@ -1167,8 +1169,11 @@ async function load() {
   }
 
   canManageDates = !!(staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.view_profit_report)));
-  document.getElementById('day-nav').classList.toggle('hidden', !canManageDates);
-  document.getElementById('day-nav').classList.toggle('flex', canManageDates);
+  canSeeDays = canManageDates || !!(staffRow && staffRow.permissions && staffRow.permissions.view_past_days);
+  document.getElementById('day-nav').classList.toggle('hidden', !canSeeDays);
+  document.getElementById('day-nav').classList.toggle('flex', canSeeDays);
+  // employees who only see today: no full history, no search across days, no period statement
+  if (!canSeeDays) ['fullHistoryToggle', 'dcRangeBtn', 'dcSearchBtn'].forEach(id => { const el = document.getElementById(id); if (el) el.classList.add('hidden'); });
 
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
@@ -1185,7 +1190,7 @@ async function load() {
   if (m) {
     const d = new Date(+m[1], +m[2] - 1, +m[3]);
     const today = new Date(); today.setHours(0, 0, 0, 0);
-    if (!isNaN(d) && d <= today && (canManageDates || d.getTime() === today.getTime())) {
+    if (!isNaN(d) && d <= today && (canSeeDays || d.getTime() === today.getTime())) {
       selectedDate = d;
       updateDayNav();
       document.getElementById('addFormDate').value = localDateStr(selectedDate);

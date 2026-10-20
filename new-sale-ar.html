@@ -15,8 +15,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
-<script src="theme.js?v=75"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
 <script src="gm-invoice-edit.js?v=2"></script>
 <script id="tailwind-config">
         tailwind.config = {
@@ -173,6 +173,7 @@
 
 <!-- Client Info Section -->
 <section id="ns-customer" class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm">
+<div id="ns-seller" class="hidden mb-3"></div>
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-4">معلومات العميل</h2>
 
 <div id="customer-selected" class="hidden items-center justify-between bg-surface-container-low rounded-lg p-3">
@@ -560,6 +561,7 @@
         const __allowed = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['create_invoice'] === true));
         // offline with no saved copy of the permissions: let the server decide when the sale syncs
         if (!__allowed && (navigator.onLine || __staffPerm)) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); window.location.href = 'index-ar.html'; }
+        if (__allowed && navigator.onLine) gmSellerPicker(document.getElementById('ns-seller')).catch(() => {});
         // keep an on-device copy of pieces/customers/prices so selling works without internet
         if (navigator.onLine && Date.now() - Number(localStorage.getItem('gm_snapshot_at') || 0) > 5 * 60 * 1000) gmRefreshSnapshots().catch(() => {});
     })();
@@ -600,7 +602,7 @@
         const isOwner = perm && perm.role === 'owner';
         const has = k => !!(perm && perm.permissions && perm.permissions[k] === true);
         __canManageOunce = isOwner || has('manage_gold_price');
-        __canSeeCost = isOwner || has('view_reports');
+        __canSeeCost = isOwner || has('view_profit_report'); // making cost lets one work out the profit
         __canEditWeights = isOwner || has('edit_sale_weights');
         if (cart.length) renderCart(); // an invoice opened for edit was drawn before this answer came back
         if (!(isOwner || has('view_profit_report') || __canManageOunce)) return;
@@ -2106,6 +2108,7 @@
         const payload = {
             store_id: GOLDMIND_STORE_ID,
             client_ref: clientRef,
+            salesperson_id: window.gmSeller || null,
             customer_id: selectedCustomer.id,
             new_customer: selectedCustomer._new ? { name: selectedCustomer.name, phone: selectedCustomer.phone || null } : null,
             payment_method: selectedPaymentMethod,

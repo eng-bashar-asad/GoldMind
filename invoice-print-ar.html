@@ -18,9 +18,9 @@
 <title>فاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
+<script src="supabase-config.js?v=49"></script>
 <script src="pint-ae.js"></script>
-<script src="theme.js?v=75"></script>
+<script src="theme.js?v=76"></script>
 <script src="gm-profit.js?v=7"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
@@ -120,6 +120,8 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm text-center font-semibold">هذه الفاتورة ملغاة ولا تُحتسب في أي تقرير
 <button type="button" id="banner-restore-btn" onclick="restoreInvoiceFlow()" class="hidden mt-2 mx-auto items-center gap-1 px-4 h-9 rounded-lg bg-white border border-red-300 text-blue-700 text-[13px]"><span class="material-symbols-outlined text-[18px]">restore</span>استعادة الفاتورة لتعديلها</button></div>
 </div>
+<!-- owner / set_seller: change who this sale counts for -->
+<div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="seller-edit"></div>
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="profit-panel">
 <div class="bg-emerald-50 border border-emerald-200 rounded-lg p-4">
 <div class="flex items-center justify-between mb-3">
@@ -177,6 +179,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 <div class="text-left">
 <div>طريقة الدفع: <span id="inv-payment"></span></div>
 <div>الموظف: <span id="inv-creator"></span></div>
+<div id="inv-seller-line" class="hidden">البائع: <span id="inv-seller"></span></div>
 </div>
 </div>
 
@@ -558,6 +561,23 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         document.getElementById('inv-date').style.whiteSpace = 'nowrap'; // date and time on one line
         document.getElementById('inv-payment').textContent = gmPaymentLabel(invoice, store);
         document.getElementById('inv-creator').textContent = creator && creator.full_name ? creator.full_name : '—';
+        // «البائع»: who the sale counts for in the staff sales report (empty on old invoices = who entered it)
+        if (invoice.type === 'sale' || invoice.type === 'return') {
+            const spId = invoice.salesperson_id || invoice.created_by;
+            const showSeller = async id => {
+                const { data: sp } = id === invoice.created_by ? { data: creator } : await goldmindClient.from('staff').select('full_name').eq('id', id).maybeSingle();
+                document.getElementById('inv-seller').textContent = (sp && sp.full_name) || '—';
+                document.getElementById('inv-seller-line').classList.toggle('hidden', id === invoice.created_by);
+            };
+            showSeller(spId);
+            if (invoice.type === 'sale' && invoice.status !== 'cancelled' && invoice.store_id === GOLDMIND_STORE_ID) {
+                gmSellerPicker(document.getElementById('seller-edit'), { value: spId, onChange: async id => {
+                    const { data: upd, error } = await goldmindClient.from('invoices').update({ salesperson_id: id }).eq('id', invoice.id).select('salesperson_id').maybeSingle();
+                    if (error || !upd || upd.salesperson_id !== id) { gmNotify('تعذّر تغيير البائع' + (error ? ': ' + error.message : ' — ليست لديك صلاحية تعديل الفاتورة.'), 'err'); return; }
+                    invoice.salesperson_id = id; showSeller(id); gmNotify('صارت الفاتورة محسوبة للبائع الجديد.', 'ok');
+                } }).catch(() => {});
+            }
+        }
 
         if (invoice.status === 'cancelled') {
             document.getElementById('cancelled-banner').classList.remove('hidden');

@@ -11,8 +11,8 @@
 <title>الموظفون والصلاحيات | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
-<script src="theme.js?v=75"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -102,6 +102,12 @@
 <label class="block text-[11px] text-on-surface-variant mb-1">اسم الموظف</label>
 <input id="direct-name" type="text" placeholder="مثال: أحمد محمد" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
 </div>
+<!-- a staff member who does not use the app yet: listed by name (e.g. as the seller of a sale), the login is created later -->
+<label class="flex items-start gap-2 mb-3 p-3 rounded-lg bg-surface-container-low text-[12.5px] cursor-pointer" id="direct-no-login-wrap">
+<input type="checkbox" id="direct-no-login" class="mt-0.5 w-5 h-5 rounded" onchange="toggleNoLogin()"/>
+<span><b>بدون حساب دخول الآن</b><br/><span class="text-on-surface-variant text-[11.5px]">لموظف لا يستخدم البرنامج بعد: يظهر اسمه في قائمة البائعين فقط، وتُنشئ له حساباً لاحقاً من بطاقته فتبقى مبيعاته باسمه.</span></span>
+</label>
+<div id="direct-login-fields">
 <div class="mb-3">
 <label class="block text-[11px] text-on-surface-variant mb-1">اسم المستخدم (اختياري إذا كتبت البريد — يُستخرج من البريد تلقائياً)</label>
 <input id="direct-username" type="text" dir="ltr" placeholder="ahmad_sales" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
@@ -117,6 +123,7 @@
 <div class="mb-3">
 <label class="block text-[11px] text-on-surface-variant mb-1">رقم واتساب الموظف</label>
 <input id="direct-whatsapp" type="tel" dir="ltr" placeholder="971501234567 (بدون + أو أصفار البداية)" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background focus:ring-1 focus:ring-primary outline-none text-on-background"/>
+</div>
 </div>
 <p class="text-[11px] text-on-surface-variant mb-2">نوع الموظف:</p>
 <div class="flex rounded-lg border border-outline-variant overflow-hidden mb-3">
@@ -240,7 +247,7 @@ const PERMISSION_GROUPS = [
     ['view_traders', 'عرض التجار'], ['add_traders', 'إضافة تاجر'], ['edit_traders', 'تعديل تاجر']
   ]},
   { label: 'الفواتير', icon: 'receipt_long', keys: [
-    ['view_invoices', 'عرض الفواتير'], ['create_invoice', 'إنشاء فاتورة'], ['edit_invoice', 'تعديل فاتورة (عدا الرقم والتاريخ)'], ['delete_invoice', 'حذف/إلغاء فاتورة'], ['edit_sale_weights', 'تعديل أوزان القطع في فاتورة البيع'], ['view_branch_invoices', 'فتح فواتير الفروع الأخرى (تفاصيل ديون الزبون)']
+    ['view_invoices', 'عرض الفواتير'], ['create_invoice', 'إنشاء فاتورة'], ['edit_invoice', 'تعديل فاتورة (عدا الرقم والتاريخ)'], ['delete_invoice', 'حذف/إلغاء فاتورة'], ['edit_sale_weights', 'تعديل أوزان القطع في فاتورة البيع'], ['view_branch_invoices', 'فتح فواتير الفروع الأخرى (تفاصيل ديون الزبون)'], ['set_seller', 'تحديد البائع في فاتورة البيع'], ['view_past_days', 'عرض عمليات الأيام السابقة (الفواتير وحركات الزبائن)']
   ]},
   { label: 'التقارير', icon: 'monitoring', keys: [
     ['view_reports', 'عرض التقارير'], ['view_profit_report', 'تقرير الربح (سري)']
@@ -314,7 +321,7 @@ function renderStaffCard(staff) {
         <button type="button" onclick="openStaffDetail('${staff.id}')" class="text-right block w-full">
           <p class="font-label-md text-label-md font-semibold text-on-surface truncate underline decoration-dotted decoration-outline">${gmEscapeHtml(staff.full_name) || 'بدون اسم'}</p>
         </button>
-        <p class="text-[11px] text-on-surface-variant">${isOwner ? 'مالك المتجر — كل الصلاحيات' : 'موظف'}</p>
+        <p class="text-[11px] text-on-surface-variant">${isOwner ? 'مالك المتجر — كل الصلاحيات' : (staff.user_id ? 'موظف' : 'موظف بدون حساب دخول')}</p>
       </div>
       ${(!isOwner && staff.id !== currentStaffId) ? `<button type="button" onclick="deleteStaff('${staff.id}', '${gmEscapeHtml(staff.full_name || 'هذا الموظف').replace(/'/g, "\\'")}')" class="text-error shrink-0" title="حذف الموظف">
         <span class="material-symbols-outlined" style="font-size:20px;">person_remove</span>
@@ -328,6 +335,7 @@ function renderStaffCard(staff) {
         data-staff-whatsapp="${staff.id}"/>
       <button type="button" class="h-9 px-3 rounded-lg bg-surface-container-low text-[11px] font-semibold text-primary shrink-0" onclick="saveStaffWhatsapp('${staff.id}', this)">حفظ</button>
     </div>
+    ${!isOwner && !staff.user_id ? `<button type="button" class="w-full h-10 mb-2 rounded-lg border border-primary text-primary text-[12px] font-semibold flex items-center justify-center gap-1" onclick="openLinkAccount('${staff.id}')"><span class="material-symbols-outlined" style="font-size:17px">key</span>إنشاء حساب دخول له</button>` : ''}
     <div class="pt-1">${groupsHtml}</div>
   </div>`;
 }
@@ -600,8 +608,29 @@ function toggleDirectAddForm() {
   }
 }
 
+let linkStaffId = null; // creating the login of an existing staff member who had none
+function toggleNoLogin() {
+  const off = document.getElementById('direct-no-login').checked;
+  document.getElementById('direct-login-fields').classList.toggle('hidden', off);
+}
+function openLinkAccount(staffId) {
+  const st = allStaffData.find(s => s.id === staffId);
+  if (!st) return;
+  const form = document.getElementById('direct-add-form');
+  if (form.classList.contains('hidden')) toggleDirectAddForm();
+  linkStaffId = staffId;
+  document.getElementById('direct-name').value = st.full_name || '';
+  document.getElementById('direct-whatsapp').value = st.whatsapp_phone || '';
+  document.getElementById('direct-no-login').checked = false; toggleNoLogin();
+  document.getElementById('direct-no-login-wrap').classList.add('hidden');
+  document.querySelectorAll('#direct-permissions input[data-direct-key]').forEach(i => { i.checked = !!(st.permissions && st.permissions[i.dataset.directKey]); });
+  document.getElementById('direct-add-btn').textContent = 'إنشاء الحساب';
+  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function submitDirectAdd() {
   const name = document.getElementById('direct-name').value.trim();
+  const noLogin = !linkStaffId && document.getElementById('direct-no-login').checked;
   const username = document.getElementById('direct-username').value.trim();
   const password = document.getElementById('direct-password').value;
   const email = document.getElementById('direct-email').value.trim();
@@ -610,6 +639,21 @@ async function submitDirectAdd() {
   errEl.classList.add('hidden');
 
   if (!name) { errEl.textContent = 'فضلاً أدخل اسم الموظف'; errEl.classList.remove('hidden'); return; }
+  if (noLogin) {
+    const perms = {};
+    document.querySelectorAll('#direct-permissions input[data-direct-key]').forEach(input => { perms[input.dataset.directKey] = input.checked; });
+    const btn0 = document.getElementById('direct-add-btn');
+    btn0.disabled = true; btn0.textContent = 'جارِ الإضافة...';
+    const { error: insErr } = await goldmindClient.from('staff').insert({ store_id: GOLDMIND_STORE_ID, full_name: name, role: 'staff', permissions: perms, whatsapp_phone: whatsapp || null });
+    btn0.disabled = false; btn0.textContent = 'إضافة الموظف';
+    if (insErr) { errEl.textContent = 'تعذّر إضافة الموظف: ' + insErr.message; errEl.classList.remove('hidden'); return; }
+    gmNotify('أُضيف ' + name + ' بدون حساب دخول. يظهر الآن في قائمة البائعين.', 'ok');
+    document.getElementById('direct-name').value = '';
+    document.getElementById('direct-no-login').checked = false; toggleNoLogin();
+    document.getElementById('direct-add-form').classList.add('hidden');
+    loadStaff();
+    return;
+  }
   if (!username && !email) { errEl.textContent = 'اكتب البريد الإلكتروني للموظف أو اسم مستخدم له'; errEl.classList.remove('hidden'); return; }
   if (username && !/^[a-zA-Z0-9_.]{3,20}$/.test(username)) { errEl.textContent = 'اسم المستخدم يجب أن يكون 3-20 خانة (حروف إنجليزية/أرقام/_ فقط، بدون مسافات)'; errEl.classList.remove('hidden'); return; }
   if (password && password.length < 6) { errEl.textContent = 'كلمة السر يجب أن تكون 6 أحرف على الأقل'; errEl.classList.remove('hidden'); return; }
@@ -626,7 +670,7 @@ async function submitDirectAdd() {
   btn.textContent = 'جارِ الإضافة...';
 
   const { data, error } = await goldmindClient.functions.invoke('add-staff-direct', {
-    body: { store_id: GOLDMIND_STORE_ID, full_name: name, username: username || undefined, password: password || undefined, email: email || undefined, whatsapp_phone: whatsapp, permissions }
+    body: { store_id: GOLDMIND_STORE_ID, full_name: name, username: username || undefined, password: password || undefined, email: email || undefined, whatsapp_phone: whatsapp, permissions, staff_id: linkStaffId || undefined }
   });
 
   btn.disabled = false;
@@ -662,6 +706,8 @@ async function submitDirectAdd() {
   document.getElementById('direct-add-result').classList.remove('hidden');
   document.getElementById('direct-add-form').classList.add('hidden');
 
+  linkStaffId = null;
+  document.getElementById('direct-no-login-wrap').classList.remove('hidden');
   document.getElementById('direct-name').value = '';
   document.getElementById('direct-username').value = '';
   document.getElementById('direct-password').value = '';
@@ -782,7 +828,7 @@ async function loadStaff() {
   }
 
   const { data: staffRows, error } = await goldmindClient
-    .from('staff').select('id, full_name, role, permissions, whatsapp_phone, contact_phone')
+    .from('staff').select('id, full_name, role, permissions, whatsapp_phone, contact_phone, user_id')
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('role', { ascending: false });
 

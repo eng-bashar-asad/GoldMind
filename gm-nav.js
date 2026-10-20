@@ -50,6 +50,7 @@
       ['audit-log-ar.html', 'history', 'سجل النشاط', 'view_reports'] ] },
     { t: 'الموظفون', i: 'badge', l: [
       ['staff-permissions-ar.html', 'badge', 'الموظفون والصلاحيات', 'manage_staff'],
+      ['staff-sales-ar.html', 'leaderboard', 'مبيعات الموظفين', 'view_profit_report'],
       ['payroll-ar.html', 'payments', 'الرواتب', 'manage_payroll'],
       ['hr-employees-ar.html', 'badge', 'سجل الموظفين والإجازات', 'manage_payroll'] ] },
     { t: 'التوثيق (KYC)', i: 'verified_user', l: [
@@ -198,6 +199,11 @@
     .gm-empty{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:28px 12px!important;text-align:center;color:var(--gm-on-surface-variant,#6B6355)}
     td.gm-empty{display:table-cell!important}
     .gm-empty.hidden{display:none!important}
+    /* «البائع» picker on sale screens (gmSellerPicker) */
+    .gm-seller{display:flex;align-items:center;gap:8px;min-height:44px;padding:0 6px 0 10px;border:1px solid #CBBF9E;border-radius:12px;background:#FFFDF8;font-size:13px;font-weight:700;color:#211D17}
+    .gm-seller .material-symbols-outlined{font-size:19px;color:#7A6640}
+    .gm-seller select{flex:1;min-width:0;height:40px;border:0;background:transparent;font:inherit;font-weight:600;color:inherit;box-shadow:none}
+    .gm-seller.gm-seller-other{border-color:#D9731A;background:#FDF0DC}
     /* date / time pickers: on a right-to-left page Android draws the day / month / year parts on top of each other
        (17/10 shows as a blur); they are always laid out left to right, the text still sits on the right */
     input[type=date],input[type=datetime-local],input[type=time],input[type=month],input[type=week]{direction:ltr;text-align:right;unicode-bidi:isolate}

@@ -5,8 +5,8 @@
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
-<script src="theme.js?v=75"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
 <script src="gm-report.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -226,6 +226,7 @@ async function statementWhatsApp(btn) {
   const id = new URLSearchParams(location.search).get('id');
   const fail = t => { document.getElementById('loading-state').classList.add('hidden'); const e = document.getElementById('error-state'); e.textContent = t; e.classList.remove('hidden'); };
   if (!id) return fail('لم يتم تحديد عميل.');
+  if (!(await gmStaffScope()).pastDays) return fail('كشف الحساب الكامل يحتاج صلاحية «عرض عمليات الأيام السابقة» من المدير.');
   const [{ data: store }, { data: customer }, inv, debts] = await Promise.all([
     gmStoreWithLegal(goldmindClient.from('stores').select('name, address, phone, currency, country').eq('id', GOLDMIND_STORE_ID).maybeSingle()),
     goldmindClient.from('customers').select('id, name, phone').eq('id', id).maybeSingle(),

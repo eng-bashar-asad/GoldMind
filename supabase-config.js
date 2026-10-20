@@ -39,6 +39,11 @@ async function gmFetch(input, init) {
     if (window.gmOpDate && req.method !== 'GET' && req.url.indexOf('/rest/v1/') !== -1) {
         req = new Request(req, { headers: (function (h) { h.set('x-gm-op-date', window.gmOpDate); return h; })(new Headers(req.headers)) });
     }
+    // Sale screens: the staff member the sale counts for (owner / 'set_seller' only — checked by the
+    // invoices trigger gm_seller_stamp, anything else is ignored there).
+    if (window.gmSeller && req.method !== 'GET' && req.url.indexOf('/rest/v1/') !== -1) {
+        req = new Request(req, { headers: (function (h) { h.set('x-gm-seller', window.gmSeller); return h; })(new Headers(req.headers)) });
+    }
     // The branch the user is working in: server functions shared by the organization's branches
     // (e.g. trader vouchers, multi-branch 2.3) record the movement there. Checked server-side.
     if (GOLDMIND_STORE_ID && req.method !== 'GET' && req.url.indexOf('/rest/v1/') !== -1) {
@@ -605,6 +610,59 @@ async function gmLocalLowPriceLines(payload) {
     }).map(function (it) { return '\n• ' + (it.barcode || it.description || it.karat + 'K') + ': ' + it.price; });
 }
 
+// What the signed-in staff member may see (owner: everything). Used to keep employees to today's
+// operations (unless 'view_past_days'), away from wholesale traders (unless 'view_traders') and away
+// from profit figures (unless 'view_profit_report'). The daily cash box always shows every row.
+let gmScopeCache = null;
+async function gmStaffScope() {
+    if (gmScopeCache) return gmScopeCache;
+    if (!GOLDMIND_STAFF_ID) await requireGoldMindSession();
+    if (!GOLDMIND_STAFF_ID) return { owner: false, pastDays: false, traders: false, profit: false }; // not cached: no session yet
+    const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const owner = !!(me && me.role === 'owner'), has = function (k) { return owner || !!(me && me.permissions && me.permissions[k] === true); };
+    gmScopeCache = { owner: owner, pastDays: has('view_past_days'), traders: has('view_traders'), profit: has('view_profit_report') };
+    return gmScopeCache;
+}
+// start of today in the shop's display time zone, as an ISO instant
+function gmTodayStartISO() {
+    const tz = typeof gmGetDisplayTimeZone === 'function' ? gmGetDisplayTimeZone() : undefined;
+    const ymd = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date());
+    const p = ymd.split('-').map(Number), guess = Date.UTC(p[0], p[1] - 1, p[2]);
+    const off = function (t) { const d = new Date(t), parts = {}; new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(d).forEach(function (x) { parts[x.type] = x.value; }); return Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour % 24, +parts.minute, +parts.second) - Math.floor(t / 1000) * 1000; };
+    return new Date(guess - off(guess - off(guess))).toISOString();
+}
+
+// «البائع» on sale screens: the owner and staff with 'set_seller' pick who the sale counts for
+// (default: themselves). The choice goes to the server as x-gm-seller (gmFetch); the invoices trigger
+// re-checks it. Others see nothing and the sale counts for them. host: an empty element on the page.
+window.gmSeller = null;
+async function gmSellerPicker(host, opts) {
+    opts = opts || {};
+    window.gmSeller = null;
+    if (!host || !GOLDMIND_STAFF_ID) return null;
+    const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const can = me && (me.role === 'owner' || (me.permissions && me.permissions.set_seller === true));
+    if (!can) { host.classList.add('hidden'); return null; }
+    const { data: list } = await goldmindClient.from('staff').select('id, full_name, user_id').eq('store_id', GOLDMIND_STORE_ID).order('full_name');
+    const rows = (list || []).filter(function (s) { return s.full_name; });
+    if (rows.length < 2) { host.classList.add('hidden'); return null; }
+    const current = opts.value || GOLDMIND_STAFF_ID;
+    host.innerHTML = '<label class="gm-seller"><span class="material-symbols-outlined" aria-hidden="true">badge</span><span>البائع</span>'
+        + '<select aria-label="البائع">' + rows.map(function (s) {
+            return '<option value="' + s.id + '"' + (s.id === current ? ' selected' : '') + '>' + gmEscapeHtml(s.full_name) + (s.id === GOLDMIND_STAFF_ID ? ' (أنا)' : (s.user_id ? '' : ' — بدون حساب')) + '</option>';
+        }).join('') + '</select></label>';
+    const sel = host.querySelector('select');
+    const paint = function () {
+        const other = sel.value !== GOLDMIND_STAFF_ID;
+        if (!opts.onChange) window.gmSeller = other ? sel.value : null;
+        host.querySelector('.gm-seller').classList.toggle('gm-seller-other', other);
+    };
+    sel.addEventListener('change', function () { paint(); if (opts.onChange) opts.onChange(sel.value); });
+    paint();
+    host.classList.remove('hidden');
+    return sel;
+}
+
 // Posts a sale (see post_sale_invoice). Online: saved now. Offline: queued.
 // Returns {id, invoice_number} | {queued: true} | {error}.
 async function gmPostSale(payload, meta) {
@@ -659,7 +717,10 @@ async function gmRunSync() {
         for (const ref of refs) {
             const item = gmQueue().find(function (x) { return x.payload.client_ref === ref; });
             if (!item || item.status !== 'pending') continue;
-            const { data, error } = await goldmindClient.rpc('post_sale_invoice', { p: item.payload });
+            // the seller chosen when the sale was made offline travels with it (x-gm-seller, see gmFetch)
+            const prevSeller = window.gmSeller; window.gmSeller = item.payload.salesperson_id || null;
+            let data, error;
+            try { ({ data, error } = await goldmindClient.rpc('post_sale_invoice', { p: item.payload })); } finally { window.gmSeller = prevSeller; }
             if (!error) { gmUpdateQueued(ref, function () { return null; }); posted++; continue; }
             if (gmIsRetryable(error)) break;
             gmUpdateQueued(ref, function (x) { x.status = 'failed'; x.error = gmFriendlyError(error.message); return x; });

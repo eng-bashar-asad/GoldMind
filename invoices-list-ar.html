@@ -11,8 +11,8 @@
 <title>الفواتير | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
-<script src="theme.js?v=75"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -154,7 +154,7 @@ function pickKind(id) { KIND_PICK = KIND_PICK === id ? null : id; if (KIND_PICK)
 const STATUS_LABELS = { paid: 'مدفوعة', unpaid: 'غير مدفوعة', cancelled: 'ملغاة', received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة', delivered: 'تم التسليم' };
 
 let allRows = [];
-const INV_SELECT = 'id, invoice_number, type, is_exchange, status, total_amount, fabrication_fees, vat_amount, created_at, currency, pay_currency, pay_fx_rate, pay_breakdown, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name';
+const INV_SELECT = 'id, invoice_number, trader_id, type, is_exchange, status, total_amount, fabrication_fees, vat_amount, created_at, currency, pay_currency, pay_fx_rate, pay_breakdown, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name';
 
 // Barcodes (all invoices) + net weight (buyTrader) from invoice_items, in chunks of 100 ids.
 async function gmLoadItems(ids) {
@@ -200,7 +200,7 @@ async function gmOtherDocRows(fromISO, toISO) {
   });
   const rows = [...groups.values()].map(({ m, g24, fab, n }) => {
     const type = TYPE_OF[m.source], cash = type === 'traderCashOut' || type === 'traderCashIn';
-    return { id: m.id, kind: 'trader', number: m.batch_ref || (cash ? 'سند كاش' : 'سند تاجر'), type, status: '',
+    return { id: m.id, kind: 'trader', isTraderDoc: true, number: m.batch_ref || (cash ? 'سند كاش' : 'سند تاجر'), type, status: '',
       amount: fab, currency: m.currency || '', weightNote: cash ? '' : fmt(g24) + ' غ ع24' + (n > 1 ? ' · ' + n + ' قطعة' : ''),
       created_at: m.created_at, counterpartyName: (m.trader && m.trader.name) || '', counterpartyPhone: (m.trader && m.trader.phone) || '',
       href: 'ledger-ar.html?trader=' + m.trader_id };
@@ -237,6 +237,7 @@ async function gmBuildInvoiceRows(invoices) {
       barcodes: bc[i.id] || [],
       isExchange: !!i.is_exchange,
       isTraderDebt: i.type === 'buyTrader',
+      isTraderDoc: i.type === 'buyTrader' || !!i.trader_id,
       netWeight: i.type === 'buyTrader' ? (weightByInvoice[i.id] || 0) : null,
       created_at: i.created_at,
       counterpartyName: (i.customer && i.customer.name) || (i.trader && i.trader.name) || i.counterparty_name || '',
@@ -253,13 +254,15 @@ function gmBarcodeLookup(q) {
   if (q.length < 3 || gmBcSeen[q]) return;
   gmBcTimer = setTimeout(async () => {
     gmBcSeen[q] = true;
+    const scope = await gmStaffScope();
+    if (!scope.pastDays) return; // older invoices stay out of reach without the permission
     const { data: hits } = await goldmindClient.from('invoice_items').select('invoice_id').ilike('barcode', '%' + q + '%').limit(50);
     const have = new Set(allRows.map(r => r.id));
     const ids = [...new Set((hits || []).map(h => h.invoice_id))].filter(id => !have.has(id));
     if (!ids.length) return;
     const { data: inv } = await goldmindClient.from('invoices').select(INV_SELECT).eq('store_id', GOLDMIND_STORE_ID).in('id', ids);
     if (!inv || !inv.length) return;
-    allRows = allRows.concat(await gmBuildInvoiceRows(inv)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    allRows = allRows.concat((await gmBuildInvoiceRows(inv)).filter(r => scope.traders || !r.isTraderDoc)).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     if (document.getElementById('searchInput').value.trim().toLowerCase() === q) applyFilters();
   }, 350);
 }
@@ -267,6 +270,12 @@ function gmBarcodeLookup(q) {
 function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
 async function loadData() {
+  // employees without 'view_past_days' see today only; without 'view_traders' no trader documents
+  const scope = await gmStaffScope();
+  if (!scope.pastDays) {
+    const d = new Date(), local = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    ['fromDate', 'toDate'].forEach(id => { const el = document.getElementById(id); el.value = local; el.disabled = true; el.title = 'عرض الأيام السابقة يحتاج صلاحية من المدير'; });
+  }
   const fromVal = document.getElementById('fromDate').value;
   const toVal = document.getElementById('toDate').value;
   const fromISO = fromVal ? new Date(fromVal + 'T00:00:00').toISOString() : null;
@@ -308,6 +317,7 @@ async function loadData() {
   }));
 
   allRows = invRows.concat(repRows).sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+  if (!scope.traders) allRows = allRows.filter(r => !r.isTraderDoc);
 
   if (invErr || repErr) {
     document.getElementById('results-list').innerHTML = `<p class="text-error text-sm text-center py-8">تعذّر تحميل البيانات: ${(invErr || repErr).message}</p>`;

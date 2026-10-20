@@ -11,8 +11,8 @@
 <title>تبديل قطعة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
-<script src="theme.js?v=75"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -67,6 +67,7 @@
 <div class="flex justify-between items-center mb-1"><p class="font-bold text-[14px]" id="orig-number"></p><p class="text-[12px] text-on-surface-variant" id="orig-date"></p></div>
 <p class="text-[12px] text-on-surface-variant" id="orig-customer"></p>
 </div>
+<div id="ex-seller" class="hidden"></div>
 
 <h3 class="font-semibold text-[13px]">١. القطعة التي رجعت</h3>
 <div id="old-list" class="flex flex-col gap-2"></div>
@@ -244,6 +245,8 @@ async function load() {
   exRenderOld(); exDir('in'); exCur();
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
+  // the exchange counts for the seller of the original sale unless someone with the right picks another
+  gmSellerPicker(document.getElementById('ex-seller'), { value: inv.salesperson_id || inv.created_by }).catch(() => {});
 }
 load();
 </script>

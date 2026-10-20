@@ -12,8 +12,8 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
-<script src="theme.js?v=75"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
 <script id="tailwind-config">
         tailwind.config = { darkMode: "class", theme: { extend: {
           "colors": {
@@ -588,6 +588,12 @@
         updateScrapRef();
     }
 
+    window.__ciCanProfit = false;
+    gmStaffScope().then(sc => {
+        window.__ciCanProfit = sc.profit; updateScrapRef();
+        // buying from a wholesale trader needs 'view_traders': only «شراء من زبون» is left
+        if (!sc.traders) { document.getElementById('tabTrader').classList.add('hidden'); if (purchaseType === 'buyTrader') setPurchaseType('buyRetail'); }
+    }).catch(() => {});
     function updateScrapRef() {
         ensureGoldPrices();
         const el = document.getElementById('scrap-ref');
@@ -603,8 +609,9 @@
         if (!show) return;
         const ref = weight * perGram;
         let txt = 'قيمته حسب سعر اليوم (عيار ' + karat + '): ' + gmMoney(ref);
-        if (price > 0) txt += ' — المبلغ المدفوع = ' + Math.round(price / ref * 100) + '% من هذه القيمة — '
-            + (ref - price >= 0 ? 'ربح شراء الكسر: ' : 'خسارة شراء الكسر: ') + gmMoney(Math.abs(ref - price)) + ' (يظهر بتقرير الأرباح ولا يدخل الصندوق)';
+        if (price > 0) txt += ' — المبلغ المدفوع = ' + Math.round(price / ref * 100) + '% من هذه القيمة'
+            // the profit part only for the owner / profit-report permission
+            + (window.__ciCanProfit ? ' — ' + (ref - price >= 0 ? 'ربح شراء الكسر: ' : 'خسارة شراء الكسر: ') + gmMoney(Math.abs(ref - price)) + ' (يظهر بتقرير الأرباح ولا يدخل الصندوق)' : '');
         el.textContent = txt;
     }
     ['manual-karat', 'manual-weight', 'manual-price'].forEach(id => {

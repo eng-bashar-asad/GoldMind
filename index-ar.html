@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=75"></script>
+<script src="theme.js?v=76"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -628,7 +628,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=48"></script>
+<script src="supabase-config.js?v=49"></script>
 <script src="gm-logo.js?v=2" defer></script>
 <script src="gm-biometric.js?v=1"></script>
 <script>window.addEventListener('load', function () { setTimeout(function () { if (window.GMBio) GMBio.maybePrompt(); }, 2500); });</script>
@@ -2474,7 +2474,14 @@ document.addEventListener('DOMContentLoaded', function () {
             ]);
             const baseCurrency = (store && store.currency) || 'AED';
             // an invoice cancelled, edited and re-posted shows once, with its final value
-            const recent = gmCollapseMovements(recentRaw);
+            let recent = gmCollapseMovements(recentRaw);
+            // staff without 'view_traders' see nothing about wholesale traders, even today's
+            if (!(await gmStaffScope()).traders && recent.length) {
+                const ids = [...new Set(recent.map(m => m.invoice_id).filter(Boolean))];
+                const { data: tInv } = ids.length ? await goldmindClient.from('invoices').select('id').in('id', ids).not('trader_id', 'is', null) : { data: [] };
+                const tSet = new Set((tInv || []).map(i => i.id));
+                recent = recent.filter(m => !m.trader_movement_id && !tSet.has(m.invoice_id) && !/التاجر/.test(m.description || ''));
+            }
 
             const container = document.getElementById('recentMovementsEl');
             if (!recent || recent.length === 0) {

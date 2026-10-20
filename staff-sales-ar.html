@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>مبيعات الموظفين | GoldMind</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="supabase-config.js?v=49"></script>
+<script src="theme.js?v=76"></script>
+<script src="gm-report.js?v=4"></script>
+<script src="gm-profit.js?v=7"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)", "error": "#ba1a1a",
+          "on-secondary": "#ffffff", "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)",
+          "outline": "#76777d", "success": "#1e7d32"
+        },
+        "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    .ss-chip { height: 36px; padding: 0 14px; border-radius: 999px; border: 1px solid #CBBF9E; background: #fff; font-size: 13px; font-weight: 600; color: #211D17; }
+    .ss-chip.on { background: #1C1A16; color: #FBF8F1; border-color: #1C1A16; }
+    .ss-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+    .ss-kpi { background: #fff; border: 1px solid #E4DAC0; border-radius: 14px; padding: 12px 14px; min-width: 0; }
+    .ss-kpi small { display: block; font-size: 12px; color: #6B6355; }
+    .ss-kpi b { display: block; font-size: 20px; margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ss-card { background: #fff; border: 1px solid #E4DAC0; border-radius: 14px; overflow: hidden; color: #211D17; }
+    .ss-t { width: 100%; border-collapse: collapse; }
+    .ss-t th { padding: 9px 10px; text-align: right; font-size: 12px; font-weight: 700; color: #6B6355; background: #F7F2E6; border-bottom: 1px solid #E4DAC0; white-space: nowrap; }
+    .ss-t td { padding: 8px 10px; font-size: 13px; border-bottom: 1px solid #EFE7D2; white-space: nowrap; }
+    .ss-t .n { text-align: left; font-family: "Times New Roman", Times, serif; }
+    .ss-t th.n { text-align: left; }
+    .ss-t tr[data-sid] { cursor: pointer; } .ss-t tr[data-sid]:hover td, .ss-t tr.on td { background: #FBF8F1; }
+    .ss-t tr.on td:first-child { box-shadow: inset -4px 0 0 #1C1A16; }
+    .ss-t tfoot td { background: #F7F2E6; font-weight: 700; }
+    .ss-act { height: 40px; padding: 0 14px; border-radius: 10px; border: 1px solid #CBBF9E; background: #fff; font-size: 13px; font-weight: 700; color: #211D17; display: inline-flex; align-items: center; gap: 4px; }
+    .ss-act.dark { background: #1C1A16; color: #FBF8F1; border-color: #1C1A16; }
+    .gm-print-only { display: none; }
+    @media print { @page { margin: 8mm; } .no-print, header, #gmNav, .gm-bottom-tabs { display: none !important; } .gm-print-only { display: block !important; } body { background: #fff; } main { padding: 0 !important; max-width: none !important; } }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md">
+<header class="bg-surface-container-lowest text-primary border-b border-outline-variant z-50 sticky top-0">
+<div class="flex justify-between items-center px-4 w-full h-16">
+<div class="flex items-center gap-4">
+<button onclick="gmSmartBack('staff-permissions-ar.html')" aria-label="رجوع" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
+<span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
+</button>
+<h1 class="font-bold text-[19px] lg:text-[24px] whitespace-nowrap">مبيعات الموظفين</h1>
+</div>
+<div class="flex items-center gap-2">
+<button type="button" class="ss-act" onclick="ssPdf(this)" aria-label="ملف PDF"><span class="material-symbols-outlined">picture_as_pdf</span><span class="hidden sm:inline">PDF</span></button>
+<button type="button" class="ss-act dark" onclick="window.print()" aria-label="طباعة"><span class="material-symbols-outlined">print</span><span class="hidden sm:inline">طباعة</span></button>
+</div>
+</div>
+</header>
+<main class="pb-32 max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8 py-4 flex flex-col gap-4">
+<div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">هذه الشاشة للمدير أو لمن لديه صلاحية "تقرير الربح".</div>
+
+<div id="page-content" class="hidden flex flex-col gap-4">
+<!-- period -->
+<div class="no-print flex flex-wrap items-end gap-2">
+<div class="flex flex-wrap gap-1.5" id="ssPeriods" role="group" aria-label="الفترة">
+<button type="button" class="ss-chip" data-p="today">اليوم</button>
+<button type="button" class="ss-chip on" data-p="month">هذا الشهر</button>
+<button type="button" class="ss-chip" data-p="last">الشهر الماضي</button>
+<button type="button" class="ss-chip" data-p="custom">مخصص</button>
+</div>
+<div id="ssCustom" class="hidden flex items-end gap-2">
+<label class="text-[11px] text-on-surface-variant">من<input type="date" id="ssFrom" class="block h-10 border border-outline-variant rounded-lg px-2 text-[13px] bg-surface-container-lowest"/></label>
+<label class="text-[11px] text-on-surface-variant">إلى<input type="date" id="ssTo" class="block h-10 border border-outline-variant rounded-lg px-2 text-[13px] bg-surface-container-lowest"/></label>
+<button type="button" class="ss-act dark" onclick="ssLoad()">عرض</button>
+</div>
+</div>
+
+<div id="ssSheet" class="flex flex-col gap-4">
+<div class="gm-print-only"><h2 style="margin:0;font-size:18px;font-weight:700">مبيعات الموظفين</h2><div id="ssPrintSub" style="font-size:12px;color:#6B6355"></div></div>
+<p class="text-[12.5px] text-on-surface-variant" id="ssRange"></p>
+<div class="ss-kpis" id="ssKpis"></div>
+<section class="ss-card">
+<div class="overflow-x-auto" id="ssTable"></div>
+</section>
+<section class="ss-card hidden" id="ssDetail"></section>
+</div>
+<p class="no-print text-[11.5px] text-on-surface-variant">البائع هو الموظف المحدد في الفاتورة (وإن لم يُحدَّد فمن أدخلها). المرتجعات تُخصم من بائع الفاتورة الأصلية، والملغاة لا تُحسب. الربح بنفس طريقة تقرير الأرباح.</p>
+</div>
+</main>
+<nav class="gm-bottom-tabs"></nav>
+
+<script>
+const SS = { period: 'month', invoices: [], lines: {}, staff: {}, pick: null, karats: [] };
+const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const esc = s => gmEscapeHtml(String(s == null ? '' : s));
+const todayStr = () => gmDateStrInTz(Date.now());
+
+function ssRangeDates() {
+  const t = todayStr(), y = +t.slice(0, 4), m = +t.slice(5, 7);
+  if (SS.period === 'today') return [t, t];
+  if (SS.period === 'month') return [t.slice(0, 8) + '01', t];
+  if (SS.period === 'last') {
+    const py = m === 1 ? y - 1 : y, pm = m === 1 ? 12 : m - 1;
+    const last = new Date(Date.UTC(py, pm, 0)).getUTCDate();
+    const mm = String(pm).padStart(2, '0');
+    return [py + '-' + mm + '-01', py + '-' + mm + '-' + String(last).padStart(2, '0')];
+  }
+  return [document.getElementById('ssFrom').value || t, document.getElementById('ssTo').value || t];
+}
+
+// one invoice → { sid, weight per karat, 24k equivalent, value, profit }; a return counts against its seller
+function ssInvoiceTotals(inv, lines, ctx) {
+  const out = { byKarat: {}, w24: 0, value: 0, profit: 0, weight: 0 };
+  lines.forEach(it => {
+    const p = gmLineProfit(it, inv.type === 'return', ctx.vatMul, ctx.prices);
+    const k = Number(it.karat) || 0, w = p.sign * p.grossWeight;
+    if (k) { out.byKarat[k] = (out.byKarat[k] || 0) + w; out.w24 += w * k / 24; }
+    out.weight += w; out.value += p.revenue; out.profit += p.profit;
+  });
+  return out;
+}
+// ponytail: self-check — a 10 g 18K line sold for 1000 → 7.5 g in 24K, value 1000
+console.assert((() => { const r = ssInvoiceTotals({ type: 'sale' }, [{ karat: 18, weight_grams: 10, line_total: 1000, gold_price_per_gram: 50 }], { vatMul: 1, prices: {} }); return r.w24 === 7.5 && r.value === 1000 && r.byKarat[18] === 10; })(), 'ssInvoiceTotals');
+
+async function ssLoad() {
+  const [from, to] = ssRangeDates();
+  const r = gmRangeISO(from, to);
+  document.getElementById('ssRange').textContent = 'الفترة: ' + from.split('-').reverse().join('/') + ' – ' + to.split('-').reverse().join('/');
+  document.getElementById('ssPrintSub').textContent = document.getElementById('ssRange').textContent;
+  document.getElementById('ssTable').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">جارِ الحساب...</p>';
+  const { data: invs, error } = await gmFetchAllRows(() => goldmindClient.from('invoices')
+    .select('id, type, invoice_number, created_at, total_amount, salesperson_id, created_by, customer:customer_id(name)')
+    .eq('store_id', GOLDMIND_STORE_ID).in('type', ['sale', 'return']).neq('status', 'cancelled')
+    .gte('created_at', r.from).lt('created_at', r.to).order('created_at', { ascending: true }).order('id'));
+  if (error) { document.getElementById('ssTable').innerHTML = '<p class="text-center text-error text-sm py-8">تعذّر التحميل: ' + esc(error.message) + '</p>'; return; }
+  const ctx = await gmStoreProfitContext();
+  const ids = (invs || []).map(i => i.id), byInv = {};
+  for (let s = 0; s < ids.length; s += 100) {
+    const res = await goldmindClient.from('invoice_items').select(GM_PROFIT_ITEM_SELECT).in('invoice_id', ids.slice(s, s + 100));
+    (res.data || []).forEach(it => (byInv[it.invoice_id] = byInv[it.invoice_id] || []).push(it));
+  }
+  SS.invoices = (invs || []).map(inv => ({ ...inv, sid: inv.salesperson_id || inv.created_by, t: ssInvoiceTotals(inv, byInv[inv.id] || [], ctx) }));
+  SS.karats = [...new Set(SS.invoices.flatMap(i => Object.keys(i.t.byKarat).map(Number)))].sort((a, b) => b - a);
+  ssRender();
+}
+
+function ssRender() {
+  const per = {};
+  SS.invoices.forEach(i => {
+    const p = per[i.sid] = per[i.sid] || { sid: i.sid, sales: 0, returns: 0, byKarat: {}, w24: 0, value: 0, profit: 0 };
+    if (i.type === 'return') p.returns++; else p.sales++;
+    Object.entries(i.t.byKarat).forEach(([k, w]) => p.byKarat[k] = (p.byKarat[k] || 0) + w);
+    p.w24 += i.t.w24; p.value += i.t.value; p.profit += i.t.profit;
+  });
+  const rows = Object.values(per).sort((a, b) => b.value - a.value);
+  const tot = rows.reduce((t, p) => { t.sales += p.sales; t.w24 += p.w24; t.value += p.value; t.profit += p.profit; SS.karats.forEach(k => t.byKarat[k] = (t.byKarat[k] || 0) + (p.byKarat[k] || 0)); return t; }, { sales: 0, w24: 0, value: 0, profit: 0, byKarat: {} });
+  document.getElementById('ssKpis').innerHTML =
+    `<div class="ss-kpi" style="background:#1C1A16;border-color:#1C1A16;color:#FBF8F1"><small style="color:#CFC4AA">قيمة المبيعات</small><b dir="ltr" style="text-align:right">${fmt(tot.value)}</b></div>`
+    + `<div class="ss-kpi"><small>الربح</small><b dir="ltr" style="text-align:right;color:${tot.profit >= 0 ? '#1B5E20' : '#8A2A1E'}">${fmt(tot.profit)}</b></div>`
+    + `<div class="ss-kpi"><small>الوزن (معادل 24)</small><b><bdi dir="ltr">${fmt(tot.w24)}</bdi> غ</b></div>`
+    + `<div class="ss-kpi"><small>عدد الفواتير</small><b>${tot.sales}</b></div>`;
+  const name = sid => (SS.staff[sid] && SS.staff[sid].full_name) || 'موظف محذوف';
+  const el = document.getElementById('ssTable');
+  if (!rows.length) { el.innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا توجد مبيعات بهذه الفترة.</p>'; document.getElementById('ssDetail').classList.add('hidden'); return; }
+  const kh = SS.karats.map(k => `<th class="n">عيار ${k}</th>`).join('');
+  el.innerHTML = `<table class="ss-t"><thead><tr><th>الموظف</th><th>الفواتير</th>${kh}<th class="n">معادل 24</th><th class="n">القيمة</th><th class="n">الربح</th></tr></thead><tbody>`
+    + rows.map(p => `<tr data-sid="${p.sid}" class="${p.sid === SS.pick ? 'on' : ''}" tabindex="0" onclick="ssPick('${p.sid}')" onkeydown="if(event.key==='Enter')ssPick('${p.sid}')">
+        <td><b>${esc(name(p.sid))}</b>${SS.staff[p.sid] && !SS.staff[p.sid].user_id ? ' <span class="text-[11px] text-on-surface-variant">(بدون حساب)</span>' : ''}</td>
+        <td>${p.sales}${p.returns ? ` <span class="text-[11px] text-error">− ${p.returns} مرتجع</span>` : ''}</td>
+        ${SS.karats.map(k => `<td class="n">${p.byKarat[k] ? fmt(p.byKarat[k]) : '—'}</td>`).join('')}
+        <td class="n">${fmt(p.w24)}</td><td class="n"><b>${fmt(p.value)}</b></td><td class="n" style="color:${p.profit >= 0 ? '#1B5E20' : '#8A2A1E'}">${fmt(p.profit)}</td></tr>`).join('')
+    + `</tbody><tfoot><tr><td>المجموع</td><td>${tot.sales}</td>${SS.karats.map(k => `<td class="n">${fmt(tot.byKarat[k] || 0)}</td>`).join('')}<td class="n">${fmt(tot.w24)}</td><td class="n">${fmt(tot.value)}</td><td class="n">${fmt(tot.profit)}</td></tr></tfoot></table>`;
+  ssRenderDetail();
+}
+
+function ssPick(sid) { SS.pick = SS.pick === sid ? null : sid; ssRender(); if (SS.pick) document.getElementById('ssDetail').scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+// statement of one staff member: every invoice in the period
+function ssRenderDetail() {
+  const box = document.getElementById('ssDetail');
+  const list = SS.invoices.filter(i => i.sid === SS.pick);
+  if (!SS.pick || !list.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
+  const nm = (SS.staff[SS.pick] && SS.staff[SS.pick].full_name) || '';
+  const t = list.reduce((a, i) => { a.w24 += i.t.w24; a.weight += i.t.weight; a.value += i.t.value; a.profit += i.t.profit; return a; }, { w24: 0, weight: 0, value: 0, profit: 0 });
+  box.innerHTML = `<div class="flex flex-wrap items-center gap-2 p-3"><h2 class="m-0 text-[15px] font-bold">كشف مبيعات: ${esc(nm)}</h2><span class="text-[12px] text-on-surface-variant">${list.length} فاتورة</span>
+      <button type="button" class="ss-act ms-auto no-print" onclick="ssPdf(this, true)"><span class="material-symbols-outlined">picture_as_pdf</span>كشف PDF</button></div>
+    <div class="overflow-x-auto"><table class="ss-t"><thead><tr><th>التاريخ</th><th>الفاتورة</th><th>الزبون</th><th class="n">الوزن</th><th class="n">معادل 24</th><th class="n">القيمة</th><th class="n">الربح</th></tr></thead><tbody>`
+    + list.map(i => `<tr onclick="location.href='invoice-print-ar.html?id=${i.id}'" style="cursor:pointer">
+        <td>${esc(gmFormatDateTime(i.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' }))}</td>
+        <td dir="ltr" style="text-align:right">${esc(i.invoice_number || '')}${i.type === 'return' ? ' <span class="text-error text-[11px]">مرتجع</span>' : ''}</td>
+        <td>${esc((i.customer && i.customer.name) || '—')}</td>
+        <td class="n">${fmt(i.t.weight)}</td><td class="n">${fmt(i.t.w24)}</td><td class="n">${fmt(i.t.value)}</td><td class="n" style="color:${i.t.profit >= 0 ? '#1B5E20' : '#8A2A1E'}">${fmt(i.t.profit)}</td></tr>`).join('')
+    + `</tbody><tfoot><tr><td colspan="3">المجموع</td><td class="n">${fmt(t.weight)}</td><td class="n">${fmt(t.w24)}</td><td class="n">${fmt(t.value)}</td><td class="n">${fmt(t.profit)}</td></tr></tfoot></table></div>`;
+  box.classList.remove('hidden');
+}
+
+async function ssPdf(btn, onlyDetail) {
+  const sheet = document.getElementById(onlyDetail ? 'ssDetail' : 'ssSheet');
+  const nm = onlyDetail && SS.staff[SS.pick] ? '-' + SS.staff[SS.pick].full_name : '';
+  await gmReportPdf(sheet, 'مبيعات-الموظفين' + nm + '-' + ssRangeDates().join('_'), btn);
+}
+
+document.getElementById('ssPeriods').addEventListener('click', e => {
+  const b = e.target.closest('[data-p]'); if (!b) return;
+  SS.period = b.dataset.p;
+  document.querySelectorAll('#ssPeriods [data-p]').forEach(x => x.classList.toggle('on', x === b));
+  document.getElementById('ssCustom').classList.toggle('hidden', SS.period !== 'custom');
+  if (SS.period === 'custom') { const t = todayStr(); if (!document.getElementById('ssFrom').value) { document.getElementById('ssFrom').value = t.slice(0, 8) + '01'; document.getElementById('ssTo').value = t; } return; }
+  ssLoad();
+});
+
+(async function () {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  document.getElementById('loading-state').classList.add('hidden');
+  if (!(me && (me.role === 'owner' || (me.permissions && me.permissions.view_profit_report === true)))) { document.getElementById('no-access').classList.remove('hidden'); return; }
+  const { data: staff } = await goldmindClient.from('staff').select('id, full_name, user_id').in('store_id', await gmOrgStoreIds());
+  (staff || []).forEach(s => SS.staff[s.id] = s);
+  document.getElementById('page-content').classList.remove('hidden');
+  ssLoad();
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('service-worker.js').catch(() => {});
+  });
+}
+</script>
+</body></html>
