@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=49"></script>
-<script src="theme.js?v=76"></script>
+<script src="theme.js?v=77"></script>
 <script src="gm-profit.js?v=7"></script>
 <script src="gm-report.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -125,8 +125,8 @@ const TYPE = { sale: 'بيع', return: 'مرتجع', buyTrader: 'شراء من �
 function rangeFor(p) {
   const tz = gmGetDisplayTimeZone();
   const today = gmDateStrInTz(Date.now(), tz);
-  if (p === 'today') return { fromStr: today, toStr: today, label: 'اليوم ' + today };
-  if (p === 'yesterday') { const y = gmAddDays(today, -1); return { fromStr: y, toStr: y, label: 'أمس ' + y }; }
+  if (p === 'today') return { fromStr: today, toStr: today, label: 'اليوم' };
+  if (p === 'yesterday') { const y = gmAddDays(today, -1); return { fromStr: y, toStr: y, label: 'أمس' }; }
   if (p === 'week') return { fromStr: gmAddDays(today, -6), toStr: today, label: 'آخر 7 أيام' };
   const [Y, M] = today.split('-').map(Number);
   if (p === 'month') return { fromStr: `${Y}-${String(M).padStart(2, '0')}-01`, toStr: today, label: 'هذا الشهر' };
@@ -162,7 +162,10 @@ async function load(r) {
   if (!r) return;
   window.__frRange = r;
   const { from, to } = gmRangeISO(r.fromStr, r.toStr);
-  document.getElementById('fr-period').innerHTML = `${esc(r.label)} — من <bdi dir="ltr">${esc(r.fromStr)}</bdi> إلى <bdi dir="ltr">${esc(r.toStr)}</bdi>`;
+  const dmy = s => s.split('-').reverse().join('/'); // 2026-10-20 → 20/10/2026, like the date boxes
+  document.getElementById('fr-period').innerHTML = r.fromStr === r.toStr
+    ? `${esc(r.label)} — <bdi dir="ltr">${esc(dmy(r.fromStr))}</bdi>`
+    : `${esc(r.label)} — من <bdi dir="ltr">${esc(dmy(r.fromStr))}</bdi> إلى <bdi dir="ltr">${esc(dmy(r.toStr))}</bdi>`;
   document.getElementById('fr-period-p').innerHTML = 'الفترة: من <bdi dir="ltr">' + esc(r.fromStr) + '</bdi> إلى <bdi dir="ltr">' + esc(r.toStr) + '</bdi>';
   document.getElementById('fr-printed').textContent = 'تاريخ الطباعة: ' + gmFormatDateTime(new Date(), { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
   const body = document.getElementById('fr-body');

@@ -207,6 +207,8 @@
     /* date / time pickers: on a right-to-left page Android draws the day / month / year parts on top of each other
        (17/10 shows as a blur); they are always laid out left to right, the text still sits on the right */
     input[type=date],input[type=datetime-local],input[type=time],input[type=month],input[type=week]{direction:ltr;text-align:right;unicode-bidi:isolate}
+    input.gm-date-masked{color:transparent!important;-webkit-text-fill-color:transparent}
+    input.gm-date-masked::-webkit-datetime-edit,input.gm-date-masked::-webkit-date-and-time-value{opacity:0}
     input[type=date]::-webkit-datetime-edit,input[type=datetime-local]::-webkit-datetime-edit,input[type=time]::-webkit-datetime-edit,input[type=month]::-webkit-datetime-edit{direction:ltr}
     .gm-empty::before{content:'';width:72px;height:60px;flex:none;display:block;margin:0 auto 10px;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 60' fill='none'%3E%3Cellipse cx='36' cy='54' rx='24' ry='4' fill='%23E4DAC0'/%3E%3Crect x='14' y='18' width='44' height='30' rx='6' fill='%23FBF8F1' stroke='%23C9B98F' stroke-width='2'/%3E%3Cpath d='M14 26h44' stroke='%23C9B98F' stroke-width='2'/%3E%3Cpath d='M26 36h20M30 41h12' stroke='%23D9C79C' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M22 18l5-9h18l5 9' stroke='%23C9B98F' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='58' cy='10' r='3' fill='%23D9B45A'/%3E%3Cpath d='M10 9v6M7 12h6' stroke='%23D9B45A' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")}
     /* press feel: buttons sink a little when pressed */
@@ -370,12 +372,45 @@
     });
   }
   var emptyTimer = null;
+  // Phones: Android draws a date box's value twice (two layers slightly apart) on a right-to-left page,
+  // so the numbers land on top of each other. On touch screens the native text is hidden and the
+  // date is written once on top, as DD/MM/YYYY; tapping still opens the phone's date picker.
+  var COARSE = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  var VALUE = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value');
+  function dateText(v) { var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || ''); return m ? m[3] + '/' + m[2] + '/' + m[1] : ''; }
+  function maskDate(inp) {
+    if (inp.__gmMask || !inp.parentNode) return;
+    inp.__gmMask = true;
+    var cs = getComputedStyle(inp);
+    var wrap = document.createElement('span');
+    wrap.className = 'gm-date-wrap';
+    var full = /\b(w-full|flex-1)\b/.test(inp.className) || inp.style.width === '100%' || cs.display === 'block';
+    wrap.style.cssText = 'position:relative;vertical-align:top;min-width:0;' + (full ? 'display:block;width:100%;' : 'display:inline-block;')
+      + (/\bflex-1\b/.test(inp.className) ? 'flex:1 1 0%;' : '');
+    var txt = document.createElement('span');
+    txt.className = 'gm-date-txt';
+    txt.setAttribute('aria-hidden', 'true');
+    txt.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;pointer-events:none;direction:ltr;justify-content:flex-end;'
+      + 'padding:0 ' + cs.paddingRight + ' 0 ' + cs.paddingLeft + ';font:inherit;font-size:' + cs.fontSize + ';color:' + cs.color + ';white-space:nowrap;overflow:hidden';
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp); wrap.appendChild(txt);
+    if (full) inp.style.width = '100%';
+    inp.classList.add('gm-date-masked');
+    var paint = function () { txt.textContent = dateText(VALUE.get.call(inp)); };
+    // values set by the page's own code (inp.value = ...) repaint too
+    Object.defineProperty(inp, 'value', { configurable: true, get: function () { return VALUE.get.call(inp); }, set: function (v) { VALUE.set.call(inp, v); paint(); } });
+    inp.addEventListener('input', paint); inp.addEventListener('change', paint);
+    paint();
+  }
+  function maskDates() { if (COARSE) document.querySelectorAll('input[type=date]:not(.gm-date-masked)').forEach(maskDate); }
+  window.gmDateText = dateText;
   function watchEmpty() {
     markEmpty(document);
+    maskDates();
     var busyQueued = false;
     new MutationObserver(function () {
       if (!busyQueued) { busyQueued = true; requestAnimationFrame(function () { busyQueued = false; markBusy(); }); }
-      clearTimeout(emptyTimer); emptyTimer = setTimeout(function () { markEmpty(document); }, 60); })
+      clearTimeout(emptyTimer); emptyTimer = setTimeout(function () { markEmpty(document); maskDates(); }, 60); })
       .observe(document.body, { childList: true, subtree: true, characterData: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchEmpty); else watchEmpty();
