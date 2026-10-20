@@ -98,3 +98,16 @@ test('repairs board: a column per status, late tickets marked, the arrow moves a
   const patch = calls.find(c => c.method === 'PATCH' && c.name === 'repair_tickets');
   expect(JSON.parse(patch.body)).toEqual({ status: 'in_progress' });
 });
+
+test('daily cash box: rows from an invoice do not show the invoice number, tapping them still opens the invoice', async ({ page }) => {
+  const d = base();
+  d.daily_cash_log = [{ id: 'e1', store_id: STORE, operation_type: 'مبيعات لـ هلا', notes: 'INV-2026-000055', direction: 'in', amount: 500, currency: 'AED',
+    cash_movement_id: 'cm1', cm: { invoice_id: 'inv1' }, created_at: ago(0.1) }];
+  await install(page, { db: d });
+  await page.goto('/daily-cashbox-ar.html');
+  const cell = page.locator('#cashbox-table-body td[data-entry="e1"]');
+  await expect(cell).toContainText('مبيعات لـ هلا');
+  await expect(cell).not.toContainText('INV-2026-000055');
+  await cell.click();
+  await expect(page).toHaveURL(/invoice-print-ar\.html\?id=inv1/);
+});

@@ -751,7 +751,7 @@ function renderAll() {
     return `
       <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" data-entry="${e.id}" onclick="openEditModal('${e.id}')"${styleAttr}>
         <div class="font-semibold">${e.cash_movement_id || e.bank_invoice_id ? '<span class="material-symbols-outlined align-middle" style="font-size:13px" title="تلقائي من فاتورة">receipt_long</span> ' : ''}${gmEscapeHtml(e.operation_type)}</div>
-        ${e.notes ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(e.notes)}</div>` : ''}
+        ${dcNote(e) ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(dcNote(e))}</div>` : ''}
         ${gmSaleNote(e, metaClass)}
         <div class="text-[10px] ${metaClass}">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
       </td>
@@ -770,6 +770,16 @@ function renderAll() {
 // they have no row in the table above). Info only: never changes balances.
 const daySalesCache = {};
 let daySales = [];
+// rows from a sale / purchase invoice: the invoice number is not written (tapping the row opens the invoice)
+function dcNote(e) {
+  const n = e.notes || '';
+  if (!(e.bank_invoice_id || (e.cm && e.cm.invoice_id))) return n;
+  return n.replace(/\s*(?:لل|ل)?(?:فاتورة\s*)?\bP?INV-\d{4}-\d+\b/g, '').replace(/[\s—-]+$/, '').trim();
+}
+console.assert(dcNote({ notes: 'INV-2026-000055', cm: { invoice_id: 'x' } }) === '' && dcNote({ notes: 'PINV-2026-000022', bank_invoice_id: 'y' }) === ''
+  && dcNote({ notes: 'تعديل عملات الدفع — المبلغ الجديد للفاتورة INV-2026-000043', bank_invoice_id: 'y' }) === 'تعديل عملات الدفع — المبلغ الجديد'
+  && dcNote({ notes: 'INV-2026-000055' }) === 'INV-2026-000055', 'dcNote');
+
 function gmSaleNote(e, cls) {
   const inv = e.cm && e.cm.invoice_id && daySales.find(x => x.id === e.cm.invoice_id);
   if (!inv) return '';
