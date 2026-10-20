@@ -896,6 +896,40 @@ function gmAddCanvasPages(pdf, canvas, firstOnCurrentPage, breaksPx) {
 // iframe that is always 738px wide (A4 width minus margins, plus a little
 // room), with the page's own styles copied in. The phone's screen width,
 // zoom or scroll position therefore can't shift or cut the page.
+// html2canvas (PDF export) draws each word from its own measured box, but in Arabic it loses spaces
+// ("دانا ملص" → "داناملص") and puts brackets / colons / Latin codes on the wrong side or on top of
+// each other. Giving every word, and the punctuation at its edges, its own <span> makes each box exact.
+// Only call it on a copy that is about to be rendered (an onclone document or the PDF iframe).
+function gmPdfArabicFix(root) {
+    if (!root || !root.ownerDocument) return root;
+    var doc = root.ownerDocument, AR = /[\u0600-\u06FF]/, list = [];
+    var w = doc.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+    while (w.nextNode()) {
+        var n = w.currentNode, p = n.parentNode;
+        if (p && /^(SCRIPT|STYLE|TEXTAREA|OPTION)$/.test(p.nodeName)) continue;
+        if (AR.test(n.nodeValue) && /\S/.test(n.nodeValue) && (/\S\s+\S/.test(n.nodeValue) || /^[^\p{L}\p{N}\s]|[^\p{L}\p{N}\s]$/u.test(n.nodeValue.trim()))) list.push(n);
+    }
+    var span = function (t) { var e = doc.createElement('span'); e.textContent = t; return e; };
+    // a bracket drawn on its own is not mirrored by the canvas, so flip it in right-to-left text
+    var PAIRS = { '(': ')', ')': '(', '[': ']', ']': '[', '{': '}', '}': '{', '<': '>', '>': '<', '«': '»', '»': '«' };
+    var mirror = function (t) { return t.replace(/[()[\]{}<>«»]/g, function (c) { return PAIRS[c]; }); };
+    list.forEach(function (n) {
+        var f = doc.createDocumentFragment();
+        var view = doc.defaultView, rtl = !!(view && n.parentNode && view.getComputedStyle(n.parentNode).direction === 'rtl');
+        n.nodeValue.split(/(\s+)/).forEach(function (part) {
+            if (!part) return;
+            if (/^\s+$/.test(part)) { f.appendChild(doc.createTextNode(part)); return; }
+            var m = part.match(/^([^\p{L}\p{N}]*)([\s\S]*?)([^\p{L}\p{N}]*)$/u);
+            if (!m || !m[2]) { f.appendChild(span(part)); return; }
+            if (m[1]) f.appendChild(span(rtl ? mirror(m[1]) : m[1]));
+            f.appendChild(span(m[2]));
+            if (m[3]) f.appendChild(span(rtl ? mirror(m[3]) : m[3]));
+        });
+        n.parentNode.replaceChild(f, n);
+    });
+    return root;
+}
+
 async function gmPdfFromNodes(nodes, filename, title, shareText) {
     await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
     await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js', 'html2pdf');
@@ -936,7 +970,7 @@ async function gmPdfFromNodes(nodes, filename, title, shareText) {
 
         var slices = [];
         for (var i = 0; i < placed.length; i++) {
-            var node = placed[i];
+            var node = gmPdfArabicFix(placed[i]);
             // safe cut lines: bottoms of blocks up to 3 levels deep and of table rows
             var top = node.getBoundingClientRect().top;
             var cssBreaks = Array.prototype.map.call(

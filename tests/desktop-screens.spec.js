@@ -128,3 +128,18 @@ test('printed daily statement: invoice rows show no invoice number, own notes st
   await expect(page.locator('body')).not.toContainText('INV-2026-000043');
   await expect(page.locator('body')).toContainText('INV-2026-000001 ملاحظتي');   // typed by hand, kept
 });
+
+test('PDF export: Arabic words and the brackets at their edges get their own boxes (no merged words, brackets on the right side)', async ({ page }) => {
+  await install(page, { db: base() });
+  await page.goto('/daily-cashbox-print-ar.html');
+  const out = await page.evaluate(() => {
+    const d = document.createElement('div'); d.dir = 'rtl';
+    d.innerHTML = '<p>كشف الحركة (فترة محددة)</p><p>عربون DEP-000003 — راما</p><p>Plain English text</p>';
+    document.body.appendChild(d); gmPdfArabicFix(d);
+    const r = [...d.querySelectorAll('p')].map(p => [...p.querySelectorAll('span')].map(s => s.textContent));
+    d.remove(); return r;
+  });
+  expect(out[0]).toEqual(['كشف', 'الحركة', ')', 'فترة', 'محددة', '(']);
+  expect(out[1]).toEqual(['عربون', 'DEP-000003', '—', 'راما']);
+  expect(out[2]).toEqual([]);                                             // no Arabic: left alone
+});

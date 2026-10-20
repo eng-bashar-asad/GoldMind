@@ -11,8 +11,8 @@
 <title>الجرد | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=46"></script>
-<script src="theme.js?v=72"></script>
+<script src="supabase-config.js?v=47"></script>
+<script src="theme.js?v=73"></script>
 <script src="zebra-rfid.js?v=6"></script>
 <script src="gm-report.js?v=4"></script>
 <script src="gm-uhf.js?v=1"></script>
@@ -1639,7 +1639,7 @@ async function exportPdf(sheetId, btnId) {
       margin: 10,
       filename: 'تقرير-جرد-' + new Date().toISOString().slice(0,10) + '.pdf',
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, scrollX: 0, scrollY: 0, useCORS: true, letterRendering: true },
+      html2canvas: { scale: 2, scrollX: 0, scrollY: 0, useCORS: true, letterRendering: true, onclone: d => gmPdfArabicFix(d.body) },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
     }).from(sheet), 'تقرير-جرد-' + new Date().toISOString().slice(0,10) + '.pdf');
   } catch (err) {

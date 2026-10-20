@@ -5,8 +5,8 @@
 <title>كشف الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=46"></script>
-<script src="theme.js?v=72"></script>
+<script src="supabase-config.js?v=47"></script>
+<script src="theme.js?v=73"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -275,7 +275,7 @@ async function generateCashboxPdfBase64() {
   const dataUriString = await html2pdf().set({
     margin: 8,
     image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
+    html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, onclone: d => gmPdfArabicFix(d.body) },
     jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
     pagebreak: { mode: ['css', 'legacy'] }
   }).from(sheet).outputPdf('datauristring');
@@ -370,7 +370,7 @@ async function downloadCashboxPdf() {
       margin: 8,
       filename: `كشف-يومي-${dateLabel.replace(/\//g, '-').replace(/ – /g, '_إلى_')}.pdf`,
       image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0 },
+      html2canvas: { scale: 2, useCORS: true, scrollX: 0, scrollY: 0, onclone: d => gmPdfArabicFix(d.body) },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['css', 'legacy'] }
     }).from(sheet).save();
