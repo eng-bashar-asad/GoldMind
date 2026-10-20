@@ -6,7 +6,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=46"></script>
-<script src="theme.js?v=71"></script>
+<script src="theme.js?v=72"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -231,9 +231,9 @@ async function load() {
     const inBg = inn && gmLinkColorFor(inn.link_group) ? `background-color:${gmLinkColorFor(inn.link_group)};` : '';
     const outBg = o && gmLinkColorFor(o.link_group) ? `background-color:${gmLinkColorFor(o.link_group)};` : '';
     rowsHtml += `<div class="flex">
-      <div class="py-1.5 px-3 border-t border-outline-variant font-semibold" style="width:28%;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (inn.notes ? ' — ' + gmEscapeHtml(inn.notes) : '') : ''}</div>
+      <div class="py-1.5 px-3 border-t border-outline-variant font-semibold" style="width:28%;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (gmCashNote(inn) ? ' — ' + gmEscapeHtml(gmCashNote(inn)) : '') : ''}</div>
       <div class="py-1.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="width:22%;${inBg}" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</div>
-      <div class="py-1.5 px-3 border-t border-r border-outline-variant font-semibold" style="width:28%;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (o.notes ? ' — ' + gmEscapeHtml(o.notes) : '') : ''}</div>
+      <div class="py-1.5 px-3 border-t border-r border-outline-variant font-semibold" style="width:28%;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (gmCashNote(o) ? ' — ' + gmEscapeHtml(gmCashNote(o)) : '') : ''}</div>
       <div class="py-1.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="width:22%;${outBg}" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</div>
     </div>`;
   }

@@ -111,3 +111,20 @@ test('daily cash box: rows from an invoice do not show the invoice number, tappi
   await cell.click();
   await expect(page).toHaveURL(/invoice-print-ar\.html\?id=inv1/);
 });
+
+test('printed daily statement: invoice rows show no invoice number, own notes stay', async ({ page }) => {
+  const d = base();
+  const at = ago(0.1), day = at.slice(0, 10);
+  d.daily_cash_log = [
+    { id: 'e1', store_id: STORE, operation_type: 'مبيعات لـ هلا', notes: 'INV-2026-000055', direction: 'in', amount: 500, currency: 'USD', cash_movement_id: 'cm1', cm: { invoice_id: 'i1' }, created_at: at },
+    { id: 'e2', store_id: STORE, operation_type: 'فاتورة بيع', notes: 'تعديل عملات الدفع — إخراج المبلغ القديم للفاتورة INV-2026-000043', direction: 'out', amount: 20, currency: 'USD', bank_invoice_id: 'i2', created_at: at },
+    { id: 'e3', store_id: STORE, operation_type: 'تصريف', notes: 'INV-2026-000001 ملاحظتي', direction: 'in', amount: 5, currency: 'USD', created_at: at },
+  ];
+  await install(page, { db: d });
+  await page.goto('/daily-cashbox-print-ar.html?from=' + day + '&to=' + day);
+  await expect(page.locator('body')).toContainText('مبيعات لـ هلا');
+  await expect(page.locator('body')).toContainText('إخراج المبلغ القديم');
+  await expect(page.locator('body')).not.toContainText('INV-2026-000055');
+  await expect(page.locator('body')).not.toContainText('INV-2026-000043');
+  await expect(page.locator('body')).toContainText('INV-2026-000001 ملاحظتي');   // typed by hand, kept
+});

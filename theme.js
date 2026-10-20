@@ -254,6 +254,17 @@ console.assert(gmCollapseMovements([{ id: 3, invoice_id: 'b', currency: 'USD', c
   { id: 2, invoice_id: 'b', currency: 'USD', created_at: '2026-10-01T10:30:00Z', direction: 'out', amount: 6100, description: 'إلغاء فاتورة X' }])
   .map(e => e.direction + e.amount + e.description).join() === 'in270فاتورة X', 'gmCollapseMovements');
 
+// Daily cash box rows posted from a sale / purchase invoice: the invoice number is not written
+// (the row opens the invoice). Used by the box, its search and its printed statement.
+function gmCashNote(e) {
+  const n = e.notes || '';
+  if (!(e.bank_invoice_id || e.cash_movement_id || (e.cm && e.cm.invoice_id))) return n;
+  return n.replace(/\s*(?:لل|ل)?(?:فاتورة\s*)?\bP?INV-\d{4}-\d+\b/g, '').replace(/[\s—-]+$/, '').trim();
+}
+console.assert(gmCashNote({ notes: 'INV-2026-000055', cm: { invoice_id: 'x' } }) === '' && gmCashNote({ notes: 'PINV-2026-000022', bank_invoice_id: 'y' }) === ''
+  && gmCashNote({ notes: 'تعديل عملات الدفع — المبلغ الجديد للفاتورة INV-2026-000043', bank_invoice_id: 'y' }) === 'تعديل عملات الدفع — المبلغ الجديد'
+  && gmCashNote({ notes: 'INV-2026-000055' }) === 'INV-2026-000055', 'gmCashNote');
+
 function gmFormatDualCurrency(amount, store) {
   const base = (store && store.currency) || '';
   return gmFormatNumber(amount) + (base ? ' ' + base : '');
