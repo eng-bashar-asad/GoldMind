@@ -909,7 +909,12 @@ function gmPdfArabicFix(root) {
         if (p && /^(SCRIPT|STYLE|TEXTAREA|OPTION)$/.test(p.nodeName)) continue;
         if (AR.test(n.nodeValue) && /\S/.test(n.nodeValue) && (/\S\s+\S/.test(n.nodeValue) || /^[^\p{L}\p{N}\s]|[^\p{L}\p{N}\s]$/u.test(n.nodeValue.trim()))) list.push(n);
     }
-    var span = function (t) { var e = doc.createElement('span'); e.textContent = t; return e; };
+    // inline-block: each word is measured as its own box, so a Latin code (DEP-000003) inside Arabic can't overlap
+    var span = function (t) {
+        var e = doc.createElement('span'); e.textContent = t; e.style.display = 'inline-block';
+        if (!AR.test(t) && /[A-Za-z0-9]/.test(t)) e.dir = 'ltr';
+        return e;
+    };
     // a bracket drawn on its own is not mirrored by the canvas, so flip it in right-to-left text
     var PAIRS = { '(': ')', ')': '(', '[': ']', ']': '[', '{': '}', '}': '{', '<': '>', '>': '<', '«': '»', '»': '«' };
     var mirror = function (t) { return t.replace(/[()[\]{}<>«»]/g, function (c) { return PAIRS[c]; }); };
