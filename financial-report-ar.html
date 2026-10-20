@@ -183,7 +183,7 @@ async function build(from, to) {
   const S = FR.scope.ids(), q = () => goldmindClient;
   const inPeriod = (t) => t.gte('created_at', from).lt('created_at', to);
 
-  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR] = await Promise.all([
+  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR, givenR] = await Promise.all([
     gmFetchAllRows(() => inPeriod(q().from('invoices').select('id, store_id, invoice_number, type, payment_method, total_amount, amount_paid, cash_paid_amount, bank_paid_amount, created_at, counterparty_name').in('store_id', S).neq('status', 'cancelled')).order('created_at')),
     inPeriod(q().from('invoices').select('id', { count: 'exact', head: true }).in('store_id', S).eq('status', 'cancelled')),
     gmFetchAllRows(() => inPeriod(q().from('expense_entries').select('amount, description, category:category_id(name)').in('store_id', S))),
@@ -196,7 +196,9 @@ async function build(from, to) {
     gmFetchAllRows(() => q().from('pieces').select('weight_grams, accounting_weight_grams, karat').in('store_id', S).eq('status', 'available')),
     q().from('gold_stock_lots').select('weight_grams_remaining, karat').in('store_id', S),
     q().from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID),
-    gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer_id, customer:customer_id(name)').in('store_id', S).lt('created_at', to).order('created_at'))
+    gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer_id, customer:customer_id(name)').in('store_id', S).lt('created_at', to).order('created_at')),
+    // goods given to wholesale traders: their profit, same formula as the profit report (gm-profit.js)
+    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select(GM_TRADER_GIVE_SELECT).in('store_id', S).eq('source', 'stock_given')).order('created_at').order('id'))
   ]);
   for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR]) if (x.error) throw x.error;
 
@@ -304,14 +306,17 @@ async function build(from, to) {
   // discounts with traders on the cash balance: theirs = less profit, ours = more profit
   const trDiscShop = tmR.data.filter(m => m.source === 'discount' && m.movement_type !== 'debt_increase').reduce((a, m) => a + Number(m.fab_fee_amount || 0), 0);
   const trDiscTrader = tmR.data.filter(m => m.source === 'discount' && m.movement_type === 'debt_increase').reduce((a, m) => a + Number(m.fab_fee_amount || 0), 0);
-  const netProfit = P.profit + scrapProfit - expTotal - discTotal + trDiscShop - trDiscTrader;
+  const price24 = Number(((pricesR.data || []).find(r => Number(r.karat) === 24) || {}).price_per_gram) || 0;
+  const wsProfit = gmSumTraderGive(givenR.data || [], price24).profit;
+  const salesProfitAll = P.profit + wsProfit;  // customers + wholesale traders
+  const netProfit = salesProfitAll + scrapProfit - expTotal - discTotal + trDiscShop - trDiscTrader;
   let h = '';
   // profit line: sales → profit − expenses = net. Purchases are their own item
   // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
   const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px]" style="color:#6B6150;">${t[4]}</div>` : ''}</div>`;
   const tiles = canProfit
-    ? [['صافي المبيعات', money(netSales), ''], ['ربح المبيعات', money(P.profit), cls(P.profit)],
-       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات' + (scrapProfit ? ' + ربح الكسر' : '') + ' − المصاريف' + (discTotal ? ' − خصومات الديون' : '') + (trDiscShop || trDiscTrader ? ' ± خصومات التجار' : ''), money(netProfit), cls(netProfit)]]
+    ? [['صافي المبيعات', money(netSales), ''], ['ربح المبيعات' + (wsProfit ? ' (زبائن + جملة)' : ''), money(salesProfitAll), cls(salesProfitAll)],
+       ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات' + (wsProfit ? ' + ربح الجملة' : '') + (scrapProfit ? ' + ربح الكسر' : '') + ' − المصاريف' + (discTotal ? ' − خصومات الديون' : '') + (trDiscShop || trDiscTrader ? ' ± خصومات التجار' : ''), money(netProfit), cls(netProfit)]]
     : [['صافي المبيعات', money(netSales), ''], ['المصاريف', money(expTotal), '']];
   tiles.push(['المشتريات', money(buysTotal), '', 'col-span-2', 'بند مستقل — لا تُخصم من الربح (شراء ذهب يدخل المخزن)']);
   h += `<div class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
@@ -334,7 +339,9 @@ async function build(from, to) {
       ${row('الضريبة', money(-P.vat))}
       ${row('كلفة المصنعية', money(-P.fabCost))}
       ${P.diamondCost ? row('كلفة الماس', money(-P.diamondCost)) : ''}
-      ${row('ربح المبيعات', `<span class="${cls(P.profit)}">${money(P.profit)}</span>`, ' class="tot"')}
+      ${row('ربح مبيعات الزبائن', `<span class="${cls(P.profit)}">${money(P.profit)}</span>`, ' class="tot"')}
+      ${wsProfit ? row('ربح البضاعة الخارجة لتجار الجملة', `<span class="${cls(wsProfit)}">${money(wsProfit)}</span>`) : ''}
+      ${wsProfit ? row('ربح كل المبيعات', `<span class="${cls(salesProfitAll)}">${money(salesProfitAll)}</span>`, ' class="tot"') : ''}
       ${scrapProfit ? row('ربح شراء الكسر (فرق السعر عن سعر البرنامج — لا يدخل الصندوق)', `<span class="${cls(scrapProfit)}">${money(scrapProfit)}</span>`) : ''}
       ${row('المصاريف', money(-expTotal))}
       ${discTotal ? row('خصومات على ديون الزبائن', money(-discTotal)) : ''}
