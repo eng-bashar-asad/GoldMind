@@ -198,6 +198,10 @@
     .gm-empty{display:flex!important;flex-direction:column;align-items:center;justify-content:center;gap:10px;padding:28px 12px!important;text-align:center;color:var(--gm-on-surface-variant,#6B6355)}
     td.gm-empty{display:table-cell!important}
     .gm-empty.hidden{display:none!important}
+    /* date / time pickers: on a right-to-left page Android draws the day / month / year parts on top of each other
+       (17/10 shows as a blur); they are always laid out left to right, the text still sits on the right */
+    input[type=date],input[type=datetime-local],input[type=time],input[type=month],input[type=week]{direction:ltr;text-align:right;unicode-bidi:isolate}
+    input[type=date]::-webkit-datetime-edit,input[type=datetime-local]::-webkit-datetime-edit,input[type=time]::-webkit-datetime-edit,input[type=month]::-webkit-datetime-edit{direction:ltr}
     .gm-empty::before{content:'';width:72px;height:60px;flex:none;display:block;margin:0 auto 10px;background:no-repeat center/contain url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 72 60' fill='none'%3E%3Cellipse cx='36' cy='54' rx='24' ry='4' fill='%23E4DAC0'/%3E%3Crect x='14' y='18' width='44' height='30' rx='6' fill='%23FBF8F1' stroke='%23C9B98F' stroke-width='2'/%3E%3Cpath d='M14 26h44' stroke='%23C9B98F' stroke-width='2'/%3E%3Cpath d='M26 36h20M30 41h12' stroke='%23D9C79C' stroke-width='2' stroke-linecap='round'/%3E%3Cpath d='M22 18l5-9h18l5 9' stroke='%23C9B98F' stroke-width='2' stroke-linejoin='round'/%3E%3Ccircle cx='58' cy='10' r='3' fill='%23D9B45A'/%3E%3Cpath d='M10 9v6M7 12h6' stroke='%23D9B45A' stroke-width='2' stroke-linecap='round'/%3E%3C/svg%3E")}
     /* press feel: buttons sink a little when pressed */
     .gm-qg,.dsk-action,.gm-tab,.gm-tab-sale,.gm-fab,.cd-act,.cu-act,.ns-pb-btn,#save-invoice-btn,#save-btn,.gm-cta,.gm-chip-btn,.gm-hbtn,.qa-tile{transition:transform .12s ease,filter .12s ease}

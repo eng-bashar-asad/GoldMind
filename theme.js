@@ -254,15 +254,23 @@ console.assert(gmCollapseMovements([{ id: 3, invoice_id: 'b', currency: 'USD', c
   { id: 2, invoice_id: 'b', currency: 'USD', created_at: '2026-10-01T10:30:00Z', direction: 'out', amount: 6100, description: 'إلغاء فاتورة X' }])
   .map(e => e.direction + e.amount + e.description).join() === 'in270فاتورة X', 'gmCollapseMovements');
 
-// Daily cash box rows posted from a sale / purchase invoice: the invoice number is not written
-// (the row opens the invoice). Used by the box, its search and its printed statement.
+// Daily cash box rows posted automatically (sales, purchases, deposits, repairs, returns, transfers):
+// document numbers (INV-2026-000055, PINV-…, DEP-000003, REP-…, RET-…) are not written — the row opens
+// its document. A note that then only repeats the row's own title is dropped too.
+// Used by the box, its search and its printed statement; notes typed by hand are left as they are.
 function gmCashNote(e) {
   const n = e.notes || '';
   if (!(e.bank_invoice_id || e.cash_movement_id || (e.cm && e.cm.invoice_id))) return n;
-  return n.replace(/\s*(?:لل|ل)?(?:فاتورة\s*)?\bP?INV-\d{4}-\d+\b/g, '').replace(/[\s—-]+$/, '').trim();
+  let t = n.replace(/\s*(?:لل|ل)?(?:(?:فاتورة|سند|تذكرة|رقم)\s*)?\b[A-Z]{2,6}-(?:\d{4}-)?\d+\b/g, ' ')
+    .replace(/\s{2,}/g, ' ').replace(/^[\s—–-]+|[\s—–-]+$/g, '').trim();
+  const op = (e.operation_type || '').trim();
+  if (op && t.startsWith(op)) t = t.slice(op.length).replace(/^[\s—–:-]+/, '').trim();
+  return t;
 }
 console.assert(gmCashNote({ notes: 'INV-2026-000055', cm: { invoice_id: 'x' } }) === '' && gmCashNote({ notes: 'PINV-2026-000022', bank_invoice_id: 'y' }) === ''
   && gmCashNote({ notes: 'تعديل عملات الدفع — المبلغ الجديد للفاتورة INV-2026-000043', bank_invoice_id: 'y' }) === 'تعديل عملات الدفع — المبلغ الجديد'
+  && gmCashNote({ operation_type: 'عربون', notes: 'عربون DEP-000003 — راما مملوك', cash_movement_id: 'c' }) === 'راما مملوك'
+  && gmCashNote({ notes: 'صيانة REP-2026-000004', cash_movement_id: 'c' }) === 'صيانة'
   && gmCashNote({ notes: 'INV-2026-000055' }) === 'INV-2026-000055', 'gmCashNote');
 
 function gmFormatDualCurrency(amount, store) {
@@ -1183,7 +1191,7 @@ function gmHardwareBack() {
 (function () {
   if (window.GM_NAV_DISABLED || document.querySelector('script[src^="gm-nav.js"]')) return;
   var sc = document.createElement('script');
-  sc.src = 'gm-nav.js?v=17';
+  sc.src = 'gm-nav.js?v=18';
   document.head.appendChild(sc);
 })();
 

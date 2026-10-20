@@ -25,7 +25,8 @@ test('daily cashbox: first posting, reversal and new posting of one invoice show
     row('r5', '09', 'in', 300, 'حذف قيمة فاتورة PINV-6 (قبل التعديل)', 'p6') ] }) });
   await page.goto('/daily-cashbox-ar.html');
   const body = page.locator('#cashbox-table-body');
-  await expect(body).toContainText('PINV-5');
+  await expect(body).toContainText('دفع فاتورة شراء');
+  await expect(body).not.toContainText('PINV-5');           // document numbers are not written in the box
   await expect(body).toContainText('1,700.00');
   await expect(body).not.toContainText('قبل التعديل');
   await expect(body).not.toContainText('PINV-6');          // cancelled the same day: gone
