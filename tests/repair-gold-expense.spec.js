@@ -66,3 +66,21 @@ test('repair gold with a cash labour fee: two expenses, the cash one in the same
   expect(cash).toMatchObject({ store_id: STORE, category_id: 'cr', amount: 15, from_daily_cashbox: true });
   expect(errs).toEqual([]);
 });
+
+test('repair paid only in cash: no grams, nothing taken from the scrap box, one cash expense', async ({ page }) => {
+  page.on('dialog', d => d.accept());
+  const calls = await install(page, {
+    db: base({ expense_categories: [{ id: 'cr', store_id: STORE, name: 'تصاليح ذهب' }], gold_prices: [], expense_entries: [] }),
+    rpc: { record_repair_gold: () => ({ body: 'e1' }), record_expense: () => ({ body: 'e2' }) }
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/expense-entry-ar.html');
+  await page.click('.cat-chip:has-text("تصاليح ذهب")');
+  await page.fill('#repair-desc', 'اجرة ورشة اوبي تصليح البازل');
+  await page.fill('#repair-cash', '135');
+  await page.click('#repair-btn');
+  await expect(page.locator('#save-success')).toContainText('سُجّلت أجرة التصليح نقداً بدون ذهب');
+  expect(calls.some(c => c.name === 'record_repair_gold')).toBe(false);
+  const cash = JSON.parse(calls.find(c => c.name === 'record_expense').body).p;
+  expect(cash).toMatchObject({ category_id: 'cr', amount: 135, from_daily_cashbox: true, description: 'أجرة تصليح ذهب — اجرة ورشة اوبي تصليح البازل' });
+});

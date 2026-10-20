@@ -122,7 +122,7 @@
 
 <!-- repair gold: scrap-box gold used for a repair, expense at cost (no cashbox effect) -->
 <div id="repair-form" class="hidden flex flex-col gap-4">
-<p class="text-[12px] text-on-surface-variant leading-5">الذهب يُسحب من صندوق الكسر بالعيار المحدد (الأقدم أولاً)، وتُسجَّل كلفته مصروفاً من نوع «تصاليح ذهب». لا يدخل الصندوق اليومي. أجرة الكاش إن وُجدت تُسجَّل كمصروف منفصل.</p>
+<p class="text-[12px] text-on-surface-variant leading-5">الذهب يُسحب من صندوق الكسر بالعيار المحدد (الأقدم أولاً)، وتُسجَّل كلفته مصروفاً من نوع «تصاليح ذهب». لا يدخل الصندوق اليومي. أجرة الكاش إن وُجدت تُسجَّل كمصروف منفصل، ويمكن تسجيل الأجرة نقداً فقط وترك الغرامات صفراً.</p>
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
 <div class="grid grid-cols-2 gap-2">
 <label class="block text-[12px] text-on-surface-variant">العيار
@@ -238,28 +238,32 @@ function updateRepairPreview() {
     : 'تظهر القيمة بسعر اليوم بعد إدخال الغرامات (يلزم تسجيل سعر العيار).';
 }
 async function saveRepairGold() {
-  const grams = parseFloat($('repair-grams').value), karat = $('repair-karat').value;
-  if (!(grams > 0)) return msg('save-error', 'أدخل الغرامات');
-  if (!confirm(`سحب ${grams} غ عيار ${karat} من صندوق الكسر كتصليح؟`)) return;
+  const grams = parseFloat($('repair-grams').value) || 0, karat = $('repair-karat').value;
+  const desc = $('repair-desc').value.trim() || null, cash = parseFloat($('repair-cash').value) || 0;
+  // gold, cash labour, or both: a repair paid only in cash takes nothing from the scrap box
+  if (grams < 0 || cash < 0) return msg('save-error', 'الأرقام لا تكون سالبة');
+  if (!(grams > 0) && !(cash > 0)) return msg('save-error', 'أدخل الغرامات أو أجرة التصليح نقداً');
+  if (grams > 0 && !confirm(`سحب ${grams} غ عيار ${karat} من صندوق الكسر كتصليح؟`)) return;
   const btn = $('repair-btn');
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
-  const desc = $('repair-desc').value.trim() || null, cash = parseFloat($('repair-cash').value) || 0;
-  const { error } = await goldmindClient.rpc('record_repair_gold', { p: { store_id: GOLDMIND_STORE_ID, karat: Number(karat), grams, description: desc } });
-  if (error) { btn.disabled = false; btn.textContent = 'تسجيل تصليح الذهب'; return msg('save-error', 'تعذّر الحفظ: ' + error.message); }
+  if (grams > 0) {
+    const { error } = await goldmindClient.rpc('record_repair_gold', { p: { store_id: GOLDMIND_STORE_ID, karat: Number(karat), grams, description: desc } });
+    if (error) { btn.disabled = false; btn.textContent = 'تسجيل تصليح الذهب'; return msg('save-error', 'تعذّر الحفظ: ' + error.message); }
+  }
   // cash labour is a separate expense in the same category (own cashbox row); gold part is already saved above
   let cashErr = null;
   if (cash > 0) {
     const { data: cat } = await goldmindClient.from('expense_categories').select('id').eq('store_id', GOLDMIND_STORE_ID).eq('name', REPAIR_CAT).maybeSingle();
     const r = cat ? await goldmindClient.rpc('record_expense', { p: { store_id: GOLDMIND_STORE_ID, category_id: cat.id, amount: cash,
-      description: 'أجرة تصليح ذهب عيار ' + karat + (desc ? ' — ' + desc : ''), from_daily_cashbox: $('repair-from-cashbox').checked, currency: CUR } })
+      description: (grams > 0 ? 'أجرة تصليح ذهب عيار ' + karat : 'أجرة تصليح ذهب') + (desc ? ' — ' + desc : ''), from_daily_cashbox: $('repair-from-cashbox').checked, currency: CUR } })
       : { error: { message: 'نوع «تصاليح ذهب» غير موجود' } };
     cashErr = r.error;
   }
   btn.disabled = false; btn.textContent = 'تسجيل تصليح الذهب';
   $('repair-grams').value = ''; $('repair-desc').value = ''; $('repair-cash').value = ''; updateRepairPreview();
   loadList();
-  if (cashErr) return msg('save-error', 'سُجّل الذهب المصروف، لكن تعذّر تسجيل الأجرة النقدية: ' + cashErr.message + '. سجّلها من المصاريف العادية.');
-  msg('save-success', cash > 0 ? 'سُجّل تصليح الذهب (ذهب من الكسر + أجرة نقدية).' : 'سُجّل تصليح الذهب مصروفاً وسُحب من صندوق الكسر.');
+  if (cashErr) return msg('save-error', (grams > 0 ? 'سُجّل الذهب المصروف، لكن تعذّر تسجيل الأجرة النقدية: ' : 'تعذّر تسجيل الأجرة: ') + cashErr.message + (grams > 0 ? '. سجّلها من المصاريف العادية.' : ''));
+  msg('save-success', grams > 0 && cash > 0 ? 'سُجّل تصليح الذهب (ذهب من الكسر + أجرة نقدية).' : grams > 0 ? 'سُجّل تصليح الذهب مصروفاً وسُحب من صندوق الكسر.' : 'سُجّلت أجرة التصليح نقداً بدون ذهب.');
 }
 
 async function saveCategory() {
