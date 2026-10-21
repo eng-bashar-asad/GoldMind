@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict bSb7gkcWPO74neKt7H2mxic4q4HJCK5K15Vi2Ogqrbo3YJDlpkfn6xUJus9eCr9
+\restrict OgCcZb7ED41N6aJddZUBmfOfdhJXBlcb7dgbP0annXAVt7v85FJh6BnhWmSWsRO
 
 
 SET statement_timeout = 0;
@@ -347,7 +347,7 @@ begin
   end if;
   return query
     select s.id, s.name, s.country, s.currency, s.created_at,
-           (select count(*) from public.staff st where st.store_id = s.id) as staff_count,
+           (select count(*) from public.staff st where st.store_id = s.id and st.user_id is not null) as staff_count,
            p.name_ar, sub.status, sub.trial_end, sub.current_period_end,
            greatest(
              s.created_at,
@@ -1450,7 +1450,7 @@ CREATE FUNCTION public.get_effective_staff_count(p_store_id uuid) RETURNS intege
     LANGUAGE sql STABLE
     SET search_path TO 'public'
     AS $$
-  select count(*)::int from staff where store_id = p_store_id;
+  select count(*)::int from staff where store_id = p_store_id and user_id is not null;
 $$;
 
 
@@ -1849,6 +1849,39 @@ begin
   new.gold_price_per_gram := round(pr, 2);
   return new;
 end $$;
+
+
+--
+-- Name: gm_seller_stamp(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_seller_stamp() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare h text; wanted uuid; allowed boolean;
+begin
+  if tg_op = 'INSERT' and new.type = 'return' and new.related_invoice_id is not null then
+    select coalesce(salesperson_id, created_by) into new.salesperson_id from invoices where id = new.related_invoice_id;
+    return new;
+  end if;
+  wanted := new.salesperson_id;
+  if tg_op = 'INSERT' then
+    h := nullif(current_setting('request.headers', true), '')::json->>'x-gm-seller';
+    if h ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then wanted := h::uuid; end if;
+  elsif new.salesperson_id is not distinct from old.salesperson_id then
+    return new;
+  end if;
+  allowed := wanted is not null
+    and public.has_permission('set_seller', new.store_id)
+    and exists (select 1 from staff where id = wanted and store_id in (select public.org_store_ids(new.store_id)));
+  if tg_op = 'INSERT' then
+    new.salesperson_id := case when allowed then wanted else new.created_by end;
+  elsif not allowed then
+    new.salesperson_id := old.salesperson_id;
+  end if;
+  return new;
+end $_$;
 
 
 --
@@ -5679,6 +5712,7 @@ CREATE TABLE public.invoices (
     pay_fx_rate numeric,
     pay_breakdown jsonb,
     is_exchange boolean DEFAULT false NOT NULL,
+    salesperson_id uuid,
     CONSTRAINT invoices_seller_id_type_check CHECK (((seller_id_type IS NULL) OR (seller_id_type = ANY (ARRAY['emirates_id'::text, 'passport'::text, 'other'::text]))))
 );
 
@@ -7776,6 +7810,13 @@ CREATE INDEX invoices_store_id_fk_idx ON public.invoices USING btree (store_id);
 
 
 --
+-- Name: invoices_store_salesperson_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoices_store_salesperson_created_idx ON public.invoices USING btree (store_id, salesperson_id, created_at);
+
+
+--
 -- Name: invoices_trader_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -8203,6 +8244,13 @@ CREATE TRIGGER trg_auto_upgrade_on_staff_change AFTER INSERT OR DELETE ON public
 
 
 --
+-- Name: staff trg_auto_upgrade_on_staff_login; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_auto_upgrade_on_staff_login AFTER UPDATE OF user_id ON public.staff FOR EACH ROW WHEN (((old.user_id IS NULL) AND (new.user_id IS NOT NULL))) EXECUTE FUNCTION public.auto_upgrade_on_staff_change();
+
+
+--
 -- Name: cash_movements trg_cash_movement_deleted_bank_sync; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -8263,6 +8311,13 @@ CREATE TRIGGER trg_gold_prices_currency_guard BEFORE INSERT OR UPDATE OF price_p
 --
 
 CREATE TRIGGER trg_invoice_bank_part_sync AFTER UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.trg_invoice_bank_part_sync();
+
+
+--
+-- Name: invoices trg_invoice_salesperson; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_invoice_salesperson BEFORE INSERT OR UPDATE OF salesperson_id ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.gm_seller_stamp();
 
 
 --
@@ -9050,6 +9105,14 @@ ALTER TABLE ONLY public.invoices
 
 ALTER TABLE ONLY public.invoices
     ADD CONSTRAINT invoices_related_invoice_id_fkey FOREIGN KEY (related_invoice_id) REFERENCES public.invoices(id);
+
+
+--
+-- Name: invoices invoices_seller_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.invoices
+    ADD CONSTRAINT invoices_seller_id_fkey FOREIGN KEY (salesperson_id) REFERENCES public.staff(id) ON DELETE SET NULL;
 
 
 --
@@ -11379,6 +11442,15 @@ GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO service_role;
 
 
 --
+-- Name: FUNCTION gm_seller_stamp(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_seller_stamp() TO anon;
+GRANT ALL ON FUNCTION public.gm_seller_stamp() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_seller_stamp() TO service_role;
+
+
+--
 -- Name: FUNCTION gm_session_ok(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12889,5 +12961,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict bSb7gkcWPO74neKt7H2mxic4q4HJCK5K15Vi2Ogqrbo3YJDlpkfn6xUJus9eCr9
+\unrestrict OgCcZb7ED41N6aJddZUBmfOfdhJXBlcb7dgbP0annXAVt7v85FJh6BnhWmSWsRO
 
