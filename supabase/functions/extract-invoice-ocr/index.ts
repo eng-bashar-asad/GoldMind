@@ -86,6 +86,8 @@ Deno.serve(async (req: Request) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   try {
     const body = await req.json();
+    // signed-in users only, the health check too (it spends the Gemini quota)
+    if (!(await signedInUser(req))) return json({ error: "NOT_SIGNED_IN" }, 401);
     // Health check (no image, fixed one-word prompt): which model answers. Lets us see quickly that the
     // key and model still work after Google renames models.
     if (body && body.selftest === true) {
@@ -103,7 +105,6 @@ Deno.serve(async (req: Request) => {
       }
       return json({ ok: false, error: "NO_MODEL_AVAILABLE", candidates: models.slice(0, 6) });
     }
-    if (!(await signedInUser(req))) return json({ error: "NOT_SIGNED_IN" }, 401);
     const { image_base64, mime_type } = body || {};
     if (!image_base64 || typeof image_base64 !== "string") return json({ error: "MISSING_IMAGE" }, 400);
     const key = Deno.env.get("GEMINI_API_KEY");

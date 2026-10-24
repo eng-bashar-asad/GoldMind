@@ -11,7 +11,7 @@
 <title>الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=49"></script>
+<script src="supabase-config.js?v=50"></script>
 <script src="theme.js?v=77"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -35,6 +35,8 @@
 <style>
     html { font-size: 87.5%; }
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+.dc-entered-btn{color:#6B6150;border-radius:999px;padding:2px 8px}
+.dc-entered-btn[aria-pressed="true"]{color:#8A6A1C;background:rgba(212,175,55,.16)}
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <style>
@@ -221,7 +223,10 @@
 <div id="gm-entries-col" class="flex flex-col gap-3">
 <div class="flex items-center justify-between mt-2">
 <h2 class="font-semibold text-[13px]" id="entries-heading">عمليات اليوم</h2>
+<div class="flex items-center gap-3">
+<button onclick="dcToggleEntered()" id="dcEnteredBtn" aria-pressed="false" class="dc-entered-btn text-[12px] font-semibold inline-flex items-center gap-1 gm-hit" title="عرض وقت إدخال كل حركة"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">schedule</span>وقت الإدخال</button>
 <button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold" id="fullHistoryToggle">عرض كل العمليات</button>
+</div>
 </div>
 <div class="overflow-x-auto rounded-xl border border-outline-variant shadow-lg" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
 <table class="w-full text-[12px] border-collapse" id="cashbox-table">
@@ -299,8 +304,26 @@
 let currentDirection = 'in';
 let allEntries = []; // every entry ever (for computing running balance)
 let todayEntries = []; // entries for the currently selected day
-let canManageDates = false; // owner/manager only: view/add/edit entries on days other than today
-let canSeeDays = false; // view other days (and the full list, the search, period statements): canManageDates or 'view_past_days'
+let canManageDates = false; // add an entry on a past day: owner or 'backdate_entries'
+let canSeeDays = false; // view other days (and the full list, the search, period statements): owner or 'view_past_cashbox'
+let canEditPast = false; // edit/delete rows of past days: owner or 'edit_past_cash' (the server checks the same)
+// "وقت الإدخال": when each row was really typed in (rows added on a past day show it in amber)
+let dcShowEntered = (() => { try { return localStorage.getItem('gm_dc_entered') === '1'; } catch (_) { return false; } })();
+function dcToggleEntered() {
+  dcShowEntered = !dcShowEntered;
+  try { localStorage.setItem('gm_dc_entered', dcShowEntered ? '1' : '0'); } catch (_) {}
+  dcPaintEnteredBtn();
+  renderAll();
+}
+function dcPaintEnteredBtn() { const b = document.getElementById('dcEnteredBtn'); if (b) b.setAttribute('aria-pressed', String(dcShowEntered)); }
+function dcEnteredHtml(e, metaClass) {
+  if (!dcShowEntered) return '';
+  if (!e.entered_at) return `<div class="text-[10px] ${metaClass}">وقت الإدخال: غير مسجّل</div>`;
+  const late = localDateStr(new Date(e.entered_at)) !== localDateStr(new Date(e.created_at));
+  const t = gmFormatDateTime(e.entered_at, { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return `<div class="text-[10px] ${late ? 'font-semibold' : metaClass}"${late ? ' style="color:#B45309"' : ''}>أُدخلت: <span dir="ltr">${t}</span>${late ? ' (بتاريخ سابق)' : ''}</div>`;
+}
+const dcIsPastDay = e => localDateStr(new Date(e.created_at)) < localDateStr(new Date());
 let selectedDate = new Date(); selectedDate.setHours(0, 0, 0, 0);
 let gmHighlightEntry = new URLSearchParams(location.search).get('entry'); // opened from a search result
 let showFullHistory = false; // when true, entries-list shows every entry ever, not just the selected day
@@ -500,6 +523,12 @@ async function submitEntry() {
     const dir = rowEl.dataset.dir || 'in';
     if (!amt || amt <= 0) { errEl.textContent = 'يوجد سطر إضافي دون مبلغ صحيح — املأه أو احذفه'; errEl.classList.remove('hidden'); return; }
     rows.push({ direction: dir, amount: amt, currency: cur });
+  }
+
+  const pastDay = canManageDates && document.getElementById('addFormDate').value && document.getElementById('addFormDate').value < localDateStr(new Date());
+  if (pastDay) {
+    const d = document.getElementById('addFormDate').value;
+    if (!confirm(`أنت تضيف حركة بتاريخ سابق (${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}). هل تريد إتمام العملية؟`)) return;
   }
 
   const btn = document.getElementById('submitBtn');
@@ -756,6 +785,7 @@ function renderAll() {
         ${dcNote(e) ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(dcNote(e))}</div>` : ''}
         ${gmSaleNote(e, metaClass)}
         <div class="text-[10px] ${metaClass}">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
+        ${dcEnteredHtml(e, metaClass)}
       </td>
       <td class="px-2 py-2 border-b border-outline-variant text-center font-bold font-data-mono cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>${fmt(e.amount)}<div class="text-[9px] font-normal ${metaClass}">${e.currency}</div></td>`;
   }
@@ -840,6 +870,7 @@ function openEditModal(id) {
     else openVoucherDate(e); // سند قبض/صرف: تعديل التاريخ
     return;
   }
+  if (dcIsPastDay(e) && !canEditPast) { alert('ليس لديك صلاحية تعديل أو حذف حركات الأيام السابقة.'); return; }
   modalEntryId = id;
   setModalDirection(e.direction);
   document.getElementById('modalOpType').value = e.operation_type || '';
@@ -1168,8 +1199,11 @@ async function load() {
     return;
   }
 
-  canManageDates = !!(staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.view_profit_report)));
-  canSeeDays = canManageDates || !!(staffRow && staffRow.permissions && staffRow.permissions.view_past_days);
+  const perm = k => !!(isOwner || (staffRow.permissions && staffRow.permissions[k] === true));
+  canManageDates = perm('backdate_entries');
+  canSeeDays = perm('view_past_cashbox');
+  canEditPast = perm('edit_past_cash');
+  dcPaintEnteredBtn();
   document.getElementById('day-nav').classList.toggle('hidden', !canSeeDays);
   document.getElementById('day-nav').classList.toggle('flex', canSeeDays);
   // employees who only see today: no full history, no search across days, no period statement

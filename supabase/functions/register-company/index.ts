@@ -9,8 +9,8 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // Security:
 // - never touches an existing account (an email that exists is refused)
 // - the temporary password is EMAILED (Brevo, sender "GoldMind"), never returned
-//   to the browser, so only the real owner of the address can sign in.
-//   Until the BREVO_API_KEY secret is set the old behaviour stays (password shown).
+//   to the browser, so only the real owner of the address can sign in. Without the
+//   BREVO_API_KEY secret registration is refused (nothing is created).
 // - rate limited: 3 registrations an hour per address, 20 a day in total
 // - field lengths capped; internal error details go to the logs only
 
@@ -97,6 +97,7 @@ Deno.serve(async (req: Request) => {
     const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
     const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY') || '';
+    if (!BREVO_API_KEY) { console.error('BREVO_API_KEY missing'); return json({ error: GENERIC }, 500); }
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 
     // rate limit
@@ -129,14 +130,12 @@ Deno.serve(async (req: Request) => {
     const userId = newUser.user.id;
 
     // email first: if it cannot be delivered, undo the account so the address stays free
-    if (BREVO_API_KEY) {
-      try {
-        await sendPasswordEmail(BREVO_API_KEY, email, owner_name, company_name, tempPassword);
-      } catch (e) {
-        console.error('email', e);
-        await admin.auth.admin.deleteUser(userId);
-        return json({ error: 'تعذّر إرسال البريد إلى هذا العنوان. تأكد من البريد الإلكتروني وحاول مرة أخرى.' }, 502);
-      }
+    try {
+      await sendPasswordEmail(BREVO_API_KEY, email, owner_name, company_name, tempPassword);
+    } catch (e) {
+      console.error('email', e);
+      await admin.auth.admin.deleteUser(userId);
+      return json({ error: 'تعذّر إرسال البريد إلى هذا العنوان. تأكد من البريد الإلكتروني وحاول مرة أخرى.' }, 502);
     }
 
     const { data: newStore, error: storeErr } = await admin.from('stores').insert({
@@ -160,9 +159,7 @@ Deno.serve(async (req: Request) => {
     });
     if (subErr) { console.error('subscription', subErr); return json({ error: 'أُنشئت الشركة لكن تعذّر تفعيل التجربة المجانية، تواصل معنا.' }, 400); }
 
-    return BREVO_API_KEY
-      ? json({ success: true, email, emailed: true })
-      : json({ success: true, email, temp_password: tempPassword }); // ponytail: until BREVO_API_KEY secret is set
+    return json({ success: true, email, emailed: true });
   } catch (e) {
     console.error('register-company', e);
     return json({ error: GENERIC }, 500);

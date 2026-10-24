@@ -5,7 +5,7 @@
 <title>كشف الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=49"></script>
+<script src="supabase-config.js?v=50"></script>
 <script src="theme.js?v=77"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
@@ -164,12 +164,11 @@ function gmLinkColorFor(group) {
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
-  // another day or a period: owner, profit-report or 'view_past_days' (same rule as the cash box page)
+  // another day or a period: owner or 'view_past_cashbox' (same rule as the cash box page)
   const rg = getDateRange(), t0 = new Date(); t0.setHours(0, 0, 0, 0);
   if (rg.isRange || rg.from.getTime() !== t0.getTime()) {
     const sc = await gmStaffScope();
-    const { data: me } = await goldmindClient.from('staff').select('permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-    if (!(sc.pastDays || sc.profit || (me && me.permissions && me.permissions.view_profit_report))) {
+    if (!(sc.owner || sc.pastCash)) {
       document.body.innerHTML = '<p style="padding:40px;text-align:center;color:#ba1a1a;font-family:Arial">عرض الأيام السابقة يحتاج صلاحية من المدير.</p>';
       return;
     }

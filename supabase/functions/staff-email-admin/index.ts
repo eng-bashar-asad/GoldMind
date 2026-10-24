@@ -51,6 +51,9 @@ serve(async (req) => {
     });
     const { data: { user: callerUser }, error: callerErr } = await callerClient.auth.getUser();
     if (callerErr || !callerUser) return json({ error: 'الجلسة غير صالحة، سجّل الدخول من جديد' }, 401);
+    // a password sign-in must have finished the emailed-code step (same rule as the database: gm_session_ok)
+    const { data: twoFaOk } = await callerClient.rpc('gm_session_ok');
+    if (twoFaOk !== true) return json({ error: 'أكمل التحقق برمز البريد الإلكتروني أولاً ثم أعد المحاولة', code: '2FA_REQUIRED' }, 403);
 
     const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
 

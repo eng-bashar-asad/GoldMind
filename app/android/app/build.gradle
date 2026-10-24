@@ -32,6 +32,11 @@ android {
             }
         }
     }
+    // Zebra RFID sled (RFD4031): its code is compiled only when the Zebra SDK .aar was put in libs/
+    // at build time (it is never in the repo); otherwise the app simply has no Zebra support.
+    if (file('libs/rfidapi3lib-2.0.5.297.aar').exists()) {
+        sourceSets { main { java.srcDirs += 'src/zebra/java' } }
+    }
     buildTypes {
         debug {
             if (System.getenv("GM_KEYSTORE_PATH")) signingConfig signingConfigs.goldmind

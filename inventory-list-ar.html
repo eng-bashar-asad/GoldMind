@@ -12,7 +12,7 @@
 <title>المخزن | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=49"></script>
+<script src="supabase-config.js?v=50"></script>
 <script src="theme.js?v=77"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -386,7 +386,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         const chip = { available: ['#E3F1E6', '#2E7D46'], reserved: ['#FFF1D6', '#8A5A00'], sold: ['#EFE9DD', '#6B6150'], given_to_trader: ['#E8EEF9', '#33517E'] }[piece.status] || ['#EFE9DD', '#6B6150'];
         const typeLabel = [piece.piece_type, piece.category1, piece.category2].filter(Boolean).join(' · ') || piece.description_ar || 'قطعة';
         const photo = piece.photo_url
-            ? `<img src="${gmEscapeHtml(piece.photo_url)}" onclick="event.preventDefault(); event.stopPropagation(); openPhotoLightbox('${gmEscapeHtml(piece.photo_url)}')" alt="صورة القطعة" loading="lazy"/>`
+            ? `<img src="${gmEscapeHtml(piece.photo_url)}" onclick="event.preventDefault(); event.stopPropagation(); openPhotoLightbox(${gmEscapeHtml(JSON.stringify(String(piece.photo_url)))})" alt="صورة القطعة" loading="lazy"/>`
             : `<span class="ph gm-gicon"><span class="material-symbols-outlined" style="position:relative;font-size:26px;">photo_camera</span><span class="gm-sweep" aria-hidden="true"></span></span>`;
         return `
         <a href="piece-edit-ar.html?id=${piece.id}" class="gm-piece">
@@ -411,7 +411,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
             const chip = { available: ['#E3F1E6', '#2E7D46'], reserved: ['#FFF1D6', '#8A5A00'], sold: ['#EFE9DD', '#6B6150'], given_to_trader: ['#E8EEF9', '#33517E'] }[piece.status] || ['#EFE9DD', '#6B6150'];
             const typeLabel = [piece.piece_type, piece.category1, piece.category2].filter(Boolean).join(' · ') || piece.description_ar || 'قطعة';
             const photo = piece.photo_url
-                ? `<img src="${gmEscapeHtml(piece.photo_url)}" alt="" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:8px" onclick="event.stopPropagation(); openPhotoLightbox('${gmEscapeHtml(piece.photo_url)}')"/>`
+                ? `<img src="${gmEscapeHtml(piece.photo_url)}" alt="" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:8px" onclick="event.stopPropagation(); openPhotoLightbox(${gmEscapeHtml(JSON.stringify(String(piece.photo_url)))})"/>`
                 : '<span style="display:inline-block;width:40px;height:40px;border-radius:8px;background:#EFE7D2"></span>';
             const href = 'piece-edit-ar.html?id=' + encodeURIComponent(piece.id);
             return `<tr class="cursor-pointer hover:bg-[#FBF6E8]" onclick="location.href='${href}'">` +
@@ -434,7 +434,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
     function populateSearchTypeOptions() {
         const types = [...new Set(ALL_PIECES_RAW.map(p => p.piece_type).filter(Boolean))].sort();
         const select = document.getElementById('search-type');
-        select.innerHTML = '<option value="">الكل</option>' + types.map(t => `<option value="${t}">${t}</option>`).join('');
+        select.innerHTML = '<option value="">الكل</option>' + types.map(t => `<option value="${gmEscapeHtml(t)}">${gmEscapeHtml(t)}</option>`).join('');
     }
 
     function toggleSearch() {

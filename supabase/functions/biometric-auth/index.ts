@@ -104,6 +104,12 @@ Deno.serve(async (req) => {
     const caller = createClient(SUPABASE_URL, ANON_KEY, { global: { headers: { Authorization: auth } }, auth: { persistSession: false } });
     const { data } = await caller.auth.getUser();
     userId = data?.user?.id || null;
+    // adding a fingerprint / Face ID needs a session that finished the emailed-code step:
+    // otherwise a stolen password alone could register a passkey and skip the code for good
+    if (userId) {
+      const { data: twoFaOk } = await caller.rpc('gm_session_ok');
+      if (twoFaOk !== true) userId = null;
+    }
   }
 
   const out = await handle({ swa, db, mint, cfg, userId }, body);

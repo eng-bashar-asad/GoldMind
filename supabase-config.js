@@ -617,10 +617,10 @@ let gmScopeCache = null;
 async function gmStaffScope() {
     if (gmScopeCache) return gmScopeCache;
     if (!GOLDMIND_STAFF_ID) await requireGoldMindSession();
-    if (!GOLDMIND_STAFF_ID) return { owner: false, pastDays: false, traders: false, profit: false }; // not cached: no session yet
+    if (!GOLDMIND_STAFF_ID) return { owner: false, pastDays: false, pastCash: false, backdate: false, traders: false, profit: false }; // not cached: no session yet
     const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
     const owner = !!(me && me.role === 'owner'), has = function (k) { return owner || !!(me && me.permissions && me.permissions[k] === true); };
-    gmScopeCache = { owner: owner, pastDays: has('view_past_days'), traders: has('view_traders'), profit: has('view_profit_report') };
+    gmScopeCache = { owner: owner, pastDays: has('view_past_days'), pastCash: has('view_past_cashbox'), backdate: has('backdate_entries'), traders: has('view_traders'), profit: has('view_profit_report') };
     return gmScopeCache;
 }
 // start of today in the shop's display time zone, as an ISO instant
@@ -1078,10 +1078,17 @@ function gmOpDatePaint(inp) {
     if (note) note.textContent = past ? 'ستُسجَّل العملية بتاريخ سابق' : '';
 }
 function gmOpDateInit() {
-    document.querySelectorAll('[data-gm-opdate]').forEach(function (box) {
+    const boxes = document.querySelectorAll('[data-gm-opdate]');
+    if (!boxes.length) return;
+    // only the owner and staff with 'backdate_entries' get the field (the server checks the same)
+    gmStaffScope().then(function (sc) {
+        if (sc.owner || sc.backdate) document.querySelectorAll('.gm-opdate').forEach(function (w) { w.hidden = false; });
+    });
+    boxes.forEach(function (box) {
         if (box.querySelector('.gm-opdate')) return;
         const wrap = document.createElement('div');
         wrap.className = 'gm-opdate';
+        wrap.hidden = true;
         wrap.style.cssText = 'margin-bottom:10px';
         wrap.innerHTML = '<label style="display:block;font-size:11px;font-weight:600;opacity:.75;margin-bottom:4px">تاريخ العملية</label>'
             + '<input type="date" dir="ltr" style="width:100%;height:44px;border:1px solid rgba(128,128,128,.45);border-radius:8px;padding:0 12px;background:transparent;color:inherit">'
@@ -1098,9 +1105,17 @@ function gmOpDateCapture(e) {
     if (!t || !t.closest) return;
     const box = t.closest('[data-gm-opdate]');
     if (box) {
-        const inp = box.querySelector('.gm-opdate input');
+        const inp = box.querySelector('.gm-opdate:not([hidden]) input');
         const v = inp && inp.value;
         window.gmOpDate = v && v < gmTodayStr() ? v : null;
+        // a back-dated save asks once (the press on a save button / the form submit)
+        const saving = e.type === 'submit' || (!t.closest('form') && t.closest('button[type="submit"],button:not([type]),[data-gm-save]'));
+        if (window.gmOpDate && saving && !t.closest('.gm-opdate')) {
+            const d = window.gmOpDate;
+            if (!confirm('أنت تضيف حركة بتاريخ سابق (' + d.slice(8) + '/' + d.slice(5, 7) + '/' + d.slice(0, 4) + '). هل تريد إتمام العملية؟')) {
+                e.preventDefault(); e.stopImmediatePropagation(); window.gmOpDate = null;
+            }
+        }
     } else if (t.closest('[id$="-form"],[id$="Form"],form')) {
         window.gmOpDate = null;
     }

@@ -628,7 +628,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=49"></script>
+<script src="supabase-config.js?v=50"></script>
 <script src="gm-logo.js?v=2" defer></script>
 <script src="gm-biometric.js?v=1"></script>
 <script>window.addEventListener('load', function () { setTimeout(function () { if (window.GMBio) GMBio.maybePrompt(); }, 2500); });</script>
@@ -848,6 +848,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
           <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">payments</span><span class="dsk-stat-label">مبيعات اليوم</span></div>
           <div class="dsk-stat-value" id="dskTodaySalesEl" style="visibility:hidden;color:#1B5E20">0.00</div>
           <div class="dsk-stat-trend flat"><span class="dsk-sub-num" id="dskTodayInvoiceCountEl" style="visibility:hidden;">0</span> فاتورة اليوم</div>
+          <div class="dsk-stat-trend flat hidden" id="dskTodayBuysEl"></div>
         </div>
         <a class="dsk-stat" href="customers-ar.html" style="--dsk-tint:#F3DEDA;--dsk-ink:#8A3B32;">
           <div class="dsk-stat-head"><span class="material-symbols-outlined dsk-stat-ic">request_quote</span><span class="dsk-stat-label">ديون الزبائن</span></div>
@@ -1312,7 +1313,8 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 </div>
 <div class="hidden" id="gmMetricPark">
 <div class="gm-metric" id="gmMetricSales"><span class="gm-metric-label">مبيعات اليوم</span>
-<div class="gm-metric-value truncate" style="visibility:hidden;" id="todaySalesEl">0.00</div></div>
+<div class="gm-metric-value truncate" style="visibility:hidden;" id="todaySalesEl">0.00</div>
+<div class="gm-metric-sub hidden text-[12px] font-semibold mt-1 truncate" style="color:#6B6150" id="todayBuysEl"></div></div>
 <div class="gm-metric" id="gmMetricCash"><span class="gm-metric-label">نقد الصندوق</span>
 <div class="gm-metric-value truncate" style="visibility:hidden;" id="dailyCashboxBalanceEl">0.00</div>
 <div class="gm-metric-sub hidden text-[13px] font-bold font-data-mono mt-1 truncate" id="dailyCashboxOtherCurrenciesEl"></div></div>
@@ -2311,6 +2313,13 @@ document.addEventListener('DOMContentLoaded', function () {
             }
             fitStatNumber(document.getElementById('todaySalesEl'));
             fitStatNumber(document.getElementById('todayInvoiceCountEl'));
+            // today's purchases under the sales figure (wholesale-trader purchases only with 'view_traders')
+            gmStaffScope().then(sc => {
+                const buyTypes = sc.traders ? ['buyRetail', 'buyTrader'] : ['buyRetail'];
+                const buys = (todayInvoices || []).filter(i => buyTypes.includes(i.type));
+                const txt = buys.length ? 'مشتريات اليوم: ' + gmFormatDualCurrency(buys.reduce((s, i) => s + Number(i.total_amount || 0), 0), store) : '';
+                ['todayBuysEl', 'dskTodayBuysEl'].forEach(id => { const el = document.getElementById(id); if (el) { el.textContent = txt; el.classList.toggle('hidden', !txt); } });
+            });
             const dskSalesEl = document.getElementById('dskTodaySalesEl');
             const dskInvCountEl = document.getElementById('dskTodayInvoiceCountEl');
             if (dskSalesEl) { dskSalesEl.textContent = gmFormatDualCurrency(todaySales, store); dskSalesEl.style.visibility = 'visible'; fitStatNumber(dskSalesEl); }

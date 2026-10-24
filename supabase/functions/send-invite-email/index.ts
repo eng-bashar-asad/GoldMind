@@ -36,6 +36,12 @@ Deno.serve(async (req: Request) => {
     // verify_jwt is on, so the gateway has already checked the token's signature
     const callerId = decodeJwtSub(req.headers.get("Authorization"));
     if (!callerId) return json({ error: "NOT_AUTHENTICATED" }, 401);
+    // a password sign-in must have finished the emailed-code step (same rule as the database: gm_session_ok)
+    {
+      const caller = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_ANON_KEY")!, { global: { headers: { Authorization: req.headers.get("Authorization")! } } });
+      const { data: twoFaOk } = await caller.rpc("gm_session_ok");
+      if (twoFaOk !== true) return json({ error: "2FA_REQUIRED" }, 403);
+    }
 
     const { store_id, invite_email } = await req.json();
     if (!store_id || !invite_email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(String(invite_email)) || String(invite_email).length > 254) {

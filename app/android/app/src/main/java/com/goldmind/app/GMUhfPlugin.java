@@ -6,11 +6,19 @@ import com.getcapacitor.PluginCall;
 import com.getcapacitor.PluginMethod;
 import com.getcapacitor.annotation.CapacitorPlugin;
 
+import android.Manifest;
+import android.content.pm.PackageManager;
+import android.os.Build;
+
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
+
 import java.lang.reflect.Method;
 
 /**
  * UHF RFID on Chainway handhelds (C72 and similar) through Chainway's DeviceAPI,
- * and on Urovo handhelds (DT50P / Tagway THS 3.0) through UrovoUhf — same JS API for both.
+ * on Urovo handhelds (DT50P / Tagway THS 3.0) through UrovoUhf, and on a Zebra Bluetooth sled
+ * (RFD4031, paired with the phone) through ZebraRfd — same JS API for all three.
  * Chainway part:
  * (com.rscja.deviceapi.RFIDWithUHFUART). The SDK .aar is downloaded from
  * chainway.net at build time (see build-apk.yml) and is never in the repo, so it
@@ -33,6 +41,7 @@ public class GMUhfPlugin extends Plugin {
     private Thread loop;
     private final UrovoUhf uro = new UrovoUhf();
     private boolean isUro;
+    private RfidSled sled;          // Zebra sled (ZebraRfd, only in builds that bundle the Zebra SDK)
 
     @Override
     public void load() { instance = this; }
@@ -55,8 +64,22 @@ public class GMUhfPlugin extends Plugin {
             if (ok != null && ok) { reader = r; return true; }
         } catch (Throwable ignored) { /* not a Chainway device, or SDK not bundled */ }
         if (uro.open(getContext())) { isUro = true; return true; }
-        return false;
+        return openSled();
     }
+
+    // Zebra RFD4031 over Bluetooth: the SDK needs Android 10+, and Android 12+ asks once for "nearby devices".
+    private boolean openSled() {
+        if (Build.VERSION.SDK_INT < 29) return false;
+        try {
+            if (sled == null) sled = (RfidSled) Class.forName("com.goldmind.app.ZebraRfd").getDeclaredConstructor().newInstance();
+        } catch (Throwable notBundled) { return false; }
+        if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
+            if (getActivity() != null) ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 7311);
+            return false; // asked; the page's next try connects
+        }
+        return sled.open(getContext(), GMUhfPlugin::onTrigger);
+    }
+    private boolean isSled() { return reader == null && !isUro && sled != null; }
 
     private Object call(String name, Class<?>[] types, Object... args) throws Exception {
         Method m = readerClass.getMethod(name, types);
@@ -85,6 +108,17 @@ public class GMUhfPlugin extends Plugin {
         JSObject o = new JSObject(); o.put("oldEpc", old); o.put("epc", now); c.resolve(o);
     }
 
+    // Zebra sled: same steps — nearest label at low power, write, read back to verify
+    private void writeSled(PluginCall c, String epc) throws Exception {
+        int p = c.getInt("power", 5);
+        String old = sled.readOne(p);
+        if (old == null) { c.reject("لم تُقرأ أي شريحة — قرّب الملصقة من مقدمة الجهاز"); return; }
+        if (!sled.writeEpc(old, epc, p)) { c.reject("فشلت الكتابة على الشريحة — أعد المحاولة"); return; }
+        String now = sled.readOne(p);
+        if (now == null || !now.startsWith(epc)) { c.reject("كُتبت الشريحة لكن تعذّر التحقق منها — أعد المحاولة"); return; }
+        JSObject o = new JSObject(); o.put("oldEpc", old); o.put("epc", now); c.resolve(o);
+    }
+
     @PluginMethod
     public void available(PluginCall c) {
         JSObject o = new JSObject();
@@ -98,6 +132,7 @@ public class GMUhfPlugin extends Plugin {
         try {
             String epc;
             if (isUro) epc = uro.readOne(c.getInt("power", 10));
+            else if (isSled()) epc = sled.readOne(c.getInt("power", 10));
             else { power(c, 10); epc = epcOf(call("inventorySingleTag", new Class<?>[]{})); }
             if (epc == null || epc.isEmpty()) { c.reject("لم تُقرأ أي شريحة — قرّب الملصقة من الجهاز"); return; }
             JSObject o = new JSObject(); o.put("epc", epc); c.resolve(o);
@@ -112,6 +147,7 @@ public class GMUhfPlugin extends Plugin {
         if (running) { c.reject("أوقف القراءة المستمرة أولاً"); return; }
         try {
             if (isUro) { writeUrovo(c, epc); return; }
+            if (isSled()) { writeSled(c, epc); return; }
             // low power so only the label held against the device is reached
             power(c, 5);
             String old = epcOf(call("inventorySingleTag", new Class<?>[]{}));
@@ -131,6 +167,12 @@ public class GMUhfPlugin extends Plugin {
         try {
             if (isUro) {
                 if (!uro.start(c.getInt("power", 0), (epc, rssi) -> {
+                    JSObject o = new JSObject(); o.put("epc", epc); o.put("rssi", String.valueOf(rssi)); notifyListeners("tag", o);
+                })) { c.reject("تعذّر بدء القراءة"); return; }
+                running = true; c.resolve(); return;
+            }
+            if (isSled()) {
+                if (!sled.start(c.getInt("power", 0), (epc, rssi) -> {
                     JSObject o = new JSObject(); o.put("epc", epc); o.put("rssi", String.valueOf(rssi)); notifyListeners("tag", o);
                 })) { c.reject("تعذّر بدء القراءة"); return; }
                 running = true; c.resolve(); return;
@@ -166,6 +208,7 @@ public class GMUhfPlugin extends Plugin {
     private void stopReading() {
         running = false;
         if (isUro) { uro.stop(); return; }
+        if (isSled()) { sled.stop(); return; }
         try { if (reader != null) call("stopInventory", new Class<?>[]{}); } catch (Throwable ignored) { }
     }
 
@@ -174,6 +217,7 @@ public class GMUhfPlugin extends Plugin {
         stopReading();
         try { if (reader != null) call("free", new Class<?>[]{}); } catch (Throwable ignored) { }
         if (isUro) uro.close();
+        if (sled != null) sled.close();
         reader = null;
         instance = null;
     }
