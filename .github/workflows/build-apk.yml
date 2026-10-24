@@ -129,6 +129,23 @@ jobs:
           echo "0ae03ee59eb102c5575751cf8ec0950349c9bc486b33ad498c0d4aaab6e381a8  /tmp/urfid.aar" | sha256sum -c -
           cp /tmp/urfid.aar app/android/app/libs/URFIDLibrary-v2.5.0718.aar
 
+      # RFID on the Zebra RFD4031 Bluetooth sled: Zebra's RFID SDK may not be published in this
+      # public repo, so it is kept in the private repo eng-bashar-asad/GoldMind-private-libs and read
+      # with a read-only token (secret ZEBRA_LIBS_TOKEN). Checked by SHA-256. Without the secret or
+      # the file the build simply has no Zebra support (the Zebra code is compiled only when the .aar
+      # is in libs/, see app/build.gradle).
+      - name: Zebra RFID SDK
+        continue-on-error: true
+        env:
+          ZEBRA_LIBS_TOKEN: ${{ secrets.ZEBRA_LIBS_TOKEN }}
+        run: |
+          if [ -z "$ZEBRA_LIBS_TOKEN" ]; then echo "ZEBRA_LIBS_TOKEN not set - building without Zebra"; exit 0; fi
+          mkdir -p app/android/app/libs
+          curl -fsSL --retry 3 -H "Authorization: Bearer $ZEBRA_LIBS_TOKEN" -H "Accept: application/vnd.github.raw" \
+            -o /tmp/zebra.aar "https://api.github.com/repos/eng-bashar-asad/GoldMind-private-libs/contents/zebra/rfidapi3lib-2.0.5.297.aar"
+          echo "82ebd79109ba2f78723eb3d841764b1352abe49c2c963d343251fdc00f6cd4a0  /tmp/zebra.aar" | sha256sum -c -
+          cp /tmp/zebra.aar app/android/app/libs/rfidapi3lib-2.0.5.297.aar
+
       - name: Sync Capacitor Android project
         working-directory: app
         run: npx cap sync android
