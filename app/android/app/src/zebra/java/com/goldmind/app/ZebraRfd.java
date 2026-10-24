@@ -38,6 +38,10 @@ final class ZebraRfd implements RfidSled {
     private volatile TagSink sink;
     private volatile AtomicReference<String> single;
     private int[] powerLevels; // dBm x 10, by index
+    private String deviceName = "";
+
+    @Override
+    public String name() { return reader != null && reader.isConnected() ? deviceName : ""; }
 
     private static String clean(String e) { return e == null ? null : e.replaceAll("[^0-9A-Fa-f]", "").toUpperCase(); }
 
@@ -80,7 +84,9 @@ final class ZebraRfd implements RfidSled {
             if (readers == null) readers = new Readers(ctx, ENUM_TRANSPORT.BLUETOOTH);
             ArrayList<ReaderDevice> list = readers.GetAvailableRFIDReaderList();
             if (list == null || list.isEmpty()) return false;
-            RFIDReader r = list.get(0).getRFIDReader();
+            ReaderDevice dev = list.get(0);
+            RFIDReader r = dev.getRFIDReader();
+            deviceName = dev.getName() == null ? "" : dev.getName();
             if (!r.isConnected()) r.connect();
             r.Events.addEventsListener(events);
             r.Events.setHandheldEvent(true);

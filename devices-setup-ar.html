@@ -12,6 +12,7 @@
 <script src="supabase-config.js?v=51"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
 <script src="zebra-rfid.js?v=6"></script>
+<script src="gm-uhf.js?v=2"></script>
 <script src="theme.js?v=78"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -176,6 +177,7 @@
       <p class="font-bold mb-2">ما نوع القارئ؟</p>
       <div class="flex flex-col gap-2" id="reader-pick">
         <button type="button" class="choice" data-reader="zebra" aria-pressed="false"><p class="font-bold">Zebra</p><p class="text-[12px] text-on-surface-variant">جهاز Zebra أندرويد مع قبضة RFD40 / RFD90، أو MC3330R</p></button>
+        <button type="button" class="choice" data-reader="sled" aria-pressed="false"><p class="font-bold">Zebra RFD40 بالبلوتوث</p><p class="text-[12px] text-on-surface-variant">قبضة RFD4031 / RFD40 مربوطة بموبايلك بالبلوتوث، داخل تطبيق GoldMind للأندرويد</p></button>
         <button type="button" class="choice" data-reader="chainway" aria-pressed="false"><p class="font-bold">Chainway أو Urovo</p><p class="text-[12px] text-on-surface-variant">مثل C72 و C66، و Urovo DT50P (THS 3.0)، داخل تطبيق GoldMind للأندرويد</p></button>
         <button type="button" class="choice" data-reader="usb" aria-pressed="false"><p class="font-bold">قارئ USB أو بلوتوث على الكمبيوتر</p><p class="text-[12px] text-on-surface-variant">يعمل بوضع «لوحة المفاتيح» (HID / Keyboard)</p></button>
       </div>
@@ -202,6 +204,55 @@
     <div class="step"><span class="step-n">2</span><div class="flex-1">
       <p class="font-bold mb-1">تطبيق GoldMind للأندرويد</p>
       <p class="text-[13px] text-on-surface-variant leading-6">أجهزة Chainway و Urovo تعمل مباشرة داخل تطبيق GoldMind، بلا أي إعداد إضافي. التثبيت والربط مشروحان خطوة بخطوة في <a class="text-primary underline" href="rfid-guide-ar.html">دليل RFID</a>. في صفحة الجرد اضغط «ابدأ القراءة بالجهاز» أو زر المسدس.</p>
+    </div></div>
+  </div>
+
+  <div class="card hidden" id="reader-sled">
+    <div class="step"><span class="step-n">2</span><div class="flex-1">
+      <p class="font-bold mb-1">ربط القبضة (مرة واحدة)</p>
+      <ol class="tips">
+        <li>ثبّت أحدث نسخة من تطبيق GoldMind للأندرويد.</li>
+        <li>شغّل القبضة، ومن <b>إعدادات الموبايل ← البلوتوث</b> اربطها (يظهر اسمها مثل <code>RFD4031-…</code>).</li>
+        <li>اضغط «اتصال» تحت. أول مرة يطلب الموبايل إذن <b>الأجهزة القريبة</b>: وافق ثم اضغط «اتصال» مرة ثانية.</li>
+      </ol>
+    </div></div>
+  </div>
+
+  <div class="card hidden" id="reader-native">
+    <div class="step"><span class="step-n">3</span><div class="flex-1">
+      <p class="font-bold mb-2">الحالة والاختبار</p>
+      <p id="nat-web" class="hidden text-[13px] bad mb-2">هذه الإعدادات تعمل من داخل تطبيق GoldMind للأندرويد فقط — افتح الصفحة من التطبيق.</p>
+      <div class="flex items-center gap-2 flex-wrap">
+        <span class="material-symbols-outlined" id="nat-ic" aria-hidden="true">bluetooth_disabled</span>
+        <span id="nat-status" class="text-[14px] font-bold flex-1">غير متصل</span>
+        <button type="button" class="btn btn-line h-10 px-3" id="nat-connect"><span class="material-symbols-outlined">bluetooth_searching</span> اتصال</button>
+        <button type="button" class="btn btn-line h-10 px-3 hidden" id="nat-disconnect">قطع الاتصال</button>
+      </div>
+      <div class="flex gap-2 mt-3 flex-wrap">
+        <button type="button" class="btn btn-line h-10 px-3" id="nat-read1"><span class="material-symbols-outlined">nfc</span> قراءة ليبل واحد</button>
+        <button type="button" class="btn btn-line h-10 px-3" id="nat-scan"><span class="material-symbols-outlined">sensors</span> قراءة مستمرة (اختبار)</button>
+      </div>
+      <p id="nat-msg" class="text-[13px] mt-2"></p>
+      <ul id="nat-list" class="text-[12px] font-data-mono mt-1" dir="ltr"></ul>
+    </div></div>
+  </div>
+
+  <div class="card hidden" id="reader-settings">
+    <div class="step"><span class="step-n">4</span><div class="flex-1">
+      <p class="font-bold mb-1">إعدادات القارئ على هذا الموبايل</p>
+      <p class="text-[12px] text-on-surface-variant mb-3">تُحفظ على هذا الموبايل، وتعمل بها شاشة الجرد وبرمجة الشرائح.</p>
+      <label class="block text-[13px] font-bold" for="set-write">مسافة الكتابة (برمجة الشريحة): <span id="set-write-v" class="font-data-mono" dir="ltr"></span></label>
+      <input type="range" id="set-write" min="1" max="30" step="1" class="w-full" aria-describedby="set-write-h"/>
+      <p id="set-write-h" class="text-[11.5px] text-on-surface-variant mb-3">الأقل = يجب أن يكون الليبل ملاصقاً للجهاز، فلا تُبرمج الشريحة المجاورة بالخطأ. المنصوح: 5.</p>
+      <label class="block text-[13px] font-bold" for="set-count">قوة الجرد: <span id="set-count-v" class="font-data-mono" dir="ltr"></span></label>
+      <input type="range" id="set-count" min="5" max="31" step="1" class="w-full" aria-describedby="set-count-h"/>
+      <p id="set-count-h" class="text-[11.5px] text-on-surface-variant mb-3">أقصى اليمين = أعلى قوة (أبعد مسافة). خفّفها إن كان يقرأ قطعاً من خارج المكان الذي تجرده.</p>
+      <p class="text-[13px] font-bold mb-1">زناد الجهاز</p>
+      <div class="flex flex-col gap-2" id="set-trigger">
+        <button type="button" class="choice" data-trigger="hold" aria-pressed="false"><p class="font-bold">اضغط مطوّلاً</p><p class="text-[12px] text-on-surface-variant">يقرأ طالما الزناد مضغوط، ويتوقف عند تركه</p></button>
+        <button type="button" class="choice" data-trigger="toggle" aria-pressed="false"><p class="font-bold">ضغطة تشغيل وضغطة إيقاف</p><p class="text-[12px] text-on-surface-variant">ضغطة تبدأ القراءة، والضغطة التالية توقفها</p></button>
+      </div>
+      <button type="button" class="btn btn-line h-10 px-3 mt-3" id="set-reset">الإعدادات الافتراضية</button>
     </div></div>
   </div>
 
@@ -252,9 +303,12 @@ function showBrand(brand) {
 }
 function showReader(r) {
   pick('reader-pick', 'data-reader', r);
-  ['zebra', 'chainway', 'usb'].forEach(k => $('reader-' + k).classList.toggle('hidden', k !== r));
-  $('reader-test').classList.toggle('hidden', r === 'chainway');
-  if (r !== 'chainway') setTimeout(() => $('rfid-test').focus(), 50);
+  ['zebra', 'chainway', 'usb', 'sled'].forEach(k => $('reader-' + k).classList.toggle('hidden', k !== r));
+  const nat = r === 'chainway' || r === 'sled';
+  $('reader-native').classList.toggle('hidden', !nat);
+  $('reader-settings').classList.toggle('hidden', !nat);
+  $('reader-test').classList.toggle('hidden', nat);
+  if (nat) natInit(r); else setTimeout(() => $('rfid-test').focus(), 50);
 }
 $('kind-pick').addEventListener('click', e => { const b = e.target.closest('[data-kind]'); if (b) showKind(b.dataset.kind); });
 $('brand-pick').addEventListener('click', e => { const b = e.target.closest('[data-brand]'); if (b) showBrand(b.dataset.brand); });
@@ -339,10 +393,71 @@ $('other-test').addEventListener('click', () => {
   window.print();
 });
 
+// ---- RFID inside the Android app (Chainway / Urovo / Zebra RFD40 sled): status, test, settings ----
+const KIND_NAME = { chainway: 'Chainway', urovo: 'Urovo', zebra: 'Zebra' };
+let natScanning = false;
+function natPaint(st) {
+  const on = st && st.available;
+  $('nat-ic').textContent = on ? 'bluetooth_connected' : 'bluetooth_disabled';
+  $('nat-ic').className = 'material-symbols-outlined ' + (on ? 'ok' : 'bad');
+  $('nat-status').textContent = on ? 'متصل — ' + (KIND_NAME[st.kind] || '') + (st.name ? ' ' + st.name : '') : 'غير متصل';
+  $('nat-disconnect').classList.toggle('hidden', !(on && st.kind === 'zebra'));
+}
+async function natConnect() {
+  if (!GMUhf.native) return;
+  $('nat-status').textContent = 'جارٍ الاتصال...';
+  const st = await GMUhf.status();
+  natPaint(st);
+  if (!st.available) $('nat-msg').textContent = 'لم يُعثر على قارئ. تأكد أن القبضة مشغّلة ومربوطة بالبلوتوث، وإن طلب الموبايل إذن «الأجهزة القريبة» فوافق ثم اضغط «اتصال» مجدداً.';
+  else $('nat-msg').textContent = '';
+  return st;
+}
+function natSettingsPaint() {
+  const s = GMUhf.settings();
+  $('set-write').value = s.writePower;
+  $('set-write-v').textContent = s.writePower + ' dBm';
+  $('set-count').value = s.countPower || 31;
+  $('set-count-v').textContent = s.countPower ? s.countPower + ' dBm' : 'أعلى قوة';
+  $('set-trigger').querySelectorAll('[data-trigger]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.trigger === s.trigger)));
+}
+let natReady = false;
+function natInit() {
+  natSettingsPaint();
+  $('nat-web').classList.toggle('hidden', GMUhf.native);
+  if (natReady) return;
+  natReady = true;
+  $('nat-connect').onclick = natConnect;
+  $('nat-disconnect').onclick = async () => { if (natScanning) await natScan(); await GMUhf.disconnect(); natPaint(null); };
+  $('nat-read1').onclick = async () => {
+    if (!GMUhf.native) return;
+    $('nat-msg').textContent = 'قرّب ليبل من الجهاز...';
+    try { const epc = await GMUhf.readOne(GMUhf.settings().writePower > 10 ? GMUhf.settings().writePower : 10); $('nat-msg').textContent = ''; gotTag(epc, 'nat-list'); }
+    catch (e) { $('nat-msg').textContent = e.message; }
+  };
+  $('nat-scan').onclick = natScan;
+  $('set-write').oninput = () => { GMUhf.saveSettings({ writePower: Number($('set-write').value) }); natSettingsPaint(); };
+  $('set-count').oninput = () => { const v = Number($('set-count').value); GMUhf.saveSettings({ countPower: v >= 31 ? 0 : v }); natSettingsPaint(); };
+  $('set-trigger').onclick = e => { const b = e.target.closest('[data-trigger]'); if (b) { GMUhf.saveSettings({ trigger: b.dataset.trigger }); natSettingsPaint(); } };
+  $('set-reset').onclick = () => { GMUhf.saveSettings({ writePower: 5, countPower: 0, trigger: 'hold' }); natSettingsPaint(); };
+  GMUhf.onTrigger(down => { if (down !== natScanning) natScan(); });
+  if (GMUhf.native) natConnect();
+}
+async function natScan() {
+  if (!GMUhf.native) return;
+  const b = $('nat-scan');
+  if (natScanning) { natScanning = false; b.lastChild.textContent = ' قراءة مستمرة (اختبار)'; await GMUhf.stop(); return; }
+  const seen = new Set();
+  natScanning = true; b.lastChild.textContent = ' إيقاف القراءة';
+  try {
+    await GMUhf.start(epc => { const v = String(epc).toUpperCase(); if (seen.has(v)) return; seen.add(v); gotTag(v, 'nat-list'); $('nat-msg').textContent = 'عدد الشرائح المقروءة: ' + seen.size; });
+  } catch (e) { natScanning = false; b.lastChild.textContent = ' قراءة مستمرة (اختبار)'; $('nat-msg').textContent = e.message; }
+}
+
 // ---- RFID read test ----
 const shopPrefix = () => String(window.GOLDMIND_STORE_ID || '').replace(/[^0-9a-f]/gi, '').slice(0, 8).toUpperCase();
 let reads = 0, idle = null;
-async function gotTag(raw) {
+async function gotTag(raw, listId) {
+  if (listId) return gotTagInto(raw, listId);
   const v = String(raw).replace(/\s+/g, '').toUpperCase();
   if (!v) return;
   reads++;
@@ -359,6 +474,19 @@ async function gotTag(raw) {
     li.textContent = v + '  ←  ' + (data ? (data.barcode + ' ' + (data.description_ar || '')) : 'شريحة من محلك غير مرتبطة بقطعة');
   } else if (!/^[0-9A-F]+$/.test(v)) {
     li.textContent = v + '  ←  هذا باركود وليس شريحة RFID';
+  }
+}
+// same lookup as the typed test, into another list (the in-app reader test)
+async function gotTagInto(raw, listId) {
+  const v = String(raw).replace(/\s+/g, '').toUpperCase();
+  if (!v) return;
+  const list = $(listId), li = document.createElement('li');
+  li.textContent = v;
+  list.prepend(li);
+  while (list.children.length > 12) list.lastChild.remove();
+  if (v.length >= 24 && v.startsWith(shopPrefix())) {
+    const { data } = await goldmindClient.from('pieces').select('barcode, description_ar').eq('store_id', GOLDMIND_STORE_ID).eq('rfid_epc', v).maybeSingle();
+    li.textContent = v + '  ←  ' + (data ? (data.barcode + ' ' + (data.description_ar || '')) : 'شريحة من محلك غير مرتبطة بقطعة');
   }
 }
 $('rfid-test').addEventListener('keydown', e => {

@@ -126,6 +126,24 @@ public class GMUhfPlugin extends Plugin {
         c.resolve(o);
     }
 
+    // For the device settings page: which reader this phone has, and the sled's name.
+    @PluginMethod
+    public void status(PluginCall c) {
+        boolean ok = open();
+        JSObject o = new JSObject();
+        o.put("available", ok);
+        o.put("kind", !ok ? "none" : reader != null ? "chainway" : isUro ? "urovo" : "zebra");
+        o.put("name", ok && isSled() ? sled.name() : "");
+        c.resolve(o);
+    }
+
+    @PluginMethod
+    public void disconnect(PluginCall c) {
+        stopReading();
+        if (sled != null) sled.close();
+        c.resolve();
+    }
+
     @PluginMethod
     public void readOne(PluginCall c) {
         if (!open()) { c.reject("لا يوجد قارئ RFID في هذا الجهاز"); return; }

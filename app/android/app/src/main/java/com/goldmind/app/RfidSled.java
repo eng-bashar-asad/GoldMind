@@ -21,4 +21,6 @@ interface RfidSled {
     boolean start(int powerDbm, TagSink sink) throws Exception;
     void stop();
     void close();
+    /** Name of the connected sled (e.g. RFD4031-...), or "" when not connected. */
+    String name();
 }
