@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=50"></script>
-<script src="theme.js?v=77"></script>
+<script src="theme.js?v=78"></script>
 <script src="gm-camera.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js"></script>
 <script src="zebra-rfid.js?v=6"></script>
@@ -147,6 +147,11 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <button onclick="gmSmartBack('inventory-list-ar.html')" class="gm-back" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button>
 <h1 class="gm-on-canvas" style="margin:0;font-size:18px;font-weight:700;color:#1F1A12;">بيانات القطعة</h1>
 </div>
+<div id="pcNav" class="hidden items-center gap-1">
+<button type="button" id="pcPrev" class="gm-hit w-10 h-10 rounded-full flex items-center justify-center" aria-label="القطعة السابقة" title="القطعة السابقة (→)"><span class="material-symbols-outlined">chevron_right</span></button>
+<span id="pcPos" class="text-[12px] font-semibold font-data-mono whitespace-nowrap" style="color:#6B6150" dir="rtl"></span>
+<button type="button" id="pcNext" class="gm-hit w-10 h-10 rounded-full flex items-center justify-center" aria-label="القطعة التالية" title="القطعة التالية (←)"><span class="material-symbols-outlined">chevron_left</span></button>
+</div>
 </div>
 </header>
 <main class="pb-32 w-full mx-auto px-4 sm:px-8" id="page-main">
@@ -174,6 +179,7 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <button id="gmRechipBtn" onclick="gmReprogramChip(this)" type="button" class="sq hidden" aria-label="تغيير برمجة الشريحة" title="تغيير برمجة الشريحة (رقم جديد، نفس الباركود)"><span class="material-symbols-outlined">autorenew</span><span class="pc-lbl">شريحة جديدة</span></button>
 <button id="gmRfidPrintBtn" onclick="location.href='piece-label-print-ar.html?id=' + encodeURIComponent(currentPiece.id)" type="button" class="sq hidden" aria-label="طباعة وبرمجة بطابعة RFID" title="طباعة وبرمجة بطابعة RFID"><span class="material-symbols-outlined">wifi_tethering</span><span class="pc-lbl">طابعة RFID</span></button>
 <a id="pcMoveBtn" href="branch-transfers-ar.html" class="sq pc-only hidden" aria-label="نقل لفرع" title="نقل لفرع"><span class="material-symbols-outlined">swap_horiz</span><span class="pc-lbl">نقل لفرع</span></a>
+<button id="pcScrapBtn" onclick="pcLinkScrap(this)" type="button" class="sq hidden" aria-label="ربط القطعة بصندوق الكسر" title="ربط بالكسر: القطعة أُضيفت جديدة وهي فعلاً مصنوعة من الكسر"><span class="material-symbols-outlined">recycling</span><span class="pc-lbl">ربط بالكسر</span></button>
 <button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="sq" aria-label="طباعة ملصق القطعة" title="طباعة ملصق القطعة"><span class="material-symbols-outlined">print</span><span class="pc-lbl">طباعة ملصق</span></button>
 <button type="button" class="sq" aria-label="تعديل البيانات" title="تعديل البيانات" onclick="gmOpenEdit()"><span class="material-symbols-outlined">edit</span><span class="pc-lbl">تعديل</span></button>
 </div>
@@ -567,6 +573,74 @@ async function printLabelDirectly() {
   }
 }
 
+// السابقة / التالية: the same list (box, filter, order) the piece was opened from in the inventory list.
+// Arrow keys on the computer (RTL: ← next, → previous), a sideways swipe on the phone.
+let pcDirty = false;
+
+// «ربط بالكسر»: a piece added as new stock that was really made from the scrap box. Takes its weight
+// out of «كسر <عيار>» exactly like production does (RPC production_take; it refuses twice).
+let pcScrapAvail = 0;
+async function pcScrapSetup(me) {
+  const p = currentPiece;
+  const allowed = me && (me.role === 'owner' || (me.permissions && me.permissions.add_piece === true));
+  if (!allowed || !p || !['available', 'reserved'].includes(p.status) || !p.karat) return;
+  const box = 'كسر ' + p.karat;
+  const [{ data: drawn }, { data: lots }] = await Promise.all([
+    goldmindClient.from('piece_lot_draws').select('id').eq('piece_id', p.id).limit(1),
+    goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('store_id', GOLDMIND_STORE_ID).eq('box_name', box).gt('weight_grams_remaining', 0)
+  ]);
+  if (drawn && drawn.length) return;
+  pcScrapAvail = (lots || []).reduce((s, l) => s + Number(l.weight_grams_remaining || 0), 0);
+  if (pcScrapAvail <= 0) return;
+  document.getElementById('pcScrapBtn').classList.remove('hidden');
+}
+async function pcLinkScrap(btn) {
+  const p = currentPiece, box = 'كسر ' + p.karat, w = Number(p.weight_grams || 0);
+  if (w > pcScrapAvail + 0.0005) { alert('وزن القطعة (' + w.toFixed(2) + ' غ) أكبر من الموجود في ' + box + ' (' + pcScrapAvail.toFixed(2) + ' غ).'); return; }
+  if (!confirm('ربط القطعة ' + (p.barcode || '') + ' بصندوق ' + box + '؟\nسيُسحب ' + w.toFixed(2) + ' غ من الصندوق (الموجود ' + pcScrapAvail.toFixed(2) + ' غ) كأنها أُنتجت منه.')) return;
+  btn.disabled = true;
+  const { error } = await goldmindClient.rpc('production_take', { p_piece: p.id, p_box: box });
+  btn.disabled = false;
+  if (error) { showMessage('تعذّر الربط: ' + error.message, true); return; }
+  btn.classList.add('hidden');
+  showMessage('تم ربط القطعة بصندوق ' + box + ' وسُحب وزنها منه.', false);
+  loadPieceLog();
+}
+function pcSetupNav() {
+  let ids = [];
+  try { ids = JSON.parse(sessionStorage.getItem('gm_piece_nav') || '[]'); } catch (_) {}
+  const i = ids.indexOf(pieceId);
+  if (i < 0 || ids.length < 2) return;
+  const nav = document.getElementById('pcNav');
+  nav.classList.remove('hidden'); nav.classList.add('flex');
+  document.getElementById('pcPos').textContent = 'القطعة ' + (i + 1) + ' من ' + ids.length;
+  const go = d => {
+    const id = ids[i + d];
+    if (!id) return;
+    if (pcDirty && !confirm('لديك تعديلات غير محفوظة على هذه القطعة. هل تريد الانتقال بدون حفظ؟')) return;
+    pcDirty = false; // the confirm above already covers leaving
+    location.replace('piece-edit-ar.html?id=' + encodeURIComponent(id)); // back still returns to the list
+  };
+  const prev = document.getElementById('pcPrev'), next = document.getElementById('pcNext');
+  prev.disabled = i === 0; next.disabled = i === ids.length - 1;
+  [prev, next].forEach(b => b.style.opacity = b.disabled ? '.35' : '');
+  prev.onclick = () => go(-1); next.onclick = () => go(1);
+  document.addEventListener('keydown', e => {
+    if (e.target.closest && e.target.closest('input, select, textarea, [contenteditable]')) return;
+    if (e.key === 'ArrowLeft') go(1); else if (e.key === 'ArrowRight') go(-1);
+  });
+  let sx = null, sy = 0;
+  const main = document.getElementById('page-main');
+  main.addEventListener('touchstart', e => { const x = e.touches[0] && e.touches[0].clientX; if (e.touches.length === 1 && x > 30 && x < innerWidth - 30 && !e.target.closest('input, select, textarea')) { sx = x; sy = e.touches[0].clientY; } }, { passive: true });
+  main.addEventListener('touchend', e => {
+    if (sx == null) return;
+    const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy; sx = null;
+    if (Math.abs(dx) > 80 && Math.abs(dx) > 2 * Math.abs(dy)) go(dx < 0 ? -1 : 1); // RTL: finger to the left = previous
+  });
+}
+document.addEventListener('input', e => { if (e.target.closest && e.target.closest('#form-wrap')) pcDirty = true; });
+document.addEventListener('change', e => { if (e.target.closest && e.target.closest('#form-wrap')) pcDirty = true; });
+
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
@@ -639,6 +713,8 @@ async function load() {
   if (canDelete) document.getElementById('delete-btn').classList.remove('hidden');
   gmRenderPieceView();
   document.getElementById('form-wrap').classList.remove('hidden');
+  pcSetupNav();
+  pcScrapSetup(me);
 
   loadPieceLog();
 }
@@ -810,6 +886,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   photoRemoved = false;
 
   showMessage('تم حفظ التعديلات بنجاح!', false);
+  pcDirty = false;
   gmRenderPieceView();
   loadPieceLog();
 });

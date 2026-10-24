@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=50"></script>
-<script src="theme.js?v=77"></script>
+<script src="theme.js?v=78"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -404,6 +404,8 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
     // a row opens the piece like the card does. Empty list -> '' so each caller keeps its message.
     function piecesHtml(pieces) {
         if (!pieces.length) return '';
+        // the piece page walks this same list (السابقة / التالية)
+        try { sessionStorage.setItem('gm_piece_nav', JSON.stringify(pieces.map(p => p.id))); } catch (_) {}
         if (!(window.matchMedia && window.matchMedia('(min-width: 1024px)').matches)) return pieces.map(pieceCardHtml).join('');
         const th = t => `<th class="px-3 py-2.5 text-right text-[12px] font-bold whitespace-nowrap" style="color:#6B6150;background:#F7F2E6;border-bottom:1px solid #E4DAC0">${t}</th>`;
         const td = (v, extra) => `<td class="px-3 py-2.5 text-[13px] whitespace-nowrap" style="border-bottom:1px solid #EFE7D2" ${extra || ''}>${v}</td>`;

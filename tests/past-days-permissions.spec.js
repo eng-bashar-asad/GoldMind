@@ -30,8 +30,7 @@ test('employee without past-day permissions: no day arrows, no date field, canno
 });
 
 test('back-dating asks first; cancelling saves nothing', async ({ page }) => {
-  const calls = [];
-  await install(page, { db: db('staff', { manage_daily_cashbox: true, backdate_entries: true, view_past_cashbox: true }), calls });
+  await install(page, { db: db('staff', { manage_daily_cashbox: true, backdate_entries: true, view_past_cashbox: true }) });
   await page.goto('/daily-cashbox-ar.html');
   await page.waitForFunction(() => typeof allEntries !== 'undefined' && allEntries.length === 2);
   await page.evaluate(() => { if (document.getElementById('addForm').classList.contains('hidden')) toggleAddForm(); });

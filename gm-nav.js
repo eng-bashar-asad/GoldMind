@@ -217,7 +217,7 @@
     .gm-qg:active .gm-gi,.dsk-action:active .gm-gi{transform:translateY(2px);box-shadow:0 0 0 1px color-mix(in srgb,var(--c,#C8952E) 55%,transparent) inset,0 -6px 10px color-mix(in srgb,var(--c,#C8952E) 22%,transparent) inset,0 4px 8px -6px rgba(0,0,0,.6)!important}
     /* a button busy saving shows a spinner (its text already says «جارِ …») */
     button.gm-busy{position:relative;opacity:.85;cursor:progress}
-    button.gm-busy::after{content:'';display:inline-block;width:15px;height:15px;margin-inline-start:8px;vertical-align:-3px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:gmSpin .7s linear infinite}
+    button.gm-busy:not([data-total])::after{content:'';display:inline-block;width:15px;height:15px;margin-inline-start:8px;vertical-align:-3px;border-radius:50%;border:2px solid currentColor;border-top-color:transparent;animation:gmSpin .7s linear infinite}
     @keyframes gmSpin{to{transform:rotate(360deg)}}
     /* phone: swipe from the edge to go back, pull down to refresh */
     #gmEdgeBack,#gmPull{position:fixed;z-index:10040;pointer-events:none;display:flex;align-items:center;justify-content:center;width:44px;height:44px;border-radius:50%;background:#1C1A16;color:#E9CF8B;box-shadow:0 8px 20px rgba(0,0,0,.3);opacity:0;transition:opacity .15s}
@@ -225,7 +225,7 @@
     #gmPull{top:10px;left:50%;margin-left:-22px}
     #gmEdgeBack.on,#gmPull.on{opacity:1}
     #gmPull.go .material-symbols-outlined{animation:gmSpin .7s linear infinite}
-    @media (prefers-reduced-motion:reduce){.gm-qg,.dsk-action,.gm-tab,.gm-tab-sale{transition:none}button.gm-busy::after,#gmPull.go .material-symbols-outlined{animation:none}}
+    @media (prefers-reduced-motion:reduce){.gm-qg,.dsk-action,.gm-tab,.gm-tab-sale{transition:none}button.gm-busy:not([data-total])::after,#gmPull.go .material-symbols-outlined{animation:none}}
     /* phone floating add button */
     .gm-fab{position:fixed;inset-inline-end:16px;bottom:calc(86px + env(safe-area-inset-bottom));z-index:49;width:58px;height:58px;border-radius:18px;background:#7A6640;color:#fff;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 18px rgba(28,26,22,.25)}
     .gm-fab .material-symbols-outlined{font-size:28px}
@@ -414,6 +414,58 @@
       .observe(document.body, { childList: true, subtree: true, characterData: true });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchEmpty); else watchEmpty();
+
+  // ---- Enter moves to the next field (every screen) ----
+  // Enter: next visible, enabled field in the same form / dialog / section; on the last field it
+  // presses the form's save button. Shift+Enter: back one field. Left alone: barcode/search boxes,
+  // fields with their own Enter (inline onkeydown, or a handler that called preventDefault),
+  // textareas, and anything inside [data-gm-enter="off"].
+  var ENTER_SKIP = /barcode|باركود|search|بحث|scan|مسح/i;
+  var SAVE_RE = /^(حفظ|ترحيل|تسجيل|إضافة|أضف|تأكيد|إصدار|إنشاء)/;
+  function gmFields(scope) {
+    return Array.prototype.filter.call(scope.querySelectorAll('input, select, textarea'), function (el) {
+      if (el.disabled || el.readOnly || el.tabIndex < 0) return false;
+      if (/^(hidden|button|submit|reset|file|checkbox|radio|range|color|image)$/i.test(el.type || '')) return false;
+      if (el.closest('[data-gm-enter="off"], [hidden], .hidden')) return false;
+      return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+    });
+  }
+  function gmEnterScope(el) {
+    return el.closest('form, [role=dialog], dialog, [data-gm-opdate], [data-enter-scope]')
+      || el.closest('section, .gm-card, main') || document.body;
+  }
+  function gmSaveButton(scope) {
+    var bs = Array.prototype.filter.call(scope.querySelectorAll('button, [type=submit]'), function (b) {
+      return !b.disabled && (b.offsetWidth || b.offsetHeight) && !b.closest('[data-gm-enter="off"]');
+    });
+    return bs.find(function (b) { return b.type === 'submit' || b.hasAttribute('data-gm-save'); })
+      || bs.find(function (b) { return SAVE_RE.test((b.textContent || '').trim()); });
+  }
+  window.gmEnterNext = function (el, back) {
+    var scope = gmEnterScope(el), list = gmFields(scope), i = list.indexOf(el);
+    if (i < 0) return false;
+    var next = list[i + (back ? -1 : 1)];
+    if (next) {
+      next.focus();
+      if (next.select && /^(text|number|tel|email|search|url|password|)$/i.test(next.type || '')) { try { next.select(); } catch (x) { /* number inputs */ } }
+      return true;
+    }
+    if (back) return false;
+    if (el.form) return false; // a real form: the browser's own Enter submits it
+    var save = gmSaveButton(scope);
+    if (save) { save.click(); return true; }
+    return false;
+  };
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
+    var t = e.target;
+    if (!t || !t.matches || !t.matches('input, select') || !document.contains(t)) return;
+    if (/^(button|submit|reset|file|checkbox|radio)$/i.test(t.type || '')) return;
+    if (t.hasAttribute('onkeydown') || t.closest('[data-gm-enter="off"]')) return;
+    if (ENTER_SKIP.test((t.id || '') + ' ' + (t.name || '') + ' ' + (t.placeholder || '') + ' ' + (t.getAttribute('aria-label') || ''))) return;
+    if (t.getAttribute('list') && !t.value) return; // let the suggestion list open
+    if (gmEnterNext(t, e.shiftKey)) e.preventDefault();
+  });
 
   // count a number up to its value once (idea from 21st.dev "number ticker"); keeps the text around the number (currency, units).
   // If the page writes a new value meanwhile, the count stops and the new value stays.

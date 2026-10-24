@@ -16,7 +16,7 @@
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="supabase-config.js?v=50"></script>
-<script src="theme.js?v=77"></script>
+<script src="theme.js?v=78"></script>
 <script src="gm-invoice-edit.js?v=2"></script>
 <script id="tailwind-config">
         tailwind.config = {
@@ -2059,6 +2059,7 @@
 
         saveBtn.disabled = true;
         saveBtn.setAttribute('aria-busy', 'true');
+        saveBtn.removeAttribute('data-total'); // the total sits in ::after, which the busy spinner also uses (it spun the total)
         saveBtn.textContent = 'جارِ الحفظ...';
 
         const { data: { session } } = await goldmindClient.auth.getSession();
