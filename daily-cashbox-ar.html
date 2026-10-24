@@ -11,7 +11,7 @@
 <title>الحركة اليومية | GoldMind</title>
 <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="supabase-config.js?v=50"></script>
+<script src="supabase-config.js?v=51"></script>
 <script src="theme.js?v=78"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -928,6 +928,7 @@ async function saveVoucherDate() {
   const d = document.getElementById('voucherDateInput').value;
   errEl.classList.add('hidden');
   if (!d) { errEl.textContent = 'اختر التاريخ'; errEl.classList.remove('hidden'); return; }
+  if (d < localDateStr(new Date()) && !confirm(`أنت تنقل السند إلى يوم سابق (${d.slice(8)}/${d.slice(5, 7)}/${d.slice(0, 4)}). هل تريد إتمام التعديل؟`)) return;
   const { error } = await goldmindClient.rpc('set_voucher_date', { p_cash_movement: voucherEntryId, p_date: d });
   if (error) { errEl.textContent = 'تعذّر الحفظ: ' + error.message; errEl.classList.remove('hidden'); return; }
   closeVoucherDate();
@@ -954,6 +955,8 @@ async function saveModalEdit() {
 
   if (!opType) { errEl.textContent = 'فضلاً اكتب نوع العملية'; errEl.classList.remove('hidden'); return; }
   if (!amount || amount <= 0) { errEl.textContent = 'فضلاً أدخل مبلغاً صحيحاً'; errEl.classList.remove('hidden'); return; }
+  const editedEntry = allEntries.find(x => x.id === modalEntryId);
+  if (editedEntry && dcIsPastDay(editedEntry) && !confirm(`أنت تعدّل حركة من يوم سابق (${gmFormatDateTime(editedEntry.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' })}). هل تريد إتمام التعديل؟`)) return;
 
   // Same "join or mint a group" logic as adding a new linked entry, but
   // also handles unlinking (empty selection → link_group cleared).
@@ -989,7 +992,9 @@ async function saveModalEdit() {
 
 async function deleteModalEntry() {
   if (!modalEntryId) return;
-  if (!confirm('هل أنت متأكد من حذف هذه العملية نهائياً؟ سيتم تحديث الرصيد تلقائياً.')) return;
+  const delEntry = allEntries.find(x => x.id === modalEntryId);
+  const pastNote = delEntry && dcIsPastDay(delEntry) ? '\nانتبه: هذه حركة من يوم سابق (' + gmFormatDateTime(delEntry.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' }) + ').' : '';
+  if (!confirm('هل أنت متأكد من حذف هذه العملية نهائياً؟ سيتم تحديث الرصيد تلقائياً.' + pastNote)) return;
 
   const { error } = await goldmindClient.from('daily_cash_log').delete().eq('id', modalEntryId);
   if (error) {

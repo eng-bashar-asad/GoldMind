@@ -256,6 +256,7 @@ async function requireGoldMindSession(redirectTo) {
     if (timedOut) return null;
 
     if (navigator.onLine && await gmTwoFactorNeeded(session)) { gmGoTwoFactor(); return null; }
+    gmScheduleSnapshot();
 
     // Mandatory privacy-policy acceptance gate — applies to every user (owner
     // or staff), regardless of how they signed up. Skipped only on the gate
@@ -525,9 +526,34 @@ async function goldMindSignOut(redirectTo) {
 // ---- Offline sales: queue on the device, post automatically when back online ----
 // Each queued sale carries a client_ref; post_sale_invoice ignores a repeat of
 // the same ref, so a retry after a dropped connection can never double-post.
-// ponytail: queue lives in localStorage (fine for dozens of sales); move to
-// IndexedDB if shops ever queue hundreds while offline.
+// The queue lives in localStorage (read synchronously everywhere) and every change is copied to
+// IndexedDB too: if the browser / Android WebView clears localStorage, the unsent sales come back
+// from there on the next page load (gmRestoreQueue). Storage is asked to be "persistent" so the
+// device does not evict it.
 const GM_QUEUE_KEY = 'gm_offline_sales';
+function gmIdb() {
+    return new Promise(function (ok, no) {
+        if (!window.indexedDB) return no(new Error('no indexedDB'));
+        const r = indexedDB.open('goldmind-offline', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('kv'); };
+        r.onsuccess = function () { ok(r.result); };
+        r.onerror = function () { no(r.error); };
+    });
+}
+function gmIdbPut(key, val) {
+    return gmIdb().then(function (db) { return new Promise(function (ok) { const tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').put(val, key); tx.oncomplete = function () { db.close(); ok(); }; tx.onerror = function () { db.close(); ok(); }; }); }).catch(function () {});
+}
+function gmIdbGet(key) {
+    return gmIdb().then(function (db) { return new Promise(function (ok) { const g = db.transaction('kv').objectStore('kv').get(key); g.onsuccess = function () { db.close(); ok(g.result); }; g.onerror = function () { db.close(); ok(undefined); }; }); }).catch(function () { return undefined; });
+}
+async function gmRestoreQueue() {
+    if (gmQueue().length) return;
+    const saved = await gmIdbGet(GM_QUEUE_KEY);
+    if (Array.isArray(saved) && saved.length && !gmQueue().length) {
+        localStorage.setItem(GM_QUEUE_KEY, JSON.stringify(saved));
+        gmRenderOfflineBadge();
+    }
+}
 const GM_SNAPSHOT_TABLES = {
     pieces: 'status=eq.available',
     customers: '',
@@ -537,7 +563,11 @@ const GM_SNAPSHOT_TABLES = {
 };
 
 function gmQueue() { try { return JSON.parse(localStorage.getItem(GM_QUEUE_KEY)) || []; } catch (e) { return []; } }
-function gmSaveQueue(q) { localStorage.setItem(GM_QUEUE_KEY, JSON.stringify(q)); gmRenderOfflineBadge(); }
+function gmSaveQueue(q) {
+    try { localStorage.setItem(GM_QUEUE_KEY, JSON.stringify(q)); } catch (e) { /* full: IndexedDB below still keeps it */ }
+    gmIdbPut(GM_QUEUE_KEY, q);
+    gmRenderOfflineBadge();
+}
 // Change one queued sale (found by its client_ref) on a fresh read of the queue,
 // so a sale saved while a sync is running is never overwritten.
 function gmUpdateQueued(ref, fn) {
@@ -561,6 +591,16 @@ function gmIsRetryable(error) {
     return gmIsNetworkError(error) || /JWT|expired|5\d\d|timeout|Service Unavailable|Bad Gateway/i.test(String(error && (error.message || error.code || '')));
 }
 
+// Keep the device's offline copy fresh from whatever page is open (once per 30 minutes, when idle).
+let gmSnapScheduled = false;
+function gmScheduleSnapshot() {
+    if (gmSnapScheduled || !navigator.onLine) return;
+    gmSnapScheduled = true;
+    setTimeout(function () {
+        if (!GOLDMIND_STORE_ID || Date.now() - Number(localStorage.getItem('gm_snapshot_at') || 0) < 30 * 60 * 1000) return;
+        (window.requestIdleCallback || setTimeout)(function () { gmRefreshSnapshots().catch(function () {}); });
+    }, 4000);
+}
 // Downloads the tables the sale screen searches, so it keeps working offline.
 async function gmRefreshSnapshots() {
     if (!navigator.onLine || !GOLDMIND_STORE_ID || !window.caches) return;
@@ -764,7 +804,11 @@ function gmRenderOfflineBadge() {
         document.body.appendChild(b);
     }
     const parts = [];
-    if (offline) parts.push('بدون إنترنت');
+    if (offline) {
+        // how old the device's copy of the stock / customers / prices is
+        const at = Number(localStorage.getItem('gm_snapshot_at') || 0);
+        parts.push(at ? 'بدون إنترنت — البيانات محدّثة حتى ' + new Date(at).toLocaleString('en-GB', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : 'بدون إنترنت — لا توجد نسخة محفوظة من البيانات');
+    }
     if (pending) parts.push(pending + ' فاتورة بانتظار الترحيل');
     if (failed) parts.push(failed + ' لم تُرحَّل');
     b.style.background = failed ? '#FDECEA' : offline ? '#FFF4E0' : '#E6F0FF';
@@ -819,7 +863,10 @@ function gmShowQueue() {
 
 window.addEventListener('online', function () { gmRenderOfflineBadge(); gmSyncQueue(); });
 window.addEventListener('offline', gmRenderOfflineBadge);
-document.addEventListener('DOMContentLoaded', function () { gmRenderOfflineBadge(); setTimeout(gmSyncQueue, 1500); });
+document.addEventListener('DOMContentLoaded', function () {
+    gmRestoreQueue().then(function () { gmRenderOfflineBadge(); setTimeout(gmSyncQueue, 1500); });
+    try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(function () {}); } catch (e) { /* ignore */ }
+});
 setInterval(gmSyncQueue, 30000);
 
 // Save a finished html2pdf job. In the browser this downloads the file as
