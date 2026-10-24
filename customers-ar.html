@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=51"></script>
-<script src="theme.js?v=79"></script>
+<script src="theme.js?v=80"></script>
 <script src="gm-report.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -149,7 +149,7 @@ function render() {
   const list = CUSTOMERS.filter(c =>
     KIND_OK[KIND](c) && BAL_OK[BALF](BAL[c.id] || 0, c) &&
     (!q || (c.name || '').toLowerCase().includes(q) || (qd.length >= 3 && digits(c.phone).includes(qd))));
-  document.getElementById('count').textContent = list.length + (KIND === 'company' ? ' شركة' : ' زبون');
+  document.getElementById('count').textContent = gmCountLabel(list.length, KIND === 'company' ? ['شركة', 'شركتان', 'شركات'] : ['زبون', 'زبونان', 'زبائن']);
   // totals for this kind (individuals or companies), whatever the chip
   let owed = 0, credit = 0;
   CUSTOMERS.filter(KIND_OK[KIND]).forEach(c => { const b = BAL[c.id] || 0; if (b > 0.005) owed += b; else if (b < -0.005) credit -= b; });
@@ -236,7 +236,7 @@ function renderSide() {
         <a class="cu-act" href="customer-debts-print-ar.html?id=${c.id}">كشف حساب</a>
         ${wa ? `<a class="cu-act" href="${esc(wa)}" target="_blank" rel="noopener">واتساب</a>` : '<span class="cu-act" aria-disabled="true" style="opacity:.45">واتساب</span>'}
       </div>
-      <a href="customer-debts-ar.html?open=${c.id}" class="block text-center mt-3 text-[13px] font-bold" style="color:#7A6640">فتح الحساب الكامل ←</a>
+      <a href="customer-debts-ar.html?open=${c.id}" class="block text-center mt-3 text-[13px] font-bold min-h-[24px] gm-hit" style="color:#7A6640">فتح الحساب الكامل ←</a>
     </section>
     <section class="cu-card"><h2>آخر الحركات</h2>${moves.length ? moves.map(m => `<div class="cu-kv"><span><span class="font-data-mono text-on-surface-variant">${dm(m.created_at)}</span> ${esc(m.source && LBL[m.source] ? LBL[m.source] : m.movement_type === 'debt_increase' ? 'بيع / دين' : 'دفعة')}</span><span class="font-data-mono ${m.movement_type === 'debt_increase' ? '' : 'text-success'}">${m.movement_type === 'debt_increase' ? '+' : '−'}${fmt(m.cash_amount)}</span></div>`).join('') : '<p class="text-[12.5px] text-on-surface-variant py-1">لا توجد حركات على الحساب.</p>'}</section>
     <section class="cu-card"><h2>البيانات</h2>

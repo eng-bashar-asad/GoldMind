@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=51"></script>
-<script src="theme.js?v=79"></script>
+<script src="theme.js?v=80"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -126,7 +126,7 @@
 <div class="flex flex-wrap gap-1.5 ms-2" id="mcTypes" role="group" aria-label="نوع الحركة"></div>
 <label class="ms-auto flex items-center gap-2 h-9 px-3 rounded-lg border border-outline-variant bg-surface-container-lowest" style="flex:0 1 240px">
 <span class="material-symbols-outlined text-on-surface-variant">search</span>
-<input id="mcQ" type="search" aria-label="بحث بالحركات" placeholder="بحث بالبيان" class="border-0 p-0 flex-1 min-w-0 text-[13px] bg-transparent focus:ring-0" oninput="mcRender()"/>
+<input id="mcQ" type="search" aria-label="بحث بالحركات" placeholder="بحث بالبيان" class="border-0 p-0 flex-1 min-w-0 min-h-[24px] text-[13px] bg-transparent focus:ring-0" oninput="mcRender()"/>
 </label>
 </div>
 <div id="mcTable"></div>
@@ -173,8 +173,8 @@ function mcRender() {
   const others = Object.keys(tot).filter(c => c !== base);
   document.getElementById('mcKpis').innerHTML =
     `<div class="mc-kpi dark"><small>صافي ${pl} · ${base}</small><b dir="ltr" class="font-data-mono">${fmt(b.in - b.out)}</b><i>${all.length} حركة</i></div>`
-    + `<div class="mc-kpi"><small>داخل ${pl}</small><b dir="ltr" class="font-data-mono text-success">+${fmt(b.in)}</b><i>${b.nIn} حركة · ${base}</i></div>`
-    + `<div class="mc-kpi"><small>خارج ${pl}</small><b dir="ltr" class="font-data-mono text-error">−${fmt(b.out)}</b><i>${b.nOut} حركة · ${base}</i></div>`
+    + `<div class="mc-kpi"><small>داخل ${pl}</small><b dir="ltr" class="font-data-mono text-success">${b.in ? '+' : ''}${fmt(b.in)}</b><i>${b.nIn} حركة · ${base}</i></div>`
+    + `<div class="mc-kpi"><small>خارج ${pl}</small><b dir="ltr" class="font-data-mono text-error">${b.out ? '−' : ''}${fmt(b.out)}</b><i>${b.nOut} حركة · ${base}</i></div>`
     + others.map(c => `<div class="mc-kpi"><small>صافي ${c}</small><b dir="ltr" class="font-data-mono">${fmt(tot[c].in - tot[c].out)}</b><i>داخل ${fmt(tot[c].in)} · خارج ${fmt(tot[c].out)}</i></div>`).join('');
   // type chips with counts
   const cnt = {}; all.forEach(m => { const t = mcType(m); cnt[t] = (cnt[t] || 0) + 1; });

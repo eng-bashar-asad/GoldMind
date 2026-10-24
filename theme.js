@@ -179,6 +179,13 @@ function gmCloseTimezonePicker() {
   if (el) { el.classList.add('hidden'); el.classList.remove('flex'); }
 }
 
+// Arabic count + noun: 2 -> dual ("زبونان"), 3-10 -> plural ("5 زبائن"), otherwise singular ("1 زبون", "12 زبون").
+// forms = [singular, dual, plural]
+function gmCountLabel(n, forms) {
+  if (n === 2) return forms[1];
+  const m = n % 100;
+  return n + ' ' + (m >= 3 && m <= 10 ? forms[2] : forms[0]);
+}
 // Random file-name part for uploads, so public file links can't be guessed (16 hex chars).
 function gmRandName() {
   const a = new Uint8Array(8); crypto.getRandomValues(a);
@@ -1197,7 +1204,7 @@ function gmHardwareBack() {
 (function () {
   if (window.GM_NAV_DISABLED || document.querySelector('script[src^="gm-nav.js"]')) return;
   var sc = document.createElement('script');
-  sc.src = 'gm-nav.js?v=21';
+  sc.src = 'gm-nav.js?v=22';
   document.head.appendChild(sc);
 })();
 

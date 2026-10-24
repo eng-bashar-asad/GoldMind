@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=51"></script>
-<script src="theme.js?v=79"></script>
+<script src="theme.js?v=80"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -43,6 +43,8 @@
 /* computer (design "الصندوق اليومي"): a number strip on top, the quick entry line above the day's table,
    tools and the drawer count in a side column */
 #dcKpis, #dcSide { display: none; }
+/* phone: the short "what is this page" note goes to the end, the balance comes first */
+@media (max-width:1023px){ #page-content > p.text-outline{order:99} }
 @media (min-width:1024px){
   #page-content:not(.hidden){display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,330px);gap:14px 22px;align-items:start}
   #page-content > *{grid-column:2;margin:0!important}
@@ -225,14 +227,14 @@
 <h2 class="font-semibold text-[13px]" id="entries-heading">عمليات اليوم</h2>
 <div class="flex items-center gap-3">
 <button onclick="dcToggleEntered()" id="dcEnteredBtn" aria-pressed="false" class="dc-entered-btn text-[12px] font-semibold inline-flex items-center gap-1 gm-hit" title="عرض وقت إدخال كل حركة"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">schedule</span>وقت الإدخال</button>
-<button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold" id="fullHistoryToggle">عرض كل العمليات</button>
+<button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold gm-hit" id="fullHistoryToggle">عرض كل العمليات</button>
 </div>
 </div>
 <div class="overflow-x-auto rounded-xl border border-outline-variant shadow-lg" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
 <table class="w-full text-[12px] border-collapse" id="cashbox-table">
 <thead>
 <tr>
-<th colspan="2" class="bg-success/10 text-success font-bold py-2 text-[13px] border-b border-outline-variant border-l-2 border-outline-variant">الداخل</th>
+<th colspan="2" class="bg-success/10 text-[#166534] font-bold py-2 text-[13px] border-b border-outline-variant border-l-2 border-outline-variant">الداخل</th>
 <th colspan="2" class="bg-error/10 text-error font-bold py-2 text-[13px] border-b border-outline-variant">الصادر</th>
 </tr>
 </thead>
@@ -459,12 +461,12 @@ function dcRenderKpis(bals) {
   const el = document.getElementById('dcKpis');
   if (!bals.length) { el.innerHTML = '<div class="dc-kpi"><small>الدرج</small><b>0.00</b><i>لا يوجد رصيد مسجّل بعد</i></div>'; }
   else el.innerHTML = [...bals].sort((a, b) => (b.cur === base) - (a.cur === base)).map(({ cur, opening, todayNet, closing }, i) =>
-    `<div class="dc-kpi${i === 0 ? ' dark' : ''}"><small>${cur} · المفروض بالدرج</small><b dir="ltr" class="font-data-mono">${fmt(closing)}</b><i>افتتاحي <span class="font-data-mono">${fmt(opening)}</span> · صافي اليوم <span class="font-data-mono" dir="ltr">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</span></i></div>`).join('');
+    `<div class="dc-kpi${i === 0 ? ' dark' : ''}"><small>${cur} · الرصيد الحالي</small><b dir="ltr" class="font-data-mono">${fmt(closing)}</b><i>افتتاحي <span class="font-data-mono">${fmt(opening)}</span> · صافي اليوم <span class="font-data-mono" dir="ltr">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</span></i></div>`).join('');
   if (dcIsDesk() && canManageDates) document.getElementById('addFormDate').value = localDateStr(selectedDate);
   // drawer count: what was counted vs what the book says
   const cnt = document.getElementById('dcCount');
   const keep = {}; cnt.querySelectorAll('input[data-cur]').forEach(i => keep[i.dataset.cur] = i.value);
-  cnt.innerHTML = bals.length ? bals.map(({ cur, closing }) => `<div class="dc-kv"><span>${cur} المفروض</span><b class="font-data-mono" dir="ltr">${fmt(closing)}</b></div>
+  cnt.innerHTML = bals.length ? bals.map(({ cur, closing }) => `<div class="dc-kv"><span>${cur} الرصيد الحالي</span><b class="font-data-mono" dir="ltr">${fmt(closing)}</b></div>
     <div class="dc-kv"><label for="dcc-${cur}">${cur} المعدود</label><input id="dcc-${cur}" data-cur="${cur}" data-expect="${closing}" type="number" step="0.01" dir="ltr" inputmode="decimal" placeholder="0.00" value="${gmEscapeHtml(keep[cur] || '')}" oninput="dcDiff(this)" class="w-28 h-9 border border-outline-variant rounded-lg px-2 text-[13px] font-data-mono"/></div>
     <div class="dc-kv"><span>الفرق</span><span class="dc-tag" id="dcd-${cur}">—</span></div>`).join('') : '<p class="text-[12px] text-on-surface-variant">ما في رصيد لتعدّه.</p>';
   cnt.querySelectorAll('input[data-cur]').forEach(dcDiff);
@@ -679,7 +681,7 @@ function renderAll() {
           <div class="text-[11px] font-bold ${cur === 'AED' ? 'text-secondary' : 'text-success'} mb-2">${cur}</div>
           <div class="grid grid-cols-3 gap-2 text-center">
             <div><p class="text-[10px] text-on-surface-variant">افتتاحي اليوم</p><p class="font-bold text-[14px] font-data-mono">${fmt(opening)}</p></div>
-            <div><p class="text-[10px] text-on-surface-variant">صافي اليوم</p><p class="font-bold text-[14px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</p></div>
+            <div><p class="text-[10px] text-on-surface-variant">صافي اليوم</p><p dir="ltr" class="font-bold text-[14px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</p></div>
             <div><p class="text-[10px] text-on-surface-variant">الرصيد الحالي</p><p class="font-bold text-[15px] font-data-mono">${fmt(closing)}</p></div>
           </div>
         </div>`).join('');

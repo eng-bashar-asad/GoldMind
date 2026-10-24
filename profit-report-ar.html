@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=51"></script>
-<script src="theme.js?v=79"></script>
+<script src="theme.js?v=80"></script>
 <script src="gm-profit.js?v=7"></script>
 <script src="gm-report.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -86,16 +86,16 @@
 </div>
 </div>
 
-<p class="text-[11px] text-outline">الربح = سعر البيع − قيمة الذهب (بسعر السوق وقت البيع نفسه) − الضريبة − كلفة المصنعية المسجّلة على القطعة (وزن القطعة × كلفة المصنعية للغرام). هذا هو صافي ربح المصنعية الفعلي — سعر الذهب نفسه لا يُحتسب ربحاً لأنك تشتري بديله بسعر السوق.</p>
+
 
 <div id="filters-host" class="no-print bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex flex-col gap-3">
 <div class="grid grid-cols-2 gap-2">
 <div>
-<label class="text-[10px] text-outline block mb-1">من تاريخ</label>
+<label for="date-from" class="text-[10px] text-outline block mb-1">من تاريخ</label>
 <input id="date-from" type="date" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[12px]"/>
 </div>
 <div>
-<label class="text-[10px] text-outline block mb-1">إلى تاريخ</label>
+<label for="date-to" class="text-[10px] text-outline block mb-1">إلى تاريخ</label>
 <input id="date-to" type="date" class="w-full h-10 border border-outline-variant rounded-lg px-2 text-[12px]"/>
 </div>
 </div>
@@ -112,6 +112,8 @@
 <button type="button" id="pr-xlsx-btn" onclick="exportExcel(this)" class="h-10 rounded-lg font-semibold text-[13px] border border-green-700 text-green-800 flex items-center justify-center gap-1"><span class="material-symbols-outlined">table_view</span>Excel</button>
 </div>
 </div>
+
+<p class="text-[11px] text-outline">الربح = سعر البيع − قيمة الذهب (بسعر السوق وقت البيع نفسه) − الضريبة − كلفة المصنعية المسجّلة على القطعة (وزن القطعة × كلفة المصنعية للغرام). هذا هو صافي ربح المصنعية الفعلي — سعر الذهب نفسه لا يُحتسب ربحاً لأنك تشتري بديله بسعر السوق.</p>
 
 <div class="no-print flex gap-2" role="group" aria-label="نوع التقرير">
 <button type="button" data-view="brief" class="pr-view h-10 px-5 rounded-full border border-outline-variant font-bold text-[13px]">تقرير مختصر</button>
@@ -446,7 +448,7 @@ async function applyFilters() {
       <thead><tr style="background:#EFE7D2;font-size:13px;">
         <th style="${B}text-align:right;">البند</th><th style="${B}">المبلغ</th><th style="${B}">الوزن القائم (غ)</th><th style="${B}">الوزن المحاسبي (غ)</th></tr></thead>
       <tbody>
-        ${group('١) المبيعات والأرباح')}
+        ${group('1) المبيعات والأرباح')}
         ${line('مبيعات الزبائن', W.gross, W.acc, retail.revenue)}
         ${line('ربح مبيعات الزبائن', null, null, retail.profit, green)}
         ${ws.fee ? line('ربح الجملة: مصنعية التجار', null, null, ws.making, green) : ''}
@@ -457,12 +459,12 @@ async function applyFilters() {
         ${!boxFilter && trDisc.forShop ? line('خصومات التجار لصالح المحل (تُضاف للربح)', null, null, trDisc.forShop, green) : ''}
         ${!boxFilter && trDisc.forTrader ? line('خصومات لصالح التجار (تُخصم من الربح)', null, null, trDisc.forTrader, red) : ''}
         ${line(boxFilter ? 'صافي ربح الصندوق' : 'صافي ربح المحل', null, null, shopProfit, 'background:#D7EBD2;color:#14532d;font-size:17px;')}
-        ${group('٢) حركة الذهب (لا تدخل في حساب الربح)')}
+        ${group('2) حركة الذهب (لا تدخل في حساب الربح)')}
         ${!boxFilter ? line('مشتريات الكسر', scrapT.gross, scrapT.acc, scrapPaid) : ''}
         ${!boxFilter ? line('إدخال بضاعة من التجار', inT.gross, inT.acc, inFee) : ''}
         ${line('إخراج بضاعة للتجار', ws.gross, ws.pieceAcc, ws.fee)}
         ${!boxFilter && scrapOut.gross ? line('إخراج كسر للتجار بالكلفة', scrapOut.gross, scrapOut.acc, null) : ''}
-        ${group('٣) المخزون')}
+        ${group('3) المخزون')}
         ${line('وزن البضاعة بالمحل الآن', stock.gross, stock.acc, null)}
       </tbody></table>
     <p style="padding:10px 12px;font-size:13px;line-height:1.7;color:#3b3325;">
