@@ -60,3 +60,6 @@ end $$;
 
 -- SEC-015 (low, same pass): fixed search_path.
 alter function public.gm_op_date_stamp() set search_path = public;
+
+-- SEC-005: purchase/expense attachments are private; pages show them via signed links (gmPrivateFileUrls).
+update storage.buckets set public = false where id = 'invoice-attachments';
