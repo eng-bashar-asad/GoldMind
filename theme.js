@@ -179,6 +179,12 @@ function gmCloseTimezonePicker() {
   if (el) { el.classList.add('hidden'); el.classList.remove('flex'); }
 }
 
+// Random file-name part for uploads, so public file links can't be guessed (16 hex chars).
+function gmRandName() {
+  const a = new Uint8Array(8); crypto.getRandomValues(a);
+  return Array.from(a, b => b.toString(16).padStart(2, '0')).join('');
+}
+
 
 // (customer/company/trader/staff names, notes, search results, etc.)
 // and gets injected into the page via innerHTML/template strings must

@@ -17,7 +17,7 @@ let changed = 0;
 for (const file of fs.readdirSync(www).filter(f => f.endsWith('.html'))) {
   const p = path.join(www, file);
   const before = fs.readFileSync(p, 'utf8');
-  let html = before.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2[^"]*"><\/script>/g, '<script src="supabase.js"></script>');
+  let html = before.replace(/<script src="https:\/\/cdn\.jsdelivr\.net\/npm\/@supabase\/supabase-js@2[^"]*"[^>]*><\/script>/g, '<script src="supabase.js"></script>');
   if (/Material\+Symbols\+Outlined/.test(html) && !html.includes('material-symbols/outlined.css')) {
     // first in <head>, so each page's own icon size/style rules still win
     html = html.replace(/<head>/, '<head>\n<link rel="stylesheet" href="material-symbols/outlined.css">');

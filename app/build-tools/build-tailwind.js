@@ -20,7 +20,7 @@ const dir = path.resolve(process.cwd(), dirArg ? dirArg.slice(6) : '../www');
 const appDir = path.resolve(__dirname, '..');
 const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'gm-tw-'));
 
-const CDN_RE = /<script src="https:\/\/cdn\.tailwindcss\.com([^"]*)"><\/script>\s*\n?/;
+const CDN_RE = /<script src="https:\/\/cdn\.tailwindcss\.com([^"]*)"[^>]*><\/script>\s*\n?/; // pinned tags carry integrity/crossorigin
 const CFG_RE = /<script id="tailwind-config">([\s\S]*?)<\/script>\s*\n?/;
 
 function readConfig(src) {
@@ -40,7 +40,7 @@ for (const file of fs.readdirSync(dir).filter(f => f.endsWith('.html'))) {
   if (!cdn) continue;
   const cfgTag = html.match(CFG_RE);
   const cfg = cfgTag ? readConfig(cfgTag[1]) : {};
-  const plugins = (cdn[1].match(/plugins=([^&"]*)/) || [, ''])[1].split(',').filter(Boolean).sort();
+  const plugins = (cdn[1].match(/plugins=([^&"]*)/) || [, ''])[1].split(',').filter(Boolean).map(p => p.split('@')[0]).sort(); // forms@0.5.10 -> forms
   const key = crypto.createHash('md5').update(JSON.stringify([cfg, plugins])).digest('hex').slice(0, 8);
   if (!groups.has(key)) groups.set(key, { cfg, plugins, files: [] });
   groups.get(key).files.push(file);

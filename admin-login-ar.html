@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
 <title>GoldMind | دخول مالك المنصة</title>
-<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600;700&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -61,7 +61,7 @@
         fontFamily: { "headline-xl": ["Inter", "IBM+Plex+Sans+Arabic"], "body-md": ["Inter", "IBM+Plex+Sans+Arabic"] }
     } } }
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=51"></script>
 <script src="gm-logo.js?v=2" defer></script>
 </head>
@@ -184,11 +184,12 @@ document.getElementById('adminPasswordForm').addEventListener('submit', async fu
 
     let email = identifier;
     if (!identifier.includes('@')) {
-        const { data: resolvedEmail, error: lookupError } = await goldmindClient.rpc('lookup_email_by_username', { p_username: identifier });
+        // the email comes back only with the right password (no email lookup by username alone)
+        const { data: resolvedEmail, error: lookupError } = await goldmindClient.rpc('login_email_for', { p_username: identifier, p_password: password });
         if (lookupError || !resolvedEmail) {
             btn.disabled = false;
             btn.textContent = 'دخول';
-            errEl.textContent = 'لا يوجد حساب بهذا اسم المستخدم';
+            errEl.textContent = lookupError && /RATE_LIMITED/.test(lookupError.message || '') ? 'محاولات كثيرة، انتظر دقيقة ثم حاول مجدداً' : 'اسم المستخدم أو كلمة السر غير صحيحة';
             errEl.classList.remove('hidden');
             return;
         }
