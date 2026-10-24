@@ -45,3 +45,17 @@ test('daily cash box: one name for the balance, and the net keeps its sign in fr
   expect(html).not.toContain('المفروض');
   expect(html).toContain('الرصيد الحالي');
 });
+
+// Purchase photos live in a private folder: the print page shows them through signed links.
+test('purchase invoice photos are shown through signed links', async ({ page }) => {
+  const pub = 'https://puzkfwbmipldzgwofhjg.supabase.co/storage/v1/object/public/invoice-attachments/' + STORE + '/purchase-PINV-1-photo-1.jpg';
+  await install(page, { db: { stores: [{ id: STORE, name: 'محل', currency: 'AED' }], staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {} }], user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    invoices: [{ id: 'inv1', store_id: STORE, invoice_number: 'PINV-1', type: 'buyTrader', status: 'paid', total_amount: 100, created_at: new Date().toISOString(), bulk_photos: [pub] }], invoice_items: [] } });
+  const signed = [];
+  await page.route(/storage\/v1\/object\/sign\/invoice-attachments/, r => { const b = JSON.parse(r.request().postData()); signed.push(...b.paths); r.fulfill({ json: b.paths.map(p => ({ path: p, signedURL: '/object/sign/invoice-attachments/' + p + '?token=t', error: null })) }); });
+  await page.route(/storage\/v1\/object\/(public|sign)\/invoice-attachments\/.*\.jpg/, r => r.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg"/>' }));
+  await page.goto('/invoice-print-ar.html?id=inv1');
+  const img = page.locator('#bulk-photos-grid img');
+  await expect(img).toHaveAttribute('src', /\/object\/sign\/invoice-attachments\/.+purchase-PINV-1-photo-1\.jpg\?token=t/);
+  expect(signed).toEqual([STORE + '/purchase-PINV-1-photo-1.jpg']);
+});

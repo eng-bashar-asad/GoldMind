@@ -416,6 +416,22 @@ async function gmCustomerRpc(name, args) {
   return r;
 }
 
+// Invoice attachments are in a private storage folder: a saved link (…/object/public/invoice-attachments/<path>)
+// is turned into a signed link valid for one hour. Other links are returned unchanged.
+async function gmPrivateFileUrls(urls) {
+    const list = Array.isArray(urls) ? urls : [];
+    const MARK = '/object/public/invoice-attachments/';
+    const paths = list.map(u => { const i = String(u || '').indexOf(MARK); return i < 0 ? null : decodeURIComponent(String(u).slice(i + MARK.length).split('?')[0]); });
+    const want = paths.filter(Boolean);
+    if (!want.length) return list;
+    try {
+        const { data, error } = await goldmindClient.storage.from('invoice-attachments').createSignedUrls(want, 3600);
+        if (error || !data) return list;
+        const byPath = {}; data.forEach(d => { if (d && d.signedUrl) byPath[d.path] = d.signedUrl; });
+        return list.map((u, i) => (paths[i] && byPath[paths[i]]) || u);
+    } catch (e) { return list; }
+}
+
 async function gmFetchAllRows(makeQuery) {
   var all = [];
   for (var from = 0; ; from += 1000) {

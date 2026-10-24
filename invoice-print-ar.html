@@ -18,7 +18,7 @@
 <title>فاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=51"></script>
+<script src="supabase-config.js?v=52"></script>
 <script src="pint-ae.js"></script>
 <script src="theme.js?v=80"></script>
 <script src="gm-profit.js?v=7"></script>
@@ -683,7 +683,8 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         // ---- Optional bulk-lot photos (buyTrader stock intake) ----
         if (Array.isArray(invoice.bulk_photos) && invoice.bulk_photos.length) {
             document.getElementById('bulk-photos-section').classList.remove('hidden');
-            document.getElementById('bulk-photos-grid').innerHTML = invoice.bulk_photos
+            const bulkPhotos = await gmPrivateFileUrls(invoice.bulk_photos); // private folder: signed links
+            document.getElementById('bulk-photos-grid').innerHTML = bulkPhotos
                 .map(url => `<img src="${gmEscapeHtml(url)}" alt="صورة البضاعة" onclick="gmPhotoViewer(this.src)" style="cursor:zoom-in" class="w-20 h-20 object-cover rounded border border-gray-300"/>`).join('');
         }
 
