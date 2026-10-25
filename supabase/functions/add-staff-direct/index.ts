@@ -10,8 +10,9 @@
 //  - both           -> both are used as given
 //
 // Security: an email that already has an account is NEVER taken over (no
-// password reset, no username change): the caller is told to use the email
-// invite instead. A failed add removes the account it just created.
+// password reset, no username change). If the caller already manages that person
+// in another company, the same account is simply added here (linked: true);
+// otherwise the caller is told to use the email invite instead. A failed add removes the account it just created.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -47,6 +48,28 @@ function usernameBaseFromEmail(email: string) {
   base = base.slice(0, 16);
   if (base.length < 3) base = (base + 'staff').slice(0, 8);
   return base;
+}
+
+// An existing account may be added directly only when the caller already manages that same
+// person in another company (owner / manage_staff there): e.g. one owner with several companies.
+// Nothing about the account changes (no password, no username): the person signs in as before.
+async function linkIfManagedElsewhere(admin: any, callerId: string, userId: string, store_id: string) {
+  const { data: mine } = await admin.from('staff').select('store_id, role, permissions').eq('user_id', callerId);
+  const managed = (mine || []).filter((r: any) => r.store_id !== store_id && (r.role === 'owner' || r.permissions?.manage_staff === true)).map((r: any) => r.store_id);
+  if (!managed.length) return false;
+  const { data: his } = await admin.from('staff').select('id').eq('user_id', userId).in('store_id', managed).limit(1);
+  return !!(his && his.length);
+}
+
+async function linkExisting(admin: any, userId: string, store_id: string, staff_id: string | undefined, full_name: string, permissions: any, whatsapp_phone: string | undefined, username: string | null, email: string | null) {
+  const { data: here } = await admin.from('staff').select('id').eq('user_id', userId).eq('store_id', store_id).maybeSingle();
+  if (here) return json({ error: 'هذا الحساب موظف بالفعل في هذا المتجر' }, 400);
+  const { error } = staff_id
+    ? await admin.from('staff').update({ user_id: userId, full_name, permissions: permissions || {}, whatsapp_phone: whatsapp_phone || null })
+        .eq('id', staff_id).eq('store_id', store_id).is('user_id', null)
+    : await admin.from('staff').insert({ store_id, user_id: userId, full_name, role: 'staff', permissions: permissions || {}, whatsapp_phone: whatsapp_phone || null });
+  if (error) return json({ error: 'تعذّر حفظ بيانات الموظف: ' + error.message }, 400);
+  return json({ success: true, linked: true, username, email });
 }
 
 serve(async (req) => {
@@ -100,7 +123,12 @@ serve(async (req) => {
     let username = givenUsername;
     if (username) {
       const { data: taken } = await admin.from('user_profiles').select('id').ilike('username', username).maybeSingle();
-      if (taken) return json({ error: 'اسم المستخدم هذا مستخدم مسبقاً — اختر اسماً غيره' }, 400);
+      if (taken) {
+        if (!givenEmail && await linkIfManagedElsewhere(admin, callerUser.id, taken.id, store_id)) {
+          return await linkExisting(admin, taken.id, store_id, staff_id, full_name, permissions, whatsapp_phone, username, null);
+        }
+        return json({ error: 'اسم المستخدم هذا مستخدم مسبقاً — اختر اسماً غيره' }, 400);
+      }
     } else {
       const base = usernameBaseFromEmail(givenEmail);
       username = '';
@@ -124,6 +152,10 @@ serve(async (req) => {
     if (existingUser) {
       const { data: here } = await admin.from('staff').select('id').eq('user_id', existingUser.id).eq('store_id', store_id).maybeSingle();
       if (here) return json({ error: 'هذا الحساب موظف بالفعل في هذا المتجر' }, 400);
+      if (await linkIfManagedElsewhere(admin, callerUser.id, existingUser.id, store_id)) {
+        const { data: prof } = await admin.from('user_profiles').select('username').eq('id', existingUser.id).maybeSingle();
+        return await linkExisting(admin, existingUser.id, store_id, staff_id, full_name, permissions, whatsapp_phone, prof?.username || null, email);
+      }
       return json({ error: 'هذا البريد الإلكتروني لديه حساب GoldMind مسبقاً. استخدم خيار "دعوة بالبريد الإلكتروني" في الأسفل، وسيدخل الموظف بحسابه نفسه.' }, 400);
     }
 

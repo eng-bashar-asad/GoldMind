@@ -696,6 +696,19 @@ async function submitDirectAdd() {
     return;
   }
 
+  // the same person already works in another of your companies: added here with his own account
+  if (data && data.linked) {
+    gmNotify('أُضيف ' + name + ' إلى هذه الشركة بحسابه الحالي — يدخل بنفس اسم المستخدم وكلمة السر، ويختار الشركة بعد الدخول.', 'ok');
+    linkStaffId = null;
+    document.getElementById('direct-no-login-wrap').classList.remove('hidden');
+    ['direct-name', 'direct-username', 'direct-password', 'direct-email', 'direct-whatsapp'].forEach(id => { document.getElementById(id).value = ''; });
+    document.querySelectorAll('#direct-permissions input[data-direct-key]').forEach(i => i.checked = false);
+    applyDirectRolePreset('custom');
+    document.getElementById('direct-add-form').classList.add('hidden');
+    loadStaff();
+    return;
+  }
+
   const loginUrl = window.location.href.replace('staff-permissions-ar.html', 'login-entry-ar.html')
     .split('?')[0] + '?mode=quick&username=' + encodeURIComponent(data.username);
   const message = 'مرحباً ' + name + ' 👋\n' +
