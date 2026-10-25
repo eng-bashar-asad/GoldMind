@@ -1269,6 +1269,7 @@ function showTraderDetail(traderId) {
               <div class="flex items-center gap-2 mb-2">
                 ${pc.photo_url ? `<img src="${gmEscapeHtml(pc.photo_url)}" alt="" class="w-11 h-11 rounded-md object-cover shrink-0"/>` : ''}
                 <span class="font-data-mono text-[12px] font-semibold">${gmEscapeHtml(pc.barcode || 'بالجملة')}</span>
+                ${first.source === 'stock_given' && r.piece_id ? `<button type="button" onclick="ldReturnPiece('${r.id}', '${group.batchId}', this)" class="ms-auto h-8 px-3 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">undo</span> إرجاع للمخزن</button>` : ''}
               </div>
               <div class="grid grid-cols-3 gap-2">
                 <input id="edit-batch-weight-${group.batchId}-${idx}" type="number" step="0.001" dir="ltr" placeholder="الوزن القائم" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.weight_grams || ''}"/>
@@ -1623,6 +1624,24 @@ async function deleteStockMovementBatch(batchId) {
   const traderIdToReopen = currentTraderId;
   await load();
   showTraderDetail(traderIdToReopen);
+}
+
+// "إرجاع للمخزن" from a give-out voucher: the piece leaves the trader's account (gold and making
+// cost of that line) and goes back to stock unchanged — gross and accounting weight, making cost,
+// stones, everything as it was before it was given (the piece record itself is never changed).
+async function ldReturnPiece(movementId, batchId, btn) {
+  const code = btn.parentElement.querySelector('.font-data-mono').textContent.trim();
+  if (!confirm('إرجاع القطعة ' + code + ' إلى المخزن؟\nتُحذف من حساب التاجر (الذهب والمصنعية) وترجع إلى المخزن بنفس مواصفاتها: الوزن القائم والمحاسبي والمصنعية والأحجار.')) return;
+  btn.disabled = true;
+  const { error } = await goldmindClient.rpc('trader_return_piece', { p_movement: movementId });
+  if (error) { btn.disabled = false; alert('تعذّر الإرجاع: ' + error.message); return; }
+  const traderIdToReopen = currentTraderId;
+  await load();
+  showTraderDetail(traderIdToReopen);
+  // keep the voucher open for the next piece
+  const form = document.getElementById('edit-batch-form-' + batchId);
+  if (form && form.classList.contains('hidden')) toggleEditStockBatch(batchId);
+  gmNotify('رجعت القطعة ' + code + ' إلى المخزن.', 'ok');
 }
 
 function toggleEditStockBatch(batchId) {
