@@ -74,3 +74,16 @@ test('no money at all in the period: the cash card is hidden', async ({ page }) 
   await expect(page.locator('#stCashCards')).toHaveClass(/\bhidden\b/);
   await expect(page.locator('#stLedgerRows')).toContainText('لا توجد حركات بهذه الفترة');
 });
+
+test('statement shows the making cost per gram before the total making cost', async ({ page }) => {
+  await page.addInitScript(() => { try { localStorage.clear(); } catch (e) {} });
+  const d = db();
+  d.trader_movements[0].fab_fee_per_gram = 15; d.trader_movements[1].fab_fee_per_gram = 15;
+  await install(page, { db: d });
+  await page.goto('/trader-statement-print-ar.html?trader=t1');
+  const heads = await page.locator('.stmt-table thead th').allTextContents();
+  expect(heads.indexOf('مصنعية/غ')).toBe(heads.findIndex(h => h.startsWith('نقد')) - 1);
+  await expect(page.locator('#stLedgerRows tr.st-m').first().locator('td').nth(4)).toHaveText('15.00');
+  await page.click('#stOpts [data-view=details]');
+  await expect(page.locator('#stLedgerRows tr.st-p').first().locator('td').nth(4)).toHaveText('15.00');
+});
