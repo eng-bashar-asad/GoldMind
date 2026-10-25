@@ -121,17 +121,10 @@ async function gmSaveInvoiceEdit(s) {
     updatePayload.counterparty_name = s.counterparty || null;
   }
 
-  // currency switch, step 1: before the invoice changes, so the box removes it in the OLD currencies
+  // currency switch: what the invoice holds in the main box now (the difference is booked after the update)
   if (saleMoney && saleMoney.replace) {
     const { data: cms } = await goldmindClient.from('cash_movements').select('direction, amount').eq('invoice_id', invoice.id);
-    const inBox = r2((cms || []).reduce((t, m) => t + (m.direction === 'in' ? 1 : -1) * Number(m.amount || 0), 0));
-    if (inBox > 0.009) {
-      const { error } = await goldmindClient.from('cash_movements').insert({
-        store_id: GOLDMIND_STORE_ID, box: 'main', direction: 'out', amount: inBox, invoice_id: invoice.id, created_by: GOLDMIND_STAFF_ID,
-        description: 'تعديل عملات الدفع — إخراج المبلغ القديم للفاتورة ' + invoice.invoice_number
-      });
-      if (error) return { error: 'تعذّر حفظ الفاتورة: ' + error.message };
-    }
+    saleMoney.replace.inBox = r2((cms || []).reduce((t, m) => t + (m.direction === 'in' ? 1 : -1) * Number(m.amount || 0), 0));
   }
   const { error: invUpdateError } = await goldmindClient.from('invoices').update(updatePayload).eq('id', invoice.id);
   if (invUpdateError) return { error: 'تعذّر حفظ الفاتورة: ' + invUpdateError.message };
@@ -192,11 +185,15 @@ async function gmSaveInvoiceEdit(s) {
   // the money / debt effect, dated today
   if (saleMoney) {
     if (saleMoney.replace) {
-      // step 2: the new payment, split into the daily box per currency by the new pay_breakdown
-      if (saleMoney.replace.newIn > 0.009) await goldmindClient.from('cash_movements').insert({
-        store_id: GOLDMIND_STORE_ID, box: 'main', direction: 'in', amount: saleMoney.replace.newIn, invoice_id: invoice.id, created_by: GOLDMIND_STAFF_ID,
-        description: 'تعديل عملات الدفع — المبلغ الجديد للفاتورة ' + invoice.invoice_number
+      // main box: only the difference; daily box: the invoice's own rows are rewritten in place
+      // (same day, one row per currency) — no "out old / in new" rows
+      const diff = r2(saleMoney.replace.newIn - saleMoney.replace.inBox);
+      if (Math.abs(diff) > 0.009) await goldmindClient.from('cash_movements').insert({
+        store_id: GOLDMIND_STORE_ID, box: 'main', direction: diff > 0 ? 'in' : 'out', amount: Math.abs(diff), invoice_id: invoice.id, created_by: GOLDMIND_STAFF_ID,
+        edit_delta: true, description: 'تعديل عملات الدفع — فرق الفاتورة ' + invoice.invoice_number
       });
+      const { error: rwErr } = await goldmindClient.rpc('gm_invoice_daily_rewrite', { p_invoice: invoice.id });
+      if (rwErr) console.warn('daily box rewrite', rwErr.message);
     } else if (Math.abs(saleMoney.cashDelta) > 0.009) {
       await goldmindClient.from('cash_movements').insert({
         store_id: GOLDMIND_STORE_ID, box: 'main', direction: saleMoney.cashDelta > 0 ? 'in' : 'out', amount: r2(Math.abs(saleMoney.cashDelta)),

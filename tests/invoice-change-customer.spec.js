@@ -95,7 +95,7 @@ test('mixed invoice paid off later: editing it does not refund the later payment
   expect(calls.some(c => c.method === 'POST' && (c.name === 'cash_movements' || c.name === 'customer_debts'))).toBe(false);
 });
 
-test('edit a sale: pay part of it in another currency (pay_breakdown, box out old / in new)', async ({ page }) => {
+test('edit a sale: pay part of it in another currency (pay_breakdown, daily rows rewritten in place)', async ({ page }) => {
   const errs = []; page.on('pageerror', e => errs.push(e.message));
   const calls = await install(page, { db: {
     stores: [{ id: STORE, name: 'محل', currency: 'USD', secondary_currency: 'SYP', secondary_currency_rate: 13000 }],
@@ -117,9 +117,10 @@ test('edit a sale: pay part of it in another currency (pay_breakdown, box out ol
   await expect(page.locator('#mixedNote')).toContainText('1,000.00');
   page.on('dialog', d => d.accept());
   await page.click('#save-btn');
-  await expect.poll(() => calls.filter(c => c.method === 'POST' && c.name === 'cash_movements').length).toBe(2);
-  const seq = calls.filter(c => (c.method === 'POST' && c.name === 'cash_movements') || (c.method === 'PATCH' && c.name === 'invoices')).map(c => c.method === 'PATCH' ? 'patch' : JSON.parse(c.body).direction + ' ' + JSON.parse(c.body).amount);
-  expect(seq).toEqual(['out 1000', 'patch', 'in 1000']);
+  // same total: no money moves in the main box; the invoice's own daily rows are rewritten (no out/in pair)
+  await expect.poll(() => calls.filter(c => c.name === 'gm_invoice_daily_rewrite').length).toBe(1);
+  expect(JSON.parse(calls.find(c => c.name === 'gm_invoice_daily_rewrite').body)).toEqual({ p_invoice: 's1' });
+  expect(calls.filter(c => c.method === 'POST' && c.name === 'cash_movements')).toHaveLength(0);
   const body = JSON.parse(calls.find(c => c.method === 'PATCH' && c.name === 'invoices').body);
   expect(body.pay_breakdown).toEqual([{ currency: 'USD', amount: 600, rate: 1, method: 'cash' }, { currency: 'SYP', amount: 5200000, rate: 13000, method: 'cash' }]);
   expect([body.payment_method, body.amount_paid, body.cash_paid_amount, body.status]).toEqual(['mixed', 1000, 1000, 'paid']);
