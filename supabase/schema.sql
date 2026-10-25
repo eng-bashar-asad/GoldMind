@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict B02TfhBMxdSbXTJdu6Kmp4n6KhEve97bPDxhJ6vkPspC9m34VlQwGKDrNU5BaQ2
+\restrict F4HjpcgfsTo7PVbfI0u15IKbd8Io5Z06Vo30OiE58Z6yz1IHsOKoX8tZVDibhL2
 
 
 SET statement_timeout = 0;
@@ -1585,7 +1585,7 @@ CREATE FUNCTION public.give_scrap_to_trader(p_trader uuid, p_karat integer, p_we
     SET search_path TO 'public'
     AS $$
 declare t record; me uuid; w numeric := round(coalesce(p_weight, 0), 3); left_w numeric; take numeric;
-        cost numeric := 0; lot record; avail numeric; note text; mid uuid;
+        cost numeric := 0; lot record; avail numeric; mid uuid;
 begin
   select id, gm_acting_store(store_id) as store_id, name into t from traders where id = p_trader;
   if t is null then raise exception 'التاجر غير موجود'; end if;
@@ -1595,6 +1595,11 @@ begin
    where store_id = t.store_id and box_name = 'كسر ' || p_karat and weight_grams_remaining > 0;
   if w > avail + 0.0005 then raise exception 'الوزن أكبر من الموجود في صندوق كسر % (% غ)', p_karat, round(avail, 3); end if;
   select id into me from staff where user_id = auth.uid() and store_id = t.store_id limit 1;
+
+  insert into trader_movements (store_id, trader_id, movement_type, weight_grams, accounting_weight_grams, karat,
+      gold_24k_equivalent, fab_fee_amount, source, notes, created_by)
+    values (t.store_id, t.id, 'debt_decrease', w, w, p_karat, round(w * p_karat / 24.0, 3), 0, 'scrap_given', '', me)
+    returning id into mid;
 
   left_w := w;
   for lot in select l.id, l.weight_grams_remaining rem,
@@ -1607,16 +1612,14 @@ begin
     exit when left_w <= 0.0005;
     take := least(lot.rem, left_w);
     update gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining - take, 3) where id = lot.id;
+    insert into trader_scrap_draws (store_id, movement_id, lot_id, grams) values (t.store_id, mid, lot.id, round(take, 3));
     cost := cost + take * lot.per_g;
     left_w := left_w - take;
   end loop;
   cost := round(cost, 2);
 
-  note := format('إخراج كسر عيار %s بالكلفة: %s غ (كلفته %s)', p_karat, w, cost) || coalesce(' — ' || nullif(trim(p_notes), ''), '');
-  insert into trader_movements (store_id, trader_id, movement_type, weight_grams, accounting_weight_grams, karat,
-      gold_24k_equivalent, fab_fee_amount, source, notes, created_by)
-    values (t.store_id, t.id, 'debt_decrease', w, w, p_karat, round(w * p_karat / 24.0, 3), 0, 'scrap_given', note, me)
-    returning id into mid;
+  update trader_movements set notes = format('إخراج كسر عيار %s بالكلفة: %s غ (كلفته %s)', p_karat, w, cost)
+      || coalesce(' — ' || nullif(trim(p_notes), ''), '') where id = mid;
   return jsonb_build_object('id', mid, 'cost', cost);
 end $$;
 
@@ -1690,6 +1693,44 @@ $$;
 
 
 --
+-- Name: gm_cash_log_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_cash_log_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+declare
+  today date := (now() at time zone 'Asia/Dubai')::date;
+  st uuid := coalesce(new.store_id, old.store_id);
+  od date; nd date;
+begin
+  if current_user <> 'authenticated' or auth.uid() is null then return coalesce(new, old); end if;
+  if tg_op <> 'INSERT' then
+    od := (old.created_at at time zone 'Asia/Dubai')::date;
+    if tg_op = 'UPDATE' and (to_jsonb(new) - 'link_group') = (to_jsonb(old) - 'link_group') then return new; end if;
+    if od < today and not public.has_permission('edit_past_cash', st) then
+      raise exception 'ليس لديك صلاحية تعديل أو حذف حركات الأيام السابقة' using errcode = '42501';
+    end if;
+    if public.gm_fiscal_closed(st, od) then
+      raise exception 'السنة المالية % مقفلة', extract(year from od)::int using errcode = '42501';
+    end if;
+    if tg_op = 'DELETE' then return old; end if;
+    if new.created_at is not distinct from old.created_at then return new; end if;
+  end if;
+  nd := (new.created_at at time zone 'Asia/Dubai')::date;
+  if nd < today and not public.has_permission('backdate_entries', st) then
+    raise exception 'ليس لديك صلاحية تسجيل حركة بتاريخ سابق' using errcode = '42501';
+  end if;
+  if nd > today then raise exception 'لا يمكن تسجيل حركة بتاريخ لاحق' using errcode = '22008'; end if;
+  if public.gm_fiscal_closed(st, nd) then
+    raise exception 'السنة المالية % مقفلة — لا يمكن التسجيل بتاريخ فيها', extract(year from nd)::int using errcode = '42501';
+  end if;
+  return new;
+end $$;
+
+
+--
 -- Name: gm_daily_label(text, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1757,6 +1798,19 @@ end $$;
 
 
 --
+-- Name: gm_fiscal_closed(uuid, date); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from fiscal_year_closures
+                 where store_id = p_store and fiscal_year = extract(year from p_day)::int);
+$$;
+
+
+--
 -- Name: gm_op_date(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1784,7 +1838,14 @@ CREATE FUNCTION public.gm_op_date_stamp() RETURNS trigger
     AS $$
 declare d date := public.gm_op_date();
 begin
+  new.entered_at := now();
   if d is not null then
+    if auth.uid() is not null and not public.has_permission('backdate_entries', new.store_id) then
+      raise exception 'ليس لديك صلاحية تسجيل عملية بتاريخ سابق' using errcode = '42501';
+    end if;
+    if public.gm_fiscal_closed(new.store_id, d) then
+      raise exception 'السنة المالية % مقفلة — لا يمكن التسجيل بتاريخ فيها', extract(year from d)::int using errcode = '42501';
+    end if;
     new.created_at := (d + (now() at time zone 'Asia/Dubai')::time) at time zone 'Asia/Dubai';
   end if;
   return new;
@@ -1852,6 +1913,31 @@ end $$;
 
 
 --
+-- Name: gm_scrap_return_unrecorded(uuid, integer, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_scrap_return_unrecorded(p_store uuid, p_karat integer, p_grams numeric, p_note text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare left_g numeric := round(p_grams, 3); r record; a numeric;
+begin
+  for r in select id, weight_grams_total - weight_grams_remaining room from gold_stock_lots
+            where store_id = p_store and box_name = 'كسر ' || p_karat and weight_grams_remaining < weight_grams_total
+            order by created_at desc, id desc for update loop
+    exit when left_g <= 0.0005;
+    a := least(left_g, r.room);
+    update gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining + a, 3) where id = r.id;
+    left_g := left_g - a;
+  end loop;
+  if left_g > 0.0005 then
+    insert into gold_stock_lots (store_id, karat, box_name, weight_grams_total, weight_grams_remaining, notes)
+      values (p_store, p_karat, 'كسر ' || p_karat, round(left_g, 3), round(left_g, 3), p_note);
+  end if;
+end $$;
+
+
+--
 -- Name: gm_seller_stamp(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1898,6 +1984,45 @@ CREATE FUNCTION public.gm_session_ok() RETURNS boolean
     or exists (select 1 from public.login_2fa l where l.session_id = nullif(auth.jwt()->>'session_id', '')::uuid
                  and l.user_id = auth.uid() and l.verified_at is not null);
 $$;
+
+
+--
+-- Name: gm_staff_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_staff_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+declare
+  me record;
+  k text;
+  st uuid := coalesce(new.store_id, old.store_id);
+begin
+  if current_user <> 'authenticated' or auth.uid() is null then return coalesce(new, old); end if;
+  select role, permissions into me from staff where user_id = auth.uid() and store_id = st;
+  if tg_op = 'DELETE' then
+    if old.role = 'owner' then raise exception 'لا يمكن حذف مالك الحساب' using errcode = '42501'; end if;
+    return old;
+  end if;
+  if tg_op = 'UPDATE' then
+    if new.store_id is distinct from old.store_id then raise exception 'لا يمكن نقل الموظف لمتجر آخر' using errcode = '42501'; end if;
+    if new.role is distinct from old.role then raise exception 'لا يمكن تغيير دور الموظف' using errcode = '42501'; end if;
+    if new.user_id is distinct from old.user_id then raise exception 'لا يمكن تغيير حساب دخول الموظف من هنا' using errcode = '42501'; end if;
+  else
+    if new.role is distinct from 'staff' then raise exception 'الموظف الجديد يُضاف بدور موظف فقط' using errcode = '42501'; end if;
+    if new.user_id is not null then raise exception 'حساب الدخول يُنشأ من شاشة الموظفين فقط' using errcode = '42501'; end if;
+  end if;
+  if me.role = 'owner' then return new; end if;
+  if tg_op = 'UPDATE' and old.role = 'owner' then raise exception 'لا يمكن تعديل حساب المالك' using errcode = '42501'; end if;
+  for k in select key from jsonb_each_text(coalesce(new.permissions, '{}'::jsonb)) where value = 'true' loop
+    if coalesce(me.permissions ->> k, '') <> 'true'
+       and (tg_op = 'INSERT' or coalesce(old.permissions ->> k, '') <> 'true') then
+      raise exception 'لا يمكنك منح صلاحية لا تملكها (%)', k using errcode = '42501';
+    end if;
+  end loop;
+  return new;
+end $$;
 
 
 --
@@ -2241,6 +2366,37 @@ $$;
 
 
 --
+-- Name: login_email_for(text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.login_email_for(p_username text, p_password text) RETURNS text
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public', 'extensions'
+    AS $_$
+declare v_ip text; v_user text := 'u:' || lower(trim(coalesce(p_username, ''))); v_email text; v_hash text;
+begin
+  if length(coalesce(p_password, '')) = 0 or length(v_user) < 5 then return null; end if;
+    v_ip := split_part(coalesce((current_setting('request.headers', true)::json ->> 'x-forwarded-for'), 'unknown'), ',', 1);
+      if (select count(*) from lookup_username_attempts where caller_ip = v_ip and attempted_at > now() - interval '60 seconds') >= 5
+           or (select count(*) from lookup_username_attempts where caller_ip = v_user and attempted_at > now() - interval '5 minutes') >= 10
+                or (select count(*) from lookup_username_attempts where attempted_at > now() - interval '60 seconds') >= 120 then
+                    raise exception 'RATE_LIMITED' using errcode = '42901';
+                      end if;
+                        insert into lookup_username_attempts (caller_ip) values (v_ip), (v_user);
+                          delete from lookup_username_attempts where attempted_at < now() - interval '10 minutes';
+                            select u.email::text, u.encrypted_password into v_email, v_hash
+                                from user_profiles up join auth.users u on u.id = up.id
+                                   where lower(up.username) = lower(trim(p_username)) limit 1;
+                                     if v_hash is null or v_hash = '' then
+                                         perform crypt(p_password, '$2a$10$abcdefghijklmnopqrstuuJ7xJ0hX5d2h5e4lV0YbQyH3n7m1QW2e');
+                                             return null;
+                                               end if;
+                                                 if crypt(p_password, v_hash) = v_hash then return v_email; end if;
+                                                   return null;
+                                                   end $_$;
+
+
+--
 -- Name: lookup_email_by_username(text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2248,22 +2404,21 @@ CREATE FUNCTION public.lookup_email_by_username(p_username text) RETURNS text
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  v_ip text;
-    v_recent_count int;
-    begin
-      v_ip := split_part(coalesce((current_setting('request.headers', true)::json ->> 'x-forwarded-for'), 'unknown'), ',', 1);
-        select count(*) into v_recent_count from public.lookup_username_attempts
-           where caller_ip = v_ip and attempted_at > now() - interval '60 seconds';
-             if v_recent_count >= 5 then raise exception 'RATE_LIMITED' using errcode = '42901'; end if;
-               if (select count(*) from public.lookup_username_attempts where attempted_at > now() - interval '60 seconds') >= 60 then
-                   raise exception 'RATE_LIMITED' using errcode = '42901';
-                     end if;
-                       insert into public.lookup_username_attempts (caller_ip) values (v_ip);
-                         delete from public.lookup_username_attempts where attempted_at < now() - interval '10 minutes';
-                           return (select u.email::text from public.user_profiles up join auth.users u on u.id = up.id
-                                      where lower(up.username) = lower(trim(p_username)) limit 1);
-                                      end $$;
+-- Kept only for older app builds. Returns just the internal staff login address
+-- (…@staff.goldmind.app), never a real email; new pages use login_email_for().
+declare v_ip text; v_email text;
+begin
+  v_ip := split_part(coalesce((current_setting('request.headers', true)::json ->> 'x-forwarded-for'), 'unknown'), ',', 1);
+  if (select count(*) from public.lookup_username_attempts where caller_ip = v_ip and attempted_at > now() - interval '60 seconds') >= 5
+     or (select count(*) from public.lookup_username_attempts where attempted_at > now() - interval '60 seconds') >= 60 then
+    raise exception 'RATE_LIMITED' using errcode = '42901';
+  end if;
+  insert into public.lookup_username_attempts (caller_ip) values (v_ip);
+  select u.email::text into v_email from public.user_profiles up join auth.users u on u.id = up.id
+   where lower(up.username) = lower(trim(p_username)) limit 1;
+  if v_email like '%@staff.goldmind.app' then return v_email; end if;
+  return null;
+end $$;
 
 
 --
@@ -4767,6 +4922,33 @@ end $_$;
 
 
 --
+-- Name: trg_scrap_given_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_scrap_given_guard() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare d record; n int := 0;
+begin
+  if tg_op = 'UPDATE' then
+    if new.weight_grams is distinct from old.weight_grams or new.karat is distinct from old.karat then
+      raise exception 'لا يمكن تعديل وزن إخراج الكسر — احذف الحركة (يرجع الوزن لصندوق الكسر) ثم أخرجه من جديد';
+    end if;
+    return new;
+  end if;
+  for d in select lot_id, grams from trader_scrap_draws where movement_id = old.id loop
+    update gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining + d.grams, 3) where id = d.lot_id;
+    n := n + 1;
+  end loop;
+  if n = 0 and coalesce(old.weight_grams, 0) > 0 then
+    perform gm_scrap_return_unrecorded(old.store_id, old.karat, old.weight_grams, 'أُرجع من حذف إخراج كسر لتاجر');
+  end if;
+  return old;
+end $$;
+
+
+--
 -- Name: trg_settlement_lot_sync(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5053,7 +5235,8 @@ CREATE TABLE public.cash_movements (
     trader_movement_id uuid,
     fx_amount numeric,
     fx_currency text,
-    edit_delta boolean DEFAULT false NOT NULL
+    edit_delta boolean DEFAULT false NOT NULL,
+    entered_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -5182,7 +5365,8 @@ CREATE TABLE public.customer_debts (
     created_by uuid,
     source text,
     currency text,
-    cash_movement_id uuid
+    cash_movement_id uuid,
+    entered_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -5285,6 +5469,7 @@ CREATE TABLE public.daily_cash_log (
     cash_movement_id uuid,
     bank_part boolean DEFAULT false NOT NULL,
     bank_invoice_id uuid,
+    entered_at timestamp with time zone DEFAULT now(),
     CONSTRAINT daily_cash_log_amount_check CHECK ((amount > (0)::numeric)),
     CONSTRAINT daily_cash_log_direction_check CHECK ((direction = ANY (ARRAY['in'::text, 'out'::text])))
 );
@@ -5945,7 +6130,8 @@ CREATE TABLE public.piece_movements (
     event_type text NOT NULL,
     note text,
     created_by uuid,
-    created_at timestamp with time zone DEFAULT now() NOT NULL
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    entered_at timestamp with time zone DEFAULT now()
 );
 
 
@@ -6491,6 +6677,7 @@ CREATE TABLE public.trader_movements (
     gold_stock_lot_id uuid,
     piece_acc_weight numeric,
     gold_price_24k numeric,
+    entered_at timestamp with time zone DEFAULT now(),
     CONSTRAINT trader_movements_source_check CHECK ((source = ANY (ARRAY['settlement'::text, 'stock_given'::text, 'stock_received'::text, 'opening_balance'::text, 'cash_out'::text, 'cash_in'::text, 'gold_to_cash'::text, 'scrap_given'::text, 'discount'::text])))
 );
 
@@ -6545,6 +6732,21 @@ COMMENT ON COLUMN public.trader_movements.cost_fab_per_gram IS 'Our own making c
 
 
 --
+-- Name: trader_scrap_draws; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.trader_scrap_draws (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    store_id uuid NOT NULL,
+    movement_id uuid NOT NULL,
+    lot_id uuid NOT NULL,
+    grams numeric NOT NULL,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT trader_scrap_draws_grams_check CHECK ((grams > (0)::numeric))
+);
+
+
+--
 -- Name: traders; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -6591,6 +6793,7 @@ CREATE TABLE public.user_profiles (
     username text,
     created_at timestamp with time zone DEFAULT now() NOT NULL,
     privacy_accepted_at timestamp with time zone,
+    home_prefs jsonb,
     CONSTRAINT user_profiles_username_format CHECK (((username IS NULL) OR (username ~ '^[a-zA-Z0-9_\.]{3,30}$'::text)))
 );
 
@@ -7180,6 +7383,14 @@ ALTER TABLE ONLY public.support_requests
 
 ALTER TABLE ONLY public.trader_movements
     ADD CONSTRAINT trader_movements_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: trader_scrap_draws trader_scrap_draws_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trader_scrap_draws
+    ADD CONSTRAINT trader_scrap_draws_pkey PRIMARY KEY (id);
 
 
 --
@@ -8195,6 +8406,13 @@ CREATE INDEX trader_movements_trader_id_fk_idx ON public.trader_movements USING 
 
 
 --
+-- Name: trader_scrap_draws_movement_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_scrap_draws_movement_idx ON public.trader_scrap_draws USING btree (movement_id);
+
+
+--
 -- Name: traders_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -8248,6 +8466,13 @@ CREATE TRIGGER trg_auto_upgrade_on_staff_change AFTER INSERT OR DELETE ON public
 --
 
 CREATE TRIGGER trg_auto_upgrade_on_staff_login AFTER UPDATE OF user_id ON public.staff FOR EACH ROW WHEN (((old.user_id IS NULL) AND (new.user_id IS NOT NULL))) EXECUTE FUNCTION public.auto_upgrade_on_staff_change();
+
+
+--
+-- Name: daily_cash_log trg_cash_log_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cash_log_guard BEFORE INSERT OR DELETE OR UPDATE ON public.daily_cash_log FOR EACH ROW EXECUTE FUNCTION public.gm_cash_log_guard();
 
 
 --
@@ -8398,6 +8623,13 @@ CREATE TRIGGER trg_piece_draws_weight BEFORE UPDATE OF weight_grams ON public.pi
 
 
 --
+-- Name: trader_movements trg_scrap_given_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_scrap_given_guard BEFORE DELETE OR UPDATE ON public.trader_movements FOR EACH ROW WHEN ((old.source = 'scrap_given'::text)) EXECUTE FUNCTION public.trg_scrap_given_guard();
+
+
+--
 -- Name: invoice_items trg_scrap_price_at_purchase; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -8416,6 +8648,13 @@ CREATE TRIGGER trg_seed_default_zebra_label_fields AFTER INSERT ON public.stores
 --
 
 CREATE TRIGGER trg_settlement_lot_sync AFTER DELETE OR UPDATE ON public.trader_movements FOR EACH ROW EXECUTE FUNCTION public.trg_settlement_lot_sync();
+
+
+--
+-- Name: staff trg_staff_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_staff_guard BEFORE INSERT OR DELETE OR UPDATE ON public.staff FOR EACH ROW EXECUTE FUNCTION public.gm_staff_guard();
 
 
 --
@@ -9652,6 +9891,22 @@ ALTER TABLE ONLY public.trader_movements
 
 
 --
+-- Name: trader_scrap_draws trader_scrap_draws_lot_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trader_scrap_draws
+    ADD CONSTRAINT trader_scrap_draws_lot_id_fkey FOREIGN KEY (lot_id) REFERENCES public.gold_stock_lots(id);
+
+
+--
+-- Name: trader_scrap_draws trader_scrap_draws_movement_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.trader_scrap_draws
+    ADD CONSTRAINT trader_scrap_draws_movement_id_fkey FOREIGN KEY (movement_id) REFERENCES public.trader_movements(id) ON DELETE CASCADE;
+
+
+--
 -- Name: traders traders_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -10188,6 +10443,15 @@ ALTER TABLE public.inventory_gifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: invoice_items invoice_items: members read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "invoice_items: members read" ON public.invoice_items FOR SELECT USING ((invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE public.is_store_member(i.store_id))));
+
+
+--
 -- Name: invoice_items invoice_items_select_org; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -10287,6 +10551,13 @@ CREATE POLICY manage_gold_price ON public.gold_prices USING (public.has_permissi
 --
 
 CREATE POLICY "manage_subscription can edit subscription" ON public.subscriptions USING ((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id)));
+
+
+--
+-- Name: trader_scrap_draws members read scrap draws; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "members read scrap draws" ON public.trader_scrap_draws FOR SELECT USING (public.is_store_member(store_id));
 
 
 --
@@ -10680,9 +10951,11 @@ ALTER TABLE public.stock_vouchers ENABLE ROW LEVEL SECURITY;
 -- Name: invoice_items store access: invoice_items; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "store access: invoice_items" ON public.invoice_items USING ((invoice_id IN ( SELECT invoices.id
-   FROM public.invoices
-  WHERE public.is_store_member(invoices.store_id))));
+CREATE POLICY "store access: invoice_items" ON public.invoice_items USING ((invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id))))) WITH CHECK ((invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id)))));
 
 
 --
@@ -10861,6 +11134,12 @@ CREATE POLICY trader_movements_select_org ON public.trader_movements FOR SELECT 
 
 CREATE POLICY trader_movements_write ON public.trader_movements USING ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
 
+
+--
+-- Name: trader_scrap_draws; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.trader_scrap_draws ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: traders; Type: ROW SECURITY; Schema: public; Owner: -
@@ -11381,6 +11660,15 @@ GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO service_role;
 
 
 --
+-- Name: FUNCTION gm_cash_log_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_cash_log_guard() TO anon;
+GRANT ALL ON FUNCTION public.gm_cash_log_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_cash_log_guard() TO service_role;
+
+
+--
 -- Name: FUNCTION gm_daily_label(p_op text, p_notes text, p_cm uuid, OUT op text, OUT notes text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -11395,6 +11683,15 @@ GRANT ALL ON FUNCTION public.gm_daily_label(p_op text, p_notes text, p_cm uuid, 
 
 REVOKE ALL ON FUNCTION public.gm_draw_for_piece(p_piece uuid, p_store uuid, p_box text, p_lot uuid, p_grams numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_draw_for_piece(p_piece uuid, p_store uuid, p_box text, p_lot uuid, p_grams numeric) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_fiscal_closed(p_store uuid, p_day date); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO anon;
+GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO service_role;
 
 
 --
@@ -11442,6 +11739,14 @@ GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO service_role;
 
 
 --
+-- Name: FUNCTION gm_scrap_return_unrecorded(p_store uuid, p_karat integer, p_grams numeric, p_note text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_scrap_return_unrecorded(p_store uuid, p_karat integer, p_grams numeric, p_note text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_scrap_return_unrecorded(p_store uuid, p_karat integer, p_grams numeric, p_note text) TO service_role;
+
+
+--
 -- Name: FUNCTION gm_seller_stamp(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -11457,6 +11762,15 @@ GRANT ALL ON FUNCTION public.gm_seller_stamp() TO service_role;
 GRANT ALL ON FUNCTION public.gm_session_ok() TO anon;
 GRANT ALL ON FUNCTION public.gm_session_ok() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_session_ok() TO service_role;
+
+
+--
+-- Name: FUNCTION gm_staff_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_staff_guard() TO anon;
+GRANT ALL ON FUNCTION public.gm_staff_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_staff_guard() TO service_role;
 
 
 --
@@ -11583,6 +11897,16 @@ GRANT ALL ON FUNCTION public.join_company_by_invite(target_store_id uuid) TO ser
 GRANT ALL ON FUNCTION public.log_audit_event() TO anon;
 GRANT ALL ON FUNCTION public.log_audit_event() TO authenticated;
 GRANT ALL ON FUNCTION public.log_audit_event() TO service_role;
+
+
+--
+-- Name: FUNCTION login_email_for(p_username text, p_password text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.login_email_for(p_username text, p_password text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.login_email_for(p_username text, p_password text) TO anon;
+GRANT ALL ON FUNCTION public.login_email_for(p_username text, p_password text) TO authenticated;
+GRANT ALL ON FUNCTION public.login_email_for(p_username text, p_password text) TO service_role;
 
 
 --
@@ -12157,6 +12481,15 @@ GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO service_role;
 GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO anon;
 GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO service_role;
+
+
+--
+-- Name: FUNCTION trg_scrap_given_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_scrap_given_guard() TO anon;
+GRANT ALL ON FUNCTION public.trg_scrap_given_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_scrap_given_guard() TO service_role;
 
 
 --
@@ -12871,6 +13204,15 @@ GRANT ALL ON TABLE public.trader_movements TO service_role;
 
 
 --
+-- Name: TABLE trader_scrap_draws; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.trader_scrap_draws TO anon;
+GRANT ALL ON TABLE public.trader_scrap_draws TO authenticated;
+GRANT ALL ON TABLE public.trader_scrap_draws TO service_role;
+
+
+--
 -- Name: TABLE traders; Type: ACL; Schema: public; Owner: -
 --
 
@@ -12961,5 +13303,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict B02TfhBMxdSbXTJdu6Kmp4n6KhEve97bPDxhJ6vkPspC9m34VlQwGKDrNU5BaQ2
+\unrestrict F4HjpcgfsTo7PVbfI0u15IKbd8Io5Z06Vo30OiE58Z6yz1IHsOKoX8tZVDibhL2
 
