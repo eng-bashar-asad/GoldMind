@@ -3,6 +3,40 @@
 const GOLDMIND_SUPABASE_URL = 'https://puzkfwbmipldzgwofhjg.supabase.co';
 const GOLDMIND_SUPABASE_KEY = 'sb_publishable_QxjJeGblzseQTvTH87eyZw_19Zu206o';
 
+// Digits are always entered in English (0-9) everywhere: Arabic-Indic / Persian digits and the
+// Arabic decimal and thousands marks typed on an Arabic keyboard become Latin as they are typed
+// (or pasted). gmLatinDigits(text) does the same for any string.
+const GM_AR_DIGITS = /[٠-٩۰-۹٫٬]/;
+function gmLatinDigits(text) {
+    return String(text == null ? '' : text).replace(/[٠-٩۰-۹٫٬]/g, c => {
+        const n = c.charCodeAt(0);
+        if (n === 0x066B) return '.';
+        if (n === 0x066C) return ',';
+        return String(n >= 0x06F0 ? n - 0x06F0 : n - 0x0660);
+    });
+}
+if (typeof document !== 'undefined') {
+    const fieldOk = el => el && (el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !/^(checkbox|radio|file|button|submit|reset|color|range|hidden|image)$/i.test(el.type)));
+    const fire = el => el.dispatchEvent(new Event('input', { bubbles: true }));
+    document.addEventListener('beforeinput', e => {
+        const el = e.target;
+        if (!fieldOk(el) || e.isComposing || !e.data || !GM_AR_DIGITS.test(e.data)) return;
+        e.preventDefault();
+        const text = gmLatinDigits(e.data);
+        try { el.setRangeText(text, el.selectionStart, el.selectionEnd, 'end'); }
+        catch (_) { el.value = (el.value || '') + text; } // number/email fields have no caret API
+        fire(el);
+    }, true);
+    // pasted or auto-filled text
+    document.addEventListener('input', e => {
+        const el = e.target;
+        if (!fieldOk(el) || !GM_AR_DIGITS.test(el.value || '')) return;
+        let pos = null; try { pos = el.selectionStart; } catch (_) {}
+        el.value = gmLatinDigits(el.value);
+        try { if (pos != null) el.setSelectionRange(pos, pos); } catch (_) {}
+    }, true);
+}
+
 // International calling codes for the countries offered on
 // company-settings-ar.html's "الدولة" field. Used wherever we build a
 // wa.me WhatsApp link, so the prefix matches the store's own country
