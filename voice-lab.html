@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<meta name="robots" content="noindex"/>
+<title>مختبر الصوت — GoldMind</title>
+<!-- Standalone test page: speech-to-text only. No login, no data is read or saved anywhere. -->
+<style>
+  :root { --bg:#F6F1E6; --card:#FFFFFF; --fg:#1C1917; --muted:#6B6257; --line:#E3D9C6; --gold:#7A6640; --on-gold:#FFFFFF; --live:#B42318; --ok:#3F6B47; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font-family: Arial, 'Times New Roman', sans-serif; line-height:1.6; }
+  main { max-width:720px; margin:0 auto; padding:20px 16px 60px; display:flex; flex-direction:column; gap:14px; }
+  h1 { font-size:20px; margin:0; }
+  p.sub { margin:0; color:var(--muted); font-size:13px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:14px; padding:14px; display:flex; flex-direction:column; gap:10px; }
+  .row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+  label { font-size:13px; color:var(--muted); }
+  select, button { font:inherit; min-height:44px; border-radius:10px; }
+  select { border:1px solid var(--line); padding:0 10px; background:var(--card); color:var(--fg); }
+  button { border:1px solid var(--line); background:var(--card); color:var(--fg); padding:0 16px; cursor:pointer; }
+  button.primary { background:var(--gold); color:var(--on-gold); border-color:var(--gold); font-weight:700; font-size:16px; flex:1; }
+  button.primary.on { background:var(--live); border-color:var(--live); }
+  button:focus-visible, select:focus-visible { outline:2px solid var(--fg); outline-offset:2px; }
+  #status { font-size:13px; color:var(--muted); }
+  #status.live::before { content:''; display:inline-block; width:9px; height:9px; border-radius:50%; background:var(--live); margin-inline-end:6px; animation:pulse 1s infinite; }
+  @keyframes pulse { 50% { opacity:.3; } }
+  @media (prefers-reduced-motion: reduce) { #status.live::before { animation:none; } }
+  #interim { min-height:28px; color:var(--muted); font-size:15px; }
+  ol { margin:0; padding-inline-start:22px; display:flex; flex-direction:column; gap:10px; }
+  li { font-size:16px; }
+  li small { display:block; color:var(--muted); font-size:12px; }
+  .empty { color:var(--muted); font-size:14px; }
+  .warn { background:#FFF4E5; border:1px solid #F1C27D; color:#7A4B00; border-radius:10px; padding:10px; font-size:13px; }
+</style>
+</head>
+<body>
+<main>
+  <h1>مختبر الصوت</h1>
+  <p class="sub">جرّب كيف يكتب المحرّك كلامك العربي. هذه الصفحة للتجربة فقط: لا تحتاج تسجيل دخول، ولا تقرأ أو تحفظ أي بيانات في البرنامج.</p>
+
+  <div id="unsupported" class="warn" hidden>المتصفح الحالي لا يدعم التعرّف على الصوت. افتح الصفحة في Google Chrome على الموبايل أو الكمبيوتر (أو Safari على iPhone).</div>
+
+  <div class="card">
+    <div class="row">
+      <label for="lang">لهجة التعرّف</label>
+      <select id="lang">
+        <option value="ar-SY">عربي — سوريا</option>
+        <option value="ar-AE">عربي — الإمارات</option>
+        <option value="ar-SA">عربي — السعودية</option>
+        <option value="ar-JO">عربي — الأردن</option>
+        <option value="ar-LB">عربي — لبنان</option>
+      </select>
+    </div>
+    <div class="row">
+      <button id="mic" class="primary" type="button">ابدأ الاستماع</button>
+    </div>
+    <div id="status">المايك مغلق. اضغط «ابدأ الاستماع» وتكلّم بشكل طبيعي، وتوقّف ثانيتين بين كل أمر.</div>
+    <div id="interim" aria-live="polite"></div>
+  </div>
+
+  <div class="card">
+    <div class="row" style="justify-content:space-between">
+      <strong>ما فهمه المحرّك</strong>
+      <div class="row">
+        <button id="copy" type="button">نسخ الكل</button>
+        <button id="clear" type="button">مسح</button>
+      </div>
+    </div>
+    <ol id="list"></ol>
+    <div id="empty" class="empty">لم تُسجَّل أي جملة بعد. مثال تجربه: «ضيف تاجر جديد اسمه مجد بيطار، وأعطيه قطعة عيار 18 وزن قائم 10.5 ومحاسبي 9.8 ومصنعية الغرام 12 دولار».</div>
+  </div>
+</main>
+<script>
+(function () {
+  const SR = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const $ = id => document.getElementById(id);
+  const list = $('list'), status = $('status'), interim = $('interim'), btn = $('mic');
+  let rec = null, wanted = false, n = 0;
+  if (!SR) { $('unsupported').hidden = false; btn.disabled = true; return; }
+
+  function setOn(on) {
+    btn.classList.toggle('on', on);
+    btn.textContent = on ? 'إيقاف الاستماع' : 'ابدأ الاستماع';
+    status.classList.toggle('live', on);
+    status.textContent = on ? 'يستمع الآن… تكلّم وتوقّف ثانيتين بين كل أمر.' : 'المايك مغلق.';
+  }
+  function add(text, alts) {
+    $('empty').hidden = true;
+    const li = document.createElement('li');
+    li.textContent = text;
+    if (alts.length) { const s = document.createElement('small'); s.textContent = 'احتمالات أخرى: ' + alts.join(' | '); li.appendChild(s); }
+    list.appendChild(li);
+  }
+  function start() {
+    rec = new SR();
+    rec.lang = $('lang').value;
+    rec.continuous = true;
+    rec.interimResults = true;
+    rec.maxAlternatives = 3;
+    rec.onresult = e => {
+      let live = '';
+      for (let i = e.resultIndex; i < e.results.length; i++) {
+        const r = e.results[i];
+        if (r.isFinal) {
+          const alts = [];
+          for (let j = 1; j < r.length; j++) if (r[j].transcript.trim()) alts.push(r[j].transcript.trim());
+          add(r[0].transcript.trim(), alts);
+          n++;
+        } else live += r[0].transcript;
+      }
+      interim.textContent = live;
+    };
+    rec.onerror = e => {
+      if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { wanted = false; status.textContent = 'لم يُسمح باستخدام المايك. اسمح للمتصفح باستخدام المايك ثم أعد المحاولة.'; }
+      else if (e.error === 'no-speech') { /* silence: keep listening */ }
+      else status.textContent = 'خطأ في التعرّف: ' + e.error;
+    };
+    rec.onend = () => { interim.textContent = ''; if (wanted) { try { rec.start(); } catch (_) { setOn(false); wanted = false; } } else setOn(false); };
+    rec.start();
+    setOn(true);
+  }
+  btn.addEventListener('click', () => {
+    if (wanted) { wanted = false; rec && rec.stop(); setOn(false); return; }
+    wanted = true; start();
+  });
+  $('lang').addEventListener('change', () => { if (wanted) { wanted = false; rec && rec.stop(); setTimeout(() => { wanted = true; start(); }, 300); } });
+  $('clear').addEventListener('click', () => { list.innerHTML = ''; $('empty').hidden = false; n = 0; });
+  $('copy').addEventListener('click', async () => {
+    const text = [...list.querySelectorAll('li')].map(li => li.firstChild.textContent).join('\n');
+    try { await navigator.clipboard.writeText(text); $('copy').textContent = 'تم النسخ'; }
+    catch (_) { $('copy').textContent = 'تعذّر النسخ'; }
+    setTimeout(() => { $('copy').textContent = 'نسخ الكل'; }, 1500);
+  });
+})();
+</script>
+</body>
+</html>
