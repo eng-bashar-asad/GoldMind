@@ -127,3 +127,28 @@ test('edit a sale: pay part of it in another currency (pay_breakdown, daily rows
   expect(calls.some(c => c.method === 'POST' && c.name === 'customer_debts')).toBe(false);
   expect(errs).toEqual([]);
 });
+
+test('a debt sale switched to cash on edit: the rest is collected now and the debt cleared', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const calls = await install(page, { db: {
+    stores: [{ id: STORE, name: 'محل', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    invoices: [{ id: 's1', store_id: STORE, invoice_number: 'INV-67', type: 'sale', status: 'unpaid', payment_method: 'credit', customer_id: 'c1', total_amount: 3000, amount_paid: 0, created_at: '2026-10-26T07:00:00Z' }],
+    invoice_items: [{ id: 'it1', invoice_id: 's1', karat: 21, weight_grams: 20, line_total: 3000, description: 'طقم' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'علاء', phone: '0501' }], pieces: []
+  } });
+  await page.goto('/invoice-edit-ar.html?id=s1');
+  await expect(page.locator('#lockedNumber')).toHaveText('INV-67');
+  await page.selectOption('#paymentMethodSelect', 'cash');
+  page.on('dialog', d => d.accept());
+  await page.click('#save-btn');
+  await expect.poll(() => calls.some(c => c.method === 'POST' && c.name === 'customer_debts')).toBe(true);
+  const inv = JSON.parse(calls.find(c => c.method === 'PATCH' && c.name === 'invoices').body);
+  expect([inv.payment_method, inv.amount_paid, inv.status]).toEqual(['cash', 3000, 'paid']);
+  const cash = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'cash_movements').body);
+  expect([cash.direction, cash.amount]).toEqual(['in', 3000]);
+  const debt = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'customer_debts').body);
+  expect([debt.movement_type, debt.cash_amount]).toEqual(['debt_decrease', 3000]);
+  expect(errs).toEqual([]);
+});

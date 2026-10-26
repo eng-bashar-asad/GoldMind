@@ -96,8 +96,13 @@ async function gmSaveInvoiceEdit(s) {
   if (invoice.type === 'sale') {
     const oldPaid = Number(invoice.amount_paid || 0);
     const oldRem = oldTotal - oldPaid;
+    // a debt invoice switched to cash / card: the rest is collected now (today), the debt is cleared
+    const collectNow = oldRem > 0.009 && (newPaymentMethod === 'cash' || newPaymentMethod === 'bank') && newPaymentMethod !== invoice.payment_method;
+    if (collectNow && typeof confirm === 'function' && !confirm('سيُسجَّل تحصيل ' + gmFormatNumber(r2(newTotal - oldPaid)) + (newPaymentMethod === 'bank' ? ' فيزا/تحويل' : ' نقداً') + ' اليوم، ويُلغى دين هذه الفاتورة على الزبون. متابعة؟')) {
+      return { error: 'لم تُحفظ التعديلات.' };
+    }
     const newPaid = newPaymentMethod === 'mixed' ? r2(mixCash + mixBank + later)
-      : newPaymentMethod === 'credit' ? later : oldRem <= 0.009 ? newTotal : Math.max(later, Math.min(oldPaid, newTotal));
+      : newPaymentMethod === 'credit' ? later : (oldRem <= 0.009 || collectNow) ? newTotal : Math.max(later, Math.min(oldPaid, newTotal));
     saleMoney = { cashDelta: newPaid - oldPaid, debtDelta: (newTotal - newPaid) - oldRem };
     if (FX && newTotal > 0) {
       // keep the typed amounts exact: new rate = total typed ÷ invoice total
@@ -107,7 +112,7 @@ async function gmSaveInvoiceEdit(s) {
     }
     updatePayload.amount_paid = newPaid;
     updatePayload.status = newTotal - newPaid > 0.009 ? 'unpaid' : 'paid';
-    if (oldRem > 0.009 && newPaymentMethod !== 'credit' && newPaymentMethod !== 'mixed') updatePayload.payment_method = invoice.payment_method;
+    if (oldRem > 0.009 && !collectNow && newPaymentMethod !== 'credit' && newPaymentMethod !== 'mixed') updatePayload.payment_method = invoice.payment_method;
     updatePayload.cash_paid_amount = newPaymentMethod === 'mixed' ? mixCash : null;
     updatePayload.bank_paid_amount = newPaymentMethod === 'mixed' ? mixBank : null;
     // The currencies paid changed: take the invoice's old money out of the box (in the old
