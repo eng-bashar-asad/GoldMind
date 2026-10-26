@@ -85,8 +85,17 @@
     status.classList.toggle('live', on);
     status.textContent = on ? 'يستمع الآن… تكلّم وتوقّف ثانيتين بين كل أمر.' : 'المايك مغلق.';
   }
+  // Chrome on Android repeats the growing sentence as several "final" results
+  // ("جارفيس", "جارفيس بدي", "جارفيس بدي تضيف"…): keep only the longest one.
+  let lastText = '';
   function add(text, alts) {
     $('empty').hidden = true;
+    const last = list.lastElementChild;
+    if (last && lastText && (text.startsWith(lastText) || lastText.startsWith(text))) {
+      if (text.length >= lastText.length) { last.firstChild.textContent = text; lastText = text; }
+      return;
+    }
+    lastText = text;
     const li = document.createElement('li');
     li.textContent = text;
     if (alts.length) { const s = document.createElement('small'); s.textContent = 'احتمالات أخرى: ' + alts.join(' | '); li.appendChild(s); }
@@ -95,7 +104,8 @@
   function start() {
     rec = new SR();
     rec.lang = $('lang').value;
-    rec.continuous = true;
+    // Android: one sentence per session (restarted after each pause) — its continuous mode repeats text
+    rec.continuous = !/Android/i.test(navigator.userAgent);
     rec.interimResults = true;
     rec.maxAlternatives = 3;
     rec.onresult = e => {
@@ -105,7 +115,8 @@
         if (r.isFinal) {
           const alts = [];
           for (let j = 1; j < r.length; j++) if (r[j].transcript.trim()) alts.push(r[j].transcript.trim());
-          add(r[0].transcript.trim(), alts);
+          const t = r[0].transcript.trim();
+          if (t) add(t, alts);
           n++;
         } else live += r[0].transcript;
       }
@@ -116,7 +127,7 @@
       else if (e.error === 'no-speech') { /* silence: keep listening */ }
       else status.textContent = 'خطأ في التعرّف: ' + e.error;
     };
-    rec.onend = () => { interim.textContent = ''; if (wanted) { try { rec.start(); } catch (_) { setOn(false); wanted = false; } } else setOn(false); };
+    rec.onend = () => { interim.textContent = ''; lastText = ''; if (wanted) { try { rec.start(); } catch (_) { setOn(false); wanted = false; } } else setOn(false); };
     rec.start();
     setOn(true);
   }
@@ -125,7 +136,7 @@
     wanted = true; start();
   });
   $('lang').addEventListener('change', () => { if (wanted) { wanted = false; rec && rec.stop(); setTimeout(() => { wanted = true; start(); }, 300); } });
-  $('clear').addEventListener('click', () => { list.innerHTML = ''; $('empty').hidden = false; n = 0; });
+  $('clear').addEventListener('click', () => { list.innerHTML = ''; $('empty').hidden = false; n = 0; lastText = ''; });
   $('copy').addEventListener('click', async () => {
     const text = [...list.querySelectorAll('li')].map(li => li.firstChild.textContent).join('\n');
     try { await navigator.clipboard.writeText(text); $('copy').textContent = 'تم النسخ'; }
