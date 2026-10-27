@@ -144,7 +144,7 @@
 </div>
 
 <script>
-let parties = [], traders = [], prices = {}, CUR = '', current = null, outCart = [], newRowSeq = 0;
+let parties = [], traders = [], prices = {}, CUR = '', current = null, outCart = [], newRowSeq = 0, partyLines = [];
 const opts = { type: [], category1: [], category2: [] };
 let boxes = [], lastBox = '';
 const n = (v, d = 2) => Number(v || 0).toFixed(d);
@@ -208,10 +208,10 @@ async function onPartyChange() {
 
 async function refreshParty() {
   const [{ data: lines }, { data: vouchers }] = await Promise.all([
-    goldmindClient.from('stock_voucher_lines').select('voucher_id, direction, piece_id, barcode, karat, weight_grams, accounting_weight_grams, fab_per_gram, cost_value').eq('party_id', current.id),
+    goldmindClient.from('stock_voucher_lines').select('id, voucher_id, direction, piece_id, barcode, karat, weight_grams, accounting_weight_grams, fab_per_gram, cost_value').eq('party_id', current.id),
     goldmindClient.from('stock_vouchers').select('id, voucher_number, direction, notes, created_at, staff:created_by(full_name)').eq('party_id', current.id).order('created_at', { ascending: false }).limit(50)
   ]);
-  const L = lines || [];
+  const L = lines || []; partyLines = L;
   // pieces currently held by this party = the last line for the piece here is an "out" and the piece is still out
   const lastByPiece = {};
   L.forEach(l => { if (l.piece_id) lastByPiece[l.piece_id] = l; });
@@ -256,15 +256,88 @@ async function refreshParty() {
   const byV = {};
   L.forEach(l => { const v = byV[l.voucher_id] = byV[l.voucher_id] || { cnt: 0, w: 0, c: 0 }; v.cnt++; v.w += Number(l.weight_grams); v.c += Number(l.cost_value); });
   document.getElementById('vouchers').innerHTML = (vouchers || []).length ? vouchers.map(v => { const t = byV[v.id] || { cnt: 0, w: 0, c: 0 }; return `
-    <div class="p-3 flex items-center gap-3">
+    <div class="p-3 flex items-center gap-3 cursor-pointer hover:bg-surface-container-low" role="button" tabindex="0" aria-expanded="false" onclick="toggleVoucher('${v.id}', this)" onkeydown="if(event.key==='Enter')toggleVoucher('${v.id}', this)">
       <span class="material-symbols-outlined ${v.direction === 'out' ? 'text-error' : 'text-success'}">${v.direction === 'out' ? 'upload' : 'download'}</span>
       <div class="flex-1 min-w-0">
-        <div class="font-semibold text-[13px] font-data-mono">${esc(v.voucher_number)} <span class="font-normal text-on-surface-variant">${v.direction === 'out' ? 'إخراج' : 'إدخال'}</span></div>
+        <div class="font-semibold text-[13px] font-data-mono">${esc(v.voucher_number)} <span class="font-normal text-on-surface-variant">${v.direction === 'out' ? 'إخراج' : 'إدخال'}</span> <span class="material-symbols-outlined align-middle text-[18px] text-on-surface-variant">expand_more</span></div>
         <div class="text-[11px] text-on-surface-variant">${gmFormatDateTime(v.created_at)}${v.staff && v.staff.full_name ? ' · ' + esc(v.staff.full_name) : ''}${v.notes ? ' · ' + esc(v.notes) : ''}</div>
       </div>
       <div class="text-left text-[12px] font-data-mono">${t.cnt} قطعة · ${n(t.w, 3)}غ<br/>${money(t.c)}</div>
-      <a href="stock-voucher-print-ar.html?id=${v.id}" target="_blank" title="طباعة" class="text-primary"><span class="material-symbols-outlined">print</span></a>
-    </div>`; }).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد سندات بعد.</p>';
+      <a href="stock-voucher-print-ar.html?id=${v.id}" target="_blank" title="طباعة" aria-label="طباعة" onclick="event.stopPropagation()" class="text-primary gm-hit"><span class="material-symbols-outlined">print</span></a>
+    </div>
+    <div id="vd-${v.id}" class="hidden px-3 pb-3 space-y-2"></div>`; }).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد سندات بعد.</p>';
+}
+
+// ---- a voucher's pieces, opened in place; pieces that came in (still in stock) can be edited here ----
+let vdPieces = {};
+async function toggleVoucher(vid, head) {
+  const box = document.getElementById('vd-' + vid);
+  const open = box.classList.toggle('hidden') === false;
+  head.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!open) return;
+  const lines = partyLines.filter(l => l.voucher_id === vid);
+  const ids = lines.map(l => l.piece_id).filter(Boolean);
+  box.innerHTML = '<p class="text-[12px] text-on-surface-variant">جارِ التحميل…</p>';
+  if (ids.length) {
+    const { data } = await goldmindClient.from('pieces').select('id, barcode, status, description_ar, photo_url, box_name').in('id', ids);
+    (data || []).forEach(p => { vdPieces[p.id] = p; });
+  }
+  renderVoucherLines(vid);
+}
+function renderVoucherLines(vid) {
+  const box = document.getElementById('vd-' + vid);
+  const lines = partyLines.filter(l => l.voucher_id === vid);
+  box.innerHTML = lines.length ? lines.map(l => {
+    const p = l.piece_id ? vdPieces[l.piece_id] : null;
+    const editable = l.direction === 'in' && p && p.status === 'available';
+    return `<div class="p-2 rounded-lg border border-outline-variant" data-line="${l.id}">
+      <div class="flex items-center gap-2">
+        ${p && p.photo_url ? `<img src="${esc(p.photo_url)}" alt="" onclick="showPhoto(this.src)" style="width:40px;height:40px" class="rounded object-cover border border-outline-variant cursor-zoom-in"/>` : ''}
+        <div class="flex-1 min-w-0 text-[12px]">
+          <div class="font-data-mono font-semibold" dir="ltr" style="text-align:right">${esc(l.barcode || '')}</div>
+          <div class="text-on-surface-variant">${l.karat}K · ${n(l.weight_grams, 3)}غ قائم · ${n(l.accounting_weight_grams, 3)}غ محاسبي · مصنعية ${n(l.fab_per_gram)}/غ${p && p.box_name ? ' · ' + esc(p.box_name) : ''}${p && p.description_ar ? ' · ' + esc(p.description_ar) : ''}</div>
+        </div>
+        ${editable ? `<button type="button" onclick="editVoucherLine('${vid}','${l.id}')" class="h-9 px-3 rounded-lg border border-primary text-primary text-[12px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">edit</span>تعديل</button>` : ''}
+      </div>
+      <div class="vl-form hidden"></div>
+    </div>`; }).join('') : '<p class="text-[12px] text-on-surface-variant">لا توجد أسطر.</p>';
+}
+function editVoucherLine(vid, lid) {
+  const l = partyLines.find(x => x.id === lid), p = vdPieces[l.piece_id];
+  const f = document.querySelector(`[data-line="${lid}"] .vl-form`);
+  if (!f.classList.contains('hidden')) { f.classList.add('hidden'); return; }
+  f.className = 'vl-form grid grid-cols-2 md:grid-cols-4 gap-2 text-[12px] mt-2';
+  f.innerHTML = `
+    <label class="flex flex-col gap-1">الوزن القائم (غ)<input type="number" step="0.001" class="h-10 border border-outline-variant rounded px-2 font-data-mono" data-e="weight" value="${n(l.weight_grams, 3)}"/></label>
+    <label class="flex flex-col gap-1">الوزن المحاسبي (غ)<input type="number" step="0.001" class="h-10 border border-outline-variant rounded px-2 font-data-mono" data-e="acc" value="${n(l.accounting_weight_grams, 3)}"/></label>
+    <label class="flex flex-col gap-1">المصنعية للغرام<input type="number" step="0.01" class="h-10 border border-outline-variant rounded px-2 font-data-mono" data-e="fab" value="${n(l.fab_per_gram)}"/></label>
+    <label class="flex flex-col gap-1">الصندوق<select class="h-10 border border-outline-variant rounded px-2" data-e="box">${boxes.map(b => `<option${b === p.box_name ? ' selected' : ''}>${esc(b)}</option>`).join('')}${p.box_name && !boxes.includes(p.box_name) ? `<option selected>${esc(p.box_name)}</option>` : ''}</select></label>
+    <label class="flex flex-col gap-1 col-span-2">الوصف<input class="h-10 border border-outline-variant rounded px-2" data-e="desc" value="${esc(p.description_ar || '')}"/></label>
+    <label class="flex flex-col gap-1">صورة جديدة<input type="file" accept="image/*" capture="environment" class="text-[11px]" data-e="photo"/></label>
+    <button type="button" onclick="saveVoucherLine('${vid}','${lid}', this)" class="self-end h-10 rounded-lg bg-primary text-on-primary font-semibold">حفظ التعديل</button>
+    <p class="vl-msg hidden col-span-2 md:col-span-4 text-[12px]"></p>`;
+}
+async function saveVoucherLine(vid, lid, btn) {
+  const f = document.querySelector(`[data-line="${lid}"] .vl-form`), g = k => f.querySelector(`[data-e="${k}"]`);
+  const m = f.querySelector('.vl-msg'), say = (t, bad) => { m.textContent = t; m.className = 'vl-msg col-span-2 md:col-span-4 text-[12px] ' + (bad ? 'text-error' : 'text-success'); };
+  const w = parseFloat(g('weight').value), aw = parseFloat(g('acc').value), fab = parseFloat(g('fab').value);
+  if (!w || w <= 0) return say('اكتب الوزن القائم', true);
+  if (isNaN(fab) || fab < 0) return say('اكتب المصنعية (ولو صفراً)', true);
+  btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  let photo = null; const file = g('photo').files[0];
+  if (file) { // optional: a failed upload never blocks the edit
+    const path = GOLDMIND_STORE_ID + '/mod-' + gmRandName() + '.' + ((file.name.split('.').pop() || 'jpg').toLowerCase());
+    const { error } = await goldmindClient.storage.from('piece-photos').upload(path, file, { upsert: false });
+    if (!error) { const { data } = goldmindClient.storage.from('piece-photos').getPublicUrl(path); photo = data ? data.publicUrl : null; }
+  }
+  const { error } = await goldmindClient.rpc('stock_in_piece_update', { p_line: lid, p_weight: w, p_acc: aw > 0 ? aw : w, p_fab: fab,
+    p_description: g('desc').value.trim(), p_box: g('box').value, p_photo_url: photo });
+  btn.disabled = false; btn.textContent = 'حفظ التعديل';
+  if (error) return say('تعذّر الحفظ: ' + error.message, true);
+  await refreshParty();
+  const head = document.querySelector(`[onclick^="toggleVoucher('${vid}'"]`);
+  if (head) await toggleVoucher(vid, head);
+  gmToast('حُفظ تعديل القطعة');
 }
 
 // ---- OUT ----

@@ -110,3 +110,31 @@ test('goods in: a row can go to the scrap box', async ({ page }) => {
   expect(sent.new_lines).toEqual([{ to_scrap: true, karat: 21, weight: 1.25 }]);
   expect(errs).toEqual([]);
 });
+
+// A voucher opens in place; a piece that came in (still in stock) is edited right there.
+test('goods in: edit a piece from its voucher on the same screen', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  let sent = null;
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'AED' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    stock_parties: [{ id: 'sp1', store_id: STORE, name: 'تعديل داخلي', kind: 'intermediary' }],
+    traders: [], gold_prices: [], piece_classification_options: [], diamond_pieces: [],
+    stock_vouchers: [{ id: 'i1', store_id: STORE, party_id: 'sp1', direction: 'in', voucher_number: 'IN-00003', created_at: '2026-10-27T10:00:00Z' }],
+    stock_voucher_lines: [{ id: 'l1', voucher_id: 'i1', party_id: 'sp1', direction: 'in', piece_id: 'n1', barcode: '000770', karat: 18, weight_grams: 22.81, accounting_weight_grams: 22.81, fab_per_gram: 5, cost_value: 0 }],
+    pieces: [{ id: 'n1', store_id: STORE, barcode: '000770', box_name: 'عيار 18', status: 'available', karat: 18, weight_grams: 22.81, description_ar: 'عقد' }],
+  }, rpc: { stock_in_piece_update: a => { sent = a; return { body: null }; } } });
+  await page.goto('/stock-transfer-ar.html');
+  await page.waitForFunction(() => document.querySelectorAll('#return-box option').length > 1);
+  await page.selectOption('#party-select', 'p:sp1');
+  await page.locator('#vouchers').getByText('IN-00003').click();
+  await expect(page.locator('#vd-i1')).not.toHaveClass(/\bhidden\b/);
+  await page.locator('#vd-i1 button', { hasText: 'تعديل' }).click();
+  await page.locator('#vd-i1 [data-e="weight"]').fill('22.5');
+  await page.locator('#vd-i1 [data-e="fab"]').fill('6');
+  await page.locator('#vd-i1 button', { hasText: 'حفظ التعديل' }).click();
+  await expect.poll(() => sent).not.toBeNull();
+  expect(sent).toMatchObject({ p_line: 'l1', p_weight: 22.5, p_fab: 6, p_box: 'عيار 18', p_description: 'عقد' });
+  expect(errs).toEqual([]);
+});
