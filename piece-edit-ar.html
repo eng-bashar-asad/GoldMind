@@ -332,6 +332,8 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <option value="sold">مباعة</option>
 <option value="reserved">محجوزة</option>
 <option value="given_to_trader" disabled="">معطاة لتاجر (من سند إخراج بضاعة — عدّل من صفحة سجل حركات التاجر)</option>
+<option value="at_intermediary" disabled="">عند وسيط تعديل (من صفحة إخراج وإدخال بضاعة)</option>
+<option value="reworked" disabled="">حُوّلت لقطع جديدة</option>
 </select>
 </div>
 </div>
@@ -719,7 +721,7 @@ async function load() {
   loadPieceLog();
 }
 
-const EVENT_LABELS = { created: 'إنشاء القطعة', edited: 'تعديل', sold: 'بيع', returned: 'مرتجع', status_changed: 'تغيير الحالة', photo_changed: 'تغيير الصورة', given_to_trader: 'إعطاء بضاعة للتاجر', returned_from_trader: 'رجوع من التاجر', gifted: 'هدية', gift_reverted: 'إلغاء الهدية', restored: 'استعادة' };
+const EVENT_LABELS = { created: 'إنشاء القطعة', edited: 'تعديل', sold: 'بيع', returned: 'مرتجع', status_changed: 'تغيير الحالة', photo_changed: 'تغيير الصورة', given_to_trader: 'إعطاء بضاعة للتاجر', returned_from_trader: 'رجوع من التاجر', gifted: 'هدية', gift_reverted: 'إلغاء الهدية', restored: 'استعادة', stock_out: 'إخراج لجهة', stock_in: 'إدخال من جهة', reworked: 'حُوّلت لقطع جديدة' };
 function fmtLogDate(d) { return gmFormatDateTime(d, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }); }
 
 async function loadPieceLog() {
@@ -910,7 +912,7 @@ document.getElementById('delete-btn').addEventListener('click', async () => {
 });
 
 // ---- Piece view (chosen design 2026-09-28): read-only summary above the edit form ----
-const GM_STATUS = { available: ['متوفرة', '#E3F1E6', '#2E7D46'], reserved: ['محجوزة', '#FFF1D6', '#8A6A1C'], sold: ['مباعة', '#EDE7DA', '#6B6150'], given_to_trader: ['عند تاجر', '#E6ECF5', '#34568B'] };
+const GM_STATUS = { available: ['متوفرة', '#E3F1E6', '#2E7D46'], reserved: ['محجوزة', '#FFF1D6', '#8A6A1C'], sold: ['مباعة', '#EDE7DA', '#6B6150'], given_to_trader: ['عند تاجر', '#E6ECF5', '#34568B'], at_intermediary: ['عند وسيط تعديل', '#FFF1D6', '#8A6A1C'], reworked: ['حُوّلت لقطع جديدة', '#EDE7DA', '#6B6150'] };
 const GM_COLORS = { Gold: 'ذهبي', White: 'أبيض', Rose: 'وردي' };
 function gmN(v) { return v == null || v === '' || isNaN(Number(v)) ? '—' : Number(v).toFixed(2); }
 function gmRenderPieceView() {

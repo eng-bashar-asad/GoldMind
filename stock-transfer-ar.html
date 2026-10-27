@@ -106,7 +106,7 @@
 <!-- IN -->
 <div id="tab-in" class="hidden flex flex-col gap-3">
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-2">
-<h3 class="font-semibold text-[13px]">قطع مُعادة كما هي</h3>
+<h3 class="font-semibold text-[13px]">القطع لدى الجهة</h3>
 <div id="held-list" class="flex flex-col gap-1"></div>
 <label class="flex flex-col gap-1 text-[12px] pt-1">صندوق القطع المُعادة
 <select id="return-box" class="h-10 border border-outline-variant rounded px-2"></select></label>
@@ -240,11 +240,14 @@ async function refreshParty() {
     bal.innerHTML = `<div class="p-3 rounded-lg bg-surface-container-low">في الصندوق حالياً: <b>${held.length}</b> قطعة · <b class="font-data-mono">${n(w, 3)}غ</b> · كلفة <b class="font-data-mono">${money(held.reduce((s, p) => s + costOf(p), 0))}</b></div>`;
   }
   // held pieces (for "in")
+  // held pieces (for "in"): back as they are, or (intermediary) the original the new pieces were made from
+  const canSrc = current.kind === 'intermediary';
   document.getElementById('held-list').innerHTML = held.length ? held.map(p => `
-    <label class="flex items-center gap-2 p-2 rounded-lg hover:bg-surface-container-low cursor-pointer">
-      <input type="checkbox" class="held-cb" value="${p.id}"/>
-      <span class="font-data-mono text-[12px] flex-1">${esc(p.barcode)} · ${p.karat}K · ${n(p.weight_grams, 3)}غ ${p.description_ar ? '· ' + esc(p.description_ar) : ''}</span>
-    </label>`).join('') : '<p class="text-[12px] text-on-surface-variant">لا توجد قطع لدى هذه الجهة.</p>';
+    <div class="held-row flex flex-wrap items-center gap-x-3 gap-y-1 p-2 rounded-lg hover:bg-surface-container-low" data-id="${p.id}" data-code="${esc(p.barcode)}">
+      <span class="font-data-mono text-[12px] flex-1 min-w-[12rem]">${esc(p.barcode)} · ${p.karat}K · ${n(p.weight_grams, 3)}غ ${p.description_ar ? '· ' + esc(p.description_ar) : ''}</span>
+      <label class="flex items-center gap-1 text-[12px] cursor-pointer min-h-[32px]"><input type="checkbox" class="held-cb" value="${p.id}" onchange="heldPick(this)"/>رجعت كما هي</label>
+      ${canSrc ? `<label class="flex items-center gap-1 text-[12px] cursor-pointer min-h-[32px]"><input type="checkbox" class="held-src" value="${p.id}" onchange="heldPick(this)"/>انعملت منها القطع الجديدة</label>` : ''}
+    </div>`).join('') : '<p class="text-[12px] text-on-surface-variant">لا توجد قطع لدى هذه الجهة.</p>';
   // vouchers
   const byV = {};
   L.forEach(l => { const v = byV[l.voucher_id] = byV[l.voucher_id] || { cnt: 0, w: 0, c: 0 }; v.cnt++; v.w += Number(l.weight_grams); v.c += Number(l.cost_value); });
@@ -341,6 +344,11 @@ function addNewRow() {
     <button type="button" onclick="this.closest('.new-row').remove()" class="self-end h-10 rounded border border-error text-error">حذف</button>`;
   document.getElementById('new-rows').appendChild(div);
 }
+// one choice per held piece: back as it is, or the original of the new pieces
+function heldPick(cb) {
+  if (!cb.checked) return;
+  cb.closest('.held-row').querySelectorAll('input[type=checkbox]').forEach(o => { if (o !== cb) o.checked = false; });
+}
 async function saveIn() {
   msg('save-error', ''); msg('save-success', '');
   const back = [...document.querySelectorAll('.held-cb:checked')].map(c => c.value);
@@ -357,7 +365,16 @@ async function saveIn() {
       color: g('color').value, box_name: g('box_name').value, description_ar: g('description_ar').value.trim(), file: g('photo').files[0] || null });
   }
   if (!back.length && !lines.length) { msg('save-error', 'اختر قطعة مُعادة أو أضف قطعة جديدة', true); return; }
-  if (!confirm('حفظ سند إدخال من ' + current.name + '؟')) return;
+  // the original piece the new ones were made from is closed («حُوّلت لقطع جديدة») and never comes back as-is
+  let src = [...document.querySelectorAll('.held-src:checked')].map(c => c.value);
+  if (src.length && !lines.length) { msg('save-error', 'أضف القطع الجديدة المصنوعة من القطعة الأصلية', true); return; }
+  if (lines.length && !src.length && current.kind === 'intermediary') {
+    const left = [...document.querySelectorAll('.held-row')].filter(r => !back.includes(r.dataset.id));
+    if (left.length === 1) src = [left[0].dataset.id];
+    else if (left.length > 1) { msg('save-error', 'حدّد القطعة الأصلية اللي انعملت منها القطع الجديدة («انعملت منها القطع الجديدة»)', true); return; }
+  }
+  const srcCodes = [...document.querySelectorAll('.held-row')].filter(r => src.includes(r.dataset.id)).map(r => r.dataset.code);
+  if (!confirm('حفظ سند إدخال من ' + current.name + '؟' + (srcCodes.length ? '\n\nالقطعة ' + srcCodes.join('، ') + ' رح تتسكّر «حُوّلت لقطع جديدة» وتضل محفوظة بسجلها، وما بترجع للمخزن.' : ''))) return;
   const btn = document.getElementById('in-btn'); btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
   // photos are optional: a failed upload never blocks the voucher
   for (const l of lines) {
@@ -368,7 +385,7 @@ async function saveIn() {
     if (!error) { const { data } = goldmindClient.storage.from('piece-photos').getPublicUrl(path); l.photo_url = data ? data.publicUrl : null; }
   }
   const payload = lines.map(({ row, file, ...rest }) => rest);
-  const { data: vid, error } = await goldmindClient.rpc('stock_in_from_party', { target_party_id: current.id, return_piece_ids: back, new_lines: payload, p_notes: document.getElementById('in-notes').value.trim() || null, p_return_box: document.getElementById('return-box').value || null });
+  const { data: vid, error } = await goldmindClient.rpc('stock_in_from_party', { target_party_id: current.id, return_piece_ids: back, new_lines: payload, p_source_piece_ids: src, p_notes: document.getElementById('in-notes').value.trim() || null, p_return_box: document.getElementById('return-box').value || null });
   btn.disabled = false; btn.textContent = 'حفظ سند الإدخال';
   if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
   document.getElementById('new-rows').innerHTML = ''; document.getElementById('in-notes').value = ''; document.getElementById('return-box').value = '';
