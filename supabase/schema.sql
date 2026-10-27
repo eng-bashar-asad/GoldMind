@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict jQ1bfu5R1hNVBhhSZuPqkmcFdkS5ZdcSSXv9ccErT7f96RLhBkDZWdYw6M7PdJM
+\restrict t64OBBTL2iqdNfayBiir7LgQiYhC6WHb4EGR3taqHX47lpIt80muP9jsNdpt290
 
 
 SET statement_timeout = 0;
@@ -106,6 +106,7 @@ begin
   from cash_movements cm join invoices i on i.id = cm.invoice_id
   where cm.store_id = sid and cm.box = 'main' and cm.created_at >= '2026-08-08'
     and not coalesce(cm.edit_delta, false)
+    and coalesce(cm.description, '') not like 'تعديل عملات الدفع%' -- currency changes: the invoice's own rows are rewritten
     and not exists (select 1 from daily_cash_log l where l.cash_movement_id = cm.id);
 
   return query
@@ -1862,6 +1863,68 @@ $$;
 
 
 --
+-- Name: gm_invoice_daily_rewrite(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_invoice_daily_rewrite(p_invoice uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+                                                                                                                                                                                                                             declare inv record; keep record; r record; first boolean := true; net numeric; dep numeric; cur text; first_cm uuid;
+                                                                                                                                                                                                                             begin
+                                                                                                                                                                                                                               select i.id, i.store_id, i.invoice_number, i.type, i.status, i.pay_breakdown, i.pay_currency, i.pay_fx_rate, coalesce(c.name, '') cname
+                                                                                                                                                                                                                                   into inv from invoices i left join customers c on c.id = i.customer_id where i.id = p_invoice;
+                                                                                                                                                                                                                                     if inv.id is null or inv.type <> 'sale' or inv.status = 'cancelled' then return; end if;
+                                                                                                                                                                                                                                       if auth.uid() is not null and not has_permission('edit_invoice', inv.store_id) then
+                                                                                                                                                                                                                                           raise exception 'ليس لديك صلاحية تعديل الفواتير' using errcode = '42501';
+                                                                                                                                                                                                                                             end if;
+                                                                                                                                                                                                                                               select id into first_cm from cash_movements where invoice_id = p_invoice and direction = 'in' order by created_at limit 1;
+                                                                                                                                                                                                                                                 -- the invoice's first row (its sale day) stays and is rewritten; its other rows go
+                                                                                                                                                                                                                                                   select l.id, l.created_at, l.created_by into keep from daily_cash_log l
+                                                                                                                                                                                                                                                      where l.direction = 'in' and (l.cash_movement_id in (select id from cash_movements where invoice_id = p_invoice) or l.bank_invoice_id = p_invoice)
+                                                                                                                                                                                                                                                         order by l.created_at, l.id limit 1;
+                                                                                                                                                                                                                                                           delete from daily_cash_log l
+                                                                                                                                                                                                                                                              where (l.cash_movement_id in (select id from cash_movements where invoice_id = p_invoice) or l.bank_invoice_id = p_invoice)
+                                                                                                                                                                                                                                                                   and l.id is distinct from keep.id;
+                                                                                                                                                                                                                                                                     if inv.pay_breakdown is not null then
+                                                                                                                                                                                                                                                                         -- several currencies: one row per currency, cash parts only
+                                                                                                                                                                                                                                                                             for r in select upper(b->>'currency') c, round(sum((b->>'amount')::numeric), 2) a from jsonb_array_elements(inv.pay_breakdown) b
+                                                                                                                                                                                                                                                                                           where b->>'method' = 'cash' and (b->>'amount')::numeric > 0 group by 1 order by 1 loop
+                                                                                                                                                                                                                                                                                                 if first and keep.id is not null then
+                                                                                                                                                                                                                                                                                                         update daily_cash_log set amount = r.a, currency = r.c, cash_movement_id = first_cm, bank_invoice_id = null where id = keep.id;
+                                                                                                                                                                                                                                                                                                               else
+                                                                                                                                                                                                                                                                                                                       insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, created_at, cash_movement_id, bank_invoice_id)
+                                                                                                                                                                                                                                                                                                                               values (inv.store_id, 'مبيعات لـ ' || inv.cname, 'in', r.a, r.c, inv.invoice_number, keep.created_by, coalesce(keep.created_at, now()),
+                                                                                                                                                                                                                                                                                                                                               case when first then first_cm end, case when first then null else p_invoice end);
+                                                                                                                                                                                                                                                                                                                                                     end if;
+                                                                                                                                                                                                                                                                                                                                                           first := false;
+                                                                                                                                                                                                                                                                                                                                                               end loop;
+                                                                                                                                                                                                                                                                                                                                                                   if first and keep.id is not null then delete from daily_cash_log where id = keep.id; end if;
+                                                                                                                                                                                                                                                                                                                                                                       return;
+                                                                                                                                                                                                                                                                                                                                                                         end if;
+                                                                                                                                                                                                                                                                                                                                                                           -- one currency: what the invoice brought into the main box (+ an earlier deposit used on it);
+                                                                                                                                                                                                                                                                                                                                                                             -- the card/transfer part is then taken out by sync_invoice_bank_part as on a new sale
+                                                                                                                                                                                                                                                                                                                                                                               select coalesce(sum(case when direction = 'in' then amount else -amount end), 0) into net from cash_movements where invoice_id = p_invoice;
+                                                                                                                                                                                                                                                                                                                                                                                 select coalesce(sum(amount), 0) into dep from daily_cash_log
+                                                                                                                                                                                                                                                                                                                                                                                    where operation_type = 'عربون سابق' and link_group = 'dep_' || substr(replace(p_invoice::text, '-', ''), 1, 12);
+                                                                                                                                                                                                                                                                                                                                                                                      net := round(net + dep, 2);
+                                                                                                                                                                                                                                                                                                                                                                                        if inv.pay_currency is not null and inv.pay_fx_rate > 0 then net := round(net * inv.pay_fx_rate, 2); cur := upper(inv.pay_currency);
+                                                                                                                                                                                                                                                                                                                                                                                          else select coalesce(nullif(upper(currency), ''), 'AED') into cur from stores where id = inv.store_id; end if;
+                                                                                                                                                                                                                                                                                                                                                                                            if net <= 0.009 then
+                                                                                                                                                                                                                                                                                                                                                                                                if keep.id is not null then delete from daily_cash_log where id = keep.id; end if;
+                                                                                                                                                                                                                                                                                                                                                                                                    return;
+                                                                                                                                                                                                                                                                                                                                                                                                      end if;
+                                                                                                                                                                                                                                                                                                                                                                                                        if keep.id is not null then
+                                                                                                                                                                                                                                                                                                                                                                                                            update daily_cash_log set amount = net, currency = cur, cash_movement_id = first_cm, bank_invoice_id = null where id = keep.id;
+                                                                                                                                                                                                                                                                                                                                                                                                              else
+                                                                                                                                                                                                                                                                                                                                                                                                                  insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
+                                                                                                                                                                                                                                                                                                                                                                                                                      values (inv.store_id, 'مبيعات لـ ' || inv.cname, 'in', net, cur, inv.invoice_number, null, first_cm);
+                                                                                                                                                                                                                                                                                                                                                                                                                        end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                          perform sync_invoice_bank_part(p_invoice);
+                                                                                                                                                                                                                                                                                                                                                                                                                          end $$;
+
+
+--
 -- Name: gm_op_date(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1938,6 +2001,36 @@ begin
     else update piece_lot_draws set grams = grams - a where id = r.id; end if;
     left_g := left_g - a;
   end loop;
+end $$;
+
+
+--
+-- Name: gm_sale_debt_to_daily(uuid, numeric); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_sale_debt_to_daily(p_invoice uuid, p_amount numeric) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare inv record; used numeric; debt numeric; cur text; amt numeric; me uuid; g text;
+begin
+  select i.id, i.store_id, i.invoice_number, i.type, i.pay_currency, i.pay_fx_rate, coalesce(c.name, '') cname into inv
+    from invoices i left join customers c on c.id = i.customer_id where i.id = p_invoice;
+  if inv.id is null or inv.type <> 'sale' then return; end if;
+  select coalesce(sum(cash_amount), 0) into used from customer_debts
+   where invoice_id = p_invoice and source = 'allocation' and movement_type = 'debt_decrease' and entered_at = now();
+  debt := round(p_amount - used, 2);
+  if debt <= 0.009 then return; end if;
+  if inv.pay_currency is not null and inv.pay_fx_rate > 0 then
+    amt := round(debt * inv.pay_fx_rate, 2); cur := upper(inv.pay_currency);
+  else
+    amt := debt; select coalesce(nullif(upper(currency), ''), 'AED') into cur from stores where id = inv.store_id;
+  end if;
+  select id into me from staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
+  g := 'debt_' || substr(replace(p_invoice::text, '-', ''), 1, 12);
+  insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, link_group)
+  values (inv.store_id, 'مبيعات لـ ' || inv.cname, 'in', amt, cur, inv.invoice_number || ' — بالدين', me, g),
+         (inv.store_id, 'دين على ' || inv.cname, 'out', amt, cur, inv.invoice_number, me, g);
 end $$;
 
 
@@ -2480,57 +2573,55 @@ CREATE FUNCTION public.mirror_invoice_cash_to_daily() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare inv record; r record; first boolean := true; full_base numeric; amt numeric; cur text; note text; op text;
-begin
-  if new.invoice_id is null then return new; end if;
-  select id, type, payment_method, pay_breakdown, pay_currency, pay_fx_rate into inv from public.invoices where id = new.invoice_id;
-  if inv is null then return new; end if;
-  if inv.payment_method not in ('cash', 'bank', 'mixed') or new.amount <= 0 then return new; end if;
-  op := case inv.type when 'sale' then 'فاتورة بيع' when 'return' then 'مرتجع مبيعات' else 'فاتورة شراء' end;
-  -- an invoice edit changes the invoice's own row in the daily box (no extra +/- rows)
-  if new.edit_delta then
-    amt := case when new.fx_currency is not null and new.fx_amount > 0 then new.fx_amount
-                when inv.pay_currency is not null and inv.pay_fx_rate > 0 then new.amount * inv.pay_fx_rate else new.amount end;
-    cur := coalesce(upper(new.fx_currency), case when inv.pay_currency is not null and inv.pay_fx_rate > 0 then inv.pay_currency end, new.currency);
-    select l.id, l.direction, l.amount into r from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id
-     where m.invoice_id = inv.id and not m.edit_delta and upper(l.currency) = upper(cur)
-     order by l.created_at limit 1;
-    if r.id is not null then
-      full_base := round(r.amount + case when new.direction = r.direction then amt else -amt end, 2);
-      if full_base > 0 then
-        update daily_cash_log set amount = full_base where id = r.id;
-        perform public.sync_invoice_bank_part(new.invoice_id);
-        return new;
-      end if;
-    end if;
-  end if;
-  -- paid in several currencies: the full amount (sale, cancel, restore) goes in/out
-  -- of the daily box per currency, cash parts only (card/transfer never enters the drawer)
-  if new.fx_currency is null and inv.pay_breakdown is not null then
-    select sum((b->>'amount')::numeric / (b->>'rate')::numeric) into full_base from jsonb_array_elements(inv.pay_breakdown) b;
-    if abs(new.amount - full_base) < 0.05 then
-      for r in select upper(b->>'currency') c, sum((b->>'amount')::numeric) a from jsonb_array_elements(inv.pay_breakdown) b
-                where b->>'method' = 'cash' and (b->>'amount')::numeric > 0 group by 1 order by 1 loop
-        insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id, bank_invoice_id)
-        values (new.store_id, op, new.direction, round(r.a, 2), r.c, new.description, new.created_by,
-                case when first then new.id end, case when first then null else inv.id end);
-        first := false;
-      end loop;
-      return new;
-    end if;
-  end if;
-  amt := round(new.amount, 2); cur := new.currency; note := new.description;
-  if new.fx_currency is not null and new.fx_amount > 0 then
-    -- exact amount in the currency the invoice was sold in (from the edit page)
-    amt := round(new.fx_amount, 2); cur := upper(new.fx_currency);
-  elsif inv.pay_currency is not null and inv.pay_fx_rate > 0 and upper(inv.pay_currency) <> upper(coalesce(new.currency, '')) then
-    amt := round(new.amount * inv.pay_fx_rate, 2); cur := inv.pay_currency;
-  end if;
-  insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
-  values (new.store_id, op, new.direction, amt, cur, note, new.created_by, new.id);
-  perform public.sync_invoice_bank_part(new.invoice_id);
-  return new;
-end $$;
+ declare inv record; r record; first boolean := true; full_base numeric; amt numeric; cur text; note text; op text;
+ begin
+   if new.invoice_id is null then return new; end if;
+     -- a change of payment currencies: gm_invoice_daily_rewrite() sets the invoice's rows
+       if coalesce(new.description, '') like 'تعديل عملات الدفع%' then return new; end if;
+         select id, type, payment_method, pay_breakdown, pay_currency, pay_fx_rate into inv from public.invoices where id = new.invoice_id;
+           if inv is null then return new; end if;
+             if inv.payment_method not in ('cash', 'bank', 'mixed') or new.amount <= 0 then return new; end if;
+               op := case inv.type when 'sale' then 'فاتورة بيع' when 'return' then 'مرتجع مبيعات' else 'فاتورة شراء' end;
+                 if new.edit_delta then
+                     amt := case when new.fx_currency is not null and new.fx_amount > 0 then new.fx_amount
+                                     when inv.pay_currency is not null and inv.pay_fx_rate > 0 then new.amount * inv.pay_fx_rate else new.amount end;
+                                         cur := coalesce(upper(new.fx_currency), case when inv.pay_currency is not null and inv.pay_fx_rate > 0 then inv.pay_currency end, new.currency);
+                                             select l.id, l.direction, l.amount into r from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id
+                                                  where m.invoice_id = inv.id and not m.edit_delta and upper(l.currency) = upper(cur)
+                                                       order by l.created_at limit 1;
+                                                           if r.id is not null then
+                                                                 full_base := round(r.amount + case when new.direction = r.direction then amt else -amt end, 2);
+                                                                       if full_base > 0 then
+                                                                               update daily_cash_log set amount = full_base where id = r.id;
+                                                                                       perform public.sync_invoice_bank_part(new.invoice_id);
+                                                                                               return new;
+                                                                                                     end if;
+                                                                                                         end if;
+                                                                                                           end if;
+                                                                                                             if new.fx_currency is null and inv.pay_breakdown is not null then
+                                                                                                                 select sum((b->>'amount')::numeric / (b->>'rate')::numeric) into full_base from jsonb_array_elements(inv.pay_breakdown) b;
+                                                                                                                     if abs(new.amount - full_base) < 0.05 then
+                                                                                                                           for r in select upper(b->>'currency') c, sum((b->>'amount')::numeric) a from jsonb_array_elements(inv.pay_breakdown) b
+                                                                                                                                           where b->>'method' = 'cash' and (b->>'amount')::numeric > 0 group by 1 order by 1 loop
+                                                                                                                                                   insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id, bank_invoice_id)
+                                                                                                                                                           values (new.store_id, op, new.direction, round(r.a, 2), r.c, new.description, new.created_by,
+                                                                                                                                                                           case when first then new.id end, case when first then null else inv.id end);
+                                                                                                                                                                                   first := false;
+                                                                                                                                                                                         end loop;
+                                                                                                                                                                                               return new;
+                                                                                                                                                                                                   end if;
+                                                                                                                                                                                                     end if;
+                                                                                                                                                                                                       amt := round(new.amount, 2); cur := new.currency; note := new.description;
+                                                                                                                                                                                                         if new.fx_currency is not null and new.fx_amount > 0 then
+                                                                                                                                                                                                             amt := round(new.fx_amount, 2); cur := upper(new.fx_currency);
+                                                                                                                                                                                                               elsif inv.pay_currency is not null and inv.pay_fx_rate > 0 and upper(inv.pay_currency) <> upper(coalesce(new.currency, '')) then
+                                                                                                                                                                                                                   amt := round(new.amount * inv.pay_fx_rate, 2); cur := inv.pay_currency;
+                                                                                                                                                                                                                     end if;
+                                                                                                                                                                                                                       insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
+                                                                                                                                                                                                                         values (new.store_id, op, new.direction, amt, cur, note, new.created_by, new.id);
+                                                                                                                                                                                                                           perform public.sync_invoice_bank_part(new.invoice_id);
+                                                                                                                                                                                                                             return new;
+                                                                                                                                                                                                                             end $$;
 
 
 --
@@ -4861,6 +4952,26 @@ end $$;
 
 
 --
+-- Name: trg_cash_movement_updated_daily_sync(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_cash_movement_updated_daily_sync() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.invoice_id is not null then return new; end if;
+  update daily_cash_log
+     set amount = round(coalesce(case when new.fx_currency is not null and new.fx_amount > 0 then new.fx_amount end, new.amount), 2),
+         direction = new.direction
+   where cash_movement_id = new.id
+     and (amount <> round(coalesce(case when new.fx_currency is not null and new.fx_amount > 0 then new.fx_amount end, new.amount), 2)
+          or direction <> new.direction);
+  return new;
+end $$;
+
+
+--
 -- Name: trg_customer_debts_allocate(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -4872,6 +4983,7 @@ begin
   perform gm_allocate_customer_credit(new.store_id, new.customer_id);
   if new.movement_type = 'debt_increase' and new.invoice_id is not null then
     perform gm_deposit_sale_to_daily(new.invoice_id, new.customer_id);
+    if new.source is null then perform gm_sale_debt_to_daily(new.invoice_id, new.cash_amount); end if;
   end if;
   return null;
 end $$;
@@ -8537,6 +8649,13 @@ CREATE TRIGGER trg_cash_movement_deleted_bank_sync AFTER DELETE ON public.cash_m
 
 
 --
+-- Name: cash_movements trg_cash_movement_updated_daily_sync; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cash_movement_updated_daily_sync AFTER UPDATE OF amount, direction, fx_amount ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION public.trg_cash_movement_updated_daily_sync();
+
+
+--
 -- Name: cash_movements trg_cash_movements_currency; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -11757,6 +11876,15 @@ GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO servi
 
 
 --
+-- Name: FUNCTION gm_invoice_daily_rewrite(p_invoice uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_invoice_daily_rewrite(p_invoice uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_invoice_daily_rewrite(p_invoice uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_invoice_daily_rewrite(p_invoice uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION gm_op_date(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -11789,6 +11917,14 @@ GRANT ALL ON FUNCTION public.gm_pre_request() TO service_role;
 
 REVOKE ALL ON FUNCTION public.gm_return_draws(p_piece uuid, p_grams numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_return_draws(p_piece uuid, p_grams numeric) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_sale_debt_to_daily(p_invoice uuid, p_amount numeric); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_sale_debt_to_daily(p_invoice uuid, p_amount numeric) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_sale_debt_to_daily(p_invoice uuid, p_amount numeric) TO service_role;
 
 
 --
@@ -12489,6 +12625,14 @@ GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO service_rol
 GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO anon;
 GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO service_role;
+
+
+--
+-- Name: FUNCTION trg_cash_movement_updated_daily_sync(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.trg_cash_movement_updated_daily_sync() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.trg_cash_movement_updated_daily_sync() TO service_role;
 
 
 --
@@ -13365,5 +13509,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict jQ1bfu5R1hNVBhhSZuPqkmcFdkS5ZdcSSXv9ccErT7f96RLhBkDZWdYw6M7PdJM
+\unrestrict t64OBBTL2iqdNfayBiir7LgQiYhC6WHb4EGR3taqHX47lpIt80muP9jsNdpt290
 
