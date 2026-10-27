@@ -81,3 +81,32 @@ test('goods in: new pieces name the original they were made from', async ({ page
   await expect(page.locator('.held-row[data-id="c1"] .held-src')).not.toBeChecked();
   expect(errs).toEqual([]);
 });
+
+// Part of the result can go to a scrap box: only karat + weight are sent, flagged to_scrap.
+test('goods in: a row can go to the scrap box', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  let sent = null;
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'AED' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    stock_parties: [{ id: 'sp1', store_id: STORE, name: 'تعديل داخلي', kind: 'intermediary' }],
+    traders: [], gold_prices: [], piece_classification_options: [], diamond_pieces: [], stock_vouchers: [],
+    pieces: [{ id: 'a', store_id: STORE, barcode: '000001', box_name: 'عيار 18', status: 'available', karat: 18, weight_grams: 5 }],
+  }, rpc: { stock_in_from_party: a => { sent = a; return { body: 'v1' }; } } });
+  page.on('dialog', d => d.message().includes('طباعة') ? d.dismiss() : d.accept());
+  await page.goto('/stock-transfer-ar.html');
+  await page.waitForFunction(() => document.querySelectorAll('#return-box option').length > 1);
+  await page.selectOption('#party-select', 'p:sp1');
+  await page.evaluate(() => showTab('in'));
+  await page.evaluate(() => addNewRow());
+  const row = page.locator('.new-row').first();
+  await row.locator('[data-f="box_name"]').selectOption('__scrap:21');
+  await expect(row.locator('[data-f="fab_per_gram"]').locator('xpath=..')).toHaveClass(/\bhidden\b/);
+  await expect(row.locator('[data-f="karat"]')).toHaveValue('21');
+  await row.locator('[data-f="weight"]').fill('1.25');
+  await page.click('#in-btn');
+  await expect.poll(() => sent).not.toBeNull();
+  expect(sent.new_lines).toEqual([{ to_scrap: true, karat: 21, weight: 1.25 }]);
+  expect(errs).toEqual([]);
+});
