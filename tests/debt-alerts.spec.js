@@ -44,3 +44,21 @@ test('overdue customer and trader debts are listed; a cleared debt is not', asyn
   await expect(page.locator('#dskDebtTotalEl')).toHaveText('500.00');
   await expect(page.locator('#dskDebtSubEl')).toHaveText('كل الفروع · 1 زبون');
 });
+
+// Alerts are for individual customers: traders (wholesale) only when turned on in company settings.
+test('overdue alerts leave traders out unless turned on', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'AED', debt_alert_days: 15, debt_alert_customers: true }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ديمة الانصاري' }],
+    customer_debts: [{ id: 'a', store_id: STORE, customer_id: 'c1', movement_type: 'debt_increase', source: null, cash_amount: 500, gold_grams_24k: 0, created_at: ago(30) }],
+    traders: [{ id: 't1', store_id: STORE, name: 'جليل' }],
+    trader_movements: [{ id: 'tm', store_id: STORE, trader_id: 't1', movement_type: 'debt_decrease', source: 'stock_given', fab_fee_amount: 200, gold_24k_equivalent: 0, created_at: ago(20) }],
+  } });
+  await page.goto('/index-ar.html');
+  await expect(page.locator('#debtAlertBox')).not.toHaveClass(/\bhidden\b/);
+  const text = await page.locator('#debtAlertBox').textContent();
+  expect(text).toContain('ديمة الانصاري');
+  expect(text).not.toContain('جليل');
+});

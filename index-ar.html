@@ -2103,7 +2103,7 @@ document.addEventListener('DOMContentLoaded', function () {
             async function renderDebtAlerts(storeRow, hasPermFn) {
                 const days = Math.min(365, Math.max(1, Number(storeRow.debt_alert_days) || 15));
                 const wantCustomers = storeRow.debt_alert_customers !== false && hasPermFn('view_customers');
-                const wantTraders = storeRow.debt_alert_traders !== false && hasPermFn('view_traders');
+                const wantTraders = storeRow.debt_alert_traders === true && hasPermFn('view_traders'); // off unless turned on: alerts are for individual customers
                 if (!wantCustomers && !wantTraders) return;
                 const items = [], phones = {};
                 if (wantCustomers) {
