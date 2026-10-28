@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict t64OBBTL2iqdNfayBiir7LgQiYhC6WHb4EGR3taqHX47lpIt80muP9jsNdpt290
+\restrict BgiVTLjKjwPs0adXgF0XjPKlAfNWIsM1Gq8FdMLPAZzfIRzJh9e8me3eqLZMbas
 
 
 SET statement_timeout = 0;
@@ -2166,6 +2166,52 @@ begin
     end if;
   end loop;
   return new;
+end $$;
+
+
+--
+-- Name: gm_stock_in_rescrap(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_stock_in_rescrap(p_voucher uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare v record; fab_bal numeric; aw_bal numeric; avg_fab numeric; loss numeric := 0; sfab numeric; l record;
+        txt text[] := '{}'; cat_id uuid; eid uuid; dsc text;
+begin
+  select sv.*, pt.name party_name into v from stock_vouchers sv join stock_parties pt on pt.id = sv.party_id where sv.id = p_voucher;
+  if v is null or not exists (select 1 from stock_voucher_lines where voucher_id = p_voucher and piece_id is null and barcode like 'كسر %') then return; end if;
+  select coalesce(sum(case l2.direction when 'out' then 1 else -1 end * l2.fab_per_gram * l2.accounting_weight_grams), 0),
+         coalesce(sum(case l2.direction when 'out' then 1 else -1 end * l2.accounting_weight_grams), 0)
+    into fab_bal, aw_bal
+    from stock_voucher_lines l2 join stock_vouchers v2 on v2.id = l2.voucher_id
+   where l2.party_id = v.party_id and v2.created_at <= v.created_at
+     and not (l2.voucher_id = p_voucher and l2.piece_id is null and l2.barcode like 'كسر %');
+  avg_fab := case when aw_bal > 0.0005 and fab_bal > 0 then fab_bal / aw_bal else 0 end;
+  for l in select * from stock_voucher_lines where voucher_id = p_voucher and piece_id is null and barcode like 'كسر %' order by id loop
+    sfab := round(least(avg_fab, greatest(fab_bal - loss, 0) / l.weight_grams), 4);
+    update stock_voucher_lines set fab_per_gram = sfab,
+           cost_value = round(l.weight_grams * (coalesce(l.gold_price_per_gram, 0) + sfab), 2) where id = l.id;
+    loss := loss + l.weight_grams * sfab;
+    txt := txt || (trim(to_char(l.weight_grams, 'FM999990.000')) || ' غ لصندوق كسر ' || l.karat);
+  end loop;
+  loss := round(loss, 2);
+  dsc := 'خسارة مصنعية — ' || array_to_string(txt, '، ') || ' من ' || v.party_name
+         || ' (متوسط المصنعية ' || trim(to_char(round(avg_fab, 2), 'FM999,999,990.00')) || ' للغرام) — السند ' || v.voucher_number;
+  select id into cat_id from expense_categories where store_id = v.store_id and name = 'خسارة مصنعية' limit 1;
+  if cat_id is not null then
+    select id into eid from expense_entries where store_id = v.store_id and category_id = cat_id
+       and (description like '%— السند ' || v.voucher_number or description like '%— السند ' || v.voucher_number || ' (%')
+     order by created_at limit 1;
+  end if;
+  if eid is not null then
+    update expense_entries set amount = loss, description = dsc || case when loss = 0 then ' (لا خسارة بعد التعديل)' else '' end where id = eid;
+  elsif loss > 0 then
+    if cat_id is null then insert into expense_categories (store_id, name) values (v.store_id, 'خسارة مصنعية') returning id into cat_id; end if;
+    insert into expense_entries (store_id, category_id, amount, description, created_by)
+    values (v.store_id, cat_id, loss, dsc, (select id from staff where user_id = auth.uid() and store_id = v.store_id limit 1));
+  end if;
 end $$;
 
 
@@ -4599,6 +4645,169 @@ begin
   return vid;
 end;
 $$;
+
+
+--
+-- Name: stock_in_from_party(uuid, uuid[], jsonb, text, text, uuid[]); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text, p_source_piece_ids uuid[]) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare
+  pt record; actor uuid; vid uuid; num text; pc record; ln jsonb; gp numeric;
+  k int; wt numeric; aw numeric; fab numeric; bc text; newid uuid; cnt int := 0; rbox text := nullif(trim(p_return_box), '');
+  src_codes text; new_codes text[] := '{}';
+  src_fab numeric := 0; loss numeric := 0; scrap_txt text[] := '{}'; cat_id uuid;
+  fab_bal numeric; aw_bal numeric; held_ids uuid[]; sfab numeric;
+begin
+  select * into pt from public.stock_parties where id = target_party_id;
+  if pt is null then raise exception 'الجهة غير موجودة'; end if;
+  if not public.has_permission('stock_transfers', pt.store_id) then
+    raise exception 'ليس لديك صلاحية إخراج/إدخال البضاعة' using errcode = '42501';
+  end if;
+  select id into actor from public.staff where user_id = auth.uid() and store_id = pt.store_id limit 1;
+
+  select array_agg(p.id), string_agg(p.barcode, '، ' order by p.barcode) into held_ids, src_codes
+    from public.pieces p
+   where p.store_id = pt.store_id and p.status = 'at_intermediary' and not (p.id = any(coalesce(return_piece_ids, '{}')))
+     and (select l.direction from public.stock_voucher_lines l join public.stock_vouchers v on v.id = l.voucher_id
+           where l.piece_id = p.id and l.party_id = pt.id order by v.created_at desc limit 1) = 'out';
+
+  perform 1 from public.stores where id = pt.store_id for update;
+  num := 'IN-' || lpad((select count(*) + 1 from public.stock_vouchers where store_id = pt.store_id and direction = 'in')::text, 5, '0');
+  insert into public.stock_vouchers (store_id, party_id, direction, voucher_number, notes, created_by)
+  values (pt.store_id, pt.id, 'in', num, nullif(trim(p_notes), ''), actor) returning id into vid;
+
+  for pc in select * from public.pieces where id = any(coalesce(return_piece_ids, '{}')) for update loop
+    if pc.store_id <> pt.store_id then raise exception 'قطعة تابعة لشركة أخرى'; end if;
+    if pc.status not in ('in_box', 'at_intermediary') then raise exception 'القطعة % ليست لدى جهة (حالتها: %)', pc.barcode, pc.status; end if;
+    select price_per_gram into gp from public.gold_prices where store_id = pc.store_id and karat = pc.karat;
+    aw := coalesce(pc.accounting_weight_grams, pc.weight_grams, 0);
+    insert into public.stock_voucher_lines (voucher_id, store_id, party_id, direction, piece_id, barcode, karat,
+      weight_grams, accounting_weight_grams, fab_per_gram, gold_price_per_gram, cost_value)
+    values (vid, pc.store_id, pt.id, 'in', pc.id, pc.barcode, pc.karat, pc.weight_grams, aw,
+      coalesce(pc.cost_fabrication_per_gram, 0), gp, round(aw * (coalesce(gp, 0) + coalesce(pc.cost_fabrication_per_gram, 0)), 2));
+    update public.pieces set status = 'available', box_name = coalesce(rbox, box_name) where id = pc.id;
+    insert into public.piece_movements (store_id, piece_id, event_type, note, created_by)
+    values (pc.store_id, pc.id, 'stock_in', 'رجوع بالسند ' || num || ' من ' || pt.name || coalesce(' إلى صندوق ' || rbox, ''), actor);
+    cnt := cnt + 1;
+  end loop;
+
+  for ln in select * from jsonb_array_elements(coalesce(new_lines, '[]'::jsonb)) loop
+    k := (ln->>'karat')::int;
+    wt := (ln->>'weight')::numeric;
+    continue when coalesce((ln->>'to_scrap')::boolean, false);
+    aw := coalesce(nullif(ln->>'acc_weight', '')::numeric, wt);
+    fab := coalesce(nullif(ln->>'fab_per_gram', '')::numeric, 0);
+    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if wt is null or wt <= 0 or aw <= 0 or fab < 0 then raise exception 'وزن أو مصنعية غير صحيحة'; end if;
+    if nullif(trim(ln->>'box_name'), '') is null then raise exception 'اختر الصندوق لكل قطعة جديدة'; end if;
+    bc := public.next_piece_barcode(pt.store_id, 'gold');
+    insert into public.pieces (store_id, barcode, photo_url, weight_grams, accounting_weight_grams, karat, color, status,
+      created_by, cost_fabrication_per_gram, description_ar, piece_type, category1, category2, box_name)
+    values (pt.store_id, bc, nullif(ln->>'photo_url', ''), wt, aw, k, coalesce(nullif(ln->>'color', ''), 'Gold'), 'available',
+      actor, fab, nullif(ln->>'description_ar', ''), nullif(ln->>'piece_type', ''), nullif(ln->>'category1', ''), nullif(ln->>'category2', ''),
+      trim(ln->>'box_name'))
+    returning id into newid;
+    select price_per_gram into gp from public.gold_prices where store_id = pt.store_id and karat = k;
+    insert into public.stock_voucher_lines (voucher_id, store_id, party_id, direction, piece_id, barcode, karat,
+      weight_grams, accounting_weight_grams, fab_per_gram, gold_price_per_gram, cost_value)
+    values (vid, pt.store_id, pt.id, 'in', newid, bc, k, wt, aw, fab, gp, round(aw * (coalesce(gp, 0) + fab), 2));
+    insert into public.piece_movements (store_id, piece_id, event_type, note, created_by)
+    values (pt.store_id, newid, 'stock_in', 'قطعة جديدة بالسند ' || num || ' من ' || pt.name, actor);
+    new_codes := new_codes || bc;
+    cnt := cnt + 1;
+  end loop;
+
+  select coalesce(sum(case l.direction when 'out' then 1 else -1 end * l.fab_per_gram * l.accounting_weight_grams), 0),
+         coalesce(sum(case l.direction when 'out' then 1 else -1 end * l.accounting_weight_grams), 0)
+    into fab_bal, aw_bal from public.stock_voucher_lines l where l.party_id = pt.id;
+  src_fab := case when aw_bal > 0.0005 and fab_bal > 0 then fab_bal / aw_bal else 0 end;
+
+  for ln in select * from jsonb_array_elements(coalesce(new_lines, '[]'::jsonb)) loop
+    k := (ln->>'karat')::int;
+    wt := (ln->>'weight')::numeric;
+    continue when not coalesce((ln->>'to_scrap')::boolean, false);
+    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if wt is null or wt <= 0 then raise exception 'وزن غير صحيح'; end if;
+    wt := round(wt, 3);
+    insert into public.gold_stock_lots (store_id, karat, box_name, weight_grams_total, weight_grams_remaining, cost_fabrication_per_gram, notes, created_by)
+    values (pt.store_id, k, 'كسر ' || k, wt, wt, 0, 'من سند الإدخال ' || num || ' — ' || pt.name, actor);
+    select price_per_gram into gp from public.gold_prices where store_id = pt.store_id and karat = k;
+    sfab := round(least(src_fab, greatest(fab_bal - loss, 0) / wt), 4);
+    insert into public.stock_voucher_lines (voucher_id, store_id, party_id, direction, piece_id, barcode, karat,
+      weight_grams, accounting_weight_grams, fab_per_gram, gold_price_per_gram, cost_value)
+    values (vid, pt.store_id, pt.id, 'in', null, 'كسر ' || k, k, wt, wt, sfab, gp, round(wt * (coalesce(gp, 0) + sfab), 2));
+    loss := loss + wt * sfab;
+    scrap_txt := scrap_txt || (trim(to_char(wt, 'FM999990.000')) || ' غ لصندوق كسر ' || k);
+    cnt := cnt + 1;
+  end loop;
+
+  if cnt = 0 then raise exception 'لا توجد أي قطعة في السند'; end if;
+
+  loss := round(loss, 2);
+  if loss > 0 then
+    select id into cat_id from public.expense_categories where store_id = pt.store_id and name = 'خسارة مصنعية' limit 1;
+    if cat_id is null then insert into public.expense_categories (store_id, name) values (pt.store_id, 'خسارة مصنعية') returning id into cat_id; end if;
+    insert into public.expense_entries (store_id, category_id, amount, description, created_by)
+    values (pt.store_id, cat_id, loss, 'خسارة مصنعية — ' || array_to_string(scrap_txt, '، ') || ' من ' || pt.name
+            || ' (متوسط المصنعية ' || trim(to_char(round(src_fab, 2), 'FM999,999,990.00')) || ' للغرام) — السند ' || num, actor);
+  end if;
+
+  if (array_length(new_codes, 1) is not null or array_length(scrap_txt, 1) is not null) and held_ids is not null then
+    update public.pieces set status = 'reworked' where id = any(held_ids);
+    insert into public.piece_movements (store_id, piece_id, event_type, note, created_by)
+    select pt.store_id, p.id, 'reworked', 'حُوّلت في ' || pt.name || ' — السند ' || num || ': ' || array_to_string(new_codes || scrap_txt, '، '), actor
+      from public.pieces p where p.id = any(held_ids);
+  end if;
+  return vid;
+end;
+$$;
+
+
+--
+-- Name: stock_in_piece_update(uuid, numeric, numeric, numeric, text, text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stock_in_piece_update(p_line uuid, p_weight numeric, p_acc numeric, p_fab numeric, p_description text, p_box text, p_photo_url text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare l record; pc record; gp numeric; actor uuid; aw numeric; ch text[] := '{}';
+begin
+  select * into l from stock_voucher_lines where id = p_line for update;
+  if l is null or l.direction <> 'in' or l.piece_id is null then raise exception 'السطر غير موجود أو ليس قطعة مُدخلة'; end if;
+  if not has_permission('stock_transfers', l.store_id) then raise exception 'ليس لديك صلاحية إخراج/إدخال البضاعة' using errcode = '42501'; end if;
+  select * into pc from pieces where id = l.piece_id for update;
+  if pc.status <> 'available' then raise exception 'القطعة % لم تعد في المخزن (حالتها: %)', pc.barcode, pc.status; end if;
+  if p_weight is null or p_weight <= 0 then raise exception 'الوزن القائم يجب أن يكون أكبر من صفر'; end if;
+  aw := coalesce(nullif(p_acc, 0), p_weight);
+  if aw <= 0 or coalesce(p_fab, 0) < 0 then raise exception 'وزن أو مصنعية غير صحيحة'; end if;
+  if nullif(trim(p_box), '') is null then raise exception 'اختر الصندوق'; end if;
+  select id into actor from staff where user_id = auth.uid() and store_id = l.store_id limit 1;
+
+  if round(p_weight, 3) <> pc.weight_grams then ch := ch || ('القائم ' || pc.weight_grams || ' ← ' || round(p_weight, 3)); end if;
+  if round(aw, 3) <> coalesce(pc.accounting_weight_grams, pc.weight_grams) then ch := ch || ('المحاسبي ' || coalesce(pc.accounting_weight_grams, pc.weight_grams) || ' ← ' || round(aw, 3)); end if;
+  if coalesce(p_fab, 0) <> coalesce(pc.cost_fabrication_per_gram, 0) then ch := ch || ('المصنعية ' || coalesce(pc.cost_fabrication_per_gram, 0) || ' ← ' || coalesce(p_fab, 0)); end if;
+  if trim(p_box) is distinct from pc.box_name then ch := ch || ('الصندوق ' || coalesce(pc.box_name, '—') || ' ← ' || trim(p_box)); end if;
+  if nullif(trim(p_description), '') is distinct from pc.description_ar then ch := ch || 'الوصف'::text; end if;
+  if nullif(p_photo_url, '') is not null then ch := ch || 'الصورة'::text; end if;
+  if array_length(ch, 1) is null then return; end if;
+
+  update pieces set weight_grams = round(p_weight, 3), accounting_weight_grams = round(aw, 3),
+         cost_fabrication_per_gram = coalesce(p_fab, 0), box_name = trim(p_box),
+         description_ar = nullif(trim(p_description), ''), photo_url = coalesce(nullif(p_photo_url, ''), photo_url)
+   where id = pc.id;
+  gp := coalesce(l.gold_price_per_gram, 0);
+  update stock_voucher_lines set weight_grams = round(p_weight, 3), accounting_weight_grams = round(aw, 3),
+         fab_per_gram = coalesce(p_fab, 0), cost_value = round(aw * (gp + coalesce(p_fab, 0)), 2)
+   where id = l.id;
+  insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+  values (l.store_id, pc.id, 'edited', 'تعديل من سند الإدخال: ' || array_to_string(ch, '، '), actor);
+  perform gm_stock_in_rescrap(l.voucher_id);
+end $$;
 
 
 --
@@ -11972,6 +12181,14 @@ GRANT ALL ON FUNCTION public.gm_staff_guard() TO service_role;
 
 
 --
+-- Name: FUNCTION gm_stock_in_rescrap(p_voucher uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_stock_in_rescrap(p_voucher uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_stock_in_rescrap(p_voucher uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION gm_tm_snapshot(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12509,6 +12726,24 @@ GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_pi
 REVOKE ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text) TO authenticated;
 GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text) TO service_role;
+
+
+--
+-- Name: FUNCTION stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text, p_source_piece_ids uuid[]); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text, p_source_piece_ids uuid[]) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text, p_source_piece_ids uuid[]) TO authenticated;
+GRANT ALL ON FUNCTION public.stock_in_from_party(target_party_id uuid, return_piece_ids uuid[], new_lines jsonb, p_notes text, p_return_box text, p_source_piece_ids uuid[]) TO service_role;
+
+
+--
+-- Name: FUNCTION stock_in_piece_update(p_line uuid, p_weight numeric, p_acc numeric, p_fab numeric, p_description text, p_box text, p_photo_url text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.stock_in_piece_update(p_line uuid, p_weight numeric, p_acc numeric, p_fab numeric, p_description text, p_box text, p_photo_url text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.stock_in_piece_update(p_line uuid, p_weight numeric, p_acc numeric, p_fab numeric, p_description text, p_box text, p_photo_url text) TO authenticated;
+GRANT ALL ON FUNCTION public.stock_in_piece_update(p_line uuid, p_weight numeric, p_acc numeric, p_fab numeric, p_description text, p_box text, p_photo_url text) TO service_role;
 
 
 --
@@ -13509,5 +13744,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict t64OBBTL2iqdNfayBiir7LgQiYhC6WHb4EGR3taqHX47lpIt80muP9jsNdpt290
+\unrestrict BgiVTLjKjwPs0adXgF0XjPKlAfNWIsM1Gq8FdMLPAZzfIRzJh9e8me3eqLZMbas
 
