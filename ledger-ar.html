@@ -503,9 +503,17 @@ function goToStatementPrint() {
 <p class="text-[12px] text-on-surface-variant mb-3">امسح أو اكتب باركود كل قطعة تسلّمها للتاجر. تُحدَّد القطعة تلقائياً "معطاة لتاجر" — فلا تظهر ناقصة في الجرد ولا ضمن وزن البضاعة المتوفرة بعد ذلك.</p>
 <div class="flex gap-2 mb-3">
 <input class="flex-1 h-11 border border-outline-variant rounded-lg px-3 font-data-mono" dir="ltr" id="gs-barcode-input" placeholder="امسح أو اكتب الباركود" type="text"/>
-<button onclick="searchGiveStockBarcode()" class="h-11 w-11 bg-primary text-on-primary rounded-lg flex items-center justify-center shrink-0">
+<button onclick="searchGiveStockBarcode()" aria-label="بحث" class="h-11 w-11 bg-primary text-on-primary rounded-lg flex items-center justify-center shrink-0">
 <span class="material-symbols-outlined">search</span>
 </button>
+<button type="button" onclick="openGsScanner()" aria-label="مسح بالكاميرا" title="مسح بالكاميرا" class="h-11 w-11 border border-primary text-primary rounded-lg flex items-center justify-center shrink-0">
+<span class="material-symbols-outlined">photo_camera</span>
+</button>
+</div>
+<div id="gs-scan-box" class="hidden space-y-2 mb-3">
+<div id="gs-camera-reader" class="w-full rounded-lg overflow-hidden bg-black min-h-[200px]"></div>
+<p id="gs-scan-msg" class="text-[12px] text-on-surface-variant text-center" aria-live="polite">مرّر الكاميرا على لصاقات القطع واحدة بعد الأخرى</p>
+<button type="button" onclick="closeGsScanner()" class="w-full h-11 border border-outline-variant rounded-lg text-[13px] font-semibold">إغلاق الكاميرا</button>
 </div>
 <div id="gs-barcode-result" class="mb-3"></div>
 <div class="flex items-center gap-2 mb-3 text-[12px]">
@@ -2549,12 +2557,56 @@ async function searchGiveStockBarcode() {
 
   input.value = '';
   resultEl.innerHTML = '';
-  input.focus();
+  if (!gsScanner) input.focus(); // with the camera open, no keyboard popping up
   renderGiveStockCart();
 }
 
+// ---- camera: scan the labels one after another; each new barcode joins the voucher at once ----
+// html5-qrcode (same as the sale page) is loaded only when the camera is first opened.
+let gsScanner = null, gsLastCode = '', gsLastAt = 0;
+async function openGsScanner() {
+  const box = document.getElementById('gs-scan-box'), msgEl = document.getElementById('gs-scan-msg');
+  if (gsScanner) return;
+  box.classList.remove('hidden');
+  msgEl.textContent = 'جارِ تشغيل الكاميرا...';
+  if (!window.Html5Qrcode) {
+    try { await new Promise((ok, fail) => { const sc = document.createElement('script'); sc.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'; sc.onload = ok; sc.onerror = fail; document.head.appendChild(sc); }); }
+    catch (e) { msgEl.textContent = 'تعذّر تحميل قارئ الباركود — تحقق من الإنترنت.'; return; }
+  }
+  gsScanner = new Html5Qrcode('gs-camera-reader');
+  const F = Html5QrcodeSupportedFormats;
+  gsScanner.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 120 }, formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.QR_CODE] },
+    text => gsOnScan(text.trim()), () => {})
+    .then(() => { msgEl.textContent = 'مرّر الكاميرا على لصاقات القطع واحدة بعد الأخرى'; })
+    .catch(err => { gsScanner = null; msgEl.textContent = 'تعذّر تشغيل الكاميرا — اسمح للبرنامج باستخدام الكاميرا. (' + err + ')'; });
+}
+async function gsOnScan(code) {
+  const now = Date.now();
+  if (!code || (code === gsLastCode && now - gsLastAt < 2500)) return; // the same label stays in front of the camera
+  gsLastCode = code; gsLastAt = now;
+  const msgEl = document.getElementById('gs-scan-msg');
+  if (giveStockCart.some(it => it.barcode === code)) { msgEl.textContent = code + ' مُضافة أصلاً · المجموع ' + giveStockCart.length + ' قطعة'; return; }
+  const before = giveStockCart.length;
+  document.getElementById('gs-barcode-input').value = code;
+  await searchGiveStockBarcode();
+  if (giveStockCart.length > before) {
+    if (navigator.vibrate) navigator.vibrate(60);
+    msgEl.textContent = 'أُضيفت ' + code + ' · المجموع ' + giveStockCart.length + ' قطعة';
+  } else {
+    msgEl.textContent = code + ': ' + (document.getElementById('gs-barcode-result').textContent.trim() || 'لم تُضف');
+  }
+}
+function closeGsScanner() {
+  document.getElementById('gs-scan-box').classList.add('hidden');
+  const inst = gsScanner; gsScanner = null;
+  if (!inst) return;
+  // stop() throws when the camera never started (e.g. permission denied)
+  try { Promise.resolve(inst.stop()).then(() => inst.clear()).catch(() => {}); } catch (e) { try { inst.clear(); } catch (e2) { /* ignore */ } }
+}
+window.addEventListener('pagehide', closeGsScanner);
+
 // the photo panel follows the give-out form being opened/closed by any button
-new MutationObserver(() => renderGsPhotoPanel()).observe(document.getElementById('give-stock-form'), { attributes: true, attributeFilter: ['class'] });
+new MutationObserver(() => { renderGsPhotoPanel(); if (document.getElementById('give-stock-form').classList.contains('hidden')) closeGsScanner(); }).observe(document.getElementById('give-stock-form'), { attributes: true, attributeFilter: ['class'] });
 
 document.addEventListener('DOMContentLoaded', () => {
   const gsInput = document.getElementById('gs-barcode-input');
@@ -2792,6 +2844,7 @@ function setGiveStockMode(mode) {
   document.getElementById('gs-mode-bulk-btn').className = mode === 'bulk' ? active : inactive;
   document.getElementById('gs-barcode-mode').classList.toggle('hidden', mode !== 'barcode');
   document.getElementById('gs-bulk-mode').classList.toggle('hidden', mode !== 'bulk');
+  if (mode !== 'barcode') closeGsScanner();
   document.getElementById('gs-bulk-mode').classList.toggle('flex', mode === 'bulk');
   document.getElementById('gs-mode-scrap-btn').className = mode === 'scrap' ? active : inactive;
   document.getElementById('gs-scrap-mode').classList.toggle('hidden', mode !== 'scrap');
