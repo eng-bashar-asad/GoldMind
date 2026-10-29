@@ -437,12 +437,13 @@ document.querySelectorAll('.color-btn').forEach(btn => btn.addEventListener('cli
 // ---------- Type / Category expandable dropdowns ----------
 const ADD_NEW_VALUE = '__add_new__';
 const classificationCache = {};
+const classificationEn = {}; // 'type' only: Arabic value -> English name (the label prints it)
 
 async function loadClassificationOptions(selectId, fieldKey, label, selectedValue) {
   const select = document.getElementById(selectId);
   const { data, error } = await goldmindClient
     .from('piece_classification_options')
-    .select('value')
+    .select(fieldKey === 'type' ? 'value, value_en' : 'value')
     .eq('store_id', GOLDMIND_STORE_ID)
     .eq('field_key', fieldKey)
     .order('value', { ascending: true });
@@ -450,6 +451,7 @@ async function loadClassificationOptions(selectId, fieldKey, label, selectedValu
   if (error) { console.error('classification load error', fieldKey, error); return; }
 
   classificationCache[fieldKey] = (data || []).map(r => r.value);
+  if (fieldKey === 'type') (data || []).forEach(r => { classificationEn[r.value] = r.value_en || null; });
   renderClassificationSelect(select, fieldKey, label, selectedValue);
 }
 
@@ -824,6 +826,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     photoUrl = null;
   }
 
+  const newType = document.getElementById('piece-type').value || null, typeChanged = newType !== (currentPiece.piece_type || null);
   const { error } = await goldmindClient.from('pieces').update({
     barcode: barcode || null,
     weight_grams: weight,
@@ -839,7 +842,9 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     color: selectedColor,
     status: status,
     photo_url: photoUrl,
-    piece_type: document.getElementById('piece-type').value || null,
+    piece_type: newType,
+    // the description is the type (as on «إضافة قطعة»), and the label prints it: a new type renews both
+    ...(typeChanged ? { description_ar: newType, description_en: newType ? (classificationEn[newType] || null) : null } : {}),
     category1: document.getElementById('category1').value || null,
     category2: document.getElementById('category2').value || null
   }).eq('id', currentPiece.id);
@@ -851,6 +856,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     if (currentPiece.status !== status) changes.push('الحالة: ' + currentPiece.status + ' ← ' + status);
     if ((currentPiece.barcode || '') !== barcode) changes.push('الباركود تغيّر');
     if (photoUrl !== currentPiece.photo_url) changes.push('الصورة تغيّرت');
+    if (typeChanged) changes.push('النوع: ' + (currentPiece.piece_type || '—') + ' ← ' + (newType || '—'));
     if (changes.length) {
       await goldmindClient.from('piece_movements').insert({
         store_id: GOLDMIND_STORE_ID, piece_id: currentPiece.id,
@@ -881,7 +887,8 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   currentPiece.color = selectedColor;
   currentPiece.status = status;
   currentPiece.photo_url = photoUrl;
-  currentPiece.piece_type = document.getElementById('piece-type').value || null;
+  currentPiece.piece_type = newType;
+  if (typeChanged) { currentPiece.description_ar = newType; currentPiece.description_en = newType ? (classificationEn[newType] || null) : null; }
   currentPiece.category1 = document.getElementById('category1').value || null;
   currentPiece.category2 = document.getElementById('category2').value || null;
   selectedPhotoFile = null;
