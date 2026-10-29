@@ -247,6 +247,19 @@
 
 <!-- Single reusable edit modal (instead of a per-row hidden panel — keeps
      each table row compact like the Excel sheet this replaces) -->
+<div class="hidden fixed inset-0 bg-black/50 z-[60] items-end lg:items-center justify-center" id="autoRowModal">
+<div class="bg-surface-container-lowest w-full lg:w-96 lg:rounded-2xl rounded-t-2xl p-4">
+<div class="flex items-center justify-between mb-3">
+<h3 class="font-bold text-[15px]" id="autoRowTitle">الحركة</h3>
+<button onclick="closeAutoRow()" aria-label="إغلاق" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-surface-container-low"><span class="material-symbols-outlined">close</span></button>
+</div>
+<button onclick="autoRowOpen()" class="w-full h-11 bg-primary text-on-primary rounded-lg text-[13px] font-semibold flex items-center justify-center gap-1 mb-3"><span class="material-symbols-outlined text-[18px]">open_in_new</span>فتح الحركة</button>
+<label class="block text-[12px] font-semibold text-on-surface-variant mb-1" for="autoRowLinkSelect">ربط الحركة بعملية أخرى — تأخذان لون الخلفية نفسه في الجدول</label>
+<select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-sm mb-2" id="autoRowLinkSelect"></select>
+<p class="text-error text-[12px] hidden mb-2" id="autoRowError"></p>
+<button onclick="saveAutoRowLink()" class="w-full h-11 border border-primary text-primary rounded-lg text-[13px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[18px]">link</span>حفظ الربط</button>
+</div>
+</div>
 <div class="hidden fixed inset-0 bg-black/50 z-[60] items-end lg:items-center justify-center" id="voucherDateModal">
 <div class="bg-surface-container-lowest w-full lg:w-96 lg:rounded-2xl rounded-t-2xl p-4">
 <div class="flex items-center justify-between mb-3">
@@ -864,14 +877,8 @@ function openEditModal(id) {
   // cancel / delete it there) -- editing them here would put the two boxes
   // out of sync, so open the invoice instead.
   // Card / bank-transfer part of an invoice: taken out of the drawer automatically.
-  if (e.bank_invoice_id) { window.location.href = 'invoice-print-ar.html?id=' + e.bank_invoice_id; return; }
-  if (e.cash_movement_id) {
-    const op = e.operation_type || '';
-    if (e.cm && e.cm.invoice_id) window.location.href = 'invoice-print-ar.html?id=' + e.cm.invoice_id;
-    else if (op.includes('عربون')) window.location.href = 'deposits-ar.html';
-    else openVoucherDate(e); // سند قبض/صرف: تعديل التاريخ
-    return;
-  }
+  // These rows can still be colour-linked with other rows: ask first «فتح الحركة» or «ربط الحركة».
+  if (e.bank_invoice_id || e.cash_movement_id) { openAutoRow(e); return; }
   if (dcIsPastDay(e) && !canEditPast) { alert('ليس لديك صلاحية تعديل أو حذف حركات الأيام السابقة.'); return; }
   modalEntryId = id;
   setModalDirection(e.direction);
@@ -892,6 +899,56 @@ function openEditModal(id) {
   const modal = document.getElementById('editModal');
   modal.classList.remove('hidden');
   modal.classList.add('flex');
+}
+
+// ---- an automatic row (invoice, voucher, deposit): open it, or link it to another row ----
+let autoRowEntry = null;
+function openAutoRow(e) {
+  autoRowEntry = e;
+  document.getElementById('autoRowTitle').textContent = (e.direction === 'in' ? 'داخل' : 'صادر') + ' — ' + (e.operation_type || '') + ' — ' + fmt(e.amount) + ' ' + e.currency;
+  const pool = showFullHistory ? allEntries : todayEntries;
+  const partner = e.link_group ? pool.find(x => x.id !== e.id && x.link_group === e.link_group) : null;
+  const sel = document.getElementById('autoRowLinkSelect');
+  sel.innerHTML = '<option value="">بدون ربط</option>' + buildLinkOptionsHtml(e.id);
+  sel.value = partner ? partner.id : '';
+  document.getElementById('autoRowError').classList.add('hidden');
+  const m = document.getElementById('autoRowModal'); m.classList.remove('hidden'); m.classList.add('flex');
+}
+function closeAutoRow() {
+  const m = document.getElementById('autoRowModal'); m.classList.add('hidden'); m.classList.remove('flex');
+  autoRowEntry = null;
+}
+function autoRowOpen() {
+  const e = autoRowEntry; if (!e) return;
+  closeAutoRow();
+  if (e.bank_invoice_id) { window.location.href = 'invoice-print-ar.html?id=' + e.bank_invoice_id; return; }
+  const op = e.operation_type || '';
+  if (e.cm && e.cm.invoice_id) window.location.href = 'invoice-print-ar.html?id=' + e.cm.invoice_id;
+  else if (op.includes('عربون')) window.location.href = 'deposits-ar.html';
+  else openVoucherDate(e); // سند قبض/صرف: تعديل التاريخ
+}
+// Only link_group changes (allowed on any row, any day): joining keeps this row's group when it has one
+// and brings the other row (and the rows already linked with it) into it.
+async function saveAutoRowLink() {
+  const e = autoRowEntry; if (!e) return;
+  const errEl = document.getElementById('autoRowError'); errEl.classList.add('hidden');
+  const targetId = document.getElementById('autoRowLinkSelect').value;
+  let res;
+  if (!targetId) {
+    res = await goldmindClient.from('daily_cash_log').update({ link_group: null }).eq('id', e.id);
+  } else {
+    const t = allEntries.find(x => x.id === targetId);
+    const group = e.link_group || (t && t.link_group) || ('lnk_' + e.id.slice(0, 8));
+    if (!e.link_group) res = await goldmindClient.from('daily_cash_log').update({ link_group: group }).eq('id', e.id);
+    if (!res || !res.error) {
+      res = t && t.link_group && t.link_group !== group
+        ? await goldmindClient.from('daily_cash_log').update({ link_group: group }).eq('store_id', GOLDMIND_STORE_ID).eq('link_group', t.link_group)
+        : await goldmindClient.from('daily_cash_log').update({ link_group: group }).eq('id', targetId);
+    }
+  }
+  if (res && res.error) { errEl.textContent = 'تعذّر الحفظ: ' + res.error.message; errEl.classList.remove('hidden'); return; }
+  closeAutoRow();
+  await loadAll();
 }
 
 // The page a voucher belongs to (customer, trader or expense), or null.

@@ -108,7 +108,8 @@ test('daily cash box: rows from an invoice do not show the invoice number, tappi
   const cell = page.locator('#cashbox-table-body td[data-entry="e1"]');
   await expect(cell).toContainText('مبيعات لـ هلا');
   await expect(cell).not.toContainText('INV-2026-000055');
-  await cell.click();
+  await cell.click(); // asks «فتح الحركة» or «ربط الحركة»
+  await page.locator('#autoRowModal button', { hasText: 'فتح الحركة' }).click();
   await expect(page).toHaveURL(/invoice-print-ar\.html\?id=inv1/);
 });
 

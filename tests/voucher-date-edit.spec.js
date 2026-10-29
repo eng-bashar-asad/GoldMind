@@ -17,6 +17,7 @@ test('voucher date can be changed; invoice rows are not offered', async ({ page 
   await page.waitForFunction(() => typeof allEntries !== 'undefined' && allEntries.length === 2);
 
   await page.evaluate(() => openEditModal('d1'));
+  await page.locator('#autoRowModal button', { hasText: 'فتح الحركة' }).click();
   await expect(page.locator('#voucherDateModal')).toHaveClass(/\bflex\b/);
   await expect(page.locator('#voucherDateInput')).toHaveValue('2026-10-10');
   await page.fill('#voucherDateInput', '2026-10-01');
@@ -28,6 +29,7 @@ test('voucher date can be changed; invoice rows are not offered', async ({ page 
 
   // a row written from an invoice still opens the invoice, not the date box
   await page.evaluate(() => openEditModal('d2'));
+  await page.locator('#autoRowModal button', { hasText: 'فتح الحركة' }).click();
   await page.waitForURL(/invoice-print-ar\.html\?id=inv1/);
 });
 
