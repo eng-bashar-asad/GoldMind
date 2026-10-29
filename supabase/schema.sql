@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict BgiVTLjKjwPs0adXgF0XjPKlAfNWIsM1Gq8FdMLPAZzfIRzJh9e8me3eqLZMbas
+\restrict kbPoOlrmUEKkwRePdN6gn6IW9oz1OOVSk32CsbotKsY1f7AwOo28j7Wrxbm56gr
 
 
 SET statement_timeout = 0;
@@ -6920,7 +6920,7 @@ CREATE TABLE public.stores (
     branch_emirate_code text,
     debt_alert_days integer DEFAULT 15 NOT NULL,
     debt_alert_customers boolean DEFAULT true NOT NULL,
-    debt_alert_traders boolean DEFAULT true NOT NULL,
+    debt_alert_traders boolean DEFAULT false NOT NULL,
     display_name text,
     branch_code text,
     own_gold_price boolean DEFAULT false NOT NULL,
@@ -13744,5 +13744,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict BgiVTLjKjwPs0adXgF0XjPKlAfNWIsM1Gq8FdMLPAZzfIRzJh9e8me3eqLZMbas
+\unrestrict kbPoOlrmUEKkwRePdN6gn6IW9oz1OOVSk32CsbotKsY1f7AwOo28j7Wrxbm56gr
 
