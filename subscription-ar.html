@@ -102,6 +102,18 @@
 <div id="plans-list" class="flex flex-col gap-3"></div>
 </section>
 
+<section id="branch-billing" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-5 mb-6">
+<h2 class="font-bold text-[15px] mb-1">اشتراك الفروع</h2>
+<p class="text-[11.5px] text-on-surface-variant leading-5 mb-3">الاشتراك سنوي، وسعره لكل فرع. الفرع الجديد يدفع نسبةً من السعر السنوي حتى تاريخ تجديد الشركة، ثم تتجدّد كل الفروع معاً في تاريخ واحد. يمكن استرجاع الدفعة خلال 14 يوماً من تاريخها.</p>
+<div id="bb-rows" class="flex flex-col divide-y divide-outline-variant"></div>
+<div id="bb-total" class="mt-3 p-3 rounded-lg bg-surface-container-low text-[13px] flex flex-col gap-1"></div>
+<div id="bb-admin" class="hidden mt-3 flex flex-wrap items-center gap-2">
+<label class="text-[12px] font-semibold" for="bb-months">تجديد الشركة كاملة لمدة</label>
+<select id="bb-months" class="h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-surface-container-lowest"><option value="12">12 شهراً</option><option value="24">24 شهراً</option></select>
+<input id="bb-ref" class="h-11 border border-outline-variant rounded-lg px-3 text-[13px] flex-1 min-w-[8rem]" placeholder="مرجع الدفعة (اختياري)"/>
+<button type="button" id="bb-renew" class="h-11 px-4 rounded-lg gold-accent text-white text-[13px] font-semibold">تسجيل التجديد</button>
+</div>
+</section>
 <div id="admin-panel" class="hidden bg-surface-container-low border border-outline-variant rounded-xl p-4 mb-6">
 <p class="text-[12.5px] font-semibold text-on-surface mb-3">تسجيل دفعة اشتراك (إدارة المنصة)</p>
 <div class="flex flex-col gap-3">
@@ -266,8 +278,7 @@ async function load() {
   const { data: me } = await goldmindClient
     .from('staff').select('role, permissions').eq('user_id', session.user.id).eq('store_id', GOLDMIND_STORE_ID).single();
 
-  const { data: isPlatformAdmin } = await goldmindClient
-    .from('platform_admins').select('user_id').eq('user_id', session.user.id).maybeSingle();
+  const { data: isPlatformAdmin } = await goldmindClient.rpc('is_platform_admin');
 
   const { data: plans, error: plansErr } = await goldmindClient
     .from('plans').select('*').eq('is_active', true).order('sort_order');
@@ -303,15 +314,45 @@ async function load() {
     renderStaffUsage();
   });
 
-  if (storeRow && storeRow.organization_id) {
-    const { data: branchCount } = await goldmindClient.rpc('get_branch_count', { p_organization_id: storeRow.organization_id });
-    if (branchCount && branchCount > 1) {
-      const note = document.createElement('div');
-      note.className = 'bg-surface-container-low border border-outline-variant rounded-xl p-3 mb-6 text-[11.5px] text-on-surface-variant leading-5';
-      note.textContent = `هذا الفرع أحد ${branchCount} فروع مرتبطة بنفس المنشأة، لكل فرع اشتراكه، أما الاسم القانوني والرقم الضريبي فهما للمنشأة كلها.`;
-      document.getElementById('usage-section').insertAdjacentElement('afterend', note);
-    }
+  // Multi-branch 3.3: every branch's subscription, what a new branch owes, one renewal for the company
+  async function renderBranchBilling() {
+    const { data: rows } = await goldmindClient.rpc('branch_billing', { p_store: GOLDMIND_STORE_ID });
+    const list = rows || [];
+    const sec = document.getElementById('branch-billing');
+    sec.classList.toggle('hidden', list.length < 2);
+    if (list.length < 2) return;
+    const STAT = { trialing: 'تجريبي', active: 'فعّال', past_due: 'متأخر بالدفع', canceled: 'ملغى' };
+    document.getElementById('bb-rows').innerHTML = list.map(b => `<div class="py-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <div class="flex-1 min-w-[10rem]"><div class="font-semibold text-[13.5px]">${gmEscapeHtml(b.store_name)}${b.is_head ? ' <span class="text-[11px] text-on-surface-variant">(المكتب الرئيسي)</span>' : ''}</div>
+        <div class="text-[11.5px] text-on-surface-variant">${gmEscapeHtml(b.plan_name || '')} · ${STAT[b.status] || gmEscapeHtml(b.status)}${b.period_end ? ' · حتى ' + fmtDate(b.period_end) : ''}</div></div>
+      <div class="text-[12.5px] text-left">${fmtPrice(b.yearly, b.currency)} <span class="text-on-surface-variant">/ سنة</span></div>
+      ${b.branch_due > 0 ? `<div class="w-full text-[12.5px] text-error font-semibold flex items-center gap-2 flex-wrap">مستحق حتى تاريخ التجديد: ${fmtPrice(b.branch_due, b.branch_due_currency)}
+        ${isPlatformAdmin ? `<button type="button" class="h-9 px-3 rounded-lg border border-outline-variant text-[12px] text-on-surface" data-pay="${b.store_id}">تسجيل الدفعة</button>` : ''}</div>` : ''}
+    </div>`).join('');
+    const head = list.find(b => b.is_head) || list[0];
+    const byCur = {}; list.forEach(b => { byCur[b.currency] = (byCur[b.currency] || 0) + Number(b.yearly || 0); });
+    document.getElementById('bb-total').innerHTML = `<div class="flex justify-between"><span>تاريخ التجديد الموحّد</span><b>${head.period_end ? fmtDate(head.period_end) : '—'}</b></div>
+      <div class="flex justify-between"><span>مبلغ التجديد السنوي (${list.length} فروع)</span><b>${Object.keys(byCur).map(c => fmtPrice(byCur[c], c)).join(' + ')}</b></div>`;
+    document.getElementById('bb-admin').classList.toggle('hidden', !isPlatformAdmin);
+    document.querySelectorAll('#bb-rows [data-pay]').forEach(btn => btn.onclick = async () => {
+      if (!confirm('تسجيل دفعة هذا الفرع حتى تاريخ تجديد الشركة؟')) return;
+      btn.disabled = true;
+      const { error } = await goldmindClient.rpc('record_branch_payment', { p_store: btn.dataset.pay, p_payment_ref: document.getElementById('bb-ref').value.trim() || null });
+      btn.disabled = false;
+      if (error) { showToast('خطأ: ' + error.message, true); return; }
+      showToast('سُجّلت دفعة الفرع'); renderBranchBilling();
+    });
   }
+  document.getElementById('bb-renew').onclick = async () => {
+    const months = parseInt(document.getElementById('bb-months').value, 10);
+    if (!confirm('تجديد اشتراك كل فروع الشركة ' + months + ' شهراً؟')) return;
+    const btn = document.getElementById('bb-renew'); btn.disabled = true;
+    const { error } = await goldmindClient.rpc('record_org_renewal', { p_store: GOLDMIND_STORE_ID, p_months: months, p_payment_ref: document.getElementById('bb-ref').value.trim() || null });
+    btn.disabled = false;
+    if (error) { showToast('خطأ: ' + error.message, true); return; }
+    showToast('سُجّل تجديد الشركة'); load();
+  };
+  await renderBranchBilling();
 
   // Usage vs. plan limits
   const { data: staffLimit } = await goldmindClient.rpc('check_staff_limit', { p_store_id: GOLDMIND_STORE_ID });
