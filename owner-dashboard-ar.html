@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>لوحة المالك | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="supabase-config.js?v=54"></script>
+<script src="theme.js?v=80"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+      tailwind.config = { darkMode: "class", theme: { extend: {
+        "colors": {
+          "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+          "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)",
+          "on-primary": "var(--gm-on-primary)", "on-background": "var(--gm-on-primary)", "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)",
+          "surface-container-lowest": "var(--gm-surface-lowest)", "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "outline": "#76777d",
+          "error": "#ba1a1a", "success": "#166534"
+        },
+        "fontFamily": { "body-md": ["Inter"], "headline-md": ["Inter"], "label-md": ["Inter"] },
+        "fontSize": {
+          "body-md": ["16px", {"lineHeight": "24px", "fontWeight": "400"}],
+          "headline-md": ["24px", {"lineHeight": "32px", "fontWeight": "600"}],
+          "label-md": ["14px", {"lineHeight": "20px", "fontWeight": "500"}]
+        }
+      } } }
+    </script>
+<style>
+  html { font-size: 87.5%; } .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; } body { min-height: max(884px, 100dvh); }
+  .od-num { font-family: "Times New Roman", Times, serif; font-variant-numeric: tabular-nums; direction: ltr; unicode-bidi: isolate; }
+  .od-tile { background: var(--gm-surface-low); border-radius: 10px; padding: 10px 12px; min-width: 0; }
+  .od-tile small { display: block; font-size: 11.5px; color: var(--gm-on-surface-variant); }
+  .od-tile b { display: block; font-size: 17px; text-align: right; }
+</style>
+</head>
+<body class="bg-background text-on-background font-body-md p-4">
+<main class="w-full max-w-md lg:max-w-6xl lg:px-4 mx-auto flex flex-col gap-4 pb-10">
+<header class="flex items-center gap-2 pt-2">
+<a href="settings-ar.html" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></a>
+<div class="flex-1">
+<h1 class="font-headline-md text-headline-md font-bold">لوحة المالك</h1>
+<p class="text-[12px] text-on-surface-variant">كل الشركات والفروع التي تملكها — كل فرع بعملته</p>
+</div>
+<button type="button" onclick="load()" class="w-10 h-10 flex items-center justify-center rounded-full hover:bg-surface-container-low" aria-label="تحديث"><span class="material-symbols-outlined">refresh</span></button>
+</header>
+<div id="loading-state" class="text-center text-on-surface-variant text-sm py-8">جارِ التحميل...</div>
+<div id="od-error" class="hidden text-error text-[13px] font-semibold rounded-lg p-3 bg-surface-container-lowest border border-outline-variant" role="alert"></div>
+<div id="od-empty" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد فروع تملكها. هذه اللوحة لمالك الشركة فقط.</div>
+<div id="od-list" class="flex flex-col gap-6"></div>
+</main>
+<script>
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+const money = (v, cur) => `<span class="od-num">${gmMoney(v)}</span> <span class="text-[11px]">${esc(cur)}</span>`;
+const grams = obj => { const ks = Object.keys(obj || {}).sort((a, b) => b - a); return ks.length ? ks.map(k => `<div class="flex justify-between gap-2"><span>عيار ${esc(k)}</span><span class="od-num">${Number(obj[k]).toFixed(2)} g</span></div>`).join('') : '<div class="text-on-surface-variant">—</div>'; };
+// + = owed to the shop; − = the shop owes
+const side = v => Math.abs(v) < 0.005 ? '' : (v > 0 ? '<span class="text-success text-[11px]">لنا</span>' : '<span class="text-error text-[11px]">علينا</span>');
+
+function card(r) {
+  const drawer = Object.keys(r.drawer || {});
+  return `<section class="bg-surface-container-lowest border border-outline-variant rounded-2xl p-4 flex flex-col gap-3">
+    <div class="flex items-center gap-2">
+      <span class="material-symbols-outlined text-secondary">storefront</span>
+      <div class="flex-1 min-w-0"><div class="font-bold text-[15px] truncate">${esc(r.store_name)}</div>
+        <div class="text-[11.5px] text-on-surface-variant">${r.is_head ? 'المكتب الرئيسي · ' : ''}${esc(r.currency)}${r.incoming_transfers ? ` · <a class="underline text-secondary" href="branch-transfers-ar.html?tab=in">${r.incoming_transfers} نقل وارد</a>` : ''}</div></div>
+      <button type="button" class="h-10 px-3 rounded-lg border border-outline-variant text-[12.5px] font-semibold" onclick="goldMindSetActiveStore('${r.store_id}')">فتح الفرع</button>
+    </div>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-2">
+      <div class="od-tile"><small>مبيعات اليوم (${r.today_invoices} فاتورة)</small><b>${money(r.today_sales, r.currency)}</b></div>
+      <div class="od-tile"><small>مبيعات هذا الشهر</small><b>${money(r.month_sales, r.currency)}</b></div>
+      <div class="od-tile"><small>ديون الزبائن (${r.customers_owing} زبون)</small><b>${money(r.customers_owe, r.currency)}</b></div>
+      <div class="od-tile"><small>القطع في المخزن</small><b class="od-num">${r.stock_pieces}</b></div>
+    </div>
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-2 text-[13px]">
+      <div class="od-tile"><small>الرصيد الحالي (الحركة اليومية)</small>${drawer.length ? drawer.map(c => `<div class="flex justify-between gap-2"><span>${esc(c)}</span><span class="od-num">${gmMoney(r.drawer[c])}</span></div>`).join('') : '<div class="text-on-surface-variant">—</div>'}</div>
+      <div class="od-tile"><small>وزن القطع المتوفرة (قائم)</small>${grams(r.stock)}</div>
+      <div class="od-tile"><small>صندوق الكسر</small>${grams(r.scrap)}</div>
+      <div class="od-tile"><small>رصيد التجار على هذا الفرع</small>
+        <div class="flex justify-between gap-2"><span>ذهب عيار 24 ${side(r.traders_gold24)}</span><span class="od-num">${Math.abs(r.traders_gold24).toFixed(2)} g</span></div>
+        <div class="flex justify-between gap-2"><span>نقد ${side(r.traders_cash)}</span><span class="od-num">${gmMoney(Math.abs(r.traders_cash))}</span></div></div>
+    </div>
+  </section>`;
+}
+
+async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const errEl = document.getElementById('od-error');
+  errEl.classList.add('hidden');
+  const { data, error } = await goldmindClient.rpc('owner_dashboard');
+  document.getElementById('loading-state').classList.add('hidden');
+  if (error) { errEl.textContent = 'تعذّر تحميل اللوحة: ' + error.message; errEl.classList.remove('hidden'); return; }
+  const rows = data || [];
+  document.getElementById('od-empty').classList.toggle('hidden', rows.length > 0);
+  // one group per company, its branches under it
+  const groups = [];
+  rows.forEach(r => { let g = groups.find(x => x.id === r.organization_id); if (!g) groups.push(g = { id: r.organization_id, name: r.organization_name, rows: [] }); g.rows.push(r); });
+  document.getElementById('od-list').innerHTML = groups.map(g => `<div class="flex flex-col gap-3">
+      <h2 class="font-bold text-[14px] text-on-surface-variant flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">domain</span>${esc(g.name || 'شركة')}${g.rows.length > 1 ? ` · ${g.rows.length} فروع` : ''}</h2>
+      ${g.rows.map(card).join('')}</div>`).join('');
+}
+load();
+</script>
+</body>
+</html>
