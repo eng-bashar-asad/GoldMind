@@ -120,8 +120,10 @@ async function fakeAndroid(page) {
       Plugins: { NativeBiometric: {
         isAvailable: async () => ({ isAvailable: true, biometryType: 3 }),
         verifyIdentity: async () => { window.__bioChecks++; },
-        setCredentials: async ({ server, username, password }) => { vault[server] = { username, password }; save(); },
+        // accessControl 1 = only a fingerprint prompt can read it back (getSecureCredentials)
+        setCredentials: async ({ server, username, password, accessControl }) => { vault[server] = { username, password, protected: accessControl === 1 }; save(); },
         getCredentials: async ({ server }) => { if (!vault[server]) throw new Error('none'); return vault[server]; },
+        getSecureCredentials: async ({ server }) => { window.__bioChecks++; const v = vault[server]; if (!v || !v.protected) throw Object.assign(new Error('No protected credentials found'), { code: 21 }); return v; },
         deleteCredentials: async ({ server }) => { delete vault[server]; save(); },
       } },
     };
@@ -144,6 +146,28 @@ test('android app: turn on fingerprint, then log in with it', async ({ page }) =
   await btn.click();
   await page.waitForURL(/index-ar\.html/);
   expect(minted).toEqual([USER]);
+  // the key is stored fingerprint-protected and was read through the fingerprint prompt
+  expect(await page.evaluate(() => Object.values(JSON.parse(sessionStorage.getItem('__vault') || '{}'))[0].protected)).toBe(true);
+});
+
+test('android app: a key saved before the protected storage moves into it after one login', async ({ page }) => {
+  const { db, minted } = await setup(page);
+  await fakeAndroid(page);
+  await page.goto('/account-security-ar.html');
+  await expect(page.locator('#bioToggleBtn')).toContainText(/تفعيل|إيقاف/);
+  await page.click('#bioToggleBtn');
+  await expect(page.locator('#bioSuccess')).toContainText('تم التفعيل');
+  // simulate the old app: unprotected key, account without the "secure" mark
+  await page.evaluate(() => {
+    const v = JSON.parse(sessionStorage.getItem('__vault')); Object.values(v).forEach(c => { c.protected = false; }); sessionStorage.setItem('__vault', JSON.stringify(v));
+    const a = JSON.parse(localStorage.getItem('gm_bio_accounts')); a.forEach(x => delete x.secure); localStorage.setItem('gm_bio_accounts', JSON.stringify(a));
+  });
+  await page.goto('/login-entry-ar.html');
+  await page.locator('#step-start [data-bio-accounts] button').click();
+  await page.waitForURL(/index-ar\.html/);
+  expect(minted).toEqual([USER]);
+  expect(await page.evaluate(() => Object.values(JSON.parse(sessionStorage.getItem('__vault'))).every(c => c.protected))).toBe(true);
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem('gm_bio_accounts'))[0].secure)).toBe(true);
 });
 
 test('android app: removed device key is refused and forgotten on the phone', async ({ page }) => {

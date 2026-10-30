@@ -121,10 +121,10 @@
           var p = plugin();
           await p.verifyIdentity({ reason: 'تفعيل الدخول بالبصمة', title: 'تفعيل الدخول بالبصمة', negativeButtonText: 'إلغاء', maxAttempts: 5 });
           var k = await call({ action: 'device-enroll', device_name: deviceName() });
-          // ponytail: the plugin keeps this in Android Keystore-backed storage and we gate
-          // reading it behind verifyIdentity(); a CryptoObject-bound key is the upgrade path.
-          await p.setCredentials({ server: 'goldmind-' + k.user_id, username: k.key_id, password: k.secret });
-          saveAccount(k.user_id, k.label, { key_id: k.key_id });
+          // The device key is encrypted with a Keystore key that only a real fingerprint unlocks
+          // (BIOMETRY_CURRENT_SET: a CryptoObject-bound prompt; a new enrolled finger invalidates it).
+          await p.setCredentials({ server: 'goldmind-' + k.user_id, username: k.key_id, password: k.secret, accessControl: 1 });
+          saveAccount(k.user_id, k.label, { key_id: k.key_id, secure: true });
         } else {
           var lib = await loadLib();
           var o = await call({ action: 'passkey-register-options' });
@@ -143,8 +143,20 @@
           var p = plugin();
           var acc = GMBio.accounts().filter(function (a) { return a.user_id === userId; })[0] || GMBio.accounts()[0];
           if (!acc) throw new Error('البصمة غير مفعّلة على هذا الجهاز');
-          await p.verifyIdentity({ reason: 'الدخول إلى GoldMind', title: 'تسجيل الدخول', subtitle: acc.label || '', negativeButtonText: 'إلغاء', maxAttempts: 5 });
-          var cred = await p.getCredentials({ server: 'goldmind-' + acc.user_id });
+          var server = 'goldmind-' + acc.user_id, cred;
+          if (acc.secure) {
+            // the fingerprint prompt itself decrypts the key: no prompt, no key
+            try {
+              cred = await p.getSecureCredentials({ server: server, reason: 'الدخول إلى GoldMind', title: 'تسجيل الدخول', subtitle: acc.label || '', negativeButtonText: 'إلغاء', maxAttempts: 5 });
+            } catch (e) {
+              if ((e && (e.code || e.errorCode)) == 21) { await GMBio.forgetHere(acc.user_id); throw new Error('تغيّرت البصمات على هذا الجهاز — سجّل الدخول بكلمة السر ثم فعّل البصمة من جديد'); }
+              throw e;
+            }
+          } else {
+            // set up before the protected storage: one more login this way, then the key is moved into it
+            await p.verifyIdentity({ reason: 'الدخول إلى GoldMind', title: 'تسجيل الدخول', subtitle: acc.label || '', negativeButtonText: 'إلغاء', maxAttempts: 5 });
+            cred = await p.getCredentials({ server: server });
+          }
           var tok;
           try {
             tok = await call({ action: 'device-login', key_id: cred.username, secret: cred.password });
@@ -152,7 +164,14 @@
             if (e.status === 401) await GMBio.forgetHere(acc.user_id);
             throw e;
           }
-          return await startSession(tok);
+          var u = await startSession(tok);
+          if (!acc.secure) {
+            try {
+              await p.setCredentials({ server: server, username: cred.username, password: cred.password, accessControl: 1 });
+              saveAccount(acc.user_id, acc.label, { secure: true });
+            } catch (e) { /* stays on the old storage; tried again next login */ }
+          }
+          return u;
         }
         var lib = await loadLib();
         var o = await call({ action: 'passkey-login-options' });

@@ -53,7 +53,7 @@ async function gmReportPdf(sheetEl, filename, btn) {
   var old = btn ? btn.innerHTML : '';
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span>'; }
   try {
-    await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js', 'html2pdf');
+    await gmLoadScript('https://cdn.jsdelivr.net/npm/html2pdf.js@0.14.0/dist/html2pdf.bundle.min.js', 'html2pdf');
     await gmPdfFromNodes([gmReportNode(sheetEl)], filename, filename);
   } catch (e) {
     alert('تعذّر إنشاء ملف PDF: ' + (e && e.message ? e.message : e));

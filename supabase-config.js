@@ -1095,7 +1095,7 @@ function gmPdfArabicFix(root) {
 
 async function gmPdfFromNodes(nodes, filename, title, shareText) {
     await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js', 'html2canvas');
-    await gmLoadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js', 'html2pdf');
+    await gmLoadScript('https://cdn.jsdelivr.net/npm/html2pdf.js@0.14.0/dist/html2pdf.bundle.min.js', 'html2pdf');
     var W = 718, FRAME_W = W + 20;
     var frame = document.createElement('iframe');
     frame.setAttribute('aria-hidden', 'true');
