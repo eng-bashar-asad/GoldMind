@@ -90,3 +90,20 @@ test('statement shows the making cost per gram before the total making cost', as
   await page.click('#stOpts [data-view=details]');
   await expect(page.locator('#stLedgerRows tr.st-p').first().locator('td').nth(5)).toHaveText('15.00');
 });
+
+// Phone: «أ — بطاقات» — one card per voucher with total tiles, pieces under it in «تفاصيل»; the table is for computer/print.
+test('phone: statement as cards, with the standing-weight tile and return button', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('gm_stmt_view', 'details'); } catch (e) {} });
+  const calls = await install(page, { db: db(), rpc: { trader_return_piece: () => ({ body: { ok: true } }) } });
+  page.on('dialog', d => d.accept());
+  await page.goto('/trader-statement-print-ar.html?trader=t1');
+  const cards = page.locator('#stCards section.stc');
+  await expect(cards).toHaveCount(2);
+  await expect(cards.first()).toContainText('الوزن القائم ع18');
+  await expect(cards.first().locator('.stc-tile').first()).toContainText('30.00 g');
+  await expect(cards.first().locator('.stc-p')).toHaveCount(2);
+  await expect(page.locator('#stCards .stc-end')).toContainText('350.00');
+  await cards.first().locator('button.stc-ret').first().click();
+  await expect.poll(() => calls.some(c => c.name === 'trader_return_piece')).toBe(true);
+});
