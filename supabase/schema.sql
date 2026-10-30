@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict j570AKsyiQ0gzzXjRLt7j55k7f0NOQyUQgpv3QEveB28KiMzzImhjbhRmhX177r
+\restrict xXcVf8jV3OU7a6fivhNC6fobnME74p9gPQSrt5NwAafRXX2M2X8nK1qfYuwuktl
 
 
 SET statement_timeout = 0;
@@ -1463,22 +1463,22 @@ CREATE FUNCTION public.get_invoice_receipt(p_id uuid) RETURNS TABLE(invoice_numb
     LANGUAGE sql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                                                                                 select inv.invoice_number, inv.type, inv.status, inv.payment_method, inv.vat_amount, inv.total_amount, inv.created_at,
-                                                                                     s.name, o.logo_url, s.address, s.phone, s.email, s.vat_rate, o.tax_number,
-                                                                                         s.currency, s.secondary_currency, s.secondary_currency_rate,
-                                                                                             c.name, c.phone,
-                                                                                                 coalesce((
-                                                                                                       select jsonb_agg(jsonb_build_object(
-                                                                                                               'description', ii.description, 'description_en', ii.description_en, 'karat', ii.karat,
-                                                                                                                       'weight_grams', ii.weight_grams, 'line_total', ii.line_total, 'quantity', 1) order by ii.id)
-                                                                                                                             from invoice_items ii where ii.invoice_id = inv.id
-                                                                                                                                 ), '[]'::jsonb)
-                                                                                                                                   from invoices inv
-                                                                                                                                     join stores s on s.id = inv.store_id
-                                                                                                                                       left join organizations o on o.id = s.organization_id
-                                                                                                                                         left join customers c on c.id = inv.customer_id
-                                                                                                                                           where inv.id = p_id and inv.status != 'cancelled';
-                                                                                                                                           $$;
+  select inv.invoice_number, inv.type, inv.status, inv.payment_method, inv.vat_amount, inv.total_amount, inv.created_at,
+         s.name, o.logo_url, s.address, s.phone, s.email, s.vat_rate, o.tax_number,
+         s.currency, s.secondary_currency, s.secondary_currency_rate,
+         c.name, case when coalesce(c.phone, '') = '' then null else '•••' || right(regexp_replace(c.phone, '\D', '', 'g'), 3) end,
+         coalesce((
+           select jsonb_agg(jsonb_build_object(
+             'description', ii.description, 'description_en', ii.description_en, 'karat', ii.karat,
+             'weight_grams', ii.weight_grams, 'line_total', ii.line_total, 'quantity', 1) order by ii.id)
+           from invoice_items ii where ii.invoice_id = inv.id
+         ), '[]'::jsonb)
+    from invoices inv
+    join stores s on s.id = inv.store_id
+    left join organizations o on o.id = s.organization_id
+    left join customers c on c.id = inv.customer_id
+   where inv.id = p_id and inv.status != 'cancelled';
+$$;
 
 
 --
@@ -8795,6 +8795,13 @@ CREATE INDEX traders_store_id_fk_idx ON public.traders USING btree (store_id);
 
 
 --
+-- Name: user_profiles_username_lower_key; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE UNIQUE INDEX user_profiles_username_lower_key ON public.user_profiles USING btree (lower(username));
+
+
+--
 -- Name: zebra_label_fields_store_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -11617,7 +11624,7 @@ GRANT ALL ON FUNCTION public.admin_delete_store(target_store_id uuid) TO service
 -- Name: FUNCTION admin_extend_subscription(target_store_id uuid, p_status text, p_trial_end timestamp with time zone, p_current_period_end timestamp with time zone); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.admin_extend_subscription(target_store_id uuid, p_status text, p_trial_end timestamp with time zone, p_current_period_end timestamp with time zone) TO anon;
+REVOKE ALL ON FUNCTION public.admin_extend_subscription(target_store_id uuid, p_status text, p_trial_end timestamp with time zone, p_current_period_end timestamp with time zone) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.admin_extend_subscription(target_store_id uuid, p_status text, p_trial_end timestamp with time zone, p_current_period_end timestamp with time zone) TO authenticated;
 GRANT ALL ON FUNCTION public.admin_extend_subscription(target_store_id uuid, p_status text, p_trial_end timestamp with time zone, p_current_period_end timestamp with time zone) TO service_role;
 
@@ -11662,7 +11669,7 @@ GRANT ALL ON FUNCTION public.admin_list_store_staff(target_store_id uuid) TO ser
 -- Name: FUNCTION admin_list_stores(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.admin_list_stores() TO anon;
+REVOKE ALL ON FUNCTION public.admin_list_stores() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.admin_list_stores() TO authenticated;
 GRANT ALL ON FUNCTION public.admin_list_stores() TO service_role;
 
@@ -11716,7 +11723,7 @@ GRANT ALL ON FUNCTION public.admin_update_support_request(request_id uuid, new_s
 -- Name: FUNCTION auto_upgrade_on_staff_change(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.auto_upgrade_on_staff_change() TO anon;
+REVOKE ALL ON FUNCTION public.auto_upgrade_on_staff_change() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.auto_upgrade_on_staff_change() TO authenticated;
 GRANT ALL ON FUNCTION public.auto_upgrade_on_staff_change() TO service_role;
 
@@ -11752,7 +11759,7 @@ GRANT ALL ON FUNCTION public.cancel_invoice(target_invoice_id uuid, reason text)
 -- Name: FUNCTION cash_voucher(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.cash_voucher(p jsonb) TO anon;
+REVOKE ALL ON FUNCTION public.cash_voucher(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.cash_voucher(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.cash_voucher(p jsonb) TO service_role;
 
@@ -11788,7 +11795,7 @@ GRANT ALL ON FUNCTION public.close_fiscal_year(target_store_id uuid, target_year
 -- Name: FUNCTION consume_diamond_stock_lot(target_lot_id uuid, amount numeric); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.consume_diamond_stock_lot(target_lot_id uuid, amount numeric) TO anon;
+REVOKE ALL ON FUNCTION public.consume_diamond_stock_lot(target_lot_id uuid, amount numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.consume_diamond_stock_lot(target_lot_id uuid, amount numeric) TO authenticated;
 GRANT ALL ON FUNCTION public.consume_diamond_stock_lot(target_lot_id uuid, amount numeric) TO service_role;
 
@@ -11824,7 +11831,7 @@ GRANT ALL ON FUNCTION public.create_branch(p_from_store uuid, p_name text) TO se
 -- Name: FUNCTION create_customer_deposit(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.create_customer_deposit(p jsonb) TO anon;
+REVOKE ALL ON FUNCTION public.create_customer_deposit(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.create_customer_deposit(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.create_customer_deposit(p jsonb) TO service_role;
 
@@ -11894,7 +11901,7 @@ GRANT ALL ON FUNCTION public.customer_deposit_remaining(sid uuid) TO service_rol
 -- Name: FUNCTION customer_payment_update(p_id uuid, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.customer_payment_update(p_id uuid, p_amount numeric, p_notes text) TO anon;
+REVOKE ALL ON FUNCTION public.customer_payment_update(p_id uuid, p_amount numeric, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.customer_payment_update(p_id uuid, p_amount numeric, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.customer_payment_update(p_id uuid, p_amount numeric, p_notes text) TO service_role;
 
@@ -11912,7 +11919,7 @@ GRANT ALL ON FUNCTION public.delete_expense(p_id uuid) TO service_role;
 -- Name: FUNCTION delete_expense_category(p_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.delete_expense_category(p_id uuid) TO anon;
+REVOKE ALL ON FUNCTION public.delete_expense_category(p_id uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.delete_expense_category(p_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.delete_expense_category(p_id uuid) TO service_role;
 
@@ -11946,7 +11953,7 @@ GRANT ALL ON FUNCTION public.fill_currency_from_store() TO service_role;
 -- Name: FUNCTION find_my_pending_invites(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.find_my_pending_invites() TO anon;
+REVOKE ALL ON FUNCTION public.find_my_pending_invites() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.find_my_pending_invites() TO authenticated;
 GRANT ALL ON FUNCTION public.find_my_pending_invites() TO service_role;
 
@@ -12079,7 +12086,7 @@ GRANT ALL ON FUNCTION public.gm_draw_for_piece(p_piece uuid, p_store uuid, p_box
 -- Name: FUNCTION gm_fiscal_closed(p_store uuid, p_day date); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO anon;
+REVOKE ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO authenticated;
 GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO service_role;
 
@@ -12140,7 +12147,7 @@ GRANT ALL ON FUNCTION public.gm_sale_debt_to_daily(p_invoice uuid, p_amount nume
 -- Name: FUNCTION gm_scrap_price_at_purchase(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO anon;
+REVOKE ALL ON FUNCTION public.gm_scrap_price_at_purchase() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO service_role;
 
@@ -12157,7 +12164,7 @@ GRANT ALL ON FUNCTION public.gm_scrap_return_unrecorded(p_store uuid, p_karat in
 -- Name: FUNCTION gm_seller_stamp(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.gm_seller_stamp() TO anon;
+REVOKE ALL ON FUNCTION public.gm_seller_stamp() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_seller_stamp() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_seller_stamp() TO service_role;
 
@@ -12192,7 +12199,7 @@ GRANT ALL ON FUNCTION public.gm_stock_in_rescrap(p_voucher uuid) TO service_role
 -- Name: FUNCTION gm_tm_snapshot(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.gm_tm_snapshot() TO anon;
+REVOKE ALL ON FUNCTION public.gm_tm_snapshot() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_tm_snapshot() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_tm_snapshot() TO service_role;
 
@@ -12227,7 +12234,7 @@ GRANT ALL ON FUNCTION public.gold_price_problem(sid uuid, karat integer, price n
 -- Name: FUNCTION gold_prices_currency_guard(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.gold_prices_currency_guard() TO anon;
+REVOKE ALL ON FUNCTION public.gold_prices_currency_guard() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gold_prices_currency_guard() TO authenticated;
 GRANT ALL ON FUNCTION public.gold_prices_currency_guard() TO service_role;
 
@@ -12263,7 +12270,7 @@ GRANT ALL ON FUNCTION public.has_permission(perm text, target_store_id uuid) TO 
 -- Name: FUNCTION invoices_currency_guard(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.invoices_currency_guard() TO anon;
+REVOKE ALL ON FUNCTION public.invoices_currency_guard() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.invoices_currency_guard() TO authenticated;
 GRANT ALL ON FUNCTION public.invoices_currency_guard() TO service_role;
 
@@ -12309,7 +12316,7 @@ GRANT ALL ON FUNCTION public.join_company_by_invite(target_store_id uuid) TO ser
 -- Name: FUNCTION log_audit_event(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.log_audit_event() TO anon;
+REVOKE ALL ON FUNCTION public.log_audit_event() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.log_audit_event() TO authenticated;
 GRANT ALL ON FUNCTION public.log_audit_event() TO service_role;
 
@@ -12345,7 +12352,7 @@ GRANT ALL ON FUNCTION public.mirror_invoice_cash_to_daily() TO service_role;
 -- Name: FUNCTION my_stores(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.my_stores() TO anon;
+REVOKE ALL ON FUNCTION public.my_stores() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.my_stores() TO authenticated;
 GRANT ALL ON FUNCTION public.my_stores() TO service_role;
 
@@ -12417,7 +12424,7 @@ GRANT ALL ON FUNCTION public.post_purchase_invoice(p jsonb) TO service_role;
 -- Name: FUNCTION post_sale_exchange(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.post_sale_exchange(p jsonb) TO anon;
+REVOKE ALL ON FUNCTION public.post_sale_exchange(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.post_sale_exchange(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.post_sale_exchange(p jsonb) TO service_role;
 
@@ -12471,7 +12478,7 @@ GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount n
 -- Name: FUNCTION record_expense(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO anon;
+REVOKE ALL ON FUNCTION public.record_expense(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO service_role;
 
@@ -12480,7 +12487,7 @@ GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO service_role;
 -- Name: FUNCTION record_repair_gold(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.record_repair_gold(p jsonb) TO anon;
+REVOKE ALL ON FUNCTION public.record_repair_gold(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.record_repair_gold(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.record_repair_gold(p jsonb) TO service_role;
 
@@ -12498,7 +12505,7 @@ GRANT ALL ON FUNCTION public.record_subscription_payment(p_store_id uuid, p_mont
 -- Name: FUNCTION refund_customer_deposit(p_deposit uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.refund_customer_deposit(p_deposit uuid) TO anon;
+REVOKE ALL ON FUNCTION public.refund_customer_deposit(p_deposit uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.refund_customer_deposit(p_deposit uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.refund_customer_deposit(p_deposit uuid) TO service_role;
 
@@ -12561,7 +12568,7 @@ GRANT ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, 
 -- Name: FUNCTION reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint) TO anon;
+REVOKE ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint) TO authenticated;
 GRANT ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint) TO service_role;
 
@@ -12570,7 +12577,7 @@ GRANT ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, 
 -- Name: FUNCTION reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint, new_prefix text); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint, new_prefix text) TO anon;
+REVOKE ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint, new_prefix text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint, new_prefix text) TO authenticated;
 GRANT ALL ON FUNCTION public.reset_piece_barcode_sequence(target_store_id uuid, category text, new_seq bigint, seq_width smallint, new_prefix text) TO service_role;
 
@@ -12642,7 +12649,7 @@ GRANT ALL ON FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_cust
 -- Name: FUNCTION save_expense_category(p_store uuid, p_name text, p_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_id uuid) TO anon;
+REVOKE ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_id uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_id uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_id uuid) TO service_role;
 
@@ -12651,7 +12658,7 @@ GRANT ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_
 -- Name: FUNCTION seed_default_zebra_label_fields(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.seed_default_zebra_label_fields() TO anon;
+REVOKE ALL ON FUNCTION public.seed_default_zebra_label_fields() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.seed_default_zebra_label_fields() TO authenticated;
 GRANT ALL ON FUNCTION public.seed_default_zebra_label_fields() TO service_role;
 
@@ -12768,7 +12775,7 @@ GRANT ALL ON FUNCTION public.store_legal(p_store_id uuid) TO service_role;
 -- Name: FUNCTION stores_currency_convert_gold(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.stores_currency_convert_gold() TO anon;
+REVOKE ALL ON FUNCTION public.stores_currency_convert_gold() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.stores_currency_convert_gold() TO authenticated;
 GRANT ALL ON FUNCTION public.stores_currency_convert_gold() TO service_role;
 
@@ -12793,7 +12800,7 @@ GRANT ALL ON FUNCTION public.sync_invoice_bank_part(p_invoice uuid) TO service_r
 -- Name: FUNCTION sync_staff_to_hr_employee(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO anon;
+REVOKE ALL ON FUNCTION public.sync_staff_to_hr_employee() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO authenticated;
 GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO service_role;
 
@@ -12803,7 +12810,6 @@ GRANT ALL ON FUNCTION public.sync_staff_to_hr_employee() TO service_role;
 --
 
 REVOKE ALL ON FUNCTION public.sync_store_country_to_org() FROM PUBLIC;
-GRANT ALL ON FUNCTION public.sync_store_country_to_org() TO anon;
 GRANT ALL ON FUNCTION public.sync_store_country_to_org() TO authenticated;
 GRANT ALL ON FUNCTION public.sync_store_country_to_org() TO service_role;
 
@@ -12812,7 +12818,7 @@ GRANT ALL ON FUNCTION public.sync_store_country_to_org() TO service_role;
 -- Name: FUNCTION trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean) TO anon;
+REVOKE ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean) TO authenticated;
 GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p_amount numeric, p_notes text, p_daily boolean) TO service_role;
 
@@ -12821,7 +12827,7 @@ GRANT ALL ON FUNCTION public.trader_cash_move(p_trader uuid, p_direction text, p
 -- Name: FUNCTION trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text) TO anon;
+REVOKE ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount numeric, p_notes text) TO service_role;
 
@@ -12830,7 +12836,7 @@ GRANT ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount
 -- Name: FUNCTION trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO anon;
+REVOKE ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO service_role;
 
@@ -12848,7 +12854,7 @@ GRANT ALL ON FUNCTION public.trader_receive_stock(p_trader uuid, p_lines jsonb, 
 -- Name: FUNCTION trader_return_piece(p_movement uuid); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO anon;
+REVOKE ALL ON FUNCTION public.trader_return_piece(p_movement uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO service_role;
 
@@ -12857,7 +12863,7 @@ GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO service_rol
 -- Name: FUNCTION trg_cash_movement_deleted_bank_sync(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO anon;
+REVOKE ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_cash_movement_deleted_bank_sync() TO service_role;
 
@@ -12874,7 +12880,7 @@ GRANT ALL ON FUNCTION public.trg_cash_movement_updated_daily_sync() TO service_r
 -- Name: FUNCTION trg_customer_debts_allocate(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO anon;
+REVOKE ALL ON FUNCTION public.trg_customer_debts_allocate() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO service_role;
 
@@ -12883,7 +12889,7 @@ GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO service_role;
 -- Name: FUNCTION trg_daily_label(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_daily_label() TO anon;
+REVOKE ALL ON FUNCTION public.trg_daily_label() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_daily_label() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_daily_label() TO service_role;
 
@@ -12892,7 +12898,7 @@ GRANT ALL ON FUNCTION public.trg_daily_label() TO service_role;
 -- Name: FUNCTION trg_invoice_bank_part_sync(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO anon;
+REVOKE ALL ON FUNCTION public.trg_invoice_bank_part_sync() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO service_role;
 
@@ -12901,7 +12907,7 @@ GRANT ALL ON FUNCTION public.trg_invoice_bank_part_sync() TO service_role;
 -- Name: FUNCTION trg_invoice_status_piece_log(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_invoice_status_piece_log() TO anon;
+REVOKE ALL ON FUNCTION public.trg_invoice_status_piece_log() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_invoice_status_piece_log() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_invoice_status_piece_log() TO service_role;
 
@@ -12910,7 +12916,7 @@ GRANT ALL ON FUNCTION public.trg_invoice_status_piece_log() TO service_role;
 -- Name: FUNCTION trg_piece_draws_delete(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO anon;
+REVOKE ALL ON FUNCTION public.trg_piece_draws_delete() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO service_role;
 
@@ -12919,7 +12925,7 @@ GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO service_role;
 -- Name: FUNCTION trg_piece_draws_weight(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO anon;
+REVOKE ALL ON FUNCTION public.trg_piece_draws_weight() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO service_role;
 
@@ -12928,7 +12934,7 @@ GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO service_role;
 -- Name: FUNCTION trg_scrap_given_guard(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_scrap_given_guard() TO anon;
+REVOKE ALL ON FUNCTION public.trg_scrap_given_guard() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_scrap_given_guard() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_scrap_given_guard() TO service_role;
 
@@ -12946,7 +12952,7 @@ GRANT ALL ON FUNCTION public.trg_settlement_lot_sync() TO service_role;
 -- Name: FUNCTION trg_trader_received_sync(); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO anon;
+REVOKE ALL ON FUNCTION public.trg_trader_received_sync() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO service_role;
 
@@ -12964,7 +12970,7 @@ GRANT ALL ON FUNCTION public.update_expense(p_id uuid, p_category uuid, p_amount
 -- Name: FUNCTION update_expense_fx(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
-GRANT ALL ON FUNCTION public.update_expense_fx(p jsonb) TO anon;
+REVOKE ALL ON FUNCTION public.update_expense_fx(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.update_expense_fx(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.update_expense_fx(p jsonb) TO service_role;
 
@@ -13705,7 +13711,6 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON S
 --
 
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO postgres;
-ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO anon;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO authenticated;
 ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA public GRANT ALL ON FUNCTIONS TO service_role;
 
@@ -13744,5 +13749,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict j570AKsyiQ0gzzXjRLt7j55k7f0NOQyUQgpv3QEveB28KiMzzImhjbhRmhX177r
+\unrestrict xXcVf8jV3OU7a6fivhNC6fobnME74p9gPQSrt5NwAafRXX2M2X8nK1qfYuwuktl
 
