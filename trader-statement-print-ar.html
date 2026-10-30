@@ -106,8 +106,8 @@
 </div>
 <div class="font-bold text-[13px] mb-2 flex items-center gap-1.5"><span class="material-symbols-outlined text-[16px]" style="color:#9C8552;">receipt_long</span>سجل الحركات <span class="text-[10px] font-normal text-gray-500 mr-2"><span class="material-symbols-outlined st-arrow" style="color:#8A3B32;font-size:15px">arrow_upward</span> صادر &nbsp; <span class="material-symbols-outlined st-arrow" style="color:#3F6B47;font-size:15px">arrow_downward</span> وارد</span></div>
 <table class="w-full stmt-table" style="border-collapse:collapse;table-layout:fixed;">
-<colgroup><col style="width:12%"><col style="width:26%"><col style="width:9%"><col style="width:10%"><col style="width:9%"><col style="width:10%"><col style="width:12%"><col style="width:12%"></colgroup>
-<thead><tr><th>التاريخ</th><th>البيان</th><th>السند</th><th>ذهب (غ)</th><th>مصنعية/غ</th><th>نقد<span id="stFabCur"></span></th><th>رصيد الذهب (غ)</th><th>رصيد النقد<span id="stBalCur"></span></th></tr></thead>
+<colgroup><col style="width:11%"><col style="width:23%"><col style="width:8%"><col style="width:9%"><col style="width:9%"><col style="width:8%"><col style="width:10%"><col style="width:11%"><col style="width:11%"></colgroup>
+<thead><tr><th>التاريخ</th><th>البيان</th><th>السند</th><th>الوزن القائم (غ)</th><th>ذهب (غ)</th><th>مصنعية/غ</th><th>نقد<span id="stFabCur"></span></th><th>رصيد الذهب (غ)</th><th>رصيد النقد<span id="stBalCur"></span></th></tr></thead>
 <tbody id="stLedgerRows"></tbody>
 <tfoot id="stLedgerFoot"></tfoot>
 </table>
@@ -190,6 +190,14 @@ function stFeePerGram(rows) {
     const rates = [...new Set(rows.map(m => Number(m.fab_fee_per_gram || 0)).filter(v => v > 0).map(v => v.toFixed(2)))];
     return rates.length === 1 ? fmt(rates[0]) : (rates.length > 1 ? 'متعددة' : '—');
 }
+// standing weight in its own karat: the piece's weight; for a voucher, the total (per karat when mixed)
+function stWeight(rows) {
+    const byK = {};
+    rows.forEach(m => { const k = Number(m.karat), w = stGross(m); if (k && w > 0) byK[k] = (byK[k] || 0) + w; });
+    const ks = Object.keys(byK);
+    if (!ks.length) return '—';
+    return ks.length === 1 ? fmt(byK[ks[0]]) : ks.map(k => `<div style="white-space:nowrap">ع${k}: ${fmt(byK[k])}</div>`).join('');
+}
 function stRenderLedger() {
     document.querySelectorAll('#stOpts [data-view]').forEach(b => b.classList.toggle('on', b.dataset.view === ST_VIEW));
     document.querySelectorAll('#stOpts [data-photos]').forEach(b => b.classList.toggle('on', (b.dataset.photos === '1') === ST_PHOTOS));
@@ -204,6 +212,7 @@ function stRenderLedger() {
             <td>${fmtDate(f.created_at)}</td>
             <td>${stArrow(f.movement_type)} ${gmEscapeHtml(stLineTitle(l))}</td>
             <td class="font-data-mono">${gmEscapeHtml(f.batch_ref || '—')}</td>
+            <td class="font-data-mono font-bold">${stWeight(l.g.rows)}</td>
             <td class="font-data-mono" style="color:${col(l.gold)}">${mv(l.gold)}</td>
             <td class="font-data-mono">${stFeePerGram(l.g.rows)}</td>
             <td class="font-data-mono" style="color:${col(l.cash)}">${mv(l.cash)}</td>
@@ -219,6 +228,7 @@ function stRenderLedger() {
                 <td></td>
                 <td><div class="st-pc">${ph}<span>${gmEscapeHtml(stShort(m.notes) || p.barcode || '')}<small> · ${fmt(stGross(m))} غ</small>${ret}</span></div></td>
                 <td>${m.karat ? 'ع' + m.karat : ''}</td>
+                <td class="font-data-mono">${stWeight([m])}</td>
                 <td class="font-data-mono">${mv(sgn(m) * Number(m.gold_24k_equivalent || 0))}</td>
                 <td class="font-data-mono">${stFeePerGram([m])}</td>
                 <td class="font-data-mono">${mv(sgn(m) * Number(m.fab_fee_amount || 0))}</td>
@@ -228,9 +238,9 @@ function stRenderLedger() {
     }).join('');
     const last = ST_LINES[ST_LINES.length - 1];
     document.getElementById('stLedgerRows').innerHTML = html ||
-        `<tr><td colspan="8" class="text-gray-400 py-6">${ST_LINES.length ? 'لا توجد حركات من هذا النوع' : 'لا توجد حركات بهذه الفترة'}</td></tr>`;
+        `<tr><td colspan="9" class="text-gray-400 py-6">${ST_LINES.length ? 'لا توجد حركات من هذا النوع' : 'لا توجد حركات بهذه الفترة'}</td></tr>`;
     document.getElementById('stLedgerFoot').innerHTML = last ? `<tr class="st-v">
-        <td colspan="6">الرصيد النهائي (كل الحركات)</td>
+        <td colspan="7">الرصيد النهائي (كل الحركات)</td>
         <td class="font-data-mono" style="color:${col(last.balG)}">${fmt(last.balG)}</td>
         <td class="font-data-mono" style="color:${col(last.balC)}">${fmt(last.balC)}</td></tr>` : '';
 }

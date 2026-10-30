@@ -25,6 +25,8 @@ test('one ledger: a line per voucher, running balances, vouchers vs details, pho
   await expect(rows.locator('tr.st-p')).toHaveCount(0);
   await expect(rows).toContainText('إعطاء بضاعة · 2 قطعة · عيار 18');
   await expect(rows).toContainText('22.50');     // gold 24k, trader owes the shop
+  await expect(rows.locator('tr.st-m').first().locator('td').nth(3)).toHaveText('30.00'); // standing weight 18k: 10 + 20
+  await expect(rows.locator('tr.st-m').nth(1).locator('td').nth(3)).toHaveText('—');       // cash: no weight
   await expect(rows).toContainText('450.00');    // making
   await expect(rows).toContainText('-100.00');   // cash the shop paid out: shop owes trader
   await expect(page.locator('#stLedgerFoot')).toContainText('22.50');
@@ -33,6 +35,7 @@ test('one ledger: a line per voucher, running balances, vouchers vs details, pho
 
   await page.click('#stOpts [data-view=details]');
   await expect(rows.locator('tr.st-p')).toHaveCount(2);
+  await expect(rows.locator('tr.st-p').first().locator('td').nth(3)).toHaveText('10.00');
   await expect(rows).toContainText('000436 (خاتم)');
   await expect(rows).not.toContainText('إخراج بضاعة');
   await expect(rows.locator('img.st-ph')).toHaveCount(1);
@@ -83,7 +86,7 @@ test('statement shows the making cost per gram before the total making cost', as
   await page.goto('/trader-statement-print-ar.html?trader=t1');
   const heads = await page.locator('.stmt-table thead th').allTextContents();
   expect(heads.indexOf('مصنعية/غ')).toBe(heads.findIndex(h => h.startsWith('نقد')) - 1);
-  await expect(page.locator('#stLedgerRows tr.st-m').first().locator('td').nth(4)).toHaveText('15.00');
+  await expect(page.locator('#stLedgerRows tr.st-m').first().locator('td').nth(5)).toHaveText('15.00');
   await page.click('#stOpts [data-view=details]');
-  await expect(page.locator('#stLedgerRows tr.st-p').first().locator('td').nth(4)).toHaveText('15.00');
+  await expect(page.locator('#stLedgerRows tr.st-p').first().locator('td').nth(5)).toHaveText('15.00');
 });
