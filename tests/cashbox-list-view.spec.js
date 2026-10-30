@@ -40,7 +40,36 @@ test('phone: rows are cards, newest on top, no sideways scroll', async ({ page }
   await install(page, { db: db() });
   await page.goto('/daily-cashbox-ar.html');
   await expect(page.locator('#cashbox-table thead')).toBeHidden();
+  await expect(page.locator('[data-entry="b"]')).toBeVisible();
   const a = await page.locator('[data-entry="a"]').boundingBox(), b = await page.locator('[data-entry="b"]').boundingBox();
   expect(b.y).toBeLessThan(a.y);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+});
+
+test.describe('phone actions', () => {
+  test.use({ hasTouch: true, viewport: { width: 375, height: 800 } });
+  test('swipe shows open/link/print, the bottom bar adds and counts', async ({ page }) => {
+    await install(page, { db: db() });
+    await page.goto('/daily-cashbox-ar.html');
+    const card = page.locator('tr:has([data-entry="b"])');
+    await expect(card.locator('.dc-act')).toBeHidden();
+    await page.waitForLoadState('networkidle');
+    await card.evaluate(tr => {
+      const t = (x) => [new Touch({ identifier: 1, target: tr, clientX: x, clientY: 300 })];
+      tr.dispatchEvent(new TouchEvent('touchstart', { touches: t(300), changedTouches: t(300), bubbles: true }));
+      tr.dispatchEvent(new TouchEvent('touchend', { touches: [], changedTouches: t(180), bubbles: true, cancelable: true }));
+    });
+    await expect(card.locator('.dc-act')).toBeVisible();
+    await card.locator('.dc-act button', { hasText: 'ربط' }).click();
+    await expect(page.locator('#autoRowModal')).not.toHaveClass(/\bhidden\b/);
+    await page.locator('#autoRowModal button[aria-label="إغلاق"]').click();
+    await page.locator('#dcPhoneBar button', { hasText: 'إضافة حركة' }).click();
+    await expect(page.locator('#addForm')).not.toHaveClass(/\bhidden\b/);
+    await page.locator('#dcPhoneBar button', { hasText: 'عدّ الدرج' }).click();
+    await expect(page.locator('#dcSide')).toBeVisible();
+    expect(await page.evaluate(() => {
+      const off = [...document.querySelectorAll('#page-content *, #dcPhoneBar')].filter(el => el.getBoundingClientRect().right > innerWidth + 1 || el.getBoundingClientRect().left < -1);
+      return off.map(el => el.tagName + '#' + el.id + '.' + el.className).slice(0, 5).concat(document.documentElement.scrollWidth > innerWidth ? ['scroll ' + document.documentElement.scrollWidth] : []);
+    })).toEqual([]);
+  });
 });

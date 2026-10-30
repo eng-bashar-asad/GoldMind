@@ -84,6 +84,7 @@
 .dc-card h2{margin:0;font-size:14px;font-weight:700}
 .dc-kv{display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:13px;padding:6px 0;border-bottom:1px solid #EFE7D2}
 .dc-kv:last-child{border-bottom:0}
+.dc-kv input{width:7rem;max-width:45%;flex:none}.dc-card{min-width:0}
 .dc-tag{border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;background:#F7F2E6;color:#6B6355;white-space:nowrap}
 .dc-tag.ok{background:#E8F3EA;color:#1B5E20}.dc-tag.warn{background:#FDF0DC;color:#8A4B08}
 /* movements: one chronological list (computer: a table, oldest first, with the balance after each row;
@@ -133,7 +134,21 @@
   #dcFoot td.dc-fl{grid-column:1/-1;padding-bottom:0}
   #dcFoot td[data-k]::before{content:attr(data-k);display:block;font-size:10.5px;font-weight:400;color:var(--gm-on-surface-variant)}
 }
-@media (min-width:1024px){ #dcKpis .dc-mini{display:none} }
+@media (min-width:1024px){ #dcKpis .dc-mini{display:none} .dc-pbar, #cashbox-table .dc-act{display:none!important} }
+/* phone: drawer count + add at the thumb; a swiped card shows «فتح · ربط · طباعة» */
+.dc-pbar{position:fixed;bottom:0;inset-inline:0;z-index:40;display:flex;gap:8px;padding:10px 16px calc(12px + env(safe-area-inset-bottom));background:linear-gradient(to top,var(--gm-background,#FBF8F1) 75%,transparent)}
+.dc-pbar button{height:48px;border-radius:12px;font-size:14px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px}
+.dc-pb2{flex:1;border:1px solid var(--gm-outline-variant);background:var(--gm-surface-lowest,#fff)}
+.dc-pb1{flex:2;background:#1C1A16;color:#FBF8F1}
+@media (max-width:1023px){
+  #dcAddToggle{display:none!important}
+  #page-content > #dcSide.dc-show{display:flex}
+  #cashbox-table tbody tr{grid-template-areas:"op op op amt" "t src . bal" "act act act act";transition:transform .15s}
+  #cashbox-table td.dc-act{grid-area:act;display:none;gap:6px;margin-top:10px}
+  #cashbox-table tr.dc-open td.dc-act{display:flex}
+  #cashbox-table td.dc-act button{flex:1;height:44px;border-radius:10px;border:1px solid var(--gm-outline-variant);background:var(--gm-surface-lowest,#fff);font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:4px;color:#1C1A16}
+}
+@media (prefers-reduced-motion:reduce){ #cashbox-table tbody tr{transition:none} }
 </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
@@ -291,6 +306,11 @@
 <p id="dcNoMatch" class="hidden text-center text-on-surface-variant text-sm py-6">لا توجد حركات تطابق البحث.</p>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد عمليات مسجّلة اليوم بعد.</p>
 <div id="day-sales" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-3 text-[12px]"></div>
+</div>
+
+<div id="dcPhoneBar" class="dc-pbar">
+<button type="button" onclick="dcOpenCount()" class="dc-pb2"><span class="material-symbols-outlined" aria-hidden="true">calculate</span>عدّ الدرج</button>
+<button type="button" onclick="dcPhoneAdd()" class="dc-pb1"><span class="material-symbols-outlined" aria-hidden="true">add</span>إضافة حركة</button>
 </div>
 
 <!-- Single reusable edit modal (instead of a per-row hidden panel — keeps
@@ -773,7 +793,7 @@ function renderAll() {
     const time = gmFormatDateTime(e.created_at, showFullHistory ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { hour: '2-digit', minute: '2-digit' });
     const money = `<span dir="ltr" class="font-data-mono">${fmt(amt)}</span> <span class="text-[10px] font-normal ${meta}">${cur}</span>`;
     const hay = [e.operation_type, dcNote(e), e.staff && e.staff.full_name, src.label, fmt(amt)].join(' ');
-    return `<tr class="${bg ? 'dc-linked' : ''}" data-dir="${e.direction}" data-src="${src.kind}" data-q="${gmEscapeHtml(hay)}" onclick="openEditModal('${e.id}')"${style ? ` style="${style}"` : ''}>
+    return `<tr class="${bg ? 'dc-linked' : ''}${e.id === dcOpenId ? ' dc-open' : ''}" data-id="${e.id}" data-dir="${e.direction}" data-src="${src.kind}" data-q="${gmEscapeHtml(hay)}" onclick="openEditModal('${e.id}')"${style ? ` style="${style}"` : ''}>
       <td class="dc-t font-data-mono" dir="ltr">${time}</td>
       <td class="dc-op" data-entry="${e.id}">
         <div class="font-semibold">${dot ? `<span class="dc-dot" style="background:${dot}" title="حركة مربوطة"></span>` : ''}${gmEscapeHtml(e.operation_type)}</div>
@@ -786,6 +806,7 @@ function renderAll() {
       <td class="dc-n dc-i dc-amt-in">${e.direction === 'in' ? money : ''}</td>
       <td class="dc-n dc-o dc-amt-out">${e.direction === 'out' ? money : ''}</td>
       <td class="dc-n dc-b dc-bal">${showFullHistory ? '' : `<span dir="ltr" class="font-data-mono">${fmt(run[cur])}</span>`}</td>
+      <td class="dc-act" onclick="event.stopPropagation()"><button type="button" onclick="dcRowAct('open','${e.id}')"><span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>فتح</button><button type="button" onclick="dcRowAct('link','${e.id}')"><span class="material-symbols-outlined" aria-hidden="true">link</span>ربط</button><button type="button" onclick="dcRowAct('print','${e.id}')"><span class="material-symbols-outlined" aria-hidden="true">print</span>طباعة</button></td>
     </tr>`;
   }).join('');
   document.getElementById('dcFoot').innerHTML = Object.entries(totals).map(([cur, t]) => `<tr>
@@ -809,6 +830,43 @@ function dcSource(e) {
   return { kind: 'man', label: 'يدوي' };
 }
 console.assert(dcSource({ cm: { invoice_id: 'i' } }).kind === 'inv' && dcSource({ cash_movement_id: 'c', operation_type: 'عربون' }).label === 'عربون' && dcSource({}).kind === 'man', 'dcSource');
+
+let dcOpenId = null;
+// phone: swipe a card sideways to show its buttons (one open at a time); a tap still opens it as before
+(() => {
+  let x0 = 0, y0 = 0, tr = null;
+  const body = document.getElementById('cashbox-table-body');
+  body.addEventListener('touchstart', ev => { const t = ev.touches[0]; x0 = t.clientX; y0 = t.clientY; tr = ev.target.closest('tr'); }, { passive: true });
+  body.addEventListener('touchend', ev => {
+    const t = ev.changedTouches[0], dx = t.clientX - x0, dy = t.clientY - y0;
+    if (!tr || dcIsDesk() || Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    ev.preventDefault(); // no click after a swipe
+    const open = !tr.classList.contains('dc-open');
+    body.querySelectorAll('tr.dc-open').forEach(r => r.classList.remove('dc-open'));
+    tr.classList.toggle('dc-open', open);
+    dcOpenId = open ? tr.dataset.id : null; // stays open when the list is drawn again
+  });
+})();
+function dcRowAct(what, id) {
+  const e = allEntries.find(x => x.id === id); if (!e) return;
+  const inv = e.bank_invoice_id || (e.cm && e.cm.invoice_id);
+  if (what === 'link') return openAutoRow(e); // only the colour link changes, allowed on any row
+  if (what === 'print') return inv ? window.open('invoice-print-ar.html?id=' + inv, '_blank') : openPrintView();
+  if (e.bank_invoice_id || e.cash_movement_id) { autoRowEntry = e; return autoRowOpen(); }
+  openEditModal(id);
+}
+function dcPhoneAdd() {
+  const f = document.getElementById('addForm');
+  if (f.classList.contains('hidden')) toggleAddForm();
+  f.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  document.getElementById('opTypeInput').focus({ preventScroll: true });
+}
+function dcOpenCount() {
+  const side = document.getElementById('dcSide');
+  side.classList.add('dc-show');
+  side.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  const first = side.querySelector('input[data-cur]'); if (first) first.focus({ preventScroll: true });
+}
 
 // filters only hide rows: balances and totals stay those of the whole day
 const dcFilter = { dir: 'all', src: 'all' };
