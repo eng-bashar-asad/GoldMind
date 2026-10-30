@@ -26,6 +26,6 @@ test('search result opens its own day and highlights the entry', async ({ page }
   await expect(page.locator('#entries-heading')).not.toHaveText('عمليات اليوم');
   const cell = page.locator('[data-entry="old1"]');
   await expect(cell).toBeVisible();
-  await expect(cell).toHaveCSS('outline-style', 'solid');
+  await expect(page.locator('tr:has([data-entry="old1"])')).toHaveCSS('outline-style', 'solid');
   await expect(page.locator('[data-entry="now1"]')).toHaveCount(0); // today's entry is not on that day
 });

@@ -39,8 +39,8 @@ test('daily cash box: one name for the balance, and the net keeps its sign in fr
     daily_cash_log: [{ id: 'd1', store_id: STORE, direction: 'out', amount: 500, currency: 'AED', operation_type: 'مصروف', created_at: new Date().toISOString() }] } });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/daily-cashbox-ar.html');
-  const net = page.locator('#balances-by-currency p[dir="ltr"]');
-  await expect(net).toHaveText(/^\u200e?-500\.00$/);
+  const net = page.locator('#dcKpis .dc-mini p').last();
+  await expect(net).toHaveText(/^\u200e?[−-]500\.00$/);
   const html = await page.content();
   expect(html).not.toContain('المفروض');
   expect(html).toContain('الرصيد الحالي');

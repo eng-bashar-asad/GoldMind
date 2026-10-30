@@ -31,7 +31,7 @@ test('daily cashbox: first posting, reversal and new posting of one invoice show
   await expect(body).not.toContainText('قبل التعديل');
   await expect(body).not.toContainText('PINV-6');          // cancelled the same day: gone
   await expect(body.locator('td', { hasText: 'فاتورة شراء' })).toHaveCount(1);
-  await expect(page.locator('#balances-by-currency')).toContainText('3,300.00');
+  await expect(page.locator('#dcKpis')).toContainText('3,300.00');
   expect(errs).toEqual([]);
 });
 

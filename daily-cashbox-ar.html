@@ -42,7 +42,7 @@
 <style>
 /* computer (design "الصندوق اليومي"): a number strip on top, the quick entry line above the day's table,
    tools and the drawer count in a side column */
-#dcKpis, #dcSide { display: none; }
+#dcSide { display: none; }
 /* phone: the short "what is this page" note goes to the end, the balance comes first */
 @media (max-width:1023px){ #page-content > p.text-outline{order:99} }
 @media (min-width:1024px){
@@ -51,7 +51,7 @@
   #page-content > #dcKpis{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
   #page-content > #gm-entries-col{grid-column:1;grid-row:2 / span 40}
   #page-content > #dcSide{display:flex}
-  #balances-by-currency, #dcAddToggle{display:none!important}
+  #dcAddToggle{display:none!important}
   #page-content > p.text-outline{order:9}
   #addForm.dc-inline{display:grid!important;grid-template-columns:max-content minmax(0,1fr) minmax(0,1fr) 130px 150px;gap:8px;align-items:center;padding:12px 14px;border-radius:14px}
   #addForm.dc-inline > *{margin:0!important}
@@ -86,6 +86,54 @@
 .dc-kv:last-child{border-bottom:0}
 .dc-tag{border-radius:999px;padding:2px 9px;font-size:11.5px;font-weight:700;background:#F7F2E6;color:#6B6355;white-space:nowrap}
 .dc-tag.ok{background:#E8F3EA;color:#1B5E20}.dc-tag.warn{background:#FDF0DC;color:#8A4B08}
+/* movements: one chronological list (computer: a table, oldest first, with the balance after each row;
+   phone: the same rows drawn as cards, newest first) */
+.dc-tools{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.dc-q{flex:1 1 220px;display:flex;align-items:center;gap:6px;height:40px;padding:0 10px;border:1px solid var(--gm-outline-variant);border-radius:10px;background:var(--gm-surface-lowest,#fff)}
+.dc-q input{flex:1;min-width:0;border:0;outline:0;background:transparent;font-size:13px;height:100%}
+.dc-seg{display:inline-flex;background:var(--gm-surface-container-low,#F4EFE3);border-radius:10px;padding:3px;gap:2px;max-width:100%;overflow-x:auto}
+.dc-seg button{height:34px;padding:0 12px;border-radius:8px;font-size:12.5px;font-weight:600;color:var(--gm-on-surface-variant);white-space:nowrap}
+.dc-seg button[aria-pressed="true"]{background:var(--gm-surface-lowest,#fff);color:var(--gm-on-background,#1C1A16);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.dc-wrap{border:1px solid var(--gm-outline-variant);border-radius:14px;overflow:hidden;background:var(--gm-surface-lowest,#fff)}
+#cashbox-table th{font-size:12px;font-weight:600;color:var(--gm-on-surface-variant);text-align:start;padding:10px 12px;border-bottom:1px solid var(--gm-outline-variant);background:var(--gm-surface-container-low,#F7F2E6)}
+#cashbox-table td{padding:10px 12px;border-bottom:1px solid var(--gm-outline-variant);vertical-align:top}
+#cashbox-table .dc-n{text-align:left;white-space:nowrap}
+#cashbox-table tbody tr{cursor:pointer}
+#cashbox-table tbody tr:hover{filter:brightness(.97)}
+.dc-t{white-space:nowrap;color:var(--gm-on-surface-variant)}
+.dc-dot{display:inline-block;width:8px;height:8px;border-radius:999px;margin-inline-end:6px;vertical-align:middle}
+.dc-src{display:inline-block;border:1px solid var(--gm-outline-variant);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;white-space:nowrap;color:var(--gm-on-surface-variant)}
+.dc-amt-in{color:#15803D;font-weight:700}.dc-amt-out{color:#B91C1C;font-weight:700}
+.dc-bal{font-weight:600}
+#dcFoot td{font-weight:700;background:var(--gm-surface-container-low,#F7F2E6);border-bottom:0}
+@media (max-width:1023px){
+  /* phone: big dark balance card, other currencies as small chips, in/out tiles folded into the dark card */
+  #page-content > #dcKpis{display:flex;flex-wrap:wrap;gap:8px}
+  #dcKpis .dc-kpi.dark{flex:1 1 100%;padding:16px}
+  #dcKpis .dc-kpi.dark b{font-size:28px}
+  #dcKpis .dc-kpi:not(.dark){padding:6px 12px;border-radius:999px;display:flex;gap:6px;align-items:baseline}
+  #dcKpis .dc-kpi:not(.dark) b{font-size:13px;margin:0}
+  #dcKpis .dc-kpi:not(.dark) i, #dcKpis .dc-kpi.io{display:none}
+  .dc-wrap{border:0;background:transparent;overflow:visible}
+  #cashbox-table thead{display:none}
+  #cashbox-table tbody{display:flex;flex-direction:column-reverse;gap:8px}
+  #cashbox-table tbody tr{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-areas:"op op op amt" "t src . bal";column-gap:6px;align-items:center;background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant);border-radius:12px;padding:10px 12px}
+  #cashbox-table tbody tr.dc-linked{border-inline-start-width:4px}
+  #cashbox-table tbody td{display:block;padding:0;border:0}
+  #cashbox-table tbody td:empty{display:none}
+  #cashbox-table .dc-op{grid-area:op;min-width:0}
+  #cashbox-table .dc-t{grid-area:t;font-size:11.5px}
+  #cashbox-table .dc-s{grid-area:src}
+  #cashbox-table .dc-i, #cashbox-table .dc-o{grid-area:amt;font-size:15px}
+  #cashbox-table .dc-b{grid-area:bal;font-size:11px;color:var(--gm-on-surface-variant);font-weight:400}
+  #cashbox-table .dc-b::before{content:"الرصيد "}
+  #cashbox-table tfoot{display:block;margin-top:8px}
+  #dcFoot tr{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:4px;border:1px solid var(--gm-outline-variant);border-radius:12px;overflow:hidden;margin-bottom:6px}
+  #dcFoot td{display:block;text-align:center;padding:8px 4px;font-size:12px}
+  #dcFoot td.dc-fl{grid-column:1/-1;padding-bottom:0}
+  #dcFoot td[data-k]::before{content:attr(data-k);display:block;font-size:10.5px;font-weight:400;color:var(--gm-on-surface-variant)}
+}
+@media (min-width:1024px){ #dcKpis .dc-mini{display:none} }
 </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
@@ -130,8 +178,6 @@
 <span class="text-[13px] font-semibold" id="day-nav-label"></span>
 <button onclick="shiftDay(1)" class="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-surface-container-low" id="day-nav-next"><span class="material-symbols-outlined">chevron_left</span></button>
 </div>
-
-<div id="balances-by-currency" class="flex flex-col gap-2"></div>
 
 <button onclick="toggleAddForm()" id="dcAddToggle" class="w-full h-12 border-2 border-dashed border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">add</span> إضافة عملية
@@ -230,17 +276,19 @@
 <button onclick="toggleFullHistory()" class="text-secondary text-[12px] font-semibold gm-hit" id="fullHistoryToggle">عرض كل العمليات</button>
 </div>
 </div>
-<div class="overflow-x-auto rounded-xl border border-outline-variant shadow-lg" style="box-shadow: 0 8px 24px -6px rgba(0,0,0,0.25), 0 2px 6px -1px rgba(0,0,0,0.15);">
-<table class="w-full text-[12px] border-collapse" id="cashbox-table">
-<thead>
-<tr>
-<th colspan="2" class="bg-success/10 text-[#166534] font-bold py-2 text-[13px] border-b border-outline-variant border-l-2 border-outline-variant">الداخل</th>
-<th colspan="2" class="bg-error/10 text-error font-bold py-2 text-[13px] border-b border-outline-variant">الصادر</th>
-</tr>
-</thead>
+<div class="dc-tools">
+<label class="dc-q"><span class="material-symbols-outlined" aria-hidden="true">search</span><input id="dcFilterQ" type="search" placeholder="بحث في حركات اليوم" aria-label="بحث في الحركات المعروضة" oninput="dcApplyFilter()"/></label>
+<div class="dc-seg" role="group" aria-label="الاتجاه" id="dcDirSeg"><button data-v="all" aria-pressed="true" onclick="dcSetFilter('dir',this)">الكل</button><button data-v="in" aria-pressed="false" onclick="dcSetFilter('dir',this)">داخل</button><button data-v="out" aria-pressed="false" onclick="dcSetFilter('dir',this)">صادر</button></div>
+<div class="dc-seg" role="group" aria-label="المصدر" id="dcSrcSeg"><button data-v="all" aria-pressed="true" onclick="dcSetFilter('src',this)">كل المصادر</button><button data-v="inv" aria-pressed="false" onclick="dcSetFilter('src',this)">فواتير</button><button data-v="vch" aria-pressed="false" onclick="dcSetFilter('src',this)">سندات</button><button data-v="man" aria-pressed="false" onclick="dcSetFilter('src',this)">يدوي</button></div>
+</div>
+<div class="dc-wrap">
+<table class="w-full text-[12.5px] border-collapse" id="cashbox-table">
+<thead><tr><th>الوقت</th><th>العملية</th><th>المصدر</th><th class="dc-n">داخل</th><th class="dc-n">صادر</th><th class="dc-n">الرصيد بعدها</th></tr></thead>
 <tbody id="cashbox-table-body"></tbody>
+<tfoot id="dcFoot"></tfoot>
 </table>
 </div>
+<p id="dcNoMatch" class="hidden text-center text-on-surface-variant text-sm py-6">لا توجد حركات تطابق البحث.</p>
 <p id="empty-state" class="hidden text-center text-on-surface-variant text-sm py-8">لا توجد عمليات مسجّلة اليوم بعد.</p>
 <div id="day-sales" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-3 text-[12px]"></div>
 </div>
@@ -473,8 +521,16 @@ function dcRenderKpis(bals) {
   const base = window.__storeCurrency || 'AED';
   const el = document.getElementById('dcKpis');
   if (!bals.length) { el.innerHTML = '<div class="dc-kpi"><small>الدرج</small><b>0.00</b><i>لا يوجد رصيد مسجّل بعد</i></div>'; }
-  else el.innerHTML = [...bals].sort((a, b) => (b.cur === base) - (a.cur === base)).map(({ cur, opening, todayNet, closing }, i) =>
-    `<div class="dc-kpi${i === 0 ? ' dark' : ''}"><small>${cur} · الرصيد الحالي</small><b dir="ltr" class="font-data-mono">${fmt(closing)}</b><i>افتتاحي <span class="font-data-mono">${fmt(opening)}</span> · صافي اليوم <span class="font-data-mono" dir="ltr">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</span></i></div>`).join('');
+  else {
+    const sorted = [...bals].sort((a, b) => (b.cur === base) - (a.cur === base)), m = sorted[0];
+    const sign = n => (n >= 0 ? '+' : '−') + fmt(Math.abs(n));
+    el.innerHTML = sorted.map(({ cur, opening, todayNet, closing, tin, tout }, i) =>
+      `<div class="dc-kpi${i === 0 ? ' dark' : ''}"><small>${cur} · الرصيد الحالي</small><b dir="ltr" class="font-data-mono">${fmt(closing)}</b><i>افتتاحي <span class="font-data-mono">${fmt(opening)}</span> · صافي اليوم <span class="font-data-mono" dir="ltr">${sign(todayNet)}</span></i>`
+      + (i === 0 ? `<div class="dc-mini grid grid-cols-3 gap-2 mt-3 text-[11px]"><div>داخل<p dir="ltr" class="font-data-mono font-bold text-[14px] text-right" style="color:#86EFAC">+${fmt(tin)}</p></div><div>صادر<p dir="ltr" class="font-data-mono font-bold text-[14px] text-right" style="color:#FCA5A5">−${fmt(tout)}</p></div><div>صافي اليوم<p dir="ltr" class="font-data-mono font-bold text-[14px] text-right">${sign(todayNet)}</p></div></div>` : '')
+      + '</div>').join('')
+      + `<div class="dc-kpi io"><small>داخل اليوم · ${m.cur}</small><b dir="ltr" class="font-data-mono dc-amt-in">+${fmt(m.tin)}</b><i>${m.nin} حركة</i></div>`
+      + `<div class="dc-kpi io"><small>صادر اليوم · ${m.cur}</small><b dir="ltr" class="font-data-mono dc-amt-out">−${fmt(m.tout)}</b><i>${m.nout} حركة</i></div>`;
+  }
   if (dcIsDesk() && canManageDates) document.getElementById('addFormDate').value = localDateStr(selectedDate);
   // drawer count: what was counted vs what the book says
   const cnt = document.getElementById('dcCount');
@@ -632,7 +688,7 @@ async function loadAll() {
   if (error) ({ data, error } = await fetchAll('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id)'));
 
   if (error) {
-    document.getElementById('cashbox-table-body').innerHTML = `<tr><td colspan="4" class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</td></tr>`;
+    document.getElementById('cashbox-table-body').innerHTML = `<tr><td colspan="6" class="text-error text-sm text-center py-8">تعذّر التحميل: ${gmEscapeHtml(error.message)}</td></tr>`;
     return;
   }
 
@@ -653,6 +709,7 @@ async function loadAll() {
 // long as there are no more than GM_LINK_PALETTE.length groups showing at
 // once, which covers normal daily use. This function is kept only as the
 // (extremely unlikely) overflow fallback for that case.
+const GM_LINK_INK = ['#B45309', '#1D4ED8', '#15803D', '#BE185D', '#C2410C', '#4338CA', '#0E7490', '#B91C1C', '#7E22CE', '#BE123C', '#4D7C0F', '#0369A1'];
 const GM_LINK_PALETTE = ['#FEF3C7', '#DBEAFE', '#DCFCE7', '#FCE7F3', '#FFEDD5', '#E0E7FF', '#CFFAFE', '#FEE2E2', '#F3E8FF', '#FFE4E6', '#ECFCCB', '#E0F2FE'];
 function gmLinkColorHashFallback(group) {
   if (!group) return null;
@@ -669,51 +726,16 @@ function renderAll() {
   todayEntries = allEntries.filter(e => new Date(e.created_at) >= selectedDate && new Date(e.created_at) < dayEnd);
   const priorEntries = allEntries.filter(e => new Date(e.created_at) < selectedDate);
 
-  // Running balance per currency: opening (everything before the selected day) + that day = closing
-  const allCurrencies = [...new Set(allEntries.map(e => e.currency))];
-  const balancesEl = document.getElementById('balances-by-currency');
-
-  // Compute balances for every currency, then drop any currency that is
-  // fully empty (no opening balance, no activity today, no current
-  // balance) — once a currency's drawer is empty it disappears from view
-  // instead of sitting there forever as a permanent 0.00 row.
-  const currencyBalances = allCurrencies.map(cur => {
-    const opening = priorEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
-    const todayNet = todayEntries.filter(e => e.currency === cur).reduce((s, e) => s + (e.direction === 'in' ? Number(e.amount) : -Number(e.amount)), 0);
-    const closing = opening + todayNet;
-    return { cur, opening, todayNet, closing };
+  // Running balance per currency: opening (everything before the selected day) + that day = closing.
+  // Currencies with nothing in them (no opening, no activity, no balance) are left out.
+  const sum = (rows, cur, dir) => rows.filter(e => e.currency === cur && (!dir || e.direction === dir)).reduce((s, e) => s + (e.direction === 'in' ? 1 : -1) * Number(e.amount), 0);
+  const currencyBalances = [...new Set(allEntries.map(e => e.currency))].map(cur => {
+    const opening = sum(priorEntries, cur), tin = sum(todayEntries, cur, 'in'), tout = -sum(todayEntries, cur, 'out');
+    const todayNet = tin - tout;
+    return { cur, opening, todayNet, closing: opening + todayNet, tin, tout,
+      nin: todayEntries.filter(e => e.currency === cur && e.direction === 'in').length, nout: todayEntries.filter(e => e.currency === cur && e.direction === 'out').length };
   }).filter(b => Math.abs(b.opening) > 0.0001 || Math.abs(b.todayNet) > 0.0001 || Math.abs(b.closing) > 0.0001);
-
   dcRenderKpis(currencyBalances);
-  if (currencyBalances.length === 0) {
-    balancesEl.innerHTML = '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 text-center text-on-surface-variant text-sm">لا يوجد رصيد مسجّل بعد.</div>';
-  } else if (currencyBalances.length === 1) {
-    // Single currency: keep the spacious card, plenty of room either way.
-    balancesEl.innerHTML = currencyBalances.map(({ cur, opening, todayNet, closing }) => `
-        <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-          <div class="text-[11px] font-bold ${cur === 'AED' ? 'text-secondary' : 'text-success'} mb-2">${cur}</div>
-          <div class="grid grid-cols-3 gap-2 text-center">
-            <div><p class="text-[10px] text-on-surface-variant">افتتاحي اليوم</p><p class="font-bold text-[14px] font-data-mono">${fmt(opening)}</p></div>
-            <div><p class="text-[10px] text-on-surface-variant">صافي اليوم</p><p dir="ltr" class="font-bold text-[14px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</p></div>
-            <div><p class="text-[10px] text-on-surface-variant">الرصيد الحالي</p><p class="font-bold text-[15px] font-data-mono">${fmt(closing)}</p></div>
-          </div>
-        </div>`).join('');
-  } else {
-    // More than one active currency: one shared card, each currency as a
-    // compact single-line row (small currency chip + 3 tight columns)
-    // instead of a full-height card per currency — keeps the page short
-    // no matter how many currencies are active at once.
-    const rows = currencyBalances.map(({ cur, opening, todayNet, closing }) => `
-        <div class="flex items-center gap-2 py-2 px-1 border-b border-outline-variant last:border-b-0">
-          <div class="text-[10px] font-bold ${cur === 'AED' ? 'text-secondary' : 'text-success'} w-12 shrink-0">${cur}</div>
-          <div class="grid grid-cols-3 gap-1 flex-1 text-center">
-            <div class="flex flex-col leading-tight"><span class="text-[9px] text-on-surface-variant">افتتاحي</span><span class="font-bold text-[12px] font-data-mono">${fmt(opening)}</span></div>
-            <div class="flex flex-col leading-tight"><span class="text-[9px] text-on-surface-variant">صافي اليوم</span><span class="font-bold text-[12px] font-data-mono ${todayNet >= 0 ? 'text-success' : 'text-error'}">${todayNet >= 0 ? '+' : ''}${fmt(todayNet)}</span></div>
-            <div class="flex flex-col leading-tight"><span class="text-[9px] text-on-surface-variant">الحالي</span><span class="font-bold text-[13px] font-data-mono">${fmt(closing)}</span></div>
-          </div>
-        </div>`).join('');
-    balancesEl.innerHTML = `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl px-2">${rows}</div>`;
-  }
 
   const bodyEl = document.getElementById('cashbox-table-body');
   const emptyEl = document.getElementById('empty-state');
@@ -723,93 +745,89 @@ function renderAll() {
     emptyEl.textContent = 'لا توجد عمليات مسجّلة بعد.';
   }
 
-  if (entriesToShow.length === 0) {
-    bodyEl.innerHTML = '';
-    document.getElementById('cashbox-table').classList.add('hidden');
-    emptyEl.classList.remove('hidden');
-    return;
-  }
-  document.getElementById('cashbox-table').classList.remove('hidden');
-  emptyEl.classList.add('hidden');
+  const table = document.getElementById('cashbox-table');
+  table.classList.toggle('hidden', entriesToShow.length === 0);
+  emptyEl.classList.toggle('hidden', entriesToShow.length > 0);
+  document.querySelector('.dc-tools').classList.toggle('hidden', entriesToShow.length === 0);
+  if (!entriesToShow.length) { bodyEl.innerHTML = ''; document.getElementById('dcFoot').innerHTML = ''; dcApplyFilter(); return; }
 
-  // Group entries into clusters by link_group (an entry with no
-  // link_group is its own singleton cluster), then order clusters by
-  // their most-recent activity and lay out each cluster's out/in members
-  // in the SAME cluster order for both columns. That's what actually
-  // pulls linked entries onto the same or adjacent rows — sorting each
-  // column independently by its own timestamps (the old approach) could
-  // put a linked pair many rows apart if they weren't logged back-to-back.
-  const scoped = entriesToShow;
-  const clustersByKey = new Map();
-  scoped.forEach(e => {
-    const key = e.link_group || ('__solo_' + e.id);
-    if (!clustersByKey.has(key)) clustersByKey.set(key, []);
-    clustersByKey.get(key).push(e);
-  });
-  const clusters = [...clustersByKey.values()].map(members => ({
-    members,
-    latest: Math.max(...members.map(e => new Date(e.created_at).getTime()))
-  }));
-  clusters.sort((a, b) => a.latest - b.latest); // oldest cluster first, newest at the bottom
-
-  const outEntries = [];
-  const inEntries = [];
-  clusters.forEach(cluster => {
-    const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    // No padding between clusters: the table must stay fully filled on
-    // both sides at all times, so an unbalanced cluster (e.g. 2 out
-    // entries but only 1 in entry) no longer opens a blank cell — the next
-    // cluster's entries simply flow up to fill the gap. Each cell still
-    // carries its OWN entry's link color (see cellHtml below), so a linked
-    // pair stays visually tied together by color even if it lands a row
-    // or two apart from its partner.
-    outEntries.push(...outMembers);
-    inEntries.push(...inMembers);
-  });
-  const rowCount = Math.max(outEntries.length, inEntries.length);
-
-  // Assign each distinct link_group visible right now its own palette
-  // color, in the order clusters appear above (oldest first) — this is what
-  // actually guarantees two unrelated groups on screen together never share
-  // a color (see note on GM_LINK_PALETTE above).
-  const groupColorMap = new Map();
-  let nextColorIdx = 0;
-  clusters.forEach(cluster => {
-    const g = cluster.members[0] && cluster.members[0].link_group;
-    if (g && !groupColorMap.has(g)) {
-      if (nextColorIdx < GM_LINK_PALETTE.length) {
-        groupColorMap.set(g, GM_LINK_PALETTE[nextColorIdx]);
-        nextColorIdx++;
-      } else {
-        groupColorMap.set(g, gmLinkColorHashFallback(g)); // overflow: >12 groups on screen at once
-      }
-    }
-  });
-
-  function cellHtml(e) {
-    if (!e) return '<td></td><td></td>';
-    const color = e.link_group ? groupColorMap.get(e.link_group) : null;
+  // oldest first; each row shows its currency's balance right after it
+  const rows = [...entriesToShow].sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || String(a.id).localeCompare(String(b.id)));
+  const run = {};
+  if (!showFullHistory) currencyBalances.forEach(b => { run[b.cur] = b.opening; });
+  // linked rows (same link_group) share a color: each group on screen gets its own, in order of appearance
+  const groupColor = new Map();
+  rows.forEach(e => { if (e.link_group && !groupColor.has(e.link_group)) { const k = groupColor.size; groupColor.set(e.link_group, k < GM_LINK_PALETTE.length ? k : -1); } });
+  const ink = g => { const k = groupColor.get(g); return k >= 0 ? [GM_LINK_PALETTE[k], GM_LINK_INK[k]] : [gmLinkColorHashFallback(g), '#6B6150']; };
+  const totals = {};
+  bodyEl.innerHTML = rows.map(e => {
+    const amt = Number(e.amount), cur = e.currency;
+    run[cur] = (run[cur] || 0) + (e.direction === 'in' ? amt : -amt);
+    const t = totals[cur] || (totals[cur] = { tin: 0, tout: 0, n: 0 });
+    t[e.direction === 'in' ? 'tin' : 'tout'] += amt; t.n++;
+    const src = dcSource(e);
+    const [bg, dot] = e.link_group ? ink(e.link_group) : [null, null];
     const hl = e.id === gmHighlightEntry ? 'outline:3px solid #D4A017;outline-offset:-3px;' : '';
-    const styleAttr = color || hl ? ` style="${color ? `background:${color};color:#1a1c1e;` : ''}${hl}"` : '';
-    const metaClass = color ? 'opacity-70' : 'text-on-surface-variant';
-    const dateLabel = showFullHistory ? gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit' }) + ' ' : '';
-    return `
-      <td class="px-2 py-2 border-b border-outline-variant cursor-pointer" data-entry="${e.id}" onclick="openEditModal('${e.id}')"${styleAttr}>
-        <div class="font-semibold">${e.cash_movement_id || e.bank_invoice_id ? '<span class="material-symbols-outlined align-middle" style="font-size:13px" title="تلقائي من فاتورة">receipt_long</span> ' : ''}${gmEscapeHtml(e.operation_type)}</div>
-        ${dcNote(e) ? `<div class="text-[10px] ${metaClass}">${gmEscapeHtml(dcNote(e))}</div>` : ''}
-        ${gmSaleNote(e, metaClass)}
-        <div class="text-[10px] ${metaClass}">${dateLabel}${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
-        ${dcEnteredHtml(e, metaClass)}
+    const style = (bg ? `background:${bg};color:#1a1c1e;border-color:${dot};` : '') + hl;
+    const meta = bg ? 'opacity-70' : 'text-on-surface-variant';
+    const time = gmFormatDateTime(e.created_at, showFullHistory ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { hour: '2-digit', minute: '2-digit' });
+    const money = `<span dir="ltr" class="font-data-mono">${fmt(amt)}</span> <span class="text-[10px] font-normal ${meta}">${cur}</span>`;
+    const hay = [e.operation_type, dcNote(e), e.staff && e.staff.full_name, src.label, fmt(amt)].join(' ');
+    return `<tr class="${bg ? 'dc-linked' : ''}" data-dir="${e.direction}" data-src="${src.kind}" data-q="${gmEscapeHtml(hay)}" onclick="openEditModal('${e.id}')"${style ? ` style="${style}"` : ''}>
+      <td class="dc-t font-data-mono" dir="ltr">${time}</td>
+      <td class="dc-op" data-entry="${e.id}">
+        <div class="font-semibold">${dot ? `<span class="dc-dot" style="background:${dot}" title="حركة مربوطة"></span>` : ''}${gmEscapeHtml(e.operation_type)}</div>
+        ${dcNote(e) ? `<div class="text-[11px] ${meta}">${gmEscapeHtml(dcNote(e))}</div>` : ''}
+        ${gmSaleNote(e, meta)}
+        <div class="text-[10.5px] ${meta}">${gmEscapeHtml((e.staff && e.staff.full_name) || '')}</div>
+        ${dcEnteredHtml(e, meta)}
       </td>
-      <td class="px-2 py-2 border-b border-outline-variant text-center font-bold font-data-mono cursor-pointer" onclick="openEditModal('${e.id}')"${styleAttr}>${fmt(e.amount)}<div class="text-[9px] font-normal ${metaClass}">${e.currency}</div></td>`;
-  }
+      <td class="dc-s"><span class="dc-src">${src.label}</span></td>
+      <td class="dc-n dc-i dc-amt-in">${e.direction === 'in' ? money : ''}</td>
+      <td class="dc-n dc-o dc-amt-out">${e.direction === 'out' ? money : ''}</td>
+      <td class="dc-n dc-b dc-bal">${showFullHistory ? '' : `<span dir="ltr" class="font-data-mono">${fmt(run[cur])}</span>`}</td>
+    </tr>`;
+  }).join('');
+  document.getElementById('dcFoot').innerHTML = Object.entries(totals).map(([cur, t]) => `<tr>
+      <td colspan="3" class="dc-fl">مجموع ${showFullHistory ? 'كل العمليات' : 'اليوم'} · ${cur} · ${t.n} حركة</td>
+      <td class="dc-n dc-amt-in" data-k="داخل"><span dir="ltr" class="font-data-mono">${fmt(t.tin)}</span></td>
+      <td class="dc-n dc-amt-out" data-k="صادر"><span dir="ltr" class="font-data-mono">${fmt(t.tout)}</span></td>
+      <td class="dc-n" data-k="الرصيد">${showFullHistory ? '' : `<span dir="ltr" class="font-data-mono">${fmt(run[cur])}</span>`}</td></tr>`).join('');
+  dcApplyFilter();
+}
 
-  let rowsHtml = '';
-  for (let i = 0; i < rowCount; i++) {
-    rowsHtml += '<tr>' + cellHtml(inEntries[i]) + cellHtml(outEntries[i]) + '</tr>';
+// where a row came from: an invoice, a voucher (customer/trader/deposit…) or typed in by hand
+function dcSource(e) {
+  if (e.bank_invoice_id || (e.cm && e.cm.invoice_id)) return { kind: 'inv', label: 'فاتورة' };
+  if (e.cash_movement_id) {
+    const op = e.operation_type || '';
+    if (op.includes('عربون')) return { kind: 'vch', label: 'عربون' };
+    if (e.cm && e.cm.trader_movement_id) return { kind: 'vch', label: 'سند تاجر' };
+    if (e.cm && e.cm.cd && e.cm.cd.length) return { kind: 'vch', label: 'سند زبون' };
+    return { kind: 'vch', label: 'سند' };
   }
-  bodyEl.innerHTML = rowsHtml;
+  return { kind: 'man', label: 'يدوي' };
+}
+console.assert(dcSource({ cm: { invoice_id: 'i' } }).kind === 'inv' && dcSource({ cash_movement_id: 'c', operation_type: 'عربون' }).label === 'عربون' && dcSource({}).kind === 'man', 'dcSource');
+
+// filters only hide rows: balances and totals stay those of the whole day
+const dcFilter = { dir: 'all', src: 'all' };
+function dcSetFilter(k, btn) {
+  dcFilter[k] = btn.dataset.v;
+  btn.parentNode.querySelectorAll('button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+  dcApplyFilter();
+}
+function dcApplyFilter() {
+  const q = (document.getElementById('dcFilterQ').value || '').trim().toLowerCase();
+  let shown = 0;
+  document.querySelectorAll('#cashbox-table-body > tr').forEach(tr => {
+    const ok = (dcFilter.dir === 'all' || tr.dataset.dir === dcFilter.dir) && (dcFilter.src === 'all' || tr.dataset.src === dcFilter.src)
+      && (!q || tr.dataset.q.toLowerCase().includes(q));
+    tr.style.display = ok ? '' : 'none';
+    shown += ok;
+  });
+  const any = document.querySelectorAll('#cashbox-table-body > tr').length;
+  document.getElementById('dcNoMatch').classList.toggle('hidden', !any || shown > 0);
 }
 
 // ---- Sales of the day: every sale invoice with its value and the part left
