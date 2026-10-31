@@ -49,21 +49,24 @@ function gmShowUpdateBanner(apkUrl, latestSha) {
   if (document.getElementById('gm-update-banner')) return;
   const bar = document.createElement('div');
   bar.id = 'gm-update-banner';
+  // The app now draws under the phone's status bar (Android 15+, Capacitor 8): keep the bar below it,
+  // otherwise the status bar covers it and «تنزيل» can't be tapped.
+  const SAFE_TOP = 'max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))';
   bar.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:#B4955A;color:#fff;' +
-    'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;' +
+    'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;padding-top:calc(8px + ' + SAFE_TOP + ');' +
     'font-family:Inter,sans-serif;font-size:12.5px;font-weight:600;direction:rtl;box-shadow:0 2px 8px rgba(0,0,0,.15);';
   bar.innerHTML =
     '<span>يتوفر تحديث جديد للتطبيق</span>' +
     '<span style="display:flex;gap:6px;align-items:center;">' +
-      '<a href="' + apkUrl + '" style="background:#fff;color:#7a6222;border-radius:999px;padding:5px 12px;text-decoration:none;font-weight:700;">تنزيل</a>' +
-      '<button type="button" style="background:transparent;border:none;color:#fff;font-size:16px;line-height:1;cursor:pointer;padding:2px 4px;">×</button>' +
+      '<a href="' + apkUrl + '" style="background:#fff;color:#7a6222;border-radius:999px;padding:8px 14px;text-decoration:none;font-weight:700;">تنزيل</a>' +
+      '<button type="button" aria-label="إخفاء" style="background:transparent;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;min-width:44px;min-height:44px;">×</button>' +
     '</span>';
   bar.querySelector('button').onclick = function () {
     localStorage.setItem('goldmind_update_dismissed_sha', latestSha);
     bar.remove();
   };
   document.body.prepend(bar);
-  document.body.style.paddingTop = (document.body.style.paddingTop ? 'calc(' + document.body.style.paddingTop + ' + 38px)' : '38px');
+  document.body.style.paddingTop = 'calc(' + (document.body.style.paddingTop || '0px') + ' + 44px + max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px)))';
 }
 
 // GoldMind shared theming system.
@@ -928,11 +931,11 @@ goldmindLoadSavedFont();
   const style = document.createElement('style');
   style.textContent = `
     header.sticky.top-0, header.fixed.top-0 {
-      padding-top: env(safe-area-inset-top, 0px);
+      padding-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
     }
     nav.sticky.bottom-0, nav.fixed.bottom-0,
     div.sticky.bottom-0, div.fixed.bottom-0 {
-      padding-bottom: env(safe-area-inset-bottom, 0px);
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
     }
     header.sticky.top-0 > div:first-child,
     header.fixed.top-0 > div:first-child {
