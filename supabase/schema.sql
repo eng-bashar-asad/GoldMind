@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xXcVf8jV3OU7a6fivhNC6fobnME74p9gPQSrt5NwAafRXX2M2X8nK1qfYuwuktl
+\restrict mIHrc3f98KzariGAOWdWTkvSRuyWGvcr4bCBQcIvYmguzODF7m1gUqUCahrcDtO
 
 
 SET statement_timeout = 0;
@@ -516,6 +516,29 @@ CREATE FUNCTION public.barcode_counter_store(p_store uuid) RETURNS uuid
     from stores s left join organizations o on o.id = s.organization_id
       where s.id = p_store;
       $$;
+
+
+--
+-- Name: branch_billing(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.branch_billing(p_store uuid) RETURNS TABLE(store_id uuid, store_name text, is_head boolean, plan_name text, status text, period_end timestamp with time zone, yearly numeric, currency text, branch_due numeric, branch_due_currency text)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  with o as (select s.organization_id org from stores s where s.id = p_store),
+       ok as (select (public.is_platform_admin())
+                  or exists (select 1 from staff st join stores s2 on s2.id = st.store_id, o
+                              where st.user_id = auth.uid() and st.role = 'owner' and s2.organization_id = o.org) v)
+  select s.id, coalesce(nullif(s.display_name, ''), s.name), coalesce(org.head_office_store_id, org.primary_store_id) = s.id,
+         p.name_ar, sb.status, coalesce(sb.current_period_end, sb.trial_end),
+         y.amount, y.currency, sb.branch_due, sb.branch_due_currency
+    from o join stores s on s.organization_id = o.org join organizations org on org.id = o.org
+    join subscriptions sb on sb.store_id = s.id join plans p on p.id = sb.plan_id
+    cross join lateral gm_plan_yearly(sb.plan_id, s.id) y, ok
+   where ok.v and public.gm_session_ok()
+   order by 3 desc, s.created_at;
+$$;
 
 
 --
@@ -1967,6 +1990,22 @@ end $$;
 
 
 --
+-- Name: gm_plan_yearly(uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_plan_yearly(p_plan uuid, p_store uuid, OUT amount numeric, OUT currency text) RETURNS record
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  with s as (select upper(coalesce(nullif(currency, ''), 'USD')) cur from stores where id = p_store),
+       p as (select prices, price_yearly from plans where id = p_plan)
+  select coalesce((p.prices -> s.cur ->> 'yearly')::numeric, (p.prices -> 'USD' ->> 'yearly')::numeric, p.price_yearly),
+         case when p.prices -> s.cur ->> 'yearly' is not null then s.cur else 'USD' end
+    from s, p;
+$$;
+
+
+--
 -- Name: gm_pre_request(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2846,6 +2885,55 @@ CREATE FUNCTION public.org_store_ids(sid uuid) RETURNS SETOF uuid
 
 
 --
+-- Name: owner_dashboard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.owner_dashboard() RETURNS TABLE(store_id uuid, store_name text, organization_id uuid, organization_name text, is_head boolean, currency text, today_sales numeric, today_invoices integer, month_sales numeric, drawer jsonb, stock_pieces integer, stock jsonb, scrap jsonb, customers_owe numeric, customers_owing integer, traders_gold24 numeric, traders_cash numeric, incoming_transfers integer)
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  with mine as (
+    select s.id, coalesce(nullif(s.display_name, ''), s.name) nm, s.organization_id, o.name oname,
+           (o.head_office_store_id = s.id) head, upper(coalesce(nullif(s.currency, ''), 'AED')) cur
+      from staff st join stores s on s.id = st.store_id left join organizations o on o.id = s.organization_id
+     where st.user_id = auth.uid() and st.role = 'owner' and public.gm_session_ok()
+  ), day as (
+    select (date_trunc('day', now() at time zone 'Asia/Dubai')) at time zone 'Asia/Dubai' d0,
+           (date_trunc('month', now() at time zone 'Asia/Dubai')) at time zone 'Asia/Dubai' m0
+  )
+  select m.id, m.nm, m.organization_id, m.oname, coalesce(m.head, false), m.cur,
+    coalesce((select sum(i.total_amount) from invoices i, day where i.store_id = m.id and i.type = 'sale' and i.status <> 'cancelled' and i.created_at >= day.d0), 0),
+    coalesce((select count(*) from invoices i, day where i.store_id = m.id and i.type = 'sale' and i.status <> 'cancelled' and i.created_at >= day.d0), 0)::int,
+    coalesce((select sum(i.total_amount) from invoices i, day where i.store_id = m.id and i.type = 'sale' and i.status <> 'cancelled' and i.created_at >= day.m0), 0),
+    coalesce((select jsonb_object_agg(c.cur, c.bal) from (
+        select upper(l.currency) cur, round(sum(case l.direction when 'in' then l.amount else -l.amount end), 2) bal
+          from daily_cash_log l where l.store_id = m.id group by 1 having abs(sum(case l.direction when 'in' then l.amount else -l.amount end)) >= 0.005) c), '{}'::jsonb),
+    coalesce((select count(*) from pieces p where p.store_id = m.id and p.status = 'available'), 0)::int,
+    coalesce((select jsonb_object_agg(k.karat, k.w) from (
+        select p.karat, round(sum(p.weight_grams), 3) w from pieces p
+         where p.store_id = m.id and p.status = 'available' and p.karat is not null group by 1) k), '{}'::jsonb),
+    coalesce((select jsonb_object_agg(k.karat, k.w) from (
+        select g.karat, round(sum(g.weight_grams_remaining), 3) w from gold_stock_lots g
+         where g.store_id = m.id and g.box_name like 'كسر %' and g.weight_grams_remaining > 0 group by 1) k), '{}'::jsonb),
+    coalesce((select sum(b) from (
+        select sum(case d.movement_type when 'debt_increase' then d.cash_amount else -d.cash_amount end) b
+          from customer_debts d where d.store_id = m.id and (d.source is null or d.source <> 'allocation')
+         group by d.customer_id) x where b > 0.005), 0),
+    coalesce((select count(*) from (
+        select sum(case d.movement_type when 'debt_increase' then d.cash_amount else -d.cash_amount end) b
+          from customer_debts d where d.store_id = m.id and (d.source is null or d.source <> 'allocation')
+         group by d.customer_id) x where b > 0.005), 0)::int,
+    coalesce((select round(sum(case t.movement_type when 'debt_decrease' then 1 else -1 end * coalesce(t.gold_24k_equivalent, 0)), 3)
+                from trader_movements t where t.store_id = m.id), 0),
+    coalesce((select round(sum(case t.movement_type when 'debt_decrease' then 1 else -1 end * coalesce(t.fab_fee_amount, 0)), 2)
+                from trader_movements t where t.store_id = m.id), 0),
+    coalesce((select count(*) from branch_transfers b where b.to_store_id = m.id and b.status = 'in_transit'), 0)::int
+  from mine m
+  order by m.oname nulls last, coalesce(m.head, false) desc, m.nm;
+$$;
+
+
+--
 -- Name: post_purchase_invoice(jsonb); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3535,6 +3623,28 @@ CREATE FUNCTION public.receive_branch_transfer(p_transfer uuid, p_barcodes text[
 
 
 --
+-- Name: record_branch_payment(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_branch_payment(p_store uuid, p_payment_ref text DEFAULT NULL::text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare sb record;
+begin
+  if not public.is_platform_admin() then raise exception 'unauthorized'; end if;
+  select * into sb from subscriptions where store_id = p_store for update;
+  if sb.id is null then raise exception 'no subscription found for store'; end if;
+  if coalesce(sb.branch_due, 0) <= 0 then raise exception 'لا يوجد مبلغ مستحق على هذا الفرع'; end if;
+  update subscriptions set branch_due = null, branch_due_since = null, status = 'active', deactivated_at = null,
+         payment_ref = coalesce(p_payment_ref, payment_ref), updated_at = now() where id = sb.id;
+  insert into audit_log (store_id, action_type, description)
+  values (p_store, 'subscription_payment_recorded', 'دفعة اشتراك الفرع حتى تاريخ تجديد الشركة: ' || sb.branch_due || ' ' || coalesce(sb.branch_due_currency, '')
+          || coalesce(' - مرجع: ' || p_payment_ref, ''));
+end $$;
+
+
+--
 -- Name: record_customer_payment(uuid, numeric, text, text, uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3613,6 +3723,33 @@ end $$;
 
 
 --
+-- Name: record_org_renewal(uuid, integer, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.record_org_renewal(p_store uuid, p_months integer, p_payment_ref text DEFAULT NULL::text) RETURNS timestamp with time zone
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare org uuid; head uuid; base timestamptz; newend timestamptz; n int;
+begin
+  if not public.is_platform_admin() then raise exception 'unauthorized'; end if;
+  if p_months is null or p_months < 1 or p_months > 36 then raise exception 'عدد أشهر غير صحيح'; end if;
+  select organization_id into org from stores where id = p_store;
+  select coalesce(head_office_store_id, primary_store_id) into head from organizations where id = org;
+  select greatest(coalesce(current_period_end, now()), now()) into base from subscriptions where store_id = coalesce(head, p_store);
+  newend := base + (p_months || ' months')::interval;
+  update subscriptions set status = 'active', current_period_end = newend, branch_due = null, branch_due_since = null,
+         deactivated_at = null, payment_ref = coalesce(p_payment_ref, payment_ref), updated_at = now()
+   where store_id in (select id from stores where organization_id = org);
+  get diagnostics n = row_count;
+  insert into audit_log (store_id, action_type, description)
+  values (coalesce(head, p_store), 'subscription_payment_recorded', 'تجديد اشتراك الشركة (' || n || ' فروع) ' || p_months || ' شهر حتى '
+          || to_char(newend at time zone 'Asia/Dubai', 'DD/MM/YYYY') || coalesce(' - مرجع: ' || p_payment_ref, ''));
+  return newend;
+end $$;
+
+
+--
 -- Name: record_repair_gold(jsonb); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3676,31 +3813,19 @@ CREATE FUNCTION public.record_subscription_payment(p_store_id uuid, p_months int
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare
-  v_sub subscriptions%rowtype;
-  v_base timestamptz;
+declare v_sub subscriptions%rowtype; v_base timestamptz;
 begin
-  if not exists (select 1 from platform_admins where user_id = auth.uid()) then
-    raise exception 'unauthorized';
-  end if;
-
+  if not public.is_platform_admin() then raise exception 'unauthorized'; end if;
   select * into v_sub from subscriptions where store_id = p_store_id limit 1;
   if v_sub.id is null then raise exception 'no subscription found for store'; end if;
-
   v_base := greatest(coalesce(v_sub.current_period_end, now()), now());
-  update subscriptions set
-    status = 'active',
-    plan_id = coalesce(p_plan_id, plan_id),
+  update subscriptions set status = 'active', plan_id = coalesce(p_plan_id, plan_id),
     current_period_end = v_base + (p_months || ' months')::interval,
-    payment_ref = coalesce(p_payment_ref, payment_ref),
-    deactivated_at = null,
-    updated_at = now()
+    payment_ref = coalesce(p_payment_ref, payment_ref), deactivated_at = null, updated_at = now()
   where id = v_sub.id;
-
   insert into audit_log (store_id, action_type, description)
   values (p_store_id, 'subscription_payment_recorded', 'تسجيل دفعة اشتراك يدوياً: ' || p_months || ' شهر' || coalesce(' - مرجع: ' || p_payment_ref, ''));
-end;
-$$;
+end $$;
 
 
 --
@@ -5147,6 +5272,29 @@ CREATE FUNCTION public.trader_return_piece(p_movement uuid) RETURNS jsonb
 
 
 --
+-- Name: trg_branch_subscription_due(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_branch_subscription_due() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare head uuid; org uuid; y record; days numeric;
+begin
+  select organization_id into org from stores where id = new.store_id;
+  if org is null then return new; end if;
+  select coalesce(head_office_store_id, primary_store_id) into head from organizations where id = org;
+  if head is null or head = new.store_id or new.status <> 'active' or new.current_period_end is null or new.current_period_end <= now() then return new; end if;
+  select * into y from gm_plan_yearly(new.plan_id, new.store_id);
+  days := ceil(extract(epoch from (new.current_period_end - now())) / 86400);
+  new.branch_due := round(coalesce(y.amount, 0) * least(days, 365) / 365, 2);
+  new.branch_due_currency := y.currency;
+  new.branch_due_since := now();
+  return new;
+end $$;
+
+
+--
 -- Name: trg_cash_movement_deleted_bank_sync(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5456,31 +5604,6 @@ end $$;
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
-
---
--- Name: _backup_20260927_intake_batches; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public._backup_20260927_intake_batches (
-    id uuid,
-    store_id uuid,
-    source_type text,
-    source_lot_id uuid,
-    notes text,
-    created_by uuid,
-    created_at timestamp with time zone
-);
-
-
---
--- Name: _backup_20260927_piece_batches; Type: TABLE; Schema: public; Owner: -
---
-
-CREATE TABLE public._backup_20260927_piece_batches (
-    piece_id uuid,
-    intake_batch_id uuid
-);
-
 
 --
 -- Name: audit_log; Type: TABLE; Schema: public; Owner: -
@@ -7000,6 +7123,9 @@ CREATE TABLE public.subscriptions (
     pending_upgrade_plan_id uuid,
     last_auto_upgrade_at timestamp with time zone,
     deactivated_at timestamp with time zone,
+    branch_due numeric,
+    branch_due_currency text,
+    branch_due_since timestamp with time zone,
     CONSTRAINT subscriptions_status_check CHECK ((status = ANY (ARRAY['trialing'::text, 'active'::text, 'past_due'::text, 'canceled'::text])))
 );
 
@@ -8851,6 +8977,13 @@ CREATE TRIGGER trg_auto_upgrade_on_staff_login AFTER UPDATE OF user_id ON public
 
 
 --
+-- Name: subscriptions trg_branch_subscription_due; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_branch_subscription_due BEFORE INSERT ON public.subscriptions FOR EACH ROW EXECUTE FUNCTION public.trg_branch_subscription_due();
+
+
+--
 -- Name: daily_cash_log trg_cash_log_guard; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -10320,18 +10453,6 @@ ALTER TABLE ONLY public.zebra_label_fields
 
 
 --
--- Name: _backup_20260927_intake_batches; Type: ROW SECURITY; Schema: public; Owner: -
---
-
-ALTER TABLE public._backup_20260927_intake_batches ENABLE ROW LEVEL SECURITY;
-
---
--- Name: _backup_20260927_piece_batches; Type: ROW SECURITY; Schema: public; Owner: -
---
-
-ALTER TABLE public._backup_20260927_piece_batches ENABLE ROW LEVEL SECURITY;
-
---
 -- Name: platform_admins admins can view admin list; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -11738,6 +11859,15 @@ GRANT ALL ON FUNCTION public.barcode_counter_store(p_store uuid) TO service_role
 
 
 --
+-- Name: FUNCTION branch_billing(p_store uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.branch_billing(p_store uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.branch_billing(p_store uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.branch_billing(p_store uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION cancel_branch_transfer(p_transfer uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12119,6 +12249,15 @@ GRANT ALL ON FUNCTION public.gm_op_date_stamp() TO service_role;
 
 
 --
+-- Name: FUNCTION gm_plan_yearly(p_plan uuid, p_store uuid, OUT amount numeric, OUT currency text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_plan_yearly(p_plan uuid, p_store uuid, OUT amount numeric, OUT currency text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_plan_yearly(p_plan uuid, p_store uuid, OUT amount numeric, OUT currency text) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_plan_yearly(p_plan uuid, p_store uuid, OUT amount numeric, OUT currency text) TO service_role;
+
+
+--
 -- Name: FUNCTION gm_pre_request(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12412,6 +12551,15 @@ GRANT ALL ON FUNCTION public.org_store_ids(sid uuid) TO service_role;
 
 
 --
+-- Name: FUNCTION owner_dashboard(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.owner_dashboard() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.owner_dashboard() TO authenticated;
+GRANT ALL ON FUNCTION public.owner_dashboard() TO service_role;
+
+
+--
 -- Name: FUNCTION post_purchase_invoice(p jsonb); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12466,6 +12614,15 @@ GRANT ALL ON FUNCTION public.receive_branch_transfer(p_transfer uuid, p_barcodes
 
 
 --
+-- Name: FUNCTION record_branch_payment(p_store uuid, p_payment_ref text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.record_branch_payment(p_store uuid, p_payment_ref text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.record_branch_payment(p_store uuid, p_payment_ref text) TO authenticated;
+GRANT ALL ON FUNCTION public.record_branch_payment(p_store uuid, p_payment_ref text) TO service_role;
+
+
+--
 -- Name: FUNCTION record_customer_payment(p_customer uuid, p_amount numeric, p_method text, p_notes text, p_store uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12481,6 +12638,15 @@ GRANT ALL ON FUNCTION public.record_customer_payment(p_customer uuid, p_amount n
 REVOKE ALL ON FUNCTION public.record_expense(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.record_expense(p jsonb) TO service_role;
+
+
+--
+-- Name: FUNCTION record_org_renewal(p_store uuid, p_months integer, p_payment_ref text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.record_org_renewal(p_store uuid, p_months integer, p_payment_ref text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.record_org_renewal(p_store uuid, p_months integer, p_payment_ref text) TO authenticated;
+GRANT ALL ON FUNCTION public.record_org_renewal(p_store uuid, p_months integer, p_payment_ref text) TO service_role;
 
 
 --
@@ -12860,6 +13026,14 @@ GRANT ALL ON FUNCTION public.trader_return_piece(p_movement uuid) TO service_rol
 
 
 --
+-- Name: FUNCTION trg_branch_subscription_due(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_branch_subscription_due() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_branch_subscription_due() TO service_role;
+
+
+--
 -- Name: FUNCTION trg_cash_movement_deleted_bank_sync(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12973,24 +13147,6 @@ GRANT ALL ON FUNCTION public.update_expense(p_id uuid, p_category uuid, p_amount
 REVOKE ALL ON FUNCTION public.update_expense_fx(p jsonb) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.update_expense_fx(p jsonb) TO authenticated;
 GRANT ALL ON FUNCTION public.update_expense_fx(p jsonb) TO service_role;
-
-
---
--- Name: TABLE _backup_20260927_intake_batches; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public._backup_20260927_intake_batches TO anon;
-GRANT ALL ON TABLE public._backup_20260927_intake_batches TO authenticated;
-GRANT ALL ON TABLE public._backup_20260927_intake_batches TO service_role;
-
-
---
--- Name: TABLE _backup_20260927_piece_batches; Type: ACL; Schema: public; Owner: -
---
-
-GRANT ALL ON TABLE public._backup_20260927_piece_batches TO anon;
-GRANT ALL ON TABLE public._backup_20260927_piece_batches TO authenticated;
-GRANT ALL ON TABLE public._backup_20260927_piece_batches TO service_role;
 
 
 --
@@ -13749,5 +13905,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xXcVf8jV3OU7a6fivhNC6fobnME74p9gPQSrt5NwAafRXX2M2X8nK1qfYuwuktl
+\unrestrict mIHrc3f98KzariGAOWdWTkvSRuyWGvcr4bCBQcIvYmguzODF7m1gUqUCahrcDtO
 
