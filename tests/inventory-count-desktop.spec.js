@@ -7,8 +7,8 @@ test('count detail on computer: start screen hidden', async ({ page }) => {
     inventory_counts: [{ id: 'k1', store_id: STORE, status: 'completed', method: 'camera', scope: ['gold'], started_at: '2026-09-27T09:00:00Z', expected_piece_count: 6 }], inventory_count_expected: exp, inventory_count_scans: [] } });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/inventory-count-ar.html');
-  await expect(page.locator('#scope-wrap')).toBeVisible();
+  await expect(page.locator('#hub-wrap')).toBeVisible();
   await page.locator('#past-sessions-list button').first().click();
   await expect(page.locator('#sd-review')).toContainText('ناقصة فعلاً');
-  await expect(page.locator('#scope-wrap')).toBeHidden();
+  await expect(page.locator('#hub-wrap')).toBeHidden();
 });

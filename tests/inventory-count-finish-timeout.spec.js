@@ -18,7 +18,7 @@ test('finish: slow network gives a message and the button comes back', async ({ 
   await page.addInitScript(() => { window.Html5QrcodeSupportedFormats = {}; window.Html5Qrcode = function () { this.start = () => Promise.resolve(); this.stop = () => Promise.resolve(); }; });
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
-  await page.click('text=استئناف الجلسة');
+  await page.click('text=متابعة المسح');
   await page.waitForFunction(() => currentCountId === 'k1' && stats.expected === 1);
   // from now on the scans request never answers
   await page.route(/inventory_count_scans/, () => {});
@@ -44,7 +44,7 @@ test('finish works when the camera is not running (stop() throws)', async ({ pag
   await page.addInitScript(() => { window.Html5QrcodeSupportedFormats = {}; window.Html5Qrcode = function () { this.start = () => Promise.reject(new Error('NotAllowedError')); this.stop = () => { throw 'Cannot stop, scanner is not running or paused.'; }; this.clear = () => {}; }; });
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
-  await page.click('text=استئناف الجلسة');
+  await page.click('text=متابعة المسح');
   await page.waitForFunction(() => currentCountId === 'k1' && stats.expected === 1);
   await page.click('#finish-btn');
   await expect(page.locator('#report-wrap')).not.toHaveClass(/\bhidden\b/);

@@ -20,8 +20,8 @@ test('scan screen: missing pieces with photos, found button', async ({ page }) =
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
-  await page.click('text=استئناف الجلسة');
-  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (2)');
+  await page.click('text=متابعة المسح');
+  await expect(page.locator('#missing-live-label')).toHaveText('الناقص (2)');
   await page.click('#missing-live-btn');
   const w = page.locator('#missing-live-wrap');
   await expect(w).toContainText('ناقصة فعلاً: 2 قطعة');                 // 000002 + reserved 000004
@@ -31,7 +31,7 @@ test('scan screen: missing pieces with photos, found button', async ({ page }) =
   await expect(w).not.toContainText('خرجت من المخزن'); // gift 000003 dropped when the count reopened (current stock)
   await w.locator('button:has-text("وُجدت")').first().click();
   await expect(w).toContainText('ناقصة فعلاً: 1 قطعة');
-  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (1)');
+  await expect(page.locator('#missing-live-label')).toHaveText('الناقص (1)');
   const ins = calls.find(c => c.method === 'POST' && c.name === 'inventory_count_scans');
   expect(JSON.parse(ins.body)).toMatchObject({ rfid_epc: '000002', match_status: 'matched', scan_method: 'manual' });
   expect(errs).toEqual([]);
@@ -55,8 +55,8 @@ test('missing pieces sheet: big photos, barcode, weight, karat; PDF', async ({ p
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
-  await page.click('text=استئناف الجلسة');
-  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (2)');
+  await page.click('text=متابعة المسح');
+  await expect(page.locator('#missing-live-label')).toHaveText('الناقص (2)');
   await page.click('#missing-live-btn');
   const w = page.locator('#missing-live-wrap');
   await expect(w).toContainText('ناقصة فعلاً: 2 قطعة');                 // 000002 + reserved 000004

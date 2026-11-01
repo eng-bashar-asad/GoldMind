@@ -26,7 +26,7 @@ test('closing a reopened count counts missing against the current stock', async 
   await page.addInitScript(() => { window.Html5QrcodeSupportedFormats = {}; window.Html5Qrcode = function () { this.start = () => Promise.resolve(); this.stop = () => Promise.resolve(); }; });
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
-  await page.click('text=استئناف الجلسة');
+  await page.click('text=متابعة المسح');
   await expect(page.locator('#stat-expected')).toHaveText('2');
   await expect(page.locator('#finish-btn')).toHaveText('إغلاق الجرد');
   await page.click('#finish-btn');

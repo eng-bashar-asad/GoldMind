@@ -56,8 +56,8 @@ async function openPhone(context, scans, staffId) {
   page.on('dialog', d => d.accept());
   page.on('pageerror', e => console.log('PAGEERR', e.message));
   await page.goto('/inventory-count-ar.html');
-  await expect(page.locator('#resume-details')).toHaveText(/RFID/);
-  await page.click('text=استئناف الجلسة');
+  await expect(page.locator('#running-title')).toHaveText(/RFID/);
+  await page.click('text=متابعة المسح');
   await expect(page.locator('#stat-expected')).toHaveText('3');
   return page;
 }
@@ -115,8 +115,8 @@ test('report lists show each piece photo, and why a surplus scan was surplus', a
   await shareScans(page, scans);
   page.on('dialog', d => d.accept());
   await page.goto('/inventory-count-ar.html');
-  await expect(page.locator('#resume-details')).toHaveText(/RFID/);
-  await page.click('text=استئناف الجلسة');
+  await expect(page.locator('#running-title')).toHaveText(/RFID/);
+  await page.click('text=متابعة المسح');
   await expect(page.locator('#stat-expected')).toHaveText('3');
   await scan(page, 'E1');
   await scan(page, 'S1');      // sold piece still in the shop

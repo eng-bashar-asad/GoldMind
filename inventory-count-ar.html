@@ -43,11 +43,8 @@
     body { min-height: max(884px, 100dvh); }
 </style>
 <style>
-@media (min-width:1024px){
-  #scope-wrap:not(.hidden){display:grid;grid-template-columns:1fr 1fr;column-gap:40px;align-items:start;grid-auto-rows:min-content}
-  #scope-wrap > *:not(#past-sessions-wrap){grid-column:1}
-  #scope-wrap > #past-sessions-wrap{grid-column:2;grid-row:1 / span 20;position:sticky;top:80px;max-height:calc(100vh - 100px);overflow:auto}
-}
+.scan-tab{color:var(--gm-on-surface-variant);border-bottom:2px solid transparent}
+.scan-tab[aria-selected="true"]{color:#b91c1c;border-bottom-color:#dc2626}
 </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
@@ -66,144 +63,129 @@
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">لا تملك صلاحية إجراء الجرد.</div>
 
-<!-- Resume banner (shown above scope-wrap if an in_progress session exists) -->
-<div id="resume-banner" class="hidden py-4 flex flex-col gap-3">
-<div class="bg-amber-50 border border-amber-300 rounded-xl p-4">
-<div class="flex items-center gap-2 mb-1">
-<span class="material-symbols-outlined text-amber-700">history</span>
-<span class="text-[13px] font-bold text-amber-800">توجد جلسة جرد غير مكتملة</span>
+<!-- ===== Hub (2026-11-01): the running count is always on top, history below. ===== -->
+<div id="hub-wrap" class="hidden py-5 flex flex-col gap-5">
+<section id="resume-banner" class="hidden bg-surface-container-lowest border-2 border-amber-400 rounded-2xl p-4 lg:p-5">
+<div class="flex flex-wrap items-center gap-2 mb-3">
+<span class="inline-flex items-center gap-1 bg-amber-100 text-amber-900 text-[12px] font-bold rounded-full px-3 py-1"><span class="material-symbols-outlined" style="font-size:15px" aria-hidden="true">radio_button_checked</span>جرد جارٍ</span>
+<h2 id="running-title" class="text-[16px] font-bold">جرد غير مكتمل</h2>
+<span id="resume-details" class="text-[12px] text-on-surface-variant"></span>
 </div>
-<p id="resume-details" class="text-[12px] text-amber-800"></p>
+<div class="flex items-center gap-3 mb-3">
+<div class="flex-1 h-3 rounded-full bg-surface-container-low overflow-hidden"><div id="running-bar" class="h-full bg-green-600" style="width:0%"></div></div>
+<span id="running-progress" class="text-[13px] font-bold font-data-mono" dir="ltr">—</span>
 </div>
-<div class="flex gap-2">
-<button onclick="resumeSession()" class="flex-1 h-12 bg-primary text-on-primary rounded-lg font-bold text-[13px]">استئناف الجلسة</button>
-<button onclick="discardInProgressAndStartNew()" class="flex-1 h-12 border border-error text-error rounded-lg font-bold text-[13px]">إلغاؤها والبدء من جديد</button>
+<div class="grid grid-cols-3 gap-2 mb-4 lg:max-w-xl">
+<div class="rounded-xl bg-green-50 text-center py-2"><div id="running-matched" class="text-lg font-bold text-green-700">—</div><div class="text-[11px] text-green-800">مطابقة</div></div>
+<div class="rounded-xl bg-red-50 text-center py-2"><div id="running-missing" class="text-lg font-bold text-red-700">—</div><div class="text-[11px] text-red-800">لم تُمسح بعد</div></div>
+<div class="rounded-xl bg-amber-50 text-center py-2"><div id="running-surplus" class="text-lg font-bold text-amber-700">—</div><div class="text-[11px] text-amber-900">زيادة</div></div>
 </div>
+<div class="flex flex-col sm:flex-row gap-2">
+<button type="button" onclick="resumeSession()" class="h-12 px-6 rounded-xl bg-primary text-on-primary font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined" aria-hidden="true">qr_code_scanner</span>متابعة المسح</button>
+<button type="button" onclick="closeRunningFromHub()" class="h-12 px-6 rounded-xl border-2 border-primary text-primary font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span>إغلاق الجرد</button>
+<button type="button" onclick="discardInProgressAndStartNew()" class="h-12 px-4 rounded-xl text-error text-[13px] font-semibold sm:ms-auto">إلغاء الجرد</button>
+</div>
+</section>
+
+<div class="flex flex-wrap items-center justify-between gap-3 bg-surface-container-low rounded-xl px-4 py-3">
+<span id="new-count-note" class="text-[12.5px] text-on-surface-variant">ابدأ جرداً جديداً للقطع المتوفرة بالمخزن.</span>
+<button type="button" id="new-count-btn" onclick="openNewCount()" class="h-11 px-5 rounded-lg bg-primary text-on-primary text-[13px] font-bold flex items-center gap-1 disabled:opacity-40"><span class="material-symbols-outlined" aria-hidden="true">add</span>جرد جديد</button>
 </div>
 
-<!-- Step 1: warehouse/scope selection -->
-<div id="scope-wrap" class="hidden py-6 flex flex-col gap-5">
-<div id="past-sessions-wrap">
-<h3 class="text-[13px] font-bold mb-2">جلسات الجرد السابقة — اضغط على جلسة لعرض النواقص والزيادات ومتابعتها</h3>
-<div id="past-sessions-list" class="flex flex-col gap-2"></div>
-</div>
-<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4">
-<p class="text-[13px] text-on-surface-variant leading-relaxed">اختر المستودعات التي تريد جردها في هذه الجلسة.</p>
+<section id="past-sessions-wrap">
+<h2 class="text-[15px] font-bold mb-2">سجل الجرد</h2>
+<div id="past-sessions-list" class="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden"></div>
+</section>
 </div>
 
+<!-- ===== New count: scope + method + start, one panel ===== -->
+<div id="scope-wrap" class="hidden py-5 max-w-3xl w-full mx-auto">
+<section class="bg-surface-container-lowest border border-outline-variant rounded-2xl p-4 lg:p-5 flex flex-col gap-5">
 <div id="conflict-warning" class="hidden bg-red-50 border border-red-300 rounded-xl p-4">
 <div class="flex items-center gap-2 mb-1">
-<span class="material-symbols-outlined text-red-700">warning</span>
+<span class="material-symbols-outlined text-red-700" aria-hidden="true">warning</span>
 <span class="text-[13px] font-bold text-red-700">تنبيه تضارب بيانات</span>
 </div>
 <p id="conflict-warning-text" class="text-[12px] text-red-700 leading-relaxed"></p>
 </div>
 
-<div class="flex flex-col gap-2">
-<label onclick="event.preventDefault(); toggleScopeBox('gold')" class="flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-xl cursor-pointer">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-secondary">inventory_2</span>
 <div>
-<div class="text-[13px] font-bold">قطع ذهبية جاهزة</div>
-<div id="gold-count-label" class="text-[10px] text-on-surface-variant">—</div>
-</div>
+<h3 class="text-[14px] font-bold mb-2">1. ماذا تريد أن تجرد؟</h3>
+<div class="grid sm:grid-cols-2 gap-2">
+<label onclick="event.preventDefault(); toggleScopeBox('gold')" class="flex items-center justify-between gap-3 p-3 bg-surface-container-low border border-outline-variant rounded-xl cursor-pointer">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary" aria-hidden="true">inventory_2</span>
+<div><div class="text-[13px] font-bold">قطع ذهبية جاهزة</div><div id="gold-count-label" class="text-[11px] text-on-surface-variant">—</div></div>
 </div>
 <div id="scope-gold-box" class="w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all"></div>
 </label>
-
-<label id="diamond-scope-row" onclick="event.preventDefault(); toggleScopeBox('diamond')" class="hidden flex items-center justify-between p-4 bg-surface-container-low border border-outline-variant rounded-xl cursor-pointer">
+<label id="diamond-scope-row" onclick="event.preventDefault(); toggleScopeBox('diamond')" class="hidden flex items-center justify-between gap-3 p-3 bg-surface-container-low border border-outline-variant rounded-xl cursor-pointer">
 <div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-secondary">diamond</span>
-<div>
-<div class="text-[13px] font-bold">قطع ألماس</div>
-<div id="diamond-count-label" class="text-[10px] text-on-surface-variant">—</div>
-</div>
+<span class="material-symbols-outlined text-secondary" aria-hidden="true">diamond</span>
+<div><div class="text-[13px] font-bold">قطع ألماس</div><div id="diamond-count-label" class="text-[11px] text-on-surface-variant">—</div></div>
 </div>
 <div id="scope-diamond-box" class="w-7 h-7 rounded-lg border-2 flex items-center justify-center transition-all"></div>
 </label>
-
-<div class="p-4 bg-surface-container-low border border-outline-variant rounded-xl opacity-60">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined">layers</span>
-<div>
-<div class="text-[13px] font-bold">مخزون الكسر / الجملة</div>
-<div class="text-[10px] text-on-surface-variant">غير قابل للجرد بالمسح — هذا المخزون بالوزن وليس بقطع مرقّمة، يُراجع من صفحة المخزون بالجملة</div>
 </div>
-</div>
-</div>
-</div>
-
-<div id="category-filter-wrap" class="hidden relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="category-filter">تصفية إضافية (اختياري) — صنف ١</label>
-<select id="category-filter" class="w-full h-12 border border-outline-variant rounded-lg px-3 bg-white text-[13px]">
-<option value="">كل الأصناف</option>
-</select>
-</div>
-
+<div class="grid sm:grid-cols-2 gap-2 mt-3">
 <div id="box-filter-wrap" class="hidden relative">
-<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="box-filter">جرد صندوق محدد (اختياري)</label>
-<select id="box-filter" class="w-full h-12 border border-outline-variant rounded-lg px-3 bg-white text-[13px]">
-<option value="">كل الصناديق</option>
-</select>
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="box-filter">صندوق محدد (اختياري)</label>
+<select id="box-filter" onchange="applyScope()" class="w-full h-12 border border-outline-variant rounded-lg px-3 bg-white text-[13px]"><option value="">كل الصناديق</option></select>
+</div>
+<div id="category-filter-wrap" class="hidden relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="category-filter">صنف محدد (اختياري)</label>
+<select id="category-filter" onchange="applyScope()" class="w-full h-12 border border-outline-variant rounded-lg px-3 bg-white text-[13px]"><option value="">كل الأصناف</option></select>
+</div>
+</div>
+<p class="text-[11px] text-on-surface-variant mt-2">مخزون الكسر والجملة لا يُجرد بالمسح لأنه بالوزن وليس بقطع مرقّمة — يُراجع من صفحة المخزون بالجملة.</p>
+<p id="scope-error" class="hidden text-error text-[12px] mt-2">اختر نوعاً واحداً على الأقل.</p>
 </div>
 
-<p id="scope-error" class="hidden text-error text-[12px] text-center">اختر مستودع واحد على الأقل للمتابعة</p>
-<button id="scope-continue-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all">متابعة</button>
-</div>
-
-<!-- Step 2: method selection -->
-<div id="start-wrap" class="hidden py-6 flex flex-col gap-5">
 <div>
-<h3 class="text-[12px] font-bold text-on-surface-variant mb-2">طريقة الجرد</h3>
-<div class="grid grid-cols-2 gap-3">
-<button type="button" id="method-rfid-btn" onclick="setCountMethod('rfid')" class="p-4 border-2 rounded-xl flex flex-col items-center gap-2">
-<span class="material-symbols-outlined text-2xl">sensors</span>
-<span class="text-[12px] font-bold">قارئ RFID</span>
-<span class="text-[10px] text-on-surface-variant text-center">يحتاج قارئ RFID متصل بالجهاز</span>
+<h3 class="text-[14px] font-bold mb-2">2. كيف ستمسح؟</h3>
+<div class="grid grid-cols-2 gap-2">
+<button type="button" id="method-camera-btn" onclick="setCountMethod('camera')" class="p-3 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-2xl" aria-hidden="true">photo_camera</span>
+<span class="text-[13px] font-bold">كاميرا / قارئ باركود</span>
+<span class="text-[11px] text-on-surface-variant text-center">الباركود المطبوع على الملصقة</span>
 </button>
-<button type="button" id="method-camera-btn" onclick="setCountMethod('camera')" class="p-4 border-2 rounded-xl flex flex-col items-center gap-2">
-<span class="material-symbols-outlined text-2xl">photo_camera</span>
-<span class="text-[12px] font-bold">كاميرا الهاتف</span>
-<span class="text-[10px] text-on-surface-variant text-center">تمسح باركود القطعة مباشرة</span>
+<button type="button" id="method-rfid-btn" onclick="setCountMethod('rfid')" class="p-3 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-1">
+<span class="material-symbols-outlined text-2xl" aria-hidden="true">sensors</span>
+<span class="text-[13px] font-bold">قارئ RFID</span>
+<span class="text-[11px] text-on-surface-variant text-center">يقرأ الشرائح القريبة دفعة واحدة</span>
 </button>
 </div>
-<p id="rfid-diamond-note" class="hidden text-[10px] text-outline mt-2">قطع الألماس ليس لها رقاقات RFID، لذا لا يتاح خيار قارئ RFID عندما يكون الألماس ضمن نطاق الجرد. استخدم الكاميرا أو الإدخال اليدوي.</p>
-<p class="text-[10px] text-outline mt-2">في جميع الحالات، يتوفر في شاشة المسح حقل إدخال يدوي يمكنك استخدامه إذا لم يعمل الباركود أو الرقاقة.</p>
+<p id="rfid-diamond-note" class="hidden text-[11px] text-outline mt-2">قطع الألماس ليس لها شرائح RFID، لذا لا يتاح قارئ RFID عندما يكون الألماس ضمن الجرد.</p>
+<p class="text-[11px] text-outline mt-2">في شاشة المسح يوجد دائماً حقل إدخال يدوي إذا لم يعمل الباركود أو الشريحة.</p>
 </div>
 
-<div class="bg-surface-container-low border border-outline-variant rounded-xl p-4 flex items-center justify-between">
-<span class="text-[13px] font-semibold text-on-surface-variant">القطع المتوفرة ضمن النطاق المختار</span>
-<span id="expected-count" class="text-lg font-bold">—</span>
+<div class="flex flex-col sm:flex-row sm:items-center gap-3 bg-surface-container-low rounded-xl p-3">
+<div class="flex-1 text-[13px]">3. القطع التي ستُجرد: <b id="expected-count" class="text-[17px]">—</b></div>
+<button id="start-btn" class="h-12 px-8 rounded-xl bg-primary text-on-primary font-bold disabled:opacity-50" disabled>اختر طريقة المسح أولاً</button>
 </div>
-<button id="start-btn" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all" disabled>اختر طريقة الجرد أولاً</button>
-
+<button type="button" onclick="backToHub()" class="self-start text-[13px] font-semibold text-primary flex items-center gap-1"><span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>رجوع لقائمة الجرد</button>
+</section>
 </div>
 
-<!-- Step 3: live scan -->
-<div id="scan-wrap" class="hidden py-6 flex flex-col gap-4">
+<!-- ===== Scan: scanner on one side, what is left on the other ===== -->
+<div id="scan-wrap" class="hidden py-5">
+<div class="flex flex-col gap-4 lg:grid lg:grid-cols-[minmax(0,5fr)_minmax(0,7fr)] lg:gap-6 lg:items-start">
+<section class="flex flex-col gap-3 lg:sticky lg:top-20">
+<div class="flex items-center gap-3">
+<div class="flex-1 h-3 rounded-full bg-surface-container-low overflow-hidden"><div id="scan-progress-bar" class="h-full bg-green-600" style="width:0%"></div></div>
+<span id="scan-progress-text" class="text-[13px] font-bold font-data-mono" dir="ltr">0 / 0</span>
+</div>
 <div class="grid grid-cols-4 gap-2">
-<div class="bg-surface-container-low rounded-lg p-2 text-center">
-<div id="stat-expected" class="text-lg font-bold">0</div>
-<div class="text-[10px] text-on-surface-variant">متوقعة</div>
-</div>
-<div class="bg-surface-container-low rounded-lg p-2 text-center">
-<div id="stat-scanned" class="text-lg font-bold text-primary">0</div>
-<div class="text-[10px] text-on-surface-variant">مُمسوحة</div>
-</div>
-<div class="bg-green-50 rounded-lg p-2 text-center">
-<div id="stat-matched" class="text-lg font-bold text-green-700">0</div>
-<div class="text-[10px] text-green-700">مطابقة</div>
-</div>
-<div class="bg-red-50 rounded-lg p-2 text-center">
-<div id="stat-unexpected" class="text-lg font-bold text-red-700">0</div>
-<div class="text-[10px] text-red-700">زيادة</div>
-</div>
+<div class="bg-surface-container-low rounded-xl p-2 text-center"><div id="stat-expected" class="text-lg font-bold">0</div><div class="text-[11px] text-on-surface-variant">متوقعة</div></div>
+<div class="bg-surface-container-low rounded-xl p-2 text-center"><div id="stat-scanned" class="text-lg font-bold text-primary">0</div><div class="text-[11px] text-on-surface-variant">مُمسوحة</div></div>
+<div class="bg-green-50 rounded-xl p-2 text-center"><div id="stat-matched" class="text-lg font-bold text-green-700">0</div><div class="text-[11px] text-green-800">مطابقة</div></div>
+<div class="bg-amber-50 rounded-xl p-2 text-center"><div id="stat-unexpected" class="text-lg font-bold text-amber-700">0</div><div class="text-[11px] text-amber-900">زيادة</div></div>
 </div>
 
 <div id="rfid-input-wrap" class="hidden relative">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="scan-input">حقل المسح — وجّه القارئ إلى هنا وامسح</label>
 <input autocomplete="off" autofocus class="w-full h-16 border-2 border-primary rounded-lg px-4 focus:ring-2 focus:ring-primary outline-none text-center font-data-mono text-lg tracking-widest" dir="ltr" id="scan-input" placeholder="بانتظار المسح..." type="text"/>
-<button type="button" id="uhf-toggle" onclick="gmUhfToggle()" class="hidden w-full h-14 mt-3 rounded-lg bg-primary text-on-primary font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined">sensors</span><span id="uhf-toggle-text">ابدأ القراءة بالجهاز</span></button>
+<button type="button" id="uhf-toggle" onclick="gmUhfToggle()" class="hidden w-full h-14 mt-3 rounded-lg bg-primary text-on-primary font-bold flex items-center justify-center gap-2"><span class="material-symbols-outlined" aria-hidden="true">sensors</span><span id="uhf-toggle-text">ابدأ القراءة بالجهاز</span></button>
 <p id="uhf-hint" class="hidden text-[11px] text-on-surface-variant text-center mt-1">أو اضغط زناد الجهاز مطوّلاً — يقرأ كل الشرايح القريبة ويتوقف عند تركه.</p>
 </div>
 
@@ -216,36 +198,43 @@
 <div id="last-scan-box" class="hidden text-center text-sm font-semibold py-3 rounded-lg" role="status" aria-live="polite"></div>
 <p id="scan-by-people" class="hidden text-center text-[11.5px] text-on-surface-variant"></p>
 
-<!-- Manual fallback + locate-in-checklist, always available regardless of method -->
-<div class="border-t border-outline-variant pt-3">
-<div class="relative">
+<div class="relative mt-1">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline" for="manual-input">إدخال يدوي / بحث برقم القطعة</label>
 <div class="flex gap-2">
-<input autocomplete="off" class="flex-1 h-12 border border-outline-variant rounded-lg px-3 outline-none font-data-mono text-sm" dir="ltr" id="manual-input" placeholder="رقم القطعة أو الباركود" type="text"/>
-<button onclick="handleManualSubmit()" class="h-12 px-4 bg-primary text-on-primary rounded-lg text-[12px] font-bold">تأكيد</button>
+<input autocomplete="off" class="flex-1 min-w-0 h-12 border border-outline-variant rounded-lg px-3 outline-none font-data-mono text-sm" dir="ltr" id="manual-input" placeholder="رقم القطعة أو الباركود" type="text"/>
+<button onclick="handleManualSubmit()" class="h-12 px-4 bg-primary text-on-primary rounded-lg text-[12px] font-bold">تسجيل</button>
 </div>
+<p class="text-[11px] text-outline mt-1">اكتب رقم القطعة ثم "تسجيل" إذا لم يعمل الباركود أو الشريحة.</p>
 </div>
-<p class="text-[10px] text-outline mt-1">اكتب رقم القطعة لتجد موقعها في الجدول أدناه، أو اضغط "تأكيد" لتسجيلها كمُمسوحة يدوياً إذا لم يعمل الباركود/الرقاقة.</p>
-</div>
-
-<button type="button" id="missing-live-btn" onclick="toggleMissingLive()" class="w-full h-12 rounded-lg text-[13px] font-bold flex items-center justify-center gap-2 bg-red-50 text-red-700 border border-red-200">
-<span class="material-symbols-outlined text-[18px]">image_search</span> <span id="missing-live-label">القطع الناقصة مع الصور</span>
-</button>
-<div id="missing-live-wrap" class="hidden flex-col gap-2"></div>
-<button onclick="toggleChecklist()" class="w-full h-10 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1">
-<span class="material-symbols-outlined text-[16px]">checklist</span> <span id="checklist-toggle-label">عرض جدول كل القطع</span>
-</button>
-<div id="checklist-wrap" class="hidden flex-col gap-2 max-h-72 overflow-y-auto border border-outline-variant rounded-xl p-2"></div>
-
-<div class="flex flex-col gap-1 max-h-56 overflow-y-auto" id="scan-log"></div>
 
 <!-- Cancelled barcodes (old numbers of pieces that got a new one). Never a match. -->
 <div id="cancelled-wrap" class="hidden flex-col gap-2 border border-red-200 rounded-xl p-2">
 <p class="text-[12px] font-bold text-red-700">باركودات ملغية (<span id="cancelled-count">0</span>) — ملصقات قديمة، ما بتعتبر القطعة موجودة</p>
 <div id="cancelled-list" class="flex flex-col gap-1"></div>
 </div>
+</section>
 
-<button id="finish-btn" class="w-full h-14 border-2 border-primary text-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2">إغلاق الجرد</button>
+<section class="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden min-w-0">
+<div class="flex border-b border-outline-variant text-[13px] font-bold overflow-x-auto" role="tablist">
+<button type="button" role="tab" id="missing-live-btn" data-tab="missing" onclick="setScanTab('missing')" class="scan-tab px-4 py-3 whitespace-nowrap"><span id="missing-live-label">الناقص</span></button>
+<button type="button" role="tab" data-tab="surplus" onclick="setScanTab('surplus')" class="scan-tab px-4 py-3 whitespace-nowrap"><span id="surplus-live-label">الزيادة</span></button>
+<button type="button" role="tab" data-tab="log" onclick="setScanTab('log')" class="scan-tab px-4 py-3 whitespace-nowrap">آخر المسح</button>
+<button type="button" role="tab" data-tab="all" onclick="setScanTab('all')" class="scan-tab px-4 py-3 whitespace-nowrap">كل القطع</button>
+</div>
+<div class="p-3">
+<div id="missing-live-wrap" class="hidden flex-col gap-2"></div>
+<div id="surplus-live-wrap" class="hidden flex-col gap-1"></div>
+<div id="scan-log" class="hidden flex-col gap-1 max-h-[60vh] overflow-y-auto"></div>
+<div id="checklist-wrap" class="hidden flex-col gap-2 max-h-[60vh] overflow-y-auto"></div>
+</div>
+</section>
+
+<div class="sticky bottom-0 z-20 lg:col-span-2 -mx-4 lg:mx-0 bg-surface-container-lowest border-t lg:border border-outline-variant lg:rounded-2xl p-3 flex items-center gap-2">
+<button type="button" onclick="backToHub()" class="h-12 px-4 rounded-xl border border-outline-variant font-bold text-[13px] flex items-center gap-1 shrink-0"><span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>قائمة الجرد</button>
+<span class="hidden lg:block text-[12px] text-on-surface-variant">الجرد يبقى فعّالاً عند الرجوع للقائمة.</span>
+<button id="finish-btn" class="h-12 flex-1 lg:flex-none lg:px-10 lg:ms-auto rounded-xl bg-primary text-on-primary font-bold flex items-center justify-center gap-2 active:scale-[0.98] transition-all">إغلاق الجرد</button>
+</div>
+</div>
 </div>
 
 <!-- Step 4: report summary -->
@@ -304,9 +293,9 @@
 <button id="post-count-btn" onclick="postCount()" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2 flex items-center justify-center gap-2">
 <span class="material-symbols-outlined">task_alt</span> ترحيل الجرد
 </button>
-<p class="text-[10px] text-outline text-center -mt-3">الترحيل يُقفل الجلسة كسجل نهائي معتمد. لا يغيّر حالة أي قطعة تلقائياً — القطع الناقصة تحتاج إلى قرارك بمراجعتها يدوياً. يستطيع المدير إلغاء الترحيل والتعديل لاحقاً من "جلسات سابقة".</p>
+<p class="text-[10px] text-outline text-center -mt-3">الترحيل يُقفل الجلسة كسجل نهائي معتمد. لا يغيّر حالة أي قطعة تلقائياً — القطع الناقصة تحتاج إلى قرارك بمراجعتها يدوياً. يستطيع المدير إلغاء الترحيل والتعديل لاحقاً من "سجل الجرد".</p>
 
-<button id="new-session-btn" class="w-full h-12 border border-outline-variant rounded-lg font-semibold text-[13px]">جلسة جرد جديدة</button>
+<button id="new-session-btn" class="w-full h-12 border border-outline-variant rounded-lg font-semibold text-[13px]">رجوع لقائمة الجرد</button>
 
 <!-- Printable summary, kept in normal document flow (just hidden) so
      html2pdf/html2canvas can capture real, attached, on-screen content —
@@ -381,6 +370,63 @@ function renderScopeBox(key) {
 function toggleScopeBox(key) {
   scopeChecked[key] = !scopeChecked[key];
   renderScopeBox(key);
+  applyScope();
+}
+
+// ---- Views (2026-11-01): one helper, so the running count is never lost behind a hidden screen ----
+const GM_VIEWS = ['hub-wrap', 'scope-wrap', 'scan-wrap', 'report-wrap', 'subscreen-wrap', 'session-detail-wrap'];
+function showView(id) {
+  GM_VIEWS.forEach(v => document.getElementById(v).classList.toggle('hidden', v !== id));
+  document.getElementById('header-title').textContent =
+    { 'scope-wrap': 'جرد جديد', 'scan-wrap': 'الجرد — جارٍ', 'session-detail-wrap': 'تفاصيل الجرد' }[id] || 'الجرد';
+  window.scrollTo(0, 0);
+}
+// Back to the list; a running count stays running and shows on top.
+async function backToHub() {
+  stopCameraScanner();
+  stopLiveSync();
+  await checkInProgressSession();
+  showView('hub-wrap');
+  renderRunningCard();
+  loadPastSessions();
+}
+function openNewCount() {
+  if (inProgressSession) return;
+  countMethod = null; matchField = null;
+  ['rfid', 'camera'].forEach(m => { document.getElementById('method-' + m + '-btn').className = 'p-3 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-1'; });
+  const startBtn = document.getElementById('start-btn');
+  startBtn.disabled = true; startBtn.textContent = 'اختر طريقة المسح أولاً';
+  applyScope();
+  showView('scope-wrap');
+}
+async function closeRunningFromHub() {
+  await resumeSession();
+  document.getElementById('finish-btn').click();
+}
+async function renderRunningCard() {
+  const card = document.getElementById('resume-banner');
+  const btn = document.getElementById('new-count-btn');
+  const note = document.getElementById('new-count-note');
+  card.classList.toggle('hidden', !inProgressSession);
+  btn.disabled = !!inProgressSession;
+  note.textContent = inProgressSession
+    ? 'يكون جرد واحد فقط فعّالاً في الوقت نفسه. أغلق الجرد الجاري لتبدأ جرداً جديداً.'
+    : 'ابدأ جرداً جديداً للقطع المتوفرة بالمخزن.';
+  if (!inProgressSession) return;
+  const s = inProgressSession;
+  const scopeTxt = (s.scope || []).map(x => ({ gold: 'قطع ذهبية', diamond: 'ألماس' }[x] || x)).join(' + ');
+  document.getElementById('running-title').textContent = scopeTxt + ' — ' + (s.method === 'camera' ? 'كاميرا' : 'RFID');
+  document.getElementById('resume-details').textContent = 'بدأ ' + gmFormatDateTime(s.started_at);
+  const { data } = await gmFetchAllRows(() => goldmindClient.from('inventory_count_scans').select('rfid_epc, match_status').eq('count_id', s.id));
+  const rows = (data || []).filter(r => r.match_status !== 'cancelled');
+  const matched = new Set(rows.filter(r => r.match_status === 'matched').map(r => r.rfid_epc)).size;
+  const surplus = new Set(rows.filter(r => r.match_status === 'unexpected').map(r => r.rfid_epc)).size;
+  const expected = s.expected_piece_count || 0;
+  document.getElementById('running-matched').textContent = matched;
+  document.getElementById('running-missing').textContent = Math.max(expected - matched, 0);
+  document.getElementById('running-surplus').textContent = surplus;
+  document.getElementById('running-progress').textContent = matched + ' / ' + expected;
+  document.getElementById('running-bar').style.width = (expected ? Math.min(100, matched * 100 / expected) : 0) + '%';
 }
 let selectedCategory = '';
 let selectedBox = '';
@@ -438,21 +484,8 @@ function headerBack() {
     closeSubScreen();
     return;
   }
-  if (!document.getElementById('scan-wrap').classList.contains('hidden')) {
-    if (!confirm('هل تريد الخروج من شاشة المسح؟ لن يُحذف شيء — ستبقى الجلسة محفوظة ويمكنك إكمالها لاحقاً عبر "استئناف الجلسة".')) return;
-    stopCameraScanner();
-    stopLiveSync();
-    document.getElementById('scan-wrap').classList.add('hidden');
-    document.getElementById('start-wrap').classList.remove('hidden');
-    return;
-  }
-  if (!document.getElementById('report-wrap').classList.contains('hidden')) {
-    gmSmartBack('index-ar.html');
-    return;
-  }
-  if (!document.getElementById('start-wrap').classList.contains('hidden')) {
-    document.getElementById('start-wrap').classList.add('hidden');
-    document.getElementById('scope-wrap').classList.remove('hidden');
+  if (['scan-wrap', 'report-wrap', 'scope-wrap'].some(v => !document.getElementById(v).classList.contains('hidden'))) {
+    backToHub(); // the count stays as it is; a running one shows on top of the list
     return;
   }
   gmSmartBack('index-ar.html');
@@ -489,15 +522,8 @@ async function init() {
   await loadAllPieces();
   await checkInProgressSession();
 
-  if (inProgressSession) {
-    document.getElementById('resume-details').textContent =
-      'بدأت بتاريخ ' + gmFormatDateTime(inProgressSession.started_at) +
-      ' — ' + (inProgressSession.method === 'camera' ? 'كاميرا' : 'RFID') + ' — ' +
-      (inProgressSession.scope || []).map(x => ({ gold: 'قطع ذهبية', diamond: 'ألماس' }[x] || x)).join(' + ');
-    document.getElementById('resume-banner').classList.remove('hidden');
-  } else {
-    document.getElementById('scope-wrap').classList.remove('hidden');
-  }
+  showView('hub-wrap');
+  renderRunningCard();
   loadPastSessions();
 }
 
@@ -536,7 +562,7 @@ async function refreshExpectedFromStock() {
 }
 
 async function resumeSession() {
-  document.getElementById('resume-banner').classList.add('hidden');
+  if (!inProgressSession) return;
   const countId = inProgressSession.id;
   countMethod = inProgressSession.method;
   matchField = countMethod === 'rfid' ? 'rfid_epc' : 'barcode';
@@ -569,14 +595,15 @@ async function resumeSession() {
   renderChecklist();
   startLiveSync();
 
-  document.getElementById('scope-wrap').classList.add('hidden');
-  document.getElementById('start-wrap').classList.add('hidden');
-  document.getElementById('scan-wrap').classList.remove('hidden');
+  showView('scan-wrap');
+  setScanTab(currentScanTab);
 
   if (countMethod === 'rfid') {
+    document.getElementById('camera-wrap').classList.add('hidden');
     document.getElementById('rfid-input-wrap').classList.remove('hidden');
     document.getElementById('scan-input').focus();
   } else {
+    document.getElementById('rfid-input-wrap').classList.add('hidden');
     document.getElementById('camera-wrap').classList.remove('hidden');
     document.getElementById('camera-wrap').classList.add('flex');
     startCameraScanner();
@@ -587,8 +614,7 @@ async function discardInProgressAndStartNew() {
   if (!confirm('هل تريد إلغاء الجلسة غير المكتملة نهائياً؟ ستُحذف كل المسوحات المسجّلة فيها.')) return;
   await goldmindClient.from('inventory_counts').update({ status: 'cancelled' }).eq('id', inProgressSession.id);
   inProgressSession = null;
-  document.getElementById('resume-banner').classList.add('hidden');
-  document.getElementById('scope-wrap').classList.remove('hidden');
+  backToHub();
 }
 
 async function loadAllPieces() {
@@ -662,30 +688,33 @@ function detectAndShowConflicts() {
   box.classList.remove('hidden');
 }
 
-document.getElementById('scope-continue-btn').addEventListener('click', () => {
+// Scope, filters and method sit on one panel: every change recomputes the count right away.
+function applyScope() {
   scope.gold = scopeChecked.gold;
   scope.diamond = scopeChecked.diamond;
   selectedCategory = document.getElementById('category-filter').value || '';
   selectedBox = document.getElementById('box-filter').value || '';
-
-  if (!scope.gold && !scope.diamond) {
-    document.getElementById('scope-error').classList.remove('hidden');
-    return;
-  }
-  document.getElementById('scope-error').classList.add('hidden');
+  const none = !scope.gold && !scope.diamond;
+  document.getElementById('scope-error').classList.toggle('hidden', !none);
 
   const rfidBtn = document.getElementById('method-rfid-btn');
-  if (scope.diamond || !storeInfo.rfid_enabled) {
-    rfidBtn.classList.add('hidden');
-    document.getElementById('rfid-diamond-note').classList.toggle('hidden', !scope.diamond);
-  } else {
-    rfidBtn.classList.remove('hidden');
-    document.getElementById('rfid-diamond-note').classList.add('hidden');
-  }
+  const noRfid = scope.diamond || !storeInfo.rfid_enabled;
+  rfidBtn.classList.toggle('hidden', noRfid);
+  document.getElementById('rfid-diamond-note').classList.toggle('hidden', !(scope.diamond && storeInfo.rfid_enabled));
+  if (noRfid && countMethod === 'rfid') { countMethod = null; matchField = null; }
 
-  document.getElementById('scope-wrap').classList.add('hidden');
-  document.getElementById('start-wrap').classList.remove('hidden');
-});
+  const startBtn = document.getElementById('start-btn');
+  if (countMethod && !none) {
+    document.getElementById('expected-count').textContent = poolForMethod(countMethod).length;
+    startBtn.disabled = false;
+    startBtn.textContent = 'بدء الجرد';
+  } else {
+    document.getElementById('expected-count').textContent = none ? '0' : currentScopePool().length;
+    startBtn.disabled = true;
+    startBtn.textContent = none ? 'اختر ما تريد جرده' : 'اختر طريقة المسح أولاً';
+  }
+  return !none;
+}
 
 function currentScopePool() {
   let pool = [];
@@ -705,20 +734,14 @@ function poolForMethod(method) {
 function setCountMethod(method) {
   countMethod = method;
   matchField = method === 'rfid' ? 'rfid_epc' : 'barcode';
-
   const rfidBtn = document.getElementById('method-rfid-btn');
   const camBtn = document.getElementById('method-camera-btn');
-  const selected = 'p-4 border-2 border-primary bg-primary/5 rounded-xl flex flex-col items-center gap-2';
-  const unselected = 'p-4 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-2';
-  rfidBtn.className = method === 'rfid' ? selected : unselected;
+  const selected = 'p-3 border-2 border-primary bg-primary/5 rounded-xl flex flex-col items-center gap-1';
+  const unselected = 'p-3 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-1';
+  const rfidHidden = rfidBtn.classList.contains('hidden');
+  rfidBtn.className = (method === 'rfid' ? selected : unselected) + (rfidHidden ? ' hidden' : '');
   camBtn.className = method === 'camera' ? selected : unselected;
-
-  const pool = poolForMethod(method);
-  document.getElementById('expected-count').textContent = pool.length;
-
-  const startBtn = document.getElementById('start-btn');
-  startBtn.disabled = false;
-  startBtn.textContent = 'بدء جلسة جرد جديدة';
+  applyScope();
 }
 
 async function loadPastSessions() {
@@ -726,33 +749,40 @@ async function loadPastSessions() {
     .from('inventory_counts')
     .select('id, status, started_at, completed_at, expected_piece_count, matched_count, missing_count, unexpected_count, method, scope')
     .eq('store_id', GOLDMIND_STORE_ID)
-    .neq('status', 'in_progress')
     .neq('status', 'cancelled')
     .order('started_at', { ascending: false })
-    .limit(8);
+    .limit(12);
 
   const list = document.getElementById('past-sessions-list');
-  list.innerHTML = '';
-  (data || []).forEach(s => {
+  const rows = data || [];
+  if (!rows.length) {
+    list.innerHTML = '<div class="text-[13px] text-on-surface-variant text-center py-6">لا يوجد جرد سابق بعد</div>';
+    return;
+  }
+  const ST = { in_progress: ['جارٍ', 'bg-amber-100 text-amber-900'], posted: ['مُرحّل', 'bg-green-100 text-green-800'], completed: ['مغلق — غير مُرحّل', 'bg-surface-container-low text-on-surface-variant'] };
+  const scopeTxt = sc => (sc || []).map(x => ({ gold: 'قطع ذهبية', diamond: 'ألماس' }[x] || x)).join(' + ');
+  list.innerHTML = '<div class="hidden md:grid grid-cols-[1.1fr_1.6fr_1fr_.7fr_.7fr_1.3fr_.5fr] gap-2 px-4 py-2 bg-surface-container-low text-[12px] font-semibold text-on-surface-variant"><span>التاريخ</span><span>النطاق والطريقة</span><span class="text-center">مطابقة</span><span class="text-center">ناقصة</span><span class="text-center">زيادة</span><span class="text-center">الحالة</span><span></span></div>';
+  rows.forEach(s => {
+    const st = ST[s.status] || [s.status, 'bg-surface-container-low'];
+    const running = s.status === 'in_progress';
     const row = document.createElement('button');
-    row.className = 'w-full bg-surface-container-low rounded-lg p-3 flex items-center justify-between text-[12px] text-right';
-    const dateStr = gmFormatDateTime(s.started_at, { day: 'numeric', month: 'short', year: 'numeric' });
-    const methodLabel = s.method === 'camera' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">photo_camera</span>' : (s.method === 'rfid' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">sensors</span>' : '');
-    const statusLabel = s.status === 'posted' ? 'مُرحّلة' : 'مكتملة';
-    row.innerHTML = `<span class="font-semibold">${methodLabel} ${dateStr}</span>
-      <span class="text-on-surface-variant">${statusLabel}</span>
-      <span>${s.matched_count || 0}/${s.expected_piece_count || 0} مطابقة · <b class="text-red-700">${s.missing_count || 0}</b> ناقصة</span>
-      <span class="material-symbols-outlined text-[16px] text-outline">chevron_left</span>`;
-    row.onclick = () => openSessionDetail(s.id);
+    row.type = 'button';
+    row.className = 'w-full text-start border-t border-outline-variant first:border-t-0 px-4 py-3 text-[13px] flex flex-wrap items-center gap-x-3 gap-y-1 md:grid md:grid-cols-[1.1fr_1.6fr_1fr_.7fr_.7fr_1.3fr_.5fr] md:gap-2 hover:bg-surface-container-low ' + (running ? 'bg-amber-50/60' : '');
+    const missing = running ? Math.max((s.expected_piece_count || 0) - (s.matched_count || 0), 0) : (s.missing_count || 0);
+    row.innerHTML = `<span class="font-bold">${gmFormatDateTime(s.started_at, { day: '2-digit', month: '2-digit', year: 'numeric' })}</span>
+      <span class="text-on-surface-variant md:text-on-surface">${gmEscapeHtml(scopeTxt(s.scope))} · ${s.method === 'camera' ? 'كاميرا' : 'RFID'}</span>
+      <span class="font-data-mono md:text-center w-full md:w-auto order-last md:order-none text-[12px] md:text-[13px] text-on-surface-variant md:text-on-surface">${running ? 'جارٍ — افتح للمتابعة' : (s.matched_count || 0) + '/' + (s.expected_piece_count || 0) + ' مطابقة'}${running ? '' : `<span class="md:hidden"> · <b class="text-red-700">${missing}</b> ناقصة · <b class="text-amber-700">${s.unexpected_count || 0}</b> زيادة</span>`}</span>
+      <span class="hidden md:block text-center font-bold text-red-700">${running ? '—' : missing}</span>
+      <span class="hidden md:block text-center font-bold text-amber-700">${running ? '—' : (s.unexpected_count || 0)}</span>
+      <span class="md:text-center ms-auto md:ms-0"><span class="${st[1]} rounded-full px-3 py-1 text-[11.5px] font-bold whitespace-nowrap">${st[0]}</span></span>
+      <span class="hidden md:block text-start text-primary font-bold underline">${running ? 'متابعة' : 'فتح'}</span>`;
+    row.onclick = running ? () => { inProgressSession = s; resumeSession(); } : () => openSessionDetail(s.id);
     list.appendChild(row);
   });
-  if ((data || []).length === 0) {
-    list.innerHTML = '<div class="text-[12px] text-on-surface-variant text-center py-2">لا توجد جلسات سابقة بعد</div>';
-  }
 }
 
 document.getElementById('start-btn').addEventListener('click', async () => {
-  if (!countMethod) return;
+  if (!countMethod || !applyScope()) return;
   const btn = document.getElementById('start-btn');
   btn.disabled = true;
   btn.textContent = 'جارِ البدء...';
@@ -781,7 +811,7 @@ document.getElementById('start-btn').addEventListener('click', async () => {
 
   if (error || !countRow) {
     btn.disabled = false;
-    btn.textContent = 'بدء جلسة جرد جديدة';
+    btn.textContent = 'بدء الجرد';
     alert('تعذّر بدء جلسة الجرد: ' + (error ? error.message : ''));
     return;
   }
@@ -807,7 +837,9 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   }
 
   btn.disabled = false;
-  btn.textContent = 'بدء جلسة جرد جديدة';
+  btn.textContent = 'بدء الجرد';
+  inProgressSession = { id: countRow.id, method: countMethod, scope: scopeArr, started_at: countRow.started_at, expected_piece_count: expectedPool.length };
+  document.getElementById('scan-log').innerHTML = '';
 
   scannedValues = new Set(); cancelledSeen.clear();
   scanBy = {};
@@ -817,8 +849,8 @@ document.getElementById('start-btn').addEventListener('click', async () => {
   renderChecklist();
   startLiveSync();
 
-  document.getElementById('start-wrap').classList.add('hidden');
-  document.getElementById('scan-wrap').classList.remove('hidden');
+  showView('scan-wrap');
+  setScanTab('log');
 
   if (countMethod === 'rfid') {
     document.getElementById('rfid-input-wrap').classList.remove('hidden');
@@ -958,7 +990,7 @@ async function syncScans() {
     stopCameraScanner();
     alert(cnt.status === 'cancelled'
       ? 'تم إلغاء جلسة الجرد هذه من جهاز آخر.'
-      : 'تم إنهاء جلسة الجرد هذه من جهاز آخر. يمكنك عرض تقريرها من "الجلسات السابقة".');
+      : 'تم إنهاء جلسة الجرد هذه من جهاز آخر. يمكنك عرض تقريرها من "سجل الجرد".');
     window.location.reload();
   }
 }
@@ -992,6 +1024,8 @@ function updateStatsUI() {
   document.getElementById('stat-scanned').textContent = stats.scanned;
   document.getElementById('stat-matched').textContent = stats.matched;
   document.getElementById('stat-unexpected').textContent = stats.unexpected;
+  document.getElementById('scan-progress-text').textContent = stats.matched + ' / ' + stats.expected;
+  document.getElementById('scan-progress-bar').style.width = (stats.expected ? Math.min(100, stats.matched * 100 / stats.expected) : 0) + '%';
 }
 
 function addLogRow(text, kind) {
@@ -1200,13 +1234,30 @@ async function handleScan(value, method) {
   }
 }
 
-function toggleChecklist() {
-  const wrap = document.getElementById('checklist-wrap');
-  const willShow = wrap.classList.contains('hidden');
-  wrap.classList.toggle('hidden');
-  wrap.classList.toggle('flex', willShow);
-  document.getElementById('checklist-toggle-label').textContent = willShow ? 'إخفاء جدول كل القطع' : 'عرض جدول كل القطع';
-  if (willShow) renderChecklist(document.getElementById('manual-input').value.trim());
+// Scan screen side panel: one tab at a time (missing with photos / extra / last scans / all pieces).
+let currentScanTab = 'log';
+const SCAN_TAB_PANEL = { missing: 'missing-live-wrap', surplus: 'surplus-live-wrap', log: 'scan-log', all: 'checklist-wrap' };
+function setScanTab(tab) {
+  currentScanTab = tab;
+  document.querySelectorAll('.scan-tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.tab === tab)));
+  Object.entries(SCAN_TAB_PANEL).forEach(([t, id]) => {
+    const el = document.getElementById(id);
+    el.classList.toggle('hidden', t !== tab); el.classList.toggle('flex', t === tab);
+  });
+  missingLiveOpen = tab === 'missing';
+  if (tab === 'missing') renderMissingLive();
+  if (tab === 'surplus') renderSurplusLive();
+  if (tab === 'all') renderChecklist(document.getElementById('manual-input').value.trim());
+}
+function renderSurplusLive() {
+  const vals = Array.from(scannedValues).filter(v => !expectedByField[v]);
+  const lbl = document.getElementById('surplus-live-label');
+  if (lbl) lbl.textContent = 'الزيادة (' + vals.length + ')';
+  if (currentScanTab !== 'surplus') return;
+  document.getElementById('surplus-live-wrap').innerHTML = vals.length
+    ? '<p class="text-[11.5px] text-on-surface-variant mb-1">رموز مُسحت وليست ضمن القطع المتوقعة. تُراجع وتُحذف من تقرير الجرد بعد الإغلاق.</p>' +
+      vals.map(v => `<div class="flex items-center justify-between gap-2 bg-amber-50 rounded-lg px-3 py-2 text-[12.5px]"><span class="font-data-mono" dir="ltr">${gmEscapeHtml(v)}</span><span class="text-on-surface-variant">${gmEscapeHtml(staffName(scanBy[v]))}</span></div>`).join('')
+    : '<div class="text-[13px] text-on-surface-variant text-center py-4">لا توجد زيادة</div>';
 }
 
 function renderChecklist(filterText) {
@@ -1239,13 +1290,8 @@ const ML_LEFT = { sold: 'مباعة', gifted: 'هدية', given_to_trader: 'عن
 function updateMissingLiveLabel() {
   const n = expectedPool.filter(p => !scannedValues.has(p[matchField])).length;
   const el = document.getElementById('missing-live-label');
-  if (el) el.textContent = 'القطع الناقصة مع الصور (' + n + ')';
-}
-function toggleMissingLive() {
-  missingLiveOpen = !missingLiveOpen;
-  const w = document.getElementById('missing-live-wrap');
-  w.classList.toggle('hidden', !missingLiveOpen); w.classList.toggle('flex', missingLiveOpen);
-  if (missingLiveOpen) renderMissingLive();
+  if (el) el.textContent = 'الناقص (' + n + ')';
+  renderSurplusLive();
 }
 // ---- Missing pieces sheet: big photo, then barcode / gross weight / karat.
 // 16 pieces per A4 page (4 × 4), each page its own block so a card is never cut.
@@ -1429,8 +1475,9 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
 
   renderReportCounts();
 
-  document.getElementById('scan-wrap').classList.add('hidden');
-  document.getElementById('report-wrap').classList.remove('hidden');
+  inProgressSession = null;
+  showView('report-wrap');
+  document.getElementById('header-title').textContent = 'تقرير الجرد';
 });
 
 // Photo + details for the pieces in the missing / surplus lists, fetched once per report.
@@ -1612,15 +1659,13 @@ async function continueScanning() {
     id: currentCountId, method: countMethod,
     scope: [scope.gold ? 'gold' : null, scope.diamond ? 'diamond' : null].filter(Boolean)
   };
-  document.getElementById('report-wrap').classList.add('hidden');
-  document.getElementById('subscreen-wrap').classList.add('hidden');
   await resumeSession();
 }
 
 function closeSubScreen() {
   document.getElementById('subscreen-wrap').classList.add('hidden');
   document.getElementById('report-wrap').classList.remove('hidden');
-  document.getElementById('header-title').textContent = 'الجرد';
+  document.getElementById('header-title').textContent = 'تقرير الجرد';
 }
 
 // ---- Export ----
@@ -1710,25 +1755,12 @@ function startNewSession() {
   scannedValues = new Set(); cancelledSeen.clear();
   document.getElementById('scan-log').innerHTML = '';
   document.getElementById('checklist-wrap').innerHTML = '';
-  document.getElementById('checklist-wrap').classList.add('hidden');
-  document.getElementById('checklist-toggle-label').textContent = 'عرض جدول كل القطع';
   document.getElementById('last-scan-box').classList.add('hidden');
-  document.getElementById('report-wrap').classList.add('hidden');
-  document.getElementById('subscreen-wrap').classList.add('hidden');
-  document.getElementById('method-rfid-btn').className = 'p-4 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-2';
-  document.getElementById('method-camera-btn').className = 'p-4 border-2 border-outline-variant rounded-xl flex flex-col items-center gap-2';
-  document.getElementById('expected-count').textContent = '—';
-  const startBtn = document.getElementById('start-btn');
-  startBtn.disabled = true;
-  startBtn.textContent = 'اختر طريقة الجرد أولاً';
   scopeChecked.gold = true;
   scopeChecked.diamond = false;
   renderScopeBox('gold');
   renderScopeBox('diamond');
-  loadAllPieces().then(() => {
-    document.getElementById('start-wrap').classList.add('hidden');
-    document.getElementById('scope-wrap').classList.remove('hidden');
-  });
+  loadAllPieces().then(backToHub);
 }
 document.getElementById('new-session-btn').addEventListener('click', startNewSession);
 
@@ -1740,10 +1772,7 @@ let sessionDetailExpectedRows = [];
 
 async function openSessionDetail(countId) {
   sessionDetailId = countId;
-  document.getElementById('start-wrap').classList.add('hidden');
-  document.getElementById('scope-wrap').classList.add('hidden');
-  document.getElementById('session-detail-wrap').classList.remove('hidden');
-  document.getElementById('header-title').textContent = 'تفاصيل الجلسة';
+  showView('session-detail-wrap');
   document.getElementById('sd-review').innerHTML = '<div class="text-center text-[12px] text-on-surface-variant py-6">جارِ التحميل...</div>';
 
   const [{ data: countRow }, { data: expectedRows }, { data: scanRows }] = await Promise.all([
@@ -1785,7 +1814,6 @@ async function openSessionDetail(countId) {
       const { error } = await goldmindClient.from('inventory_counts').update({ status: 'in_progress', completed_at: null }).eq('id', countId);
       if (error) { alert('تعذّر فتح الجلسة: ' + error.message); return; }
       inProgressSession = { id: countId, method: countRow.method, scope: countRow.scope || [] };
-      document.getElementById('session-detail-wrap').classList.add('hidden');
       await resumeSession();
     };
     ownerActions.appendChild(resumeBtn);
@@ -2009,10 +2037,7 @@ async function sdDeleteUnknown(btn) {
 }
 
 function closeSessionDetail() {
-  document.getElementById('session-detail-wrap').classList.add('hidden');
-  document.getElementById('scope-wrap').classList.remove('hidden');
-  document.getElementById('header-title').textContent = 'الجرد';
-  loadPastSessions();
+  backToHub();
 }
 
 init();

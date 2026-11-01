@@ -40,7 +40,7 @@ test('a cancelled old barcode is listed, never counted as a match', async ({ pag
   await page.addInitScript(() => { window.Html5QrcodeSupportedFormats = {}; window.Html5Qrcode = function () { this.start = () => Promise.resolve(); this.stop = () => Promise.resolve(); }; });
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
-  await page.click('text=استئناف الجلسة');
+  await page.click('text=متابعة المسح');
   await expect(page.locator('#scan-wrap')).not.toHaveClass(/\bhidden\b/);
   await page.evaluate(() => handleScan('OLD9', 'camera'));
   await expect(page.locator('#cancelled-count')).toHaveText('1');
@@ -68,7 +68,7 @@ test('a replaced chip number is listed as cancelled in an RFID count', async ({ 
   await page.addInitScript(() => { window.Html5QrcodeSupportedFormats = {}; window.Html5Qrcode = function () { this.start = () => Promise.resolve(); this.stop = () => Promise.resolve(); }; });
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
-  await page.click('text=استئناف الجلسة');
+  await page.click('text=متابعة المسح');
   await expect(page.locator('#scan-wrap')).not.toHaveClass(/\bhidden\b/);
   await page.evaluate(([v]) => handleScan(v, 'rfid'), [OLD]);
   await expect(page.locator('#cancelled-count')).toHaveText('1');
