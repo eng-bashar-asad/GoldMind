@@ -26,7 +26,7 @@ test('staff without permissions: reports hidden in menu', async ({ page }) => {
   await page.goto('/inventory-list-ar.html');
   await page.waitForTimeout(1500);
   await expect(page.locator('#gmNav a[href="profit-report-ar.html"]')).toBeHidden();
-  await expect(page.locator('#gmNav a[href="inventory-list-ar.html"]')).toHaveCount(1);
+  await expect(page.locator('#gmNav .gn-g a[href="inventory-list-ar.html"]')).toHaveCount(1);
 });
 
 test('laptop home: full sidebar + who is online', async ({ page }) => {

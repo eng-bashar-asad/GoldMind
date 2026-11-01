@@ -114,7 +114,85 @@
       background:linear-gradient(125deg,#c89a3c,#f6e2a6 40%,#d4a64a 60%,#b58a33);color:#2A1F08;cursor:pointer}
     .gm-nav-btn .material-symbols-outlined{font-size:22px}
     body.gm-nav-open{overflow:hidden}
-    @media print{#gmNav,#gmNavOverlay,.gm-nav-btn{display:none!important}}
+    /* menu look (Bashar 2026-11-02): dark, or light glass; chosen at the top of the menu, kept per device */
+    #gmNav .gn-style{display:flex;gap:4px;margin:0 14px 8px;padding:4px;border-radius:14px;background:#2A251C}
+    #gmNav .gn-style button{flex:1;min-height:38px;border:0;border-radius:10px;background:transparent;color:#BFB39A;font:inherit;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;gap:6px;cursor:pointer}
+    #gmNav .gn-style button .material-symbols-outlined{font-size:18px}
+    #gmNav .gn-style button[aria-checked="true"]{background:#D9B45A;color:#17140F}
+    #gmNav .gn-search{display:flex;align-items:center;gap:8px;margin:0 14px 6px;min-height:44px;padding:0 12px;border-radius:14px;border:1px solid #3a3226;background:#2A251C;color:#BFB39A;font:inherit;font-size:13.5px;cursor:pointer;text-align:start;width:calc(100% - 28px)}
+    #gmNav .gn-search .gn-st{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #gmNav kbd,.gm-pal kbd{font:inherit;font-size:11px;border-radius:6px;padding:2px 6px;background:#3a3226;color:#E9CF8B;direction:ltr;white-space:nowrap}
+    #gmNav .gn-sec{display:flex;align-items:center;justify-content:space-between;font-size:11.5px;font-weight:700;color:#8C8270;padding:8px 22px 2px}
+    #gmNav .gn-sec button{border:0;background:transparent;color:#D9B45A;font:inherit;font-size:12px;font-weight:700;cursor:pointer;min-height:36px;padding:0 4px}
+    #gmNav .gn-favempty{font-size:12px;color:#8C8270;padding:2px 24px 6px}
+    #gmNav a.gn-a{position:relative}
+    #gmNav .gn-badge{margin-inline-start:auto;min-width:22px;height:22px;padding:0 7px;border-radius:999px;font-size:11.5px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:#2A251C;color:#E9CF8B;white-space:nowrap}
+    #gmNav .gn-badge.red{background:#dc2626;color:#fff}
+    #gmNav .gn-badge.amber{background:#f59e0b;color:#2a1a00}
+    #gmNav .gn-badge.dot{min-width:9px;width:9px;height:9px;padding:0;background:#dc2626}
+    #gmNav .gn-badge.txt{background:transparent;color:#BFB39A;font-weight:600;padding:0}
+    #gmNav a.gn-a.here .gn-badge:not(.red):not(.amber):not(.dot){background:rgba(23,20,15,.15);color:#17140F}
+    #gmNav .gn-star{margin-inline-start:6px;width:34px;height:34px;border:0;border-radius:8px;background:transparent;color:#8C8270;display:none;align-items:center;justify-content:center;cursor:pointer;flex:none}
+    #gmNav.gn-editing .gn-star{display:inline-flex}
+    #gmNav .gn-star.on{color:#E9CF8B}
+    #gmNav .gn-me{display:flex;align-items:center;gap:10px;padding:8px;border-radius:14px;background:#2A251C;margin:0 0 6px}
+    #gmNav .gn-av{width:38px;height:38px;border-radius:50%;background:#E9CF8B;color:#2A1F08;display:flex;align-items:center;justify-content:center;font-weight:700;position:relative;flex:none}
+    #gmNav .gn-av::after{content:"";position:absolute;bottom:-1px;left:-1px;width:11px;height:11px;border-radius:50%;background:#16a34a;border:2px solid #2A251C}
+    #gmNav .gn-me-t{min-width:0;flex:1;line-height:1.35}
+    #gmNav .gn-me-t b{display:block;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #gmNav .gn-me-t span{font-size:11.5px;opacity:.75;display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    #gmNav .gn-me a{font-size:12px;font-weight:700;color:#D9B45A;white-space:nowrap;text-decoration:underline;min-height:36px;display:inline-flex;align-items:center}
+    #gmNav.gn-light{background:linear-gradient(160deg,rgba(255,250,238,.84),rgba(250,236,205,.74) 55%,rgba(226,187,112,.66));-webkit-backdrop-filter:blur(22px) saturate(160%);backdrop-filter:blur(22px) saturate(160%);color:#2E2618;border:1px solid rgba(255,255,255,.7)}
+    @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){#gmNav.gn-light{background:#FBF3E2}}
+    #gmNav.gn-light .gn-head,#gmNav.gn-light .gn-foot{border-color:rgba(140,106,34,.22)}
+    #gmNav.gn-light .gn-head b{color:#7A5A14}
+    #gmNav.gn-light .gn-x,#gmNav.gn-light .gn-mini{background:rgba(255,255,255,.6);color:#3a301e}
+    #gmNav.gn-light .gn-h{color:#2E2618}
+    #gmNav.gn-light .gn-h .gn-ic,#gmNav.gn-light a.gn-a .material-symbols-outlined{color:#8c6a22}
+    #gmNav.gn-light .gn-h .gn-chev{color:#8a7a58}
+    #gmNav.gn-light a.gn-a{color:#3a301e}
+    #gmNav.gn-light a.gn-a:hover{background:rgba(255,255,255,.45)}
+    #gmNav.gn-light a.gn-a.here{background:rgba(255,255,255,.88);color:#1f1808;font-weight:700;box-shadow:0 4px 14px rgba(120,85,20,.18),inset 0 0 0 1px rgba(201,154,60,.55)}
+    #gmNav.gn-light a.gn-a.here .material-symbols-outlined{color:#8c6a22}
+    #gmNav.gn-light .gn-style,#gmNav.gn-light .gn-search,#gmNav.gn-light .gn-me{background:rgba(255,255,255,.58);border-color:rgba(255,255,255,.8);color:#5b4a2a}
+    #gmNav.gn-light .gn-style button{color:#6b5a38}
+    #gmNav.gn-light .gn-style button[aria-checked="true"]{background:#fff;color:#1f1808;box-shadow:0 2px 6px rgba(120,85,20,.22)}
+    #gmNav.gn-light kbd{background:rgba(140,106,34,.14);color:#6b4f12}
+    #gmNav.gn-light .gn-sec,#gmNav.gn-light .gn-favempty{color:#7a6a48}
+    #gmNav.gn-light .gn-sec button,#gmNav.gn-light .gn-me a{color:#7A5A14}
+    #gmNav.gn-light .gn-badge{background:rgba(140,106,34,.16);color:#5e4510}
+    #gmNav.gn-light .gn-badge.txt{background:transparent;color:#6b4f12}
+    #gmNav.gn-light .gn-out{color:#b42318}
+    #gmNav.gn-light .gn-av::after{border-color:#fff}
+    #gmNav.gn-light .gn-star{color:#a08c60}
+    #gmNav.gn-light .gn-star.on{color:#c8901a}
+    .gm-pal-ov{position:fixed;inset:0;z-index:10050;background:rgba(40,28,8,.32);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);display:none;align-items:flex-start;justify-content:center;padding:10vh 12px 0}
+    .gm-pal-ov.open{display:flex}
+    .gm-pal{width:min(620px,100%);max-height:74vh;display:flex;flex-direction:column;border-radius:20px;overflow:hidden;background:rgba(255,250,240,.97);box-shadow:0 30px 80px rgba(60,40,8,.35);direction:rtl;color:#2E2618;font-family:inherit}
+    .gm-pal-in{display:flex;align-items:center;gap:8px;padding:0 16px;border-bottom:1px solid #EADCBC}
+    .gm-pal-in input{flex:1;min-width:0;border:0!important;background:transparent!important;font:inherit;font-size:17px;padding:16px 4px;outline:none;box-shadow:none!important;color:#2E2618}
+    .gm-pal-in button{border:0;background:transparent;min-width:44px;min-height:44px;color:#7A5A14;font:inherit;font-weight:700;cursor:pointer}
+    .gm-pal kbd{background:rgba(140,106,34,.14);color:#6b4f12}
+    .gm-pal-list{overflow-y:auto;padding-bottom:8px}
+    .gm-pal-g{font-size:11.5px;color:#8a7a58;padding:10px 18px 4px;font-weight:700}
+    .gm-pal-row{display:flex;align-items:center;gap:12px;padding:10px 18px;min-height:44px;font-size:14px;color:inherit;text-decoration:none}
+    .gm-pal-row .material-symbols-outlined{color:#8c6a22}
+    .gm-pal-row small{margin-inline-start:auto;color:#8a7a58;font-size:12px}
+    .gm-pal-row.on{background:#F3E6C6}
+    .gm-pal-empty{padding:18px;text-align:center;color:#8a7a58;font-size:13px}
+    @media (max-width:640px){.gm-pal-ov{padding:0}.gm-pal{max-height:100%;height:100%;border-radius:0}.gm-pal kbd{display:none}}
+    @media (max-width:1023px){#gmNav .gn-search kbd{display:none}}
+    @media screen and (min-width:1024px){
+      html.gm-desk #gmNav.gn-light{top:12px;right:12px;height:calc(100% - 24px);border-radius:24px;box-shadow:0 24px 60px rgba(90,62,15,.22)}
+      html.gm-desk.gm-navlight{--gm-side:288px}
+      html.gm-desk.gm-navlight.gm-mini{--gm-side:100px}
+      html.gm-desk.gm-mini #gmNav .gn-style,html.gm-desk.gm-mini #gmNav .gn-sec,html.gm-desk.gm-mini #gmNav .gn-favempty,html.gm-desk.gm-mini #gmNav .gn-search .gn-st,html.gm-desk.gm-mini #gmNav .gn-search kbd,html.gm-desk.gm-mini #gmNav .gn-me-t,html.gm-desk.gm-mini #gmNav .gn-me a{display:none}
+      html.gm-desk.gm-mini #gmNav .gn-search{justify-content:center;padding:0;margin:0 10px 6px;width:calc(100% - 20px)}
+      html.gm-desk.gm-mini #gmNav .gn-me{justify-content:center;background:transparent}
+      html.gm-desk.gm-mini #gmNav a.gn-a>.gn-badge{display:inline-flex!important;position:absolute;top:2px;left:6px;min-width:16px;height:16px;font-size:9.5px;padding:0 4px}
+      html.gm-desk.gm-mini #gmNav a.gn-a>.gn-badge.txt{display:none!important}
+    }
+    @media print{#gmNav,#gmNavOverlay,.gm-nav-btn,.gm-pal-ov{display:none!important}}
     /* computer (>=1024px): the menu is a fixed side bar on the right, the page sits beside it,
        and the phone's bottom tab bar and menu buttons go away (design "GoldMind — تصميم الكمبيوتر") */
     #gmNav .gn-mini{display:none}
@@ -489,21 +567,258 @@
     requestAnimationFrame(step);
   };
 
+  // ---- Menu extras (Bashar 2026-11-02): light/dark look, favourites, search (Ctrl+K), badges, who/branch card ----
+  var STYLE_KEY = 'gm_nav_style', FAV_KEY = 'gm_nav_favs';
+  var FAV_DEFAULT = ['new-sale-ar.html', 'daily-cashbox-ar.html', 'inventory-list-ar.html'];
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+  function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* private mode */ } }
+  function isDesk() { return !!(window.matchMedia && matchMedia('(min-width:1024px)').matches); }
+  // default: light glass on computers, dark on phones and scanners (blur is heavy there)
+  function navStyle() { var v = lsGet(STYLE_KEY); return v === 'light' || v === 'dark' ? v : (isDesk() ? 'light' : 'dark'); }
+  function applyStyle(st) {
+    var d = document.getElementById('gmNav'); if (!d) return;
+    d.classList.toggle('gn-light', st === 'light');
+    document.documentElement.classList.toggle('gm-navlight', st === 'light');
+    d.querySelectorAll('.gn-style button').forEach(function (b) { b.setAttribute('aria-checked', String(b.dataset.st === st)); });
+  }
+  function linkDef(href) {
+    for (var i = 0; i < GROUPS.length; i++) for (var j = 0; j < GROUPS[i].l.length; j++) if (GROUPS[i].l[j][0] === href) return GROUPS[i].l[j];
+    return null;
+  }
+  function favs() { try { var f = JSON.parse(lsGet(FAV_KEY) || 'null'); if (Array.isArray(f)) return f; } catch (e) { /* ignore */ } return FAV_DEFAULT.slice(); }
+  function linkHtml(x, fav) {
+    return '<a class="gn-a' + (fav ? ' gn-fav' : '') + (x[0] === page ? ' here' : '') + '" href="' + x[0] + '"' + (x[3] ? ' data-nav-perm="' + x[3] + '"' : '') + '><span class="material-symbols-outlined">' + x[1] + '</span><span>' + esc(x[2]) + '</span>'
+      + (x[0] === '#tz' ? '' : '<button type="button" class="gn-star" data-href="' + x[0] + '" aria-label="إضافة إلى المفضّلة أو إزالتها"><span class="material-symbols-outlined">star</span></button>') + '</a>';
+  }
+  function renderFavs() {
+    var d = document.getElementById('gmNav'); if (!d) return;
+    var list = favs().map(linkDef).filter(Boolean);
+    d.querySelector('.gn-favlist').innerHTML = list.length ? list.map(function (x) { return linkHtml(x, true); }).join('')
+      : '<div class="gn-favempty">اضغط «تعديل» ثم النجمة بجانب أي صفحة لتثبيتها هنا.</div>';
+    var f = favs();
+    d.querySelectorAll('.gn-star').forEach(function (b) {
+      var on = f.indexOf(b.dataset.href) !== -1;
+      b.classList.toggle('on', on);
+      b.firstChild.style.fontVariationSettings = on ? "'FILL' 1" : "'FILL' 0";
+    });
+    d.querySelectorAll('.gn-favlist a.gn-a').forEach(function (a) { a.title = (a.children[1] || a).textContent.trim(); });
+    paintBadges();
+    applyPermissions();
+  }
+  function toggleFav(href) {
+    var f = favs(), i = f.indexOf(href);
+    if (i === -1) f.push(href); else f.splice(i, 1);
+    lsSet(FAV_KEY, JSON.stringify(f));
+    renderFavs();
+  }
+
+  // Badges: small counts beside pages that need attention. Cached for 2 minutes per tab.
+  var badges = {};
+  function setBadge(href, html) { badges[href] = html; }
+  function paintBadges() {
+    var d = document.getElementById('gmNav'); if (!d) return;
+    d.querySelectorAll('a.gn-a > .gn-badge').forEach(function (b) { b.remove(); });
+    Object.keys(badges).forEach(function (href) {
+      if (!badges[href]) return;
+      d.querySelectorAll('a.gn-a[href="' + href + '"]').forEach(function (a) {
+        var t = document.createElement('span'); t.innerHTML = badges[href];
+        var b = t.firstChild; var star = a.querySelector('.gn-star');
+        a.insertBefore(b, star || null);
+      });
+    });
+  }
+  async function storeReady() {
+    for (var i = 0; i < 20 && (typeof GOLDMIND_STORE_ID === 'undefined' || !GOLDMIND_STORE_ID); i++) await new Promise(function (r) { setTimeout(r, 300); });
+    return typeof GOLDMIND_STORE_ID !== 'undefined' && GOLDMIND_STORE_ID && typeof goldmindClient !== 'undefined';
+  }
+  async function loadBadges() {
+    try {
+      if (!(await storeReady())) return;
+      var S = GOLDMIND_STORE_ID, key = 'gm_nav_badges_' + S, cached = null;
+      try { cached = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (e) { /* ignore */ }
+      if (cached && Date.now() - cached.t < 120000) { badges = cached.b; }
+      else {
+        var b = {};
+        var q = await Promise.all([
+          goldmindClient.from('pieces').select('id', { count: 'exact', head: true }).eq('store_id', S).eq('status', 'available'),
+          goldmindClient.from('inventory_counts').select('status').eq('store_id', S).in('status', ['in_progress', 'completed']),
+          goldmindClient.from('repair_tickets').select('id', { count: 'exact', head: true }).eq('store_id', S).eq('status', 'ready'),
+          goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', S)
+        ].map(function (p) { return Promise.resolve(p).catch(function () { return {}; }); }));
+        if (q[0] && q[0].count) b['inventory-list-ar.html'] = '<span class="gn-badge">' + q[0].count + '</span>';
+        var counts = (q[1] && q[1].data) || [];
+        if (counts.some(function (c) { return c.status === 'in_progress'; })) b['inventory-count-ar.html'] = '<span class="gn-badge amber" title="جرد جارٍ">جارٍ</span>';
+        else if (counts.length) b['inventory-count-ar.html'] = '<span class="gn-badge amber" title="جرد مغلق ينتظر الترحيل">' + counts.length + '</span>';
+        if (q[2] && q[2].count) b['repairs-ar.html'] = '<span class="gn-badge" title="جاهزة للتسليم">' + q[2].count + '</span>';
+        var gp = ((q[3] && q[3].data) || []).filter(function (r) { return Number(r.price_per_gram) > 0; }).sort(function (x, y) { return x.karat - y.karat; })[0];
+        if (gp) b['gold-price-ar.html'] = '<span class="gn-badge txt" dir="ltr">' + esc(gp.karat + 'K ' + Number(gp.price_per_gram).toFixed(2)) + '</span>';
+        badges = b;
+        try { sessionStorage.setItem(key, JSON.stringify({ t: Date.now(), b: b })); } catch (e) { /* ignore */ }
+      }
+      // overdue debts are worked out by the home screen; it leaves the counts here
+      var od = null; try { od = JSON.parse(lsGet('gm_nav_overdue') || 'null'); } catch (e) { /* ignore */ }
+      if (od && od.s === S) {
+        if (od.c) badges['customers-ar.html'] = '<span class="gn-badge red" title="ديون متأخرة">' + od.c + '</span>';
+        if (od.t) badges['ledger-ar.html'] = '<span class="gn-badge dot" title="تجار عليهم أرصدة متأخرة"></span>';
+      }
+      paintBadges();
+    } catch (e) { /* badges are extras */ }
+  }
+
+  // Who is signed in, in which branch (+ switch when there are several)
+  async function loadMe() {
+    try {
+      if (!(await storeReady()) || typeof GOLDMIND_STAFF_ID === 'undefined' || !GOLDMIND_STAFF_ID) return;
+      var key = 'gm_nav_me_' + GOLDMIND_STAFF_ID + '_' + GOLDMIND_STORE_ID, me = null;
+      try { me = JSON.parse(sessionStorage.getItem(key) || 'null'); } catch (e) { /* ignore */ }
+      if (!me) {
+        var r = await Promise.all([
+          goldmindClient.from('staff').select('full_name, role').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
+          goldmindClient.from('stores').select('name').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+          Promise.resolve(goldmindClient.rpc('my_stores')).catch(function () { return {}; })
+        ]);
+        me = { n: (r[0].data && r[0].data.full_name) || '', role: r[0].data && r[0].data.role, store: (r[1].data && r[1].data.name) || '',
+          many: Array.isArray(r[2] && r[2].data) && r[2].data.length > 1 };
+        try { sessionStorage.setItem(key, JSON.stringify(me)); } catch (e) { /* ignore */ }
+      }
+      var ROLE = { owner: 'المالك', manager: 'مدير' };
+      var box = document.querySelector('#gmNav .gn-me'); if (!box) return;
+      box.innerHTML = '<div class="gn-av" aria-hidden="true">' + esc((me.n || '؟').trim().charAt(0)) + '</div>'
+        + '<div class="gn-me-t"><b>' + esc(me.n || 'مستخدم') + (ROLE[me.role] ? ' — ' + ROLE[me.role] : '') + '</b><span>' + (me.store ? 'الفرع: ' + esc(me.store) : '') + '</span></div>'
+        + (me.many ? '<a href="switch-branch-ar.html">تبديل الفرع</a>' : '');
+      box.hidden = false;
+    } catch (e) { /* card is an extra */ }
+  }
+
+  // Search (Ctrl+K): pages you can open, customers, traders, and a piece by barcode
+  function norm(t) { return String(t || '').toLowerCase().replace(/[ً-ْـ]/g, '').replace(/[أإآ]/g, 'ا').replace(/ة/g, 'ه').replace(/ى/g, 'ي'); }
+  var pal = null, palRows = [], palOn = 0, palSeq = 0;
+  function palEnsure() {
+    if (pal) return pal;
+    pal = document.createElement('div'); pal.className = 'gm-pal-ov'; pal.setAttribute('role', 'dialog'); pal.setAttribute('aria-label', 'بحث');
+    pal.innerHTML = '<div class="gm-pal"><div class="gm-pal-in"><span class="material-symbols-outlined" style="color:#8c6a22">search</span>'
+      + '<input type="text" autocomplete="off" enterkeyhint="go" placeholder="ابحث عن صفحة أو زبون أو تاجر أو باركود…" aria-label="بحث"/><kbd>Esc</kbd><button type="button" aria-label="إغلاق البحث">إغلاق</button></div>'
+      + '<div class="gm-pal-list" role="listbox"></div></div>';
+    document.body.appendChild(pal);
+    var input = pal.querySelector('input');
+    pal.addEventListener('click', function (e) { if (e.target === pal) palClose(); });
+    pal.querySelector('.gm-pal-in button').addEventListener('click', palClose);
+    input.addEventListener('input', function () { palSearch(input.value); });
+    input.addEventListener('keydown', function (e) {
+      if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); palMove(e.key === 'ArrowDown' ? 1 : -1); }
+      else if (e.key === 'Enter') { e.preventDefault(); var a = palRows[palOn]; if (a) a.click(); }
+      else if (e.key === 'Escape') { e.preventDefault(); palClose(); }
+    });
+    return pal;
+  }
+  function palOpen() {
+    palEnsure(); close();
+    pal.classList.add('open');
+    var input = pal.querySelector('input'); input.value = ''; palSearch('');
+    input.focus(); setTimeout(function () { input.focus(); }, 30);
+  }
+  function palClose() { if (pal) pal.classList.remove('open'); }
+  function palMove(n) {
+    if (!palRows.length) return;
+    palOn = (palOn + n + palRows.length) % palRows.length;
+    palRows.forEach(function (r, i) { r.classList.toggle('on', i === palOn); });
+    palRows[palOn].scrollIntoView({ block: 'nearest' });
+  }
+  function palPaint(groups) {
+    var list = pal.querySelector('.gm-pal-list'), html = '';
+    groups.forEach(function (g) {
+      if (!g.rows.length) return;
+      html += '<div class="gm-pal-g">' + g.t + '</div>' + g.rows.map(function (r) {
+        return '<a class="gm-pal-row" role="option" href="' + esc(r.href) + '"><span class="material-symbols-outlined">' + r.i + '</span><span>' + esc(r.t) + '</span>' + (r.s ? '<small>' + esc(r.s) + '</small>' : '') + '</a>';
+      }).join('');
+    });
+    list.innerHTML = html || '<div class="gm-pal-empty">لا نتائج. جرّب كلمة أخرى، أو اكتب باركود القطعة.</div>';
+    palRows = Array.prototype.slice.call(list.querySelectorAll('.gm-pal-row'));
+    palRows.forEach(function (r) {
+      r.addEventListener('click', function (e) {
+        if (r.getAttribute('href') === '#tz') { e.preventDefault(); palClose(); if (typeof gmOpenTimezonePicker === 'function') gmOpenTimezonePicker(); return; }
+        palClose();
+      });
+    });
+    palOn = 0; if (palRows[0]) palRows[0].classList.add('on');
+  }
+  function visiblePages() {
+    var out = [], seen = {};
+    document.querySelectorAll('#gmNav .gn-g a.gn-a').forEach(function (a) {
+      if (a.style.display === 'none') return;
+      var href = a.getAttribute('href'); if (seen[href]) return; seen[href] = 1;
+      var x = linkDef(href); if (x) out.push({ href: href, i: x[1], t: x[2] });
+    });
+    return out;
+  }
+  async function palSearch(q) {
+    var seq = ++palSeq, nq = norm(q.trim());
+    var pages = visiblePages().filter(function (p) { return !nq || norm(p.t).indexOf(nq) !== -1; });
+    if (!nq) {
+      var fav = favs();
+      pages.sort(function (a, b) { return (fav.indexOf(a.href) === -1) - (fav.indexOf(b.href) === -1); });
+    }
+    var groups = [{ t: 'صفحات', rows: pages.slice(0, nq ? 8 : 12) }];
+    palPaint(groups);
+    if (q.trim().length < 2 || !(await storeReady())) return;
+    await new Promise(function (r) { setTimeout(r, 220); });
+    if (seq !== palSeq) return;
+    try {
+      var term = q.trim().replace(/[%,()]/g, ' ');
+      var stores = typeof gmOrgStoreIds === 'function' ? await gmOrgStoreIds().catch(function () { return [GOLDMIND_STORE_ID]; }) : [GOLDMIND_STORE_ID];
+      if (!stores || !stores.length) stores = [GOLDMIND_STORE_ID];
+      var r = await Promise.all([
+        goldmindClient.from('customers').select('id, name, phone').in('store_id', stores).ilike('name', '%' + term + '%').limit(5),
+        goldmindClient.from('traders').select('id, name').in('store_id', stores).ilike('name', '%' + term + '%').limit(5),
+        goldmindClient.from('pieces').select('id, barcode, description_ar, weight_grams, status').eq('store_id', GOLDMIND_STORE_ID).eq('barcode', q.trim()).limit(3)
+      ].map(function (p) { return Promise.resolve(p).catch(function () { return {}; }); }));
+      if (seq !== palSeq) return;
+      groups.push({ t: 'قطع', rows: ((r[2] && r[2].data) || []).map(function (p) { return { href: 'piece-edit-ar.html?id=' + p.id, i: 'qr_code_2', t: p.barcode + (p.description_ar ? ' — ' + p.description_ar : ''), s: p.weight_grams != null ? Number(p.weight_grams).toFixed(2) + ' غ' : '' }; }) });
+      groups.push({ t: 'زبائن', rows: ((r[0] && r[0].data) || []).map(function (c) { return { href: 'customer-debts-ar.html?open=' + encodeURIComponent(c.id), i: 'person', t: c.name, s: c.phone || '' }; }) });
+      groups.push({ t: 'تجار', rows: ((r[1] && r[1].data) || []).map(function (t) { return { href: 'ledger-ar.html?trader=' + encodeURIComponent(t.id), i: 'storefront', t: t.name }; }) });
+      palPaint(groups);
+    } catch (e) { /* pages stay listed */ }
+  }
+  window.gmOpenSearch = palOpen;
+  document.addEventListener('keydown', function (e) {
+    var typing = /^(input|textarea|select)$/i.test((e.target && e.target.tagName) || '') || (e.target && e.target.isContentEditable);
+    if ((e.ctrlKey || e.metaKey) && !e.altKey && (e.key === 'k' || e.key === 'K' || e.key === 'ك')) { e.preventDefault(); palOpen(); return; }
+    if (e.key === '[' && !typing && !e.ctrlKey && !e.metaKey && isDesk()) {
+      var m = document.querySelector('#gmNav .gn-mini'); if (m) { e.preventDefault(); m.click(); }
+    }
+  });
+
   function build() {
     var ov = document.createElement('div'); ov.id = 'gmNavOverlay';
     var d = document.createElement('aside'); d.id = 'gmNav'; d.setAttribute('aria-label', 'القائمة'); d.setAttribute('aria-hidden', 'true');
-    var html = '<div class="gn-head"><b>GoldMind</b><button type="button" class="gn-mini" aria-label="تصغير القائمة" title="تصغير / توسيع القائمة"><span class="material-symbols-outlined">dock_to_left</span></button><button type="button" class="gn-x" aria-label="إغلاق القائمة"><span class="material-symbols-outlined">close</span></button></div><nav>';
+    var html = '<div class="gn-head"><b>GoldMind</b><button type="button" class="gn-mini" aria-label="تصغير القائمة" title="تصغير / توسيع القائمة"><span class="material-symbols-outlined">dock_to_left</span></button><button type="button" class="gn-x" aria-label="إغلاق القائمة"><span class="material-symbols-outlined">close</span></button></div>'
+      + '<div class="gn-style" role="radiogroup" aria-label="شكل القائمة"><button type="button" role="radio" data-st="light"><span class="material-symbols-outlined">light_mode</span>فاتحة</button><button type="button" role="radio" data-st="dark"><span class="material-symbols-outlined">dark_mode</span>غامقة</button></div>'
+      + '<button type="button" class="gn-search" aria-label="بحث (Ctrl+K)"><span class="material-symbols-outlined">search</span><span class="gn-st">ابحث عن صفحة أو زبون أو باركود…</span><kbd>Ctrl K</kbd></button><nav>'
+      + '<div class="gn-sec"><span>المفضّلة</span><button type="button" class="gn-favedit">تعديل</button></div><div class="gn-favlist"></div><div class="gn-sec"><span>كل الصفحات</span></div>';
     GROUPS.forEach(function (g) {
       var here = g.l.some(function (x) { return x[0] === page; });
       html += '<div class="gn-g' + (here ? ' open here-g' : '') + '"><button type="button" class="gn-h" aria-expanded="' + here + '"><span class="material-symbols-outlined gn-ic">' + g.i + '</span><span>' + esc(g.t) + '</span><span class="material-symbols-outlined gn-chev">expand_more</span></button><div class="gn-b"><div>';
       g.l.forEach(function (x) {
-        html += '<a class="gn-a' + (x[0] === page ? ' here' : '') + '" href="' + x[0] + '"' + (x[3] ? ' data-nav-perm="' + x[3] + '"' : '') + '><span class="material-symbols-outlined">' + x[1] + '</span><span>' + esc(x[2]) + '</span></a>';
+        html += linkHtml(x, false);
       });
       html += '</div></div></div>';
     });
-    html += '</nav><div class="gn-foot"><button type="button" class="gn-out"><span class="material-symbols-outlined">logout</span>تسجيل الخروج</button></div>';
+    html += '</nav><div class="gn-foot"><div class="gn-me" hidden></div><button type="button" class="gn-out"><span class="material-symbols-outlined">logout</span>تسجيل الخروج</button></div>';
     d.innerHTML = html;
     document.body.appendChild(ov); document.body.appendChild(d);
+    applyStyle(navStyle());
+    d.querySelectorAll('.gn-style button').forEach(function (b) { b.addEventListener('click', function () { lsSet(STYLE_KEY, b.dataset.st); applyStyle(b.dataset.st); }); });
+    d.querySelector('.gn-search').addEventListener('click', palOpen);
+    d.querySelector('.gn-favedit').addEventListener('click', function () {
+      var on = d.classList.toggle('gn-editing');
+      this.textContent = on ? 'تم' : 'تعديل';
+    });
+    // the star sits inside the link: it must not follow it
+    d.addEventListener('click', function (e) {
+      var st = e.target.closest && e.target.closest('.gn-star');
+      if (!st) return;
+      e.preventDefault(); e.stopPropagation(); toggleFav(st.dataset.href);
+    });
 
     ov.addEventListener('click', close);
     d.querySelector('.gn-mini').addEventListener('click', function () {
@@ -512,7 +827,7 @@
       try { localStorage.setItem('gm_nav_mini', mini ? '1' : ''); } catch (e) { /* ignore */ }
     });
     // in the small bar a link shows its name on hover
-    d.querySelectorAll('a.gn-a').forEach(function (a) { a.title = a.textContent.trim(); });
+    d.querySelectorAll('a.gn-a').forEach(function (a) { a.title = (a.children[1] || a).textContent.trim(); });
     d.querySelector('.gn-x').addEventListener('click', close);
     d.querySelector('.gn-out').addEventListener('click', function () { if (typeof goldMindSignOut === 'function') goldMindSignOut(); });
     d.querySelectorAll('.gn-h').forEach(function (b) {
@@ -592,8 +907,10 @@
 
   function mount() {
     build();
+    renderFavs();
     addButton();
     setTimeout(applyPermissions, 600);
+    setTimeout(function () { loadBadges(); loadMe(); }, 800);
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mount); else mount();
 })();

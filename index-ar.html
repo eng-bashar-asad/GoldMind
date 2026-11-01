@@ -2148,6 +2148,8 @@ document.addEventListener('DOMContentLoaded', function () {
                     });
                     gmDebtAgeRows('trader', days, names, byParty).forEach(function (x) { items.push(x); });
                 }
+                // the side menu shows these counts on every page (gm-nav.js)
+                try { localStorage.setItem('gm_nav_overdue', JSON.stringify({ s: GOLDMIND_STORE_ID, c: items.filter(function (x) { return x.kind === 'customer'; }).length, t: items.filter(function (x) { return x.kind !== 'customer'; }).length })); } catch (e) { /* private mode */ }
                 if (!items.length) return;
                 items.sort(function (a, b) { return b.days - a.days; });
                 const esc = function (t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
