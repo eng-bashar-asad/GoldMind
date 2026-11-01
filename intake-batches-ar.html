@@ -104,7 +104,7 @@
 
     function pieceRowHtml(p) {
         const fabPerGram = Number(p.cost_fabrication_per_gram || 0);
-        const totalFab = fabPerGram * Number(p.weight_grams || 0);
+        const totalFab = fabPerGram * Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : (p.weight_grams || 0)); // shop rule: accounting weight
         return `
         <div class="flex items-center gap-2 border border-outline-variant rounded-lg px-2 py-1.5 bg-surface-container-low text-[13px] cursor-pointer active:scale-[0.99] transition-transform" onclick="window.location.href='piece-edit-ar.html?id=${p.id}'">
             ${p.photo_url

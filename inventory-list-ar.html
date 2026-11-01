@@ -507,7 +507,8 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
     }
 
     function totalFabValue(pieces) {
-        return pieces.reduce((sum, p) => sum + Number(p.cost_fabrication_per_gram || 0) * Number(p.weight_grams || 0), 0);
+        // shop rule: making cost is on the accounting weight (falls back to gross when not set)
+        return pieces.reduce((sum, p) => sum + Number(p.cost_fabrication_per_gram || 0) * Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : (p.weight_grams || 0)), 0);
     }
 
     function renderTotals(pieces) {
