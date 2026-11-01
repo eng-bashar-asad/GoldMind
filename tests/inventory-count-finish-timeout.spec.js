@@ -24,7 +24,7 @@ test('finish: slow network gives a message and the button comes back', async ({ 
   await page.route(/inventory_count_scans/, () => {});
   await page.click('#finish-btn');
   await expect(page.locator('#finish-btn')).toContainText('جارِ');
-  await expect(page.locator('#finish-btn')).toHaveText('إنهاء الجلسة وعرض التقرير', { timeout: 40000 });
+  await expect(page.locator('#finish-btn')).toHaveText('إغلاق الجرد', { timeout: 40000 });
   await expect(page.locator('#gmToasts')).toContainText('الاتصال بطيء'); // messages show as a notification now, not a blocking box
 });
 

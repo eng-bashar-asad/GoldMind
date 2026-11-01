@@ -21,17 +21,17 @@ test('scan screen: missing pieces with photos, found button', async ({ page }) =
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
   await page.click('text=استئناف الجلسة');
-  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (3)');
+  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (2)');
   await page.click('#missing-live-btn');
   const w = page.locator('#missing-live-wrap');
   await expect(w).toContainText('ناقصة فعلاً: 2 قطعة');                 // 000002 + reserved 000004
   await expect(w.locator('img[alt="صورة القطعة"]')).toHaveCount(2);
   await expect(w).toContainText('الوزن 12.50 غ · محاسبة 12.10 غ');
   await expect(w).toContainText('الصندوق: قطع ذهبية');
-  await expect(w).toContainText('خرجت من المخزن بعد بدء الجرد: 1');     // gift 000003
+  await expect(w).not.toContainText('خرجت من المخزن'); // gift 000003 dropped when the count reopened (current stock)
   await w.locator('button:has-text("وُجدت")').first().click();
   await expect(w).toContainText('ناقصة فعلاً: 1 قطعة');
-  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (2)');
+  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (1)');
   const ins = calls.find(c => c.method === 'POST' && c.name === 'inventory_count_scans');
   expect(JSON.parse(ins.body)).toMatchObject({ rfid_epc: '000002', match_status: 'matched', scan_method: 'manual' });
   expect(errs).toEqual([]);
@@ -56,14 +56,14 @@ test('missing pieces sheet: big photos, barcode, weight, karat; PDF', async ({ p
   await page.goto('/inventory-count-ar.html');
   await page.waitForFunction(() => typeof inProgressSession !== 'undefined' && inProgressSession);
   await page.click('text=استئناف الجلسة');
-  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (3)');
+  await expect(page.locator('#missing-live-label')).toHaveText('القطع الناقصة مع الصور (2)');
   await page.click('#missing-live-btn');
   const w = page.locator('#missing-live-wrap');
   await expect(w).toContainText('ناقصة فعلاً: 2 قطعة');                 // 000002 + reserved 000004
   await expect(w.locator('img[alt="صورة القطعة"]')).toHaveCount(2);
   await expect(w).toContainText('الوزن 12.50 غ · محاسبة 12.10 غ');
   await expect(w).toContainText('الصندوق: قطع ذهبية');
-  await expect(w).toContainText('خرجت من المخزن بعد بدء الجرد: 1');     // gift 000003
+  await expect(w).not.toContainText('خرجت من المخزن'); // gift 000003 dropped when the count reopened (current stock)
   await expect(w.locator('button:has-text("طباعة الناقص بالصور")')).toBeVisible();
   const items = await page.evaluate(() => gmMissingSheetItems);
   expect(items.map(i => [i.barcode, i.weight, i.karat])).toEqual([['000002', 12.5, 18], ['000004', 12.5, 18]]);

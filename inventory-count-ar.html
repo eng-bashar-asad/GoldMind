@@ -245,7 +245,7 @@
 <div id="cancelled-list" class="flex flex-col gap-1"></div>
 </div>
 
-<button id="finish-btn" class="w-full h-14 border-2 border-primary text-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2">إنهاء الجلسة وعرض التقرير</button>
+<button id="finish-btn" class="w-full h-14 border-2 border-primary text-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2">إغلاق الجرد</button>
 </div>
 
 <!-- Step 4: report summary -->
@@ -513,6 +513,28 @@ async function checkInProgressSession() {
   inProgressSession = data || null;
 }
 
+// Reopen / close a count against the stock as it is NOW (Bashar 2026-11-01): pieces that left stock
+// after the count started (sold, gift, trader, deleted) drop out of the expected list, so "missing"
+// means missing today. The start snapshot stays in inventory_count_expected as history.
+// ponytail: pieces added to stock after the start are not pulled in (a scan of one shows as extra).
+async function refreshExpectedFromStock() {
+  const still = new Set();
+  const key = p => (p.source === 'diamond' ? 'diamond:' : 'gold:') + p.id;
+  for (const [src, table] of [['gold', 'pieces'], ['diamond', 'diamond_pieces']]) {
+    const ids = expectedPool.filter(p => (p.source === 'diamond') === (src === 'diamond') && p.id).map(p => p.id);
+    for (let i = 0; i < ids.length; i += 150) {
+      const { data, error } = await goldmindClient.from(table).select('id')
+        .in('id', ids.slice(i, i + 150)).in('status', ['available', 'reserved']);
+      if (error || !data) return false; // offline: keep the start list rather than drop pieces
+      data.forEach(r => still.add(src + ':' + r.id));
+    }
+  }
+  expectedPool = expectedPool.filter(p => still.has(key(p)));
+  Object.keys(expectedByField).forEach(v => { const p = expectedByField[v]; if (!p || !still.has(key(p))) delete expectedByField[v]; });
+  stats.expected = expectedPool.length;
+  return true;
+}
+
 async function resumeSession() {
   document.getElementById('resume-banner').classList.add('hidden');
   const countId = inProgressSession.id;
@@ -530,6 +552,7 @@ async function resumeSession() {
   }));
   expectedByField = {};
   (expectedRows || []).forEach(r => { expectedByField[r.match_value] = expectedPool.find(p => p.id === r.piece_id && p.source === r.piece_source); });
+  await refreshExpectedFromStock();
   await loadCancelledBarcodes();
 
   const { data: scanRows } = await goldmindClient
@@ -1347,10 +1370,10 @@ function gmWithTimeout(promise, ms, what) {
 }
 document.getElementById('finish-btn').addEventListener('click', async () => {
   if (!currentCountId) return;
-  if (!confirm('هل تريد إنهاء جلسة الجرد وعرض تقرير الفرق؟')) return;
+  if (!confirm('هل تريد إغلاق الجرد؟ سيُعاد حساب الناقص حسب المخزون الحالي.')) return;
 
   const btn = document.getElementById('finish-btn');
-  const resetBtn = () => { btn.disabled = false; btn.textContent = 'إنهاء الجلسة وعرض التقرير'; };
+  const resetBtn = () => { btn.disabled = false; btn.textContent = 'إغلاق الجرد'; };
   btn.disabled = true;
   btn.textContent = 'جارِ الإنهاء...';
   stopLiveSync(); // no background sync racing the finish
@@ -1374,7 +1397,10 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
 
     stopCameraScanner();
 
-    missingListCache = expectedPool.filter(p => !scannedValues.has(p[matchField]));
+    btn.textContent = 'جارِ قراءة المخزون الحالي...';
+    await gmWithTimeout(refreshExpectedFromStock(), 20000, 'stock').catch(() => false); // slow: report on the start list
+    recalcStats();
+    missingListCache =expectedPool.filter(p => !scannedValues.has(p[matchField]));
     surplusListCache = Array.from(scannedValues).filter(v => !expectedByField[v]);
     const missingCount = missingListCache.length;
 
@@ -1391,13 +1417,13 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
   } catch (e) {
     resetBtn(); startLiveSync();
     const slow = String(e && e.message || '').startsWith('TIMEOUT');
-    alert(slow ? 'الاتصال بطيء جداً ولم يكتمل الإنهاء. مسحاتك محفوظة — تأكد من الإنترنت ثم اضغط "إنهاء الجلسة" مرة أخرى.'
-               : 'تعذّر إنهاء الجلسة: ' + (e && e.message ? e.message : e));
+    alert(slow ? 'الاتصال بطيء جداً ولم يكتمل الإغلاق. مسحاتك محفوظة — تأكد من الإنترنت ثم اضغط "إغلاق الجرد" مرة أخرى.'
+               : 'تعذّر إغلاق الجرد: ' + (e && e.message ? e.message : e));
     return;
   }
 
   btn.disabled = false;
-  btn.textContent = 'إنهاء الجلسة وعرض التقرير';
+  btn.textContent = 'إغلاق الجرد';
 
   currentSessionMeta = { date: gmFormatDateTime(), method: countMethod };
 
@@ -1754,7 +1780,7 @@ async function openSessionDetail(countId) {
     ownerActions.classList.add('flex');
     const resumeBtn = document.createElement('button');
     resumeBtn.className = 'flex-1 h-11 border-2 border-primary text-primary rounded-lg text-[12px] font-bold';
-    resumeBtn.textContent = 'متابعة هذه الجلسة (مسح / إضافة / حذف)';
+    resumeBtn.textContent = 'إعادة تفعيل الجرد (مسح / إضافة / حذف)';
     resumeBtn.onclick = async () => {
       const { error } = await goldmindClient.from('inventory_counts').update({ status: 'in_progress', completed_at: null }).eq('id', countId);
       if (error) { alert('تعذّر فتح الجلسة: ' + error.message); return; }
@@ -1763,7 +1789,7 @@ async function openSessionDetail(countId) {
       await resumeSession();
     };
     ownerActions.appendChild(resumeBtn);
-    editHint.textContent = 'الجلسة غير مُرحّلة بعد — يمكنك حذف أي مسحة خاطئة (أيقونة السلة)، أو متابعة الجلسة ثم "إنهاء الجلسة" لتعديل الناقص والزيادة قبل الترحيل.';
+    editHint.textContent = 'الجلسة غير مُرحّلة بعد — يمكنك حذف أي مسحة خاطئة (أيقونة السلة)، أو "إعادة تفعيل الجرد" ثم "إغلاق الجرد" ليُعاد حساب الناقص حسب المخزون الحالي قبل الترحيل.';
     editHint.classList.remove('hidden');
   } else {
     ownerActions.classList.add('hidden');
