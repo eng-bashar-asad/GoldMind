@@ -94,9 +94,9 @@ test('two phones share one count: no double counting, one full report', async ({
 
   // Finishing on A collects everyone's scans: nothing missing.
   await a.click('#finish-btn');
-  await expect(a.locator('#report-wrap')).toBeVisible();
-  await expect(a.locator('#report-scanned')).toHaveText('3');
-  await expect(a.locator('#report-missing-count')).toHaveText('0');
+  await expect(a.locator('#session-detail-wrap')).not.toHaveClass(/\bhidden\b/);
+  await expect(a.locator('#sd-matched')).toHaveText('3');
+  await expect(a.locator('#sd-missing')).toHaveText('0');
   expect(scans).toHaveLength(3);
 });
 
@@ -122,21 +122,14 @@ test('report lists show each piece photo, and why a surplus scan was surplus', a
   await scan(page, 'S1');      // sold piece still in the shop
   await scan(page, 'ZZ9');     // unknown tag
   await page.click('#finish-btn');
-  await expect(page.locator('#report-missing-count')).toHaveText('2');
+  await expect(page.locator('#sd-missing')).toHaveText('2');
+  const missing = page.locator('#sd-p-missing');
+  await expect(missing.locator('img')).toHaveCount(1);
+  await expect(missing.locator('img')).toHaveAttribute('src', /icon-192/);
+  await expect(missing).toContainText('خاتم');                // no photo -> placeholder, still described
 
-  await page.click("button[onclick=\"openSubScreen('missing')\"]");
-  const missing = page.locator('#subscreen-list > div');
-  await expect(missing).toHaveCount(2);
-  await expect(missing.nth(0).locator('img')).toHaveAttribute('src', /icon-192/);
-  await expect(missing.nth(1).locator('img')).toHaveCount(0);   // no photo -> placeholder
-  await expect(missing.nth(1)).toContainText('خاتم');
-
-  await page.evaluate(() => closeSubScreen());
-  await page.click("button[onclick=\"openSubScreen('surplus')\"]");
-  const surplus = page.locator('#subscreen-list > div');
-  await expect(surplus).toHaveCount(2);
-  await expect(surplus.filter({ hasText: 'S1' })).toContainText('حالتها: مباعة');
-  await expect(surplus.filter({ hasText: 'S1' }).locator('img')).toHaveAttribute('src', /icon-512/);
-  await expect(surplus.filter({ hasText: 'ZZ9' })).toContainText('غير مسجّلة في النظام');
-  if (process.env.UI_OUT) await page.screenshot({ path: process.env.UI_OUT + '/surplus.png' });
+  const surplus = page.locator('#sd-p-surplus');
+  await expect(page.locator('#sd-surplus')).toHaveText('2');
+  await expect(surplus).toContainText('مسجّلة — مباعة');       // S1: a sold piece still in the shop
+  await expect(surplus).toContainText('غير مسجّلة في النظام'); // ZZ9: unknown tag
 });

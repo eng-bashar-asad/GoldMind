@@ -47,6 +47,6 @@ test('finish works when the camera is not running (stop() throws)', async ({ pag
   await page.click('text=متابعة المسح');
   await page.waitForFunction(() => currentCountId === 'k1' && stats.expected === 1);
   await page.click('#finish-btn');
-  await expect(page.locator('#report-wrap')).not.toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#session-detail-wrap')).not.toHaveClass(/\bhidden\b/);
   expect(errs).toEqual([]);
 });

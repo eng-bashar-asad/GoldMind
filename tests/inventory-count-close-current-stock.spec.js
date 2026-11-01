@@ -30,8 +30,9 @@ test('closing a reopened count counts missing against the current stock', async 
   await expect(page.locator('#stat-expected')).toHaveText('2');
   await expect(page.locator('#finish-btn')).toHaveText('إغلاق الجرد');
   await page.click('#finish-btn');
-  await expect(page.locator('#report-expected')).toHaveText('2');
-  await expect(page.locator('#report-missing-count')).toHaveText('1');
+  await expect(page.locator('#session-detail-wrap')).not.toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#sd-expected')).toHaveText('2');
+  await expect(page.locator('#sd-missing')).toHaveText('1');
   expect(await page.evaluate(() => missingListCache.map(p => p.barcode))).toEqual(['A2']);
   expect(errors).toEqual([]);
 });

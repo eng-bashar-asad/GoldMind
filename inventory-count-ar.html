@@ -45,6 +45,8 @@
 <style>
 .scan-tab{color:var(--gm-on-surface-variant);border-bottom:2px solid transparent}
 .scan-tab[aria-selected="true"]{color:#b91c1c;border-bottom-color:#dc2626}
+.sd-tab{color:var(--gm-on-surface-variant);border-bottom:2px solid transparent}
+.sd-tab[aria-selected="true"]{color:var(--gm-on-surface);border-bottom-color:var(--gm-primary)}
 </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
@@ -237,69 +239,39 @@
 </div>
 </div>
 
-<!-- Step 4: report summary -->
-<div id="report-wrap" class="hidden py-6 flex flex-col gap-5">
-<div class="grid grid-cols-3 gap-2">
-<div class="bg-surface-container-low rounded-lg p-3 text-center">
-<div id="report-expected" class="text-xl font-bold">0</div>
-<div class="text-[10px] text-on-surface-variant">متوقعة</div>
+<!-- ===== One page per count (2026-11-01): after closing and from the history. Editable until the owner posts it. ===== -->
+<div id="session-detail-wrap" class="hidden py-5 flex flex-col gap-4">
+<section class="bg-surface-container-lowest border border-outline-variant rounded-2xl p-4 lg:p-5">
+<div id="session-detail-meta" class="flex flex-wrap items-center gap-2 mb-3"></div>
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-4">
+<div class="rounded-xl bg-surface-container-low text-center py-2"><div id="sd-expected" class="text-lg font-bold">0</div><div class="text-[11px] text-on-surface-variant">متوقعة الآن</div></div>
+<div class="rounded-xl bg-green-50 text-center py-2"><div id="sd-matched" class="text-lg font-bold text-green-700">0</div><div class="text-[11px] text-green-800">مطابقة</div></div>
+<div class="rounded-xl bg-red-50 text-center py-2"><div id="sd-missing" class="text-lg font-bold text-red-700">0</div><div class="text-[11px] text-red-800">ناقصة فعلاً</div></div>
+<div class="rounded-xl bg-amber-50 text-center py-2"><div id="sd-surplus" class="text-lg font-bold text-amber-700">0</div><div class="text-[11px] text-amber-900">زيادة</div></div>
 </div>
-<div class="bg-green-50 rounded-lg p-3 text-center">
-<div id="report-matched" class="text-xl font-bold text-green-700">0</div>
-<div class="text-[10px] text-green-700">مطابقة</div>
-</div>
-<div class="bg-surface-container-low rounded-lg p-3 text-center">
-<div id="report-scanned" class="text-xl font-bold">0</div>
-<div class="text-[10px] text-on-surface-variant">إجمالي المسح</div>
-</div>
-</div>
+<div id="sd-balanced" class="hidden bg-green-50 border border-green-200 rounded-xl p-3 mb-3 text-center text-green-800 font-bold text-[13px]"><span class="material-symbols-outlined" aria-hidden="true">task_alt</span> الجرد متطابق — لا ناقص ولا زيادة</div>
+<div id="session-owner-actions" class="flex flex-wrap gap-2"></div>
+<p id="session-edit-hint" class="text-[12px] text-on-surface-variant mt-3"></p>
+</section>
 
-<div id="report-balanced" class="hidden bg-green-50 border border-green-200 rounded-xl p-4 text-center text-green-800 font-bold text-[14px]">
-<span class="material-symbols-outlined align-middle">task_alt</span> الجرد متطابق تماماً — لا قطع ناقصة ولا زيادة
+<section class="bg-surface-container-lowest border border-outline-variant rounded-2xl overflow-hidden">
+<div class="flex border-b border-outline-variant text-[13px] font-bold overflow-x-auto" role="tablist">
+<button type="button" role="tab" data-sdtab="missing" onclick="setSdTab('missing')" class="sd-tab px-4 py-3 whitespace-nowrap"><span id="sd-tab-missing">ناقصة فعلاً</span></button>
+<button type="button" role="tab" data-sdtab="surplus" onclick="setSdTab('surplus')" class="sd-tab px-4 py-3 whitespace-nowrap"><span id="sd-tab-surplus">زيادة</span></button>
+<button type="button" role="tab" data-sdtab="left" onclick="setSdTab('left')" class="sd-tab px-4 py-3 whitespace-nowrap"><span id="sd-tab-left">خرجت من المخزن</span></button>
+<button type="button" role="tab" data-sdtab="scans" onclick="setSdTab('scans')" class="sd-tab px-4 py-3 whitespace-nowrap"><span id="sd-tab-scans">كل المسحات</span></button>
+<button type="button" role="tab" data-sdtab="gold" onclick="setSdTab('gold')" class="sd-tab px-4 py-3 whitespace-nowrap">ذهب الجرد</button>
 </div>
-<p id="report-fix-hint" class="text-[11.5px] text-on-surface-variant -mb-2">قبل الترحيل: افتح القطع الناقصة لتضيف ما وجدته منها، أو القطع الزيادة لتحذف المسحات الخاطئة، حتى يتطابق الجرد.</p>
-
-<button onclick="openSubScreen('missing')" class="w-full p-4 bg-red-50 border border-red-200 rounded-xl flex items-center justify-between">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-red-700 text-2xl">remove_circle</span>
-<div class="text-right">
-<div class="text-[13px] font-bold text-red-700">قطع ناقصة</div>
-<div class="text-[10px] text-red-700">قطع متوقعة بالمخزون ولم تُمسح</div>
-</div>
-</div>
-<span id="report-missing-count" class="text-xl font-bold text-red-700">0</span>
-</button>
-
-<button onclick="openSubScreen('surplus')" class="w-full p-4 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between">
-<div class="flex items-center gap-3">
-<span class="material-symbols-outlined text-amber-700 text-2xl">add_circle</span>
-<div class="text-right">
-<div class="text-[13px] font-bold text-amber-700">قطع زيادة</div>
-<div class="text-[10px] text-amber-700">باركودات مُسحت وليس لها قطعة متوفرة مطابقة (مباعة سابقاً مثلاً)</div>
+<div class="p-3">
+<div id="sd-review" class="flex flex-col gap-4"></div>
+<div id="sd-p-scans" class="hidden flex-col gap-1">
+<div id="session-scans-list" class="flex flex-col gap-1 max-h-[65vh] overflow-y-auto"></div>
 </div>
 </div>
-<span id="report-surplus-count" class="text-xl font-bold text-amber-700">0</span>
-</button>
+</section>
+<button type="button" onclick="closeSessionDetail()" class="self-start text-[13px] font-semibold text-primary flex items-center gap-1"><span class="material-symbols-outlined" aria-hidden="true">arrow_forward</span>رجوع لقائمة الجرد</button>
 
-<div class="flex gap-2">
-<button onclick="exportCsv(missingListCache, surplusListCache, currentSessionMeta)" class="flex-1 h-11 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">table_view</span> Excel (CSV)</button>
-<button onclick="exportPdf('report-print-sheet','report-download-btn')" id="report-download-btn" class="flex-1 h-11 border border-outline-variant rounded-lg text-[12px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[16px]">picture_as_pdf</span> PDF</button>
-</div>
-
-<button id="continue-scan-btn" onclick="continueScanning()" class="w-full h-12 border-2 border-primary text-primary rounded-lg font-bold text-[13px] flex items-center justify-center gap-2">
-<span class="material-symbols-outlined">barcode_scanner</span> متابعة المسح (وجدت قطعاً ناقصة)
-</button>
-
-<button id="post-count-btn" onclick="postCount()" class="w-full h-14 bg-primary text-on-primary rounded-lg font-bold active:scale-[0.98] transition-all mt-2 flex items-center justify-center gap-2">
-<span class="material-symbols-outlined">task_alt</span> ترحيل الجرد
-</button>
-<p class="text-[10px] text-outline text-center -mt-3">الترحيل يُقفل الجلسة كسجل نهائي معتمد. لا يغيّر حالة أي قطعة تلقائياً — القطع الناقصة تحتاج إلى قرارك بمراجعتها يدوياً. يستطيع المدير إلغاء الترحيل والتعديل لاحقاً من "سجل الجرد".</p>
-
-<button id="new-session-btn" class="w-full h-12 border border-outline-variant rounded-lg font-semibold text-[13px]">رجوع لقائمة الجرد</button>
-
-<!-- Printable summary, kept in normal document flow (just hidden) so
-     html2pdf/html2canvas can capture real, attached, on-screen content —
-     toggled visible only for the instant of capture. -->
+<!-- Printable summary, kept in normal flow (just hidden) so html2pdf can capture it. -->
 <div id="report-print-sheet" class="hidden bg-white p-6 text-black" dir="rtl">
 <h2 class="text-lg font-bold mb-1">تقرير جرد المخزون — GoldMind</h2>
 <p id="print-meta" class="text-xs text-gray-600 mb-4"></p>
@@ -313,39 +285,6 @@
 <h3 class="font-bold text-sm mb-1">قطع زيادة</h3>
 <table class="w-full text-xs border-collapse" id="print-surplus-table"></table>
 </div>
-</div>
-
-<!-- Sub-screen: missing / surplus list -->
-<div id="subscreen-wrap" class="hidden py-6 flex flex-col gap-4">
-<button onclick="closeSubScreen()" class="self-start flex items-center gap-1 text-[13px] font-semibold text-primary">
-<span class="material-symbols-outlined text-[18px]">arrow_forward</span> رجوع للجرد
-</button>
-<h2 id="subscreen-title" class="text-lg font-bold"></h2>
-<div id="subscreen-list" class="flex flex-col gap-2"></div>
-</div>
-
-<!-- Session detail / edit screen (past sessions) -->
-<div id="session-detail-wrap" class="hidden py-6 flex flex-col gap-4">
-<button onclick="closeSessionDetail()" class="self-start flex items-center gap-1 text-[13px] font-semibold text-primary">
-<span class="material-symbols-outlined text-[18px]">arrow_forward</span> رجوع للجرد
-</button>
-<div id="session-detail-meta" class="bg-surface-container-low border border-outline-variant rounded-xl p-4 text-[12px]"></div>
-
-<div id="session-owner-actions" class="hidden flex gap-2"></div>
-<p id="session-edit-hint" class="hidden text-[11px] text-outline"></p>
-
-<div class="grid grid-cols-3 gap-2">
-<div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-matched" class="text-lg font-bold text-green-700">0</div><div class="text-[10px]">مطابقة</div></div>
-<div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-missing" class="text-lg font-bold text-red-700">0</div><div class="text-[10px]">لم تُمسح</div><div id="sd-missing-real" class="text-[10px] text-red-700"></div></div>
-<div class="bg-surface-container-low rounded-lg p-2 text-center"><div id="sd-surplus" class="text-lg font-bold text-amber-700">0</div><div class="text-[10px]">زيادة</div></div>
-</div>
-
-<div id="sd-review" class="flex flex-col gap-4"></div>
-
-<details class="bg-surface-container-low rounded-xl p-3">
-<summary class="text-[12px] font-bold text-on-surface-variant cursor-pointer">كل المسوحات المسجّلة بهذه الجلسة</summary>
-<div id="session-scans-list" class="flex flex-col gap-1 max-h-96 overflow-y-auto mt-2"></div>
-</details>
 </div>
 
 </main>
@@ -374,7 +313,7 @@ function toggleScopeBox(key) {
 }
 
 // ---- Views (2026-11-01): one helper, so the running count is never lost behind a hidden screen ----
-const GM_VIEWS = ['hub-wrap', 'scope-wrap', 'scan-wrap', 'report-wrap', 'subscreen-wrap', 'session-detail-wrap'];
+const GM_VIEWS = ['hub-wrap', 'scope-wrap', 'scan-wrap', 'session-detail-wrap'];
 function showView(id) {
   GM_VIEWS.forEach(v => document.getElementById(v).classList.toggle('hidden', v !== id));
   document.getElementById('header-title').textContent =
@@ -449,9 +388,8 @@ let liveTimer = null;
 let html5QrCode = null;
 let lastCameraValue = null;
 let lastCameraTime = 0;
-let missingListCache = [];
-let surplusListCache = [];
-let currentSessionMeta = {};
+let missingListCache = []; // the open count page's real missing pieces (for export)
+let surplusListCache = []; // the open count page's extra scanned codes (for export)
 let inProgressSession = null;
 
 function showEl(id) { document.getElementById(id).classList.remove('hidden'); }
@@ -480,11 +418,7 @@ function headerBack() {
     closeSessionDetail();
     return;
   }
-  if (!document.getElementById('subscreen-wrap').classList.contains('hidden')) {
-    closeSubScreen();
-    return;
-  }
-  if (['scan-wrap', 'report-wrap', 'scope-wrap'].some(v => !document.getElementById(v).classList.contains('hidden'))) {
+  if (['scan-wrap', 'scope-wrap'].some(v => !document.getElementById(v).classList.contains('hidden'))) {
     backToHub(); // the count stays as it is; a running one shows on top of the list
     return;
   }
@@ -1446,9 +1380,7 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
     btn.textContent = 'جارِ قراءة المخزون الحالي...';
     await gmWithTimeout(refreshExpectedFromStock(), 20000, 'stock').catch(() => false); // slow: report on the start list
     recalcStats();
-    missingListCache =expectedPool.filter(p => !scannedValues.has(p[matchField]));
-    surplusListCache = Array.from(scannedValues).filter(v => !expectedByField[v]);
-    const missingCount = missingListCache.length;
+    const missingCount = expectedPool.filter(p => !scannedValues.has(p[matchField])).length;
 
     btn.textContent = 'جارِ حفظ النتيجة...';
     const { error: finErr } = await gmWithTimeout(goldmindClient.from('inventory_counts').update({
@@ -1470,213 +1402,19 @@ document.getElementById('finish-btn').addEventListener('click', async () => {
 
   btn.disabled = false;
   btn.textContent = 'إغلاق الجرد';
-
-  currentSessionMeta = { date: gmFormatDateTime(), method: countMethod };
-
-  renderReportCounts();
-
   inProgressSession = null;
-  showView('report-wrap');
-  document.getElementById('header-title').textContent = 'تقرير الجرد';
+  const closedId = currentCountId;
+  currentCountId = null;
+  openSessionDetail(closedId);
 });
 
-// Photo + details for the pieces in the missing / surplus lists, fetched once per report.
-const PIECE_STATUS_AR = { available: 'متاحة', sold: 'مباعة', gifted: 'مُهداة', reserved: 'محجوزة', at_party: 'لدى جهة', with_party: 'لدى جهة', melted: 'مُذوّبة', returned: 'مُرتجعة' };
-let reportPieceInfo = null; // { byId: {source:id -> row}, byValue: {scanned value -> row} }
-
-async function fetchInChunks(table, column, values, columns) {
-  const out = [];
-  for (let i = 0; i < values.length; i += 150) {
-    const { data } = await goldmindClient.from(table).select(columns)
-      .eq('store_id', GOLDMIND_STORE_ID).in(column, values.slice(i, i + 150));
-    (data || []).forEach(r => out.push(r));
-  }
-  return out;
-}
-
-async function loadReportPieceInfo() {
-  if (reportPieceInfo && reportPieceInfo.countId === currentCountId) return reportPieceInfo;
-  const info = { countId: currentCountId, byId: {}, byValue: {} };
-  const goldIds = missingListCache.filter(p => p.source !== 'diamond').map(p => p.id);
-  const diaIds = missingListCache.filter(p => p.source === 'diamond').map(p => p.id);
-  const values = surplusListCache.slice();
-  const cols = 'id, barcode, description_ar, photo_url, status';
-  const jobs = [];
-  if (goldIds.length) jobs.push(fetchInChunks('pieces', 'id', goldIds, cols).then(r => r.forEach(x => { info.byId['gold:' + x.id] = x; })));
-  if (diaIds.length) jobs.push(fetchInChunks('diamond_pieces', 'id', diaIds, cols).then(r => r.forEach(x => { info.byId['diamond:' + x.id] = x; })));
-  if (values.length) {
-    jobs.push(fetchInChunks('pieces', matchField === 'rfid_epc' ? 'rfid_epc' : 'barcode', values, cols + ', rfid_epc')
-      .then(r => r.forEach(x => { info.byValue[matchField === 'rfid_epc' ? x.rfid_epc : x.barcode] = x; })));
-    if (matchField !== 'rfid_epc') {
-      jobs.push(fetchInChunks('diamond_pieces', 'barcode', values, cols).then(r => r.forEach(x => { if (!info.byValue[x.barcode]) info.byValue[x.barcode] = x; })));
-    }
-  }
-  try { await Promise.all(jobs); } catch (e) { /* offline: list still shows without photos */ }
-  reportPieceInfo = info;
-  return info;
-}
-
-function pieceThumb(url) {
-  if (!url) {
-    return '<div class="w-14 h-14 shrink-0 rounded-lg bg-surface-container-high flex items-center justify-center text-outline"><span class="material-symbols-outlined" aria-hidden="true">image_not_supported</span></div>';
-  }
-  const safe = gmEscapeHtml(url);
-  return `<a href="${safe}" target="_blank" rel="noopener" class="shrink-0" aria-label="عرض صورة القطعة بحجم كامل"><img src="${safe}" alt="صورة القطعة" loading="lazy" class="w-14 h-14 rounded-lg object-cover border border-outline-variant"/></a>`;
-}
-
-async function openSubScreen(kind) {
-  document.getElementById('report-wrap').classList.add('hidden');
-  document.getElementById('subscreen-wrap').classList.remove('hidden');
-  document.getElementById('header-title').textContent = kind === 'missing' ? 'القطع الناقصة' : 'القطع الزيادة';
-
-  const list = document.getElementById('subscreen-list');
-  document.getElementById('subscreen-title').textContent = kind === 'missing'
-    ? 'قطع متوقعة بالمخزون ولم تُمسح خلال الجلسة'
-    : 'باركودات مُسحت وليس لها قطعة متوفرة مطابقة';
-
-  const empty = kind === 'missing' ? missingListCache.length === 0 : surplusListCache.length === 0;
-  if (empty) {
-    list.innerHTML = kind === 'missing'
-      ? '<div class="text-[12px] text-on-surface-variant py-4 text-center"><span class="material-symbols-outlined text-green-700" style="font-size:16px;vertical-align:-3px" aria-hidden="true">task_alt</span> لا توجد قطع ناقصة — كل شيء مطابق</div>'
-      : '<div class="text-[12px] text-on-surface-variant py-4 text-center">لا توجد مسوحات زيادة</div>';
-    return;
-  }
-  list.innerHTML = '<div class="text-[12px] text-on-surface-variant py-4 text-center">جارٍ تحميل الصور...</div>';
-  const info = await loadReportPieceInfo();
-
-  currentSubKind = kind;
-  if (kind === 'missing') {
-    list.innerHTML = missingListCache.map((p, i) => {
-      const row = info.byId[(p.source === 'diamond' ? 'diamond:' : 'gold:') + p.id] || {};
-      const desc = p.description_ar || row.description_ar || '';
-      return `
-        <div class="flex items-center gap-3 bg-red-50 rounded-lg p-2 text-[12px]">
-          ${pieceThumb(row.photo_url)}
-          <div class="min-w-0 flex-1">
-            <div class="font-semibold text-red-700">${gmEscapeHtml(p.barcode || row.barcode || p.id.slice(0, 8))}</div>
-            ${desc ? `<div class="text-on-surface-variant truncate">${gmEscapeHtml(desc)}</div>` : ''}
-          </div>
-          <div class="flex flex-col items-end gap-1 shrink-0">
-            <span class="text-on-surface-variant">${p.weight_grams != null ? (p.weight_grams + 'g') : ''} ${p.karat ? 'عيار ' + p.karat : ''}</span>
-            <button type="button" onclick="addMissingToCount(${i}, this)" class="h-8 px-3 rounded-lg bg-green-700 text-white text-[11.5px] font-bold flex items-center gap-1"><span class="material-symbols-outlined text-[16px]">add</span>وُجدت — أضفها</button>
-          </div>
-        </div>`;
-    }).join('');
-  } else {
-    list.innerHTML = surplusListCache.map((v, i) => {
-      const row = info.byValue[v];
-      const status = row ? (PIECE_STATUS_AR[row.status] || row.status || '') : '';
-      return `
-        <div class="flex items-center gap-3 bg-amber-50 rounded-lg p-2 text-[12px]">
-          ${pieceThumb(row && row.photo_url)}
-          <div class="min-w-0 flex-1">
-            <div class="font-data-mono font-semibold">${gmEscapeHtml(v)}</div>
-            ${row && row.description_ar ? `<div class="text-on-surface-variant truncate">${gmEscapeHtml(row.description_ar)}</div>` : ''}
-            <div class="text-[11px] ${row ? 'text-amber-800' : 'text-outline'}">${row ? 'مسجّلة في النظام — حالتها: ' + gmEscapeHtml(status) : 'غير مسجّلة في النظام'}</div>
-          </div>
-          <button type="button" onclick="removeSurplusFromCount(${i}, this)" class="h-8 px-3 rounded-lg border border-error text-error text-[11.5px] font-bold flex items-center gap-1 shrink-0"><span class="material-symbols-outlined text-[16px]">delete</span>احذفها</button>
-        </div>`;
-    }).join('');
-  }
-}
-
-// ---- Fix the difference before posting (2026-09-28) ----
-// Missing piece found on the shelf -> add it as a manual scan.
-// Wrong / extra scan -> delete it. Repeat until nothing is missing or extra.
-let currentSubKind = null;
-
-function renderReportCounts() {
-  const missing = missingListCache.length, surplus = surplusListCache.length;
-  document.getElementById('report-expected').textContent = stats.expected;
-  document.getElementById('report-matched').textContent = stats.matched;
-  document.getElementById('report-scanned').textContent = stats.scanned;
-  document.getElementById('report-missing-count').textContent = missing;
-  document.getElementById('report-surplus-count').textContent = surplus;
-  const balanced = missing === 0 && surplus === 0;
-  document.getElementById('report-balanced').classList.toggle('hidden', !balanced);
-  document.getElementById('report-fix-hint').classList.toggle('hidden', balanced);
-}
-
-async function saveReportCounts() {
-  await goldmindClient.from('inventory_counts').update({
-    scanned_piece_count: stats.scanned,
-    matched_count: stats.matched,
-    missing_count: missingListCache.length,
-    unexpected_count: stats.unexpected
-  }).eq('id', currentCountId);
-}
-
-async function addMissingToCount(i, btn) {
-  const p = missingListCache[i];
-  if (!p || !currentCountId) return;
-  const value = p[matchField] || p.barcode;
-  if (!value) { alert('لا يوجد رقم لهذه القطعة يمكن تسجيله.'); return; }
-  if (!confirm('تأكيد: القطعة ' + (p.barcode || value) + ' موجودة فعلاً بالمحل؟ ستُسجَّل كممسوحة يدوياً باسمك.')) return;
-  btn.disabled = true;
-  const res = await saveScan({
-    store_id: GOLDMIND_STORE_ID, count_id: currentCountId, rfid_epc: value,
-    piece_id: p.source === 'diamond' ? null : p.id, piece_source: p.source || null,
-    match_status: 'matched', scan_method: 'manual', scanned_by: GOLDMIND_STAFF_ID
-  });
-  if (res === 'retry') { btn.disabled = false; alert('تعذّر الحفظ. تأكد من الاتصال بالإنترنت وحاول مرة أخرى.'); return; }
-  scannedValues.add(value);
-  scanBy[value] = GOLDMIND_STAFF_ID;
-  missingListCache = missingListCache.filter(x => x !== p);
-  recalcStats();
-  await saveReportCounts();
-  renderReportCounts();
-  openSubScreen('missing');
-}
-
-async function removeSurplusFromCount(i, btn) {
-  const v = surplusListCache[i];
-  if (v == null || !currentCountId) return;
-  if (!confirm('حذف المسحة ' + v + ' من الجرد؟')) return;
-  btn.disabled = true;
-  const { error } = await goldmindClient.from('inventory_count_scans').delete()
-    .eq('count_id', currentCountId).eq('rfid_epc', v);
-  if (error) { btn.disabled = false; alert('تعذّر الحذف: ' + error.message); return; }
-  goldmindClient.from('audit_log').insert({
-    store_id: GOLDMIND_STORE_ID, action_type: 'inventory_count_scan_removed',
-    description: 'حذف مسحة زيادة من الجرد: ' + v
-  }).then(() => {});
-  scannedValues.delete(v);
-  delete scanBy[v];
-  surplusListCache = surplusListCache.filter(x => x !== v);
-  recalcStats();
-  await saveReportCounts();
-  renderReportCounts();
-  openSubScreen('surplus');
-}
-
-// Back to the scanner with the same session (e.g. the missing pieces were found in another drawer).
-async function continueScanning() {
-  if (!currentCountId) return;
-  const { error } = await goldmindClient.from('inventory_counts')
-    .update({ status: 'in_progress', completed_at: null }).eq('id', currentCountId);
-  if (error) { alert('تعذّر فتح الجلسة: ' + error.message); return; }
-  inProgressSession = {
-    id: currentCountId, method: countMethod,
-    scope: [scope.gold ? 'gold' : null, scope.diamond ? 'diamond' : null].filter(Boolean)
-  };
-  await resumeSession();
-}
-
-function closeSubScreen() {
-  document.getElementById('subscreen-wrap').classList.add('hidden');
-  document.getElementById('report-wrap').classList.remove('hidden');
-  document.getElementById('header-title').textContent = 'تقرير الجرد';
-}
-
-// ---- Export ----
-function exportCsv(missing, surplus, meta) {
+// ---- Export of the open count page ----
+function exportCsv() {
   let csv = '\uFEFFنوع,الباركود,الوصف,الوزن,العيار\n';
-  missing.forEach(p => {
+  missingListCache.forEach(p => {
     csv += `ناقصة,"${(p.barcode || '').replace(/"/g,'')}","${(p.description_ar || '').replace(/"/g,'')}",${p.weight_grams || ''},${p.karat || ''}\n`;
   });
-  surplus.forEach(v => {
-    csv += `زيادة,"${v.replace(/"/g,'')}",,,\n`;
-  });
+  surplusListCache.forEach(v => { csv += `زيادة,"${String(v).replace(/"/g,'')}",,,\n`; });
   const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -1686,25 +1424,22 @@ function exportCsv(missing, surplus, meta) {
   URL.revokeObjectURL(url);
 }
 
-async function exportPdf(sheetId, btnId) {
-  const sheet = document.getElementById(sheetId);
-  const btn = document.getElementById(btnId);
+async function exportPdf(btn) {
+  const sheet = document.getElementById('report-print-sheet');
   const originalHtml = btn.innerHTML;
   btn.disabled = true;
   btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span>';
-
-  document.getElementById('print-meta').textContent = gmFormatDateTime() + ' — طريقة: ' + (countMethod === 'camera' ? 'كاميرا' : 'RFID/يدوي');
-  document.getElementById('print-expected').textContent = document.getElementById('report-expected').textContent;
-  document.getElementById('print-matched').textContent = document.getElementById('report-matched').textContent;
-  document.getElementById('print-scanned').textContent = document.getElementById('report-scanned').textContent;
+  const m = sdSummary;
+  document.getElementById('print-meta').textContent = (m.date || '') + ' — طريقة: ' + (m.method === 'camera' ? 'كاميرا' : 'RFID/يدوي') + ' — ' + (m.statusLabel || '');
+  document.getElementById('print-expected').textContent = m.expected || 0;
+  document.getElementById('print-matched').textContent = m.matched || 0;
+  document.getElementById('print-scanned').textContent = m.scanned || 0;
   document.getElementById('print-missing-table').innerHTML = missingListCache.map(p =>
     `<tr><td class="border px-2 py-1">${gmEscapeHtml(p.barcode || '')}</td><td class="border px-2 py-1">${gmEscapeHtml(p.description_ar || '')}</td></tr>`).join('') || '<tr><td class="border px-2 py-1">لا يوجد</td></tr>';
   document.getElementById('print-surplus-table').innerHTML = surplusListCache.map(v =>
     `<tr><td class="border px-2 py-1">${gmEscapeHtml(v)}</td></tr>`).join('') || '<tr><td class="border px-2 py-1">لا يوجد</td></tr>';
-
   sheet.classList.remove('hidden');
   if (document.fonts && document.fonts.ready) { await document.fonts.ready; }
-
   try {
     await (window.gmSavePdf || ((w) => w.save()))(html2pdf().set({
       margin: 10,
@@ -1722,32 +1457,6 @@ async function exportPdf(sheetId, btnId) {
   }
 }
 
-async function postCount() {
-  if (!currentCountId) return;
-  const msg = 'ستُقفل جلسة الجرد كسجل نهائي معتمد (' + missingListCache.length + ' ناقصة، ' + surplusListCache.length + ' زيادة). يستطيع المدير إلغاء الترحيل والتعديل لاحقاً. هل أنت متأكد؟';
-  if (!confirm(msg)) return;
-
-  const btn = document.getElementById('post-count-btn');
-  btn.disabled = true;
-
-  const { data: { session } } = await goldmindClient.auth.getSession();
-  await goldmindClient.from('inventory_counts').update({
-    status: 'posted',
-    posted_at: new Date().toISOString(),
-    posted_by: session ? session.user.id : null
-  }).eq('id', currentCountId);
-
-  await goldmindClient.from('audit_log').insert({
-    store_id: GOLDMIND_STORE_ID,
-    action_type: 'inventory_count_posted',
-    description: 'ترحيل جرد: ' + stats.matched + ' مطابقة، ' + missingListCache.length + ' ناقصة، ' + surplusListCache.length + ' زيادة (طريقة: ' + countMethod + ')'
-  });
-
-  btn.disabled = false;
-  alert('تم ترحيل الجرد بنجاح.');
-  startNewSession();
-}
-
 function startNewSession() {
   currentCountId = null;
   countMethod = null;
@@ -1762,17 +1471,47 @@ function startNewSession() {
   renderScopeBox('diamond');
   loadAllPieces().then(backToHub);
 }
-document.getElementById('new-session-btn').addEventListener('click', startNewSession);
 
-// ---- Past session detail / edit (owner can unpost + delete a mis-scan) ----
+// ---- One page per count (2026-11-01) ----
+// Closed counts stay editable (found / delete a wrong scan / reopen for scanning) until the
+// owner posts them; a posted count is locked, only the owner can unpost it.
+// Missing is judged against the stock NOW: pieces that left stock (sold, gift, trader, deleted)
+// are listed apart and never counted as missing.
 let sessionDetailId = null;
 let sessionDetailStatus = null;
+let sessionDetailRow = null;
 let sessionDetailScanRows = [];
 let sessionDetailExpectedRows = [];
+let sdSummary = {};
+let currentSdTab = 'missing';
+const SD_STATUS = { in_progress: ['جارٍ', 'bg-amber-100 text-amber-900'], completed: ['مغلق — غير مُرحّل', 'bg-surface-container-low text-on-surface-variant'], posted: ['مُرحّل ومقفول', 'bg-green-100 text-green-800'] };
+const sdEditable = () => sessionDetailStatus !== 'posted';
+
+function setSdTab(tab) {
+  currentSdTab = tab;
+  document.querySelectorAll('.sd-tab').forEach(b => b.setAttribute('aria-selected', String(b.dataset.sdtab === tab)));
+  ['missing', 'surplus', 'left', 'gold'].forEach(t => {
+    const el = document.getElementById('sd-p-' + t);
+    if (el) el.classList.toggle('hidden', t !== tab);
+  });
+  const scans = document.getElementById('sd-p-scans');
+  scans.classList.toggle('hidden', tab !== 'scans'); scans.classList.toggle('flex', tab === 'scans');
+}
+
+function sdButton(label, icon, cls, onclick, id) {
+  const b = document.createElement('button');
+  b.type = 'button';
+  if (id) b.id = id;
+  b.className = 'h-12 px-5 rounded-xl font-bold text-[13px] flex items-center justify-center gap-2 ' + cls;
+  b.innerHTML = (icon ? '<span class="material-symbols-outlined" aria-hidden="true">' + icon + '</span>' : '') + label;
+  b.onclick = onclick;
+  return b;
+}
 
 async function openSessionDetail(countId) {
   sessionDetailId = countId;
   showView('session-detail-wrap');
+  currentSdTab = 'missing';
   document.getElementById('sd-review').innerHTML = '<div class="text-center text-[12px] text-on-surface-variant py-6">جارِ التحميل...</div>';
 
   const [{ data: countRow }, { data: expectedRows }, { data: scanRows }] = await Promise.all([
@@ -1780,118 +1519,72 @@ async function openSessionDetail(countId) {
     gmFetchAllRows(() => goldmindClient.from('inventory_count_expected').select('*').eq('count_id', countId).order('match_value')),
     gmFetchAllRows(() => goldmindClient.from('inventory_count_scans').select('*').eq('count_id', countId).order('scanned_at', { ascending: false }))
   ]);
-
+  sessionDetailRow = countRow;
   sessionDetailStatus = countRow.status;
   sessionDetailExpectedRows = expectedRows || [];
-  sessionDetailScanRows = scanRows || [];
+  sessionDetailScanRows = (scanRows || []).filter(r => r.match_status !== 'cancelled');
+  renderSessionHeader();
+  renderSessionScansList();
+  await renderSessionReview();
+  setSdTab(currentSdTab);
+}
 
-  const dateStr = gmFormatDateTime(countRow.started_at);
-  const statusLabel = countRow.status === 'posted' ? 'مُرحّلة <span class="material-symbols-outlined text-green-700" style="font-size:15px;vertical-align:-3px" aria-hidden="true">check_circle</span>' : 'مكتملة';
+function renderSessionHeader() {
+  const c = sessionDetailRow;
+  const st = SD_STATUS[c.status] || [c.status, 'bg-surface-container-low'];
+  const scopeTxt = (c.scope || []).map(x => ({ gold: 'قطع ذهبية', diamond: 'ألماس' }[x] || x)).join(' + ');
+  document.getElementById('header-title').textContent = 'جرد ' + gmFormatDateTime(c.started_at, { day: '2-digit', month: '2-digit', year: 'numeric' });
   document.getElementById('session-detail-meta').innerHTML =
-    `<div class="font-bold mb-1">${dateStr}</div>
-     <div class="text-on-surface-variant">الطريقة: ${countRow.method === 'camera' ? 'كاميرا' : 'RFID'} — النطاق: ${(countRow.scope || []).map(x => ({ gold: 'قطع ذهبية', diamond: 'ألماس' }[x] || x)).join(' + ')}</div>
-     <div class="mt-1">الحالة: <span class="font-bold">${statusLabel}</span></div>`;
+    `<span class="${st[1]} rounded-full px-3 py-1 text-[12px] font-bold">${st[0]}</span>
+     <h2 class="text-[16px] font-bold">${gmEscapeHtml(scopeTxt)} — ${c.method === 'camera' ? 'كاميرا' : 'RFID'}</h2>
+     <span class="text-[12px] text-on-surface-variant">بدأ ${gmFormatDateTime(c.started_at)}${c.completed_at ? ' · أُغلق ' + gmFormatDateTime(c.completed_at) : ''}${c.posted_at ? ' · رُحّل ' + gmFormatDateTime(c.posted_at) : ''}</span>`;
 
-  const ownerActions = document.getElementById('session-owner-actions');
-  const editHint = document.getElementById('session-edit-hint');
-  ownerActions.innerHTML = '';
-  if (isOwner && countRow.status === 'posted') {
-    ownerActions.classList.remove('hidden');
-    ownerActions.classList.add('flex');
-    const unpostBtn = document.createElement('button');
-    unpostBtn.className = 'flex-1 h-11 border border-error text-error rounded-lg text-[12px] font-bold';
-    unpostBtn.textContent = 'إلغاء الترحيل والتعديل';
-    unpostBtn.onclick = () => unpostSession(countId);
-    ownerActions.appendChild(unpostBtn);
-    editHint.classList.add('hidden');
-  } else if (countRow.status === 'completed') {
-    ownerActions.classList.remove('hidden');
-    ownerActions.classList.add('flex');
-    const resumeBtn = document.createElement('button');
-    resumeBtn.className = 'flex-1 h-11 border-2 border-primary text-primary rounded-lg text-[12px] font-bold';
-    resumeBtn.textContent = 'إعادة تفعيل الجرد (مسح / إضافة / حذف)';
-    resumeBtn.onclick = async () => {
-      const { error } = await goldmindClient.from('inventory_counts').update({ status: 'in_progress', completed_at: null }).eq('id', countId);
-      if (error) { alert('تعذّر فتح الجلسة: ' + error.message); return; }
-      inProgressSession = { id: countId, method: countRow.method, scope: countRow.scope || [] };
-      await resumeSession();
-    };
-    ownerActions.appendChild(resumeBtn);
-    editHint.textContent = 'الجلسة غير مُرحّلة بعد — يمكنك حذف أي مسحة خاطئة (أيقونة السلة)، أو "إعادة تفعيل الجرد" ثم "إغلاق الجرد" ليُعاد حساب الناقص حسب المخزون الحالي قبل الترحيل.';
-    editHint.classList.remove('hidden');
-  } else {
-    ownerActions.classList.add('hidden');
-    editHint.textContent = 'الجلسة مُرحّلة — التعديل يحتاج صلاحية مدير لإلغاء الترحيل أولاً.';
-    editHint.classList.remove('hidden');
+  const box = document.getElementById('session-owner-actions');
+  const hint = document.getElementById('session-edit-hint');
+  box.innerHTML = '';
+  if (c.status === 'completed') {
+    if (isOwner) box.appendChild(sdButton('ترحيل الجرد وقفله', 'verified', 'bg-primary text-on-primary', postSession, 'post-count-btn'));
+    box.appendChild(sdButton('إعادة تفعيل الجرد', 'restart_alt', 'border-2 border-primary text-primary', reopenSession));
+    hint.textContent = 'الجرد مغلق وغير مُرحّل، فيمكن تعديله: «وُجدت» لقطعة ناقصة، حذف مسحة خاطئة، أو «إعادة تفعيل الجرد» لمتابعة المسح. ' +
+      (isOwner ? 'الترحيل يقفل الجرد نهائياً كسجل معتمد.' : 'الترحيل والقفل بيد المدير.');
+  } else if (c.status === 'posted') {
+    if (isOwner) box.appendChild(sdButton('إلغاء الترحيل للتعديل', 'lock_open', 'border border-error text-error', () => unpostSession(c.id)));
+    hint.textContent = 'الجرد مُرحّل ومقفول — لا يمكن تعديله' + (isOwner ? ' إلا بإلغاء الترحيل.' : '. إلغاء الترحيل بيد المدير.');
+  } else if (c.status === 'in_progress') {
+    box.appendChild(sdButton('متابعة المسح', 'qr_code_scanner', 'bg-primary text-on-primary', () => { inProgressSession = c; resumeSession(); }));
+    hint.textContent = 'الجرد ما زال جارياً.';
   }
-
-  renderSessionDetailCounts();
-  renderSessionScansList();
-  renderSessionReview();
+  box.appendChild(sdButton('PDF', 'picture_as_pdf', 'border border-outline-variant', function () { exportPdf(this); }, 'report-download-btn'));
+  box.appendChild(sdButton('Excel', 'table_view', 'border border-outline-variant', exportCsv));
 }
 
-function renderSessionDetailCounts() {
-  const scannedMap = {};
-  sessionDetailScanRows.forEach(r => { scannedMap[r.rfid_epc] = r; });
-  const missing = sessionDetailExpectedRows.filter(e => !scannedMap[e.match_value]);
-  const matched = sessionDetailScanRows.filter(r => r.match_status === 'matched').length;
-  const surplus = sessionDetailScanRows.filter(r => r.match_status === 'unexpected').length;
-  document.getElementById('sd-matched').textContent = matched;
-  document.getElementById('sd-missing').textContent = missing.length;
-  document.getElementById('sd-surplus').textContent = surplus;
+async function reopenSession() {
+  const c = sessionDetailRow;
+  const { error } = await goldmindClient.from('inventory_counts').update({ status: 'in_progress', completed_at: null }).eq('id', c.id);
+  if (error) { alert('تعذّر إعادة تفعيل الجرد: ' + error.message); return; }
+  inProgressSession = { id: c.id, method: c.method, scope: c.scope || [], started_at: c.started_at, expected_piece_count: c.expected_piece_count };
+  await resumeSession();
 }
 
-function renderSessionScansList() {
-  const canEdit = isOwner ? true : (sessionDetailStatus !== 'posted');
-  const list = document.getElementById('session-scans-list');
-  if (sessionDetailScanRows.length === 0) {
-    list.innerHTML = '<div class="text-[12px] text-on-surface-variant text-center py-3">لا توجد مسوحات</div>';
-    return;
-  }
-  list.innerHTML = sessionDetailScanRows.map(r => {
-    const isMatched = r.match_status === 'matched';
-    const colorClass = isMatched ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700';
-    const methodIcon = r.scan_method === 'camera' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">photo_camera</span>' : (r.scan_method === 'manual' ? '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">keyboard</span>' : '<span class="material-symbols-outlined " style="font-size:15px;vertical-align:-3px" aria-hidden="true">sensors</span>');
-    const trash = (sessionDetailStatus !== 'posted')
-      ? `<button onclick="deleteScanRow('${r.id}')" class="text-error"><span class="material-symbols-outlined text-[18px]">delete</span></button>`
-      : '';
-    return `<div class="flex items-center justify-between px-3 py-2 rounded-lg ${colorClass} text-[12px]">
-      <span class="font-data-mono">${methodIcon} ${gmEscapeHtml(r.rfid_epc)}</span>
-      <div class="flex items-center gap-2">
-        <span class="font-semibold">${isMatched ? 'مطابقة' : 'زيادة'}</span>
-        ${trash}
-      </div>
-    </div>`;
-  }).join('');
-}
-
-async function deleteScanRow(scanRowId) {
-  if (!confirm('هل تريد حذف هذه المسحة من الجلسة؟ سيُحدَّث تقرير الفرق تلقائياً.')) return;
-  await goldmindClient.from('inventory_count_scans').delete().eq('id', scanRowId);
-  sessionDetailScanRows = sessionDetailScanRows.filter(r => r.id !== scanRowId);
-  await recomputeSessionCounts(sessionDetailId);
-  renderSessionDetailCounts();
-  renderSessionScansList();
-  renderSessionReview();
-}
-
-async function recomputeSessionCounts(countId) {
-  const scannedMap = {};
-  sessionDetailScanRows.forEach(r => { scannedMap[r.rfid_epc] = r; });
-  const missingCount = sessionDetailExpectedRows.filter(e => !scannedMap[e.match_value]).length;
-  const matchedCount = sessionDetailScanRows.filter(r => r.match_status === 'matched').length;
-  const unexpectedCount = sessionDetailScanRows.filter(r => r.match_status === 'unexpected').length;
-  await goldmindClient.from('inventory_counts').update({
-    matched_count: matchedCount,
-    missing_count: missingCount,
-    unexpected_count: unexpectedCount,
-    scanned_piece_count: sessionDetailScanRows.length
-  }).eq('id', countId);
+async function postSession() {
+  if (!isOwner) return;
+  const s = sdSummary;
+  if (!confirm('سيُرحّل الجرد ويُقفل كسجل نهائي معتمد (' + s.missing + ' ناقصة، ' + s.surplus + ' زيادة). لن يُعدَّل بعدها إلا بإلغاء الترحيل من المدير. متأكد؟')) return;
+  const { data: { session } } = await goldmindClient.auth.getSession();
+  const { error } = await goldmindClient.from('inventory_counts').update({
+    status: 'posted', posted_at: new Date().toISOString(), posted_by: session ? session.user.id : null
+  }).eq('id', sessionDetailId);
+  if (error) { alert('تعذّر الترحيل: ' + error.message); return; }
+  goldmindClient.from('audit_log').insert({
+    store_id: GOLDMIND_STORE_ID, action_type: 'inventory_count_posted',
+    description: 'ترحيل جرد: ' + s.matched + ' مطابقة، ' + s.missing + ' ناقصة، ' + s.surplus + ' زيادة (طريقة: ' + (sessionDetailRow.method || '') + ')'
+  }).then(() => {});
+  openSessionDetail(sessionDetailId);
 }
 
 async function unpostSession(countId) {
   if (!isOwner) return;
-  if (!confirm('هل تريد إلغاء ترحيل هذه الجلسة والسماح بتعديلها؟')) return;
+  if (!confirm('هل تريد إلغاء ترحيل هذا الجرد والسماح بتعديله؟')) return;
   await goldmindClient.from('inventory_counts').update({ status: 'completed', posted_at: null, posted_by: null }).eq('id', countId);
   await goldmindClient.from('audit_log').insert({
     store_id: GOLDMIND_STORE_ID,
@@ -1901,7 +1594,87 @@ async function unpostSession(countId) {
   openSessionDetail(countId);
 }
 
-// ---- Past session review (2026-09-30): what is really missing, what left stock, extra scans, gold totals ----
+function renderSessionScansList() {
+  const list = document.getElementById('session-scans-list');
+  document.getElementById('sd-tab-scans').textContent = 'كل المسحات (' + sessionDetailScanRows.length + ')';
+  if (sessionDetailScanRows.length === 0) {
+    list.innerHTML = '<div class="text-[12px] text-on-surface-variant text-center py-3">لا توجد مسحات</div>';
+    return;
+  }
+  list.innerHTML = sessionDetailScanRows.map(r => {
+    const isMatched = r.match_status === 'matched';
+    const colorClass = isMatched ? 'bg-green-50 text-green-800' : 'bg-amber-50 text-amber-900';
+    const icon = r.scan_method === 'camera' ? 'photo_camera' : (r.scan_method === 'manual' ? 'keyboard' : 'sensors');
+    const trash = sdEditable()
+      ? `<button type="button" onclick="deleteScanRow('${gmEscapeHtml(String(r.id))}')" class="gm-hit text-error" aria-label="حذف المسحة"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span></button>`
+      : '';
+    return `<div class="flex items-center justify-between gap-2 px-3 py-2 rounded-lg ${colorClass} text-[12.5px]">
+      <span class="font-data-mono" dir="ltr"><span class="material-symbols-outlined" style="font-size:15px;vertical-align:-3px" aria-hidden="true">${icon}</span> ${gmEscapeHtml(r.rfid_epc)}</span>
+      <span class="flex items-center gap-2"><span class="font-semibold">${isMatched ? 'مطابقة' : 'زيادة'}</span>${trash}</span>
+    </div>`;
+  }).join('');
+}
+
+async function sdSaveCounts() {
+  if (!sdEditable()) return;
+  const s = sdSummary;
+  await goldmindClient.from('inventory_counts').update({
+    matched_count: s.matched, missing_count: s.missing, unexpected_count: s.surplus, scanned_piece_count: s.scanned
+  }).eq('id', sessionDetailId);
+}
+
+async function sdAfterEdit() {
+  renderSessionScansList();
+  await renderSessionReview();
+  setSdTab(currentSdTab);
+  sdSaveCounts();
+}
+
+async function deleteScanRow(scanRowId) {
+  if (!sdEditable()) return;
+  if (!confirm('هل تريد حذف هذه المسحة من الجرد؟')) return;
+  const { error } = await goldmindClient.from('inventory_count_scans').delete().eq('id', scanRowId);
+  if (error) { alert('تعذّر الحذف: ' + error.message); return; }
+  const row = sessionDetailScanRows.find(r => String(r.id) === String(scanRowId));
+  goldmindClient.from('audit_log').insert({ store_id: GOLDMIND_STORE_ID, action_type: 'inventory_count_scan_removed', description: 'حذف مسحة من الجرد: ' + (row ? row.rfid_epc : scanRowId) }).then(() => {});
+  sessionDetailScanRows = sessionDetailScanRows.filter(r => String(r.id) !== String(scanRowId));
+  await sdAfterEdit();
+}
+
+// Gold totals like the stock page (inventory-list-ar.html): every box in the count, 24k as pieces, no scrap;
+// gross weight, accounting weight, diamond ct, per karat. Making value follows the shop rule:
+// fab per gram x ACCOUNTING weight (the stock page multiplies by gross weight).
+function sdGoldTotals(pieces) {
+  const t = { n: pieces.length, w: 0, a: 0, fab: 0, ct: 0, karat: {} };
+  pieces.forEach(p => {
+    const w = Number(p.weight_grams) || 0;
+    const acc = Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : w) || 0;
+    t.w += w;
+    t.a += acc;
+    t.fab += (Number(p.cost_fabrication_per_gram) || 0) * acc;
+    t.ct += (Number(p.accent_diamond_carat) || 0) + (Number(p.center_stone_carat) || 0);
+    const k = p.karat || '—';
+    t.karat[k] = t.karat[k] || { n: 0, w: 0 };
+    t.karat[k].n++; t.karat[k].w += w;
+  });
+  return t;
+}
+function sdGoldCard(title, t, tone) {
+  const f2 = v => (Number(v) || 0).toFixed(2);
+  const karats = Object.keys(t.karat).sort((a, b) => b - a).map(k => `<span class="bg-surface-container-low rounded-lg px-2 py-1">عيار ${gmEscapeHtml(k)}: <b dir="ltr">${f2(t.karat[k].w)}</b> غ · ${t.karat[k].n} قطعة</span>`).join('');
+  return `<div class="rounded-xl border ${tone} p-3">
+    <div class="text-[13px] font-bold mb-2">${title} (${t.n} قطعة)</div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+      <div><div class="font-bold font-data-mono" dir="ltr">${f2(t.w)}</div><div class="text-[11px] text-on-surface-variant">الوزن القائم (غ)</div></div>
+      <div><div class="font-bold font-data-mono" dir="ltr">${f2(t.a)}</div><div class="text-[11px] text-on-surface-variant">الوزن المحاسبي (غ)</div></div>
+      <div><div class="font-bold font-data-mono" dir="ltr">${gmEscapeHtml(typeof gmMoney === 'function' ? gmMoney(t.fab) : f2(t.fab))}</div><div class="text-[11px] text-on-surface-variant">قيمة المصنعية</div></div>
+      <div><div class="font-bold font-data-mono" dir="ltr">${f2(t.ct)} ct</div><div class="text-[11px] text-on-surface-variant">الألماس</div></div>
+    </div>
+    ${karats ? `<div class="flex flex-wrap gap-1 mt-2 text-[11.5px]">${karats}</div>` : ''}
+  </div>`;
+}
+
+// What is really missing, what left stock, extra scans, gold totals.
 const SD_LEFT_LABEL = { sold: 'مباعة', gifted: 'هدية', given_to_trader: 'عند تاجر', deleted: 'محذوفة من البرنامج' };
 async function renderSessionReview() {
   const box = document.getElementById('sd-review');
@@ -1917,7 +1690,7 @@ async function renderSessionReview() {
     }
   };
   await Promise.all([
-    chunks(goldIds, 'pieces', 'id, barcode, status, weight_grams, accounting_weight_grams, cost_fabrication_per_gram, karat, box_name, photo_url, piece_type'),
+    chunks(goldIds, 'pieces', 'id, barcode, status, weight_grams, accounting_weight_grams, cost_fabrication_per_gram, accent_diamond_carat, center_stone_carat, karat, box_name, photo_url, piece_type, description_ar'),
     diaIds.length ? chunks(diaIds, 'diamond_pieces', 'id, barcode, status, photo_url') : null
   ]);
   const info = e => pieceInfo[(e.piece_source === 'diamond' ? 'diamond:' : 'gold:') + e.piece_id];
@@ -1926,87 +1699,99 @@ async function renderSessionReview() {
   const realMissing = [], leftStock = [];
   missingRows.forEach(e => { const p = info(e); (p && stillHere(p.status) ? realMissing : leftStock).push({ e, p }); });
 
-  // gold totals of the pieces found in the count
-  const t = { n: 0, w: 0, a: 0, fab: 0 }, mt = { w: 0, a: 0 };
-  sessionDetailExpectedRows.forEach(e => {
-    const p = info(e); if (!p || e.piece_source === 'diamond') return;
-    const w = Number(p.weight_grams) || 0, a = Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : p.weight_grams) || 0;
-    if (scanned.has(e.match_value)) { t.n++; t.w += w; t.a += a; t.fab += a * (Number(p.cost_fabrication_per_gram) || 0); }
-    else if (stillHere(p.status)) { mt.w += w; mt.a += a; }
-  });
+  // gold of the pieces found in the count, of the missing ones, and of everything expected now
+  const goldOf = rows => rows.map(e => info(e)).filter(p => p && p.weight_grams !== undefined);
+  const nowRows = sessionDetailExpectedRows.filter(e => { const p = info(e); return p && stillHere(p.status); });
+  const foundT = sdGoldTotals(goldOf(nowRows.filter(e => scanned.has(e.match_value))));
+  const missT = sdGoldTotals(goldOf(realMissing.map(x => x.e)));
+  const nowT = sdGoldTotals(goldOf(nowRows));
 
   // extra scans: a registered piece (show its status) or an unknown / misread code
   const surplus = sessionDetailScanRows.filter(r => r.match_status !== 'matched');
   const lookup = surplus.map(r => r.rfid_epc).filter(v => /^[\w .-]+$/.test(v || ''));
   const known = {};
   for (let i = 0; i < lookup.length; i += 100) {
-    const { data } = await goldmindClient.from('pieces').select('id, barcode, status').eq('store_id', GOLDMIND_STORE_ID).in('barcode', lookup.slice(i, i + 100));
+    const { data } = await goldmindClient.from('pieces').select('id, barcode, status, photo_url, description_ar').eq('store_id', GOLDMIND_STORE_ID).in('barcode', lookup.slice(i, i + 100));
     (data || []).forEach(p => { known[p.barcode] = p; });
+    const { data: byChip } = await goldmindClient.from('pieces').select('id, barcode, rfid_epc, status, photo_url, description_ar').eq('store_id', GOLDMIND_STORE_ID).in('rfid_epc', lookup.slice(i, i + 100));
+    (byChip || []).forEach(p => { if (p.rfid_epc && !known[p.rfid_epc]) known[p.rfid_epc] = p; });
   }
   const unknownSurplus = surplus.filter(r => !known[r.rfid_epc]);
-  const editable = sessionDetailStatus !== 'posted';
+  const editable = sdEditable();
   const f2 = v => (Number(v) || 0).toFixed(2);
   const esc = v => gmEscapeHtml(v == null ? '' : String(v));
   const thumb = url => url ? `<button type="button" onclick="gmCountPhoto('${esc(url)}')" aria-label="فتح الصورة" class="shrink-0 lg:w-full"><img src="${esc(url)}" alt="" loading="lazy" class="w-14 h-14 lg:w-full lg:h-56 rounded-lg object-cover lg:object-contain lg:bg-white"></button>` : '<div class="w-14 h-14 lg:w-full lg:h-56 rounded-lg bg-surface-container-low shrink-0"></div>';
   const pieceLink = p => p ? `<a href="piece-edit-ar.html?id=${esc(p.id)}" class="text-[11.5px] font-semibold text-primary underline">فتح القطعة</a>` : '';
   const statusLabel = st => SD_LEFT_LABEL[st] || (st === 'available' ? 'متوفرة' : st === 'reserved' ? 'محجوزة' : esc(st));
 
+  // summary (tiles, saved counts, export)
+  const matched = new Set(sessionDetailScanRows.filter(r => r.match_status === 'matched').map(r => r.rfid_epc)).size;
+  sdSummary = { expected: nowRows.length, matched, missing: realMissing.length, surplus: surplus.length, scanned: sessionDetailScanRows.length,
+    method: sessionDetailRow.method, date: gmFormatDateTime(sessionDetailRow.started_at), statusLabel: (SD_STATUS[sessionDetailStatus] || [''])[0] };
+  document.getElementById('sd-expected').textContent = sdSummary.expected;
+  document.getElementById('sd-matched').textContent = matched;
+  document.getElementById('sd-missing').textContent = realMissing.length;
+  document.getElementById('sd-surplus').textContent = surplus.length;
+  document.getElementById('sd-balanced').classList.toggle('hidden', !!(realMissing.length || surplus.length));
+  document.getElementById('sd-tab-missing').textContent = 'ناقصة فعلاً (' + realMissing.length + ')';
+  document.getElementById('sd-tab-surplus').textContent = 'زيادة (' + surplus.length + ')';
+  document.getElementById('sd-tab-left').textContent = 'خرجت من المخزن (' + leftStock.length + ')';
+  missingListCache = realMissing.map(({ e, p }) => ({ barcode: e.barcode || e.match_value, description_ar: (p && (p.description_ar || p.piece_type)) || e.description_ar, weight_grams: p && p.weight_grams != null ? p.weight_grams : e.weight_grams, karat: e.karat || (p && p.karat) }));
+  surplusListCache = surplus.map(r => r.rfid_epc);
   gmMissingSheetItems = realMissing.map(({ e, p }) => ({ barcode: e.barcode || e.match_value, photo: p && p.photo_url, weight: p && p.weight_grams != null ? p.weight_grams : e.weight_grams, karat: e.karat || (p && p.karat), type: p && p.piece_type }));
-  box.innerHTML = `
-  <div class="bg-surface-container-low rounded-xl p-3">
-    <div class="text-[12px] font-bold mb-2">ذهب القطع التي وُجدت بالجرد (${t.n} قطعة)</div>
-    <div class="grid grid-cols-3 gap-2 text-center">
-      <div><div class="font-bold font-data-mono">${f2(t.w)}</div><div class="text-[10px] text-on-surface-variant">الوزن القائم (غ)</div></div>
-      <div><div class="font-bold font-data-mono">${f2(t.a)}</div><div class="text-[10px] text-on-surface-variant">وزن المحاسبة (غ)</div></div>
-      <div><div class="font-bold font-data-mono">${f2(t.fab)}</div><div class="text-[10px] text-on-surface-variant">مجموع المصنعيات</div></div>
-    </div>
-    ${realMissing.length ? `<div class="text-[11px] text-red-700 mt-2">وزن الناقص فعلاً: ${f2(mt.w)} غ قائم / ${f2(mt.a)} غ محاسبة</div>` : ''}
-  </div>
 
-  <div>
-    <h3 class="text-[13px] font-bold text-red-700 mb-1">ناقصة فعلاً (${realMissing.length}) — ما زالت بالمخزن في النظام ولم تُمسح</h3>
+  box.innerHTML = `
+  <div id="sd-p-missing" class="flex flex-col gap-2">
+    <h3 class="text-[13px] font-bold text-red-700">ناقصة فعلاً (${realMissing.length}) — ما زالت بالمخزن في النظام ولم تُمسح</h3>
     ${realMissing.length ? gmMissingSheetButtons() : ''}
-    <p class="text-[11px] text-on-surface-variant mb-2">ابحث عنها بالمحل. إن وجدتها اضغط "وُجدت"، وإن كانت قد خرجت فعلاً (بيع أو تاجر أو صندوق آخر) افتح القطعة وصحّح حالتها.</p>
+    ${realMissing.length ? `<p class="text-[11.5px] text-on-surface-variant">ابحث عنها بالمحل. إن وجدتها اضغط "وُجدت"، وإن كانت قد خرجت فعلاً (بيع أو تاجر أو صندوق آخر) افتح القطعة وصحّح حالتها. وزن الناقص: ${f2(missT.w)} غ قائم / ${f2(missT.a)} غ محاسبي.</p>` : ''}
     <div class="flex flex-col gap-2 lg:grid lg:grid-cols-3 xl:grid-cols-4 lg:gap-3">${realMissing.map(({ e, p }) => `
       <div class="flex items-center gap-3 bg-red-50 rounded-xl p-2 text-[12px] lg:flex-col lg:items-stretch lg:text-[13px]">
         ${thumb(p && p.photo_url)}
         <div class="min-w-0 flex-1">
           <div class="font-bold font-data-mono" dir="ltr" style="text-align:right;">${esc(e.barcode || e.match_value)}</div>
-          <div class="text-on-surface-variant truncate">${esc([p && p.piece_type, e.karat ? 'عيار ' + e.karat : '', e.weight_grams != null ? f2(e.weight_grams) + ' غ' : '', p && p.box_name, p && p.status === 'reserved' ? 'محجوزة' : ''].filter(Boolean).join(' · '))}</div>
+          <div class="text-on-surface-variant truncate">${esc([p && (p.piece_type || p.description_ar), e.karat ? 'عيار ' + e.karat : '', e.weight_grams != null ? f2(e.weight_grams) + ' غ' : '', p && p.box_name, p && p.status === 'reserved' ? 'محجوزة' : ''].filter(Boolean).join(' · '))}</div>
           ${pieceLink(p)}
         </div>
-        ${editable ? `<button type="button" onclick="sdMarkFound('${esc(e.piece_id)}', '${esc(e.piece_source || '')}', this)" data-v="${esc(e.match_value)}" class="h-8 lg:h-10 px-3 rounded-lg bg-green-700 text-white text-[11.5px] lg:text-[13px] font-bold shrink-0">وُجدت</button>` : ''}
-      </div>`).join('') || '<div class="text-[12px] text-green-700">لا توجد قطع ناقصة فعلاً ✓</div>'}</div>
+        ${editable ? `<button type="button" onclick="sdMarkFound('${esc(e.piece_id)}', '${esc(e.piece_source || '')}', this)" data-v="${esc(e.match_value)}" class="h-10 px-3 rounded-lg bg-green-700 text-white text-[12px] lg:text-[13px] font-bold shrink-0">وُجدت</button>` : ''}
+      </div>`).join('') || '<div class="text-[13px] text-green-700 py-3">لا توجد قطع ناقصة فعلاً ✓</div>'}</div>
   </div>
 
-  ${leftStock.length ? `<div>
-    <h3 class="text-[13px] font-bold mb-1">ليست ناقصة — خرجت من المخزن بعد بدء الجرد (${leftStock.length})</h3>
-    <p class="text-[11px] text-on-surface-variant mb-2">ظهرت هذه القطع ضمن الناقص لأنها كانت بالمخزن لحظة بدء الجرد. إن كانت حالتها خاطئة افتحها وصحّحها.</p>
+  <div id="sd-p-surplus" class="hidden flex flex-col gap-2">
+    <h3 class="text-[13px] font-bold text-amber-700">زيادة (${surplus.length}) — رموز مُسحت وليست ضمن القطع المتوقعة</h3>
+    ${unknownSurplus.length ? `<p class="text-[11.5px] text-on-surface-variant">${unknownSurplus.length} منها رموز غير موجودة في النظام، وغالباً هي قراءات خاطئة من الكاميرا.</p>
+      ${editable ? `<button type="button" onclick="sdDeleteUnknown(this)" class="self-start h-10 px-3 rounded-lg border border-error text-error text-[12px] font-bold">حذف كل الرموز غير الموجودة في النظام (${unknownSurplus.length})</button>` : ''}` : ''}
+    <div class="flex flex-col gap-1 lg:grid lg:grid-cols-2 lg:gap-2">${surplus.map(r => { const p = known[r.rfid_epc]; return `
+      <div class="flex items-center justify-between gap-2 bg-amber-50 rounded-lg px-3 py-2 text-[12.5px]">
+        <span class="font-data-mono" dir="ltr">${esc(r.rfid_epc)}</span>
+        <span class="text-on-surface-variant flex-1 text-center">${p ? 'مسجّلة — ' + statusLabel(p.status) + (p.description_ar ? ' · ' + esc(p.description_ar) : '') : 'غير مسجّلة في النظام'}</span>
+        ${p ? `<a href="piece-edit-ar.html?id=${esc(p.id)}" class="text-[12px] font-semibold text-primary underline">فتح</a>` : ''}
+        ${editable ? `<button type="button" onclick="deleteScanRow('${esc(r.id)}')" class="gm-hit text-error" aria-label="حذف المسحة"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">delete</span></button>` : ''}
+      </div>`; }).join('') || '<div class="text-[13px] text-on-surface-variant py-3">لا توجد زيادة</div>'}</div>
+  </div>
+
+  <div id="sd-p-left" class="hidden flex flex-col gap-2">
+    <h3 class="text-[13px] font-bold">ليست ناقصة — خرجت من المخزن بعد بدء الجرد (${leftStock.length})</h3>
+    <p class="text-[11.5px] text-on-surface-variant">كانت بالمخزن لحظة بدء الجرد ثم بيعت أو خرجت أو حُذفت، فلا تُحسب ناقصة. إن كانت حالتها خاطئة افتحها وصحّحها.</p>
     <div class="flex flex-col gap-1 lg:grid lg:grid-cols-3 xl:grid-cols-4 lg:gap-2">${leftStock.map(({ e, p }) => `
       <div class="flex items-center justify-between gap-2 bg-surface-container-low rounded-lg px-3 py-2 text-[12px]">
         <span class="font-data-mono" dir="ltr">${esc(e.barcode || e.match_value)}</span>
         <span class="font-semibold">${statusLabel(p ? p.status : 'deleted')}</span>
         ${pieceLink(p) || '<span></span>'}
-      </div>`).join('')}</div>
-  </div>` : ''}
+      </div>`).join('') || '<div class="text-[13px] text-on-surface-variant py-3">لا شيء</div>'}</div>
+  </div>
 
-  <div>
-    <h3 class="text-[13px] font-bold text-amber-700 mb-1">زيادة (${surplus.length})</h3>
-    ${unknownSurplus.length ? `<p class="text-[11px] text-on-surface-variant mb-2">${unknownSurplus.length} منها رموز غير موجودة في النظام، وغالباً هي قراءات خاطئة من الكاميرا.</p>
-      ${editable ? `<button type="button" onclick="sdDeleteUnknown(this)" class="h-9 px-3 mb-2 rounded-lg border border-error text-error text-[12px] font-bold">حذف كل الرموز غير الموجودة في النظام (${unknownSurplus.length})</button>` : ''}` : ''}
-    <div class="flex flex-col gap-1 lg:grid lg:grid-cols-3 xl:grid-cols-4 lg:gap-2">${surplus.filter(r => known[r.rfid_epc]).map(r => { const p = known[r.rfid_epc]; return `
-      <div class="flex items-center justify-between gap-2 bg-amber-50 rounded-lg px-3 py-2 text-[12px]">
-        <span class="font-data-mono" dir="ltr">${esc(r.rfid_epc)}</span>
-        <span>مسجّلة — ${statusLabel(p.status)}</span>
-        <a href="piece-edit-ar.html?id=${esc(p.id)}" class="text-[11.5px] font-semibold text-primary underline">فتح</a>
-      </div>`; }).join('')}</div>
+  <div id="sd-p-gold" class="hidden flex flex-col gap-3">
+    <p class="text-[11.5px] text-on-surface-variant">محسوبة بنفس طريقة صفحة المخزن: كل الصناديق ضمن الجرد (ذهبية وألماسية وغيرها، وعيار 24 كقطع)، والكسر ليس منها. قيمة المصنعية = مصنعية الغرام × الوزن المحاسبي.</p>
+    ${sdGoldCard('المخزون المتوقع الآن', nowT, 'border-outline-variant')}
+    ${sdGoldCard('ذهب القطع التي وُجدت بالجرد', foundT, 'border-green-200 bg-green-50/40')}
+    ${missT.n ? sdGoldCard('ذهب القطع الناقصة فعلاً', missT, 'border-red-200 bg-red-50/40') : ''}
   </div>`;
   window.__sdUnknownIds = unknownSurplus.map(r => r.id);
-  const realEl = document.getElementById('sd-missing-real');
-  if (realEl) realEl.textContent = leftStock.length ? 'منها ' + realMissing.length + ' ناقصة فعلاً' : '';
 }
 
 async function sdMarkFound(pieceId, source, btn) {
+  if (!sdEditable()) return;
   const value = btn.dataset.v;
   if (!confirm('تأكيد: القطعة ' + value + ' موجودة فعلاً بالمحل؟ ستُسجَّل كممسوحة يدوياً باسمك.')) return;
   btn.disabled = true;
@@ -2017,28 +1802,28 @@ async function sdMarkFound(pieceId, source, btn) {
   }).select('id').maybeSingle();
   if (error && error.code !== '23505') { btn.disabled = false; alert('تعذّر الحفظ: ' + error.message); return; }
   sessionDetailScanRows.unshift({ id: (data && data.id) || ('new-' + Date.now()), rfid_epc: value, match_status: 'matched', scan_method: 'manual' });
-  await recomputeSessionCounts(sessionDetailId);
-  renderSessionDetailCounts(); renderSessionScansList(); renderSessionReview();
+  await sdAfterEdit();
 }
 
 async function sdDeleteUnknown(btn) {
+  if (!sdEditable()) return;
   const ids = (window.__sdUnknownIds || []).filter(id => !String(id).startsWith('new-'));
-  if (!ids.length || !confirm('حذف ' + ids.length + ' مسحة لرموز غير موجودة في النظام من هذه الجلسة؟')) return;
+  if (!ids.length || !confirm('حذف ' + ids.length + ' مسحة لرموز غير موجودة في النظام من هذا الجرد؟')) return;
   btn.disabled = true;
   for (let i = 0; i < ids.length; i += 100) {
     const { error } = await goldmindClient.from('inventory_count_scans').delete().in('id', ids.slice(i, i + 100));
     if (error) { btn.disabled = false; alert('تعذّر الحذف: ' + error.message); return; }
   }
-  goldmindClient.from('audit_log').insert({ store_id: GOLDMIND_STORE_ID, action_type: 'inventory_count_scan_removed', description: 'حذف ' + ids.length + ' مسحة غير موجودة في النظام من جلسة جرد' }).then(() => {});
+  goldmindClient.from('audit_log').insert({ store_id: GOLDMIND_STORE_ID, action_type: 'inventory_count_scan_removed', description: 'حذف ' + ids.length + ' مسحة غير موجودة في النظام من جرد' }).then(() => {});
   const gone = new Set(ids);
   sessionDetailScanRows = sessionDetailScanRows.filter(r => !gone.has(r.id));
-  await recomputeSessionCounts(sessionDetailId);
-  renderSessionDetailCounts(); renderSessionScansList(); renderSessionReview();
+  await sdAfterEdit();
 }
 
 function closeSessionDetail() {
   backToHub();
 }
+
 
 init();
 </script>
