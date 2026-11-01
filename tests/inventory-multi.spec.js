@@ -12,7 +12,8 @@ function db(me = STAFF) {
     staff: [{ id: STAFF, user_id: me === STAFF ? USER : 'other', store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' },
             { id: STAFF2, user_id: me === STAFF2 ? USER : 'other', store_id: STORE, role: 'owner', permissions: {}, full_name: 'أحمد' }],
     user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
-    pieces: [],
+    // the expected pieces still exist in stock (closing a count re-reads the current stock)
+    pieces: ['E1', 'E2', 'E3'].map((v, i) => ({ id: 'p' + i, store_id: STORE, barcode: 'GM-' + v, rfid_epc: v, status: 'available' })),
     inventory_counts: [{ id: COUNT, store_id: STORE, status: 'in_progress', method: 'rfid', scope: ['gold'], started_at: '2026-09-27T08:00:00Z', expected_piece_count: 3 }],
     inventory_count_expected: ['E1', 'E2', 'E3'].map((v, i) => ({ count_id: COUNT, piece_id: 'p' + i, piece_source: 'gold', match_value: v, barcode: 'GM-' + v, karat: 18, weight_grams: 5 })),
   };
@@ -105,6 +106,7 @@ test('report lists show each piece photo, and why a surplus scan was surplus', a
   const page = await ctx.newPage();
   const base = db(STAFF);
   base.pieces = [
+    { id: 'p0', store_id: STORE, barcode: 'GM-E1', rfid_epc: 'E1', status: 'available', description_ar: 'حلق', photo_url: null },
     { id: 'p1', store_id: STORE, barcode: 'GM-E2', rfid_epc: 'E2', status: 'available', description_ar: 'سوار', photo_url: 'http://localhost:4173/icon-192.png' },
     { id: 'p2', store_id: STORE, barcode: 'GM-E3', rfid_epc: 'E3', status: 'available', description_ar: 'خاتم', photo_url: null },
     { id: 'ps', store_id: STORE, barcode: 'GM-S1', rfid_epc: 'S1', status: 'sold', description_ar: 'عقد', photo_url: 'http://localhost:4173/icon-512.png' },
