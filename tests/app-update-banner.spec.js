@@ -18,3 +18,18 @@ test('update bar stays below the status bar and its download link is tappable', 
   expect(box.y).toBeGreaterThanOrEqual(32);
   expect(await page.evaluate(({ x, y }) => document.elementFromPoint(x, y).textContent, { x: box.x + box.width / 2, y: box.y + box.height / 2 })).toBe('تنزيل');
 });
+
+// A new commit that changes nothing in the app (tests, SQL, notes) is not an update (Bashar 2026-11-02).
+for (const [label, releaseContent, shown] of [['same app files: no bar', '1234567890abcdef', false], ['changed app files: bar', 'fedcba0987654321', true]]) {
+  test('update bar compares app content — ' + label, async ({ page }) => {
+    await page.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true }; });
+    await install(page, { db: { stores: [{ id: STORE, name: 'محل', currency: 'AED' }], staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {} }], user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }] } });
+    await page.route(/build-info\.json/, r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ sha: 'a'.repeat(40), content: '1234567890abcdef' }) }));
+    await page.route(/api\.github\.com\/repos\/.*\/releases\/tags\/app-latest/, r => r.fulfill({ contentType: 'application/json', body: JSON.stringify({ body: 'Automatically built from commit ' + 'b'.repeat(40) + ' (content ' + releaseContent + '). Download' }) }));
+    const seen = page.waitForResponse(/releases\/tags\/app-latest/);
+    await page.goto('/reports-ar.html');
+    await seen;
+    if (shown) await expect(page.locator('#gm-update-banner')).toBeVisible();
+    else { await page.waitForTimeout(500); await expect(page.locator('#gm-update-banner')).toHaveCount(0); }
+  });
+}

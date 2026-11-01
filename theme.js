@@ -34,10 +34,14 @@ if (!history.state) {
       return fetch('https://api.github.com/repos/eng-bashar-asad/GoldMind/releases/tags/app-latest', { cache: 'no-store' })
         .then(r => r.ok ? r.json() : null)
         .then(rel => {
-          const m = rel && String(rel.body || '').match(/commit ([0-9a-f]{40})/);
+          const body = String(rel && rel.body || '');
+          const m = body.match(/commit ([0-9a-f]{40})/);
           if (!m) return;
           const releaseSha = m[1];
           if (releaseSha === buildInfo.sha) return; // this phone already has the newest APK
+          // Same app files, only another commit (tests, SQL, notes): not an update (Bashar 2026-11-02).
+          const c = body.match(/content ([0-9a-f]{16})/);
+          if (c && buildInfo.content && c[1] === buildInfo.content) return;
           if (localStorage.getItem(DISMISS_KEY) === releaseSha) return; // user already dismissed this exact version
           gmShowUpdateBanner(APK_URL, releaseSha);
         });

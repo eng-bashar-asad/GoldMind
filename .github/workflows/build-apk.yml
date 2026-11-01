@@ -11,9 +11,24 @@ name: Build GoldMind APK
 # 404'd even though the build itself succeeded. This comment-only edit
 # forces one clean rebuild to repopulate the asset.
 
+# Build only when the app's own files change (Bashar 2026-11-02): a push of tests,
+# SQL, migrations or notes used to build a "new" APK with nothing new in it, so
+# the in-app update bar showed twice in a row. Root-level patterns only match the
+# site root (GitHub `*` never crosses a `/`), which is exactly what gets bundled.
 on:
   push:
     branches: [main]
+    paths:
+      - '*.html'
+      - '*.js'
+      - '*.png'
+      - '*.jpg'
+      - '*.jpeg'
+      - '*.svg'
+      - '*.ico'
+      - '*.webmanifest'
+      - 'app/**'
+      - '.github/workflows/build-apk.yml'
   workflow_dispatch: {}
 
 # Multiple pushes landing close together (e.g. several files updated in a
@@ -87,9 +102,14 @@ jobs:
       # know whether a newer APK is available — since installing this app
       # from a sideloaded APK never auto-updates on its own the way the
       # website (GitHub Pages / PWA) does.
+      # "content" = fingerprint of the app's own tracked files (git blob ids of the
+      # bundled root files + app/). Same files -> same fingerprint, so the in-app
+      # update bar stays quiet for a build that changes nothing in the app.
       - name: Stamp build version into the app
         run: |
-          printf '{"sha": "%s", "built_at": "%s"}' "${{ github.sha }}" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > app/www/build-info.json
+          CONTENT=$(git ls-files -s -- ':(glob)*.html' ':(glob)*.js' ':(glob)*.png' ':(glob)*.jpg' ':(glob)*.jpeg' ':(glob)*.svg' ':(glob)*.ico' ':(glob)*.webmanifest' 'app' | sha256sum | cut -c1-16)
+          echo "GM_CONTENT=$CONTENT" >> "$GITHUB_ENV"
+          printf '{"sha": "%s", "content": "%s", "built_at": "%s"}' "${{ github.sha }}" "$CONTENT" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > app/www/build-info.json
 
       # Precompile static Tailwind CSS (one file per distinct page config)
       # and strip the runtime Play CDN script from the bundled pages.
@@ -185,7 +205,7 @@ jobs:
         with:
           tag_name: app-latest
           name: "GoldMind APK (latest)"
-          body: "Automatically built from commit ${{ github.sha }}. Download GoldMind.apk below and open it on your phone to install (allow 'install unknown apps' for your browser if asked)."
+          body: "Automatically built from commit ${{ github.sha }} (content ${{ env.GM_CONTENT }}). Download GoldMind.apk below and open it on your phone to install (allow 'install unknown apps' for your browser if asked)."
           files: apk-output/GoldMind.apk
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
