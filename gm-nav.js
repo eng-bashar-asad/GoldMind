@@ -183,7 +183,8 @@
     @media (max-width:640px){.gm-pal-ov{padding:0}.gm-pal{max-height:100%;height:100%;border-radius:0}.gm-pal kbd{display:none}}
     @media (max-width:1023px){#gmNav .gn-search kbd{display:none}}
     @media screen and (min-width:1024px){
-      html.gm-desk #gmNav.gn-light{top:12px;right:12px;height:calc(100% - 24px);border-radius:24px;box-shadow:0 24px 60px rgba(90,62,15,.22)}
+      /* flush with the screen edges so it meets the page's top bar (Bashar 2026-11-02: a floating panel didn't line up) */
+      html.gm-desk #gmNav.gn-light{top:0;right:0;height:100%;border-radius:0;border-width:0 0 0 1px;border-color:rgba(140,106,34,.22);box-shadow:-10px 0 30px rgba(90,62,15,.10)}
       html.gm-desk.gm-navlight{--gm-side:288px}
       html.gm-desk.gm-navlight.gm-mini{--gm-side:100px}
       html.gm-desk.gm-mini #gmNav .gn-style,html.gm-desk.gm-mini #gmNav .gn-sec,html.gm-desk.gm-mini #gmNav .gn-favempty,html.gm-desk.gm-mini #gmNav .gn-search .gn-st,html.gm-desk.gm-mini #gmNav .gn-search kbd,html.gm-desk.gm-mini #gmNav .gn-me-t,html.gm-desk.gm-mini #gmNav .gn-me a{display:none}

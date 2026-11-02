@@ -41,6 +41,36 @@
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <style>
+/* give-out pieces: one compact row each instead of a tall card (Bashar 2026-11-02) */
+#gm-live-totals{display:none}
+#gm-live-totals .gm-lt-in{background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant);border-radius:14px;padding:12px 14px}
+#gm-live-totals h3{font-size:14px;font-weight:700;margin-bottom:8px;display:flex;align-items:center;gap:6px}
+#gm-live-totals #gs-preview{margin:0!important;font-size:13.5px;gap:6px}
+#gm-live-totals #gs-preview .font-data-mono{font-size:14.5px}
+.gs-tbl{border:1px solid var(--gm-outline-variant);border-radius:12px;overflow:hidden;background:var(--gm-surface-lowest,#fff)}
+.gs-row{display:grid;grid-template-columns:24px minmax(0,1.5fr) 40px repeat(3,minmax(0,1fr)) 58px 32px;gap:6px;align-items:center;padding:4px 8px;border-bottom:1px solid #EFE7D2;font-size:12.5px}
+.gs-row:last-child{border-bottom:0}
+.gs-row.priced{grid-template-columns:24px minmax(0,1.5fr) 40px minmax(0,2fr) 32px}
+.gs-row.hd{background:#F7F2E6;font-size:11px;font-weight:700;color:var(--gm-on-surface-variant);padding:7px 8px}
+.gs-row input{width:100%;height:32px;border:1px solid var(--gm-outline-variant);border-radius:8px;padding:0 6px;font-size:12.5px;direction:ltr;text-align:left;background:#fff}
+.gs-row .gs-fl{display:none}
+.gs-n{font-size:11px;color:#8C8270;text-align:center}
+.gs-nm{min-width:0}.gs-nm b{display:block;font-size:12.5px;line-height:1.3}.gs-nm span{display:block;font-size:11px;color:#8C8270;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.gs-k,.gs-24{text-align:center}
+.gs-nm .gs-kph{display:none}
+.gs-del{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#ba1a1a}
+.gs-del:hover{background:#FBE9E7}
+@media (max-width:639px){
+  .gs-row,.gs-row.priced{grid-template-columns:repeat(3,minmax(0,1fr));position:relative;padding:8px}
+  .gs-row.hd,.gs-n,.gs-k,.gs-24{display:none}
+  .gs-nm{grid-column:1/-1;padding-inline-end:40px}
+  .gs-row.priced .gs-f{grid-column:1/-1}
+  .gs-row .gs-fl{display:block;font-size:10px;color:#6B6355;margin-bottom:2px}
+  .gs-nm .gs-kph{display:inline}
+  .gs-del{position:absolute;top:4px;left:4px;width:40px;height:40px}
+}
+</style>
+<style>
 /* computer: trader card and forms on the right, the movements fill the rest */
 @media (min-width:1024px){
   #trader-detail-view:not(.hidden){display:grid;grid-template-columns:minmax(0,360px) minmax(0,1fr) minmax(0,380px);column-gap:24px;align-items:start}
@@ -48,6 +78,10 @@
   #trader-detail-view > #gm-forms-col{grid-column:2;grid-row:1 / span 40}
   #trader-detail-view > #gm-side-col{grid-column:3;grid-row:1 / span 40;position:sticky;top:80px;max-height:calc(100vh - 96px);overflow-y:auto}
   #gm-forms-col:has(> div:not(.hidden)) > #gm-forms-hint{display:none}
+  /* give-out voucher: its running totals stay beside you in the right column (Bashar 2026-11-02) */
+  #trader-detail-view > #gm-live-totals{grid-column:1;grid-row:span 37}
+  #trader-detail-view:has(#give-stock-form:not(.hidden) #gs-barcode-mode:not(.hidden)) > #gm-live-totals{display:block}
+  #gm-live-totals .gm-lt-in{position:sticky;top:80px}
 }
 </style>
 <style>
@@ -363,6 +397,9 @@ function goToStatementPrint() {
 <span class="material-symbols-outlined text-[19px]">currency_exchange</span> تسكير عملات (تحويل رصيد الذهب إلى كاش)
 </button>
 </div>
+
+<!-- computer: the give-out voucher's totals, always in view while scanning (filled with #gs-preview) -->
+<div id="gm-live-totals" aria-live="polite"><div class="gm-lt-in"><h3><span class="material-symbols-outlined text-[18px]" aria-hidden="true">functions</span>مجموع السند حتى الآن</h3><div id="gs-preview-slot"></div></div></div>
 
 <div id="gm-forms-col" class="flex flex-col gap-4">
 <p id="gm-forms-hint" class="hidden lg:block text-center text-[13px] text-on-surface-variant border border-dashed border-outline-variant rounded-xl py-12">اختر عملية من الأزرار (إخراج بضاعة، إدخال بضاعة، تسوية...) لتظهر هنا.</p>
@@ -2670,6 +2707,7 @@ function renderGsPhotoPanel() {
 
 function renderGiveStockCart(previewOnly) {
   renderGsPhotoPanel();
+  gsPlacePreview();
   document.querySelectorAll('#gs-basis button').forEach(b => { const on = b.dataset.v === gsBasis(); b.style.background = on ? '#000' : ''; b.style.color = on ? '#fff' : ''; });
   const priced = gsIsPriced();
   if (priced && gsGoldPrices === null) { gsGoldPrices = {}; gsLoadGoldPrices(); }
@@ -2709,36 +2747,35 @@ function renderGiveStockCart(previewOnly) {
 
   if (previewOnly) return; // don't rebuild the list while the user is mid-typing in one of its inputs
 
-  // newest scanned piece on top
-  document.getElementById('gs-cart-list').innerHTML = giveStockCart.slice().reverse().map(it => ` 
-    <div class="bg-white border border-outline-variant rounded-lg p-3 flex flex-col gap-2">
-      <div class="flex items-center justify-between gap-2">
-        <div class="min-w-0">
-          <div class="font-data-mono font-bold text-sm">قائم ${fmt(it.grossWeight)} غ &middot; محاسبي ${fmt(it.accountingWeight)} غ &middot; عيار ${it.karat}</div>
-          <div class="text-outline text-[11px] font-data-mono truncate">${gmEscapeHtml(it.barcode)}${it.description ? ' — ' + gmEscapeHtml(it.description) : ''}</div>
-        </div>
-        <button onclick="removeGiveStockCartItem(${it.cartId})" class="text-error shrink-0"><span class="material-symbols-outlined text-[18px]">delete</span></button>
-      </div>
-      ${priced ? `<div>
-          <label class="block text-[10px] text-on-surface-variant mb-0.5">السعر على التاجر (${currencyUnitLabel()}) — كلفتها علينا الآن ${fmtMoney(gsPieceCost(it))}</label>
-          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.price || ''}" oninput="updateGiveStockCartItem(${it.cartId}, 'price', this.value)"/>
-        </div>` : ''}
-      <div class="grid grid-cols-3 gap-2 ${priced ? 'hidden' : ''}">
-        <div>
-          <label class="block text-[10px] text-on-surface-variant mb-0.5">الوزن القائم (غ)</label>
-          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.grossWeight}" oninput="updateGiveStockCartItem(${it.cartId}, 'grossWeight', this.value)"/>
-        </div>
-        <div>
-          <label class="block text-[10px] text-on-surface-variant mb-0.5">الوزن المحاسبي (غ)</label>
-          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.accountingWeight}" oninput="updateGiveStockCartItem(${it.cartId}, 'accountingWeight', this.value)"/>
-        </div>
-        <div>
-          <label class="block text-[10px] text-on-surface-variant mb-0.5">مصنعية للغرام</label>
-          <input type="number" step="0.01" class="w-full h-9 border border-outline-variant rounded px-2 font-data-mono text-[12px]" value="${it.fabPerGram}" oninput="updateGiveStockCartItem(${it.cartId}, 'fabPerGram', this.value)"/>
-        </div>
-      </div>
-    </div>`).join('');
+  // newest scanned piece on top, one compact row each
+  const n = giveStockCart.length;
+  const num = (it, f, v) => `<input type="number" step="0.01" inputmode="decimal" aria-label="${f[1]} ${gmEscapeHtml(it.barcode)}" value="${v}" oninput="updateGiveStockCartItem(${it.cartId}, '${f[0]}', this.value)"/>`;
+  const field = (it, f, v) => `<label class="gs-f"><span class="gs-fl">${f[1]}</span>${num(it, f, v)}</label>`;
+  document.getElementById('gs-cart-list').innerHTML = !n ? '' : '<div class="gs-tbl">'
+    + (priced
+      ? `<div class="gs-row priced hd"><span>#</span><span>القطعة</span><span class="gs-k">عيار</span><span>السعر على التاجر (${currencyUnitLabel()})</span><span></span></div>`
+      : '<div class="gs-row hd"><span>#</span><span>القطعة</span><span class="gs-k">عيار</span><span>قائم غ</span><span>محاسبي غ</span><span>مصنعية/غ</span><span class="gs-24">ع24</span><span></span></div>')
+    + giveStockCart.slice().reverse().map((it, i) => `
+    <div class="gs-row${priced ? ' priced' : ''}">
+      <span class="gs-n">${n - i}</span>
+      <div class="gs-nm"><b class="font-data-mono" dir="ltr" style="text-align:right">${gmEscapeHtml(it.barcode)}</b><span>${it.description ? gmEscapeHtml(it.description) : ''}<span class="gs-kph"> · عيار ${it.karat}</span></span></div>
+      <span class="gs-k font-data-mono">${it.karat}</span>
+      ${priced
+        ? `<label class="gs-f"><span class="gs-fl">السعر على التاجر — كلفتها علينا ${fmtMoney(gsPieceCost(it))}</span>${num(it, ['price', 'السعر'], it.price || '')}</label>`
+        : field(it, ['grossWeight', 'القائم'], it.grossWeight) + field(it, ['accountingWeight', 'المحاسبي'], it.accountingWeight) + field(it, ['fabPerGram', 'مصنعية/غ'], it.fabPerGram)
+          + `<span class="gs-24 font-data-mono">${fmt(gsBillW(it) * ((it.karat || 0) / 24))}</span>`}
+      <button type="button" class="gs-del" onclick="removeGiveStockCartItem(${it.cartId})" aria-label="حذف ${gmEscapeHtml(it.barcode)}"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+    </div>`).join('') + '</div>';
 }
+
+// computer: the totals box sits in the right column (sticky); phone: under the list as before
+function gsPlacePreview() {
+  const prev = document.getElementById('gs-preview'), slot = document.getElementById('gs-preview-slot');
+  if (!prev || !slot) return;
+  if (window.matchMedia('(min-width:1024px)').matches) { if (prev.parentElement !== slot) slot.appendChild(prev); }
+  else if (prev.parentElement === slot) document.getElementById('gs-cart-list').after(prev);
+}
+window.matchMedia('(min-width:1024px)').addEventListener('change', gsPlacePreview);
 
 async function submitGiveStock() {
   const errEl = document.getElementById('gs-error');

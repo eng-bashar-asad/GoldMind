@@ -36,3 +36,23 @@ test('give stock by weight: several lines, one voucher', async ({ page }) => {
   expect(rows.every(r => r.source === 'stock_given' && r.movement_type === 'debt_decrease')).toBe(true);
   expect(errs).toEqual([]);
 });
+
+// Computer: the voucher's totals sit in the right column beside the list (Bashar 2026-11-02)
+test('give-out totals move beside the list on a computer', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'AED' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'جليل' }], trader_movements: [],
+    pieces: [{ id: 'pc1', store_id: STORE, barcode: '000709', status: 'available', karat: 18, weight_grams: 10, accounting_weight_grams: 9, cost_fabrication_per_gram: 5 }],
+  } });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/ledger-ar.html?trader=t1');
+  await page.waitForFunction(() => typeof toggleGiveStockForm === 'function' && currentTraderId === 't1');
+  await page.evaluate(() => toggleGiveStockForm());
+  await page.locator('#gs-barcode-input').fill('000709');
+  await page.evaluate(() => searchGiveStockBarcode());
+  await expect(page.locator('#gs-cart-list .gs-row:not(.hd)')).toHaveCount(1);
+  await expect(page.locator('#gs-preview-slot #gs-preview')).toHaveCount(1);
+  await expect(page.locator('#gs-preview-count')).toHaveText('1');
+});
