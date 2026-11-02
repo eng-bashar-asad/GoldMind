@@ -13,6 +13,7 @@ test('update bar stays below the status bar and its download link is tappable', 
   await page.goto('/reports-ar.html');
   const link = page.locator('#gm-update-banner a', { hasText: 'تنزيل' });
   await expect(link).toBeVisible();
+  await expect(link).toHaveAttribute('href', /GoldMind\.apk\?v=bbbbbbbbbbbb$/); // per-version link
   await page.evaluate(() => document.documentElement.style.setProperty('--safe-area-inset-top', '32px')); // what Capacitor injects
   const box = await link.boundingBox();
   expect(box.y).toBeGreaterThanOrEqual(32);

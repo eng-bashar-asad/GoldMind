@@ -62,7 +62,9 @@ function gmShowUpdateBanner(apkUrl, latestSha) {
   bar.innerHTML =
     '<span>يتوفر تحديث جديد للتطبيق</span>' +
     '<span style="display:flex;gap:6px;align-items:center;">' +
-      '<a href="' + apkUrl + '" style="background:#fff;color:#7a6222;border-radius:999px;padding:8px 14px;text-decoration:none;font-weight:700;">تنزيل</a>' +
+      // a different link for every version: the phone's browser otherwise offers to "open" the APK it
+      // downloaded last time (same address), which reinstalls the old version and the bar comes back.
+      '<a href="' + apkUrl + '?v=' + String(latestSha).slice(0, 12) + '" style="background:#fff;color:#7a6222;border-radius:999px;padding:8px 14px;text-decoration:none;font-weight:700;">تنزيل</a>' +
       '<button type="button" aria-label="إخفاء" style="background:transparent;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;min-width:44px;min-height:44px;">×</button>' +
     '</span>';
   bar.querySelector('button').onclick = function () {
