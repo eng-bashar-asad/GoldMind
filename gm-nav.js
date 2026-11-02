@@ -240,6 +240,8 @@
       html.gm-anim .gm-pop{animation:gmPop .42s cubic-bezier(.34,1.56,.64,1) both;animation-delay:calc(var(--gm-i,0) * 45ms + 180ms)}
       @media (hover:hover){html.gm-glass.gm-light-canvas main :is(a,button):is(.rounded-xl,.rounded-2xl):not(:disabled){transition:transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s}
         html.gm-glass.gm-light-canvas main :is(a,button):is(.rounded-xl,.rounded-2xl):not(:disabled):hover{transform:translateY(-3px);box-shadow:0 18px 40px rgba(110,78,20,.18)}}
+      html.gm-noblur *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+      html.gm-noblur #gmGlassBg *{animation:none!important;stroke-dashoffset:0!important}
       @media (prefers-reduced-motion:reduce){html.gm-anim main > *,html.gm-anim .gm-pop{animation:none!important}#gmGlassBg *{animation:none!important;stroke-dashoffset:0!important}}
     }
     @media print{#gmNav,#gmNavOverlay,.gm-nav-btn,.gm-pal-ov,#gmGlassBg{display:none!important}}
@@ -876,7 +878,10 @@
       ic.style.setProperty('--gm-i', n++); ic.classList.add('gm-pop');
     });
   }
-  document.documentElement.classList.add('gm-anim');
+  // Automated test browsers have no graphics card: blur and motion only slow them down (and make timing
+  // tests flaky). There the glass colours, background and switches stay; blur and motion are off.
+  var gmBot = !!navigator.webdriver;
+  if (gmBot) document.documentElement.classList.add('gm-noblur'); else document.documentElement.classList.add('gm-anim');
   applyGlass(glassOn());
 
   function build() {

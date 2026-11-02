@@ -63,3 +63,12 @@ test('glass pages: on by default with the emblem background; «عادية» turn
   await expect(page.locator('html')).not.toHaveClass(/gm-glass/);
   await expect(page.locator('#gmNav .gn-pages button[data-gl="0"]')).toHaveAttribute('aria-checked', 'true');
 });
+
+test('test browsers: glass colours stay, blur and motion are off', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await install(page, { db });
+  await page.goto('/inventory-list-ar.html');
+  await expect(page.locator('html')).toHaveClass(/gm-glass/);
+  await expect(page.locator('html')).toHaveClass(/gm-noblur/);
+  await expect(page.locator('html')).not.toHaveClass(/gm-anim/);
+});
