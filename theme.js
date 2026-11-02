@@ -937,6 +937,9 @@ goldmindLoadSavedFont();
     header.sticky.top-0, header.fixed.top-0 {
       padding-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
     }
+    /* a fixed-height header grows by the status bar instead of squeezing its content up under it */
+    header.fixed.top-0.h-16, header.sticky.top-0.h-16 { height: calc(4rem + max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))); }
+    header.fixed.top-0.h-16 ~ main.pt-20 { padding-top: calc(5rem + max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px))); }
     nav.sticky.bottom-0, nav.fixed.bottom-0,
     div.sticky.bottom-0, div.fixed.bottom-0 {
       padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
@@ -1211,7 +1214,7 @@ function gmHardwareBack() {
 (function () {
   if (window.GM_NAV_DISABLED || document.querySelector('script[src^="gm-nav.js"]')) return;
   var sc = document.createElement('script');
-  sc.src = 'gm-nav.js?v=25';
+  sc.src = 'gm-nav.js?v=26';
   document.head.appendChild(sc);
 })();
 

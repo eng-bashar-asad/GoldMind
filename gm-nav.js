@@ -199,20 +199,20 @@
     #gmNav.gn-light .gn-pages{color:#7a6a48}
     #gmGlassBg{display:none}
     @media screen{
-      html.gm-glass.gm-light-canvas{background:radial-gradient(900px 640px at 88% 4%,#f1d18a 0,transparent 60%),radial-gradient(800px 600px at 4% 98%,#e6b766 0,transparent 58%),#f3e8d1!important}
+      html.gm-glass.gm-light-canvas{background:radial-gradient(900px 640px at 88% 4%,rgba(212,175,55,.16) 0,transparent 60%),radial-gradient(800px 600px at 4% 98%,rgba(184,134,43,.12) 0,transparent 58%),var(--gm-bg,#F7F1E3)!important}
       html.gm-glass.gm-light-canvas body{background:transparent!important}
       html.gm-glass.gm-light-canvas #gmGlassBg{display:block;position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
-      html.gm-glass.gm-light-canvas{--gm-surface-lowest:rgba(255,252,244,.46)!important;--gm-surface-low:rgba(250,238,212,.4)!important}
+      html.gm-glass.gm-light-canvas{--gm-surface-lowest:rgba(255,252,244,.78)!important;--gm-surface-low:rgba(250,238,212,.72)!important}
       html.gm-glass.gm-light-canvas :is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-white,.bg-surface):is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl,[class*="rounded-["]):not(.fixed *):not(input,select,textarea),
       html.gm-glass.gm-light-canvas :is(header.sticky,header.fixed,.sticky.top-0){-webkit-backdrop-filter:blur(14px) saturate(165%);backdrop-filter:blur(14px) saturate(165%)}
-      html.gm-glass.gm-light-canvas .bg-white:is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl,[class*="rounded-["]):not(.fixed *):not(input,select,textarea){background-color:rgba(255,253,247,.46)!important}
+      html.gm-glass.gm-light-canvas .bg-white:is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl,[class*="rounded-["]):not(.fixed *):not(input,select,textarea){background-color:rgba(255,253,247,.78)!important}
       html.gm-glass.gm-light-canvas :is(.bg-surface-container-lowest,.bg-white):is(.rounded-xl,.rounded-2xl,.rounded-3xl,[class*="rounded-["]):not(.fixed *){border-color:rgba(255,255,255,.7)!important;box-shadow:0 14px 34px rgba(110,78,20,.10),inset 0 1px 0 rgba(255,255,255,.85)}
       /* page-made white cards (their own class names) */
-      html.gm-glass.gm-light-canvas :is(.gm-row,.gm-mcard,.gm-qa,.gm-spec,.gd-card,.ss-card,.ss-kpi,.mc-card,.mc-kpi,.rp-card,.pc-card,.ld-card,.inv-card,.tax-card,.stc,.dsk-card,.dsk-kpi):not(.fixed *){background:rgba(255,253,247,.46)!important;-webkit-backdrop-filter:blur(14px) saturate(165%);backdrop-filter:blur(14px) saturate(165%);border:1px solid rgba(255,255,255,.7)!important;box-shadow:0 14px 34px rgba(110,78,20,.10),inset 0 1px 0 rgba(255,255,255,.85)}
+      html.gm-glass.gm-light-canvas :is(.gm-row,.gm-mcard,.gm-qa,.gm-spec,.gd-card,.ss-card,.ss-kpi,.mc-card,.mc-kpi,.rp-card,.pc-card,.ld-card,.inv-card,.tax-card,.stc,.dsk-card,.dsk-kpi):not(.fixed *){background:rgba(255,253,247,.78)!important;-webkit-backdrop-filter:blur(14px) saturate(165%);backdrop-filter:blur(14px) saturate(165%);border:1px solid rgba(255,255,255,.7)!important;box-shadow:0 14px 34px rgba(110,78,20,.10),inset 0 1px 0 rgba(255,255,255,.85)}
       /* home (computer): its own surface colour + panels; quick-access tiles (phone + computer); stock status buttons; small chip buttons */
-      html.gm-glass.gm-light-canvas .dsk-app{--dsk-surface:rgba(255,252,244,.46)!important;--dsk-surface-sunken:rgba(250,238,212,.36)!important;--dsk-bg:transparent!important;background:transparent!important}
+      html.gm-glass.gm-light-canvas .dsk-app{--dsk-surface:rgba(255,252,244,.78)!important;--dsk-surface-sunken:rgba(250,238,212,.7)!important;--dsk-bg:transparent!important;background:transparent!important}
       html.gm-glass.gm-light-canvas :is(.dsk-stat,.dsk-panel,.dsk-action-strip,.dsk-topbar):not(.fixed *){-webkit-backdrop-filter:blur(14px) saturate(165%);backdrop-filter:blur(14px) saturate(165%);border-color:rgba(255,255,255,.7)!important}
-      html.gm-glass.gm-light-canvas :is(.gm-qg,.gm-status button:not([aria-pressed="true"]),.gm-chip-btn:not([style*="background"]),.dsk-customize-btn):not(.fixed *){background:rgba(255,253,247,.44)!important;-webkit-backdrop-filter:blur(12px) saturate(160%);backdrop-filter:blur(12px) saturate(160%);border-color:rgba(255,255,255,.72)!important;box-shadow:0 10px 26px rgba(110,78,20,.10),inset 0 1px 0 rgba(255,255,255,.85)}
+      html.gm-glass.gm-light-canvas :is(.gm-qg,.gm-status button:not([aria-pressed="true"]),.gm-chip-btn:not([style*="background"]),.dsk-customize-btn):not(.fixed *){background:rgba(255,253,247,.76)!important;-webkit-backdrop-filter:blur(12px) saturate(160%);backdrop-filter:blur(12px) saturate(160%);border-color:rgba(255,255,255,.72)!important;box-shadow:0 10px 26px rgba(110,78,20,.10),inset 0 1px 0 rgba(255,255,255,.85)}
       html.gm-glass.gm-light-canvas :is(input,select,textarea){background-color:rgba(255,255,255,.88)}
       html.gm-glass.gm-light-canvas .fixed :is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-white,.bg-surface){background-color:#FFFDF8!important}
       html.gm-glass.gm-light-canvas .gm-bottom-tabs{background:rgba(255,252,244,.62)!important;-webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);border-top-color:rgba(255,255,255,.7)}
@@ -852,20 +852,20 @@
     var desk = isDesk();
     var bg = document.createElement('div'); bg.id = 'gmGlassBg'; bg.setAttribute('aria-hidden', 'true');
     var ring = 'M159 58.7 A72 72 0 1 0 163.6 133.8 L163.6 108 L136 108';
-    bg.innerHTML = '<svg viewBox="0 0 200 200" style="width:' + (desk ? 'min(1100px,150vw)' : '170vw') + ';height:auto;left:' + (desk ? '-18%' : '-55%') + ';top:' + (desk ? '-8%' : '6%') + ';opacity:.55">'
+    bg.innerHTML = '<svg viewBox="0 0 200 200" style="width:' + (desk ? 'min(1100px,150vw)' : '170vw') + ';height:auto;left:' + (desk ? '-18%' : '-55%') + ';top:' + (desk ? '-8%' : '6%') + ';opacity:.2">'
       + '<defs><linearGradient id="gmgg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBE7A1"/><stop offset=".5" stop-color="#D4AF37"/><stop offset="1" stop-color="#8E6A1F"/></linearGradient>'
       + '<radialGradient id="gmss" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFF3C8" stop-opacity=".95"/><stop offset=".45" stop-color="#F5D77A" stop-opacity=".45"/><stop offset="1" stop-color="#F5D77A" stop-opacity="0"/></radialGradient>'
-      + '<linearGradient id="gmcy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9BE3F0"/><stop offset="1" stop-color="#4FB3C8"/></linearGradient>'
+      + '<linearGradient id="gmcy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#C9A04A"/><stop offset="1" stop-color="#7A5A1E"/></linearGradient>'
       + '<linearGradient id="gmau" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3D27A"/><stop offset="1" stop-color="#B8862B"/></linearGradient></defs>'
       + '<g class="gms"><path class="gmr" d="' + ring + '" fill="none" stroke="url(#gmgg)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/></g>'
       + '<g stroke-width="2.4" stroke-linecap="round" opacity=".9">'
-      + '<g class="gmc"><line x1="66" y1="62" x2="66" y2="146" stroke="#7FD6E8"/><rect x="59.5" y="70" width="13" height="70" rx="3" fill="url(#gmcy)"/></g>'
+      + '<g class="gmc"><line x1="66" y1="62" x2="66" y2="146" stroke="#A8822F"/><rect x="59.5" y="70" width="13" height="70" rx="3" fill="url(#gmcy)"/></g>'
       + '<g class="gmc"><line x1="86" y1="98" x2="86" y2="146" stroke="#D4AF37"/><rect x="79.5" y="106" width="13" height="34" rx="3" fill="url(#gmau)"/></g>'
-      + '<g class="gmc"><line x1="106" y1="56" x2="106" y2="146" stroke="#7FD6E8"/><rect x="99.5" y="64" width="13" height="76" rx="3" fill="url(#gmcy)"/></g>'
+      + '<g class="gmc"><line x1="106" y1="56" x2="106" y2="146" stroke="#A8822F"/><rect x="99.5" y="64" width="13" height="76" rx="3" fill="url(#gmcy)"/></g>'
       + '<g class="gmc"><line x1="126" y1="86" x2="126" y2="146" stroke="#D4AF37"/><rect x="119.5" y="94" width="13" height="46" rx="3" fill="url(#gmau)"/></g></g>'
       + '<path d="M66 58 L86 94 L106 52 L126 82 L136 96" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="1.8" stroke-linecap="round"/>'
       + '<circle class="gmt" cx="66" cy="58" r="7" fill="url(#gmss)"/><circle class="gmt" cx="106" cy="52" r="7" fill="url(#gmss)"/><circle class="gmt" cx="136" cy="96" r="7" fill="url(#gmss)"/></svg>'
-      + (desk ? '<svg viewBox="0 0 200 200" style="width:340px;height:auto;right:22%;bottom:-90px;opacity:.35"><path d="' + ring + '" fill="none" stroke="url(#gmgg)" stroke-width="12" stroke-linecap="round"/></svg>' : '');
+      + (desk ? '<svg viewBox="0 0 200 200" style="width:340px;height:auto;right:22%;bottom:-90px;opacity:.14"><path d="' + ring + '" fill="none" stroke="url(#gmgg)" stroke-width="12" stroke-linecap="round"/></svg>' : '');
     document.body.insertBefore(bg, document.body.firstChild);
   }
   // icons on the page's buttons pop in one after another (only what is on screen at load)
