@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fBImGTPEIdd7Na95XRt88pV6yE8KWCQNvbdzfuDTaASleYuiMIVsxidNxaEnC8Q
+\restrict xw5aQroqLY3EnMuUvXEgs3zdVLf86CtEqBEBHhlv72l2SZCtezuKRL7ejRITnp3
 
 
 SET statement_timeout = 0;
@@ -1987,6 +1987,28 @@ begin
   end if;
   return new;
 end $$;
+
+
+--
+-- Name: gm_piece_barcode_epc_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_piece_barcode_epc_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $_$
+begin
+  if new.barcode ~ '^[0-9]{1,16}$' and exists (
+      select 1 from public.pieces p
+          where p.store_id = new.store_id and p.id <> new.id
+                and p.barcode ~ '^[0-9]{1,16}$'
+                      and ltrim(p.barcode, '0') = ltrim(new.barcode, '0')
+                        ) then
+                            raise exception 'الباركود % يطابق باركود قطعة أخرى في المحل بعد حذف الأصفار من اليسار (مثل 4 و 000004)، فتأخذان رقم شريحة RFID نفسه. اختر باركوداً آخر أو اتركه فارغاً ليُولَّد تلقائياً.', new.barcode
+                                  using errcode = 'unique_violation';
+                                    end if;
+                                      return new;
+                                      end $_$;
 
 
 --
@@ -8963,6 +8985,13 @@ CREATE TRIGGER audit_pieces AFTER INSERT OR DELETE OR UPDATE ON public.pieces FO
 
 
 --
+-- Name: pieces pieces_barcode_epc_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER pieces_barcode_epc_guard BEFORE INSERT OR UPDATE OF barcode, store_id ON public.pieces FOR EACH ROW EXECUTE FUNCTION public.gm_piece_barcode_epc_guard();
+
+
+--
 -- Name: staff trg_auto_upgrade_on_staff_change; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -12249,6 +12278,14 @@ GRANT ALL ON FUNCTION public.gm_op_date_stamp() TO service_role;
 
 
 --
+-- Name: FUNCTION gm_piece_barcode_epc_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_piece_barcode_epc_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_piece_barcode_epc_guard() TO service_role;
+
+
+--
 -- Name: FUNCTION gm_plan_yearly(p_plan uuid, p_store uuid, OUT amount numeric, OUT currency text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -13905,5 +13942,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fBImGTPEIdd7Na95XRt88pV6yE8KWCQNvbdzfuDTaASleYuiMIVsxidNxaEnC8Q
+\unrestrict xw5aQroqLY3EnMuUvXEgs3zdVLf86CtEqBEBHhlv72l2SZCtezuKRL7ejRITnp3
 
