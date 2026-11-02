@@ -233,11 +233,13 @@
       /* entrance: page blocks rise one after another, icons on buttons pop in; once per page load */
       @keyframes gmRise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
       @keyframes gmPop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:none}}
-      html.gm-anim main > :nth-child(-n+14){animation:gmRise .5s cubic-bezier(.22,1,.36,1) both}
+      /* backwards, not both: a transform kept after the animation turns the block into the frame of any fixed
+         pop-up inside it, so edit sheets opened at the bottom of the page instead of on screen */
+      html.gm-anim main > :nth-child(-n+14){animation:gmRise .5s cubic-bezier(.22,1,.36,1) backwards}
       html.gm-anim main > :nth-child(2){animation-delay:55ms}html.gm-anim main > :nth-child(3){animation-delay:110ms}html.gm-anim main > :nth-child(4){animation-delay:165ms}
       html.gm-anim main > :nth-child(5){animation-delay:220ms}html.gm-anim main > :nth-child(6){animation-delay:275ms}html.gm-anim main > :nth-child(7){animation-delay:330ms}
       html.gm-anim main > :nth-child(8){animation-delay:385ms}html.gm-anim main > :nth-child(n+9){animation-delay:440ms}
-      html.gm-anim .gm-pop{animation:gmPop .42s cubic-bezier(.34,1.56,.64,1) both;animation-delay:calc(var(--gm-i,0) * 45ms + 180ms)}
+      html.gm-anim .gm-pop{animation:gmPop .42s cubic-bezier(.34,1.56,.64,1) backwards;animation-delay:calc(var(--gm-i,0) * 45ms + 180ms)}
       @media (hover:hover){html.gm-glass.gm-light-canvas main :is(a,button):is(.rounded-xl,.rounded-2xl):not(:disabled){transition:transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s}
         html.gm-glass.gm-light-canvas main :is(a,button):is(.rounded-xl,.rounded-2xl):not(:disabled):hover{transform:translateY(-3px);box-shadow:0 18px 40px rgba(110,78,20,.18)}}
       html.gm-noblur *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}

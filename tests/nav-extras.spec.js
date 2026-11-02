@@ -80,3 +80,15 @@ test('login page stays out of glass pages', async ({ page }) => {
   await page.waitForTimeout(400);
   expect(await page.evaluate(() => document.documentElement.classList.contains('gm-glass'))).toBe(false);
 });
+
+// The entrance motion must not leave a transform behind: it would make the animated block the frame of
+// fixed pop-ups inside it (the daily box edit sheet opened at the bottom of the page) — Bashar 2026-11-02
+test('entrance motion leaves no transform on page blocks', async ({ page }) => {
+  await page.addInitScript(() => Object.defineProperty(Navigator.prototype, 'webdriver', { get: () => false })); // motion on
+  await install(page, { generic: true });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/daily-cashbox-ar.html');
+  await expect(page.locator('#page-content')).not.toHaveClass(/\bhidden\b/);
+  await page.waitForTimeout(1200);
+  expect(await page.evaluate(() => getComputedStyle(document.getElementById('page-content')).transform)).toBe('none');
+});
