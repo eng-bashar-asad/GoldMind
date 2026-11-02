@@ -154,7 +154,7 @@ function pickKind(id) { KIND_PICK = KIND_PICK === id ? null : id; if (KIND_PICK)
 const STATUS_LABELS = { paid: 'مدفوعة', unpaid: 'غير مدفوعة', cancelled: 'ملغاة', received: 'مستلمة', in_progress: 'قيد التصليح', ready: 'جاهزة', delivered: 'تم التسليم' };
 
 let allRows = [];
-const INV_SELECT = 'id, invoice_number, trader_id, type, is_exchange, status, total_amount, fabrication_fees, vat_amount, created_at, currency, pay_currency, pay_fx_rate, pay_breakdown, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name';
+const INV_SELECT = 'id, invoice_number, trader_id, type, is_exchange, status, total_amount, fabrication_fees, vat_amount, created_at, currency, pay_currency, pay_fx_rate, pay_breakdown, audited_at, customer:customer_id(name, phone), trader:trader_id(name, phone), counterparty_name';
 
 // Barcodes (all invoices) + net weight (buyTrader) from invoice_items, in chunks of 100 ids.
 async function gmLoadItems(ids) {
@@ -236,6 +236,7 @@ async function gmBuildInvoiceRows(invoices) {
       paidMain: paid.main, paidSub: !!paid.sub, paidSplit: paid.split || '',
       barcodes: bc[i.id] || [],
       isExchange: !!i.is_exchange,
+      audited: !!i.audited_at,
       isTraderDebt: i.type === 'buyTrader',
       isTraderDoc: i.type === 'buyTrader' || !!i.trader_id,
       netWeight: i.type === 'buyTrader' ? (weightByInvoice[i.id] || 0) : null,
@@ -272,6 +273,7 @@ function fmt(n) { return Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { mini
 async function loadData() {
   // employees without 'view_past_days' see today only; without 'view_traders' no trader documents
   const scope = await gmStaffScope();
+  gmAuditScope = scope;
   if (!scope.pastDays) {
     const d = new Date(), local = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
     ['fromDate', 'toDate'].forEach(id => { const el = document.getElementById(id); el.value = local; el.disabled = true; el.title = 'عرض الأيام السابقة يحتاج صلاحية من المدير'; });
@@ -370,7 +372,7 @@ function applyFilters() {
     </div>`; };
   const amountHtml = r => r.amount == null ? '—' : (r.paidMain ? gmEscapeHtml(r.paidMain) : fmt(r.isExchange ? Math.abs(r.amount) : r.amount) + (r.currency ? ' ' + gmEscapeHtml(r.currency) : ''));
   list.innerHTML = (wide ? '<div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden"><table class="w-full border-collapse text-[13px]"><thead><tr>' +
-      ['الوقت', 'الرقم', 'النوع', 'الطرف', 'التفاصيل', 'الحالة', 'المبلغ'].map((h, i) => `<th class="px-3 py-2.5 text-[12px] font-bold text-on-surface-variant bg-surface-container-low border-b border-outline-variant" style="text-align:${i === 6 ? 'left' : 'right'}">${h}</th>`).join('') + '</tr></thead><tbody>' : '') +
+      ['الوقت', 'الرقم', 'النوع', 'الطرف', 'التفاصيل', 'الحالة', 'المبلغ', 'مدقق'].map((h, i) => `<th class="px-3 py-2.5 text-[12px] font-bold text-on-surface-variant bg-surface-container-low border-b border-outline-variant" style="text-align:${i === 6 ? 'left' : i === 7 ? 'center' : 'right'}">${h}</th>`).join('') + '</tr></thead><tbody>' : '') +
     groups.map((g, gi) => {
     const sales = g.rows.filter(r => r.type === 'sale');
     const buys = g.rows.filter(r => r.type === 'buyRetail' || r.type === 'buyTrader');
@@ -378,7 +380,7 @@ function applyFilters() {
     const sum = sales.reduce((t, r) => t + Number(r.amount || 0), 0), bsum = buys.reduce((t, r) => t + Number(r.amount || 0), 0);
     const label = g.key === today ? 'اليوم' : g.key === yday ? 'أمس' : weekday(g.rows[0].created_at);
     const head = dayHead(g, gi, label, sales, sum, cur, buys, bsum);
-    if (wide) return `<tr><td colspan="7" class="p-1.5">${head}</td></tr>` + g.rows.map(r => {
+    if (wide) return `<tr><td colspan="8" class="p-1.5">${head}</td></tr>` + g.rows.map(r => {
       const kc = kindColor(r), statusLabel = STATUS_LABELS[r.status] || r.status || '';
       const details = [r.isTraderDebt ? 'وزن صافي ' + fmt(r.netWeight) + ' غ' : '', r.weightNote ? gmEscapeHtml(r.weightNote) : ''].filter(Boolean).join(' · ');
       return `<tr class="inv-row cursor-pointer hover:bg-surface-container-low" onclick="location.href='${r.href}'" style="box-shadow:inset -5px 0 0 ${kc[0]}">
@@ -388,7 +390,8 @@ function applyFilters() {
         <td class="px-3 py-2 border-b border-outline-variant">${gmEscapeHtml(r.counterpartyName || 'بدون اسم')}${r.counterpartyPhone ? ' <span class="text-[11px] text-on-surface-variant font-data-mono" dir="ltr">' + gmEscapeHtml(r.counterpartyPhone) + '</span>' : ''}</td>
         <td class="px-3 py-2 border-b border-outline-variant text-[12px] text-on-surface-variant">${details}${r.barcodes && r.barcodes.length ? '<div class="inv-bc font-data-mono flex flex-wrap gap-1 mt-0.5" dir="ltr">' + gmBarcodeChips(r.barcodes, q) + '</div>' : ''}</td>
         <td class="px-3 py-2 border-b border-outline-variant text-[12px] whitespace-nowrap">${gmEscapeHtml(statusLabel)}</td>
-        <td class="px-3 py-2 border-b border-outline-variant font-data-mono font-bold text-left whitespace-nowrap" dir="ltr"><span class="inv-amount">${amountHtml(r)}</span>${r.paidMain ? '<div class="text-[10px] font-normal text-on-surface-variant">' + fmt(r.amount) + ' ' + gmEscapeHtml(r.currency || '') + '</div>' : ''}${r.paidSplit ? '<div class="inv-split text-[10px] font-normal text-on-surface-variant">' + gmEscapeHtml(r.paidSplit) + '</div>' : ''}</td></tr>`;
+        <td class="px-3 py-2 border-b border-outline-variant font-data-mono font-bold text-left whitespace-nowrap" dir="ltr"><span class="inv-amount">${amountHtml(r)}</span>${r.paidMain ? '<div class="text-[10px] font-normal text-on-surface-variant">' + fmt(r.amount) + ' ' + gmEscapeHtml(r.currency || '') + '</div>' : ''}${r.paidSplit ? '<div class="inv-split text-[10px] font-normal text-on-surface-variant">' + gmEscapeHtml(r.paidSplit) + '</div>' : ''}</td>
+        <td class="px-2 py-2 border-b border-outline-variant text-center" onclick="event.stopPropagation()">${gmAuditBox(r)}</td></tr>`;
     }).join('');
     return `<div class="mt-2">${head}</div>` + g.rows.map(r => {
     const dateStr = gmFormatDateTime(r.created_at, { hour: '2-digit', minute: '2-digit' });
@@ -407,6 +410,7 @@ function applyFilters() {
           ${r.barcodes && r.barcodes.length ? `<p class="inv-bc text-[11px] font-data-mono text-on-surface-variant flex flex-wrap gap-1" dir="ltr">${gmBarcodeChips(r.barcodes, q)}</p>` : ''}
         </div>
         <div class="flex items-center gap-1 shrink-0">
+          ${r.kind === 'invoice' ? gmAuditBox(r) : ''}
           <div class="flex flex-col items-end">
             ${r.amount == null ? '' : `<span class="inv-amount font-data-mono font-bold text-[14px]" dir="ltr">${r.paidMain ? gmEscapeHtml(r.paidMain) : fmt(r.isExchange ? Math.abs(r.amount) : r.amount) + (r.currency ? ' ' + gmEscapeHtml(r.currency) : '')}</span>`}
             ${r.isExchange ? `<span class="text-[9px] text-on-surface-variant">${Number(r.amount) > 0.004 ? 'فرق على الزبون' : Number(r.amount) < -0.004 ? 'فرق للزبون' : 'بدون فرق'}</span>` : ''}
@@ -419,6 +423,38 @@ function applyFilters() {
       </a>`;
   }).join('');
   }).join('') + (wide ? '</tbody></table></div>' : '');
+}
+
+// «مدقق»: checked = the invoice is locked (enforced by the invoices trigger). Owner or 'audit_invoices'
+// may check it; only the owner may uncheck it.
+let gmAuditScope = { owner: false, audit: false };
+function gmAuditBox(r) {
+  if (r.kind !== 'invoice') return '';
+  const canOn = gmAuditScope.owner || gmAuditScope.audit, can = r.audited ? gmAuditScope.owner : canOn;
+  const tip = r.audited ? (can ? 'مدققة ومقفلة — اضغط لإلغاء التدقيق' : 'مدققة ومقفلة — إلغاء التدقيق للمدير فقط') : (can ? 'تدقيق الفاتورة وقفلها على التعديل' : 'التدقيق يحتاج صلاحية من المدير');
+  return `<label class="gm-audit inline-flex items-center justify-center gap-1 rounded-lg px-1.5 text-[11px] font-bold ${can ? 'cursor-pointer' : 'opacity-60 cursor-not-allowed'}" style="min-width:44px;min-height:44px;color:${r.audited ? '#1B5E20' : 'inherit'}" title="${tip}" onclick="gmAuditLabelClick(event, this)">
+    <input type="checkbox" class="w-5 h-5 accent-green-700" data-audit="${r.id}" aria-label="مدقق ${gmEscapeHtml(r.number || '')}" ${r.audited ? 'checked' : ''} ${can ? '' : 'disabled'} onclick="event.stopPropagation()" onchange="gmToggleAudit('${r.id}', this)"><span class="lg:hidden">مدقق</span></label>`;
+}
+// the phone card is a link: a tap on the label must not open the invoice
+function gmAuditLabelClick(e, label) {
+  e.stopPropagation();
+  if (e.target.tagName === 'INPUT') return;
+  e.preventDefault();
+  const box = label.querySelector('input');
+  if (box.disabled) return;
+  box.checked = !box.checked;
+  box.dispatchEvent(new Event('change'));
+}
+async function gmToggleAudit(id, box) {
+  const row = allRows.find(x => x.id === id && x.kind === 'invoice'); if (!row) return;
+  const on = box.checked;
+  if (!on && !confirm('إلغاء إشارة «مدقق» يفتح الفاتورة ' + (row.number || '') + ' للتعديل. متابعة؟')) { box.checked = true; return; }
+  box.disabled = true;
+  const { error } = await goldmindClient.rpc('set_invoice_audited', { p_invoice: id, p_on: on });
+  if (error) { box.checked = !on; box.disabled = false; gmNotify(error.message || 'تعذّر حفظ التدقيق', 'err'); return; }
+  row.audited = on;
+  gmNotify(on ? 'تم تدقيق الفاتورة ' + (row.number || '') + ' وقفلها' : 'تم إلغاء تدقيق الفاتورة ' + (row.number || ''), 'ok');
+  applyFilters();
 }
 
 function gmBarcodeChips(list, q) {

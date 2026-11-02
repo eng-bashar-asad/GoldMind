@@ -120,6 +120,9 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm text-center font-semibold">هذه الفاتورة ملغاة ولا تُحتسب في أي تقرير
 <button type="button" id="banner-restore-btn" onclick="restoreInvoiceFlow()" class="hidden mt-2 mx-auto items-center gap-1 px-4 h-9 rounded-lg bg-white border border-red-300 text-blue-700 text-[13px]"><span class="material-symbols-outlined text-[18px]">restore</span>استعادة الفاتورة لتعديلها</button></div>
 </div>
+<div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="audited-banner">
+<div class="bg-green-50 border border-green-200 text-green-800 rounded-lg p-3 text-sm text-center font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">verified</span>فاتورة مدققة ومقفلة على التعديل — يلغي المدير إشارة «مدقق» من قائمة الفواتير</div>
+</div>
 <!-- owner / set_seller: change who this sale counts for -->
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="seller-edit"></div>
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="profit-panel">
@@ -562,6 +565,9 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         document.getElementById('inv-payment').textContent = gmPaymentLabel(invoice, store);
         document.getElementById('inv-creator').textContent = creator && creator.full_name ? creator.full_name : '—';
         // «البائع»: who the sale counts for in the staff sales report (empty on old invoices = who entered it)
+        // «مدقق»: locked for any edit until the owner unchecks it on the invoices list (the trigger enforces it)
+        const auditLocked = !!invoice.audited_at;
+        if (auditLocked) document.getElementById('audited-banner').classList.remove('hidden');
         if (invoice.type === 'sale' || invoice.type === 'return') {
             const spId = invoice.salesperson_id || invoice.created_by;
             const showSeller = async id => {
@@ -570,7 +576,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
                 document.getElementById('inv-seller-line').classList.toggle('hidden', id === invoice.created_by);
             };
             showSeller(spId);
-            if (invoice.type === 'sale' && invoice.status !== 'cancelled' && invoice.store_id === GOLDMIND_STORE_ID) {
+            if (!auditLocked && invoice.type === 'sale' && invoice.status !== 'cancelled' && invoice.store_id === GOLDMIND_STORE_ID) {
                 gmSellerPicker(document.getElementById('seller-edit'), { value: spId, onChange: async id => {
                     const { data: upd, error } = await goldmindClient.from('invoices').update({ salesperson_id: id }).eq('id', invoice.id).select('salesperson_id').maybeSingle();
                     if (error || !upd || upd.salesperson_id !== id) { gmNotify('تعذّر تغيير البائع' + (error ? ': ' + error.message : ' — ليست لديك صلاحية تعديل الفاتورة.'), 'err'); return; }
@@ -591,13 +597,13 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             }
         } else {
             const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
-            if (staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.delete_invoice))) {
+            if (!auditLocked && staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.delete_invoice))) {
                 const btn = document.getElementById('cancel-invoice-btn');
                 btn.classList.remove('hidden');
                 btn.classList.add('flex');
                 window.__currentInvoiceId = invoiceId;
             }
-            if (staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.edit_invoice))
+            if (!auditLocked && staffRow && (staffRow.role === 'owner' || (staffRow.permissions && staffRow.permissions.edit_invoice))
                 && (invoice.type === 'sale' || invoice.type === 'buyTrader' || invoice.type === 'buyRetail')) {
                 const editBtn = document.getElementById('edit-invoice-btn');
                 editBtn.classList.remove('hidden');
@@ -621,7 +627,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             const m = String(invoice.invoice_number || '').match(/-(\d{4})-(\d+)$/) || [];
             const isLast = invoice.type === 'sale' && !invoice.is_exchange && Number(m[1]) === Number(store.next_invoice_seq_year)
                 && Number(m[2]) === Number(store.next_invoice_seq) - 1;
-            if (isLast) {
+            if (isLast && !auditLocked) {
                 const { data: ownerRow } = await goldmindClient.from('staff').select('role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
                 if (ownerRow && ownerRow.role === 'owner') {
                     const delBtn = document.getElementById('delete-invoice-btn');

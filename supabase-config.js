@@ -710,7 +710,7 @@ async function gmStaffScope() {
     if (!GOLDMIND_STAFF_ID) return { owner: false, pastDays: false, pastCash: false, backdate: false, traders: false, profit: false }; // not cached: no session yet
     const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
     const owner = !!(me && me.role === 'owner'), has = function (k) { return owner || !!(me && me.permissions && me.permissions[k] === true); };
-    gmScopeCache = { owner: owner, pastDays: has('view_past_days'), pastCash: has('view_past_cashbox'), backdate: has('backdate_entries'), traders: has('view_traders'), profit: has('view_profit_report') };
+    gmScopeCache = { owner: owner, pastDays: has('view_past_days'), pastCash: has('view_past_cashbox'), backdate: has('backdate_entries'), traders: has('view_traders'), profit: has('view_profit_report'), audit: has('audit_invoices') };
     return gmScopeCache;
 }
 // start of today in the shop's display time zone, as an ISO instant
