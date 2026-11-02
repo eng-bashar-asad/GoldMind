@@ -73,3 +73,16 @@ test.describe('phone actions', () => {
     })).toEqual([]);
   });
 });
+
+// «حركة» button fixed in the top bar opens the add form straight away (Bashar 2026-11-02)
+test('phone: top «حركة» button opens the add form', async ({ page }) => {
+  await install(page, { db: db() });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/daily-cashbox-ar.html');
+  const btn = page.locator('#dcTopAdd');
+  await expect(btn).toBeVisible();
+  await expect(page.locator('#addForm')).toHaveClass(/\bhidden\b/);
+  await btn.click();
+  await expect(page.locator('#addForm')).not.toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#opTypeInput')).toBeFocused();
+});
