@@ -11,24 +11,14 @@ name: Build GoldMind APK
 # 404'd even though the build itself succeeded. This comment-only edit
 # forces one clean rebuild to repopulate the asset.
 
-# Build only when the app's own files change (Bashar 2026-11-02): a push of tests,
-# SQL, migrations or notes used to build a "new" APK with nothing new in it, so
-# the in-app update bar showed twice in a row. Root-level patterns only match the
-# site root (GitHub `*` never crosses a `/`), which is exactly what gets bundled.
+# One APK a day (Bashar 2026-11-02): building on every push gave two "update" bars within the
+# same hour when two fixes landed close together. The website still updates on every push;
+# the app is built once a night at 03:00 Dubai (23:00 UTC), and only if the app's own files
+# changed since the APK on the release. An urgent fix: run this workflow by hand
+# (Actions -> Build GoldMind APK -> Run workflow), which always builds.
 on:
-  push:
-    branches: [main]
-    paths:
-      - '*.html'
-      - '*.js'
-      - '*.png'
-      - '*.jpg'
-      - '*.jpeg'
-      - '*.svg'
-      - '*.ico'
-      - '*.webmanifest'
-      - 'app/**'
-      - '.github/workflows/build-apk.yml'
+  schedule:
+    - cron: '0 23 * * *'
   workflow_dispatch: {}
 
 # Multiple pushes landing close together (e.g. several files updated in a
@@ -45,7 +35,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # Nightly: skip the build when the app files match the APK already on the release.
+  check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    outputs:
+      changed: ${{ steps.cmp.outputs.changed }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - name: Compare app files with the released APK
+        id: cmp
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          CONTENT=$(git ls-files -s -- ':(glob)*.html' ':(glob)*.js' ':(glob)*.png' ':(glob)*.jpg' ':(glob)*.jpeg' ':(glob)*.svg' ':(glob)*.ico' ':(glob)*.webmanifest' 'app' | sha256sum | cut -c1-16)
+          RELEASED=$(gh api "repos/${{ github.repository }}/releases/tags/app-latest" -q .body 2>/dev/null | grep -oE 'content [0-9a-f]{16}' | cut -d' ' -f2 || true)
+          echo "app files $CONTENT, released APK ${RELEASED:-none}"
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$CONTENT" != "$RELEASED" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: check
+    if: needs.check.outputs.changed == 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
