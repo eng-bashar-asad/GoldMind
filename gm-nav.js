@@ -192,7 +192,53 @@
       html.gm-desk.gm-mini #gmNav a.gn-a>.gn-badge{display:inline-flex!important;position:absolute;top:2px;left:6px;min-width:16px;height:16px;font-size:9.5px;padding:0 4px}
       html.gm-desk.gm-mini #gmNav a.gn-a>.gn-badge.txt{display:none!important}
     }
-    @media print{#gmNav,#gmNavOverlay,.gm-nav-btn,.gm-pal-ov{display:none!important}}
+    /* ---- glass pages (Bashar 2026-11-02): translucent cards over the GoldMind emblem, light themes only, screen only ---- */
+    #gmNav .gn-pages{display:flex;align-items:center;gap:6px;margin:-2px 14px 8px;font-size:11.5px;font-weight:700;color:#8C8270}
+    #gmNav .gn-pages .gn-style{flex:1;margin:0;padding:3px}
+    #gmNav .gn-pages .gn-style button{min-height:32px;font-size:12px}
+    #gmNav.gn-light .gn-pages{color:#7a6a48}
+    #gmGlassBg{display:none}
+    @media screen{
+      html.gm-glass.gm-light-canvas{background:radial-gradient(900px 640px at 88% 4%,#f1d18a 0,transparent 60%),radial-gradient(800px 600px at 4% 98%,#e6b766 0,transparent 58%),#f3e8d1!important}
+      html.gm-glass.gm-light-canvas body{background:transparent!important}
+      html.gm-glass.gm-light-canvas #gmGlassBg{display:block;position:fixed;inset:0;z-index:-1;pointer-events:none;overflow:hidden}
+      html.gm-glass.gm-light-canvas{--gm-surface-lowest:rgba(255,252,244,.46)!important;--gm-surface-low:rgba(250,238,212,.4)!important}
+      html.gm-glass.gm-light-canvas :is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-white,.bg-surface):is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl,[class*="rounded-["]):not(.fixed *):not(input,select,textarea),
+      html.gm-glass.gm-light-canvas :is(header.sticky,header.fixed,.sticky.top-0){-webkit-backdrop-filter:blur(14px) saturate(165%);backdrop-filter:blur(14px) saturate(165%)}
+      html.gm-glass.gm-light-canvas .bg-white:is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl,[class*="rounded-["]):not(.fixed *):not(input,select,textarea){background-color:rgba(255,253,247,.46)!important}
+      html.gm-glass.gm-light-canvas :is(.bg-surface-container-lowest,.bg-white):is(.rounded-xl,.rounded-2xl,.rounded-3xl,[class*="rounded-["]):not(.fixed *){border-color:rgba(255,255,255,.7)!important;box-shadow:0 14px 34px rgba(110,78,20,.10),inset 0 1px 0 rgba(255,255,255,.85)}
+      /* page-made white cards (their own class names) */
+      html.gm-glass.gm-light-canvas :is(.gm-row,.gm-mcard,.gm-qa,.gm-spec,.gd-card,.ss-card,.ss-kpi,.mc-card,.mc-kpi,.rp-card,.pc-card,.ld-card,.inv-card,.tax-card,.stc,.dsk-card,.dsk-kpi):not(.fixed *){background:rgba(255,253,247,.46)!important;-webkit-backdrop-filter:blur(14px) saturate(165%);backdrop-filter:blur(14px) saturate(165%);border:1px solid rgba(255,255,255,.7)!important;box-shadow:0 14px 34px rgba(110,78,20,.10),inset 0 1px 0 rgba(255,255,255,.85)}
+      html.gm-glass.gm-light-canvas :is(input,select,textarea){background-color:rgba(255,255,255,.88)}
+      html.gm-glass.gm-light-canvas .fixed :is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-white,.bg-surface){background-color:#FFFDF8!important}
+      html.gm-glass.gm-light-canvas .gm-bottom-tabs{background:rgba(255,252,244,.62)!important;-webkit-backdrop-filter:blur(16px) saturate(170%);backdrop-filter:blur(16px) saturate(170%);border-top-color:rgba(255,255,255,.7)}
+      @supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+        html.gm-glass.gm-light-canvas{--gm-surface-lowest:rgba(255,252,244,.9)!important;--gm-surface-low:rgba(250,238,212,.9)!important}
+      }
+      #gmGlassBg svg{position:absolute}
+      #gmGlassBg .gmr{stroke-dasharray:640;stroke-dashoffset:640;animation:gmDraw 2.2s cubic-bezier(.22,1,.36,1) .2s forwards}
+      #gmGlassBg .gms{transform-origin:100px 100px;animation:gmSpin 60s linear infinite}
+      #gmGlassBg .gmc{transform-box:fill-box;transform-origin:bottom;animation:gmBreathe 5s ease-in-out infinite alternate}
+      #gmGlassBg .gmc:nth-child(2){animation-delay:-1.2s}#gmGlassBg .gmc:nth-child(3){animation-delay:-2.4s}#gmGlassBg .gmc:nth-child(4){animation-delay:-3.6s}
+      #gmGlassBg .gmt{transform-box:fill-box;transform-origin:center;animation:gmTwinkle 2.6s ease-in-out infinite}
+      #gmGlassBg .gmt:nth-of-type(2){animation-delay:-.9s}#gmGlassBg .gmt:nth-of-type(3){animation-delay:-1.7s}
+      @keyframes gmDraw{to{stroke-dashoffset:0}}
+      @keyframes gmSpin{to{transform:rotate(360deg)}}
+      @keyframes gmBreathe{from{transform:scaleY(.86)}to{transform:scaleY(1.06)}}
+      @keyframes gmTwinkle{0%,100%{opacity:.25;transform:scale(.6)}50%{opacity:1;transform:scale(1.15)}}
+      /* entrance: page blocks rise one after another, icons on buttons pop in; once per page load */
+      @keyframes gmRise{from{opacity:0;transform:translateY(14px) scale(.985)}to{opacity:1;transform:none}}
+      @keyframes gmPop{from{opacity:0;transform:scale(.55)}to{opacity:1;transform:none}}
+      html.gm-anim main > :nth-child(-n+14){animation:gmRise .5s cubic-bezier(.22,1,.36,1) both}
+      html.gm-anim main > :nth-child(2){animation-delay:55ms}html.gm-anim main > :nth-child(3){animation-delay:110ms}html.gm-anim main > :nth-child(4){animation-delay:165ms}
+      html.gm-anim main > :nth-child(5){animation-delay:220ms}html.gm-anim main > :nth-child(6){animation-delay:275ms}html.gm-anim main > :nth-child(7){animation-delay:330ms}
+      html.gm-anim main > :nth-child(8){animation-delay:385ms}html.gm-anim main > :nth-child(n+9){animation-delay:440ms}
+      html.gm-anim .gm-pop{animation:gmPop .42s cubic-bezier(.34,1.56,.64,1) both;animation-delay:calc(var(--gm-i,0) * 45ms + 180ms)}
+      @media (hover:hover){html.gm-glass.gm-light-canvas main :is(a,button):is(.rounded-xl,.rounded-2xl):not(:disabled){transition:transform .22s cubic-bezier(.22,1,.36,1),box-shadow .22s}
+        html.gm-glass.gm-light-canvas main :is(a,button):is(.rounded-xl,.rounded-2xl):not(:disabled):hover{transform:translateY(-3px);box-shadow:0 18px 40px rgba(110,78,20,.18)}}
+      @media (prefers-reduced-motion:reduce){html.gm-anim main > *,html.gm-anim .gm-pop{animation:none!important}#gmGlassBg *{animation:none!important;stroke-dashoffset:0!important}}
+    }
+    @media print{#gmNav,#gmNavOverlay,.gm-nav-btn,.gm-pal-ov,#gmGlassBg{display:none!important}}
     /* computer (>=1024px): the menu is a fixed side bar on the right, the page sits beside it,
        and the phone's bottom tab bar and menu buttons go away (design "GoldMind — تصميم الكمبيوتر") */
     #gmNav .gn-mini{display:none}
@@ -579,7 +625,7 @@
     var d = document.getElementById('gmNav'); if (!d) return;
     d.classList.toggle('gn-light', st === 'light');
     document.documentElement.classList.toggle('gm-navlight', st === 'light');
-    d.querySelectorAll('.gn-style button').forEach(function (b) { b.setAttribute('aria-checked', String(b.dataset.st === st)); });
+    d.querySelectorAll('.gn-style button[data-st]').forEach(function (b) { b.setAttribute('aria-checked', String(b.dataset.st === st)); });
   }
   function linkDef(href) {
     for (var i = 0; i < GROUPS.length; i++) for (var j = 0; j < GROUPS[i].l.length; j++) if (GROUPS[i].l[j][0] === href) return GROUPS[i].l[j];
@@ -788,11 +834,53 @@
     }
   });
 
+  // ---- Glass pages + GoldMind emblem background + entrance motion (Bashar 2026-11-02) ----
+  var GLASS_KEY = 'gm_glass';
+  function glassOn() { return lsGet(GLASS_KEY) !== '0'; } // on unless switched off on this device
+  function applyGlass(on) {
+    document.documentElement.classList.toggle('gm-glass', on);
+    document.querySelectorAll('#gmNav .gn-pages button').forEach(function (b) { b.setAttribute('aria-checked', String((b.dataset.gl === '1') === on)); });
+  }
+  function mountGlassBg() {
+    if (document.getElementById('gmGlassBg')) return;
+    var desk = isDesk();
+    var bg = document.createElement('div'); bg.id = 'gmGlassBg'; bg.setAttribute('aria-hidden', 'true');
+    var ring = 'M159 58.7 A72 72 0 1 0 163.6 133.8 L163.6 108 L136 108';
+    bg.innerHTML = '<svg viewBox="0 0 200 200" style="width:' + (desk ? 'min(1100px,150vw)' : '170vw') + ';height:auto;left:' + (desk ? '-18%' : '-55%') + ';top:' + (desk ? '-8%' : '6%') + ';opacity:.55">'
+      + '<defs><linearGradient id="gmgg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FBE7A1"/><stop offset=".5" stop-color="#D4AF37"/><stop offset="1" stop-color="#8E6A1F"/></linearGradient>'
+      + '<radialGradient id="gmss" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#FFF3C8" stop-opacity=".95"/><stop offset=".45" stop-color="#F5D77A" stop-opacity=".45"/><stop offset="1" stop-color="#F5D77A" stop-opacity="0"/></radialGradient>'
+      + '<linearGradient id="gmcy" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#9BE3F0"/><stop offset="1" stop-color="#4FB3C8"/></linearGradient>'
+      + '<linearGradient id="gmau" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#F3D27A"/><stop offset="1" stop-color="#B8862B"/></linearGradient></defs>'
+      + '<g class="gms"><path class="gmr" d="' + ring + '" fill="none" stroke="url(#gmgg)" stroke-width="15" stroke-linecap="round" stroke-linejoin="round"/></g>'
+      + '<g stroke-width="2.4" stroke-linecap="round" opacity=".9">'
+      + '<g class="gmc"><line x1="66" y1="62" x2="66" y2="146" stroke="#7FD6E8"/><rect x="59.5" y="70" width="13" height="70" rx="3" fill="url(#gmcy)"/></g>'
+      + '<g class="gmc"><line x1="86" y1="98" x2="86" y2="146" stroke="#D4AF37"/><rect x="79.5" y="106" width="13" height="34" rx="3" fill="url(#gmau)"/></g>'
+      + '<g class="gmc"><line x1="106" y1="56" x2="106" y2="146" stroke="#7FD6E8"/><rect x="99.5" y="64" width="13" height="76" rx="3" fill="url(#gmcy)"/></g>'
+      + '<g class="gmc"><line x1="126" y1="86" x2="126" y2="146" stroke="#D4AF37"/><rect x="119.5" y="94" width="13" height="46" rx="3" fill="url(#gmau)"/></g></g>'
+      + '<path d="M66 58 L86 94 L106 52 L126 82 L136 96" fill="none" stroke="#fff" stroke-opacity=".8" stroke-width="1.8" stroke-linecap="round"/>'
+      + '<circle class="gmt" cx="66" cy="58" r="7" fill="url(#gmss)"/><circle class="gmt" cx="106" cy="52" r="7" fill="url(#gmss)"/><circle class="gmt" cx="136" cy="96" r="7" fill="url(#gmss)"/></svg>'
+      + (desk ? '<svg viewBox="0 0 200 200" style="width:340px;height:auto;right:22%;bottom:-90px;opacity:.35"><path d="' + ring + '" fill="none" stroke="url(#gmgg)" stroke-width="12" stroke-linecap="round"/></svg>' : '');
+    document.body.insertBefore(bg, document.body.firstChild);
+  }
+  // icons on the page's buttons pop in one after another (only what is on screen at load)
+  function popIcons() {
+    var n = 0, h = window.innerHeight;
+    document.querySelectorAll('main :is(a,button) .material-symbols-outlined').forEach(function (ic) {
+      if (n >= 24) return;
+      var r = ic.getBoundingClientRect();
+      if (!r.width || r.top > h) return;
+      ic.style.setProperty('--gm-i', n++); ic.classList.add('gm-pop');
+    });
+  }
+  document.documentElement.classList.add('gm-anim');
+  applyGlass(glassOn());
+
   function build() {
     var ov = document.createElement('div'); ov.id = 'gmNavOverlay';
     var d = document.createElement('aside'); d.id = 'gmNav'; d.setAttribute('aria-label', 'القائمة'); d.setAttribute('aria-hidden', 'true');
     var html = '<div class="gn-head"><b>GoldMind</b><button type="button" class="gn-mini" aria-label="تصغير القائمة" title="تصغير / توسيع القائمة"><span class="material-symbols-outlined">dock_to_left</span></button><button type="button" class="gn-x" aria-label="إغلاق القائمة"><span class="material-symbols-outlined">close</span></button></div>'
       + '<div class="gn-style" role="radiogroup" aria-label="شكل القائمة"><button type="button" role="radio" data-st="light"><span class="material-symbols-outlined">light_mode</span>فاتحة</button><button type="button" role="radio" data-st="dark"><span class="material-symbols-outlined">dark_mode</span>غامقة</button></div>'
+      + '<div class="gn-pages"><span>الصفحات</span><div class="gn-style" role="radiogroup" aria-label="شكل الصفحات"><button type="button" role="radio" data-gl="1">زجاجية</button><button type="button" role="radio" data-gl="0">عادية</button></div></div>'
       + '<button type="button" class="gn-search" aria-label="بحث (Ctrl+K)"><span class="material-symbols-outlined">search</span><span class="gn-st">ابحث عن صفحة أو زبون أو باركود…</span><kbd>Ctrl K</kbd></button><nav>'
       + '<div class="gn-sec"><span>المفضّلة</span><button type="button" class="gn-favedit">تعديل</button></div><div class="gn-favlist"></div><div class="gn-sec"><span>كل الصفحات</span></div>';
     GROUPS.forEach(function (g) {
@@ -807,7 +895,9 @@
     d.innerHTML = html;
     document.body.appendChild(ov); document.body.appendChild(d);
     applyStyle(navStyle());
-    d.querySelectorAll('.gn-style button').forEach(function (b) { b.addEventListener('click', function () { lsSet(STYLE_KEY, b.dataset.st); applyStyle(b.dataset.st); }); });
+    applyGlass(glassOn());
+    d.querySelectorAll('.gn-pages button').forEach(function (b) { b.addEventListener('click', function () { lsSet(GLASS_KEY, b.dataset.gl); applyGlass(b.dataset.gl === '1'); }); });
+    d.querySelectorAll('.gn-style button[data-st]').forEach(function (b) { b.addEventListener('click', function () { lsSet(STYLE_KEY, b.dataset.st); applyStyle(b.dataset.st); }); });
     d.querySelector('.gn-search').addEventListener('click', palOpen);
     d.querySelector('.gn-favedit').addEventListener('click', function () {
       var on = d.classList.toggle('gn-editing');
@@ -906,7 +996,9 @@
   }
 
   function mount() {
+    mountGlassBg();
     build();
+    popIcons();
     renderFavs();
     addButton();
     setTimeout(applyPermissions, 600);

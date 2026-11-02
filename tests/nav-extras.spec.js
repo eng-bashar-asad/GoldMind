@@ -49,3 +49,17 @@ test('favourites: star a page, it shows on top; Ctrl+K finds pages, customers an
   await page.keyboard.press('Escape');
   await expect(pal).not.toHaveClass(/open/);
 });
+
+test('glass pages: on by default with the emblem background; «عادية» turns them off and is kept', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await install(page, { db });
+  await page.goto('/inventory-list-ar.html');
+  await expect(page.locator('html')).toHaveClass(/gm-glass/);
+  await expect(page.locator('#gmGlassBg svg').first()).toBeAttached();
+  await page.evaluate(() => openNavDrawer());
+  await page.click('#gmNav .gn-pages button[data-gl="0"]');
+  await expect(page.locator('html')).not.toHaveClass(/gm-glass/);
+  await page.reload();
+  await expect(page.locator('html')).not.toHaveClass(/gm-glass/);
+  await expect(page.locator('#gmNav .gn-pages button[data-gl="0"]')).toHaveAttribute('aria-checked', 'true');
+});
