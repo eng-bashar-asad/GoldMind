@@ -842,7 +842,9 @@
 
   // ---- Glass pages + GoldMind emblem background + entrance motion (Bashar 2026-11-02) ----
   var GLASS_KEY = 'gm_glass';
-  function glassOn() { return lsGet(GLASS_KEY) !== '0'; } // on unless switched off on this device
+  // pages drawn for a dark background (login screens: white text on the theme's dark colour) stay as designed
+  function darkPage() { return !!(document.body && /(^|\s)text-white(\s|$)/.test(document.body.className)); }
+  function glassOn() { return lsGet(GLASS_KEY) !== '0' && !darkPage(); } // on unless switched off on this device
   function applyGlass(on) {
     document.documentElement.classList.toggle('gm-glass', on);
     document.querySelectorAll('#gmNav .gn-pages button').forEach(function (b) { b.setAttribute('aria-checked', String((b.dataset.gl === '1') === on)); });

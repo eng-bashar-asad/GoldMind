@@ -72,3 +72,11 @@ test('test browsers: glass colours stay, blur and motion are off', async ({ page
   await expect(page.locator('html')).toHaveClass(/gm-noblur/);
   await expect(page.locator('html')).not.toHaveClass(/gm-anim/);
 });
+
+// Login screens are drawn for a dark background (white text): glass pages leave them as designed (Bashar 2026-11-02)
+test('login page stays out of glass pages', async ({ page }) => {
+  await page.goto('/login-entry-ar.html');
+  await page.waitForFunction(() => !!document.querySelector('script[src*="gm-nav.js"]'));
+  await page.waitForTimeout(400);
+  expect(await page.evaluate(() => document.documentElement.classList.contains('gm-glass'))).toBe(false);
+});

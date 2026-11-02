@@ -23,7 +23,8 @@ if (!history.state) {
   const DISMISS_KEY = 'goldmind_update_dismissed_sha';
   const APK_URL = 'https://github.com/eng-bashar-asad/GoldMind/releases/download/app-latest/GoldMind.apk';
 
-  fetch('build-info.json', { cache: 'no-store' })
+  // ?t=: never an older copy from a cache (an app update keeps the old service worker for one launch)
+  fetch('build-info.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
     .then(buildInfo => {
       if (!buildInfo || !buildInfo.sha) return;
@@ -1216,7 +1217,7 @@ function gmHardwareBack() {
 (function () {
   if (window.GM_NAV_DISABLED || document.querySelector('script[src^="gm-nav.js"]')) return;
   var sc = document.createElement('script');
-  sc.src = 'gm-nav.js?v=26';
+  sc.src = 'gm-nav.js?v=27';
   document.head.appendChild(sc);
 })();
 

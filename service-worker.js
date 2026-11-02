@@ -1,4 +1,9 @@
-const CACHE_NAME = 'goldmind-shell-v305';
+const CACHE_NAME = 'goldmind-shell-v306';
+// Inside the installed app (Capacitor serves the bundled files from https://localhost) the files are
+// already on the phone, and this worker survives an app update: it kept serving the PREVIOUS version's
+// cached theme.js / build-info.json on the first launch after updating, so the update bar came back
+// once more right after installing (Bashar 2026-11-02). There it caches nothing and drops old copies.
+const IN_APP = self.location.hostname === 'localhost';
 // Pages and files needed to keep selling with no internet. Each is cached on
 // its own so one missing file can't block the rest.
 const SHELL_ASSETS = [
@@ -6,7 +11,7 @@ const SHELL_ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './supabase-config.js?v=53',
-  './theme.js?v=81',
+  './theme.js?v=82',
   './gm-invoice-edit.js?v=4',
   './index-ar.html',
   './new-sale-ar.html',
@@ -26,6 +31,7 @@ const SHELL_ASSETS = [
 const CDN_HOSTS = ['cdn.jsdelivr.net', 'cdn.tailwindcss.com', 'fonts.googleapis.com', 'fonts.gstatic.com', 'cdnjs.cloudflare.com'];
 
 self.addEventListener('install', (event) => {
+  if (IN_APP) { self.skipWaiting(); return; }
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) =>
       Promise.all(SHELL_ASSETS.map((u) => cache.add(u).catch(() => {})))
@@ -39,7 +45,7 @@ self.addEventListener('activate', (event) => {
   // app's offline data copy) belong to the page and must survive updates.
   event.waitUntil(
     caches.keys().then((keys) =>
-      Promise.all(keys.filter((k) => k.startsWith('goldmind-shell-') && k !== CACHE_NAME).map((k) => caches.delete(k)))
+      Promise.all(keys.filter((k) => k.startsWith('goldmind-shell-') && (IN_APP || k !== CACHE_NAME)).map((k) => caches.delete(k)))
     )
   );
   self.clients.claim();
@@ -66,8 +72,9 @@ function staleWhileRevalidate(event) {
 // when offline. Same-origin static files and CDN libraries: served from cache
 // instantly and refreshed in the background.
 self.addEventListener('fetch', (event) => {
-  if (event.request.method !== 'GET') return;
+  if (event.request.method !== 'GET' || IN_APP) return;
   const url = new URL(event.request.url);
+  if (url.pathname.endsWith('/build-info.json')) return; // version check: always the real file
 
   if (url.origin !== self.location.origin) {
     if (CDN_HOSTS.includes(url.hostname)) staleWhileRevalidate(event);
