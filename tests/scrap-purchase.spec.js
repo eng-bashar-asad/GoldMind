@@ -57,12 +57,15 @@ test('scrap from an individual lands in the karat scrap box with seller ID', asy
   await page.setInputFiles('#seller-id-front', { name: 'p1.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) });
   await page.setInputFiles('#seller-id-back', { name: 'p2.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) });
 
+  // purchases may stay out of the daily box (ticked by default, shown only for cash)
+  await expect(page.locator('#pur-daily')).toBeChecked();
+  await page.uncheck('#pur-daily');
   await page.click('#save-invoice-btn');
   await expect.poll(() => (posts.company_kyc_documents || []).length, { timeout: 10000 }).toBe(2);
 
   // the whole purchase goes to the server as ONE call (it names the scrap box)
   const p = posts.rpc.p;
-  expect(p).toMatchObject({ type: 'buyRetail', payment_method: 'cash', counterparty_name: 'زبون كسر', seller_id_type: 'passport', seller_id_number: 'N1234567' });
+  expect(p).toMatchObject({ type: 'buyRetail', payment_method: 'cash', daily: false, counterparty_name: 'زبون كسر', seller_id_type: 'passport', seller_id_number: 'N1234567' });
   expect(p.client_ref).toMatch(/^[0-9a-f-]{36}$/);
   expect(p.items).toEqual([expect.objectContaining({ mode: 'bulk', karat: 21, weight: 10, price: 2700 })]);
   expect(posts.invoices).toBeUndefined(); // no direct table writes any more

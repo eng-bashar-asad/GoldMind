@@ -399,6 +399,9 @@
 </button>
 </div>
 
+<!-- like the vouchers: the cash payment may stay out of the daily box (Bashar 2026-11-02) -->
+<label id="daily-opt" class="flex items-center gap-2 text-[13px] font-semibold min-h-[44px] px-1"><input type="checkbox" id="pur-daily" checked class="w-5 h-5 rounded"/> يخرج من الصندوق اليومي (الحركة اليومية)</label>
+
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
 <button id="save-invoice-btn" class="w-full py-4 bg-[#B4955A] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
@@ -738,6 +741,7 @@
         const inactive = 'flex flex-col items-center justify-center p-4 rounded-xl border border-outline-variant bg-white text-on-surface-variant transition-all active:scale-95';
         cashBtn.className = mode === 'cash' ? active : inactive;
         creditBtn.className = mode === 'credit' ? active : inactive;
+        document.getElementById('daily-opt').classList.toggle('hidden', mode !== 'cash'); // only cash touches the daily box
         updateFabFeeVisibility();
         renderCart();
     }
@@ -1264,6 +1268,7 @@
             type: purchaseType,
             trader_id: purchaseType === 'buyTrader' ? selectedTrader.id : null,
             payment_method: selectedPaymentMethod === 'cash' ? 'cash' : 'credit',
+            daily: document.getElementById('pur-daily').checked,
             counterparty_name: purchaseType === 'buyRetail' ? (document.getElementById('retail-name').value.trim() || null) : null,
             seller_id_type: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-type').value || null) : null,
             seller_id_number: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-number').value.trim() || null) : null,
