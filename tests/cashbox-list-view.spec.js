@@ -41,8 +41,9 @@ test('phone: rows are cards, newest on top, no sideways scroll', async ({ page }
   await page.goto('/daily-cashbox-ar.html');
   await expect(page.locator('#cashbox-table thead')).toBeHidden();
   await expect(page.locator('[data-entry="b"]')).toBeVisible();
-  const a = await page.locator('[data-entry="a"]').boundingBox(), b = await page.locator('[data-entry="b"]').boundingBox();
-  expect(b.y).toBeLessThan(a.y);
+  // the list can re-render once after loading: read both positions together, retrying until stable
+  await expect.poll(() => page.evaluate(() => { const a = document.querySelector('[data-entry="a"]'), b = document.querySelector('[data-entry="b"]');
+    return !!(a && b) && b.getBoundingClientRect().top < a.getBoundingClientRect().top; })).toBe(true);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
 });
 
@@ -63,7 +64,7 @@ test.describe('phone actions', () => {
     await card.locator('.dc-act button', { hasText: 'ربط' }).click();
     await expect(page.locator('#autoRowModal')).not.toHaveClass(/\bhidden\b/);
     await page.locator('#autoRowModal button[aria-label="إغلاق"]').click();
-    await page.locator('#dcPhoneBar button', { hasText: 'إضافة حركة' }).click();
+    await page.locator('#dcTopAdd').click(); // the only «add» button now: fixed in the top bar
     await expect(page.locator('#addForm')).not.toHaveClass(/\bhidden\b/);
     await page.locator('#dcPhoneBar button', { hasText: 'عدّ الدرج' }).click();
     await expect(page.locator('#dcSide')).toBeVisible();
