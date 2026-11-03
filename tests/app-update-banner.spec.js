@@ -34,3 +34,13 @@ for (const [label, releaseContent, shown] of [['same app files: no bar', '123456
     else { await page.waitForTimeout(500); await expect(page.locator('#gm-update-banner')).toHaveCount(0); }
   });
 }
+
+test('installed app keeps the page below the status bar (no viewport-fit=cover); the website still uses it', async ({ page }) => {
+  await page.addInitScript(() => { window.Capacitor = { isNativePlatform: () => true }; });
+  await page.goto('/reports-ar.html');
+  expect(await page.locator('meta[name=viewport]').getAttribute('content')).not.toContain('viewport-fit=cover');
+});
+test('website keeps viewport-fit=cover', async ({ page }) => {
+  await page.goto('/reports-ar.html');
+  expect(await page.locator('meta[name=viewport]').getAttribute('content')).toContain('viewport-fit=cover');
+});

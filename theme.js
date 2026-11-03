@@ -767,16 +767,23 @@ goldmindLoadSavedFont();
       color: var(--gm-on-surface, #191c1e);
       background-color: var(--gm-surface-lowest, #ffffff);
     }
-    /* checkboxes/radios: a visible frame, and the tick shows when checked
-       (the white background above used to hide both) */
-    input[type=checkbox], input[type=radio] {
-      border: 1.5px solid var(--gm-outline, #76777d);
-      accent-color: var(--gm-primary, #1F1A12);
+    /* checkboxes/radios (بشار's rule): empty = a light box with a frame only; ticked = the whole box solid black.
+       No native box inside our frame (appearance none) and no tick from the forms plugin (background-image none). */
+    html input:is([type=checkbox], [type=radio]):not([class*="w-"]) { width: 20px; height: 20px; }
+    html input[type=checkbox], html input[type=radio] {
+      -webkit-appearance: none; appearance: none; flex-shrink: 0; margin: 0; padding: 0;
+      vertical-align: middle; cursor: pointer;
+      border: 2px solid var(--gm-outline, #76777d); border-radius: 5px;
+      background: #fff none !important; color: transparent; box-shadow: none;
+      transition: background-color .12s, border-color .12s;
     }
-    input[type=checkbox]:checked, input[type=radio]:checked {
-      background-color: var(--gm-primary, #1F1A12);
-      border-color: var(--gm-primary, #1F1A12);
+    html input[type=radio] { border-radius: 999px; }
+    html input[type=checkbox]:checked, html input[type=radio]:checked {
+      background: #000 none !important; border-color: #000;
     }
+    html input[type=checkbox]:focus-visible, html input[type=radio]:focus-visible { outline: 2px solid #B4955A; outline-offset: 2px; box-shadow: none; }
+    html input[type=checkbox]:disabled, html input[type=radio]:disabled { opacity: .45; cursor: not-allowed; }
+    @media (prefers-reduced-motion: reduce) { html input[type=checkbox], html input[type=radio] { transition: none; } }
   `;
   document.head.appendChild(style);
 })();
@@ -932,7 +939,12 @@ goldmindLoadSavedFont();
 // (0 on devices/browsers that don't need it, so this is a no-op there).
 (function () {
   const vp = document.querySelector('meta[name="viewport"]');
-  if (vp && !/viewport-fit/.test(vp.content)) {
+  // Inside the installed Android app (Capacitor 8) "cover" makes the WebView draw under the status bar:
+  // the clock and notifications disappear and the top buttons (PDF…) can't be tapped. Without it
+  // Capacitor keeps the page below the status bar, as before the upgrade. Only the website/PWA uses cover.
+  const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+  if (vp && isNativeApp) vp.content = vp.content.replace(/,?\s*viewport-fit=cover/, '');
+  else if (vp && !/viewport-fit/.test(vp.content)) {
     vp.content = vp.content.replace(/\s*$/, '') + ', viewport-fit=cover';
   }
   const style = document.createElement('style');
