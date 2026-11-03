@@ -66,7 +66,9 @@ test.describe('phone actions', () => {
     await page.locator('#autoRowModal button[aria-label="إغلاق"]').click();
     await page.locator('#dcTopAdd').click(); // the only «add» button now: fixed in the top bar
     await expect(page.locator('#addForm')).not.toHaveClass(/\bhidden\b/);
-    await page.locator('#dcPhoneBar button', { hasText: 'عدّ الدرج' }).click();
+    await page.locator('#dcCountBtn').click();
+    await expect(page.locator('#dcPhoneBar')).not.toContainText('عدّ الدرج');
+    await expect(page.locator('#dcAddToggle')).toBeHidden();
     await expect(page.locator('#dcSide')).toBeVisible();
     expect(await page.evaluate(() => {
       const off = [...document.querySelectorAll('#page-content *, #dcPhoneBar')].filter(el => el.getBoundingClientRect().right > innerWidth + 1 || el.getBoundingClientRect().left < -1);
