@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict xw5aQroqLY3EnMuUvXEgs3zdVLf86CtEqBEBHhlv72l2SZCtezuKRL7ejRITnp3
+\restrict YAYVS9rE2LLWZzIwqoMIQYkelFpOzuJJedkqhV6y5Xfjao4veeK9SlarQzogItb
 
 
 SET statement_timeout = 0;
@@ -1886,6 +1886,41 @@ $$;
 
 
 --
+-- Name: gm_invoice_audit_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_invoice_audit_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+declare
+  free text[] := array['amount_paid', 'status', 'einvoice_xml', 'einvoice_uuid', 'einvoice_status', 'audited_at', 'audited_by'];
+begin
+  if tg_op = 'DELETE' then
+    if old.audited_at is not null then
+      raise exception 'الفاتورة % مدققة ولا يمكن حذفها. يستطيع المدير إلغاء إشارة «مدقق» من قائمة الفواتير.', old.invoice_number using errcode = '42501';
+    end if;
+    return old;
+  end if;
+  if new.audited_at is distinct from old.audited_at and auth.uid() is not null then
+    if new.audited_at is null and not public.gm_is_store_owner(old.store_id) then
+      raise exception 'إلغاء إشارة «مدقق» للمدير فقط.' using errcode = '42501';
+    end if;
+    if new.audited_at is not null and not public.has_permission('audit_invoices', old.store_id) then
+      raise exception 'ليست لديك صلاحية تدقيق الفواتير.' using errcode = '42501';
+    end if;
+  end if;
+  if old.audited_at is not null and new.audited_at is not null then
+    if (to_jsonb(new) - free) is distinct from (to_jsonb(old) - free)
+       or (new.status is distinct from old.status and not (old.status in ('paid', 'unpaid') and new.status in ('paid', 'unpaid'))) then
+      raise exception 'الفاتورة % مدققة ومقفلة على التعديل. يستطيع المدير إلغاء إشارة «مدقق» من قائمة الفواتير.', old.invoice_number using errcode = '42501';
+    end if;
+  end if;
+  return new;
+end $$;
+
+
+--
 -- Name: gm_invoice_daily_rewrite(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1945,6 +1980,37 @@ CREATE FUNCTION public.gm_invoice_daily_rewrite(p_invoice uuid) RETURNS void
                                                                                                                                                                                                                                                                                                                                                                                                                         end if;
                                                                                                                                                                                                                                                                                                                                                                                                                           perform sync_invoice_bank_part(p_invoice);
                                                                                                                                                                                                                                                                                                                                                                                                                           end $$;
+
+
+--
+-- Name: gm_invoice_items_audit_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_invoice_items_audit_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+declare inv record;
+begin
+  select invoice_number, audited_at into inv from public.invoices
+   where id = case when tg_op = 'DELETE' then old.invoice_id else new.invoice_id end;
+  if inv.audited_at is not null then
+    raise exception 'الفاتورة % مدققة ومقفلة على التعديل. يستطيع المدير إلغاء إشارة «مدقق» من قائمة الفواتير.', inv.invoice_number using errcode = '42501';
+  end if;
+  return case when tg_op = 'DELETE' then old else new end;
+end $$;
+
+
+--
+-- Name: gm_is_store_owner(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_is_store_owner(p_store uuid) RETURNS boolean
+    LANGUAGE sql STABLE SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select exists (select 1 from public.staff where user_id = auth.uid() and store_id = p_store and role = 'owner');
+$$;
 
 
 --
@@ -2685,8 +2751,8 @@ CREATE FUNCTION public.mirror_invoice_cash_to_daily() RETURNS trigger
    if new.invoice_id is null then return new; end if;
      -- a change of payment currencies: gm_invoice_daily_rewrite() sets the invoice's rows
        if coalesce(new.description, '') like 'تعديل عملات الدفع%' then return new; end if;
-         select id, type, payment_method, pay_breakdown, pay_currency, pay_fx_rate into inv from public.invoices where id = new.invoice_id;
-           if inv is null then return new; end if;
+         select id, type, payment_method, pay_breakdown, pay_currency, pay_fx_rate, skip_daily into inv from public.invoices where id = new.invoice_id;
+           if inv is null or inv.skip_daily then return new; end if; -- purchase kept out of the daily box
              if inv.payment_method not in ('cash', 'bank', 'mixed') or new.amount <= 0 then return new; end if;
                op := case inv.type when 'sale' then 'فاتورة بيع' when 'return' then 'مرتجع مبيعات' else 'فاتورة شراء' end;
                  if new.edit_delta then
@@ -3113,6 +3179,8 @@ begin
     end if;
   end loop;
 
+  -- «يدخل إلى الصندوق اليومي» unticked: the cash still leaves the main box, the daily box is left alone
+  if not coalesce((p->>'daily')::boolean, true) then update invoices set skip_daily = true where id = inv_id; end if;
   if pm = 'cash' and total > 0 then
     insert into cash_movements (store_id, box, direction, amount, description, created_by, invoice_id)
       values (sid, 'main', 'out', total, 'دفع فاتورة شراء ' || inv_no, me, inv_id);
@@ -4567,6 +4635,30 @@ begin
                                                                                               end loop;
                                                                                               end;
                                                                                               $$;
+
+
+--
+-- Name: set_invoice_audited(uuid, boolean); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.set_invoice_audited(p_invoice uuid, p_on boolean) RETURNS timestamp with time zone
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare inv record; me uuid; v_at timestamptz;
+begin
+  select id, store_id, invoice_number, audited_at into inv from public.invoices where id = p_invoice;
+  if inv.id is null or not public.is_store_member(inv.store_id) then raise exception 'NOT_AUTHORIZED'; end if;
+  if p_on and inv.audited_at is not null then return inv.audited_at; end if;
+  if not p_on and inv.audited_at is null then return null; end if;
+  select id into me from public.staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
+  v_at := case when p_on then now() else null end;
+  update public.invoices set audited_at = v_at, audited_by = case when p_on then me else null end where id = inv.id;
+  insert into public.audit_log (store_id, staff_id, action_type, description)
+  values (inv.store_id, me, case when p_on then 'invoice_audited' else 'invoice_unaudited' end,
+          case when p_on then 'تدقيق الفاتورة ' else 'إلغاء تدقيق الفاتورة ' end || inv.invoice_number);
+  return v_at;
+end $$;
 
 
 --
@@ -6418,6 +6510,9 @@ CREATE TABLE public.invoices (
     pay_breakdown jsonb,
     is_exchange boolean DEFAULT false NOT NULL,
     salesperson_id uuid,
+    audited_at timestamp with time zone,
+    audited_by uuid,
+    skip_daily boolean DEFAULT false NOT NULL,
     CONSTRAINT invoices_seller_id_type_check CHECK (((seller_id_type IS NULL) OR (seller_id_type = ANY (ARRAY['emirates_id'::text, 'passport'::text, 'other'::text]))))
 );
 
@@ -6441,6 +6536,13 @@ COMMENT ON COLUMN public.invoices.bulk_photos IS 'Optional array of photo URLs a
 --
 
 COMMENT ON COLUMN public.invoices.seller_id_type IS 'Purchase from an individual: seller document type (emirates_id / passport / other). Photos live in company_kyc_documents (owner_type=invoice).';
+
+
+--
+-- Name: COLUMN invoices.skip_daily; Type: COMMENT; Schema: public; Owner: -
+--
+
+COMMENT ON COLUMN public.invoices.skip_daily IS 'Purchase whose cash payment is NOT entered in the daily box (chosen on the purchase screen). mirror_invoice_cash_to_daily skips it.';
 
 
 --
@@ -8982,6 +9084,20 @@ CREATE TRIGGER audit_invoices AFTER INSERT OR DELETE OR UPDATE ON public.invoice
 --
 
 CREATE TRIGGER audit_pieces AFTER INSERT OR DELETE OR UPDATE ON public.pieces FOR EACH ROW EXECUTE FUNCTION public.log_audit_event();
+
+
+--
+-- Name: invoice_items invoice_items_audit_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER invoice_items_audit_guard BEFORE INSERT OR DELETE OR UPDATE ON public.invoice_items FOR EACH ROW EXECUTE FUNCTION public.gm_invoice_items_audit_guard();
+
+
+--
+-- Name: invoices invoices_audit_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER invoices_audit_guard BEFORE DELETE OR UPDATE ON public.invoices FOR EACH ROW EXECUTE FUNCTION public.gm_invoice_audit_guard();
 
 
 --
@@ -12251,12 +12367,37 @@ GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO servi
 
 
 --
+-- Name: FUNCTION gm_invoice_audit_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_invoice_audit_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_invoice_audit_guard() TO service_role;
+
+
+--
 -- Name: FUNCTION gm_invoice_daily_rewrite(p_invoice uuid); Type: ACL; Schema: public; Owner: -
 --
 
 REVOKE ALL ON FUNCTION public.gm_invoice_daily_rewrite(p_invoice uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_invoice_daily_rewrite(p_invoice uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.gm_invoice_daily_rewrite(p_invoice uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_invoice_items_audit_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_invoice_items_audit_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_invoice_items_audit_guard() TO service_role;
+
+
+--
+-- Name: FUNCTION gm_is_store_owner(p_store uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_is_store_owner(p_store uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_is_store_owner(p_store uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_is_store_owner(p_store uuid) TO service_role;
 
 
 --
@@ -12891,6 +13032,15 @@ GRANT ALL ON FUNCTION public.set_branch_own_gold_price(p_store uuid, p_own boole
 REVOKE ALL ON FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce numeric, rate numeric) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce numeric, rate numeric) TO authenticated;
 GRANT ALL ON FUNCTION public.set_gold_ounce_price(target_store_id uuid, ounce numeric, rate numeric) TO service_role;
+
+
+--
+-- Name: FUNCTION set_invoice_audited(p_invoice uuid, p_on boolean); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.set_invoice_audited(p_invoice uuid, p_on boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.set_invoice_audited(p_invoice uuid, p_on boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.set_invoice_audited(p_invoice uuid, p_on boolean) TO service_role;
 
 
 --
@@ -13942,5 +14092,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict xw5aQroqLY3EnMuUvXEgs3zdVLf86CtEqBEBHhlv72l2SZCtezuKRL7ejRITnp3
+\unrestrict YAYVS9rE2LLWZzIwqoMIQYkelFpOzuJJedkqhV6y5Xfjao4veeK9SlarQzogItb
 
