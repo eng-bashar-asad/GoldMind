@@ -47,3 +47,23 @@ test('voucher edit: «إرجاع للمخزن» returns one piece and keeps the 
   expect(asked[0]).toEqual({ p_movement: 'm2' });
   await expect(page.locator('#edit-batch-form-b1')).not.toHaveClass(/\bhidden\b/);
 });
+
+// A give-out with one piece (no voucher batch) also offers «إرجاع للمخزن» for that same barcode.
+test('single give-out row: «إرجاع للمخزن» returns the piece on its own barcode', async ({ page }) => {
+  const asked = [];
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'هادي' }],
+    pieces: [{ id: 'pc1', store_id: STORE, barcode: '000729' }],
+    trader_movements: [
+      { id: 'm1', store_id: STORE, trader_id: 't1', piece_id: 'pc1', movement_type: 'debt_decrease', source: 'stock_given', weight_grams: 20, accounting_weight_grams: 19.53, karat: 18, gold_24k_equivalent: 15, fab_fee_per_gram: 15, fab_fee_amount: 303, notes: 'إخراج بضاعة — باركود 000729 (إسوارة)', created_at: ago(2) },
+    ],
+  }, rpc: { trader_return_piece: (b) => { asked.push(b); return { body: { ok: true } }; } } });
+  page.on('dialog', d => { expect(d.message()).toContain('000729'); d.accept(); });
+  await page.goto('/ledger-ar.html?trader=t1');
+  await page.locator('button', { hasText: 'إرجاع للمخزن' }).first().click();
+  await expect.poll(() => asked.length).toBe(1);
+  expect(asked[0]).toMatchObject({ p_movement: 'm1' });
+});

@@ -1398,6 +1398,7 @@ function showTraderDetail(traderId) {
         ${gmBranchTag(m)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(m) ? ' hidden' : ''}">
           ${m.source === 'stock_given' ? `<button onclick="gmVoucherProfitPopup('id','${m.id}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
           <button onclick="toggleEditStockMovement('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          ${m.source === 'stock_given' && m.piece_id ? `<button type="button" data-code="${gmEscapeHtml(((m.notes || '').match(/باركود\s*(\S+)/) || [])[1] || '')}" onclick="ldReturnPiece('${m.id}', '', this)" class="flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">undo</span> إرجاع للمخزن</button>` : ''}
           <button onclick="deleteStockMovement('${m.id}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>
         <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-sm-form-${m.id}">
@@ -1675,7 +1676,8 @@ async function deleteStockMovementBatch(batchId) {
 // cost of that line) and goes back to stock unchanged — gross and accounting weight, making cost,
 // stones, everything as it was before it was given (the piece record itself is never changed).
 async function ldReturnPiece(movementId, batchId, btn) {
-  const code = btn.parentElement.querySelector('.font-data-mono').textContent.trim();
+  const mono = btn.parentElement.querySelector('.font-data-mono');
+  const code = btn.dataset.code || (mono ? mono.textContent.trim() : '');
   if (!confirm('إرجاع القطعة ' + code + ' إلى المخزن؟\nتُحذف من حساب التاجر (الذهب والمصنعية) وترجع إلى المخزن بنفس مواصفاتها: الوزن القائم والمحاسبي والمصنعية والأحجار.')) return;
   btn.disabled = true;
   const { error } = await goldmindClient.rpc('trader_return_piece', { p_movement: movementId });
@@ -1684,7 +1686,7 @@ async function ldReturnPiece(movementId, batchId, btn) {
   await load();
   showTraderDetail(traderIdToReopen);
   // keep the voucher open for the next piece
-  const form = document.getElementById('edit-batch-form-' + batchId);
+  const form = batchId && document.getElementById('edit-batch-form-' + batchId);
   if (form && form.classList.contains('hidden')) toggleEditStockBatch(batchId);
   gmNotify('رجعت القطعة ' + code + ' إلى المخزن.', 'ok');
 }
