@@ -692,6 +692,9 @@
     let selectedPaymentMethod = 'cash';
     // ?edit=<invoice id>: this screen edits a posted sale invoice (gm-invoice-edit.js saves it)
     const EDIT_ID = new URLSearchParams(location.search).get('edit');
+    // ?reuse=<cancelled sale id>: a new sale that takes the cancelled invoice's number (new pieces, customer, date)
+    const REUSE_ID = new URLSearchParams(location.search).get('reuse');
+    let REUSE = null;
     let EDIT = null, EDIT_LATER = 0, CUST_CREDIT = 0;
     const editRemoved = []; // existing lines taken off the invoice
     const cart = []; // { cartId, piece (or null), barcode, karat, weight, price }
@@ -726,7 +729,7 @@
     }
 
     function saveDraftToLocalStorage() {
-        if (EDIT_ID) return; // editing a posted invoice: nothing to hold
+        if (EDIT_ID || REUSE_ID) return; // editing / re-issuing an invoice: nothing to hold
         const others = readDrafts().filter(d => d.id !== currentDraftId);
         if (cart.length === 0 && !selectedCustomer) { writeDrafts(others); return; }
         if (!currentDraftId) currentDraftId = 'd' + Date.now();
@@ -811,6 +814,7 @@
 
     function restoreDraftIfAny() {
         if (EDIT_ID) { gmLoadEdit(); return; }
+        if (REUSE_ID) { gmLoadReuse(); return; }
         // one-time migration from the old single-draft key
         try {
             const old = JSON.parse(localStorage.getItem(OLD_DRAFT_KEY) || 'null');
@@ -2099,6 +2103,12 @@
         // Photos taken at the moment of sale are uploaded first (needs internet);
         // everything else is posted by ONE server step (post_sale_invoice) that
         // saves the whole sale or nothing, and re-checks the numbers itself.
+        if (REUSE) {
+            const v = document.getElementById('reuse-date').value, d = v ? new Date(v) : null;
+            if (!d || isNaN(d) || d.getTime() > Date.now() + 5 * 60000) { showMessage('اختر تاريخاً صحيحاً للفاتورة (ليس في المستقبل).', true); saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); return; }
+            REUSE.soldAt = d.toISOString();
+            if (!navigator.onLine) { showMessage('إعادة إصدار فاتورة تحتاج اتصالاً بالإنترنت.', true); saveBtn.disabled = false; saveBtn.removeAttribute('aria-busy'); return; }
+        }
         const clientRef = (crypto.randomUUID ? crypto.randomUUID() : String(Date.now()) + Math.random());
         const stockPhotoUrls = {};
         for (const item of cart) {
@@ -2124,6 +2134,8 @@
             pay_breakdown: gmPayBreakdown(),
             pay_currency: gmSingleCur(),
             pay_fx_rate: gmSingleCur() ? gmCartByCur()[gmSingleCur()].f / total : null,
+            reuse_invoice_id: REUSE ? REUSE.id : null,
+            sold_at: REUSE ? REUSE.soldAt : null,
             items: cart.map(item => ({
                 mode: item.mode || 'manual',
                 piece_id: (item.piece && item.mode !== 'diamond') ? item.piece.id : null,
@@ -2217,6 +2229,25 @@
             onMixedAmountInput();
         }
         renderCart();
+    }
+
+    // a new sale under a cancelled invoice's number: its pieces are back in stock, so the cart starts
+    // empty (scan the pieces, old or new); customer and date start as the old invoice's, both can change.
+    async function gmLoadReuse() {
+        const fail = msg => { showMessage(msg, true); saveBtn.disabled = true; };
+        const { data: inv } = await goldmindClient.from('invoices').select('*, items:invoice_items(barcode, description), customer:customer_id(id, name, phone)').eq('id', REUSE_ID).maybeSingle();
+        if (!inv) return fail('تعذّر تحميل الفاتورة الملغاة.');
+        if (inv.type !== 'sale' || inv.status !== 'cancelled' || inv.einvoice_uuid || /-ملغاة/.test(inv.invoice_number || '')) return fail('لا يمكن إعادة إصدار هذه الفاتورة.');
+        REUSE = inv;
+        const pad = n => String(n).padStart(2, '0'), d = new Date(inv.created_at);
+        const local = d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + 'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+        const old = (inv.items || []).map(l => gmEscapeHtml(l.barcode || l.description || '')).filter(Boolean).join('، ');
+        const banner = document.getElementById('edit-banner');
+        banner.innerHTML = '<b>إعادة إصدار الفاتورة الملغاة <span dir="ltr">' + gmEscapeHtml(inv.invoice_number) + '</span> بنفس الرقم</b><br>'
+            + 'أضف القطع من جديد (القديمة رجعت للمخزن' + (old ? ': <span dir="ltr">' + old + '</span>' : '') + ')، وغيّر العميل إن لزم. تبقى الملغاة في السجل باسم «' + gmEscapeHtml(inv.invoice_number) + '-ملغاة».'
+            + '<label class="flex items-center gap-2 mt-2 flex-wrap"><span class="font-semibold">تاريخ الفاتورة:</span><input type="datetime-local" id="reuse-date" value="' + local + '" class="h-10 rounded-lg border border-[#E8C77A] bg-white px-2 text-[13px]" dir="ltr"/></label>';
+        banner.classList.remove('hidden');
+        if (inv.customer) pickCustomer(inv.customer);
     }
 
     async function gmSaveEditFromSale() {

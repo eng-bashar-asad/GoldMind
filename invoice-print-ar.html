@@ -118,7 +118,8 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 <div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="cancelled-banner">
 <div class="bg-red-50 border border-red-200 text-red-700 rounded-lg p-3 text-sm text-center font-semibold">هذه الفاتورة ملغاة ولا تُحتسب في أي تقرير
-<button type="button" id="banner-restore-btn" onclick="restoreInvoiceFlow()" class="hidden mt-2 mx-auto items-center gap-1 px-4 h-9 rounded-lg bg-white border border-red-300 text-blue-700 text-[13px]"><span class="material-symbols-outlined text-[18px]">restore</span>استعادة الفاتورة لتعديلها</button></div>
+<button type="button" id="banner-restore-btn" onclick="restoreInvoiceFlow()" class="hidden mt-2 mx-auto items-center gap-1 px-4 h-9 rounded-lg bg-white border border-red-300 text-blue-700 text-[13px]"><span class="material-symbols-outlined text-[18px]">restore</span>استعادة الفاتورة لتعديلها</button>
+<a id="banner-reissue-btn" href="#" class="hidden mt-2 mx-auto w-fit items-center gap-1 px-4 h-9 rounded-lg bg-white border border-red-300 text-[#7A6222] text-[13px]"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">edit_document</span>إعادة إصدار بنفس الرقم (قطع وعميل وتاريخ جديد)</a></div>
 </div>
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="audited-banner">
 <div class="bg-green-50 border border-green-200 text-green-800 rounded-lg p-3 text-sm text-center font-semibold flex items-center justify-center gap-1.5"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">verified</span>فاتورة مدققة ومقفلة على التعديل — يلغي المدير إشارة «مدقق» من قائمة الفواتير</div>
@@ -594,6 +595,12 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
                 restoreBtn.classList.add('flex');
                 window.__currentInvoiceId = invoiceId;
                 const bb = document.getElementById('banner-restore-btn'); bb.classList.remove('hidden'); bb.classList.add('flex');
+                // the number stays reserved for a new sale: same number, new pieces / customer / date
+                if (invoice.type === 'sale' && !invoice.einvoice_uuid && !/-ملغاة/.test(invoice.invoice_number || '')) {
+                    const rb = document.getElementById('banner-reissue-btn');
+                    rb.href = 'new-sale-ar.html?reuse=' + encodeURIComponent(invoiceId) + '&draft=none';
+                    rb.classList.remove('hidden'); rb.classList.add('flex');
+                }
             }
         } else {
             const { data: staffRow } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
