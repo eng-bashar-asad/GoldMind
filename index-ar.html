@@ -655,6 +655,7 @@
 <script src="supabase-config.js?v=54"></script>
 <script src="gm-logo.js?v=2" defer></script>
 <script src="gm-biometric.js?v=2"></script>
+<script src="gm-home-charts.js?v=1" defer></script>
 <script>window.addEventListener('load', function () { setTimeout(function () { if (window.GMBio) GMBio.maybePrompt(); }, 2500); });</script>
 <style id="gm-home-v2">
 /* ===== Home screen v2 (chosen design, 2026-09-28): polished gold + dark cards ===== */
@@ -739,6 +740,41 @@ html:not(.gm-light-canvas) #movementsDayNav .text-on-surface{color:#F7EFE9 !impo
 main.gm-pushable{transition:transform .5s cubic-bezier(.22,1,.36,1),filter .5s,border-radius .5s;transform-origin:left center}
 body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filter:brightness(.8);border-radius:28px}
 @media (prefers-reduced-motion: reduce){.gm-gold,.gm-sweep::after,.gm-chart i,.gm-metric,#navDrawer.gm-dark .gm-rise{animation:none!important}#navDrawer.gm-dark .gm-rise{opacity:1;transform:none}main.gm-pushable,#navDrawer.gm-dark{transition:none!important}}
+</style>
+<style>
+/* home charts (gm-home-charts.js) */
+.gmc-head{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:10px 12px;border-bottom:1px solid var(--gm-outline-variant,#ECE4D3);flex-wrap:wrap}
+.gmc-title{display:flex;align-items:center;gap:6px;font-size:12.5px;font-weight:700}
+.gmc-title .material-symbols-outlined{font-size:18px;color:#B4955A}
+.gmc-title small{font-weight:400;color:#9c8f78;font-size:10.5px}
+.gmc-seg{display:inline-flex;background:#F4EFE3;border-radius:9px;padding:3px;gap:2px}
+.gmc-seg button{min-width:44px;height:30px;padding:0 10px;border-radius:7px;font-size:12px;font-weight:700;color:#6B6150}
+.gmc-seg button[aria-pressed="true"]{background:#fff;color:#1C1A16;box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.gmc-gold-host{width:100%;background:#fff}
+.gmc-note{font-size:10.5px;color:#9c8f78;padding:6px 12px 10px}
+.gmc-link{font-size:11.5px;font-weight:600;color:#7A6222}
+.gmc-sales-body{display:grid;grid-template-columns:1fr;gap:12px;padding:12px}
+@media (min-width:1024px){.gmc-sales-body{grid-template-columns:3fr 2fr}}
+.gmc-block{border:1px solid #ECE4D3;border-radius:12px;padding:10px 12px;background:#fff;min-width:0}
+.gmc-bh{display:flex;justify-content:space-between;align-items:baseline;gap:6px;margin-bottom:6px}
+.gmc-bh b{font-size:12.5px}.gmc-bh span{font-size:10.5px;color:#9c8f78}
+.gmc-kpi{font-size:11.5px;color:#6B6150;margin-bottom:8px}
+.gmc-kpi b{font-family:"Times New Roman",Times,serif;font-size:15px;color:#1C1A16}
+.gmc-kpi small{display:block;font-size:10.5px;color:#9c8f78}
+.gmc-chg{font-size:11px;font-weight:700;border-radius:999px;padding:1px 7px}
+.gmc-chg.up{background:#E8F3EA;color:#1B5E20}.gmc-chg.down{background:#FDECEC;color:#B91C1C}
+.gmc-bars{display:flex;align-items:flex-end;gap:2px;height:120px;direction:ltr;border-bottom:1px solid #ECE4D3}
+.gmc-bar{flex:1;height:100%;display:flex;align-items:flex-end;min-width:0}
+.gmc-bar i{display:block;width:100%;background:#D9C59A;border-radius:3px 3px 0 0}
+.gmc-bar.today i{background:#B4955A}
+.gmc-bar:hover i{background:#7A6222}
+.gmc-axis{display:flex;justify-content:space-between;font-size:10px;color:#9c8f78;margin-top:3px;direction:ltr}
+.gmc-srow{display:grid;grid-template-columns:minmax(0,7.5rem) minmax(0,1fr) auto;gap:8px;align-items:center;padding:5px 0;font-size:12px}
+.gmc-sname{display:flex;align-items:center;gap:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600}
+.gmc-strack{height:10px;background:#F4EFE3;border-radius:999px;overflow:hidden;direction:ltr}
+.gmc-strack i{display:block;height:100%;background:#B4955A;border-radius:999px}
+.gmc-sval{white-space:nowrap;text-align:left}.gmc-sval b{font-family:"Times New Roman",Times,serif}.gmc-sval small{color:#9c8f78;font-size:10px}
+.gmc-empty{font-size:12px;color:#9c8f78;text-align:center;padding:16px}
 </style>
 </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
@@ -932,6 +968,19 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
                  light card style, with real, visible drop shadows instead
                  of shadows-on-black that barely showed. -->
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3" id="dskPriceTiles"></div>
+          </div>
+          <div class="dsk-panel" style="margin-top:14px" id="dskGoldChartPanel">
+            <div class="gmc-gold-box" data-gmc-gold>
+              <div class="gmc-head"><div class="gmc-title"><span class="material-symbols-outlined" aria-hidden="true">candlestick_chart</span>بورصة الذهب <small dir="ltr">XAU/USD</small></div><div class="gmc-seg" role="group" aria-label="مدة الشمعة"></div></div>
+              <div class="gmc-gold-host" style="height:380px"></div>
+              <p class="gmc-note">سعر الأونصة العالمي، يتأخر حتى دقيقة. سعر البيع في الفواتير يبقى سعرك المعتمد من صفحة «سعر الذهب».</p>
+            </div>
+          </div>
+          <div class="dsk-panel" style="margin-top:14px" id="dskSalesChartPanel">
+            <div class="gmc-sales-box hidden" data-gmc-sales>
+              <div class="gmc-head"><div class="gmc-title"><span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>المبيعات</div><a class="gmc-link" href="reports-ar.html">التقارير ←</a></div>
+              <div class="gmc-sales-body"><p class="gmc-empty">جارِ التحميل...</p></div>
+            </div>
           </div>
         </div>
         <div class="dsk-col-rail">
@@ -1889,6 +1938,23 @@ document.addEventListener('DOMContentLoaded', function () {
 <button type="button" id="mobPriceCustomizeBtn" class="flex items-center gap-1 text-[11px] font-semibold rounded-full px-2.5 py-1 border border-outline-variant text-secondary"><span class="material-symbols-outlined" style="font-size:13px;">tune</span>تخصيص</button>
 </div>
 <div class="grid grid-cols-1 gap-3 p-3" id="mobPriceTiles"></div>
+</div>
+</section>
+<section class="mb-4 lg:hidden">
+<div class="rounded-xl overflow-hidden bg-surface-container-lowest border border-outline-variant shadow-sm">
+<div class="gmc-gold-box" data-gmc-gold>
+              <div class="gmc-head"><div class="gmc-title"><span class="material-symbols-outlined" aria-hidden="true">candlestick_chart</span>بورصة الذهب <small dir="ltr">XAU/USD</small></div><div class="gmc-seg" role="group" aria-label="مدة الشمعة"></div></div>
+              <div class="gmc-gold-host" style="height:300px"></div>
+              <p class="gmc-note">سعر الأونصة العالمي، يتأخر حتى دقيقة. سعر البيع في الفواتير يبقى سعرك المعتمد من صفحة «سعر الذهب».</p>
+            </div>
+</div>
+</section>
+<section class="mb-4 lg:hidden">
+<div class="rounded-xl overflow-hidden bg-surface-container-lowest border border-outline-variant shadow-sm">
+<div class="gmc-sales-box hidden" data-gmc-sales>
+              <div class="gmc-head"><div class="gmc-title"><span class="material-symbols-outlined" aria-hidden="true">bar_chart</span>المبيعات</div><a class="gmc-link" href="reports-ar.html">التقارير ←</a></div>
+              <div class="gmc-sales-body"><p class="gmc-empty">جارِ التحميل...</p></div>
+            </div>
 </div>
 </section>
 
@@ -3104,6 +3170,8 @@ if ('serviceWorker' in navigator) {
     { k: 'quick', t: 'الوصول السريع', el: function () { return [document.querySelector('.dsk-toolbar-row .dsk-toolbar-label'), document.getElementById('dskActionStrip')]; } },
     { k: 'moves', t: 'حركات اليوم', el: function () { var e = document.getElementById('dskMovesTable'); return e && e.closest('.dsk-panel'); }, sizes: true, fill: 'dskMovesTable' },
     { k: 'market', t: 'السوق اللحظي', el: function () { var e = document.getElementById('dskPriceTiles'); return e && e.closest('.dsk-panel'); }, sizes: true, fill: 'dskPriceTiles' },
+    { k: 'goldchart', t: 'بورصة الذهب', el: function () { return document.getElementById('dskGoldChartPanel'); }, sizes: true },
+    { k: 'saleschart', t: 'شارت المبيعات', el: function () { return document.getElementById('dskSalesChartPanel'); }, sizes: true },
     { k: 'overdue', t: 'الديون المتأخرة', el: function () { return document.getElementById('dskDebtCard'); }, sizes: true },
     { k: 'pending', t: 'بانتظارك', el: function () { var e = document.getElementById('dskPendingEl'); return e && e.closest('.dsk-panel'); }, sizes: true, fill: 'dskPendingEl' }
   ];
