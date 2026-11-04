@@ -31,3 +31,22 @@ test('customer with a deposit: a full cash sale is paid by the deposit first, th
   await page.waitForURL(/invoice-print-ar\.html\?id=inv-1/);
   expect(posted[0]).toMatchObject({ payment_method: 'mixed', cash_paid: 500 });
 });
+
+test('the deposit is taken off even if the credit had not loaded yet when saving', async ({ page }) => {
+  const posted = []; let calls = 0;
+  await install(page, { db: db(), rpc: {
+    customer_credit: () => ({ body: calls++ === 0 ? 0 : 100 }), // first (on-screen) read is late/empty
+    post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-1', invoice_number: 'INV-1' } }; }
+  } });
+  page.on('dialog', d => d.accept());
+  await page.goto('/new-sale-ar.html?draft=none');
+  await page.fill('#barcode-search-input', 'GM-0001');
+  await page.click('button[onclick="searchByBarcode()"]');
+  await page.fill('#barcode-price-input', '1500');
+  await page.press('#barcode-price-input', 'Enter');
+  await page.fill('#customer-search', 'راما');
+  await page.click('#customer-results >> text=راما مملوك');
+  await page.click('#save-invoice-btn');
+  await page.waitForURL(/invoice-print-ar\.html\?id=inv-1/);
+  expect(posted[0]).toMatchObject({ payment_method: 'mixed', cash_paid: 1400 });
+});

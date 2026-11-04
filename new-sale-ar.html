@@ -2071,7 +2071,13 @@
         }
         // The customer's deposit (عربون) / credit always pays this invoice first: a full cash sale
         // is taken as "rest in cash" (total minus the credit), so the credit covers the remainder.
-        if (selectedPaymentMethod === 'cash' && CUST_CREDIT > 0.009 && !PAY.code && fxRows.length === 0) {
+        // Re-read the credit now: the one shown on screen loads in the background and may not be
+        // there yet (a quick save, a slow network), and then the deposit was not taken off (INV-2026-000088).
+        if (selectedCustomer && selectedCustomer.id && !EDIT_ID) {
+            const { data: cr, error: crErr } = await goldmindClient.rpc('customer_credit', { sid: GOLDMIND_STORE_ID, cust: selectedCustomer.id });
+            if (!crErr) CUST_CREDIT = Number(cr) || 0;
+        }
+        if (selectedPaymentMethod === 'cash' && CUST_CREDIT > 0.009 && !PAY.code && !fxRows.some(r => Number(r.amount) > 0)) {
             const fromCredit = Math.min(CUST_CREDIT, total);
             selectedPaymentMethod = fromCredit >= total - 0.009 ? 'credit' : 'mixed';
             document.getElementById('mixed-cash-amount').value = Math.max(0, Math.round((total - fromCredit) * 100) / 100) || '';
