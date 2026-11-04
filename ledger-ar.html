@@ -38,6 +38,7 @@
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
     .settle-tab-btn.active { background: #000; color: #fff; }
     .settle-tab-btn:not(.active) { color: #45464d; }
+body.gm-no-vedit .gm-vedit{display:none!important}
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <style>
@@ -755,6 +756,7 @@ const gmBranchTag = r => gmForeign(r)
 async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+  gmLoadVoucherRights();
   // wholesale traders: only the owner and staff with 'view_traders'
   if (!(await gmStaffScope()).traders) {
     document.getElementById('loading-state').innerHTML = '<p class="text-error">ليست لديك صلاحية عرض التجار.</p>';
@@ -1292,7 +1294,7 @@ function showTraderDetail(traderId) {
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-batch-${group.batchId}">
         <div class="flex items-center justify-between mb-1">
           <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(first)}</span>
-          <span class="text-[11px] text-on-surface-variant">${date}</span>
+          <span class="text-[11px] text-on-surface-variant flex items-center gap-2">${gmVoucherChip(first)}${date}</span>
         </div>
         <div class="grid grid-cols-2 gap-x-3 gap-y-0.5 text-[12px] mb-1">
           <span class="text-on-surface-variant">عدد القطع</span><span class="font-data-mono font-semibold text-left">${rows.length}</span>
@@ -1303,8 +1305,8 @@ function showTraderDetail(traderId) {
         ${gmBranchTag(first)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(first) ? ' hidden' : ''}">
           ${first.source === 'stock_given' ? `<a href="trader-statement-print-ar.html?trader=${first.trader_id}&batch=${group.batchId}" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">photo_library</span> القطع</a>` : ''}
           ${first.source === 'stock_given' ? `<button onclick="gmVoucherProfitPopup('batch_id','${group.batchId}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
-          <button onclick="toggleEditStockBatch('${group.batchId}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
-          <button onclick="deleteStockMovementBatch('${group.batchId}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف السند بالكامل</button>
+          <button onclick="toggleEditStockBatch('${group.batchId}')" class="gm-vedit flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          <button onclick="deleteStockMovementBatch('${group.batchId}')" class="gm-vedit flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف السند بالكامل</button>
         </div>
         <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-batch-form-${group.batchId}">
           ${rows.map((r, idx) => {
@@ -1314,7 +1316,7 @@ function showTraderDetail(traderId) {
               <div class="flex items-center gap-2 mb-2">
                 ${pc.photo_url ? `<img src="${gmEscapeHtml(pc.photo_url)}" alt="" class="w-11 h-11 rounded-md object-cover shrink-0"/>` : ''}
                 <span class="font-data-mono text-[12px] font-semibold">${gmEscapeHtml(pc.barcode || 'بالجملة')}</span>
-                ${first.source === 'stock_given' && r.piece_id ? `<button type="button" onclick="ldReturnPiece('${r.id}', '${group.batchId}', this)" class="ms-auto h-8 px-3 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">undo</span> إرجاع للمخزن</button>` : ''}
+                ${first.source === 'stock_given' && r.piece_id ? `<button type="button" onclick="ldReturnPiece('${r.id}', '${group.batchId}', this)" class="gm-vedit ms-auto h-8 px-3 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">undo</span> إرجاع للمخزن</button>` : ''}
               </div>
               <div class="grid grid-cols-3 gap-2">
                 <input id="edit-batch-weight-${group.batchId}-${idx}" type="number" step="0.001" dir="ltr" placeholder="الوزن القائم" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.weight_grams || ''}"/>
@@ -1334,7 +1336,7 @@ function showTraderDetail(traderId) {
           <p class="text-error text-[11px] hidden" id="edit-batch-error-${group.batchId}"></p>
           <div class="flex gap-2">
             <button onclick="saveEditStockBatch('${group.batchId}', ${rows.length})" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديلات</button>
-            <button onclick="toggleEditStockBatch('${group.batchId}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+            <button onclick="toggleEditStockBatch('${group.batchId}')" class="gm-vedit flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
           </div>
         </div>
       </div>`;
@@ -1360,7 +1362,7 @@ function showTraderDetail(traderId) {
       <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="trader-move-${m.id}">
         <div class="flex items-center justify-between mb-1">
           <span class="text-[13px] font-semibold ${isIncrease ? 'text-error' : 'text-success'}">${movementLabel(m)}</span>
-          <span class="text-[11px] text-on-surface-variant">${date}</span>
+          <span class="text-[11px] text-on-surface-variant flex items-center gap-2">${gmVoucherChip(m)}${date}</span>
         </div>
         <p class="text-[12px] font-data-mono">${weightLine}${feeLine}</p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
@@ -1368,8 +1370,8 @@ function showTraderDetail(traderId) {
         ${m.invoice && m.invoice.invoice_number ? `<a href="invoice-print-ar.html?id=${m.invoice_id}" class="text-[11px] text-secondary font-semibold underline mt-1 inline-block" onclick="event.stopPropagation()">عرض فاتورة الشراء: ${gmEscapeHtml(m.invoice.invoice_number)} ←</a>` : ''}
         ${isOpeningBalance ? `
         ${gmBranchTag(m)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(m) ? ' hidden' : ''}">
-          <button onclick="toggleEditOpeningBalance('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
-          <button onclick="deleteOpeningBalanceMovement('${m.id}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
+          <button onclick="toggleEditOpeningBalance('${m.id}')" class="gm-vedit flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          <button onclick="deleteOpeningBalanceMovement('${m.id}')" class="gm-vedit flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>
         <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-ob-form-${m.id}">
           <div class="flex rounded-lg border border-outline-variant overflow-hidden">
@@ -1391,15 +1393,15 @@ function showTraderDetail(traderId) {
           <p class="text-error text-[11px] hidden" id="edit-ob-error-${m.id}"></p>
           <div class="flex gap-2">
             <button onclick="saveEditOpeningBalance('${m.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
-            <button onclick="toggleEditOpeningBalance('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+            <button onclick="toggleEditOpeningBalance('${m.id}')" class="gm-vedit flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
           </div>
         </div>` : ''}
         ${isStockMovement ? `
         ${gmBranchTag(m)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(m) ? ' hidden' : ''}">
           ${m.source === 'stock_given' ? `<button onclick="gmVoucherProfitPopup('id','${m.id}')" class="gm-profit-btn flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">trending_up</span> ربح السند</button>` : ''}
-          <button onclick="toggleEditStockMovement('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
-          ${m.source === 'stock_given' && m.piece_id ? `<button type="button" data-code="${gmEscapeHtml(((m.notes || '').match(/باركود\s*(\S+)/) || [])[1] || '')}" onclick="ldReturnPiece('${m.id}', '', this)" class="flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">undo</span> إرجاع للمخزن</button>` : ''}
-          <button onclick="deleteStockMovement('${m.id}')" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
+          <button onclick="toggleEditStockMovement('${m.id}')" class="gm-vedit flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          ${m.source === 'stock_given' && m.piece_id ? `<button type="button" data-code="${gmEscapeHtml(((m.notes || '').match(/باركود\s*(\S+)/) || [])[1] || '')}" onclick="ldReturnPiece('${m.id}', '', this)" class="gm-vedit flex-1 h-8 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">undo</span> إرجاع للمخزن</button>` : ''}
+          <button onclick="deleteStockMovement('${m.id}')" class="gm-vedit flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>
         <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-sm-form-${m.id}">
           <div class="grid grid-cols-2 gap-2">
@@ -1419,19 +1421,19 @@ function showTraderDetail(traderId) {
           <p class="text-error text-[11px] hidden" id="edit-sm-error-${m.id}"></p>
           <div class="flex gap-2">
             <button onclick="saveEditStockMovement('${m.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
-            <button onclick="toggleEditStockMovement('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+            <button onclick="toggleEditStockMovement('${m.id}')" class="gm-vedit flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
           </div>
         </div>` : ''}
         ${isManualSettlement ? `
         ${gmBranchTag(m)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(m) ? ' hidden' : ''}">
-          <button onclick="toggleEditSettlement('${m.id}')" class="flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
-          <button onclick="deleteSettlementMovement('${m.id}', ${settlementIsCash})" class="flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
+          <button onclick="toggleEditSettlement('${m.id}')" class="gm-vedit flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          <button onclick="deleteSettlementMovement('${m.id}', ${settlementIsCash})" class="gm-vedit flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>
         <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-settle-form-${m.id}">
           <p class="text-[11px] text-outline">فعّل جزء الذهب و/أو النقدي حسب محتوى هذه التسوية -- أبقِ الاثنين مفعّلين إذا كانت مدمجة أصلاً، وإلا سيُصفَّر الجزء المعطّل.</p>
           <div class="flex gap-2">
-            <button type="button" id="edit-settle-type-gold-${m.id}" onclick="toggleEditSettlementPart('${m.id}','gold')" class="flex-1 h-9 rounded-lg border border-outline-variant text-[11px] font-semibold">ذهب</button>
-            <button type="button" id="edit-settle-type-cash-${m.id}" onclick="toggleEditSettlementPart('${m.id}','cash')" class="flex-1 h-9 rounded-lg border border-outline-variant text-[11px] font-semibold">نقدي</button>
+            <button type="button" id="edit-settle-type-gold-${m.id}" onclick="toggleEditSettlementPart('${m.id}','gold')" class="gm-vedit flex-1 h-9 rounded-lg border border-outline-variant text-[11px] font-semibold">ذهب</button>
+            <button type="button" id="edit-settle-type-cash-${m.id}" onclick="toggleEditSettlementPart('${m.id}','cash')" class="gm-vedit flex-1 h-9 rounded-lg border border-outline-variant text-[11px] font-semibold">نقدي</button>
           </div>
           <div class="flex rounded-lg border border-outline-variant overflow-hidden">
             <button type="button" id="edit-settle-dir-out-${m.id}" onclick="setEditSettlementDirection('${m.id}','out')" class="flex-1 h-9 text-[11px] font-semibold">صادر (منّا للتاجر)</button>
@@ -1454,7 +1456,7 @@ function showTraderDetail(traderId) {
           <p class="text-error text-[11px] hidden" id="edit-settle-error-${m.id}"></p>
           <div class="flex gap-2">
             <button onclick="saveEditSettlement('${m.id}')" class="flex-1 h-9 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التعديل</button>
-            <button onclick="toggleEditSettlement('${m.id}')" class="flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
+            <button onclick="toggleEditSettlement('${m.id}')" class="gm-vedit flex-1 h-9 border border-outline-variant rounded-lg text-[12px] font-semibold">إلغاء</button>
           </div>
         </div>` : ''}
 
@@ -1675,6 +1677,22 @@ async function deleteStockMovementBatch(batchId) {
 // "إرجاع للمخزن" from a give-out voucher: the piece leaves the trader's account (gold and making
 // cost of that line) and goes back to stock unchanged — gross and accounting weight, making cost,
 // stones, everything as it was before it was given (the piece record itself is never changed).
+// voucher number on each card: opens the printable voucher (print / PDF / WhatsApp)
+function gmVoucherChip(m) {
+  if (!m || !m.voucher_no) return '';
+  const no = gmEscapeHtml(m.voucher_no);
+  return `<a href="trader-voucher-print-ar.html?no=${encodeURIComponent(m.voucher_no)}&store=${m.store_id}" class="inline-flex items-center gap-1 h-7 px-2 rounded-md border border-outline-variant text-[11px] font-semibold text-on-background" title="طباعة السند"><span class="material-symbols-outlined text-[14px]" aria-hidden="true">receipt_long</span><span class="font-data-mono" dir="ltr">${no}</span></a>`;
+}
+// edit / delete of a voucher: the owner, or staff given «تعديل وحذف السندات» (the server checks it too)
+document.body.classList.add('gm-no-vedit');
+async function gmLoadVoucherRights() {
+  try {
+    const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+    const ok = !!(me && (me.role === 'owner' || (me.permissions && me.permissions.edit_vouchers === true)));
+    document.body.classList.toggle('gm-no-vedit', !ok);
+  } catch (e) { document.body.classList.add('gm-no-vedit'); }
+}
+
 async function ldReturnPiece(movementId, batchId, btn) {
   const mono = btn.parentElement.querySelector('.font-data-mono');
   const code = btn.dataset.code || (mono ? mono.textContent.trim() : '');
@@ -1899,7 +1917,7 @@ async function saveEditSettlement(id) {
 function voucherDateBlock(key, cmId, createdAt) {
   const fmtDay = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(d);
   return `<div class="mt-2">
-    <button type="button" onclick="document.getElementById('vd-${key}').classList.toggle('hidden')" class="h-8 px-3 border border-outline-variant rounded-lg text-[11px] font-semibold">تعديل التاريخ</button>
+    <button type="button" onclick="document.getElementById('vd-${key}').classList.toggle('hidden')" class="gm-vedit h-8 px-3 border border-outline-variant rounded-lg text-[11px] font-semibold">تعديل التاريخ</button>
     <div id="vd-${key}" class="hidden mt-2">
       <input type="date" id="vd-in-${key}" value="${fmtDay(new Date(createdAt))}" max="${fmtDay(new Date())}" dir="ltr" class="h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono"/>
       <button type="button" onclick="saveVoucherDateRow('${key}', '${cmId}')" class="h-9 px-3 bg-primary text-on-primary rounded-lg text-[12px] font-semibold">حفظ التاريخ</button>

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>سند تاجر | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.16?plugins=forms@0.5.10,container-queries@0.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="supabase-config.js?v=54"></script>
+<script src="gm-report.js?v=5"></script>
+<script src="theme.js?v=84"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-size: 18px; }
+    .num { font-family: "Times New Roman", Times, serif; direction: ltr; unicode-bidi: isolate; }
+    @media print {
+        .no-print { display: none !important; }
+        body { background: #fff !important; margin: 0 !important; }
+        html { font-size: 100% !important; }
+        #print-wrap { max-width: 100% !important; padding: 0 !important; }
+        #sheet:not(.hidden) { box-shadow: none !important; margin: 10mm !important; width: auto !important; max-width: 100% !important;
+            padding: 16px !important; display: flex !important; flex-direction: column; min-height: calc(100vh - 20mm); }
+        #signature-block { margin-top: auto !important; }
+        @page { margin: 0; }
+    }
+</style>
+</head>
+<body class="bg-gray-100 text-gray-900">
+<div class="no-print sticky top-0 bg-white border-b border-gray-200 z-50 flex items-center justify-between gap-2 px-4 h-14">
+<button onclick="gmSmartBack('ledger-ar.html')" class="flex items-center gap-1 text-sm font-semibold h-11"><span class="material-symbols-outlined">arrow_forward</span>رجوع</button>
+<div class="flex items-center gap-2">
+<button onclick="tvWhatsApp(this)" aria-label="إرسال واتساب" class="h-10 px-3 rounded-lg border border-green-200 bg-green-50 text-green-700 text-sm font-semibold flex items-center gap-1"><span class="material-symbols-outlined">chat</span><span class="hidden sm:inline">واتساب</span></button>
+<button onclick="tvPdf(this)" aria-label="تحميل PDF" class="h-10 px-3 rounded-lg border border-gray-300 text-sm font-semibold flex items-center gap-1"><span class="material-symbols-outlined">picture_as_pdf</span><span class="hidden sm:inline">PDF</span></button>
+<button onclick="window.print()" class="h-10 flex items-center gap-2 bg-black text-white px-4 rounded-lg text-sm font-semibold"><span class="material-symbols-outlined">print</span>طباعة</button>
+</div>
+</div>
+
+<div class="max-w-md lg:max-w-3xl mx-auto p-4" id="print-wrap">
+<div id="loading" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
+<div id="error" class="hidden py-20 text-center text-red-600 text-sm"></div>
+<div id="sheet" class="hidden bg-white shadow-sm p-6 border border-gray-300 rounded-xl">
+
+<div class="flex items-center gap-3 pb-2 mb-2 border-b border-dashed border-gray-300">
+<div style="flex:1; min-width:0; text-align:right; overflow-wrap:anywhere;" class="text-[9.5px] text-gray-600 leading-[1.45]" id="info-ar"></div>
+<div class="text-center shrink-0" style="max-width:38%;">
+<img class="hidden mx-auto mb-1 h-14 object-contain" id="logo" crossorigin="anonymous" alt=""/>
+<div class="font-bold text-base leading-tight" id="store-name"></div>
+</div>
+<div style="flex:1; min-width:0; text-align:left; overflow-wrap:anywhere;" class="text-[9.5px] text-gray-600 leading-[1.45]" dir="ltr" id="info-en"></div>
+</div>
+
+<div class="text-center mb-3">
+<div class="font-bold text-[15px]" id="doc-title"></div>
+<div class="text-[10px] text-gray-500 tracking-widest uppercase" id="doc-title-en"></div>
+</div>
+
+<div class="flex justify-between gap-3 text-[11.5px] text-gray-600 mb-3">
+<div>
+<div>رقم السند: <span class="font-bold text-gray-900 num" id="v-number"></span></div>
+<div>التاريخ: <span class="num" id="v-date"></span></div>
+</div>
+<div class="text-left">
+<div>التاجر: <span class="font-bold text-gray-900" id="v-party"></span></div>
+<div>الموظف: <span id="v-staff"></span></div>
+</div>
+</div>
+
+<div class="overflow-x-auto">
+<table class="w-full text-[10.5px] mb-3">
+<thead>
+<tr class="border-b-2 border-gray-800 text-gray-600">
+<th class="py-1 text-right">#</th>
+<th class="py-1 text-right">البيان</th>
+<th class="py-1 text-center">العيار</th>
+<th class="py-1 text-center">القائم</th>
+<th class="py-1 text-center">المحاسبي</th>
+<th class="py-1 text-center">ذهب 24</th>
+<th class="py-1 text-center">مصنعية/غ</th>
+<th class="py-1 text-left">المبلغ</th>
+</tr>
+</thead>
+<tbody id="lines" class="divide-y divide-gray-100"></tbody>
+</table>
+</div>
+
+<div class="border-t-2 border-gray-800 pt-2 text-[11.5px] space-y-1 w-full sm:w-2/3" style="margin-inline-start:auto;">
+<div class="flex justify-between text-gray-600"><span>عدد البنود</span><span class="num" id="t-count"></span></div>
+<div class="flex justify-between text-gray-600" id="t-gross-row"><span>إجمالي الوزن القائم</span><span class="num" id="t-gross"></span></div>
+<div class="flex justify-between text-gray-600"><span>إجمالي الذهب (عيار 24)</span><span class="num" id="t-gold"></span></div>
+<div class="flex justify-between font-bold text-[13px] pt-1 border-t border-gray-200"><span id="t-money-label">إجمالي المبلغ</span><span class="num" id="t-money"></span></div>
+<div class="flex justify-between text-gray-700 pt-2 mt-1 border-t border-dashed border-gray-300"><span>رصيد التاجر بعد السند — ذهب</span><span id="b-gold"></span></div>
+<div class="flex justify-between text-gray-700"><span>رصيد التاجر بعد السند — نقدي</span><span id="b-cash"></span></div>
+</div>
+
+<div class="mt-8 pt-2 flex justify-between items-end gap-6 text-[11px] text-gray-600" id="signature-block">
+<div class="flex items-end gap-2" style="width:40%;"><span class="shrink-0">توقيع الموظف:</span><span class="flex-1 border-b border-gray-500 h-7"></span></div>
+<div class="flex items-end gap-2" style="width:40%;"><span class="shrink-0">توقيع التاجر:</span><span class="flex-1 border-b border-gray-500 h-7"></span></div>
+</div>
+</div>
+</div>
+
+<script>
+const FRAMES = { classic: 'border border-gray-300', gold: 'border-2 border-amber-500', double: 'border-4 border-double border-gray-400', dashed: 'border-2 border-dashed border-gray-400', none: 'border-0' };
+const SHAPES = { square: 'rounded-none', soft: 'rounded-xl', round: 'rounded-3xl' };
+// voucher type from the number's prefix (see gm_trader_voucher_prefix)
+const TV_TYPES = {
+  TOUT: ['سند إخراج بضاعة للتاجر', 'Goods Issue Voucher'], TIN: ['سند إدخال بضاعة من التاجر', 'Goods Receipt Voucher'],
+  PAY: ['سند صرف للتاجر', 'Payment Voucher'], REC: ['سند قبض من التاجر', 'Receipt Voucher'],
+  DSC: ['سند خصم', 'Discount Voucher'], CNV: ['سند تسكير عملات', 'Conversion Voucher']
+};
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+const g3 = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+let TV = null;
+
+// 'لنا' = the trader owes us, 'علينا' = we owe him (same as the trader ledger)
+function tvBalance(moves) {
+  const s = m => m.movement_type === 'debt_increase' ? -1 : 1;
+  return moves.reduce((b, m) => ({ g: b.g + s(m) * Number(m.gold_24k_equivalent || 0), c: b.c + s(m) * Number(m.fab_fee_amount || 0) }), { g: 0, c: 0 });
+}
+console.assert(tvBalance([{ movement_type: 'debt_decrease', gold_24k_equivalent: 5, fab_fee_amount: 10 }, { movement_type: 'debt_increase', gold_24k_equivalent: 2, fab_fee_amount: 0 }]).g === 3, 'tvBalance');
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const q = new URLSearchParams(location.search), no = q.get('no'), storeId = q.get('store') || GOLDMIND_STORE_ID;
+  const fail = t => { document.getElementById('loading').classList.add('hidden'); const e = document.getElementById('error'); e.textContent = t; e.classList.remove('hidden'); };
+  if (!no) return fail('لا يوجد رقم سند.');
+  const [{ data: rows, error }, { data: store }] = await Promise.all([
+    goldmindClient.from('trader_movements').select('*').eq('store_id', storeId).eq('voucher_no', no).order('created_at'),
+    gmStoreWithLegal(goldmindClient.from('stores').select('*').eq('id', storeId).single())
+  ]);
+  if (error) return fail('تعذّر تحميل السند: ' + error.message);
+  if (!rows || !rows.length) return fail('السند ' + no + ' غير موجود.');
+  const first = rows[0];
+  const pieceIds = [...new Set(rows.map(r => r.piece_id).filter(Boolean))];
+  const [{ data: trader }, { data: staff }, { data: pieces }, { data: history }] = await Promise.all([
+    goldmindClient.from('traders').select('name, phone, phone_country_code').eq('id', first.trader_id).maybeSingle(),
+    first.created_by ? goldmindClient.from('staff').select('full_name').eq('id', first.created_by).maybeSingle() : Promise.resolve({ data: null }),
+    pieceIds.length ? goldmindClient.from('pieces').select('id, barcode, description_ar').in('id', pieceIds) : Promise.resolve({ data: [] }),
+    gmFetchAllRows(() => goldmindClient.from('trader_movements').select('id, movement_type, gold_24k_equivalent, fab_fee_amount, created_at').eq('trader_id', first.trader_id).lte('created_at', rows[rows.length - 1].created_at).order('id'))
+  ]);
+  const pc = {}; (pieces || []).forEach(p => { pc[p.id] = p; });
+  const st = store || {};
+  const cur = String(first.currency || st.currency || 'AED').toUpperCase();
+  const money = x => Number(x || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + cur;
+  const sheet = document.getElementById('sheet');
+  sheet.className = 'bg-white shadow-sm p-6 ' + (FRAMES[st.invoice_print_frame] || FRAMES.classic) + ' ' + (SHAPES[st.invoice_print_shape] || SHAPES.soft);
+
+  if (st.logo_url) { const l = document.getElementById('logo'); l.src = st.logo_url; l.classList.remove('hidden'); }
+  document.getElementById('store-name').textContent = st.name || '';
+  const info = en => {
+    const r = [], addr = en ? (st.address_en || st.address) : (st.address || st.address_en);
+    if (addr) r.push(`<div>${en ? 'Address' : 'العنوان'}: ${esc(addr)}</div>`);
+    if (st.phone) r.push(`<div>${en ? 'Phone' : 'الهاتف'}: <span dir="ltr">${esc(st.phone)}</span></div>`);
+    return r.join('');
+  };
+  document.getElementById('info-ar').innerHTML = info(false);
+  document.getElementById('info-en').innerHTML = info(true);
+
+  const pf = no.split('-')[0];
+  const [title, titleEn] = pf === 'TOUT' && first.source === 'scrap_given' ? ['سند إخراج كسر للتاجر', 'Scrap Issue Voucher'] : (TV_TYPES[pf] || ['سند تاجر', 'Trader Voucher']);
+  document.getElementById('doc-title').textContent = title;
+  document.getElementById('doc-title-en').textContent = titleEn;
+  document.title = no + ' | GoldMind';
+  document.getElementById('v-number').textContent = no;
+  document.getElementById('v-date').textContent = gmFormatDateTime(first.created_at);
+  document.getElementById('v-party').textContent = trader ? trader.name : '—';
+  document.getElementById('v-staff').textContent = staff && staff.full_name ? staff.full_name : '—';
+
+  const what = r => {
+    const p = r.piece_id && pc[r.piece_id];
+    if (p) return `<span class="font-semibold num">${esc(p.barcode)}</span>${p.description_ar ? ' — ' + esc(p.description_ar) : ''}`;
+    return esc(String(r.notes || '').replace(/^\s*(إخراج|إعطاء|استلام|إدخال)\s+(بضاعة|قطع|قطعة)\s*[—–-]\s*/, '') || '—');
+  };
+  const dash = '<span class="text-gray-400">—</span>';
+  document.getElementById('lines').innerHTML = rows.map((r, i) => `<tr>
+      <td class="py-1 num">${i + 1}</td>
+      <td class="py-1">${what(r)}</td>
+      <td class="py-1 text-center num">${r.karat ? r.karat + 'K' : dash}</td>
+      <td class="py-1 text-center num">${Number(r.weight_grams) > 0 ? g3(r.weight_grams) : dash}</td>
+      <td class="py-1 text-center num">${Number(r.accounting_weight_grams) > 0 ? g3(r.accounting_weight_grams) : dash}</td>
+      <td class="py-1 text-center num">${Number(r.gold_24k_equivalent) > 0 ? g3(r.gold_24k_equivalent) : dash}</td>
+      <td class="py-1 text-center num">${Number(r.fab_fee_per_gram) > 0 ? g3(r.fab_fee_per_gram) : dash}</td>
+      <td class="py-1 text-left num">${Number(r.fab_fee_amount) > 0 ? money(r.fab_fee_amount) : dash}</td>
+    </tr>`).join('');
+  const gross = rows.reduce((s, r) => s + Number(r.weight_grams || 0), 0);
+  const gold = rows.reduce((s, r) => s + Number(r.gold_24k_equivalent || 0), 0);
+  const cash = rows.reduce((s, r) => s + Number(r.fab_fee_amount || 0), 0);
+  document.getElementById('t-count').textContent = rows.length;
+  document.getElementById('t-gross').textContent = g3(gross) + ' g';
+  document.getElementById('t-gross-row').classList.toggle('hidden', !(gross > 0));
+  document.getElementById('t-gold').textContent = g3(gold) + ' g';
+  document.getElementById('t-money-label').textContent = pf === 'TOUT' || pf === 'TIN' ? 'إجمالي المصنعية' : 'إجمالي المبلغ';
+  document.getElementById('t-money').textContent = money(cash);
+  const b = tvBalance(history || []);
+  const side = v => Math.abs(v) < 0.005 ? '' : (v > 0 ? ' لنا' : ' علينا');
+  document.getElementById('b-gold').innerHTML = `<span class="num">${g3(Math.abs(b.g))} g</span>${side(b.g)}`;
+  document.getElementById('b-cash').innerHTML = `<span class="num">${money(Math.abs(b.c))}</span>${side(b.c)}`;
+
+  TV = { no, title, trader, store: st };
+  document.getElementById('loading').classList.add('hidden');
+  sheet.classList.remove('hidden');
+})();
+
+async function tvWhatsApp(btn) {
+  if (!TV) return;
+  const t = TV.trader || {};
+  const text = `مرحباً ${t.name || ''}،\nمرفق ${TV.title} رقم ${TV.no} من ${TV.store.name || 'المحل'}.\n\nشكراً لتعاملكم معنا.`;
+  btn.disabled = true;
+  try { await gmWhatsAppPdf([gmReportNode(document.getElementById('sheet'))], TV.no + '.pdf', TV.title, text, t.phone, t.phone_country_code || TV.store.country); }
+  catch (e) { alert('تعذّر تجهيز ملف PDF: ' + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; }
+}
+async function tvPdf(btn) {
+  if (!TV) return;
+  btn.disabled = true;
+  try { await gmPdfFromNodes([gmReportNode(document.getElementById('sheet'))], TV.no + '.pdf', TV.title, TV.title + ' ' + TV.no); }
+  catch (e) { alert('تعذّر تجهيز ملف PDF: ' + (e && e.message ? e.message : e)); }
+  finally { btn.disabled = false; }
+}
+</script>
+</body>
+</html>
