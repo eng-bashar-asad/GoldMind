@@ -656,6 +656,7 @@
 <script src="gm-logo.js?v=2" defer></script>
 <script src="gm-biometric.js?v=2"></script>
 <script src="gm-home-charts.js?v=1" defer></script>
+<script src="gm-home-tools.js?v=1" defer></script>
 <script>window.addEventListener('load', function () { setTimeout(function () { if (window.GMBio) GMBio.maybePrompt(); }, 2500); });</script>
 <style id="gm-home-v2">
 /* ===== Home screen v2 (chosen design, 2026-09-28): polished gold + dark cards ===== */
@@ -775,6 +776,62 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 .gmc-strack i{display:block;height:100%;background:#B4955A;border-radius:999px}
 .gmc-sval{white-space:nowrap;text-align:left}.gmc-sval b{font-family:"Times New Roman",Times,serif}.gmc-sval small{color:#9c8f78;font-size:10px}
 .gmc-empty{font-size:12px;color:#9c8f78;text-align:center;padding:16px}
+</style>
+<style>
+/* «أدوات سريعة» (gm-home-tools.js): closed glass buttons, one box open at a time */
+.gmt-root{margin-bottom:14px}
+.gmt-pills{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+.dsk-col-rail .gmt-pills{grid-template-columns:1fr}
+.gmt-pill{position:relative;display:flex;flex-direction:column;align-items:center;gap:6px;padding:12px 8px 10px;border-radius:22px;
+  background:linear-gradient(140deg,var(--tint),rgba(255,255,255,.55));border:1px solid rgba(255,255,255,.75);
+  box-shadow:0 6px 18px -8px var(--c1),inset 0 1px 0 rgba(255,255,255,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+  text-align:center;min-height:44px;transition:transform .15s,box-shadow .15s}
+.dsk-col-rail .gmt-pill{flex-direction:row;text-align:start;padding:10px 14px;border-radius:999px}
+.gmt-pill:hover{transform:translateY(-1px)}
+.gmt-pill[aria-expanded="true"]{box-shadow:0 10px 24px -10px var(--c1),inset 0 0 0 2px var(--c2)}
+.gmt-ic{width:42px;height:42px;flex-shrink:0;border-radius:999px;display:flex;align-items:center;justify-content:center;color:#fff;
+  background:radial-gradient(circle at 30% 25%,var(--c2),var(--c1) 70%);box-shadow:0 4px 10px -4px var(--c1),inset 0 1px 1px rgba(255,255,255,.6)}
+.gmt-ic .material-symbols-outlined{font-size:22px}
+.gmt-tx{display:flex;flex-direction:column;min-width:0;flex:1}
+.gmt-tx b{font-size:13px;color:#2A2418}.gmt-tx small{font-size:10.5px;color:#7a6f5c}
+@media (max-width:1023px){.gmt-tx small{display:none}.gmt-chev{display:none}}
+.gmt-chev{color:var(--c1);transition:transform .2s}
+.gmt-pill[aria-expanded="true"] .gmt-chev{transform:rotate(180deg)}
+.gmt-panel{margin-top:10px;padding:14px;border-radius:20px;background:linear-gradient(160deg,var(--tint),rgba(255,255,255,.85) 45%);
+  border:1px solid rgba(255,255,255,.8);box-shadow:0 12px 28px -14px var(--c1);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.gmt-empty{font-size:12px;color:#8a7f6a;text-align:center;padding:10px}
+.gmt-conv{display:grid;grid-template-columns:1fr auto 1fr;gap:8px;align-items:center}
+.gmt-conv input{grid-column:1/-1;height:48px;border-radius:14px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.9);font-size:20px;font-family:"Times New Roman",Times,serif;padding:0 14px;text-align:center}
+.gmt-conv select{height:44px;border-radius:12px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.9);font-size:12.5px;padding:0 8px;min-width:0}
+.gmt-swap{width:44px;height:44px;border-radius:999px;background:var(--c1);color:#fff;display:flex;align-items:center;justify-content:center}
+.gmt-res{grid-column:1/-1;text-align:center;font-size:13px;color:#4a4232;padding:6px 0}
+.gmt-res b{font-family:"Times New Roman",Times,serif;font-size:19px;color:var(--c1)}
+.gmt-rates{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:6px;margin-top:8px}
+.gmt-rate{display:flex;justify-content:space-between;gap:6px;align-items:center;padding:8px 10px;border-radius:12px;background:rgba(255,255,255,.75);font-size:12px}
+.gmt-rate small{color:#8a7f6a;font-size:10px}.gmt-rate span:last-child{font-family:"Times New Roman",Times,serif;font-weight:700;white-space:nowrap}
+.gmt-note{display:flex;align-items:center;gap:4px;font-size:11px;color:#5c4a1e;background:rgba(255,248,230,.9);border-radius:10px;padding:6px 8px;margin-top:8px}
+.gmt-note .material-symbols-outlined{font-size:16px}.gmt-note a{color:var(--c1);font-weight:700}
+.gmt-src{font-size:10px;color:#9a8f7a;margin-top:8px;text-align:center}
+.gmt-calc{display:flex;flex-direction:column;gap:10px}
+.gmt-calc label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:#4a4232}
+.gmt-calc input{height:52px;border-radius:14px;border:1px solid rgba(0,0,0,.08);background:rgba(255,255,255,.92);font-size:22px;font-family:"Times New Roman",Times,serif;text-align:center}
+.gmt-karats{display:flex;gap:6px;flex-wrap:wrap}
+.gmt-karats button{flex:1;min-width:52px;height:46px;border-radius:999px;background:rgba(255,255,255,.85);border:1px solid rgba(0,0,0,.08);font-size:16px;font-weight:700;font-family:"Times New Roman",Times,serif}
+.gmt-karats button[aria-pressed="true"]{background:var(--c1);color:#fff;border-color:var(--c1)}
+.gmt-out{margin-top:12px}
+.gmt-total{display:flex;flex-direction:column;align-items:center;padding:12px;border-radius:16px;background:rgba(255,255,255,.9)}
+.gmt-total small{font-size:11px;color:#8a7f6a}.gmt-total b{font-size:30px;font-family:"Times New Roman",Times,serif;color:var(--c1)}
+.gmt-total em{font-style:normal;font-size:13px;color:#5c4a1e;font-family:"Times New Roman",Times,serif}
+.gmt-break{display:flex;flex-direction:column;gap:2px;font-size:11.5px;color:#6b604c;margin-top:6px;text-align:center}
+.gmt-break b{font-family:"Times New Roman",Times,serif}
+.gmt-seasons{display:flex;flex-direction:column;gap:6px}
+.gmt-season{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:16px;background:rgba(255,255,255,.78)}
+.gmt-sic{width:36px;height:36px;border-radius:12px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--k2);color:var(--k1)}
+.gmt-sic .material-symbols-outlined{font-size:20px}
+.gmt-st{display:flex;flex-direction:column;flex:1;min-width:0}.gmt-st b{font-size:13px}.gmt-st small{font-size:10.5px;color:#8a7f6a}
+.gmt-days{font-size:12px;color:var(--k1);white-space:nowrap;background:var(--k2);border-radius:999px;padding:3px 10px}
+.gmt-days b{font-family:"Times New Roman",Times,serif;font-size:15px}
+@media (prefers-reduced-motion:reduce){.gmt-pill,.gmt-chev{transition:none}}
 </style>
 </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
@@ -984,6 +1041,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
           </div>
         </div>
         <div class="dsk-col-rail">
+          <section class="gmt-root" data-gm-tools="d" aria-label="أدوات سريعة" id="dskToolsBox"></section>
           <section id="dskDebtCard" class="dsk-debt hidden" aria-label="ديون متأخرة">
             <div class="dsk-debt-h"><div class="dsk-debt-t" id="dskDebtTitle">ديون متأخرة</div><div class="dsk-debt-s" id="dskDebtSummary"></div></div>
             <div class="dsk-debt-b" id="dskDebtRows"></div>
@@ -1914,6 +1972,7 @@ document.addEventListener('DOMContentLoaded', function () {
 </div>
 </section>
 <!-- Recent Movements Log -->
+<section class="mb-4 lg:hidden gmt-root" data-gm-tools="m" aria-label="أدوات سريعة"></section>
 <section class="mb-4" id="gmMovesSection" style="scroll-margin-top:80px;">
 <div class="flex justify-between items-center mb-3">
 <h3 class="gm-on-canvas" style="margin:0;font-size:15px;font-weight:700;color:#1F1A12;">حركات اليوم</h3>
@@ -3172,6 +3231,7 @@ if ('serviceWorker' in navigator) {
     { k: 'market', t: 'السوق اللحظي', el: function () { var e = document.getElementById('dskPriceTiles'); return e && e.closest('.dsk-panel'); }, sizes: true, fill: 'dskPriceTiles' },
     { k: 'goldchart', t: 'بورصة الذهب', el: function () { return document.getElementById('dskGoldChartPanel'); }, sizes: true },
     { k: 'saleschart', t: 'شارت المبيعات', el: function () { return document.getElementById('dskSalesChartPanel'); }, sizes: true },
+    { k: 'tools', t: 'أدوات سريعة (العملات، الحاسبة، المواسم)', el: function () { return document.getElementById('dskToolsBox'); } },
     { k: 'overdue', t: 'الديون المتأخرة', el: function () { return document.getElementById('dskDebtCard'); }, sizes: true },
     { k: 'pending', t: 'بانتظارك', el: function () { var e = document.getElementById('dskPendingEl'); return e && e.closest('.dsk-panel'); }, sizes: true, fill: 'dskPendingEl' }
   ];
