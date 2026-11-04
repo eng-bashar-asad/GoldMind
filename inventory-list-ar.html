@@ -204,6 +204,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
 </div>
 <div class="flex items-center gap-2">
 <button onclick="toggleSearch()" class="gm-hbtn hidden lg:inline-flex" title="بحث بالمخزون"><span class="material-symbols-outlined text-[20px]">search</span>بحث</button>
+<button id="bbBtn" onclick="openBranchBalances()" class="gm-hbtn hidden" title="أرصدة الفرع" aria-label="أرصدة الفرع"><span class="material-symbols-outlined text-[20px]">balance</span><span class="hidden sm:inline">الأرصدة</span></button>
 <button onclick="window.location.href='intake-batches-ar.html'" class="gm-hbtn" title="سندات الإدخال والإنتاج"><span class="material-symbols-outlined text-[20px]">receipt_long</span>السندات</button>
 <button onclick="window.location.href='inventory-add.html'" class="gm-gold relative hidden lg:flex items-center gap-1 h-10 px-3 rounded-full text-[13px] font-bold"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined text-[20px]" style="position:relative;">add</span><span style="position:relative;">قطعة</span></button>
 </div>
@@ -339,6 +340,27 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
 </main>
 
 <!-- Photo Lightbox -->
+<!-- أرصدة الفرع: every box × karat (count / gross / accounting / pure 24k), owner or view_branch_balances only -->
+<div id="bbModal" class="hidden fixed inset-0 z-[200] bg-black/50 flex items-end lg:items-center justify-center" onclick="if (event.target === this) closeBranchBalances()">
+<div role="dialog" aria-modal="true" aria-labelledby="bbTitle" class="bg-surface-container-lowest w-full lg:max-w-3xl max-h-[90vh] overflow-y-auto rounded-t-2xl lg:rounded-2xl p-4">
+<div class="flex items-center justify-between mb-3">
+<h2 id="bbTitle" class="text-[16px] font-bold">أرصدة الفرع</h2>
+<button type="button" onclick="closeBranchBalances()" aria-label="إغلاق" class="w-11 h-11 flex items-center justify-center rounded-full"><span class="material-symbols-outlined">close</span></button>
+</div>
+<div id="bbBody" class="text-[12.5px]"><p class="text-on-surface-variant py-6 text-center">جارٍ الحساب…</p></div>
+</div>
+</div>
+<style>
+#bbTable{border-collapse:collapse;width:100%}
+#bbTable th,#bbTable td{border:1px solid var(--gm-outline-variant,#E3DCCB);padding:6px 8px;vertical-align:top}
+#bbTable th{background:var(--gm-surface-container-low,#F4EFE3);font-weight:700;white-space:nowrap}
+#bbTable td.bb-c div{display:flex;justify-content:space-between;gap:8px;white-space:nowrap}
+#bbTable td.bb-c span:first-child{color:var(--gm-on-surface-variant,#6B6150);font-size:11px}
+#bbTable td.bb-c b{font-family:"Times New Roman",Times,serif;direction:ltr}
+#bbTable tr.bb-tot td{background:var(--gm-surface-container-low,#F4EFE3);font-weight:700}
+#bbTable .bb-pure{color:#7A6222}
+</style>
+
 <div id="photo-lightbox" onclick="closePhotoLightbox()" class="hidden fixed inset-0 bg-black/80 z-[300] flex items-center justify-center p-6">
 <img id="lightbox-img" class="max-w-full max-h-full rounded-lg object-contain"/>
 <button onclick="closePhotoLightbox()" class="absolute top-6 left-6 text-white">
@@ -363,7 +385,47 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         // behind the same view_reports permission rather than shown to
         // every employee who can merely view inventory.
         canViewAccWeight = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_reports'] === true));
+        const canBB = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_branch_balances'] === true));
+        document.getElementById('bbBtn').classList.toggle('hidden', !canBB);
     })();
+
+    // ---- أرصدة الفرع: what is physically in this branch, per box and karat.
+    // Pieces in the shop (available + reserved) and scrap boxes (weight left in gold_stock_lots).
+    // Pure (عيار 24) = accounting weight × karat ÷ 24 (accounting weight leaves out stones and allowances).
+    function gmBranchBalances(pieces, lots) {
+        const rows = {}, karats = new Set();
+        const cell = (box, k) => { karats.add(k); const r = rows[box] || (rows[box] = {}); return r[k] || (r[k] = { n: 0, gross: 0, acc: 0, pure: 0, scrap: false }); };
+        pieces.forEach(p => { const k = Number(p.karat) || 0; const c = cell(p.box_name || 'بدون صندوق', k); const g = Number(p.weight_grams) || 0, a = p.accounting_weight_grams != null ? Number(p.accounting_weight_grams) : g; c.n++; c.gross += g; c.acc += a; c.pure += a * k / 24; });
+        lots.forEach(l => { const k = Number(l.karat) || 0; const c = cell(l.box_name || ('كسر ' + k), k); const w = Number(l.weight_grams_remaining) || 0; c.scrap = true; c.gross += w; c.acc += w; c.pure += w * k / 24; });
+        return { rows, karats: [...karats].sort((a, b) => a - b) };
+    }
+    console.assert(Math.abs(gmBranchBalances([{ karat: 18, weight_grams: 10, accounting_weight_grams: 8, box_name: 'أ' }], [{ karat: 21, weight_grams_remaining: 24, box_name: 'كسر 21' }]).rows['كسر 21'][21].pure - 21) < 1e-9, 'gmBranchBalances');
+
+    async function openBranchBalances() {
+        document.getElementById('bbModal').classList.remove('hidden');
+        const body = document.getElementById('bbBody');
+        body.innerHTML = '<p class="text-on-surface-variant py-6 text-center">جارٍ الحساب…</p>';
+        const [pr, lr] = await Promise.all([
+            gmFetchAllRows(() => goldmindClient.from('pieces').select('box_name, karat, weight_grams, accounting_weight_grams').eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved']).order('id')),
+            gmFetchAllRows(() => goldmindClient.from('gold_stock_lots').select('box_name, karat, weight_grams_remaining').eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).order('id'))
+        ]);
+        if (pr.error || lr.error) { body.innerHTML = '<p class="text-error py-6 text-center">تعذّر تحميل الأرصدة. حاول مرة أخرى.</p>'; return; }
+        const { rows, karats } = gmBranchBalances(pr.data || [], lr.data || []);
+        if (!karats.length) { body.innerHTML = '<p class="text-on-surface-variant py-6 text-center">لا يوجد ذهب في هذا الفرع.</p>'; return; }
+        const f = n => gmMoney(n), f3 = n => Number(n).toLocaleString('en-US', { minimumFractionDigits: 3, maximumFractionDigits: 3 });
+        const line = (l, v, cls) => `<div class="${cls || ''}"><span>${l}</span><b>${v}</b></div>`;
+        const cellHtml = c => !c ? '<td class="text-center text-on-surface-variant">—</td>' : `<td class="bb-c">${c.scrap ? line('كسر', 'بالوزن') : line('القطع', c.n)}${line('القائم', f(c.gross))}${line('المحاسبة', f(c.acc))}${line('الصافي (24)', f3(c.pure), 'bb-pure')}</td>`;
+        const boxes = Object.keys(rows).sort((a, b) => (a.startsWith('كسر') - b.startsWith('كسر')) || a.localeCompare(b, 'ar'));
+        const tot = {}; let pureAll = 0;
+        boxes.forEach(b => karats.forEach(k => { const c = rows[b][k]; if (!c) return; const t = tot[k] || (tot[k] = { n: 0, gross: 0, acc: 0, pure: 0 }); t.n += c.n; t.gross += c.gross; t.acc += c.acc; t.pure += c.pure; pureAll += c.pure; }));
+        const rowPure = b => karats.reduce((s, k) => s + (rows[b][k] ? rows[b][k].pure : 0), 0);
+        body.innerHTML = `<div class="overflow-x-auto"><table id="bbTable"><thead><tr><th>الصندوق</th>${karats.map(k => `<th>عيار ${k}</th>`).join('')}<th>الصافي عيار 24</th></tr></thead><tbody>`
+            + boxes.map(b => `<tr><th class="text-right">${gmEscapeHtml(b)}</th>${karats.map(k => cellHtml(rows[b][k])).join('')}<td class="bb-pure font-bold" dir="ltr">${f3(rowPure(b))}</td></tr>`).join('')
+            + `<tr class="bb-tot"><td>المجموع</td>${karats.map(k => cellHtml(tot[k])).join('')}<td class="bb-pure" dir="ltr">${f3(pureAll)}</td></tr></tbody></table></div>`
+            + `<p class="mt-3 text-[16px] font-bold">مجموع الذهب الصافي في الفرع: <span class="bb-pure" dir="ltr">${f3(pureAll)}</span> غ عيار 24</p>`
+            + `<p class="mt-1 text-[11.5px] text-on-surface-variant">يشمل القطع المتوفرة والمحجوزة وصناديق الكسر. الصافي محسوب على الوزن المحاسبي × العيار ÷ 24. لا يشمل البضاعة عند التجار ولا أرصدة الذهب عند الزبائن والتجار.</p>`;
+    }
+    function closeBranchBalances() { document.getElementById('bbModal').classList.add('hidden'); }
 
     function openPhotoLightbox(url) {
         document.getElementById('lightbox-img').src = url;
