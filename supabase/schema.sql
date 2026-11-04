@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict YAYVS9rE2LLWZzIwqoMIQYkelFpOzuJJedkqhV6y5Xfjao4veeK9SlarQzogItb
+\restrict pt3f6yu9NFvV59Y6ijRPZ2gujJut7MKy7wK5bGVujZkN6RfELNbg1WLfsoV4Bde
 
 
 SET statement_timeout = 0;
@@ -2050,6 +2050,24 @@ begin
       raise exception 'السنة المالية % مقفلة — لا يمكن التسجيل بتاريخ فيها', extract(year from d)::int using errcode = '42501';
     end if;
     new.created_at := (d + (now() at time zone 'Asia/Dubai')::time) at time zone 'Asia/Dubai';
+  end if;
+  return new;
+end $$;
+
+
+--
+-- Name: gm_piece_acc_to_trader_give(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_piece_acc_to_trader_give() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.status = 'given_to_trader'
+     and coalesce(new.accounting_weight_grams, new.weight_grams) is distinct from coalesce(old.accounting_weight_grams, old.weight_grams) then
+    update trader_movements set piece_acc_weight = coalesce(new.accounting_weight_grams, new.weight_grams)
+     where id = (select id from trader_movements where piece_id = new.id and source = 'stock_given' order by created_at desc limit 1);
   end if;
   return new;
 end $$;
@@ -9276,6 +9294,13 @@ CREATE TRIGGER trg_org_head_office_check BEFORE INSERT OR UPDATE OF head_office_
 
 
 --
+-- Name: pieces trg_piece_acc_to_trader_give; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_piece_acc_to_trader_give AFTER UPDATE OF accounting_weight_grams, weight_grams ON public.pieces FOR EACH ROW EXECUTE FUNCTION public.gm_piece_acc_to_trader_give();
+
+
+--
 -- Name: pieces trg_piece_draws_delete; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -12419,6 +12444,15 @@ GRANT ALL ON FUNCTION public.gm_op_date_stamp() TO service_role;
 
 
 --
+-- Name: FUNCTION gm_piece_acc_to_trader_give(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_piece_acc_to_trader_give() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_piece_acc_to_trader_give() TO authenticated;
+GRANT ALL ON FUNCTION public.gm_piece_acc_to_trader_give() TO service_role;
+
+
+--
 -- Name: FUNCTION gm_piece_barcode_epc_guard(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -14092,5 +14126,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict YAYVS9rE2LLWZzIwqoMIQYkelFpOzuJJedkqhV6y5Xfjao4veeK9SlarQzogItb
+\unrestrict pt3f6yu9NFvV59Y6ijRPZ2gujJut7MKy7wK5bGVujZkN6RfELNbg1WLfsoV4Bde
 
