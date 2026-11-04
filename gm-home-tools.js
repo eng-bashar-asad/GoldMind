@@ -62,13 +62,14 @@
   async function loadStore() {
     var sid = typeof GOLDMIND_STORE_ID !== 'undefined' ? GOLDMIND_STORE_ID : null, me = typeof GOLDMIND_STAFF_ID !== 'undefined' ? GOLDMIND_STAFF_ID : null;
     var [st, gp, staff] = await Promise.all([
-      goldmindClient.from('stores').select('currency, country, secondary_currency, secondary_currency_rate, secondary_currency_rate_updated_at').eq('id', sid).maybeSingle(),
+      goldmindClient.from('stores').select('currency, country, secondary_currency, secondary_currency_rate, secondary_currency_rate_updated_at, occasions').eq('id', sid).maybeSingle(),
       goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', sid),
       goldmindClient.from('staff').select('role, permissions').eq('id', me).maybeSingle()
     ]);
     S.store = st.data || {};
     (gp.data || []).forEach(function (p) { S.prices[p.karat] = Number(p.price_per_gram) || 0; });
     var m = staff.data; S.canPrice = !!(m && (m.role === 'owner' || (m.permissions && m.permissions.manage_gold_price === true)));
+    S.canSettings = !!(m && (m.role === 'owner' || (m.permissions && m.permissions.edit_settings === true)));
   }
 
   // ---------- occasions ----------
@@ -84,21 +85,36 @@
       return { m: +parts.find(function (p) { return p.type === 'month'; }).value, d: +parts.find(function (p) { return p.type === 'day'; }).value };
     } catch (e) { return null; }
   }
-  function gmOccasions(country, from) {
+  // the default list of a country, in the stored shape: {t, kind, md:'MM-DD'} or {t, kind, hijri:[m,d]}
+  function defaultOccasions(country) {
+    var p2 = function (n) { return String(n).padStart(2, '0'); };
+    return (FIXED[country] || FIXED.AE).map(function (f) { return { t: f[2], kind: f[3], md: p2(f[0]) + '-' + p2(f[1]) }; })
+      .concat(HIJRI.map(function (x) { return { t: x[2], kind: x[3], hijri: [x[0], x[1]] }; }));
+  }
+  // list = the branch's own (stores.occasions) or the default; hijri ones use a confirmed date of that year if set
+  function gmOccasions(country, from, list) {
     var start = new Date(from || Date.now()); start.setHours(0, 0, 0, 0);
-    var out = [], y = start.getFullYear();
-    (FIXED[country] || FIXED.AE).forEach(function (f) {
-      var d = new Date(y, f[0] - 1, f[1]); if (d < start) d = new Date(y + 1, f[0] - 1, f[1]);
-      out.push({ t: f[2], kind: f[3], d: d });
+    var out = [], y = start.getFullYear(), todo = [];
+    (list || defaultOccasions(country)).forEach(function (o) {
+      if (!o || o.off || !o.t) return;
+      if (o.md) {
+        var mm = +o.md.slice(0, 2), dd = +o.md.slice(3, 5), d = new Date(y, mm - 1, dd);
+        if (d < start) d = new Date(y + 1, mm - 1, dd);
+        out.push({ t: o.t, kind: o.kind, d: d });
+      } else if (o.hijri) {
+        var fixed = o.dates && [y, y + 1].map(function (yy) { return o.dates[yy]; }).filter(Boolean).map(function (v) { var p = v.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }).filter(function (d) { return d >= start; })[0];
+        if (fixed) out.push({ t: o.t, kind: o.kind, d: fixed, confirmed: true }); else todo.push(o);
+      }
     });
     var seen = {};
-    for (var i = 0; i < 400; i++) {
+    for (var i = 0; i < 400 && todo.length; i++) {
       var d = new Date(start.getTime() + i * 86400000), h = hijriOf(d); if (!h) break;
-      HIJRI.forEach(function (x) { if (!seen[x[2]] && h.m === x[0] && h.d === x[1]) { seen[x[2]] = 1; out.push({ t: x[2], kind: x[3], d: d, hijri: true }); } });
+      todo.forEach(function (o) { if (!seen[o.t] && h.m === o.hijri[0] && h.d === o.hijri[1]) { seen[o.t] = 1; out.push({ t: o.t, kind: o.kind, d: d, hijri: true }); } });
     }
     return out.map(function (o) { o.days = Math.round((o.d - start) / 86400000); return o; }).sort(function (a, b) { return a.days - b.days; });
   }
   window.gmOccasions = gmOccasions;
+  console.assert(gmOccasions('SY', new Date(2026, 0, 1), [{ t: 'عيد الفطر', kind: 'eid', hijri: [10, 1], dates: { 2026: '2026-03-21' } }])[0].d.getDate() === 21, 'gmOccasions confirmed date');
   console.assert(gmOccasions('SY', new Date(2026, 11, 7))[0].t === 'عيد التحرير', 'gmOccasions');
 
   // ---------- render ----------
@@ -155,15 +171,75 @@
       + '<span>يعادل <b dir="ltr">' + num(w * k / 24, 3) + '</b> غ ذهب عيار 24</span></div>';
   }
 
+  function occList() { return Array.isArray(S.store && S.store.occasions) ? S.store.occasions : defaultOccasions(country()); }
   function seasonsHtml() {
-    var list = gmOccasions(country()).slice(0, 8);
+    var list = gmOccasions(country(), null, occList()).slice(0, 8);
     var fmt = function (d) { return d.toLocaleDateString('ar', { day: 'numeric', month: 'long' }); };
-    return '<div class="gmt-seasons">' + list.map(function (o) {
+    return '<div class="gmt-seasons">' + (list.length ? list.map(function (o) {
       var k = KIND[o.kind] || KIND.world;
       return '<div class="gmt-season" style="--k1:' + k[0] + ';--k2:' + k[1] + '"><span class="gmt-sic"><span class="material-symbols-outlined" aria-hidden="true">' + k[2] + '</span></span>'
         + '<span class="gmt-st"><b>' + esc(o.t) + '</b><small>' + fmt(o.d) + (o.hijri ? ' · تقريبي' : '') + '</small></span>'
         + '<span class="gmt-days">' + (o.days === 0 ? 'اليوم' : o.days === 1 ? 'غداً' : '<b dir="ltr">' + o.days + '</b> يوم') + '</span></div>';
-    }).join('') + '</div><div class="gmt-src">' + (country() === 'SY' ? 'العطل الرسمية في سوريا' : 'العطل الرسمية في الإمارات') + ' + عيد الأم وعيد الحب · الأعياد الهجرية تقريبية (±1 يوم حسب رؤية الهلال)</div>';
+    }).join('') : '<p class="gmt-empty">لا مناسبات — أضفها من «تعديل المناسبات».</p>') + '</div>'
+      + (S.canSettings ? '<button type="button" class="gmt-edit-btn" data-occ="edit"><span class="material-symbols-outlined" aria-hidden="true">edit_calendar</span>تعديل المناسبات</button>' : '')
+      + '<div class="gmt-src">' + (country() === 'SY' ? 'العطل الرسمية في سوريا' : 'العطل الرسمية في الإمارات') + ' + عيد الأم وعيد الحب · الأعياد الهجرية تقريبية (±1 يوم) حتى يُثبّت المدير تاريخها</div>';
+  }
+  // editor: rename, change the date (yearly), confirm this year's date of a hijri one, hide, add, remove added ones
+  function occEditHtml() {
+    var y = new Date().getFullYear(), list = occList();
+    var row = function (o, i) {
+      var date = o.md ? '<input type="date" data-oe="md" value="' + y + '-' + esc(o.md) + '" aria-label="تاريخ المناسبة (يتكرر كل سنة)" dir="ltr"/>'
+        : '<input type="date" data-oe="hd" value="' + esc((o.dates && (o.dates[y] || o.dates[y + 1])) || '') + '" aria-label="التاريخ المؤكد هذه السنة" dir="ltr"/>';
+      return '<div class="gmt-oe" data-i="' + i + '">'
+        + '<input type="text" data-oe="t" value="' + esc(o.t) + '" aria-label="اسم المناسبة" maxlength="60"/>'
+        + date
+        + '<label class="gmt-oe-off"><input type="checkbox" data-oe="off"' + (o.off ? ' checked' : '') + '/> إخفاء</label>'
+        + (o.custom ? '<button type="button" data-occ="del" aria-label="حذف المناسبة" class="gmt-oe-del"><span class="material-symbols-outlined">delete</span></button>' : '')
+        + (o.hijri ? '<small class="gmt-oe-h">هجري — اتركه فارغاً للحساب التلقائي</small>' : '')
+        + '</div>';
+    };
+    return '<div class="gmt-oes">' + list.map(row).join('') + '</div>'
+      + '<button type="button" class="gmt-edit-btn" data-occ="add"><span class="material-symbols-outlined" aria-hidden="true">add</span>مناسبة جديدة</button>'
+      + '<div class="gmt-oe-actions"><button type="button" data-occ="reset" class="gmt-oe-ghost">الرجوع للقائمة الأصلية</button><button type="button" data-occ="cancel" class="gmt-oe-ghost">إلغاء</button><button type="button" data-occ="save" class="gmt-oe-save">حفظ</button></div>'
+      + '<p class="gmt-oe-msg" aria-live="polite"></p>';
+  }
+  function occRead(panel) {
+    var y = new Date().getFullYear(), base = occList(), out = [], bad = '';
+    panel.querySelectorAll('.gmt-oe').forEach(function (r) {
+      var i = r.dataset.i, src = i === 'new' ? { kind: 'world', custom: true, md: '' } : (base[+i] || { kind: 'world', custom: true }), o = JSON.parse(JSON.stringify(src));
+      o.t = r.querySelector('[data-oe="t"]').value.trim();
+      o.off = r.querySelector('[data-oe="off"]').checked || undefined;
+      var md = r.querySelector('[data-oe="md"]'), hd = r.querySelector('[data-oe="hd"]');
+      if (md) { o.md = (md.value || '').slice(5); if (!/^\d{2}-\d{2}$/.test(o.md)) bad = bad || ('اختر تاريخ: ' + (o.t || 'المناسبة الجديدة')); }
+      if (hd) { o.dates = Object.assign({}, o.dates || {}); delete o.dates[y]; delete o.dates[y + 1]; if (hd.value) o.dates[hd.value.slice(0, 4)] = hd.value; }
+      if (!o.t) bad = bad || 'اكتب اسم كل مناسبة';
+      out.push(o);
+    });
+    return { list: out, bad: bad };
+  }
+  async function occSave(panel, list) {
+    var msg = panel.querySelector('.gmt-oe-msg');
+    msg.textContent = 'جارِ الحفظ...';
+    var { error } = await goldmindClient.from('stores').update({ occasions: list }).eq('id', GOLDMIND_STORE_ID);
+    if (error) { msg.textContent = 'تعذّر الحفظ: ' + error.message; return false; }
+    S.store.occasions = list;
+    return true;
+  }
+  async function occClick(panel, act, btn) {
+    if (act === 'edit') { panel.innerHTML = occEditHtml(); return; }
+    if (act === 'cancel') { panel.innerHTML = seasonsHtml(); return; }
+    if (act === 'add') {
+      var box = panel.querySelector('.gmt-oes'), tmp = document.createElement('div');
+      tmp.innerHTML = '<div class="gmt-oe" data-i="new"><input type="text" data-oe="t" placeholder="اسم المناسبة" aria-label="اسم المناسبة" maxlength="60"/><input type="date" data-oe="md" aria-label="تاريخ المناسبة (يتكرر كل سنة)" dir="ltr"/><label class="gmt-oe-off"><input type="checkbox" data-oe="off"/> إخفاء</label><button type="button" data-occ="del" aria-label="حذف المناسبة" class="gmt-oe-del"><span class="material-symbols-outlined">delete</span></button></div>';
+      box.appendChild(tmp.firstChild); box.lastChild.querySelector('[data-oe="t"]').focus(); return;
+    }
+    if (act === 'del') { btn.closest('.gmt-oe').remove(); return; }
+    if (act === 'reset') { if (!confirm('الرجوع لقائمة المناسبات الأصلية لبلد الفرع؟ تضيع تعديلاتك.')) return; if (await occSave(panel, null)) { S.store.occasions = null; panel.innerHTML = seasonsHtml(); } return; }
+    if (act === 'save') {
+      var r = occRead(panel), msg = panel.querySelector('.gmt-oe-msg');
+      if (r.bad) { msg.textContent = r.bad; return; }
+      if (await occSave(panel, r.list)) panel.innerHTML = seasonsHtml();
+    }
   }
 
   function render(root) {
@@ -180,6 +256,8 @@
       if (pill) return toggle(root, pill.dataset.tool);
       var sw = e.target.closest('[data-fx="swap"]');
       if (sw) { var box = sw.closest('.gmt-panel'), a = box.querySelector('[data-fx="from"]'), b = box.querySelector('[data-fx="to"]'), x = a.value; a.value = b.value; b.value = x; fxCalc(box); return; }
+      var ob = e.target.closest('[data-occ]');
+      if (ob) { occClick(ob.closest('.gmt-panel'), ob.dataset.occ, ob); return; }
       var kb = e.target.closest('[data-k]');
       if (kb) { kb.parentNode.querySelectorAll('[data-k]').forEach(function (b) { b.setAttribute('aria-pressed', String(b === kb)); }); calcRun(kb.closest('.gmt-panel')); }
     });

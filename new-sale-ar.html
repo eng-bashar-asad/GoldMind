@@ -696,6 +696,21 @@
     const REUSE_ID = new URLSearchParams(location.search).get('reuse');
     let REUSE = null;
     let EDIT = null, EDIT_LATER = 0, CUST_CREDIT = 0;
+    // the customer's deposit on this sale: 'use' = taken off this invoice, 'keep' = paid in full now, the deposit stays
+    // for its piece. Until the seller picks: 'use' when the cart holds a piece the deposit is for (or the credit is not
+    // a deposit for a piece), else 'keep'.
+    let CREDIT_CHOICE = null, DEP_BARCODES = [];
+    function gmCreditUse() {
+        if (CREDIT_CHOICE) return CREDIT_CHOICE === 'use';
+        if (!DEP_BARCODES.length) return true;
+        return cart.some(i => DEP_BARCODES.includes(String(i.barcode || (i.piece && i.piece.barcode) || '')));
+    }
+    function gmCreditChoiceRefresh() {
+        const box = document.getElementById('customer-credit');
+        if (!box || box.classList.contains('hidden')) return;
+        const use = gmCreditUse();
+        box.querySelectorAll('input[name="credit-use"]').forEach(r => { r.checked = (r.value === 'use') === use; });
+    }
     const editRemoved = []; // existing lines taken off the invoice
     const cart = []; // { cartId, piece (or null), barcode, karat, weight, price }
     let cartCounter = 0;
@@ -1364,10 +1379,19 @@
         const { data } = await goldmindClient.rpc('customer_credit', { sid: GOLDMIND_STORE_ID, cust: c.id });
         if (!selectedCustomer || selectedCustomer.id !== c.id) return;
         CUST_CREDIT = Number(data) || 0;
+        CREDIT_CHOICE = null; DEP_BARCODES = [];
         if (CUST_CREDIT > 0.009) {
-            box.innerHTML = '<b>للزبون عندنا رصيد ' + gmMoney(CUST_CREDIT) + ' ' + CUR + '</b> (عربون أو دفعة سابقة).<br>'
-                + 'يُخصم تلقائياً من المبلغ الذي يبقى عليه بهذه الفاتورة. اختر «دفعة جزئية» واكتب فقط ما يدفعه الآن — لا تكتب العربون، فهو في الصندوق من قبل.';
+            const { data: deps } = await goldmindClient.from('customer_deposits').select('deposit_number, items').eq('customer_id', c.id).eq('status', 'active');
+            if (!selectedCustomer || selectedCustomer.id !== c.id) return;
+            (deps || []).forEach(d => (Array.isArray(d.items) ? d.items : []).forEach(it => { if (it && it.barcode) DEP_BARCODES.push(String(it.barcode)); }));
+            const depFor = DEP_BARCODES.length ? ' — العربون محجوز للقطعة <span dir="ltr">' + DEP_BARCODES.map(gmEscapeHtml).join('، ') + '</span>' : '';
+            box.innerHTML = '<b>للزبون عندنا رصيد ' + gmMoney(CUST_CREDIT) + ' ' + CUR + '</b> (عربون أو دفعة سابقة)' + depFor + '.'
+                + '<div class="flex flex-col gap-1.5 mt-2" role="radiogroup" aria-label="الرصيد بهذه الفاتورة">'
+                + '<label class="flex items-center gap-2 cursor-pointer min-h-[36px]"><input type="radio" name="credit-use" value="use" onchange="CREDIT_CHOICE=this.value; if (selectedPaymentMethod===\'mixed\') onMixedAmountInput();"/> <span><b>يُخصم من العربون</b> — يدفع الباقي فقط</span></label>'
+                + '<label class="flex items-center gap-2 cursor-pointer min-h-[36px]"><input type="radio" name="credit-use" value="keep" onchange="CREDIT_CHOICE=this.value; if (selectedPaymentMethod===\'mixed\') onMixedAmountInput();"/> <span><b>يدفع المبلغ كاملاً للصندوق</b> — يبقى العربون لقطعته</span></label>'
+                + '</div><div class="text-[11px] mt-1 opacity-80">لا تكتب العربون في المدفوع، فهو في الصندوق من قبل. إذا بقي على الفاتورة دين يُغطّى من الرصيد تلقائياً.</div>';
             box.classList.remove('hidden');
+            gmCreditChoiceRefresh();
         }
         if (selectedPaymentMethod === 'mixed') onMixedAmountInput();
     }
@@ -1955,6 +1979,7 @@
     }
 
     function renderCart() {
+        gmCreditChoiceRefresh();
         const body = document.getElementById('cart-body');
         if (cart.length === 0) {
             body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
@@ -2081,7 +2106,7 @@
             const { data: cr, error: crErr } = await goldmindClient.rpc('customer_credit', { sid: GOLDMIND_STORE_ID, cust: selectedCustomer.id });
             if (!crErr) CUST_CREDIT = Number(cr) || 0;
         }
-        if (selectedPaymentMethod === 'cash' && CUST_CREDIT > 0.009 && !PAY.code && !fxRows.some(r => Number(r.amount) > 0)) {
+        if (selectedPaymentMethod === 'cash' && CUST_CREDIT > 0.009 && gmCreditUse() && !PAY.code && !fxRows.some(r => Number(r.amount) > 0)) {
             const fromCredit = Math.min(CUST_CREDIT, total);
             selectedPaymentMethod = fromCredit >= total - 0.009 ? 'credit' : 'mixed';
             document.getElementById('mixed-cash-amount').value = Math.max(0, Math.round((total - fromCredit) * 100) / 100) || '';

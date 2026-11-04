@@ -50,3 +50,28 @@ test('the deposit is taken off even if the credit had not loaded yet when saving
   await page.waitForURL(/invoice-print-ar\.html\?id=inv-1/);
   expect(posted[0]).toMatchObject({ payment_method: 'mixed', cash_paid: 1400 });
 });
+
+// a deposit held for another piece: by default the new piece is paid in full in cash and the deposit stays;
+// the seller can still take it off the deposit.
+for (const choice of ['default', 'use']) test('deposit for another piece — ' + choice, async ({ page }) => {
+  const posted = [];
+  await install(page, { db: { ...db(), customer_deposits: [{ id: 'd1', store_id: STORE, customer_id: 'c1', deposit_number: 'DEP-000009', status: 'active', amount: 300, items: [{ barcode: 'GM-0009' }] }] }, rpc: {
+    customer_credit: () => ({ body: 300 }),
+    post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-1', invoice_number: 'INV-1' } }; }
+  } });
+  page.on('dialog', d => d.accept());
+  await page.goto('/new-sale-ar.html?draft=none');
+  await page.fill('#barcode-search-input', 'GM-0001');
+  await page.click('button[onclick="searchByBarcode()"]');
+  await page.fill('#barcode-price-input', '1500');
+  await page.press('#barcode-price-input', 'Enter');
+  await page.fill('#customer-search', 'راما');
+  await page.click('#customer-results >> text=راما مملوك');
+  await expect(page.locator('#customer-credit')).toContainText('GM-0009');
+  await expect(page.locator('input[name="credit-use"][value="keep"]')).toBeChecked();
+  if (choice === 'use') await page.check('input[name="credit-use"][value="use"]');
+  await page.click('#save-invoice-btn');
+  await page.waitForURL(/invoice-print-ar\.html\?id=inv-1/);
+  if (choice === 'use') expect(posted[0]).toMatchObject({ payment_method: 'mixed', cash_paid: 1200 });
+  else expect(posted[0]).toMatchObject({ payment_method: 'cash' });
+});

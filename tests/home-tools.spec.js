@@ -53,3 +53,37 @@ test('seasons: Syrian occasions with a countdown; opening one box closes the oth
   await expect(panel).toContainText('عيد التحرير');
   await expect(panel).not.toContainText('يوم الشهيد');
 });
+
+test('seasons: the manager edits a date, hides one, adds one — saved on the branch', async ({ page }) => {
+  const root = await open(page);
+  let saved = null;
+  page.on('request', r => { if (r.method() === 'PATCH' && /\/stores/.test(r.url())) saved = JSON.parse(r.postData()).occasions; });
+  await root.locator('.gmt-pill[data-tool="seasons"]').click();
+  const panel = root.locator('[data-panel="seasons"]');
+  await panel.locator('[data-occ="edit"]').click();
+  const row = t => panel.locator('.gmt-oe').filter({ has: page.locator(`input[data-oe="t"][value="${t}"]`) });
+  await row('عيد الأم').locator('[data-oe="md"]').fill('2026-03-22');
+  await row('عيد الحب').locator('[data-oe="off"]').check();
+  await panel.locator('[data-occ="add"]').click();
+  const nw = panel.locator('.gmt-oe[data-i="new"]');
+  await nw.locator('[data-oe="t"]').fill('ذكرى افتتاح المحل');
+  await nw.locator('[data-oe="md"]').fill('2026-12-01');
+  await panel.locator('[data-occ="save"]').click();
+  await expect(panel.locator('.gmt-season').first()).toBeVisible();
+  await expect.poll(() => saved).not.toBeNull();
+  expect(saved.find(o => o.t === 'عيد الأم').md).toBe('03-22');
+  expect(saved.find(o => o.t === 'عيد الحب').off).toBe(true);
+  expect(saved.find(o => o.t === 'ذكرى افتتاح المحل')).toMatchObject({ md: '12-01', custom: true });
+  await expect(panel.locator('.gmt-seasons')).not.toContainText('عيد الحب');
+  await expect(panel.locator('.gmt-seasons')).toContainText('ذكرى افتتاح المحل');
+});
+
+test('staff without edit_settings: no «تعديل المناسبات»', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 900 });
+  await install(page, { generic: true, db: { ...db(), staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'staff', permissions: {}, full_name: 'م' }] } });
+  await page.goto('/index-ar.html');
+  const root = page.locator('[data-gm-tools="m"]');
+  await root.locator('.gmt-pill[data-tool="seasons"]').click();
+  await expect(root.locator('[data-panel="seasons"] .gmt-season').first()).toBeVisible();
+  await expect(root.locator('[data-occ="edit"]')).toHaveCount(0);
+});
