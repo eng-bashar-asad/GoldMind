@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict pt3f6yu9NFvV59Y6ijRPZ2gujJut7MKy7wK5bGVujZkN6RfELNbg1WLfsoV4Bde
+\restrict jILfKrAxNlA6DqvONgt6xuT3tC6XFVAFSPJ3ObkluSci7P1T8JSymnz24PfE1Ai
 
 
 SET statement_timeout = 0;
@@ -1886,6 +1886,28 @@ $$;
 
 
 --
+-- Name: gm_fx_save(date, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_fx_save(p_day date, p_rates jsonb) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare k text; v jsonb; n int := 0;
+begin
+  if auth.uid() is null then raise exception 'unauthorized'; end if;
+  if p_day is null or p_day < current_date - 1 or p_day > current_date + 1 then raise exception 'تاريخ غير صالح'; end if;
+  if jsonb_typeof(p_rates) <> 'object' then raise exception 'أسعار غير صالحة'; end if;
+  for k, v in select * from jsonb_each(p_rates) loop
+    n := n + 1;
+    if k !~ '^[A-Z]{3}$' or jsonb_typeof(v) <> 'number' or (v #>> '{}')::numeric <= 0 then raise exception 'سعر غير صالح: %', k; end if;
+  end loop;
+  if n < 5 or n > 250 or coalesce((p_rates->>'USD')::numeric, 0) <> 1 then raise exception 'أسعار غير صالحة'; end if;
+  insert into fx_rates_daily (day, rates) values (p_day, p_rates) on conflict (day) do nothing;
+end $_$;
+
+
+--
 -- Name: gm_invoice_audit_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2010,6 +2032,20 @@ CREATE FUNCTION public.gm_is_store_owner(p_store uuid) RETURNS boolean
     SET search_path TO 'public'
     AS $$
   select exists (select 1 from public.staff where user_id = auth.uid() and store_id = p_store and role = 'owner');
+$$;
+
+
+--
+-- Name: gm_next_voucher_no(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_next_voucher_no(p_store uuid, p_prefix text) RETURNS text
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  insert into voucher_counters (store_id, prefix, last_no) values (p_store, p_prefix, 1)
+  on conflict (store_id, prefix) do update set last_no = voucher_counters.last_no + 1
+  returning p_prefix || '-' || lpad(last_no::text, 6, '0');
 $$;
 
 
@@ -2379,6 +2415,25 @@ begin
   end if;
   return new;
 end $$;
+
+
+--
+-- Name: gm_trader_voucher_prefix(text, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_trader_voucher_prefix(p_source text, p_type text) RETURNS text
+    LANGUAGE sql IMMUTABLE
+    SET search_path TO 'public'
+    AS $$
+  select case
+    when p_source in ('stock_given', 'scrap_given') then 'TOUT'
+    when p_source = 'stock_received' then 'TIN'
+    when p_source = 'cash_out' or (p_source = 'settlement' and p_type = 'debt_decrease') then 'PAY'
+    when p_source = 'cash_in' or (p_source = 'settlement' and p_type = 'debt_increase') then 'REC'
+    when p_source = 'discount' then 'DSC'
+    when p_source = 'gold_to_cash' then 'CNV'
+  end;
+$$;
 
 
 --
@@ -3379,7 +3434,7 @@ CREATE FUNCTION public.post_sale_invoice(p jsonb) RETURNS jsonb
                       allow_low boolean := coalesce((p->>'confirm_low_price')::boolean, false);
                         cash_amt numeric := round(coalesce(nullif(p->>'cash_paid','')::numeric, 0), 2);
                           bank_amt numeric := round(coalesce(nullif(p->>'bank_paid','')::numeric, 0), 2);
-                            sold_at timestamptz := coalesce(nullif(p->>'sold_at','')::timestamptz, now());
+                            reuse uuid := nullif(p->>'reuse_invoice_id','')::uuid; old_inv record; n_old int; sold_at timestamptz := coalesce(nullif(p->>'sold_at','')::timestamptz, now());
                               me uuid; inv_id uuid; inv_no text; ex record;
                                 it jsonb; mode text; price numeric; total numeric := 0; paid numeric; remaining numeric := 0;
                                   pc record; dp record; lot record;
@@ -3412,7 +3467,7 @@ CREATE FUNCTION public.post_sale_invoice(p jsonb) RETURNS jsonb
                                                                                                           raise exception 'الفاتورة فاضية — ضيف قطعة وحدة على الأقل';
                                                                                                             end if;
                                                                                                               -- offline sales keep their real time, but never in the future or older than 14 days
-                                                                                                                if sold_at > now() + interval '5 minutes' or sold_at < now() - interval '14 days' then sold_at := now(); end if;
+                                                                                                                if sold_at > now() + interval '5 minutes' or (sold_at < now() - interval '14 days' and reuse is null) then sold_at := now(); end if;
                                                                                                                   select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
 
                                                                                                                     -- 1) validate + lock every line, build the rows to insert
@@ -3475,7 +3530,21 @@ CREATE FUNCTION public.post_sale_invoice(p jsonb) RETURNS jsonb
                                                                                                                                                                                                                                                                                                                                                                                 end if;
 
                                                                                                                                                                                                                                                                                                                                                                                   -- 2) write everything
-                                                                                                                                                                                                                                                                                                                                                                                    inv_no := next_invoice_number(sid, 'INV');
+                                                                                                                                                                                                                                                                                                                                                                                    
+    if reuse is not null then
+      select * into old_inv from invoices where id = reuse and store_id = sid for update;
+      if not found or old_inv.type <> 'sale' or old_inv.status <> 'cancelled' then raise exception 'الفاتورة الأصلية ليست فاتورة بيع ملغاة'; end if;
+      if old_inv.einvoice_uuid is not null then raise exception 'لا يمكن إعادة استخدام رقم فاتورة أُرسلت للفوترة الإلكترونية'; end if;
+      if old_inv.invoice_number like '%-ملغاة%' then raise exception 'رقم هذه الفاتورة أُعيد استخدامه من قبل'; end if;
+      if not has_permission('delete_invoice', sid) then raise exception 'ليس لديك صلاحية إعادة إصدار فاتورة ملغاة' using errcode = '42501'; end if;
+      inv_no := old_inv.invoice_number;
+      select count(*) into n_old from invoices where store_id = sid and invoice_number like inv_no || '-ملغاة%';
+      update invoices set invoice_number = inv_no || '-ملغاة' || case when n_old > 0 then (n_old + 1)::text else '' end where id = reuse;
+      insert into audit_log (store_id, action_type, description)
+        values (sid, 'invoice_reissued', 'إعادة إصدار الفاتورة الملغاة ' || inv_no || ' بنفس الرقم');
+    else
+      inv_no := next_invoice_number(sid, 'INV');
+    end if;
                                                                                                                                                                                                                                                                                                                                                                                       insert into invoices (store_id, invoice_number, type, customer_id, payment_method, cash_paid_amount, bank_paid_amount,
                                                                                                                                                                                                                                                                                                                                                                                             gold_value, fabrication_fees, vat_amount, total_amount, amount_paid, status, created_by, created_at, client_ref)
                                                                                                                                                                                                                                                                                                                                                                                                 values (sid, inv_no, 'sale', cust, pm, case when pm = 'mixed' then cash_amt end, case when pm = 'mixed' then bank_amt end,
@@ -5393,7 +5462,7 @@ CREATE FUNCTION public.trader_return_piece(p_movement uuid) RETURNS jsonb
  begin
    select * into m from trader_movements where id = p_movement and source = 'stock_given' and piece_id is not null;
      if m is null then raise exception 'القطعة غير موجودة في حساب التاجر'; end if;
-       if not has_permission('edit_traders', m.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+       if not has_permission('edit_vouchers', m.store_id) then raise exception 'ليس لديك صلاحية تعديل وحذف السندات' using errcode = '42501'; end if;
          select id into me from staff where user_id = auth.uid() and store_id = m.store_id limit 1;
            delete from trader_movements where id = m.id;
              update pieces set status = 'available' where id = m.piece_id and status = 'given_to_trader' returning barcode into bc;
@@ -5665,6 +5734,29 @@ begin
         cost_fabrication_per_gram = coalesce(new.fab_fee_per_gram, cost_fabrication_per_gram) where id = lt.id;
     end if;
   end if;
+  return new;
+end $$;
+
+
+--
+-- Name: trg_trader_voucher_no(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_trader_voucher_no() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare pf text; v text;
+begin
+  if new.voucher_no is not null then return new; end if;
+  pf := gm_trader_voucher_prefix(new.source, new.movement_type);
+  if pf is null then return new; end if;
+  select t.voucher_no into v from trader_movements t
+   where t.store_id = new.store_id and t.trader_id = new.trader_id and t.voucher_no like pf || '-%'
+     and ((new.batch_id is not null and t.batch_id = new.batch_id)
+          or (new.batch_id is null and t.batch_id is null and t.created_at = new.created_at and t.created_at > now() - interval '5 minutes'))
+   limit 1;
+  new.voucher_no := coalesce(v, gm_next_voucher_no(new.store_id, pf));
   return new;
 end $$;
 
@@ -6224,6 +6316,19 @@ CREATE TABLE public.fiscal_year_closures (
     notes text,
     closed_by uuid,
     closed_at timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+--
+-- Name: fx_rates_daily; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.fx_rates_daily (
+    day date NOT NULL,
+    base text DEFAULT 'USD'::text NOT NULL,
+    rates jsonb NOT NULL,
+    source text DEFAULT 'open.er-api.com'::text NOT NULL,
+    fetched_at timestamp with time zone DEFAULT now() NOT NULL
 );
 
 
@@ -7189,6 +7294,7 @@ CREATE TABLE public.stores (
     display_name text,
     branch_code text,
     own_gold_price boolean DEFAULT false NOT NULL,
+    occasions jsonb,
     CONSTRAINT invoice_print_frame_check CHECK ((invoice_print_frame = ANY (ARRAY['classic'::text, 'gold'::text, 'double'::text, 'dashed'::text, 'none'::text]))),
     CONSTRAINT invoice_print_shape_check CHECK ((invoice_print_shape = ANY (ARRAY['square'::text, 'soft'::text, 'round'::text]))),
     CONSTRAINT stores_branch_code_format CHECK (((branch_code IS NULL) OR (branch_code ~ '^[A-Z]{2,5}$'::text))),
@@ -7321,6 +7427,7 @@ CREATE TABLE public.trader_movements (
     piece_acc_weight numeric,
     gold_price_24k numeric,
     entered_at timestamp with time zone DEFAULT now(),
+    voucher_no text,
     CONSTRAINT trader_movements_source_check CHECK ((source = ANY (ARRAY['settlement'::text, 'stock_given'::text, 'stock_received'::text, 'opening_balance'::text, 'cash_out'::text, 'cash_in'::text, 'gold_to_cash'::text, 'scrap_given'::text, 'discount'::text])))
 );
 
@@ -7438,6 +7545,17 @@ CREATE TABLE public.user_profiles (
     privacy_accepted_at timestamp with time zone,
     home_prefs jsonb,
     CONSTRAINT user_profiles_username_format CHECK (((username IS NULL) OR (username ~ '^[a-zA-Z0-9_\.]{3,30}$'::text)))
+);
+
+
+--
+-- Name: voucher_counters; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.voucher_counters (
+    store_id uuid NOT NULL,
+    prefix text NOT NULL,
+    last_no integer DEFAULT 0 NOT NULL
 );
 
 
@@ -7642,6 +7760,14 @@ ALTER TABLE ONLY public.fiscal_year_closures
 
 ALTER TABLE ONLY public.fiscal_year_closures
     ADD CONSTRAINT fiscal_year_closures_store_id_fiscal_year_key UNIQUE (store_id, fiscal_year);
+
+
+--
+-- Name: fx_rates_daily fx_rates_daily_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.fx_rates_daily
+    ADD CONSTRAINT fx_rates_daily_pkey PRIMARY KEY (day);
 
 
 --
@@ -8058,6 +8184,14 @@ ALTER TABLE ONLY public.user_profiles
 
 ALTER TABLE ONLY public.user_profiles
     ADD CONSTRAINT user_profiles_username_key UNIQUE (username);
+
+
+--
+-- Name: voucher_counters voucher_counters_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.voucher_counters
+    ADD CONSTRAINT voucher_counters_pkey PRIMARY KEY (store_id, prefix);
 
 
 --
@@ -9049,6 +9183,13 @@ CREATE INDEX trader_movements_trader_id_fk_idx ON public.trader_movements USING 
 
 
 --
+-- Name: trader_movements_voucher_no_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_voucher_no_idx ON public.trader_movements USING btree (store_id, voucher_no);
+
+
+--
 -- Name: trader_scrap_draws_movement_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9396,6 +9537,13 @@ CREATE TRIGGER trg_tm_snapshot BEFORE INSERT ON public.trader_movements FOR EACH
 --
 
 CREATE TRIGGER trg_trader_received_sync BEFORE UPDATE ON public.trader_movements FOR EACH ROW WHEN (((new.source = 'stock_received'::text) AND ((new.piece_id IS NOT NULL) OR (new.gold_stock_lot_id IS NOT NULL)))) EXECUTE FUNCTION public.trg_trader_received_sync();
+
+
+--
+-- Name: trader_movements trg_trader_voucher_no; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_trader_voucher_no BEFORE INSERT ON public.trader_movements FOR EACH ROW EXECUTE FUNCTION public.trg_trader_voucher_no();
 
 
 --
@@ -10615,6 +10763,14 @@ ALTER TABLE ONLY public.user_profiles
 
 
 --
+-- Name: voucher_counters voucher_counters_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.voucher_counters
+    ADD CONSTRAINT voucher_counters_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id);
+
+
+--
 -- Name: zebra_label_fields zebra_label_fields_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -10991,6 +11147,19 @@ CREATE POLICY expense_entries_write ON public.expense_entries USING ((public.is_
 --
 
 ALTER TABLE public.fiscal_year_closures ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: fx_rates_daily; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.fx_rates_daily ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: fx_rates_daily fx_rates_daily_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY fx_rates_daily_read ON public.fx_rates_daily FOR SELECT TO authenticated USING (true);
+
 
 --
 -- Name: gift_cost_adjust_20261006; Type: ROW SECURITY; Schema: public; Owner: -
@@ -11809,6 +11978,20 @@ CREATE POLICY trader_movements_select_org ON public.trader_movements FOR SELECT 
 
 
 --
+-- Name: trader_movements trader_movements_voucher_edit; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY trader_movements_voucher_edit ON public.trader_movements AS RESTRICTIVE FOR UPDATE TO authenticated USING (public.has_permission('edit_vouchers'::text, store_id)) WITH CHECK (public.has_permission('edit_vouchers'::text, store_id));
+
+
+--
+-- Name: trader_movements trader_movements_voucher_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY trader_movements_voucher_remove ON public.trader_movements AS RESTRICTIVE FOR DELETE TO authenticated USING (public.has_permission('edit_vouchers'::text, store_id));
+
+
+--
 -- Name: trader_movements trader_movements_write; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -11867,6 +12050,12 @@ CREATE POLICY traders_update_delete ON public.traders FOR UPDATE USING ((public.
 --
 
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: voucher_counters; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.voucher_counters ENABLE ROW LEVEL SECURITY;
 
 --
 -- Name: zebra_label_fields; Type: ROW SECURITY; Schema: public; Owner: -
@@ -12392,6 +12581,15 @@ GRANT ALL ON FUNCTION public.gm_fiscal_closed(p_store uuid, p_day date) TO servi
 
 
 --
+-- Name: FUNCTION gm_fx_save(p_day date, p_rates jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_fx_save(p_day date, p_rates jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_fx_save(p_day date, p_rates jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_fx_save(p_day date, p_rates jsonb) TO service_role;
+
+
+--
 -- Name: FUNCTION gm_invoice_audit_guard(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12423,6 +12621,14 @@ GRANT ALL ON FUNCTION public.gm_invoice_items_audit_guard() TO service_role;
 REVOKE ALL ON FUNCTION public.gm_is_store_owner(p_store uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_is_store_owner(p_store uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.gm_is_store_owner(p_store uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_next_voucher_no(p_store uuid, p_prefix text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_next_voucher_no(p_store uuid, p_prefix text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_next_voucher_no(p_store uuid, p_prefix text) TO service_role;
 
 
 --
@@ -12553,6 +12759,14 @@ GRANT ALL ON FUNCTION public.gm_stock_in_rescrap(p_voucher uuid) TO service_role
 REVOKE ALL ON FUNCTION public.gm_tm_snapshot() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_tm_snapshot() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_tm_snapshot() TO service_role;
+
+
+--
+-- Name: FUNCTION gm_trader_voucher_prefix(p_source text, p_type text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_trader_voucher_prefix(p_source text, p_type text) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_trader_voucher_prefix(p_source text, p_type text) TO service_role;
 
 
 --
@@ -13353,6 +13567,14 @@ GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO service_role;
 
 
 --
+-- Name: FUNCTION trg_trader_voucher_no(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_trader_voucher_no() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_trader_voucher_no() TO service_role;
+
+
+--
 -- Name: FUNCTION update_expense(p_id uuid, p_category uuid, p_amount numeric, p_description text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -13648,6 +13870,15 @@ GRANT ALL ON TABLE public.expense_entries TO service_role;
 GRANT ALL ON TABLE public.fiscal_year_closures TO anon;
 GRANT ALL ON TABLE public.fiscal_year_closures TO authenticated;
 GRANT ALL ON TABLE public.fiscal_year_closures TO service_role;
+
+
+--
+-- Name: TABLE fx_rates_daily; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.fx_rates_daily TO anon;
+GRANT ALL ON TABLE public.fx_rates_daily TO authenticated;
+GRANT ALL ON TABLE public.fx_rates_daily TO service_role;
 
 
 --
@@ -14055,6 +14286,15 @@ GRANT ALL ON TABLE public.user_profiles TO service_role;
 
 
 --
+-- Name: TABLE voucher_counters; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON TABLE public.voucher_counters TO anon;
+GRANT ALL ON TABLE public.voucher_counters TO authenticated;
+GRANT ALL ON TABLE public.voucher_counters TO service_role;
+
+
+--
 -- Name: TABLE zebra_label_fields; Type: ACL; Schema: public; Owner: -
 --
 
@@ -14126,5 +14366,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict pt3f6yu9NFvV59Y6ijRPZ2gujJut7MKy7wK5bGVujZkN6RfELNbg1WLfsoV4Bde
+\unrestrict jILfKrAxNlA6DqvONgt6xuT3tC6XFVAFSPJ3ObkluSci7P1T8JSymnz24PfE1Ai
 
