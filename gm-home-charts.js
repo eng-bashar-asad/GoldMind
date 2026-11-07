@@ -7,6 +7,9 @@
 (function () {
   var TF_KEY = 'gm_gold_chart_tf';
   var TFS = [['5', '5 د'], ['15', '15 د'], ['60', 'ساعة']];
+  // night mode of the gold chart, remembered on this device
+  var DARK_KEY = 'gm_gold_chart_dark';
+  function isDark() { try { return localStorage.getItem(DARK_KEY) === '1'; } catch (e) { return false; } }
   function tf() { try { var v = localStorage.getItem(TF_KEY); return TFS.some(function (t) { return t[0] === v; }) ? v : '15'; } catch (e) { return '15'; } }
   function esc(s) { return window.gmEscapeHtml ? gmEscapeHtml(s) : String(s == null ? '' : s); }
   function money(n) { return Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 }); }
@@ -17,15 +20,18 @@
     box.querySelectorAll('[data-tf]').forEach(function (b) { b.setAttribute('aria-pressed', String(b.dataset.tf === interval)); });
     var host = box.querySelector('.gmc-gold-host');
     host.innerHTML = '';
+    host.style.background = isDark() ? '#131722' : '#fff';
+    var dk = box.querySelector('[data-dark]');
+    if (dk) { dk.setAttribute('aria-pressed', String(isDark())); dk.setAttribute('aria-label', isDark() ? 'الوضع النهاري' : 'الوضع الليلي'); dk.title = dk.getAttribute('aria-label'); dk.querySelector('.material-symbols-outlined').textContent = isDark() ? 'light_mode' : 'dark_mode'; }
     var w = document.createElement('div'); w.className = 'tradingview-widget-container'; w.style.cssText = 'height:100%;width:100%';
     var inner = document.createElement('div'); inner.className = 'tradingview-widget-container__widget'; inner.style.cssText = 'height:100%;width:100%';
     w.appendChild(inner);
     var s = document.createElement('script');
     s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
     s.async = true;
-    s.text = JSON.stringify({ autosize: true, symbol: 'OANDA:XAUUSD', interval: interval, timezone: 'Asia/Dubai', theme: 'light', style: '1', locale: 'ar_AE',
+    s.text = JSON.stringify({ autosize: true, symbol: 'OANDA:XAUUSD', interval: interval, timezone: 'Asia/Dubai', theme: isDark() ? 'dark' : 'light', style: '1', locale: 'ar_AE',
       hide_top_toolbar: true, hide_legend: false, hide_side_toolbar: true, allow_symbol_change: false, save_image: false, calendar: false, withdateranges: false,
-      backgroundColor: 'rgba(255,255,255,1)', support_host: 'https://www.tradingview.com' });
+      backgroundColor: isDark() ? 'rgba(19,23,34,1)' : 'rgba(255,255,255,1)', support_host: 'https://www.tradingview.com' });
     w.appendChild(s);
     host.appendChild(w);
     box.dataset.loaded = interval;
@@ -33,6 +39,17 @@
   function setupGold(box) {
     var seg = box.querySelector('.gmc-seg');
     seg.innerHTML = TFS.map(function (t) { return '<button type="button" data-tf="' + t[0] + '" aria-pressed="false">' + t[1] + '</button>'; }).join('');
+    var dk = document.createElement('button');
+    dk.type = 'button'; dk.className = 'gmc-dark'; dk.dataset.dark = '1';
+    dk.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>';
+    dk.setAttribute('aria-label', 'الوضع الليلي'); dk.setAttribute('aria-pressed', 'false');
+    seg.parentNode.insertBefore(dk, seg);
+    dk.addEventListener('click', function () {
+      try { localStorage.setItem(DARK_KEY, isDark() ? '0' : '1'); } catch (x) {}
+      box.classList.toggle('gmc-is-dark', isDark());
+      mountGold(box);
+    });
+    box.classList.toggle('gmc-is-dark', isDark());
     seg.addEventListener('click', function (e) {
       var b = e.target.closest('[data-tf]'); if (!b) return;
       try { localStorage.setItem(TF_KEY, b.dataset.tf); } catch (x) {}

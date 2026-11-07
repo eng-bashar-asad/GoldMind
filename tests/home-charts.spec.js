@@ -45,3 +45,18 @@ test('staff without view_reports: no sales charts', async ({ page }) => {
   await page.waitForTimeout(1500);
   await expect(page.locator('[data-gmc-sales]').last()).toHaveClass(/\bhidden\b/);
 });
+
+test('gold box: night mode button, remembered on the device', async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 1000 });
+  await install(page, { generic: true, db: db('owner', {}) });
+  await page.goto('/index-ar.html');
+  const box = page.locator('#dskGoldChartPanel [data-gmc-gold]');
+  const btn = box.locator('.gmc-dark');
+  await expect(btn).toHaveAttribute('aria-label', 'الوضع الليلي');
+  await btn.click();
+  await expect(box).toHaveClass(/gmc-is-dark/);
+  await expect(btn).toHaveAttribute('aria-pressed', 'true');
+  expect(await page.evaluate(() => localStorage.getItem('gm_gold_chart_dark'))).toBe('1');
+  await page.reload();
+  await expect(page.locator('#dskGoldChartPanel [data-gmc-gold]')).toHaveClass(/gmc-is-dark/);
+});
