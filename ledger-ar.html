@@ -2541,7 +2541,7 @@ function openGiveStockForm() {
   if (draft && Array.isArray(draft.giveStockCart) && draft.giveStockCart.length > 0) {
     const savedLabel = draft.savedAt ? gmFormatDateTime(draft.savedAt, { hour: '2-digit', minute: '2-digit', day: 'numeric', month: 'short' }) : '';
     if (confirm('يوجد سند إخراج بضاعة غير محفوظ (' + draft.giveStockCart.length + ' قطعة) من ' + savedLabel + ' — هل تريد استرجاعه؟')) {
-      giveStockCart = draft.giveStockCart;
+      giveStockCart = gsUniqueCart(draft.giveStockCart); // a saved draft may hold the same piece twice (older bug)
       giveStockCartCounter = draft.giveStockCartCounter || draft.giveStockCart.length;
       gsBasisVal = draft.basis === 'gross' ? 'gross' : 'accounting';
       document.getElementById('gs-barcode-input').value = '';
@@ -2566,6 +2566,7 @@ function resetGiveStockCart() {
   renderGiveStockCart();
 }
 
+const gsPending = new Set();
 async function searchGiveStockBarcode() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
@@ -2575,17 +2576,24 @@ async function searchGiveStockBarcode() {
   const code = input.value.trim();
   if (!code) return;
 
-  if (giveStockCart.some(it => it.barcode === code)) {
-    resultEl.innerHTML = '<div class="text-error text-sm p-2">هذه القطعة مُضافة أصلاً بالأسفل.</div>';
-    return;
-  }
+  const dupMsg = c => '<div class="text-error text-sm p-2">القطعة ' + gmEscapeHtml(c) + ' مُضافة أصلاً بالأسفل — لم تُضف مرة ثانية.</div>';
+  const variants = gmBarcodeVariants(code);
+  if (giveStockCart.some(it => variants.includes(it.barcode))) { resultEl.innerHTML = dupMsg(code); input.value = ''; return; }
+  // a scanner (or a double Enter) can send the same code again while the first search is still running
+  if (gsPending.has(code)) return;
+  gsPending.add(code);
 
   resultEl.innerHTML = '<div class="text-on-surface-variant text-sm p-2">جارِ البحث...</div>';
 
-  const { data, error } = await goldmindClient
-    .from('pieces').select('*')
-    .eq('store_id', GOLDMIND_STORE_ID).in('barcode', gmBarcodeVariants(code)).eq('status', 'available')
-    .limit(1).maybeSingle();
+  let data, error;
+  try {
+    ({ data, error } = await goldmindClient
+      .from('pieces').select('*')
+      .eq('store_id', GOLDMIND_STORE_ID).in('barcode', variants).eq('status', 'available')
+      .limit(1).maybeSingle());
+  } finally { gsPending.delete(code); }
+  // the same piece typed another way (606 / 000606) or added meanwhile
+  if (data && giveStockCart.some(it => it.pieceId === data.id)) { resultEl.innerHTML = dupMsg(data.barcode); input.value = ''; return; }
 
   if (error) {
     resultEl.innerHTML = `<div class="text-error text-sm p-2">خطأ: ${gmEscapeHtml(error.message)}</div>`;
@@ -2797,9 +2805,22 @@ function gsPlacePreview() {
 }
 window.matchMedia('(min-width:1024px)').addEventListener('change', gsPlacePreview);
 
+// one line per piece: the same piece twice would book its weight and making twice
+function gsUniqueCart(cart) {
+  const seen = new Set();
+  return (cart || []).filter(it => { const k = it.pieceId || it.barcode; if (seen.has(k)) return false; seen.add(k); return true; });
+}
 async function submitGiveStock() {
   const errEl = document.getElementById('gs-error');
   errEl.classList.add('hidden');
+  const before = giveStockCart.length;
+  giveStockCart = gsUniqueCart(giveStockCart);
+  if (giveStockCart.length < before) {
+    renderGiveStockCart();
+    errEl.textContent = 'شُطبت ' + (before - giveStockCart.length) + ' قطعة مكررة من السند. راجع القائمة ثم اضغط حفظ مرة أخرى.';
+    errEl.classList.remove('hidden');
+    return;
+  }
 
   if (giveStockCart.length === 0) {
     errEl.textContent = 'أضف قطعة واحدة على الأقل بالباركود';

@@ -27,3 +27,27 @@ test('camera scans add pieces one after another, no duplicates', async ({ page }
   await expect(page.locator('#gs-scan-msg')).toContainText('المجموع 2 قطعة');
   expect(errs).toEqual([]);
 });
+
+// typed / scanner input: the same piece is never added twice — written another way (709 / 000709),
+// sent twice quickly by a scanner, or left twice in an old draft.
+test('typed barcode: same piece twice is refused; a duplicated draft is cleaned', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'AED' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'جليل' }],
+    trader_movements: [],
+    pieces: [{ id: 'pc1', store_id: STORE, barcode: '000709', status: 'available', karat: 18, weight_grams: 10, accounting_weight_grams: 9, cost_fabrication_per_gram: 5 }],
+  } });
+  await page.goto('/ledger-ar.html?trader=t1&action=give');
+  await page.waitForFunction(() => typeof toggleGiveStockForm === 'function' && typeof currentTraderId !== 'undefined' && currentTraderId === 't1');
+  await page.evaluate(() => { if (document.getElementById('give-stock-form').classList.contains('hidden')) toggleGiveStockForm(); });
+  await page.evaluate(async () => {
+    const i = document.getElementById('gs-barcode-input');
+    i.value = '000709'; const a = searchGiveStockBarcode(); const b = searchGiveStockBarcode(); await Promise.all([a, b]); // scanner sends twice
+    i.value = '709'; await searchGiveStockBarcode(); // another way of writing it
+  });
+  expect(await page.evaluate(() => giveStockCart.length)).toBe(1);
+  await expect(page.locator('#gs-barcode-result')).toContainText('مُضافة أصلاً');
+  expect(await page.evaluate(() => gsUniqueCart([{ pieceId: 'a' }, { pieceId: 'a' }, { pieceId: 'b' }]).length)).toBe(2);
+});
