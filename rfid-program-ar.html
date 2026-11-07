@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>برمجة الشرائح السريعة | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="supabase-config.js?v=54"></script>
+<script src="theme.js?v=84"></script>
+<script src="zebra-rfid.js?v=6"></script>
+<script src="gm-uhf.js?v=2"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+  html { font-size: 87.5%; }
+  .num { font-family: "Times New Roman", Times, serif; direction: ltr; unicode-bidi: isolate; }
+  .rp-card { background: #fff; border: 1px solid #ECE4D3; border-radius: 18px; }
+  .rp-bar { height: 10px; background: #F4EFE3; border-radius: 999px; overflow: hidden; direction: ltr; }
+  .rp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #B4955A, #7A6222); border-radius: 999px; transition: width .3s; }
+  .rp-status { border-radius: 18px; padding: 14px; display: flex; gap: 12px; align-items: center; min-height: 92px; }
+  .rp-status.ok { background: #E8F3EA; color: #1B5E20; }
+  .rp-status.err { background: #FDECEC; color: #B91C1C; }
+  .rp-status.busy { background: #FFF6E0; color: #7A6222; }
+  .rp-status.idle { background: #F7F2E6; color: #6B6150; }
+  .rp-status img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: #fff; }
+  .rp-tabs button { height: 36px; padding: 0 14px; border-radius: 999px; font-weight: 700; font-size: 12.5px; color: #6B6150; }
+  .rp-tabs button[aria-pressed="true"] { background: #1C1A16; color: #FBF8F1; }
+  @media (prefers-reduced-motion: reduce) { .rp-bar i { transition: none; } }
+</style>
+</head>
+<body class="bg-[#FBF8F1] text-[#1C1A16] min-h-screen">
+<header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-[#ECE4D3] h-14 flex items-center gap-2 px-4">
+  <button onclick="gmSmartBack('inventory-list-ar.html')" class="w-11 h-11 flex items-center justify-center rounded-full" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button>
+  <h1 class="font-bold text-[16px] flex-1">برمجة الشرائح السريعة</h1>
+  <a href="rfid-guide-ar.html" class="w-11 h-11 flex items-center justify-center rounded-full" aria-label="دليل RFID"><span class="material-symbols-outlined">help</span></a>
+</header>
+
+<main class="max-w-xl mx-auto p-4 flex flex-col gap-3 pb-24">
+  <div id="rpReader" class="rp-card p-3 flex items-center gap-3 text-[13px]">
+    <span class="material-symbols-outlined text-[#B4955A]" aria-hidden="true">bluetooth_searching</span>
+    <span id="rpReaderTxt" class="flex-1">جارِ البحث عن جهاز RFID…</span>
+    <button id="rpReconnect" onclick="rpCheckReader(true)" class="h-9 px-3 rounded-full border border-[#E3DCCB] text-[12px] font-semibold">إعادة الاتصال</button>
+  </div>
+
+  <div class="rp-card p-4">
+    <div class="flex justify-between items-baseline mb-2">
+      <b class="text-[13px]">القطع المبرمجة في المخزن</b>
+      <span class="text-[13px]"><b class="num" id="rpDone">0</b> من <b class="num" id="rpTotal">0</b></span>
+    </div>
+    <div class="rp-bar"><i id="rpBar" style="width:0%"></i></div>
+    <div class="text-[11.5px] text-[#8a7f6a] mt-2">هذه الجلسة: <b class="num" id="rpSession">0</b> شريحة</div>
+  </div>
+
+  <div class="rp-card p-4 flex flex-col gap-3">
+    <label for="rpCode" class="text-[13px] font-semibold">امسح باركود القطعة، ثم قرّب ملصقتها من جهاز الزيبرا</label>
+    <div class="flex gap-2">
+      <input id="rpCode" type="text" inputmode="text" autocomplete="off" placeholder="باركود القطعة" dir="ltr"
+        class="flex-1 h-14 rounded-2xl border border-[#E3DCCB] text-center text-[22px] num" onkeydown="if(event.key==='Enter'){event.preventDefault();rpProgram(this.value);}"/>
+      <button onclick="rpToggleCamera()" id="rpCamBtn" class="w-14 h-14 rounded-2xl bg-[#1C1A16] text-white flex items-center justify-center" aria-label="مسح بالكاميرا"><span class="material-symbols-outlined">photo_camera</span></button>
+    </div>
+    <div id="rpCamBox" class="hidden rounded-2xl overflow-hidden border border-[#E3DCCB]"><div id="rpCamera"></div></div>
+    <button onclick="rpProgram(document.getElementById('rpCode').value)" class="h-12 rounded-2xl bg-[#B4955A] text-white font-bold text-[15px]">برمجة الشريحة</button>
+    <div id="rpStatus" class="rp-status idle" aria-live="polite">
+      <span class="material-symbols-outlined text-[34px]" aria-hidden="true">nfc</span>
+      <div class="text-[13px]">جاهز. ضع ملصقة واحدة فقط قرب الجهاز وأبعد باقي القطع.</div>
+    </div>
+  </div>
+
+  <div class="rp-card p-3">
+    <div class="rp-tabs flex gap-2 mb-2" role="group" aria-label="القائمة">
+      <button aria-pressed="true" data-tab="todo" onclick="rpTab(this)">لم تُبرمج</button>
+      <button aria-pressed="false" data-tab="session" onclick="rpTab(this)">بُرمجت الآن</button>
+    </div>
+    <input id="rpFilter" type="search" placeholder="بحث بالباركود أو الوصف" aria-label="بحث في القائمة" oninput="rpRenderList()" class="w-full h-10 rounded-xl border border-[#E3DCCB] px-3 text-[13px] mb-2"/>
+    <div id="rpList" class="flex flex-col divide-y divide-[#F1EBDD] text-[13px]"></div>
+  </div>
+</main>
+
+<script>
+// Quick chip programming: scan a piece's barcode (camera, keyboard or a scanner), hold its RFID label
+// near the reader (Zebra RFD40 sled over Bluetooth, or a Chainway/Urovo handheld) — the chip gets the
+// piece's number, the piece is marked programmed, and the screen is ready for the next one.
+let RP = { pieces: [], byCode: {}, byEpc: {}, session: [], tab: 'todo', busy: false };
+const esc = v => gmEscapeHtml(v == null ? '' : String(v));
+
+function rpEpcOf(p) { return p.rfid_epc || GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID); }
+function rpNorm(code) { return String(code || '').trim().toUpperCase(); }
+
+function rpTone(ok) {
+  try {
+    const a = new (window.AudioContext || window.webkitAudioContext)(), o = a.createOscillator(), g = a.createGain();
+    o.frequency.value = ok ? 1320 : 220; o.type = ok ? 'sine' : 'square'; g.gain.value = 0.08;
+    o.connect(g); g.connect(a.destination); o.start(); o.stop(a.currentTime + (ok ? 0.12 : 0.35));
+  } catch (e) { /* no audio */ }
+  if (navigator.vibrate) navigator.vibrate(ok ? 60 : [80, 60, 80]);
+}
+function rpStatus(kind, html, p) {
+  const el = document.getElementById('rpStatus');
+  el.className = 'rp-status ' + kind;
+  const icon = { ok: 'check_circle', err: 'error', busy: 'nfc', idle: 'nfc' }[kind];
+  el.innerHTML = (p && p.photo_url ? '<img src="' + esc(p.photo_url) + '" alt=""/>' : '<span class="material-symbols-outlined text-[34px]" aria-hidden="true">' + icon + '</span>') + '<div class="text-[13px]">' + html + '</div>';
+}
+function rpCounts() {
+  const done = RP.pieces.filter(p => p.rfid_encoded_at).length;
+  document.getElementById('rpDone').textContent = done;
+  document.getElementById('rpTotal').textContent = RP.pieces.length;
+  document.getElementById('rpBar').style.width = (RP.pieces.length ? Math.round(done / RP.pieces.length * 100) : 0) + '%';
+  document.getElementById('rpSession').textContent = RP.session.length;
+}
+function rpTab(btn) {
+  RP.tab = btn.dataset.tab;
+  document.querySelectorAll('.rp-tabs button').forEach(b => b.setAttribute('aria-pressed', String(b === btn)));
+  rpRenderList();
+}
+function rpRenderList() {
+  const q = rpNorm(document.getElementById('rpFilter').value);
+  let rows = RP.tab === 'todo' ? RP.pieces.filter(p => !p.rfid_encoded_at) : RP.session.map(id => RP.pieces.find(p => p.id === id)).filter(Boolean);
+  if (q) rows = rows.filter(p => rpNorm(p.barcode).includes(q) || rpNorm(p.description_ar).includes(q));
+  const el = document.getElementById('rpList');
+  if (!rows.length) { el.innerHTML = '<p class="text-center text-[#8a7f6a] py-6">' + (RP.tab === 'todo' ? 'كل القطع مبرمجة.' : 'لم تُبرمج شرائح في هذه الجلسة بعد.') + '</p>'; return; }
+  el.innerHTML = rows.slice(0, 200).map(p => '<button type="button" class="flex items-center gap-3 py-2 text-start w-full" onclick="rpPick(\'' + esc(p.barcode) + '\')">'
+    + (p.photo_url ? '<img src="' + esc(p.photo_url) + '" alt="" loading="lazy" class="w-10 h-10 rounded-lg object-cover"/>' : '<span class="w-10 h-10 rounded-lg bg-[#F4EFE3] flex items-center justify-center material-symbols-outlined text-[#B4955A]" aria-hidden="true">diamond</span>')
+    + '<span class="flex-1 min-w-0"><b class="num">' + esc(p.barcode) + '</b> <span class="text-[#6B6150]">' + esc(p.description_ar || '') + '</span><br><small class="text-[#8a7f6a]">عيار ' + esc(p.karat || '—') + ' · <span class="num">' + Number(p.weight_grams || 0).toFixed(2) + '</span> غ</small></span>'
+    + (p.rfid_encoded_at ? '<span class="material-symbols-outlined text-[#1B5E20]" aria-label="مبرمجة">check_circle</span>' : '') + '</button>').join('')
+    + (rows.length > 200 ? '<p class="text-center text-[11px] text-[#8a7f6a] py-2">يُعرض أول 200 — ابحث لتضييق القائمة.</p>' : '');
+}
+function rpPick(code) { const i = document.getElementById('rpCode'); i.value = code; i.focus(); rpProgram(code); }
+
+async function rpCheckReader(reconnect) {
+  const t = document.getElementById('rpReaderTxt');
+  t.textContent = 'جارِ البحث عن جهاز RFID…';
+  if (reconnect) await GMUhf.disconnect();
+  const s = await GMUhf.status();
+  t.textContent = s.available ? 'متصل: ' + (s.name || s.kind) : 'لا يوجد قارئ متصل — شغّل جهاز الزيبرا واربطه بالبلوتوث من إعدادات التلفون، ثم اضغط «إعادة الاتصال». (البرمجة تعمل من تطبيق GoldMind على التلفون فقط)';
+  return s.available;
+}
+
+async function rpProgram(raw) {
+  const code = rpNorm(raw);
+  if (!code || RP.busy) return;
+  const p = RP.byCode[code];
+  const input = document.getElementById('rpCode');
+  if (!p) { rpTone(false); rpStatus('err', 'الباركود <b class="num">' + esc(code) + '</b> غير موجود بين قطع المخزن المتوفرة.'); input.select(); return; }
+  if (p.rfid_encoded_at && !confirm('القطعة ' + p.barcode + ' مبرمجة من قبل. إعادة كتابة شريحتها؟')) { input.value = ''; input.focus(); return; }
+  if (!(await GMUhf.available())) { rpTone(false); rpStatus('err', 'جهاز الزيبرا غير متصل. اربطه بالبلوتوث ثم اضغط «إعادة الاتصال».'); await rpCheckReader(false); return; }
+  RP.busy = true;
+  const epc = rpEpcOf(p);
+  rpStatus('busy', 'قرّب ملصقة <b class="num">' + esc(p.barcode) + '</b> من الجهاز…', p);
+  try {
+    // the label in front of the reader may already carry another piece's number
+    let current = null;
+    try { current = await GMUhf.readOne(); } catch (e) { /* blank or not readable yet: the write reports it */ }
+    const other = current && RP.byEpc[String(current).toUpperCase().slice(0, epc.length)];
+    if (other && other.id !== p.id && !confirm('هذه الملصقة مبرمجة للقطعة ' + other.barcode + '. هل تريد كتابتها للقطعة ' + p.barcode + '؟\n\nتأكد أنك قرّبت الملصقة الصحيحة.')) throw new Error('أُلغيت — الملصقة لقطعة أخرى (' + other.barcode + ').');
+    await GMUhf.writeEpc(epc);
+    const at = new Date().toISOString();
+    const { error } = await goldmindClient.from('pieces').update({ rfid_epc: epc, rfid_encoded_at: at }).eq('id', p.id);
+    if (error) throw new Error('كُتبت الشريحة لكن تعذّر حفظها في البرنامج: ' + error.message);
+    p.rfid_epc = epc; p.rfid_encoded_at = at; RP.byEpc[epc] = p;
+    if (!RP.session.includes(p.id)) RP.session.unshift(p.id);
+    rpTone(true);
+    rpStatus('ok', '<b>تمت البرمجة</b> — <b class="num">' + esc(p.barcode) + '</b> ' + esc(p.description_ar || '') + '<br><small>امسح القطعة التالية.</small>', p);
+    rpCounts(); rpRenderList();
+  } catch (e) {
+    rpTone(false);
+    rpStatus('err', esc(e.message || e) + '<br><small>قرّب الملصقة أكثر، وأبعد الملصقات الأخرى، ثم أعد المسح.</small>', p);
+  } finally {
+    RP.busy = false; input.value = ''; input.focus();
+  }
+}
+
+// camera: each label read once (the same label stays in front of the camera)
+let rpCam = null, rpLast = '', rpLastAt = 0;
+async function rpToggleCamera() {
+  const box = document.getElementById('rpCamBox');
+  if (rpCam) { const c = rpCam; rpCam = null; box.classList.add('hidden'); try { await c.stop(); c.clear(); } catch (e) {} return; }
+  box.classList.remove('hidden');
+  if (!window.Html5Qrcode) {
+    try { await new Promise((ok, fail) => { const s = document.createElement('script'); s.src = 'https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js'; s.onload = ok; s.onerror = fail; document.head.appendChild(s); }); }
+    catch (e) { rpStatus('err', 'تعذّر تحميل قارئ الباركود — تحقق من الإنترنت.'); box.classList.add('hidden'); return; }
+  }
+  rpCam = new Html5Qrcode('rpCamera');
+  const F = Html5QrcodeSupportedFormats;
+  rpCam.start({ facingMode: 'environment' }, { fps: 10, qrbox: { width: 260, height: 110 }, formatsToSupport: [F.CODE_128, F.CODE_39, F.EAN_13, F.QR_CODE] },
+    text => { const now = Date.now(), c = rpNorm(text); if (c === rpLast && now - rpLastAt < 4000) return; rpLast = c; rpLastAt = now; rpProgram(c); }, () => {})
+    .catch(err => { rpCam = null; box.classList.add('hidden'); rpStatus('err', 'تعذّر تشغيل الكاميرا — اسمح للبرنامج باستخدامها. (' + esc(err) + ')'); });
+}
+window.addEventListener('pagehide', () => { if (rpCam) { try { rpCam.stop(); } catch (e) {} } });
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  rpCheckReader(false);
+  const res = await gmFetchAllRows(() => goldmindClient.from('pieces').select('id, barcode, description_ar, karat, weight_grams, photo_url, rfid_epc, rfid_encoded_at')
+    .eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved']).order('barcode'));
+  if (res.error) { rpStatus('err', 'تعذّر تحميل القطع: ' + esc(res.error.message)); return; }
+  RP.pieces = res.data || [];
+  RP.pieces.forEach(p => { RP.byCode[rpNorm(p.barcode)] = p; if (p.rfid_encoded_at) RP.byEpc[rpEpcOf(p)] = p; });
+  rpCounts(); rpRenderList();
+  document.getElementById('rpCode').focus();
+})();
+</script>
+</body>
+</html>

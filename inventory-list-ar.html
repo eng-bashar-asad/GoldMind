@@ -13,6 +13,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=54"></script>
+<script src="gm-uhf.js?v=2"></script>
 <script src="theme.js?v=84"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -204,6 +205,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
 </div>
 <div class="flex items-center gap-2">
 <button onclick="toggleSearch()" class="gm-hbtn hidden lg:inline-flex" title="بحث بالمخزون"><span class="material-symbols-outlined text-[20px]">search</span>بحث</button>
+<a id="rpBtn" href="rfid-program-ar.html" class="gm-hbtn hidden" title="برمجة الشرائح السريعة" aria-label="برمجة الشرائح السريعة"><span class="material-symbols-outlined text-[20px]">nfc</span><span class="hidden sm:inline">الشرائح</span></a>
 <button id="bbBtn" onclick="openBranchBalances()" class="gm-hbtn hidden" title="أرصدة الفرع" aria-label="أرصدة الفرع"><span class="material-symbols-outlined text-[20px]">balance</span><span class="hidden sm:inline">الأرصدة</span></button>
 <button onclick="window.location.href='intake-batches-ar.html'" class="gm-hbtn" title="سندات الإدخال والإنتاج"><span class="material-symbols-outlined text-[20px]">receipt_long</span>السندات</button>
 <button onclick="window.location.href='inventory-add.html'" class="gm-gold relative hidden lg:flex items-center gap-1 h-10 px-3 rounded-full text-[13px] font-bold"><span class="gm-sweep" aria-hidden="true"></span><span class="material-symbols-outlined text-[20px]" style="position:relative;">add</span><span style="position:relative;">قطعة</span></button>
@@ -387,6 +389,8 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         canViewAccWeight = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_reports'] === true));
         const canBB = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_branch_balances'] === true));
         document.getElementById('bbBtn').classList.toggle('hidden', !canBB);
+        // quick chip programming: only where a reader is reachable (the app with a Zebra sled or an RFID handheld)
+        GMUhf.available().then(ok => document.getElementById('rpBtn').classList.toggle('hidden', !ok));
     })();
 
     // ---- أرصدة الفرع: what is physically in this branch, per box and karat.
