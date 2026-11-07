@@ -23,6 +23,12 @@
     host.style.background = isDark() ? '#131722' : '#fff';
     var dk = box.querySelector('[data-dark]');
     if (dk) { dk.setAttribute('aria-pressed', String(isDark())); dk.setAttribute('aria-label', isDark() ? 'الوضع النهاري' : 'الوضع الليلي'); dk.title = dk.getAttribute('aria-label'); dk.querySelector('.material-symbols-outlined').textContent = isDark() ? 'light_mode' : 'dark_mode'; }
+    tvWidget(host, interval, false);
+    box.dataset.loaded = interval;
+  }
+  // full: the whole TradingView toolbars (candle size, indicators, and the cursor tools on the side —
+  // choose the arrow to drag the chart freely instead of the cross)
+  function tvWidget(host, interval, full) {
     var w = document.createElement('div'); w.className = 'tradingview-widget-container'; w.style.cssText = 'height:100%;width:100%';
     var inner = document.createElement('div'); inner.className = 'tradingview-widget-container__widget'; inner.style.cssText = 'height:100%;width:100%';
     w.appendChild(inner);
@@ -30,11 +36,26 @@
     s.src = 'https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js';
     s.async = true;
     s.text = JSON.stringify({ autosize: true, symbol: 'OANDA:XAUUSD', interval: interval, timezone: 'Asia/Dubai', theme: isDark() ? 'dark' : 'light', style: '1', locale: 'ar_AE',
-      hide_top_toolbar: true, hide_legend: false, hide_side_toolbar: true, allow_symbol_change: false, save_image: false, calendar: false, withdateranges: false,
+      hide_top_toolbar: !full, hide_legend: false, hide_side_toolbar: !full, allow_symbol_change: false, save_image: false, calendar: false, withdateranges: !!full,
       backgroundColor: isDark() ? 'rgba(19,23,34,1)' : 'rgba(255,255,255,1)', support_host: 'https://www.tradingview.com' });
     w.appendChild(s);
     host.appendChild(w);
-    box.dataset.loaded = interval;
+  }
+  // full screen: the whole screen for the chart, so dragging moves the chart and not the page
+  function openFull() {
+    var ov = document.createElement('div');
+    ov.className = 'gmc-full' + (isDark() ? ' gmc-is-dark' : '');
+    ov.setAttribute('role', 'dialog'); ov.setAttribute('aria-modal', 'true'); ov.setAttribute('aria-label', 'بورصة الذهب — شاشة كاملة');
+    ov.innerHTML = '<div class="gmc-head"><div class="gmc-title"><span class="material-symbols-outlined" aria-hidden="true">candlestick_chart</span>بورصة الذهب <small dir="ltr">XAU/USD</small></div>'
+      + '<button type="button" class="gmc-dark" data-close aria-label="إغلاق الشاشة الكاملة"><span class="material-symbols-outlined" aria-hidden="true">close_fullscreen</span></button></div>'
+      + '<div class="gmc-full-host"></div>';
+    document.body.appendChild(ov);
+    document.documentElement.style.overflow = 'hidden';
+    var close = function () { ov.remove(); document.documentElement.style.overflow = ''; document.removeEventListener('keydown', onKey); };
+    var onKey = function (e) { if (e.key === 'Escape') close(); };
+    ov.querySelector('[data-close]').addEventListener('click', close);
+    document.addEventListener('keydown', onKey);
+    tvWidget(ov.querySelector('.gmc-full-host'), tf(), true);
   }
   function setupGold(box) {
     var seg = box.querySelector('.gmc-seg');
@@ -44,6 +65,12 @@
     dk.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">dark_mode</span>';
     dk.setAttribute('aria-label', 'الوضع الليلي'); dk.setAttribute('aria-pressed', 'false');
     seg.parentNode.insertBefore(dk, seg);
+    var fs = document.createElement('button');
+    fs.type = 'button'; fs.className = 'gmc-dark'; fs.dataset.full = '1';
+    fs.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">open_in_full</span>';
+    fs.setAttribute('aria-label', 'شاشة كاملة (تحريك الشارت بحرية)'); fs.title = fs.getAttribute('aria-label');
+    seg.parentNode.insertBefore(fs, dk);
+    fs.addEventListener('click', openFull);
     dk.addEventListener('click', function () {
       try { localStorage.setItem(DARK_KEY, isDark() ? '0' : '1'); } catch (x) {}
       box.classList.toggle('gmc-is-dark', isDark());

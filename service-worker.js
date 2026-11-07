@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goldmind-shell-v326';
+const CACHE_NAME = 'goldmind-shell-v327';
 // Inside the installed app (Capacitor serves the bundled files from https://localhost) the files are
 // already on the phone, and this worker survives an app update: it kept serving the PREVIOUS version's
 // cached theme.js / build-info.json on the first launch after updating, so the update bar came back
@@ -21,7 +21,7 @@ const SHELL_ASSETS = [
   './gm-logo.js?v=2',
   './favicon.png',
   './gm-biometric.js?v=1',
-  './gm-home-charts.js?v=2',
+  './gm-home-charts.js?v=3',
   './gm-home-tools.js?v=2',
   './gm-profit.js?v=7',
   './gm-report.js?v=4',

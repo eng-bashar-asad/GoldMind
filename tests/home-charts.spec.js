@@ -51,7 +51,7 @@ test('gold box: night mode button, remembered on the device', async ({ page }) =
   await install(page, { generic: true, db: db('owner', {}) });
   await page.goto('/index-ar.html');
   const box = page.locator('#dskGoldChartPanel [data-gmc-gold]');
-  const btn = box.locator('.gmc-dark');
+  const btn = box.locator('[data-dark]');
   await expect(btn).toHaveAttribute('aria-label', 'الوضع الليلي');
   await btn.click();
   await expect(box).toHaveClass(/gmc-is-dark/);
@@ -59,4 +59,18 @@ test('gold box: night mode button, remembered on the device', async ({ page }) =
   expect(await page.evaluate(() => localStorage.getItem('gm_gold_chart_dark'))).toBe('1');
   await page.reload();
   await expect(page.locator('#dskGoldChartPanel [data-gmc-gold]')).toHaveClass(/gmc-is-dark/);
+});
+
+test('gold box: full screen opens over the page and closes', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await install(page, { generic: true, db: db('owner', {}) });
+  await page.goto('/index-ar.html');
+  const btn = page.locator('section [data-gmc-gold] [data-full]').first();
+  await btn.scrollIntoViewIfNeeded();
+  await btn.click();
+  const ov = page.locator('.gmc-full');
+  await expect(ov).toBeVisible();
+  await expect(ov.locator('.gmc-full-host')).toBeVisible();
+  await ov.locator('[data-close]').click();
+  await expect(ov).toHaveCount(0);
 });
