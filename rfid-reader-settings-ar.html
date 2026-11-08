@@ -118,6 +118,7 @@ function rsPaintStatus(st) {
   $('rsIc').textContent = on ? 'bluetooth_connected' : 'bluetooth_disabled';
   $('rsIc').className = 'material-symbols-outlined ' + (on ? 'ok' : 'bad');
   $('rsStatus').textContent = on ? 'متصل — ' + (st.name || st.kind || 'قارئ RFID') : 'غير متصل';
+  if (!on && st && st.error) $('rsMsg').textContent = 'السبب: ' + st.error;
   $('rsConnect').lastElementChild.textContent = on ? 'إعادة الاتصال' : (GMUhf.serial ? 'توصيل جهاز الزيبرا' : 'اتصال');
   $('rsDisconnect').classList.toggle('hidden', !on || !(GMUhf.serial || st.kind === 'zebra'));
   ['rsRead1', 'rsScan'].forEach(id => $(id).disabled = !on);

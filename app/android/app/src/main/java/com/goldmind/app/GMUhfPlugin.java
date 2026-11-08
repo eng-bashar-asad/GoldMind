@@ -42,6 +42,7 @@ public class GMUhfPlugin extends Plugin {
     private final UrovoUhf uro = new UrovoUhf();
     private boolean isUro;
     private RfidSled sled;          // Zebra sled (ZebraRfd, only in builds that bundle the Zebra SDK)
+    private String sledError = "";  // why the sled didn't connect, for the page
 
     @Override
     public void load() { instance = this; }
@@ -69,15 +70,18 @@ public class GMUhfPlugin extends Plugin {
 
     // Zebra RFD4031 over Bluetooth: the SDK needs Android 10+, and Android 12+ asks once for "nearby devices".
     private boolean openSled() {
-        if (Build.VERSION.SDK_INT < 29) return false;
+        if (Build.VERSION.SDK_INT < 29) { sledError = "جهاز الزيبرا يحتاج أندرويد 10 أو أحدث"; return false; }
         try {
             if (sled == null) sled = (RfidSled) Class.forName("com.goldmind.app.ZebraRfd").getDeclaredConstructor().newInstance();
-        } catch (Throwable notBundled) { return false; }
+        } catch (Throwable notBundled) { sledError = "مكتبة زيبرا غير موجودة في هذه النسخة من التطبيق (" + notBundled.getClass().getSimpleName() + ": " + notBundled.getMessage() + ")"; return false; }
         if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
             if (getActivity() != null) ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 7311);
+            sledError = "اسمح للتطبيق بإذن «الأجهزة القريبة» ثم اضغط «إعادة الاتصال»";
             return false; // asked; the page's next try connects
         }
-        return sled.open(getContext(), GMUhfPlugin::onTrigger);
+        boolean ok = sled.open(getContext(), GMUhfPlugin::onTrigger);
+        sledError = ok ? "" : sled.lastError();
+        return ok;
     }
     private boolean isSled() { return reader == null && !isUro && sled != null; }
 
@@ -134,6 +138,7 @@ public class GMUhfPlugin extends Plugin {
         o.put("available", ok);
         o.put("kind", !ok ? "none" : reader != null ? "chainway" : isUro ? "urovo" : "zebra");
         o.put("name", ok && isSled() ? sled.name() : "");
+        if (!ok) o.put("error", sledError);
         c.resolve(o);
     }
 

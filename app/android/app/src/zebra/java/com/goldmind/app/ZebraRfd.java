@@ -39,6 +39,10 @@ final class ZebraRfd implements RfidSled {
     private volatile AtomicReference<String> single;
     private int[] powerLevels; // dBm x 10, by index
     private String deviceName = "";
+    private volatile String lastError = "";
+
+    @Override
+    public String lastError() { return lastError; }
 
     @Override
     public String name() { return reader != null && reader.isConnected() ? deviceName : ""; }
@@ -83,7 +87,7 @@ final class ZebraRfd implements RfidSled {
         try {
             if (readers == null) readers = new Readers(ctx, ENUM_TRANSPORT.BLUETOOTH);
             ArrayList<ReaderDevice> list = readers.GetAvailableRFIDReaderList();
-            if (list == null || list.isEmpty()) return false;
+            if (list == null || list.isEmpty()) { lastError = "لا يوجد جهاز زيبرا مقترن بهذا الهاتف (إعدادات البلوتوث)"; return false; }
             ReaderDevice dev = list.get(0);
             RFIDReader r = dev.getRFIDReader();
             deviceName = dev.getName() == null ? "" : dev.getName();
@@ -93,12 +97,18 @@ final class ZebraRfd implements RfidSled {
             r.Events.setTagReadEvent(true);
             r.Events.setAttachTagDataWithReadEvent(false);
             r.Events.setReaderDisconnectEvent(true);
-            // the trigger reads RFID (not the barcode scanner); GoldMind decides what a press does
-            r.Config.setTriggerMode(ENUM_TRIGGER_MODE.RFID_MODE, true);
+            // the trigger reads RFID (not the barcode scanner); GoldMind decides what a press does.
+            // Sleds without a scanner reject this — not a reason to drop the connection.
+            try { r.Config.setTriggerMode(ENUM_TRIGGER_MODE.RFID_MODE, true); } catch (Throwable ignored) {}
             powerLevels = r.ReaderCapabilities.getTransmitPowerLevelValues();
             reader = r;
+            lastError = "";
             return true;
         } catch (Throwable e) {
+            // the SDK's own reason (e.g. reader busy with another host) — shown on the page for support
+            String m = e.getMessage();
+            try { java.lang.reflect.Method d = e.getClass().getMethod("getVendorMessage"); Object v = d.invoke(e); if (v != null) m = m + " / " + v; } catch (Throwable ignored) {}
+            lastError = "تعذّر الاتصال بجهاز الزيبرا: " + e.getClass().getSimpleName() + (m != null ? " — " + m : "");
             close();
             return false;
         }

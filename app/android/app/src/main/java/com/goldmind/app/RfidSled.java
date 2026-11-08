@@ -23,4 +23,6 @@ interface RfidSled {
     void close();
     /** Name of the connected sled (e.g. RFD4031-...), or "" when not connected. */
     String name();
+    /** Why the last open() failed, in plain words (shown on the page), or "". */
+    default String lastError() { return ""; }
 }

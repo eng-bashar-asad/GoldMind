@@ -48,7 +48,7 @@
 <main class="max-w-xl mx-auto p-4 flex flex-col gap-3 pb-24">
   <div id="rpReader" class="rp-card p-3 flex items-center gap-3 text-[13px]">
     <span class="material-symbols-outlined text-[color:var(--gm-accent)]" aria-hidden="true">bluetooth_searching</span>
-    <span id="rpReaderTxt" class="flex-1">جارِ البحث عن جهاز RFID…</span>
+    <span id="rpReaderTxt" class="flex-1 whitespace-pre-line">جارِ البحث عن جهاز RFID…</span>
     <button id="rpReconnect" onclick="rpCheckReader(true)" class="h-9 px-3 rounded-full border border-[color:var(--gm-outline-variant)] text-[12px] font-semibold">إعادة الاتصال</button>
   </div>
   <details id="rpLogBox" class="rp-card p-3 text-[12px] hidden">
@@ -169,7 +169,7 @@ async function rpCheckReader(reconnect) {
   if (GMUhf.serial) b.textContent = s.available ? 'إعادة الاتصال' : 'توصيل جهاز الزيبرا';
   t.textContent = s.available ? 'متصل: ' + (s.name || s.kind)
     : GMUhf.serial ? 'اضغط «توصيل جهاز الزيبرا» واختر منفذه (مثل COM8). أغلق برنامج 123RFID قبل ذلك.'
-    : 'لا يوجد قارئ متصل — شغّل جهاز الزيبرا واربطه بالبلوتوث من إعدادات التلفون، ثم اضغط «إعادة الاتصال».';
+    : 'لا يوجد قارئ متصل — شغّل جهاز الزيبرا واربطه بالبلوتوث من إعدادات التلفون، ثم اضغط «إعادة الاتصال».' + (s.error ? '\nالسبب: ' + s.error : '');
   rpShowLog();
   return s.available;
 }
