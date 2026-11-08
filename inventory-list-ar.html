@@ -390,8 +390,8 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         const canBB = __staffPerm && (__staffPerm.role === 'owner' || (__staffPerm.permissions && __staffPerm.permissions['view_branch_balances'] === true));
         document.getElementById('bbBtn').classList.toggle('hidden', !canBB);
         // quick chip programming: the app with a Zebra sled / RFID handheld, or Chrome/Edge on a computer (Zebra over COM)
-        if (GMUhf.serial) document.getElementById('rpBtn').classList.remove('hidden');
-        else GMUhf.available().then(ok => document.getElementById('rpBtn').classList.toggle('hidden', !ok));
+        // always in the app (the sled may be paired later, from the chips page) and on Chrome/Edge computers
+        if (GMUhf.serial || GMUhf.native) document.getElementById('rpBtn').classList.remove('hidden');
     })();
 
     // ---- أرصدة الفرع: what is physically in this branch, per box and karat.
