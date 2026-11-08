@@ -8,7 +8,7 @@
 <script src="supabase-config.js?v=54"></script>
 <script src="theme.js?v=84"></script>
 <script src="zebra-rfid.js?v=6"></script>
-<script src="gm-uhf.js?v=2"></script>
+<script src="gm-uhf.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
   html { font-size: 87.5%; }
@@ -40,6 +40,15 @@
     <span id="rpReaderTxt" class="flex-1">جارِ البحث عن جهاز RFID…</span>
     <button id="rpReconnect" onclick="rpCheckReader(true)" class="h-9 px-3 rounded-full border border-[#E3DCCB] text-[12px] font-semibold">إعادة الاتصال</button>
   </div>
+  <details id="rpLogBox" class="rp-card p-3 text-[12px] hidden">
+    <summary class="cursor-pointer font-semibold">سجل الجهاز (للدعم الفني)</summary>
+    <pre id="rpLog" dir="ltr" class="mt-2 max-h-56 overflow-auto bg-[#F7F3EA] rounded-lg p-2 text-[11px] whitespace-pre-wrap"></pre>
+    <div class="flex gap-2 mt-2">
+      <input id="rpCmd" dir="ltr" class="flex-1 h-9 rounded-lg border border-[#E3DCCB] px-2" placeholder="help" aria-label="أمر للجهاز"/>
+      <button type="button" onclick="rpSendCmd()" class="h-9 px-3 rounded-full border border-[#E3DCCB] font-semibold">إرسال</button>
+      <button type="button" onclick="rpCopyLog()" class="h-9 px-3 rounded-full border border-[#E3DCCB] font-semibold">نسخ السجل</button>
+    </div>
+  </details>
 
   <div class="rp-card p-4">
     <div class="flex justify-between items-baseline mb-2">
@@ -125,12 +134,29 @@ function rpRenderList() {
 }
 function rpPick(code) { const i = document.getElementById('rpCode'); i.value = code; i.focus(); rpProgram(code); }
 
+function rpShowLog() { if (GMUhf.log) document.getElementById('rpLog').textContent = GMUhf.log(); }
+async function rpSendCmd() {
+  const i = document.getElementById('rpCmd'), c = i.value.trim(); if (!c) return;
+  try { await GMUhf.send(c); } catch (e) { alert(e.message || e); }
+  i.value = ''; rpShowLog();
+}
+function rpCopyLog() { const s = GMUhf.log ? GMUhf.log() : ''; (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject()).then(() => gmToastSafe('نُسخ السجل'), () => alert(s)); }
+function gmToastSafe(m) { if (typeof gmToast === 'function') gmToast(m); else alert(m); }
 async function rpCheckReader(reconnect) {
   const t = document.getElementById('rpReaderTxt');
   t.textContent = 'جارِ البحث عن جهاز RFID…';
-  if (reconnect) await GMUhf.disconnect();
+  const b = document.getElementById('rpReconnect');
+  try {
+    if (reconnect) await GMUhf.disconnect();
+    // computer: picking the COM port needs this click; the browser remembers it afterwards
+    if (reconnect && GMUhf.serial) await GMUhf.connectSerial();
+  } catch (e) { t.textContent = e.message || String(e); rpShowLog(); return false; }
   const s = await GMUhf.status();
-  t.textContent = s.available ? 'متصل: ' + (s.name || s.kind) : 'لا يوجد قارئ متصل — شغّل جهاز الزيبرا واربطه بالبلوتوث من إعدادات التلفون، ثم اضغط «إعادة الاتصال». (البرمجة تعمل من تطبيق GoldMind على التلفون فقط)';
+  if (GMUhf.serial) b.textContent = s.available ? 'إعادة الاتصال' : 'وصّل جهاز الزيبرا';
+  t.textContent = s.available ? 'متصل: ' + (s.name || s.kind)
+    : GMUhf.serial ? 'اضغط «وصّل جهاز الزيبرا» واختر منفذه (مثل COM8). سكّر برنامج 123RFID قبلها.'
+    : 'لا يوجد قارئ متصل — شغّل جهاز الزيبرا واربطه بالبلوتوث من إعدادات التلفون، ثم اضغط «إعادة الاتصال».';
+  rpShowLog();
   return s.available;
 }
 
@@ -191,6 +217,7 @@ window.addEventListener('pagehide', () => { if (rpCam) { try { rpCam.stop(); } c
 (async function load() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
+  if (GMUhf.serial) document.getElementById('rpLogBox').classList.remove('hidden');
   rpCheckReader(false);
   const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
   RP.canEdit = !!(me && (me.role === 'owner' || (me.permissions && me.permissions.edit_piece === true)));

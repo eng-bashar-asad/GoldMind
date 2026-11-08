@@ -16,7 +16,7 @@
 <script src="gm-camera.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js" integrity="sha384-bWJtxtlEZtu07B/FwY3MX0DQ3sELa3qNsklnCJq64LURLKWwkjfjMh8vjxO127Pl" crossorigin="anonymous"></script>
 <script src="zebra-rfid.js?v=6"></script>
-<script src="gm-uhf.js?v=2"></script>
+<script src="gm-uhf.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -988,10 +988,17 @@ function gmLoadDeskPrices() {
 // Hold the label against the back of the device, then press the chip button.
 GMUhf.available().then(ok => { if (ok) document.getElementById('gmRechipBtn').classList.remove('hidden'); });
 // The Zebra sled talks only to the Android app (Bluetooth); a browser can't reach it.
-const GM_RFID_ONLY_APP = 'برمجة الشريحة بتصير من تطبيق GoldMind على الموبايل الموصول عليه جهاز الزيبرا (بلوتوث).\nالكمبيوتر ما بيقدر يحكي مع الجهاز.\n\nمن الموبايل: افتح هالقطعة واضغط «برمجة الشريحة»، أو المخزن ← «الشرائح» لبرمجة عدة قطع ورا بعض.';
+const GM_RFID_ONLY_APP = 'برمجة الشريحة بتصير من تطبيق GoldMind على الموبايل الموصول عليه جهاز الزيبرا، أو من متصفح Chrome أو Edge على الكمبيوتر.\n\nهالمتصفح ما بيدعم الاتصال بالجهاز.';
+// computer (Chrome/Edge): the first click asks for the Zebra's COM port; after that it reconnects by itself
+async function gmRfidReady() {
+  if (await GMUhf.available()) return true;
+  if (!GMUhf.serial) { alert(GM_RFID_ONLY_APP); return false; }
+  if (!confirm('وصّل جهاز الزيبرا: رح تطلع قائمة المنافذ، اختر منفذ الزيبرا (مثل COM8).\nسكّر برنامج 123RFID Desktop قبلها.')) return false;
+  try { return await GMUhf.connectSerial(); } catch (e) { alert(e.message || e); return false; }
+}
 async function gmWriteRfid(btn) {
   const p = currentPiece; if (!p || !p.barcode) return;
-  if (!(await GMUhf.available())) { alert(GM_RFID_ONLY_APP); return; }
+  if (!(await gmRfidReady())) return;
   if (!confirm('قرّب ملصقة القطعة ' + p.barcode + ' من ظهر الجهاز (بعيداً عن الملصقات الأخرى) ثم اضغط موافق.')) return;
   btn.disabled = true;
   // the piece's current chip number (it may have been replaced); the barcode-based one for older pieces
@@ -1009,7 +1016,7 @@ async function gmWriteRfid(btn) {
 // kept as cancelled (piece_chip_history), so a found old chip is not counted as present.
 async function gmReprogramChip(btn) {
   const p = currentPiece; if (!p || !p.barcode) return;
-  if (!(await GMUhf.available())) { alert(GM_RFID_ONLY_APP); return; }
+  if (!(await gmRfidReady())) return;
   if (!confirm('تأكيد: شريحة القطعة ' + p.barcode + ' بتصير ملغاة، وبتتكتب شريحة جديدة برقم جديد. الباركود ما بيتغيّر.\n\nقرّب الملصقة من ظهر الجهاز ثم اضغط موافق.')) return;
   btn.disabled = true;
   try {
