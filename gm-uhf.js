@@ -67,7 +67,9 @@ window.GMUhf = (function () {
 // the tag back. GMUhf.log() holds the raw exchange for diagnosing a new firmware.
 (function () {
   if (window.GMUhf.native || !('serial' in navigator)) return;
-  var base = window.GMUhf, SPP = '00001101-0000-1000-8000-00805f9b34fb';
+  // SPP = standard serial; ZRFID = the RFD40/RFD8500 RFID (ZETI) service — Chrome can open it directly over
+  // Bluetooth, without the Windows COM port.
+  var base = window.GMUhf, SPP = '00001101-0000-1000-8000-00805f9b34fb', ZRFID = '2ad8a392-0e49-e52c-a6d2-60834c012263';
   var port = null, writer = null, buf = '', lines = [], waiters = [], tagCbs = [], logBuf = [], opening = null, running = false;
   var WKEY = 'gm_zeti_write';
   var WRITES = [
@@ -153,7 +155,7 @@ window.GMUhf = (function () {
     send: function (c) { return ensure().then(function (ok) { if (!ok) throw new Error('الجهاز غير موصول'); return cmd(c, 3000); }); },
     connectSerial: async function () {
       var p;
-      try { p = await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [SPP] }); }
+      try { p = await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [ZRFID, SPP] }); }
       catch (e) {
         if (e.name === 'NotFoundError') return false; // the user closed the list
         if (e.name === 'SecurityError') throw new Error('اضغط زر «توصيل جهاز الزيبرا» لاختيار منفذ الجهاز.');
