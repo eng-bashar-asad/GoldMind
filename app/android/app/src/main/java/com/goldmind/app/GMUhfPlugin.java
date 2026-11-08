@@ -44,8 +44,22 @@ public class GMUhfPlugin extends Plugin {
     private RfidSled sled;          // Zebra sled (ZebraRfd, only in builds that bundle the Zebra SDK)
     private String sledError = "";  // why the sled didn't connect, for the page
 
+    // An error on one of the Zebra SDK's own background threads used to close the whole app.
+    // ponytail: any non-main thread's uncaught error is recorded and that thread just ends;
+    // the main thread still crashes normally. Upgrade path: fix the SDK cause the page reports.
+    private static volatile String bgCrash = "";
+
     @Override
-    public void load() { instance = this; }
+    public void load() {
+        instance = this;
+        final Thread.UncaughtExceptionHandler prev = Thread.getDefaultUncaughtExceptionHandler();
+        Thread.setDefaultUncaughtExceptionHandler((t, e) -> {
+            if (t == android.os.Looper.getMainLooper().getThread()) { if (prev != null) prev.uncaughtException(t, e); return; }
+            StackTraceElement[] st = e.getStackTrace();
+            bgCrash = e.getClass().getSimpleName() + ": " + e.getMessage() + (st.length > 0 ? " @ " + st[0] : "") + " [" + t.getName() + "]";
+            android.util.Log.e("GMUhf", "background thread error", e);
+        });
+    }
 
     /** Called by MainActivity for the scan trigger keys. */
     static boolean onTrigger(boolean down) {
@@ -74,8 +88,9 @@ public class GMUhfPlugin extends Plugin {
         try {
             if (sled == null) sled = (RfidSled) Class.forName("com.goldmind.app.ZebraRfd").getDeclaredConstructor().newInstance();
         } catch (Throwable notBundled) { sledError = "مكتبة زيبرا غير موجودة في هذه النسخة من التطبيق (" + notBundled.getClass().getSimpleName() + ": " + notBundled.getMessage() + ")"; return false; }
-        if (Build.VERSION.SDK_INT >= 31 && ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED) {
-            if (getActivity() != null) ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.BLUETOOTH_CONNECT}, 7311);
+        if (Build.VERSION.SDK_INT >= 31 && (ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_CONNECT) != PackageManager.PERMISSION_GRANTED
+                || ContextCompat.checkSelfPermission(getContext(), Manifest.permission.BLUETOOTH_SCAN) != PackageManager.PERMISSION_GRANTED)) {
+            if (getActivity() != null) ActivityCompat.requestPermissions(getActivity(), new String[]{Manifest.permission.BLUETOOTH_CONNECT, Manifest.permission.BLUETOOTH_SCAN}, 7311);
             sledError = "اسمح للتطبيق بإذن «الأجهزة القريبة» ثم اضغط «إعادة الاتصال»";
             return false; // asked; the page's next try connects
         }
@@ -138,7 +153,7 @@ public class GMUhfPlugin extends Plugin {
         o.put("available", ok);
         o.put("kind", !ok ? "none" : reader != null ? "chainway" : isUro ? "urovo" : "zebra");
         o.put("name", ok && isSled() ? sled.name() : "");
-        if (!ok) o.put("error", sledError);
+        if (!ok) o.put("error", sledError + (bgCrash.isEmpty() ? "" : " | خطأ داخلي في مكتبة زيبرا: " + bgCrash));
         c.resolve(o);
     }
 
