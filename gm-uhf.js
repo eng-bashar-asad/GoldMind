@@ -119,7 +119,7 @@ window.GMUhf = (function () {
   }
   async function open(p) {
     try { await p.open({ baudRate: 115200 }); }
-    catch (e) { if (!/already open/i.test(e.message)) { log('! open: ' + e.message); throw new Error(/busy|access|denied|failed to open/i.test(e.message) ? 'منفذ الزيبرا مشغول — سكّر برنامج 123RFID Desktop وجرّب مرة ثانية.' : 'تعذّر فتح منفذ الزيبرا: ' + e.message); } }
+    catch (e) { if (!/already open/i.test(e.message)) { log('! open: ' + e.message); throw new Error(/busy|access|denied|failed to open/i.test(e.message) ? 'منفذ الزيبرا مشغول — أغلق برنامج 123RFID Desktop وحاول مرة أخرى.' : 'تعذّر فتح منفذ الزيبرا: ' + e.message); } }
     port = p; writer = p.writable.getWriter(); pump(p);
     await cmd('cn', 2500); // "connect": the sled answers ZETI after this
     var v = await cmd('gv', 2000);
@@ -143,8 +143,8 @@ window.GMUhf = (function () {
   }
   function only(seen) {
     var k = Object.keys(seen);
-    if (!k.length) throw new Error('ما انقرأت أي ملصقة — قرّب الملصقة من رأس جهاز الزيبرا.');
-    if (k.length > 1) throw new Error('الجهاز شاف ' + k.length + ' ملصقات — بعّد باقي القطع وخلي ملصقة وحدة قدامه.');
+    if (!k.length) throw new Error('لم تُقرأ أي ملصقة — قرّب الملصقة من رأس جهاز الزيبرا.');
+    if (k.length > 1) throw new Error('قرأ الجهاز ' + k.length + ' ملصقات — أبعد باقي القطع واترك ملصقة واحدة أمامه.');
     return k[0];
   }
   window.GMUhf = Object.assign({}, base, {
@@ -181,9 +181,9 @@ window.GMUhf = (function () {
         if (/\berror\b|invalid|unknown|not supported|usage/i.test(txt)) continue;
         var after = await sweep(900);
         if (after[epc]) { try { localStorage.setItem(WKEY, tries[i]); } catch (e) {} return; }
-        if (/\bok\b/i.test(txt)) throw new Error('الجهاز قبل الأمر بس الملصقة ما تغيّرت — قرّبها أكتر وجرّب مرة ثانية.');
+        if (/\bok\b/i.test(txt)) throw new Error('قبل الجهاز الأمر لكن الملصقة لم تتغيّر — قرّبها أكثر وحاول مرة أخرى.');
       }
-      throw new Error('ما قدرت لاقي أمر الكتابة المناسب لهالجهاز. افتح «سجل الجهاز» بصفحة الشرائح وابعته لبشار.');
+      throw new Error('تعذّر العثور على أمر الكتابة المناسب لهذا الجهاز. افتح «سجل الجهاز» في صفحة الشرائح وأرسله للدعم الفني.');
     },
     start: async function (onTag) {
       if (!(await ensure())) throw new Error('جهاز الزيبرا غير موصول');

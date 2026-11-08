@@ -179,7 +179,7 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <button id="gmRechipBtn" onclick="gmReprogramChip(this)" type="button" class="sq hidden" aria-label="تغيير برمجة الشريحة" title="تغيير برمجة الشريحة (رقم جديد، نفس الباركود)"><span class="material-symbols-outlined">autorenew</span><span class="pc-lbl">شريحة جديدة</span></button>
 <button id="gmRfidPrintBtn" onclick="location.href='piece-label-print-ar.html?id=' + encodeURIComponent(currentPiece.id)" type="button" class="sq hidden" aria-label="طباعة وبرمجة بطابعة RFID" title="طباعة وبرمجة بطابعة RFID"><span class="material-symbols-outlined">wifi_tethering</span><span class="pc-lbl">طابعة RFID</span></button>
 <a id="pcMoveBtn" href="branch-transfers-ar.html" class="sq pc-only hidden" aria-label="نقل لفرع" title="نقل لفرع"><span class="material-symbols-outlined">swap_horiz</span><span class="pc-lbl">نقل لفرع</span></a>
-<button id="pcScrapBtn" onclick="pcLinkScrap(this)" type="button" class="sq hidden" aria-label="ربط القطعة بصندوق الكسر" title="ربط بالكسر: القطعة مصنوعة من صندوق الكسر — يُسحب وزنها من الصندوق حتى ما ينحسب الذهب مرتين"><span class="material-symbols-outlined">recycling</span><span class="pc-lbl">ربط بالكسر</span></button>
+<button id="pcScrapBtn" onclick="pcLinkScrap(this)" type="button" class="sq hidden" aria-label="ربط القطعة بصندوق الكسر" title="ربط بالكسر: القطعة مصنوعة من صندوق الكسر — يُسحب وزنها من الصندوق حتى لا يُحسب الذهب مرتين"><span class="material-symbols-outlined">recycling</span><span class="pc-lbl">ربط بالكسر</span></button>
 <button id="print-label-btn" onclick="printLabelDirectly()" type="button" class="sq" aria-label="طباعة ملصق القطعة" title="طباعة ملصق القطعة"><span class="material-symbols-outlined">print</span><span class="pc-lbl">طباعة ملصق</span></button>
 <button type="button" class="sq" aria-label="تعديل البيانات" title="تعديل البيانات" onclick="gmOpenEdit()"><span class="material-symbols-outlined">edit</span><span class="pc-lbl">تعديل</span></button>
 </div>
@@ -988,12 +988,12 @@ function gmLoadDeskPrices() {
 // Hold the label against the back of the device, then press the chip button.
 GMUhf.available().then(ok => { if (ok) document.getElementById('gmRechipBtn').classList.remove('hidden'); });
 // The Zebra sled talks only to the Android app (Bluetooth); a browser can't reach it.
-const GM_RFID_ONLY_APP = 'برمجة الشريحة بتصير من تطبيق GoldMind على الموبايل الموصول عليه جهاز الزيبرا، أو من متصفح Chrome أو Edge على الكمبيوتر.\n\nهالمتصفح ما بيدعم الاتصال بالجهاز.';
+const GM_RFID_ONLY_APP = 'تتم برمجة الشريحة من تطبيق GoldMind على الهاتف المتصل بجهاز الزيبرا، أو من متصفح Chrome أو Edge على الكمبيوتر.\n\nهذا المتصفح لا يدعم الاتصال بالجهاز.';
 // computer (Chrome/Edge): the first click asks for the Zebra's COM port; after that it reconnects by itself
 async function gmRfidReady() {
   if (await GMUhf.available()) return true;
   if (!GMUhf.serial) { alert(GM_RFID_ONLY_APP); return false; }
-  if (!confirm('وصّل جهاز الزيبرا: رح تطلع قائمة المنافذ، اختر منفذ الزيبرا (مثل COM8).\nسكّر برنامج 123RFID Desktop قبلها.')) return false;
+  if (!confirm('توصيل جهاز الزيبرا: ستظهر قائمة المنافذ، اختر منفذ الزيبرا (مثل COM8).\nأغلق برنامج 123RFID Desktop قبل ذلك.')) return false;
   try { return await GMUhf.connectSerial(); } catch (e) { alert(e.message || e); return false; }
 }
 async function gmWriteRfid(btn) {
@@ -1017,7 +1017,7 @@ async function gmWriteRfid(btn) {
 async function gmReprogramChip(btn) {
   const p = currentPiece; if (!p || !p.barcode) return;
   if (!(await gmRfidReady())) return;
-  if (!confirm('تأكيد: شريحة القطعة ' + p.barcode + ' بتصير ملغاة، وبتتكتب شريحة جديدة برقم جديد. الباركود ما بيتغيّر.\n\nقرّب الملصقة من ظهر الجهاز ثم اضغط موافق.')) return;
+  if (!confirm('تأكيد: ستُلغى شريحة القطعة ' + p.barcode + ' وتُكتب شريحة جديدة برقم جديد. الباركود لا يتغيّر.\n\nقرّب الملصقة من الجهاز ثم اضغط موافق.')) return;
   btn.disabled = true;
   try {
     const oldEpc = p.rfid_epc || GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID);

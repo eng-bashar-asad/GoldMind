@@ -13,22 +13,25 @@
 <style>
   html { font-size: 87.5%; }
   .num { font-family: "Times New Roman", Times, serif; direction: ltr; unicode-bidi: isolate; }
-  .rp-card { background: #fff; border: 1px solid #ECE4D3; border-radius: 18px; }
-  .rp-bar { height: 10px; background: #F4EFE3; border-radius: 999px; overflow: hidden; direction: ltr; }
-  .rp-bar i { display: block; height: 100%; background: linear-gradient(90deg, #B4955A, #7A6222); border-radius: 999px; transition: width .3s; }
+  .rp-card { background: var(--gm-surface-lowest, #fff); color: var(--gm-on-surface, #1C1A16); border: 1px solid var(--gm-outline-variant, #ECE4D3); border-radius: 18px; }
+  .rp-bar { height: 10px; background: var(--gm-surface-low, #F4EFE3); border-radius: 999px; overflow: hidden; direction: ltr; }
+  .rp-bar i { display: block; height: 100%; background: var(--gm-accent, #B4955A); border-radius: 999px; transition: width .3s; }
   .rp-status { border-radius: 18px; padding: 14px; display: flex; gap: 12px; align-items: center; min-height: 92px; }
-  .rp-status.ok { background: #E8F3EA; color: #1B5E20; }
-  .rp-status.err { background: #FDECEC; color: #B91C1C; }
-  .rp-status.busy { background: #FFF6E0; color: #7A6222; }
-  .rp-status.idle { background: #F7F2E6; color: #6B6150; }
+  .rp-status.ok { background: #E8F3EA; color: #1B5E20; border: 2px solid #2E7D32; }
+  .rp-status.err { background: #FDECEC; color: #B91C1C; border: 2px solid #D32F2F; }
+  .rp-status.busy { background: var(--gm-surface-lowest, #fff); color: var(--gm-accent, #7A6222); border: 2px solid var(--gm-accent, #B4955A); }
+  .rp-status.idle { background: var(--gm-surface-lowest, #fff); color: var(--gm-on-surface-variant, #6B6150); border: 1px solid var(--gm-outline-variant, #ECE4D3); }
   .rp-status img { width: 64px; height: 64px; border-radius: 12px; object-fit: cover; flex-shrink: 0; background: #fff; }
-  .rp-tabs button { height: 36px; padding: 0 14px; border-radius: 999px; font-weight: 700; font-size: 12.5px; color: #6B6150; }
-  .rp-tabs button[aria-pressed="true"] { background: #1C1A16; color: #FBF8F1; }
+  .rp-tabs button { height: 36px; padding: 0 14px; border-radius: 999px; font-weight: 700; font-size: 12.5px; color: var(--gm-on-surface-variant, #6B6150); }
+  .rp-tabs button[aria-pressed="true"] { background: var(--gm-primary, #1C1A16); color: var(--gm-on-primary, #FBF8F1); }
   @media (prefers-reduced-motion: reduce) { .rp-bar i { transition: none; } }
+  /* follow the chosen theme (theme.js variables), with the old colours as fallback */
+  body.rp-body { background: var(--gm-bg, #FBF8F1); color: var(--gm-on-surface, #1C1A16); }
+  .rp-head { background: var(--gm-surface-lowest, #fff); border-color: var(--gm-outline-variant, #ECE4D3); color: var(--gm-on-surface, #1C1A16); }
 </style>
 </head>
-<body class="bg-[#FBF8F1] text-[#1C1A16] min-h-screen">
-<header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-[#ECE4D3] h-14 flex items-center gap-2 px-4">
+<body class="rp-body min-h-screen">
+<header class="rp-head sticky top-0 z-40 border-b h-14 flex items-center gap-2 px-4">
   <button onclick="gmSmartBack('inventory-list-ar.html')" class="w-11 h-11 flex items-center justify-center rounded-full" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button>
   <h1 class="font-bold text-[16px] flex-1">برمجة الشرائح السريعة</h1>
   <a href="rfid-guide-ar.html" class="w-11 h-11 flex items-center justify-center rounded-full" aria-label="دليل RFID"><span class="material-symbols-outlined">help</span></a>
@@ -36,17 +39,17 @@
 
 <main class="max-w-xl mx-auto p-4 flex flex-col gap-3 pb-24">
   <div id="rpReader" class="rp-card p-3 flex items-center gap-3 text-[13px]">
-    <span class="material-symbols-outlined text-[#B4955A]" aria-hidden="true">bluetooth_searching</span>
+    <span class="material-symbols-outlined text-[color:var(--gm-accent)]" aria-hidden="true">bluetooth_searching</span>
     <span id="rpReaderTxt" class="flex-1">جارِ البحث عن جهاز RFID…</span>
-    <button id="rpReconnect" onclick="rpCheckReader(true)" class="h-9 px-3 rounded-full border border-[#E3DCCB] text-[12px] font-semibold">إعادة الاتصال</button>
+    <button id="rpReconnect" onclick="rpCheckReader(true)" class="h-9 px-3 rounded-full border border-[color:var(--gm-outline-variant)] text-[12px] font-semibold">إعادة الاتصال</button>
   </div>
   <details id="rpLogBox" class="rp-card p-3 text-[12px] hidden">
     <summary class="cursor-pointer font-semibold">سجل الجهاز (للدعم الفني)</summary>
-    <pre id="rpLog" dir="ltr" class="mt-2 max-h-56 overflow-auto bg-[#F7F3EA] rounded-lg p-2 text-[11px] whitespace-pre-wrap"></pre>
+    <pre id="rpLog" dir="ltr" class="mt-2 max-h-56 overflow-auto bg-[color:var(--gm-surface-low)] rounded-lg p-2 text-[11px] whitespace-pre-wrap"></pre>
     <div class="flex gap-2 mt-2">
-      <input id="rpCmd" dir="ltr" class="flex-1 h-9 rounded-lg border border-[#E3DCCB] px-2" placeholder="help" aria-label="أمر للجهاز"/>
-      <button type="button" onclick="rpSendCmd()" class="h-9 px-3 rounded-full border border-[#E3DCCB] font-semibold">إرسال</button>
-      <button type="button" onclick="rpCopyLog()" class="h-9 px-3 rounded-full border border-[#E3DCCB] font-semibold">نسخ السجل</button>
+      <input id="rpCmd" dir="ltr" class="flex-1 h-9 rounded-lg border border-[color:var(--gm-outline-variant)] px-2" placeholder="help" aria-label="أمر للجهاز"/>
+      <button type="button" onclick="rpSendCmd()" class="h-9 px-3 rounded-full border border-[color:var(--gm-outline-variant)] font-semibold">إرسال</button>
+      <button type="button" onclick="rpCopyLog()" class="h-9 px-3 rounded-full border border-[color:var(--gm-outline-variant)] font-semibold">نسخ السجل</button>
     </div>
   </details>
 
@@ -56,18 +59,18 @@
       <span class="text-[13px]"><b class="num" id="rpDone">0</b> من <b class="num" id="rpTotal">0</b></span>
     </div>
     <div class="rp-bar"><i id="rpBar" style="width:0%"></i></div>
-    <div class="text-[11.5px] text-[#8a7f6a] mt-2">هذه الجلسة: <b class="num" id="rpSession">0</b> شريحة</div>
+    <div class="text-[11.5px] text-[color:var(--gm-on-surface-variant)] mt-2">هذه الجلسة: <b class="num" id="rpSession">0</b> شريحة</div>
   </div>
 
   <div class="rp-card p-4 flex flex-col gap-3">
-    <label for="rpCode" class="text-[13px] font-semibold">امسح باركود القطعة، ثم قرّب ملصقتها من جهاز الزيبرا</label>
+    <label for="rpCode" class="text-[13px] font-semibold">ضع القطعة أمام جهاز الزيبرا ثم امسح باركودها — تبدأ البرمجة تلقائياً</label>
     <div class="flex gap-2">
       <input id="rpCode" type="text" inputmode="text" autocomplete="off" placeholder="باركود القطعة" dir="ltr"
-        class="flex-1 h-14 rounded-2xl border border-[#E3DCCB] text-center text-[22px] num" onkeydown="if(event.key==='Enter'){event.preventDefault();rpProgram(this.value);}"/>
-      <button onclick="rpToggleCamera()" id="rpCamBtn" class="w-14 h-14 rounded-2xl bg-[#1C1A16] text-white flex items-center justify-center" aria-label="مسح بالكاميرا"><span class="material-symbols-outlined">photo_camera</span></button>
+        class="flex-1 h-14 rounded-2xl border border-[color:var(--gm-outline-variant)] text-center text-[22px] num" onkeydown="if(event.key==='Enter'){event.preventDefault();rpProgram(this.value);}"/>
+      <button onclick="rpToggleCamera()" id="rpCamBtn" class="w-14 h-14 rounded-2xl bg-[color:var(--gm-primary)] text-[color:var(--gm-on-primary)] flex items-center justify-center" aria-label="مسح بالكاميرا"><span class="material-symbols-outlined">photo_camera</span></button>
     </div>
-    <div id="rpCamBox" class="hidden rounded-2xl overflow-hidden border border-[#E3DCCB]"><div id="rpCamera"></div></div>
-    <button onclick="rpProgram(document.getElementById('rpCode').value)" class="h-12 rounded-2xl bg-[#B4955A] text-white font-bold text-[15px]">برمجة الشريحة</button>
+    <div id="rpCamBox" class="hidden rounded-2xl overflow-hidden border border-[color:var(--gm-outline-variant)]"><div id="rpCamera"></div></div>
+    <button onclick="rpProgram(document.getElementById('rpCode').value)" class="h-12 rounded-2xl bg-[color:var(--gm-accent)] text-[color:var(--gm-on-accent)] font-bold text-[15px]">برمجة الشريحة</button>
     <div id="rpStatus" class="rp-status idle" aria-live="polite">
       <span class="material-symbols-outlined text-[34px]" aria-hidden="true">nfc</span>
       <div class="text-[13px]">جاهز. ضع ملصقة واحدة فقط قرب الجهاز وأبعد باقي القطع.</div>
@@ -79,8 +82,8 @@
       <button aria-pressed="true" data-tab="todo" onclick="rpTab(this)">لم تُبرمج</button>
       <button aria-pressed="false" data-tab="session" onclick="rpTab(this)">بُرمجت الآن</button>
     </div>
-    <input id="rpFilter" type="search" placeholder="بحث بالباركود أو الوصف" aria-label="بحث في القائمة" oninput="rpRenderList()" class="w-full h-10 rounded-xl border border-[#E3DCCB] px-3 text-[13px] mb-2"/>
-    <div id="rpList" class="flex flex-col divide-y divide-[#F1EBDD] text-[13px]"></div>
+    <input id="rpFilter" type="search" placeholder="بحث بالباركود أو الوصف" aria-label="بحث في القائمة" oninput="rpRenderList()" class="w-full h-10 rounded-xl border border-[color:var(--gm-outline-variant)] px-3 text-[13px] mb-2"/>
+    <div id="rpList" class="flex flex-col divide-y divide-[color:var(--gm-outline-variant)] text-[13px]"></div>
   </div>
 </main>
 
@@ -125,12 +128,12 @@ function rpRenderList() {
   let rows = RP.tab === 'todo' ? RP.pieces.filter(p => !p.rfid_encoded_at) : RP.session.map(id => RP.pieces.find(p => p.id === id)).filter(Boolean);
   if (q) rows = rows.filter(p => rpNorm(p.barcode).includes(q) || rpNorm(p.description_ar).includes(q));
   const el = document.getElementById('rpList');
-  if (!rows.length) { el.innerHTML = '<p class="text-center text-[#8a7f6a] py-6">' + (RP.tab === 'todo' ? 'كل القطع مبرمجة.' : 'لم تُبرمج شرائح في هذه الجلسة بعد.') + '</p>'; return; }
+  if (!rows.length) { el.innerHTML = '<p class="text-center text-[color:var(--gm-on-surface-variant)] py-6">' + (RP.tab === 'todo' ? 'كل القطع مبرمجة.' : 'لم تُبرمج شرائح في هذه الجلسة بعد.') + '</p>'; return; }
   el.innerHTML = rows.slice(0, 200).map(p => '<button type="button" class="flex items-center gap-3 py-2 text-start w-full" onclick="rpPick(\'' + esc(p.barcode) + '\')">'
-    + (p.photo_url ? '<img src="' + esc(p.photo_url) + '" alt="" loading="lazy" class="w-10 h-10 rounded-lg object-cover"/>' : '<span class="w-10 h-10 rounded-lg bg-[#F4EFE3] flex items-center justify-center material-symbols-outlined text-[#B4955A]" aria-hidden="true">diamond</span>')
-    + '<span class="flex-1 min-w-0"><b class="num">' + esc(p.barcode) + '</b> <span class="text-[#6B6150]">' + esc(p.description_ar || '') + '</span><br><small class="text-[#8a7f6a]">عيار ' + esc(p.karat || '—') + ' · <span class="num">' + Number(p.weight_grams || 0).toFixed(2) + '</span> غ</small></span>'
+    + (p.photo_url ? '<img src="' + esc(p.photo_url) + '" alt="" loading="lazy" class="w-10 h-10 rounded-lg object-cover"/>' : '<span class="w-10 h-10 rounded-lg bg-[color:var(--gm-surface-low)] flex items-center justify-center material-symbols-outlined text-[color:var(--gm-accent)]" aria-hidden="true">diamond</span>')
+    + '<span class="flex-1 min-w-0"><b class="num">' + esc(p.barcode) + '</b> <span class="text-[color:var(--gm-on-surface-variant)]">' + esc(p.description_ar || '') + '</span><br><small class="text-[color:var(--gm-on-surface-variant)]">عيار ' + esc(p.karat || '—') + ' · <span class="num">' + Number(p.weight_grams || 0).toFixed(2) + '</span> غ</small></span>'
     + (p.rfid_encoded_at ? '<span class="material-symbols-outlined text-[#1B5E20]" aria-label="مبرمجة">check_circle</span>' : '') + '</button>').join('')
-    + (rows.length > 200 ? '<p class="text-center text-[11px] text-[#8a7f6a] py-2">يُعرض أول 200 — ابحث لتضييق القائمة.</p>' : '');
+    + (rows.length > 200 ? '<p class="text-center text-[11px] text-[color:var(--gm-on-surface-variant)] py-2">يُعرض أول 200 — ابحث لتضييق القائمة.</p>' : '');
 }
 function rpPick(code) { const i = document.getElementById('rpCode'); i.value = code; i.focus(); rpProgram(code); }
 
@@ -152,9 +155,9 @@ async function rpCheckReader(reconnect) {
     if (reconnect && GMUhf.serial) await GMUhf.connectSerial();
   } catch (e) { t.textContent = e.message || String(e); rpShowLog(); return false; }
   const s = await GMUhf.status();
-  if (GMUhf.serial) b.textContent = s.available ? 'إعادة الاتصال' : 'وصّل جهاز الزيبرا';
+  if (GMUhf.serial) b.textContent = s.available ? 'إعادة الاتصال' : 'توصيل جهاز الزيبرا';
   t.textContent = s.available ? 'متصل: ' + (s.name || s.kind)
-    : GMUhf.serial ? 'اضغط «وصّل جهاز الزيبرا» واختر منفذه (مثل COM8). سكّر برنامج 123RFID قبلها.'
+    : GMUhf.serial ? 'اضغط «توصيل جهاز الزيبرا» واختر منفذه (مثل COM8). أغلق برنامج 123RFID قبل ذلك.'
     : 'لا يوجد قارئ متصل — شغّل جهاز الزيبرا واربطه بالبلوتوث من إعدادات التلفون، ثم اضغط «إعادة الاتصال».';
   rpShowLog();
   return s.available;
