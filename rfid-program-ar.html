@@ -158,7 +158,10 @@ async function rpCheckReader(reconnect) {
   const b = document.getElementById('rpReconnect');
   try {
     // computer: picking the COM port needs this click, so ask first (no await before it); remembered afterwards
-    if (reconnect && GMUhf.serial) await GMUhf.connectSerial();
+    if (reconnect && GMUhf.serial && !(await GMUhf.connectSerial())) {
+      t.textContent = 'لم يُختر أي منفذ. إن كانت القائمة فارغة: تأكد أن جهاز الزيبرا مشغّل ومقترن بالكمبيوتر من إعدادات البلوتوث في ويندوز، وأن برنامج 123RFID مغلق، ثم أعد المحاولة.';
+      return false;
+    }
     else if (reconnect) await GMUhf.disconnect();
   } catch (e) { t.textContent = e.message || String(e); rpShowLog(); return false; }
   const s = await GMUhf.status();
