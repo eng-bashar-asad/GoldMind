@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>إعدادات قارئ RFID | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="supabase-config.js?v=54"></script>
+<script src="theme.js?v=84"></script>
+<script src="zebra-rfid.js?v=6"></script>
+<script src="gm-uhf.js?v=5"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+  html { font-size: 87.5%; }
+  body.rs-body { background: var(--gm-bg, #FBF8F1); color: var(--gm-on-surface, #1C1A16); }
+  .rs-head { background: var(--gm-surface-lowest, #fff); border-color: var(--gm-outline-variant, #ECE4D3); color: var(--gm-on-surface, #1C1A16); }
+  .rs-card { background: var(--gm-surface-lowest, #fff); color: var(--gm-on-surface, #1C1A16); border: 1px solid var(--gm-outline-variant, #ECE4D3); border-radius: 18px; padding: 16px; }
+  .rs-card h2 { font-weight: 800; font-size: 15px; display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .rs-card h2 .material-symbols-outlined { color: var(--gm-accent, #B4955A); }
+  .rs-mute { color: var(--gm-on-surface-variant, #6B6150); }
+  .rs-btn { height: 40px; padding: 0 14px; border-radius: 999px; border: 1px solid var(--gm-outline-variant, #E3DCCB); font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+  .rs-btn:disabled { opacity: .45; }
+  .rs-seg { display: inline-flex; background: var(--gm-surface-low, #F4EFE3); border-radius: 999px; padding: 3px; }
+  .rs-seg button { height: 34px; padding: 0 14px; border-radius: 999px; font-weight: 700; font-size: 12.5px; color: var(--gm-on-surface-variant, #6B6150); }
+  .rs-seg button[aria-pressed="true"] { background: var(--gm-primary, #1C1A16); color: var(--gm-on-primary, #FBF8F1); }
+  .rs-range { width: 100%; accent-color: var(--gm-accent, #B4955A); }
+  .num { font-family: "Times New Roman", Times, serif; direction: ltr; unicode-bidi: isolate; }
+  .ok { color: #2E7D32; } .bad { color: #C62828; }
+  .gm-gold{position:relative;overflow:hidden;background:linear-gradient(125deg,#7a5a16 0%,#c89a3c 18%,#f6e2a6 30%,#d4a64a 42%,#8a6a1f 58%,#e2bd67 76%,#fff0bf 88%,#b58a33 100%);background-size:220% 220%;color:#2A1F08;border:0;box-shadow:0 6px 16px -6px rgba(122,90,22,.55),inset 0 1px 0 rgba(255,255,255,.55)}
+</style>
+</head>
+<body class="rs-body min-h-screen">
+<header class="rs-head sticky top-0 z-40 border-b h-14 flex items-center gap-2 px-4">
+  <button onclick="gmSmartBack('rfid-program-ar.html')" class="w-11 h-11 flex items-center justify-center rounded-full" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button>
+  <h1 class="font-bold text-[16px] flex-1">إعدادات قارئ RFID</h1>
+  <a href="rfid-program-ar.html" class="rs-btn" aria-label="برمجة الشرائح"><span class="material-symbols-outlined text-[18px]">nfc</span><span class="hidden sm:inline">برمجة الشرائح</span></a>
+</header>
+
+<main class="max-w-2xl mx-auto p-4 flex flex-col gap-3 pb-24">
+  <p class="text-[12px] rs-mute">هذه الإعدادات خاصة بهذا الجهاز (الكمبيوتر أو الهاتف) وتُحفظ عليه.</p>
+
+  <!-- 1. connection -->
+  <section class="rs-card" aria-labelledby="h-conn">
+    <h2 id="h-conn"><span class="material-symbols-outlined" aria-hidden="true">bluetooth</span>الاتصال بالقارئ</h2>
+    <div class="flex items-center gap-3 flex-wrap">
+      <span id="rsIc" class="material-symbols-outlined bad" aria-hidden="true">bluetooth_disabled</span>
+      <span id="rsStatus" class="font-bold text-[14px] flex-1 min-w-[180px]">جارٍ الفحص…</span>
+      <button id="rsConnect" class="rs-btn" type="button" onclick="rsConnect()"><span class="material-symbols-outlined text-[18px]">bluetooth_searching</span><span>اتصال</span></button>
+      <button id="rsDisconnect" class="rs-btn hidden" type="button" onclick="rsDisconnect()">قطع الاتصال</button>
+    </div>
+    <p id="rsHow" class="text-[12px] rs-mute mt-2"></p>
+    <p id="rsInfo" class="text-[12px] rs-mute mt-1 num text-start" dir="ltr"></p>
+  </section>
+
+  <!-- 2. power -->
+  <section class="rs-card" aria-labelledby="h-pow">
+    <h2 id="h-pow"><span class="material-symbols-outlined" aria-hidden="true">settings_input_antenna</span>قوة الإرسال</h2>
+    <label for="rsWrite" class="flex justify-between text-[13px] font-semibold"><span>عند برمجة الشرائح</span><span id="rsWriteV" class="num"></span></label>
+    <input id="rsWrite" type="range" dir="ltr" min="1" max="30" step="1" class="rs-range"/>
+    <p class="text-[11.5px] rs-mute mb-3">قوة منخفضة حتى يقرأ القارئ الملصقة التي أمامه فقط، لا ملصقات القطع المجاورة. إن لم يقرأ الملصقة فارفعها قليلاً.</p>
+    <label for="rsCount" class="flex justify-between text-[13px] font-semibold"><span>عند الجرد والقراءة</span><span id="rsCountV" class="num"></span></label>
+    <input id="rsCount" type="range" dir="ltr" min="5" max="31" step="1" class="rs-range"/>
+    <p class="text-[11.5px] rs-mute">قوة عالية لقراءة الرف كله بسرعة. أقصى اليمين = أعلى قوة يسمح بها الجهاز.</p>
+    <p id="rsPowNote" class="hidden text-[12px] mt-3 p-3 rounded-xl" style="background:var(--gm-surface-low,#F4EFE3)">على الكمبيوتر تُحفظ هذه القيم الآن، وتُضبط قوة جهاز الزيبرا نفسه مؤقتاً من برنامج 123RFID Desktop (Configure ← Antenna). سنفعّل ضبطها من هنا بعد قراءة قائمة أوامر جهازك من قسم «الدعم الفني» أدناه.</p>
+  </section>
+
+  <!-- 3. trigger -->
+  <section class="rs-card" aria-labelledby="h-trg">
+    <h2 id="h-trg"><span class="material-symbols-outlined" aria-hidden="true">touch_app</span>زناد القارئ</h2>
+    <div id="rsTrigger" class="rs-seg" role="group" aria-label="طريقة الزناد">
+      <button type="button" data-trigger="hold" aria-pressed="false">يقرأ ما دام مضغوطاً</button>
+      <button type="button" data-trigger="toggle" aria-pressed="false">ضغطة تبدأ وضغطة توقف</button>
+    </div>
+    <p id="rsTrgNote" class="text-[11.5px] rs-mute mt-2">يُستخدم في الجرد بالشرائح.</p>
+  </section>
+
+  <!-- 4. test -->
+  <section class="rs-card" aria-labelledby="h-test">
+    <h2 id="h-test"><span class="material-symbols-outlined" aria-hidden="true">sensors</span>اختبار القراءة</h2>
+    <div class="flex gap-2 flex-wrap">
+      <button id="rsRead1" class="rs-btn" type="button" onclick="rsReadOne()"><span class="material-symbols-outlined text-[18px]">nfc</span>قراءة ملصقة واحدة</button>
+      <button id="rsScan" class="rs-btn gm-gold" type="button" onclick="rsScan()"><span class="material-symbols-outlined text-[18px]">sensors</span><span>قراءة مستمرة</span></button>
+      <button class="rs-btn" type="button" onclick="rsClear()">مسح القائمة</button>
+    </div>
+    <p id="rsMsg" class="text-[13px] mt-2 min-h-[20px]" role="status"></p>
+    <ul id="rsList" class="mt-1 divide-y text-[13px]" style="border-color:var(--gm-outline-variant)"></ul>
+  </section>
+
+  <!-- 5. support -->
+  <details id="rsSupport" class="rs-card">
+    <summary class="cursor-pointer font-bold text-[14px]">الدعم الفني — سجل الجهاز وأوامره</summary>
+    <div class="flex gap-2 flex-wrap mt-3">
+      <button class="rs-btn" type="button" onclick="rsCmd('help')">قائمة أوامر الجهاز</button>
+      <button class="rs-btn" type="button" onclick="rsCopyLog()">نسخ السجل</button>
+    </div>
+    <pre id="rsLog" dir="ltr" class="mt-2 max-h-72 overflow-auto rounded-lg p-2 text-[11px] whitespace-pre-wrap" style="background:var(--gm-surface-low,#F4EFE3)"></pre>
+    <div class="flex gap-2 mt-2">
+      <input id="rsCmdIn" dir="ltr" class="flex-1 h-10 rounded-lg border px-2 text-[13px]" style="border-color:var(--gm-outline-variant)" placeholder="gv" aria-label="أمر للجهاز" onkeydown="if(event.key==='Enter')rsCmd(this.value)"/>
+      <button class="rs-btn" type="button" onclick="rsCmd(document.getElementById('rsCmdIn').value)">إرسال</button>
+    </div>
+    <p class="text-[11px] rs-mute mt-2">للكمبيوتر فقط. انسخ السجل وأرسله للدعم الفني عند أي مشكلة.</p>
+  </details>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const RS = { byEpc: {}, seen: new Map(), scanning: false };
+
+function rsPaintSettings() {
+  const s = GMUhf.settings();
+  $('rsWrite').value = s.writePower; $('rsWriteV').textContent = s.writePower + ' dBm';
+  $('rsCount').value = s.countPower || 31; $('rsCountV').textContent = s.countPower ? s.countPower + ' dBm' : 'أعلى قوة';
+  $('rsTrigger').querySelectorAll('[data-trigger]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.trigger === s.trigger)));
+}
+function rsPaintStatus(st) {
+  const on = !!(st && st.available);
+  $('rsIc').textContent = on ? 'bluetooth_connected' : 'bluetooth_disabled';
+  $('rsIc').className = 'material-symbols-outlined ' + (on ? 'ok' : 'bad');
+  $('rsStatus').textContent = on ? 'متصل — ' + (st.name || st.kind || 'قارئ RFID') : 'غير متصل';
+  $('rsConnect').lastElementChild.textContent = on ? 'إعادة الاتصال' : (GMUhf.serial ? 'توصيل جهاز الزيبرا' : 'اتصال');
+  $('rsDisconnect').classList.toggle('hidden', !on || !(GMUhf.serial || st.kind === 'zebra'));
+  ['rsRead1', 'rsScan'].forEach(id => $(id).disabled = !on);
+  rsShowLog();
+}
+function rsShowLog() {
+  if (!GMUhf.log) return;
+  const l = GMUhf.log(); $('rsLog').textContent = l;
+  const v = l.split('\n').filter(x => /^\S+ < /.test(x) && !/Command:|^\S+ < OK/i.test(x)).slice(0, 3).map(x => x.replace(/^\S+ < /, ''));
+  $('rsInfo').textContent = v.length ? v.join(' · ') : '';
+}
+async function rsConnect() {
+  $('rsStatus').textContent = 'جارٍ الاتصال…';
+  try {
+    // computer: the port list must open straight from this click (no await before it)
+    if (GMUhf.serial && !(await GMUhf.connectSerial())) { rsPaintStatus(null); $('rsMsg').textContent = 'لم يُختر أي منفذ. اختر «RFID Serial Port (COMx)» من القائمة.'; return; }
+  } catch (e) { rsPaintStatus(null); $('rsMsg').textContent = e.message || String(e); rsShowLog(); return; }
+  const st = await GMUhf.status(); rsPaintStatus(st);
+  $('rsMsg').textContent = st.available ? '' : 'لم يُعثر على قارئ. تأكد أن الجهاز مشغّل ومقترن بالبلوتوث.';
+}
+async function rsDisconnect() { if (RS.scanning) await rsScan(); await GMUhf.disconnect(); rsPaintStatus(null); }
+
+function rsPieceOf(epc) { return RS.byEpc[String(epc).toUpperCase()]; }
+function rsAddTag(epc) {
+  const v = String(epc).replace(/\s+/g, '').toUpperCase(); if (!v) return;
+  RS.seen.set(v, (RS.seen.get(v) || 0) + 1);
+  if (RS.seen.get(v) > 1) { $('rsMsg').textContent = 'ملصقات مختلفة: ' + RS.seen.size; return; }
+  const p = rsPieceOf(v), li = document.createElement('li');
+  li.className = 'py-2 flex items-center gap-2';
+  li.innerHTML = '<span class="material-symbols-outlined text-[18px] ' + (p ? 'ok' : 'rs-mute') + '" aria-hidden="true">' + (p ? 'check_circle' : 'help') + '</span>'
+    + '<span class="flex-1 min-w-0">' + (p ? '<b class="num">' + esc(p.barcode) + '</b> ' + esc(p.description_ar || '') : '<span class="rs-mute">ملصقة غير مبرمجة لقطعة</span>')
+    + '<br><small class="num rs-mute" dir="ltr">' + esc(v) + '</small></span>';
+  $('rsList').prepend(li);
+  $('rsMsg').textContent = 'ملصقات مختلفة: ' + RS.seen.size;
+}
+function rsClear() { RS.seen.clear(); $('rsList').innerHTML = ''; $('rsMsg').textContent = ''; }
+async function rsReadOne() {
+  $('rsMsg').textContent = 'قرّب ملصقة واحدة من القارئ…';
+  try { rsAddTag(await GMUhf.readOne(GMUhf.settings().writePower)); }
+  catch (e) { $('rsMsg').textContent = e.message || String(e); }
+  rsShowLog();
+}
+async function rsScan() {
+  const b = $('rsScan');
+  if (RS.scanning) { RS.scanning = false; b.lastElementChild.textContent = 'قراءة مستمرة'; await GMUhf.stop(); rsShowLog(); return; }
+  RS.scanning = true; b.lastElementChild.textContent = 'إيقاف القراءة';
+  try { await GMUhf.start(rsAddTag, GMUhf.settings().countPower); }
+  catch (e) { RS.scanning = false; b.lastElementChild.textContent = 'قراءة مستمرة'; $('rsMsg').textContent = e.message || String(e); }
+}
+async function rsCmd(c) {
+  c = String(c || '').trim(); if (!c) return;
+  if (!GMUhf.send) { $('rsMsg').textContent = 'الأوامر المباشرة متاحة على الكمبيوتر فقط.'; return; }
+  try { await GMUhf.send(c); } catch (e) { $('rsMsg').textContent = e.message || String(e); }
+  $('rsCmdIn').value = ''; rsShowLog();
+}
+function rsCopyLog() {
+  const s = GMUhf.log ? GMUhf.log() : '';
+  (navigator.clipboard ? navigator.clipboard.writeText(s) : Promise.reject()).then(() => { $('rsMsg').textContent = 'نُسخ السجل.'; }, () => alert(s));
+}
+
+$('rsWrite').oninput = () => { GMUhf.saveSettings({ writePower: Number($('rsWrite').value) }); rsPaintSettings(); };
+$('rsCount').oninput = () => { const v = Number($('rsCount').value); GMUhf.saveSettings({ countPower: v >= 31 ? 0 : v }); rsPaintSettings(); };
+$('rsTrigger').onclick = e => { const b = e.target.closest('[data-trigger]'); if (b) { GMUhf.saveSettings({ trigger: b.dataset.trigger }); rsPaintSettings(); } };
+window.addEventListener('pagehide', () => { if (RS.scanning) GMUhf.stop(); });
+
+(async function load() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  rsPaintSettings();
+  const pc = !!GMUhf.serial;
+  $('rsPowNote').classList.toggle('hidden', !pc);
+  $('rsSupport').classList.toggle('hidden', !pc);
+  if (pc) $('rsTrgNote').textContent = 'على الكمبيوتر يعمل زناد جهاز الزيبرا حسب إعداده الداخلي؛ هذا الخيار للتطبيق على الهاتف.';
+  $('rsHow').textContent = pc
+    ? 'الكمبيوتر: اضغط «توصيل جهاز الزيبرا» واختر «RFID Serial Port (COMx)». أغلق برنامج 123RFID Desktop قبل ذلك. يُطلب الاختيار مرة واحدة فقط.'
+    : GMUhf.native ? 'الهاتف: شغّل القارئ واربطه بالبلوتوث من إعدادات الهاتف، ثم اضغط «اتصال».'
+    : 'هذا المتصفح لا يتصل بقارئ RFID. استخدم Chrome أو Edge على الكمبيوتر، أو تطبيق GoldMind على الهاتف.';
+  if (!pc && !GMUhf.native) $('rsConnect').disabled = true;
+  GMUhf.onTrigger(down => { if (down !== RS.scanning) rsScan(); });
+  rsPaintStatus(await GMUhf.status());
+  // which piece each chip belongs to, for the read test
+  const res = await gmFetchAllRows(() => goldmindClient.from('pieces').select('barcode, description_ar, rfid_epc')
+    .eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved']));
+  (res.data || []).forEach(p => {
+    const e = (p.rfid_epc || (window.GMZebra ? GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID) : '')).toUpperCase();
+    if (e) RS.byEpc[e] = p;
+  });
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+</script>
+</body>
+</html>
