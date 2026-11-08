@@ -28,6 +28,13 @@
   /* follow the chosen theme (theme.js variables), with the old colours as fallback */
   body.rp-body { background: var(--gm-bg, #FBF8F1); color: var(--gm-on-surface, #1C1A16); }
   .rp-head { background: var(--gm-surface-lowest, #fff); border-color: var(--gm-outline-variant, #ECE4D3); color: var(--gm-on-surface, #1C1A16); }
+.gm-gold{background:linear-gradient(125deg,#7a5a16 0%,#c89a3c 18%,#f6e2a6 30%,#d4a64a 42%,#8a6a1f 58%,#e2bd67 76%,#fff0bf 88%,#b58a33 100%);background-size:220% 220%;animation:gmGoldShift 9s ease-in-out infinite alternate;color:#2A1F08}
+@keyframes gmGoldShift{from{background-position:0% 50%}to{background-position:100% 50%}}
+.gm-sweep{position:absolute;inset:0;border-radius:inherit;overflow:hidden;pointer-events:none}
+.gm-sweep::after{content:'';position:absolute;top:-40%;bottom:-40%;width:38%;left:-60%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.6) 45%,rgba(255,255,255,.08) 60%,transparent);transform:skewX(-18deg);animation:gmSweep 5.5s cubic-bezier(.65,0,.35,1) infinite}
+@keyframes gmSweep{0%,55%{left:-60%}85%,100%{left:130%}}
+  .gm-gold{position:relative;overflow:hidden;box-shadow:0 6px 16px -6px rgba(122,90,22,.55),inset 0 1px 0 rgba(255,255,255,.55)}
+  @media (prefers-reduced-motion: reduce){.gm-gold,.gm-sweep::after{animation:none!important}}
 </style>
 </head>
 <body class="rp-body min-h-screen">
@@ -70,7 +77,7 @@
       <button onclick="rpToggleCamera()" id="rpCamBtn" class="w-14 h-14 rounded-2xl bg-[color:var(--gm-primary)] text-[color:var(--gm-on-primary)] flex items-center justify-center" aria-label="مسح بالكاميرا"><span class="material-symbols-outlined">photo_camera</span></button>
     </div>
     <div id="rpCamBox" class="hidden rounded-2xl overflow-hidden border border-[color:var(--gm-outline-variant)]"><div id="rpCamera"></div></div>
-    <button onclick="rpProgram(document.getElementById('rpCode').value)" class="h-12 rounded-2xl bg-[color:var(--gm-accent)] text-[color:var(--gm-on-accent)] font-bold text-[15px]">برمجة الشريحة</button>
+    <button onclick="rpProgram(document.getElementById('rpCode').value)" class="gm-gold h-12 rounded-2xl font-bold text-[15px]"><span class="gm-sweep" aria-hidden="true"></span><span style="position:relative">برمجة الشريحة</span></button>
     <div id="rpStatus" class="rp-status idle" aria-live="polite">
       <span class="material-symbols-outlined text-[34px]" aria-hidden="true">nfc</span>
       <div class="text-[13px]">جاهز. ضع ملصقة واحدة فقط قرب الجهاز وأبعد باقي القطع.</div>
