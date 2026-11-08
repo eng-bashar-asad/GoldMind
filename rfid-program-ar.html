@@ -79,7 +79,7 @@
 // Quick chip programming: scan a piece's barcode (camera, keyboard or a scanner), hold its RFID label
 // near the reader (Zebra RFD40 sled over Bluetooth, or a Chainway/Urovo handheld) — the chip gets the
 // piece's number, the piece is marked programmed, and the screen is ready for the next one.
-let RP = { pieces: [], byCode: {}, byEpc: {}, session: [], tab: 'todo', busy: false };
+let RP = { pieces: [], byCode: {}, byEpc: {}, session: [], tab: 'todo', busy: false, canEdit: false };
 const esc = v => gmEscapeHtml(v == null ? '' : String(v));
 
 function rpEpcOf(p) { return p.rfid_epc || GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID); }
@@ -137,6 +137,8 @@ async function rpCheckReader(reconnect) {
 async function rpProgram(raw) {
   const code = rpNorm(raw);
   if (!code || RP.busy) return;
+  // saving the chip on the piece needs «تعديل القطعة»: check before writing anything on the label
+  if (!RP.canEdit) { rpTone(false); rpStatus('err', 'ليس لديك صلاحية «تعديل القطع» — اطلبها من المدير قبل برمجة الشرائح.'); return; }
   const p = RP.byCode[code];
   const input = document.getElementById('rpCode');
   if (!p) { rpTone(false); rpStatus('err', 'الباركود <b class="num">' + esc(code) + '</b> غير موجود بين قطع المخزن المتوفرة.'); input.select(); return; }
@@ -190,6 +192,9 @@ window.addEventListener('pagehide', () => { if (rpCam) { try { rpCam.stop(); } c
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
   rpCheckReader(false);
+  const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  RP.canEdit = !!(me && (me.role === 'owner' || (me.permissions && me.permissions.edit_piece === true)));
+  if (!RP.canEdit) rpStatus('err', 'ليس لديك صلاحية «تعديل القطع» — اطلبها من المدير قبل برمجة الشرائح.');
   const res = await gmFetchAllRows(() => goldmindClient.from('pieces').select('id, barcode, description_ar, karat, weight_grams, photo_url, rfid_epc, rfid_encoded_at')
     .eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved']).order('barcode'));
   if (res.error) { rpStatus('err', 'تعذّر تحميل القطع: ' + esc(res.error.message)); return; }

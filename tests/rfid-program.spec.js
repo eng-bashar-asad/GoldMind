@@ -44,3 +44,15 @@ test('unknown or sold barcode is refused; no reader is explained', async ({ page
   await expect(page.locator('#rpStatus')).toContainText('غير متصل');
   expect(await page.evaluate(() => window.__w.length)).toBe(0);
 });
+
+test('staff without «edit_piece»: nothing is written on the label', async ({ page }) => {
+  await page.addInitScript(() => { window.__w = []; });
+  await install(page, { generic: true, db: { ...db(), staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'staff', permissions: { view_inventory: true }, full_name: 'م' }] } });
+  await page.goto('/rfid-program-ar.html');
+  await page.evaluate(() => { GMUhf.available = async () => true; GMUhf.status = async () => ({ available: true }); GMUhf.readOne = async () => null; GMUhf.writeEpc = async e => { window.__w.push(e); }; });
+  await expect(page.locator('#rpTotal')).toHaveText('2');
+  await page.fill('#rpCode', '000805');
+  await page.press('#rpCode', 'Enter');
+  await expect(page.locator('#rpStatus')).toContainText('صلاحية');
+  expect(await page.evaluate(() => window.__w.length)).toBe(0);
+});
