@@ -119,7 +119,7 @@ window.GMUhf = (function () {
   }
   async function open(p) {
     try { await p.open({ baudRate: 115200 }); }
-    catch (e) { if (!/already open/i.test(e.message)) { log('! open: ' + e.message); throw new Error(/busy|access|denied|failed to open/i.test(e.message) ? 'منفذ الزيبرا مشغول — أغلق برنامج 123RFID Desktop وحاول مرة أخرى.' : 'تعذّر فتح منفذ الزيبرا: ' + e.message); } }
+    catch (e) { if (!/already open/i.test(e.message)) { log('! open: ' + e.message); throw new Error('تعذّر فتح منفذ الزيبرا. الأسباب المعتادة: الجهاز متصل بالبلوتوث بهاتف أو جهاز آخر (يقبل اتصالاً واحداً فقط)، أو الجهاز نائم أو بعيد، أو اختير المنفذ الثاني للبلوتوث بدل منفذ الجهاز، أو برنامج زيبرا ما زال يعمل في الخلفية. (' + e.message + ')'); } }
     port = p; writer = p.writable.getWriter(); pump(p);
     await cmd('cn', 2500); // "connect": the sled answers ZETI after this
     var v = await cmd('gv', 2000);
