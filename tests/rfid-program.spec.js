@@ -56,3 +56,15 @@ test('staff without «edit_piece»: nothing is written on the label', async ({ p
   await expect(page.locator('#rpStatus')).toContainText('صلاحية');
   expect(await page.evaluate(() => window.__w.length)).toBe(0);
 });
+
+test('computer: scanning while the Zebra is not connected opens the port picker and carries on', async ({ page }) => {
+  await open(page, false);
+  await page.evaluate(() => {
+    GMUhf.serial = true;
+    GMUhf.connectSerial = async () => { window.__readerOK = true; return true; };
+  });
+  await page.fill('#rpCode', '000805');
+  await page.press('#rpCode', 'Enter');
+  await expect(page.locator('#rpStatus')).toContainText('تمت البرمجة');
+  expect(await page.evaluate(() => window.__w.length)).toBe(1);
+});

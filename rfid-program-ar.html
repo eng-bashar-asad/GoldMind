@@ -179,7 +179,14 @@ async function rpProgram(raw) {
   const input = document.getElementById('rpCode');
   if (!p) { rpTone(false); rpStatus('err', 'الباركود <b class="num">' + esc(code) + '</b> غير موجود بين قطع المخزن المتوفرة.'); input.select(); return; }
   if (p.rfid_encoded_at && !confirm('القطعة ' + p.barcode + ' مبرمجة من قبل. إعادة كتابة شريحتها؟')) { input.value = ''; input.focus(); return; }
-  if (!(await GMUhf.available())) { rpTone(false); rpStatus('err', 'جهاز الزيبرا غير متصل. اربطه بالبلوتوث ثم اضغط «إعادة الاتصال».'); await rpCheckReader(false); return; }
+  let ready = await GMUhf.available();
+  // computer: the Enter/click that started this counts as the user's gesture, so the port list can open now
+  if (!ready && GMUhf.serial) {
+    rpStatus('busy', 'اختر منفذ جهاز الزيبرا من القائمة (مثل COM8)…');
+    try { ready = await GMUhf.connectSerial(); } catch (e) { rpTone(false); rpStatus('err', esc(e.message || String(e))); rpShowLog(); return; }
+    await rpCheckReader(false);
+  }
+  if (!ready) { rpTone(false); rpStatus('err', GMUhf.serial ? 'جهاز الزيبرا غير متصل. اضغط «توصيل جهاز الزيبرا» في الأعلى واختر منفذه (مثل COM8).' : 'جهاز الزيبرا غير متصل. اربطه بالبلوتوث ثم اضغط «إعادة الاتصال».'); await rpCheckReader(false); return; }
   RP.busy = true;
   const epc = rpEpcOf(p);
   rpStatus('busy', 'قرّب ملصقة <b class="num">' + esc(p.barcode) + '</b> من الجهاز…', p);
