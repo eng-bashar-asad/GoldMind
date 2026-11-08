@@ -16,7 +16,7 @@
 <script src="gm-camera.js?v=3"></script>
 <script src="https://cdn.jsdelivr.net/npm/zebra-browser-print-min@3.0.216/BrowserPrint-3.0.216.min.js" integrity="sha384-bWJtxtlEZtu07B/FwY3MX0DQ3sELa3qNsklnCJq64LURLKWwkjfjMh8vjxO127Pl" crossorigin="anonymous"></script>
 <script src="zebra-rfid.js?v=6"></script>
-<script src="gm-uhf.js?v=3"></script>
+<script src="gm-uhf.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -993,7 +993,8 @@ const GM_RFID_ONLY_APP = 'تتم برمجة الشريحة من تطبيق GoldM
 async function gmRfidReady() {
   if (await GMUhf.available()) return true;
   if (!GMUhf.serial) { alert(GM_RFID_ONLY_APP); return false; }
-  if (!confirm('توصيل جهاز الزيبرا: ستظهر قائمة المنافذ، اختر منفذ الزيبرا (مثل COM8).\nأغلق برنامج 123RFID Desktop قبل ذلك.')) return false;
+  // straight to the port list: a confirm box first would use up the click the browser requires
+  gmToast('اختر منفذ جهاز الزيبرا (مثل COM8) — وأغلق برنامج 123RFID Desktop إن كان مفتوحاً.');
   try { return await GMUhf.connectSerial(); } catch (e) { alert(e.message || e); return false; }
 }
 async function gmWriteRfid(btn) {

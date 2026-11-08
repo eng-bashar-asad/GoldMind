@@ -37,12 +37,10 @@ function fakeZebra(tags) {
 
 test('laptop: chip button asks to connect the Zebra when no port is remembered', async ({ page }) => {
   await install(page, { db: DB() });
-  await page.addInitScript(() => { navigator.serial.getPorts = async () => []; navigator.serial.requestPort = async () => { const e = new Error('x'); e.name = 'NotFoundError'; throw e; }; });
+  await page.addInitScript(() => { window.__asked = 0; navigator.serial.getPorts = async () => []; navigator.serial.requestPort = async () => { window.__asked++; const e = new Error('x'); e.name = 'NotFoundError'; throw e; }; });
   await page.goto('/piece-edit-ar.html?id=p1');
-  let msg = '';
-  page.once('dialog', d => { msg = d.message(); d.dismiss(); });
   await page.locator('#gmRfidBtn').click();
-  await expect.poll(() => msg).toContain('COM8');
+  await expect.poll(() => page.evaluate(() => window.__asked)).toBe(1);
 });
 
 test('laptop: writes the chip over the COM port, finds the write command and verifies it', async ({ page }) => {

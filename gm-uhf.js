@@ -154,7 +154,11 @@ window.GMUhf = (function () {
     connectSerial: async function () {
       var p;
       try { p = await navigator.serial.requestPort({ allowedBluetoothServiceClassIds: [SPP] }); }
-      catch (e) { if (e.name === 'NotFoundError') return false; p = await navigator.serial.requestPort(); }
+      catch (e) {
+        if (e.name === 'NotFoundError') return false; // the user closed the list
+        if (e.name === 'SecurityError') throw new Error('اضغط زر «توصيل جهاز الزيبرا» لاختيار منفذ الجهاز.');
+        p = await navigator.serial.requestPort(); // older Chrome without the Bluetooth option
+      }
       if (port && port !== p) await window.GMUhf.disconnect();
       return open(p);
     },

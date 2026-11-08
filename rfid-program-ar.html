@@ -8,7 +8,7 @@
 <script src="supabase-config.js?v=54"></script>
 <script src="theme.js?v=84"></script>
 <script src="zebra-rfid.js?v=6"></script>
-<script src="gm-uhf.js?v=3"></script>
+<script src="gm-uhf.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
   html { font-size: 87.5%; }
@@ -157,9 +157,9 @@ async function rpCheckReader(reconnect) {
   t.textContent = 'جارِ البحث عن جهاز RFID…';
   const b = document.getElementById('rpReconnect');
   try {
-    if (reconnect) await GMUhf.disconnect();
-    // computer: picking the COM port needs this click; the browser remembers it afterwards
+    // computer: picking the COM port needs this click, so ask first (no await before it); remembered afterwards
     if (reconnect && GMUhf.serial) await GMUhf.connectSerial();
+    else if (reconnect) await GMUhf.disconnect();
   } catch (e) { t.textContent = e.message || String(e); rpShowLog(); return false; }
   const s = await GMUhf.status();
   if (GMUhf.serial) b.textContent = s.available ? 'إعادة الاتصال' : 'توصيل جهاز الزيبرا';
@@ -181,12 +181,13 @@ async function rpProgram(raw) {
   if (p.rfid_encoded_at && !confirm('القطعة ' + p.barcode + ' مبرمجة من قبل. إعادة كتابة شريحتها؟')) { input.value = ''; input.focus(); return; }
   let ready = await GMUhf.available();
   // computer: the Enter/click that started this counts as the user's gesture, so the port list can open now
-  if (!ready && GMUhf.serial) {
+  // (a scanner that types without Enter isn't a gesture: then point to the button instead)
+  if (!ready && GMUhf.serial && navigator.userActivation && navigator.userActivation.isActive) {
     rpStatus('busy', 'اختر منفذ جهاز الزيبرا من القائمة (مثل COM8)…');
     try { ready = await GMUhf.connectSerial(); } catch (e) { rpTone(false); rpStatus('err', esc(e.message || String(e))); rpShowLog(); return; }
     await rpCheckReader(false);
   }
-  if (!ready) { rpTone(false); rpStatus('err', GMUhf.serial ? 'جهاز الزيبرا غير متصل. اضغط «توصيل جهاز الزيبرا» في الأعلى واختر منفذه (مثل COM8).' : 'جهاز الزيبرا غير متصل. اربطه بالبلوتوث ثم اضغط «إعادة الاتصال».'); await rpCheckReader(false); return; }
+  if (!ready) { rpTone(false); rpStatus('err', GMUhf.serial ? 'جهاز الزيبرا غير متصل. اضغط زر «توصيل جهاز الزيبرا» في أعلى الصفحة واختر منفذه (مثل COM8)، ثم امسح الباركود مرة أخرى.' : 'جهاز الزيبرا غير متصل. اربطه بالبلوتوث ثم اضغط «إعادة الاتصال».'); await rpCheckReader(false); return; }
   RP.busy = true;
   const epc = rpEpcOf(p);
   rpStatus('busy', 'قرّب ملصقة <b class="num">' + esc(p.barcode) + '</b> من الجهاز…', p);

@@ -22,7 +22,7 @@ test('changing the chip keeps the barcode, saves a new chip number and the old o
   expect(body.p_old_epc).toMatch(/^[0-9A-F]{24}$/);
   expect(body.p_new_epc).not.toBe(body.p_old_epc);
   expect(asked).toContain('000100');
-  expect(asked).toContain('الباركود ما بيتغيّر');
+  expect(asked).toContain('الباركود لا يتغيّر');
 });
 
 test('a cancelled old barcode is listed, never counted as a match', async ({ page }) => {
