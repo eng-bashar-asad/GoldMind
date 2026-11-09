@@ -1,0 +1,416 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>كشف الحركة اليومية لفترة | GoldMind</title>
+<link rel="manifest" href="manifest.json"/>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="supabase-config.js?v=55"></script>
+<script src="theme.js?v=84"></script>
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<style>
+  html { font-size: 87.5%; }
+  body.cr-body {
+    color: var(--gm-on-surface, #1C1A16);
+    background:
+      radial-gradient(1200px 500px at 85% -10%, rgba(212,175,95,.22), transparent 60%),
+      radial-gradient(900px 400px at 0% 30%, rgba(255,255,255,.55), transparent 60%),
+      var(--gm-bg, #FBF8F1);
+    background-attachment: fixed;
+  }
+  .n { font-family: "Times New Roman", Times, serif; direction: ltr; unicode-bidi: isolate; white-space: nowrap; }
+  .in { color: #1B7A3D; } .out { color: #B3261E; } .mut { color: var(--gm-on-surface-variant, #6B6150); }
+  .ms { font-family: 'Material Symbols Outlined'; font-weight: 400; font-size: 18px; line-height: 1; vertical-align: middle; }
+
+  /* glass / reflective surfaces */
+  .glass {
+    position: relative; overflow: hidden; border-radius: 22px;
+    background: linear-gradient(135deg, rgba(255,255,255,.86), rgba(255,255,255,.58));
+    -webkit-backdrop-filter: blur(16px) saturate(150%); backdrop-filter: blur(16px) saturate(150%);
+    border: 1px solid rgba(255,255,255,.75);
+    box-shadow: 0 14px 34px -18px rgba(70,48,10,.35), 0 2px 6px -2px rgba(70,48,10,.12), inset 0 1px 0 rgba(255,255,255,.95);
+    color: var(--gm-on-surface, #1C1A16);
+  }
+  .glass::before { /* the reflection */
+    content: ""; position: absolute; inset: 0 0 auto 0; height: 55%; pointer-events: none;
+    background: linear-gradient(180deg, rgba(255,255,255,.55), rgba(255,255,255,0));
+  }
+  .glass > * { position: relative; }
+  .glass-dark {
+    position: relative; overflow: hidden; border-radius: 22px; color: #FBF8F1;
+    background: linear-gradient(135deg, #2A2620 0%, #14120F 60%, #2E2921 100%);
+    box-shadow: 0 14px 30px -14px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.18);
+  }
+  .glass-dark::before { content: ""; position: absolute; inset: 0; pointer-events: none;
+    background: linear-gradient(115deg, rgba(255,255,255,.16) 0%, rgba(255,255,255,0) 38%, rgba(255,255,255,0) 70%, rgba(212,175,95,.18) 100%); }
+  .glass-dark > * { position: relative; }
+  .gold-glass {
+    background: linear-gradient(160deg, rgba(246,226,166,.75) 0%, rgba(255,247,226,.65) 45%, rgba(226,189,103,.45) 100%);
+    -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -1px 0 rgba(160,120,40,.15);
+  }
+  .cal { width: 58px; flex: none; text-align: center; border-radius: 16px; padding: 7px 0; line-height: 1.1; }
+  .cal b { display: block; font-size: 24px; font-family: "Times New Roman", serif; }
+  .cal small { font-size: 11px; color: #d9cfb8; }
+
+  /* day card: computer = side panel + table; phone = header on top */
+  .cr-day { display: grid; grid-template-columns: 240px 1fr; margin-bottom: 14px; scroll-margin-top: 130px; }
+  .cr-side { padding: 16px; display: flex; flex-direction: column; gap: 8px; border-left: 1px solid rgba(180,149,90,.25); }
+  .cr-kv { display: flex; justify-content: space-between; align-items: baseline; font-size: 12.5px; padding: 4px 0; border-top: 1px dashed rgba(160,120,40,.25); }
+  .cr-kv:first-of-type { border-top: 0; }
+  .cr-close { margin-top: auto; border-radius: 14px; padding: 8px 12px; background: rgba(255,255,255,.75); box-shadow: inset 0 1px 0 #fff, 0 4px 12px -8px rgba(70,48,10,.4); }
+  .cr-close > div { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+  .cr-tbl { width: 100%; border-collapse: collapse; align-self: start; }
+  .cr-tbl th { white-space: nowrap; font-size: 12px; font-weight: 600; text-align: right; padding: 10px 12px; color: var(--gm-on-surface-variant, #6B6150); border-bottom: 1px solid rgba(180,149,90,.25); }
+  .cr-tbl td { padding: 9px 12px; border-bottom: 1px solid rgba(180,149,90,.14); vertical-align: middle; }
+  .cr-tbl tr:last-child td { border-bottom: 0; }
+  .cr-tbl tbody tr { cursor: pointer; transition: background .15s; }
+  .cr-tbl tbody tr:not(.lk):hover td { background: rgba(255,255,255,.55); }
+  .cr-tbl tbody tr.lk:hover td { filter: brightness(1.03); }
+  .cr-tbl .c-n { text-align: left; width: 1%; }
+  .cr-tbl .c-t { width: 1%; }
+  .cr-src { font-size: 11px; border-radius: 999px; padding: 1px 8px; border: 1px solid rgba(180,149,90,.35); white-space: nowrap; color: var(--gm-on-surface-variant, #6B6150); background: rgba(255,255,255,.6); }
+  .cr-acts { white-space: nowrap; }
+  .cr-ib { width: 32px; height: 32px; border-radius: 999px; display: inline-flex; align-items: center; justify-content: center;
+    background: rgba(255,255,255,.8); border: 1px solid rgba(180,149,90,.35); color: var(--gm-on-surface-variant, #6B6150); }
+  @media (hover: hover) { .cr-acts .cr-ib { opacity: 0; transition: opacity .15s; } .cr-tbl tr:hover .cr-acts .cr-ib, .cr-tbl tr:focus-within .cr-acts .cr-ib { opacity: 1; } }
+  /* linked rows: translucent glass tint + edge stripe; colours match the daily page */
+  .cr-tbl tr.lk td { background: var(--lk-bg); }
+  .cr-tbl tr.lk td:first-child { box-shadow: inset -4px 0 0 var(--lk-ink); }
+  .cr-chip { display: inline-flex; align-items: center; gap: 3px; font-size: 11.5px; border-radius: 999px; padding: 2px 9px 2px 7px; margin-inline-start: 6px;
+    background: rgba(255,255,255,.85); border: 1px solid currentColor; white-space: nowrap; cursor: pointer; }
+  .cr-chip .ms { font-size: 15px; }
+  .cr-tbl tr.cr-focus td { box-shadow: inset 0 2px 0 #D4A017, inset 0 -2px 0 #D4A017 !important; }
+  .cr-empty { grid-template-columns: 240px 1fr; opacity: .8; }
+  .cr-seg { display: inline-flex; padding: 3px; border-radius: 999px; background: rgba(255,255,255,.7); border: 1px solid rgba(180,149,90,.3); }
+  .cr-seg button { height: 34px; padding: 0 14px; border-radius: 999px; font-weight: 700; font-size: 12.5px; color: var(--gm-on-surface-variant, #6B6150); }
+  .cr-seg button[aria-pressed="true"] { background: linear-gradient(135deg, #2A2620, #14120F); color: #FBF8F1; box-shadow: inset 0 1px 0 rgba(255,255,255,.2); }
+  @media (max-width: 1023px) {
+    .cr-day, .cr-empty { grid-template-columns: 1fr; }
+    .cr-side { border-left: 0; border-bottom: 1px solid rgba(180,149,90,.25); flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 12px; padding: 10px 12px; }
+    .cr-side .cr-kv { border: 0; padding: 0; gap: 4px; }
+    .cr-side .cr-close { margin: 0; padding: 4px 10px; }
+    .cr-tbl thead { display: none; }
+    .cr-tbl, .cr-tbl tbody { display: block; }
+    .cr-tbl tbody tr { display: grid; grid-template-columns: auto 1fr auto; gap: 2px 10px; padding: 9px 12px; border-bottom: 1px solid rgba(180,149,90,.14); }
+    .cr-tbl td { border: 0; padding: 0; }
+    .cr-tbl .c-t { grid-row: 1 / span 2; align-self: center; width: auto; }
+    .cr-tbl .c-src { display: none; }
+    .cr-tbl .c-amt { grid-column: 3; grid-row: 1; text-align: left; }
+    .cr-tbl .c-amt:empty { display: none; }
+    .cr-tbl .c-bal { grid-column: 3; grid-row: 2; text-align: left; font-size: 12px; color: var(--gm-on-surface-variant, #6B6150); }
+    .cr-tbl .cr-acts { grid-column: 2; grid-row: 2; justify-self: start; }
+    .cr-tbl .c-amt, .cr-tbl .c-bal { width: auto; }
+    .cr-tbl tr.lk td:first-child { box-shadow: none; }
+    .cr-tbl tr.lk { background: var(--lk-bg); box-shadow: inset -4px 0 0 var(--lk-ink); }
+    .cr-tbl tr.lk td { background: transparent; }
+  }
+  @media print { .no-print { display: none !important; } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; scroll-behavior: auto !important; } }
+</style>
+</head>
+<body class="cr-body min-h-screen">
+<header class="sticky top-0 z-40 h-14 flex items-center gap-2 px-4 glass no-print" style="border-radius:0;border-width:0 0 1px 0">
+  <button onclick="gmSmartBack('daily-cashbox-ar.html')" class="w-11 h-11 flex items-center justify-center rounded-full" aria-label="رجوع"><span class="material-symbols-outlined ms">arrow_forward</span></button>
+  <h1 class="font-bold text-[16px] flex-1 truncate">كشف الحركة اليومية لفترة</h1>
+  <button type="button" onclick="crPrint()" class="h-10 px-4 rounded-full font-bold text-[13px] inline-flex items-center gap-1 glass-dark" aria-label="طباعة الكشف أو حفظه PDF"><span class="material-symbols-outlined ms">print</span><span class="hidden sm:inline">طباعة / PDF</span></button>
+</header>
+
+<main class="max-w-[1280px] mx-auto p-4 flex flex-col gap-4 pb-24">
+  <div id="crNoAccess" class="hidden glass p-6 text-center text-[14px]">كشف الفترات متاح للمالك ولمن لديه صلاحية «عرض أيام الصندوق السابقة».</div>
+
+  <section id="crBar" class="glass p-3 flex flex-wrap items-end gap-3 no-print">
+    <label class="flex flex-col gap-1 text-[11px] font-semibold mut">من تاريخ<input id="crFrom" type="date" class="h-11 rounded-xl border px-3 text-[13px] bg-white/80" style="border-color:rgba(180,149,90,.4)"/></label>
+    <label class="flex flex-col gap-1 text-[11px] font-semibold mut">إلى تاريخ<input id="crTo" type="date" class="h-11 rounded-xl border px-3 text-[13px] bg-white/80" style="border-color:rgba(180,149,90,.4)"/></label>
+    <button type="button" onclick="crGo()" class="h-11 px-5 rounded-xl font-bold text-[13px] glass-dark">عرض الكشف</button>
+    <div class="flex-1"></div>
+    <div class="cr-seg" role="group" aria-label="تصفية الحركات">
+      <button type="button" data-f="all" aria-pressed="true">كل الحركات</button>
+      <button type="button" data-f="linked" aria-pressed="false">المربوطة فقط</button>
+      <button type="button" data-f="in" aria-pressed="false">داخل</button>
+      <button type="button" data-f="out" aria-pressed="false">صادر</button>
+    </div>
+    <input id="crQ" type="search" placeholder="بحث في الحركات" aria-label="بحث في الحركات" class="h-10 w-full sm:w-56 rounded-full border px-4 text-[13px] bg-white/80" style="border-color:rgba(180,149,90,.4)"/>
+  </section>
+  <p id="crMsg" class="text-[13px] mut hidden" role="status"></p>
+
+  <section id="crSummary" class="grid gap-3 grid-cols-2 lg:grid-cols-4"></section>
+  <p class="text-[12px] mut -mt-1 no-print" id="crHint">الحركات المربوطة لها نفس اللون حتى لو كانت في أيام مختلفة. اضغط الكبسولة <span class="material-symbols-outlined ms" style="font-size:14px">link</span> لتنتقل إلى شريكتها، أو زر الربط لتربط حركتين من أي يومين في الفترة.</p>
+  <div id="crDays"></div>
+</main>
+
+<!-- link two movements of the period -->
+<div id="crLinkModal" class="hidden fixed inset-0 z-50 items-center justify-center p-4" style="background:rgba(20,18,15,.45)" role="dialog" aria-modal="true" aria-labelledby="crLinkTitle">
+  <div class="glass w-full max-w-lg p-5">
+    <h2 id="crLinkTitle" class="font-bold text-[15px] mb-1">ربط حركة</h2>
+    <p id="crLinkWhat" class="text-[13px] mut mb-3"></p>
+    <label for="crLinkSel" class="block text-[11px] font-semibold mut mb-1">ربط مع (من أي يوم في الفترة)</label>
+    <select id="crLinkSel" class="w-full h-11 rounded-xl border px-3 text-[13px] bg-white/90" style="border-color:rgba(180,149,90,.4)"></select>
+    <p id="crLinkErr" class="hidden text-[12px] mt-2" style="color:#B3261E"></p>
+    <div class="flex gap-2 mt-4">
+      <button type="button" onclick="crSaveLink()" class="flex-1 h-11 rounded-xl font-bold glass-dark">حفظ</button>
+      <button type="button" onclick="crCloseLink()" class="h-11 px-5 rounded-xl font-bold border" style="border-color:rgba(180,149,90,.4)">إلغاء</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = n => Number(n || 0).toLocaleString('ar-EG-u-nu-latn', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const pad = n => String(n).padStart(2, '0');
+const dayKey = d => d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()); // local calendar day
+const WEEK = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+const MONTH = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+// same colours as the daily page, as translucent glass tints
+const LK_INK = ['#B45309', '#1D4ED8', '#15803D', '#BE185D', '#C2410C', '#4338CA', '#0E7490', '#B91C1C', '#7E22CE', '#BE123C', '#4D7C0F', '#0369A1'];
+const LK_BG = ['rgba(254,243,199,.85)', 'rgba(219,234,254,.85)', 'rgba(220,252,231,.85)', 'rgba(252,231,243,.85)', 'rgba(255,237,213,.85)', 'rgba(224,231,255,.85)',
+  'rgba(207,250,254,.85)', 'rgba(254,226,226,.85)', 'rgba(243,232,255,.85)', 'rgba(255,228,230,.85)', 'rgba(236,252,203,.85)', 'rgba(224,242,254,.85)'];
+
+const CR = { all: [], range: [], from: null, to: null, filter: 'all', linkFor: null, focus: null };
+
+// where a row came from (same rule as the daily page)
+function crSource(e) {
+  if (e.bank_invoice_id || (e.cm && e.cm.invoice_id)) return 'فاتورة';
+  if (e.cash_movement_id) {
+    const op = e.operation_type || '';
+    if (op.includes('عربون')) return 'عربون';
+    if (e.cm && e.cm.trader_movement_id) return 'سند تاجر';
+    if (e.cm && e.cm.cd && e.cm.cd.length) return 'سند زبون';
+    return 'سند';
+  }
+  return 'يدوي';
+}
+const crShort = e => (e.operation_type || '') + (gmCashNote(e) ? ' — ' + gmCashNote(e) : '');
+const crCount = n => n === 1 ? 'حركة واحدة' : n === 2 ? 'حركتان' : n + (n <= 10 ? ' حركات' : ' حركة');
+const crDayLabel = d => WEEK[d.getDay()] + ' ' + pad(d.getDate()) + '/' + pad(d.getMonth() + 1);
+
+// opening per currency = everything before the period; then each day runs on from the previous one
+function crBuild(all, from, to) {
+  const toEx = new Date(to); toEx.setDate(toEx.getDate() + 1);
+  const before = all.filter(e => new Date(e.created_at) < from);
+  const inRange = gmCollapseInvoiceRows(all.filter(e => { const t = new Date(e.created_at); return t >= from && t < toEx; }));
+  const open = {};
+  before.forEach(e => { open[e.currency] = (open[e.currency] || 0) + (e.direction === 'in' ? 1 : -1) * Number(e.amount); });
+  const run = { ...open }, days = [], byDay = new Map();
+  inRange.sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || String(a.id).localeCompare(String(b.id)));
+  inRange.forEach(e => { const k = dayKey(new Date(e.created_at)); if (!byDay.has(k)) byDay.set(k, []); byDay.get(k).push(e); });
+  for (let d = new Date(from); d < toEx; d.setDate(d.getDate() + 1)) {
+    const rows = byDay.get(dayKey(d)) || [];
+    const start = { ...run }, tin = {}, tout = {};
+    rows.forEach(e => {
+      const a = Number(e.amount), c = e.currency;
+      run[c] = (run[c] || 0) + (e.direction === 'in' ? a : -a);
+      (e.direction === 'in' ? tin : tout)[c] = ((e.direction === 'in' ? tin : tout)[c] || 0) + a;
+      e._bal = run[c];
+    });
+    days.push({ date: new Date(d), key: dayKey(d), rows, start, tin, tout, end: { ...run } });
+  }
+  const curs = [...new Set([...Object.keys(open), ...inRange.map(e => e.currency)])]
+    .filter(c => Math.abs(open[c] || 0) > 0.0001 || inRange.some(e => e.currency === c));
+  return { days, open, close: run, curs, rows: inRange };
+}
+// ponytail: tiny self-check of the day roll-forward
+(() => {
+  const r = crBuild([{ id: 'a', currency: 'USD', direction: 'in', amount: 100, created_at: '2026-11-01T09:00:00' },
+    { id: 'b', currency: 'USD', direction: 'out', amount: 30, created_at: '2026-11-02T09:00:00' },
+    { id: 'c', currency: 'USD', direction: 'in', amount: 5, created_at: '2026-11-04T09:00:00' }], new Date(2026, 10, 2), new Date(2026, 10, 3));
+  console.assert(r.open.USD === 100 && r.days.length === 2 && r.days[0].end.USD === 70 && r.days[1].start.USD === 70 && r.days[1].rows.length === 0, 'crBuild');
+})();
+
+function crRender() {
+  const R = crBuild(CR.all, CR.from, CR.to);
+  CR.range = R.rows;
+  // a colour per link group, in order of appearance over the whole period
+  const groups = new Map();
+  R.rows.forEach(e => { if (e.link_group && !groups.has(e.link_group)) groups.set(e.link_group, groups.size % LK_INK.length); });
+  const tot = (obj, c) => obj[c] || 0;
+  const sumDir = (c, dir) => R.days.reduce((s, d) => s + tot(dir === 'in' ? d.tin : d.tout, c), 0);
+
+  document.getElementById('crSummary').innerHTML = R.curs.length ? R.curs.map(c => `
+    <div class="glass-dark p-4"><div class="text-[12px]" style="color:#d9cfb8">${esc(c)} · رصيد أول الفترة</div><div class="n text-[20px] font-bold mt-1">${fmt(tot(R.open, c))}</div></div>
+    <div class="glass p-4"><div class="text-[12px] mut">${esc(c)} · إجمالي الداخل</div><div class="n text-[20px] font-bold mt-1 in">+ ${fmt(sumDir(c, 'in'))}</div></div>
+    <div class="glass p-4"><div class="text-[12px] mut">${esc(c)} · إجمالي الصادر</div><div class="n text-[20px] font-bold mt-1 out">− ${fmt(sumDir(c, 'out'))}</div></div>
+    <div class="glass p-4 gold-glass"><div class="text-[12px] mut">${esc(c)} · رصيد آخر الفترة</div><div class="n text-[20px] font-bold mt-1">${fmt(tot(R.close, c))}</div></div>`).join('')
+    : '<div class="glass p-4 text-[13px] mut">لا توجد حركات في الصندوق قبل هذه الفترة ولا خلالها.</div>';
+
+  const partnerOf = e => e.link_group ? CR.all.find(x => x.id !== e.id && x.link_group === e.link_group) : null;
+  const curTag = c => R.curs.length > 1 ? ` <span class="text-[10px] mut">${esc(c)}</span>` : '';
+  const kvs = (obj, cls, sign) => R.curs.filter(c => Math.abs(tot(obj, c)) > 0.0001).map(c => `<b class="n ${cls}">${sign}${fmt(tot(obj, c))}</b>${curTag(c)}`).join('<br>') || '<span class="mut">—</span>';
+  const bals = obj => R.curs.map(c => `<b class="n">${fmt(tot(obj, c))}</b>${curTag(c)}`).join('<br>');
+
+  document.getElementById('crDays').innerHTML = R.days.map(d => {
+    const cal = `<div class="cal glass-dark"><b>${pad(d.date.getDate())}</b><small>${MONTH[d.date.getMonth()]}</small></div>`;
+    if (!d.rows.length) return `<article class="cr-day cr-empty glass" data-day="${d.key}">
+      <aside class="cr-side gold-glass"><div class="flex items-center gap-3">${cal}<div><b class="text-[15px]">${WEEK[d.date.getDay()]}</b><div class="text-[12px] mut">لا حركات</div></div></div></aside>
+      <div class="flex items-center px-4 py-3 text-[13px] mut">يوم بلا حركات — الرصيد بقي&nbsp;${bals(d.end)}</div></article>`;
+    const rows = d.rows.map(e => {
+      const p = partnerOf(e), g = e.link_group ? groups.get(e.link_group) : null;
+      const style = g != null ? ` style="--lk-bg:${LK_BG[g]};--lk-ink:${LK_INK[g]}"` : '';
+      const chip = p ? `<span class="cr-chip" style="color:${LK_INK[g]}" role="button" tabindex="0" onclick="event.stopPropagation();crGoTo('${p.id}')" onkeydown="if(event.key==='Enter'){event.stopPropagation();crGoTo('${p.id}')}" title="انتقل إلى الحركة المربوطة"><span class="material-symbols-outlined ms">link</span>${esc((p.operation_type || '').slice(0, 26))} · ${esc(crDayLabel(new Date(p.created_at)))}</span>` : '';
+      const money = `<b class="n ${e.direction === 'in' ? 'in' : 'out'}">${e.direction === 'in' ? '+' : '−'}${fmt(e.amount)}</b>${curTag(e.currency)}`;
+      const hay = [e.operation_type, gmCashNote(e), crSource(e), fmt(e.amount), e.staff && e.staff.full_name].join(' ').toLowerCase();
+      return `<tr id="r-${e.id}" class="${g != null ? 'lk' : ''}${CR.focus === e.id ? ' cr-focus' : ''}"${style} data-dir="${e.direction}" data-linked="${e.link_group ? 1 : 0}" data-q="${esc(hay)}" onclick="crOpen('${e.id}')">
+        <td class="c-t n mut">${pad(new Date(e.created_at).getHours())}:${pad(new Date(e.created_at).getMinutes())}</td>
+        <td><div class="font-semibold">${esc(e.operation_type)}${chip}</div>${gmCashNote(e) ? `<div class="text-[11.5px] mut">${esc(gmCashNote(e))}</div>` : ''}</td>
+        <td class="c-src"><span class="cr-src">${crSource(e)}</span></td>
+        <td class="c-n c-amt">${e.direction === 'in' ? money : ''}</td>
+        <td class="c-n c-amt hidden lg:table-cell">${e.direction === 'out' ? money : ''}</td>
+        <td class="c-n c-bal n">${fmt(e._bal)}${curTag(e.currency)}</td>
+        <td class="cr-acts" onclick="event.stopPropagation()"><button type="button" class="cr-ib" onclick="crOpen('${e.id}')" aria-label="فتح الحركة في يومها" title="فتح في يومها"><span class="material-symbols-outlined ms">open_in_new</span></button>
+          <button type="button" class="cr-ib" onclick="crOpenLink('${e.id}')" aria-label="ربط الحركة" title="ربط"><span class="material-symbols-outlined ms">link</span></button></td>
+      </tr>`;
+    }).join('');
+    return `<article class="cr-day glass" data-day="${d.key}">
+      <aside class="cr-side gold-glass">
+        <div class="flex items-center gap-3">${cal}<div><b class="text-[16px]">${WEEK[d.date.getDay()]}</b><div class="text-[12px] mut">${crCount(d.rows.length)}</div></div></div>
+        <div class="cr-kv"><span class="mut">أول اليوم</span><span>${bals(d.start)}</span></div>
+        <div class="cr-kv"><span class="mut">داخل</span><span>${kvs(d.tin, 'in', '+ ')}</span></div>
+        <div class="cr-kv"><span class="mut">صادر</span><span>${kvs(d.tout, 'out', '− ')}</span></div>
+        <div class="cr-close"><div><span class="text-[12.5px]">آخر اليوم</span><span>${bals(d.end)}</span></div></div>
+      </aside>
+      <table class="cr-tbl"><thead><tr><th>الوقت</th><th>العملية</th><th class="c-src">المصدر</th><th class="c-n">داخل</th><th class="c-n">صادر</th><th class="c-n">الرصيد بعدها</th><th><span class="sr-only">إجراءات</span></th></tr></thead>
+      <tbody>${rows}</tbody></table></article>`;
+  }).join('');
+  // the out column only exists on computers; on the phone the amount column carries both
+  document.querySelectorAll('.cr-tbl tbody tr').forEach(tr => {
+    const tds = tr.querySelectorAll('td.c-amt');
+    if (!window.matchMedia('(min-width:1024px)').matches && tds[0] && !tds[0].innerHTML.trim()) tds[0].innerHTML = tds[1].innerHTML;
+  });
+  crApplyFilter();
+}
+
+function crApplyFilter() {
+  const q = (document.getElementById('crQ').value || '').trim().toLowerCase();
+  document.querySelectorAll('.cr-tbl tbody tr').forEach(tr => {
+    const f = CR.filter;
+    const ok = (f === 'all' || (f === 'linked' && tr.dataset.linked === '1') || tr.dataset.dir === f) && (!q || tr.dataset.q.includes(q));
+    tr.style.display = ok ? '' : 'none';
+  });
+  // a day whose rows are all hidden folds away while filtering (balances stay those of the whole day)
+  document.querySelectorAll('article.cr-day').forEach(a => {
+    const trs = a.querySelectorAll('.cr-tbl tbody tr');
+    const any = !trs.length ? CR.filter === 'all' && !q : [...trs].some(t => t.style.display !== 'none');
+    a.style.display = any ? '' : 'none';
+  });
+}
+document.querySelector('.cr-seg').addEventListener('click', ev => {
+  const b = ev.target.closest('button[data-f]'); if (!b) return;
+  CR.filter = b.dataset.f;
+  document.querySelectorAll('.cr-seg button').forEach(x => x.setAttribute('aria-pressed', String(x === b)));
+  crApplyFilter();
+});
+document.getElementById('crQ').addEventListener('input', crApplyFilter);
+
+// jump to the linked partner: in this statement if it's in the period, otherwise its own day
+function crGoTo(id) {
+  const tr = document.getElementById('r-' + id);
+  if (tr) {
+    if (tr.style.display === 'none') { CR.filter = 'all'; document.getElementById('crQ').value = ''; document.querySelectorAll('.cr-seg button').forEach(x => x.setAttribute('aria-pressed', String(x.dataset.f === 'all'))); crApplyFilter(); }
+    document.querySelectorAll('tr.cr-focus').forEach(t => t.classList.remove('cr-focus'));
+    tr.classList.add('cr-focus'); CR.focus = id;
+    tr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+  crOpen(id);
+}
+// a movement opens in its own day on the daily page (edit, open its document, print)
+function crOpen(id) {
+  const e = CR.all.find(x => x.id === id); if (!e) return;
+  location.href = 'daily-cashbox-ar.html?date=' + dayKey(new Date(e.created_at)) + '&entry=' + encodeURIComponent(id);
+}
+
+// ---- linking (only link_group changes; same rule as the daily page) ----
+function crOpenLink(id) {
+  const e = CR.all.find(x => x.id === id); if (!e) return;
+  CR.linkFor = e;
+  document.getElementById('crLinkWhat').textContent = (e.direction === 'in' ? 'داخل' : 'صادر') + ' — ' + (e.operation_type || '') + ' — ' + fmt(e.amount) + ' ' + e.currency + ' · ' + crDayLabel(new Date(e.created_at));
+  const partner = e.link_group ? CR.all.find(x => x.id !== e.id && x.link_group === e.link_group) : null;
+  const sel = document.getElementById('crLinkSel');
+  sel.innerHTML = '<option value="">بدون ربط</option>' + CR.range.filter(x => x.id !== e.id).map(x =>
+    `<option value="${x.id}">${esc(crDayLabel(new Date(x.created_at)))} · ${x.direction === 'in' ? 'داخل' : 'صادر'} — ${esc(x.operation_type)} — ${fmt(x.amount)} ${esc(x.currency)}</option>`).join('');
+  if (partner && !CR.range.some(x => x.id === partner.id)) sel.insertAdjacentHTML('beforeend', `<option value="${partner.id}">(خارج الفترة) ${esc(partner.operation_type)} — ${fmt(partner.amount)} ${esc(partner.currency)}</option>`);
+  sel.value = partner ? partner.id : '';
+  document.getElementById('crLinkErr').classList.add('hidden');
+  const m = document.getElementById('crLinkModal'); m.classList.remove('hidden'); m.classList.add('flex'); sel.focus();
+}
+function crCloseLink() { const m = document.getElementById('crLinkModal'); m.classList.add('hidden'); m.classList.remove('flex'); CR.linkFor = null; }
+document.getElementById('crLinkModal').addEventListener('keydown', ev => { if (ev.key === 'Escape') crCloseLink(); });
+async function crSaveLink() {
+  const e = CR.linkFor; if (!e) return;
+  const err = document.getElementById('crLinkErr'); err.classList.add('hidden');
+  const targetId = document.getElementById('crLinkSel').value;
+  const tbl = () => goldmindClient.from('daily_cash_log');
+  let res;
+  if (!targetId) res = await tbl().update({ link_group: null }).eq('id', e.id);
+  else {
+    const t = CR.all.find(x => x.id === targetId);
+    const group = e.link_group || (t && t.link_group) || ('lnk_' + e.id.slice(0, 8));
+    if (!e.link_group) res = await tbl().update({ link_group: group }).eq('id', e.id);
+    if (!res || !res.error) res = t && t.link_group && t.link_group !== group
+      ? await tbl().update({ link_group: group }).eq('store_id', GOLDMIND_STORE_ID).eq('link_group', t.link_group)
+      : await tbl().update({ link_group: group }).eq('id', targetId);
+  }
+  if (res && res.error) { err.textContent = 'تعذّر الحفظ: ' + res.error.message; err.classList.remove('hidden'); return; }
+  CR.focus = e.id;
+  crCloseLink();
+  await crLoad();
+  const tr = document.getElementById('r-' + e.id); if (tr) tr.scrollIntoView({ block: 'center' });
+}
+
+function crPrint() { window.open('daily-cashbox-print-ar.html?from=' + dayKey(CR.from) + '&to=' + dayKey(CR.to), '_blank'); }
+
+function crParse(s) { const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(s || ''); return m ? new Date(+m[1], +m[2] - 1, +m[3]) : null; }
+function crGo() {
+  const f = crParse(document.getElementById('crFrom').value), t = crParse(document.getElementById('crTo').value);
+  const msg = document.getElementById('crMsg');
+  if (!f || !t) { msg.textContent = 'حدّد تاريخ البداية والنهاية.'; msg.classList.remove('hidden'); return; }
+  if (f > t) { msg.textContent = 'تاريخ البداية يجب أن يكون قبل تاريخ النهاية.'; msg.classList.remove('hidden'); return; }
+  if ((t - f) / 864e5 > 400) { msg.textContent = 'أقصى فترة سنة تقريباً (400 يوم).'; msg.classList.remove('hidden'); return; }
+  msg.classList.add('hidden');
+  history.replaceState(null, '', '?from=' + dayKey(f) + '&to=' + dayKey(t));
+  CR.from = f; CR.to = t;
+  return crLoad();
+}
+
+async function crLoad() {
+  // everything up to the end of the period, in pages of 1000 (the opening balance needs the earlier rows)
+  const toEx = new Date(CR.to); toEx.setDate(toEx.getDate() + 1);
+  const page = async cols => {
+    const all = [];
+    for (let i = 0; ; i += 1000) {
+      const r = await goldmindClient.from('daily_cash_log').select(cols).eq('store_id', GOLDMIND_STORE_ID)
+        .lt('created_at', toEx.toISOString()).order('created_at', { ascending: true }).order('id').range(i, i + 999);
+      if (r.error) return r;
+      all.push(...(r.data || []));
+      if (!r.data || r.data.length < 1000) return { data: all, error: null };
+    }
+  };
+  let { data, error } = await page('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id, trader_movement_id, cd:customer_debts!customer_debts_cash_movement_id_fkey(customer_id))');
+  if (error) ({ data, error } = await page('*, staff:created_by(full_name), cm:cash_movement_id(invoice_id)'));
+  if (error) { const m = document.getElementById('crMsg'); m.textContent = 'تعذّر التحميل: ' + error.message; m.classList.remove('hidden'); return; }
+  CR.all = data || [];
+  crRender();
+}
+
+(async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const { data: me } = await goldmindClient.from('staff').select('permissions, role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const p = (me && me.permissions) || {};
+  const ok = me && (me.role === 'owner' || (p.manage_daily_cashbox === true && p.view_past_cashbox === true));
+  if (!ok) { ['crBar', 'crSummary', 'crHint', 'crDays'].forEach(id => document.getElementById(id).classList.add('hidden')); document.getElementById('crNoAccess').classList.remove('hidden'); return; }
+  const qs = new URLSearchParams(location.search);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  CR.from = crParse(qs.get('from')) || new Date(today.getFullYear(), today.getMonth(), 1);
+  CR.to = crParse(qs.get('to')) || today;
+  if (CR.from > CR.to) [CR.from, CR.to] = [CR.to, CR.from];
+  document.getElementById('crFrom').value = dayKey(CR.from);
+  document.getElementById('crTo').value = dayKey(CR.to);
+  await crLoad();
+})();
+</script>
+<script>
+if ('serviceWorker' in navigator) window.addEventListener('load', () => navigator.serviceWorker.register('service-worker.js').catch(() => {}));
+</script>
+</body></html>
