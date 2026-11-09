@@ -49,6 +49,15 @@ public class GMUhfPlugin extends Plugin {
     // the main thread still crashes normally. Upgrade path: fix the SDK cause the page reports.
     private static volatile String bgCrash = "";
 
+    /** A readable reason: the SDK often throws with a null message but a vendor message / class name. */
+    static String why(Throwable e) {
+        String m = e.getMessage();
+        try { Object v = e.getClass().getMethod("getVendorMessage").invoke(e); if (v != null && !String.valueOf(v).isEmpty()) m = (m == null ? "" : m + " — ") + v; } catch (Throwable ignored) {}
+        try { Object v = e.getClass().getMethod("getResults").invoke(e); if (v != null) m = (m == null ? "" : m + " — ") + v; } catch (Throwable ignored) {}
+        if (m == null || m.isEmpty() || "null".equals(m)) m = "لم تستجب الملصقة (" + e.getClass().getSimpleName() + ") — ثبّت الملصقة أمام الجهاز وأعد المحاولة";
+        return m;
+    }
+
     @Override
     public void load() {
         instance = this;
@@ -174,7 +183,7 @@ public class GMUhfPlugin extends Plugin {
             else { power(c, 10); epc = epcOf(call("inventorySingleTag", new Class<?>[]{})); }
             if (epc == null || epc.isEmpty()) { c.reject("لم تُقرأ أي شريحة — قرّب الملصقة من الجهاز"); return; }
             JSObject o = new JSObject(); o.put("epc", epc); c.resolve(o);
-        } catch (Throwable e) { c.reject("تعذّرت القراءة: " + e.getMessage()); }
+        } catch (Throwable e) { c.reject("تعذّرت القراءة: " + why(e)); }
     }
 
     @PluginMethod
@@ -195,7 +204,7 @@ public class GMUhfPlugin extends Plugin {
             String now = epcOf(call("inventorySingleTag", new Class<?>[]{}));
             if (now == null || !now.startsWith(epc)) { c.reject("كُتبت الشريحة لكن تعذّر التحقق منها — أعد المحاولة"); return; }
             JSObject o = new JSObject(); o.put("oldEpc", old); o.put("epc", now); c.resolve(o);
-        } catch (Throwable e) { c.reject("تعذّرت الكتابة: " + e.getMessage()); }
+        } catch (Throwable e) { c.reject("تعذّرت الكتابة: " + why(e)); }
     }
 
     @PluginMethod
@@ -234,7 +243,7 @@ public class GMUhfPlugin extends Plugin {
             });
             loop.start();
             c.resolve();
-        } catch (Throwable e) { c.reject("تعذّر بدء القراءة: " + e.getMessage()); }
+        } catch (Throwable e) { c.reject("تعذّر بدء القراءة: " + why(e)); }
     }
 
     @PluginMethod

@@ -36,7 +36,7 @@ final class ZebraRfd implements RfidSled {
     private RFIDReader reader;
     private TriggerSink trigger;
     private volatile TagSink sink;
-    private volatile AtomicReference<String> single;
+    private volatile java.util.concurrent.ConcurrentHashMap<String, Integer> single; // readOne: EPC -> best RSSI
     private int[] powerLevels; // dBm x 10, by index
     private String deviceName = "";
     private volatile String lastError = "";
@@ -59,8 +59,8 @@ final class ZebraRfd implements RfidSled {
             for (TagData t : tags) {
                 String epc = clean(t.getTagID());
                 if (epc == null || epc.isEmpty()) continue;
-                AtomicReference<String> one = single;
-                if (one != null) { one.compareAndSet(null, epc); continue; }
+                java.util.concurrent.ConcurrentHashMap<String, Integer> one = single;
+                if (one != null) { one.merge(epc, (int) t.getPeakRSSI(), Math::max); continue; }
                 TagSink s = sink;
                 if (s != null) s.onTag(epc, t.getPeakRSSI());
             }
@@ -135,22 +135,25 @@ final class ZebraRfd implements RfidSled {
     public String readOne(int powerDbm) throws Exception {
         if (reader == null) return null;
         setPower(powerDbm);
-        AtomicReference<String> got = new AtomicReference<>(null);
+        // the strongest label wins (the one held against the sled), not merely the first one heard
+        java.util.concurrent.ConcurrentHashMap<String, Integer> got = new java.util.concurrent.ConcurrentHashMap<>();
         single = got;
         try {
             reader.Actions.Inventory.perform();
-            for (int i = 0; i < 30 && got.get() == null; i++) Thread.sleep(50); // up to 1.5 s
+            for (int i = 0; i < 30 && got.isEmpty(); i++) Thread.sleep(50); // up to 1.5 s for a first label
+            if (!got.isEmpty()) Thread.sleep(400);                          // then a moment to compare
             reader.Actions.Inventory.stop();
         } finally {
             single = null;
         }
-        return got.get();
+        String best = null; int rssi = Integer.MIN_VALUE;
+        for (java.util.Map.Entry<String, Integer> en : got.entrySet()) if (en.getValue() > rssi) { rssi = en.getValue(); best = en.getKey(); }
+        return best;
     }
 
     @Override
     public boolean writeEpc(String oldEpc, String newEpc, int powerDbm) throws Exception {
         if (reader == null) return false;
-        setPower(powerDbm);
         TagAccess.WriteAccessParams p = reader.Actions.TagAccess.new WriteAccessParams();
         p.setMemoryBank(MEMORY_BANK.MEMORY_BANK_EPC);
         p.setOffset(2);                       // words: after CRC + PC
@@ -158,8 +161,15 @@ final class ZebraRfd implements RfidSled {
         p.setWriteDataLength(newEpc.length() / 4); // in 16-bit words
         p.setAccessPassword(0);
         p.setWriteRetries(3);
-        reader.Actions.TagAccess.writeWait(oldEpc, p, null, null);
-        return true;
+        // writing needs more power than reading; the write is addressed to oldEpc only, so a stronger
+        // field can't touch the neighbours. Try a bit above the read power, then the sled's maximum.
+        int[] tries = { powerDbm <= 0 ? 0 : Math.min(powerDbm + 6, 30), 0 };
+        Exception last = null;
+        for (int pw : tries) {
+            try { setPower(pw); reader.Actions.TagAccess.writeWait(oldEpc, p, null, null); return true; }
+            catch (Exception e) { last = e; }
+        }
+        throw last;
     }
 
     @Override
