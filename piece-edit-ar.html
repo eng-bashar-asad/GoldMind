@@ -913,7 +913,18 @@ document.getElementById('delete-btn').addEventListener('click', async () => {
   btn.disabled = false;
   btn.textContent = 'حذف القطعة';
 
-  if (error) { showMessage('تعذّر الحذف: ' + error.message, true); return; }
+  if (error) {
+    // the piece is referenced by history that must stay (sale, trader voucher, gift, stock voucher, count)
+    const m = String(error.message || ''), FK = {
+      invoice_items: 'القطعة مسجّلة في فاتورة — ألغِ الفاتورة أولاً بدل حذف القطعة.',
+      trader_movements: 'القطعة مسجّلة في حركات تاجر — أرجعها من صفحة سجل حركات التاجر.',
+      inventory_gifts: 'القطعة مسجّلة كهدية — لا يمكن حذفها.',
+      stock_voucher_lines: 'القطعة مسجّلة في سند إخراج/إدخال بضاعة — لا يمكن حذفها.',
+      inventory_count_scans: 'القطعة ظهرت في جرد سابق، ولا يمكن حذفها حالياً. غيّر حالتها بدل الحذف، أو تواصل مع الدعم الفني.'
+    };
+    const k = Object.keys(FK).find(t => m.includes('"' + t + '"'));
+    showMessage(k ? 'تعذّر الحذف: ' + FK[k] : 'تعذّر الحذف: ' + m, true); return;
+  }
 
   window.location.href = 'inventory-list-ar.html';
 });
