@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict avvT25cEhbxdXnqbFXTdvM8OwZGApAOvGtxM30Vdz4vAU1zwHrQ2aVmmm54ihsE
+\restrict dX4kee2SipKv0QqBe3QvcIJsZDsM1duySXMgRUT5bxsVtFpQHYCDDhdd7MyGBO7
 
 
 SET statement_timeout = 0;
@@ -10039,7 +10039,7 @@ ALTER TABLE ONLY public.inventory_count_scans
 --
 
 ALTER TABLE ONLY public.inventory_count_scans
-    ADD CONSTRAINT inventory_count_scans_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id);
+    ADD CONSTRAINT inventory_count_scans_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id) ON DELETE SET NULL;
 
 
 --
@@ -10487,7 +10487,7 @@ ALTER TABLE ONLY public.repair_tickets
 --
 
 ALTER TABLE ONLY public.rfid_write_jobs
-    ADD CONSTRAINT rfid_write_jobs_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id);
+    ADD CONSTRAINT rfid_write_jobs_piece_id_fkey FOREIGN KEY (piece_id) REFERENCES public.pieces(id) ON DELETE CASCADE;
 
 
 --
@@ -14366,5 +14366,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict avvT25cEhbxdXnqbFXTdvM8OwZGApAOvGtxM30Vdz4vAU1zwHrQ2aVmmm54ihsE
+\unrestrict dX4kee2SipKv0QqBe3QvcIJsZDsM1duySXMgRUT5bxsVtFpQHYCDDhdd7MyGBO7
 
