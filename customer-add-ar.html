@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=55"></script>
-<script src="theme.js?v=84"></script>
+<script src="theme.js?v=85"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -319,7 +319,7 @@
 
 <!-- Save Button -->
 <div class="pt-4 cf-save">
-<button id="save-btn" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold text-body-md shadow-md active:scale-[0.98] transition-all hover:brightness-110">
+<button id="save-btn" class="gm-cta w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold text-body-md shadow-md active:scale-[0.98] transition-all hover:brightness-110">
     حفظ العميل
 </button>
 <button type="button" id="save-sell-btn" class="h-14 rounded-lg border border-outline-variant font-bold text-[14px] bg-surface-container-lowest" onclick="window.__cfSell = true; saveBtn.click();">حفظ وبيع</button>
@@ -349,6 +349,9 @@
             select.appendChild(opt);
         });
         select.value = GOLDMIND_DEFAULT_PHONE_CODE;
+        // open on the code of the store's country (the store id is known only after sign-in finishes)
+        (async function () { try { for (let i = 0; !GOLDMIND_STORE_ID && i < 50; i++) await new Promise(r => setTimeout(r, 200)); if (!GOLDMIND_STORE_ID) return; const { data } = await goldmindClient.from('stores').select('country').eq('id', GOLDMIND_STORE_ID).maybeSingle(); const c = data && GOLDMIND_COUNTRY_PHONE_MAP[data.country]; if (c && !select.dataset.touched) select.value = c; } catch (e) {} })();
+        select.addEventListener('change', function () { select.dataset.touched = '1'; });
     }
     const phoneCodeSelect = document.getElementById('company-phone-code');
     populatePhoneCodeSelect(phoneCodeSelect);
@@ -519,7 +522,7 @@
         if (sameTrader && sameTrader.length) {
             saveBtn.disabled = false;
             saveBtn.textContent = 'حفظ العميل';
-            showMessage('«' + sameTrader[0].name + '» مسجّل كتاجر — سجّل دفعاته وحركاته من حساب التاجر بدل إضافته كزبون.', true);
+            showMessage('«' + sameTrader[0].name + '» مسجّل كتاجر — سجّل دفعاته وحركاته من حساب التاجر بدل إضافته كعميل.', true);
             messageBox.insertAdjacentHTML('beforeend', ' <a class="underline font-bold" href="ledger-ar.html?trader=' + encodeURIComponent(sameTrader[0].id) + '">فتح حساب التاجر</a>');
             return;
         }

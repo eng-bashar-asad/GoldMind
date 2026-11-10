@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=55"></script>
-<script src="theme.js?v=84"></script>
+<script src="theme.js?v=85"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -547,7 +547,7 @@
 </details>
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
-<button id="save-btn" type="button" class="w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md active:scale-[0.98] transition-all mt-2">
+<button id="save-btn" type="button" class="gm-cta w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md active:scale-[0.98] transition-all mt-2">
     حفظ البيانات
 </button>
 
@@ -1253,5 +1253,41 @@ if ('serviceWorker' in navigator) {
     navigator.serviceWorker.register('service-worker.js').catch(() => {});
   });
 }
+</script>
+
+<script>
+// the 15 sections as 5 tabs; each tab shows its sections open. One save button, fixed at the bottom.
+(function () {
+  const TABS = [['basic', 'الأساسية', 'storefront'], ['invoice', 'الفواتير والضريبة', 'receipt_long'], ['pieces', 'القطع والأسعار', 'diamond'], ['labels', 'الملصقات والأجهزة', 'qr_code_2'], ['security', 'الأمان', 'fingerprint']];
+  const MAP = { 'ترقيم الفواتير': 'invoice', 'أجرة المصنعية': 'pieces', 'معادلة المصنعية': 'labels', 'مصمم ملصق': 'labels', 'أنواع وتصنيفات': 'pieces', 'ترقيم القطع': 'pieces',
+    'بيانات التواصل': 'basic', 'أشخاص التواصل': 'basic', 'بيانات المنشأة': 'basic', 'البيانات القانونية': 'basic', 'الفوترة الإلكترونية': 'invoice', 'الألماس': 'pieces',
+    'الجرد بـ RFID': 'labels', 'تنبيه الديون': 'invoice', 'الدخول بالبصمة': 'security' };
+  const first = document.querySelector('details.group'); if (!first) return;
+  const box = first.parentElement, kids = [...box.children];
+  const tabOf = el => {
+    if (el.tagName !== 'DETAILS') return el.querySelector('#save-btn') || el.id === 'save-btn' || el.id === 'save-message' ? 'all' : 'basic';
+    const t = (el.querySelector('summary') || el).textContent;
+    const k = Object.keys(MAP).find(x => t.includes(x)); return k ? MAP[k] : 'basic';
+  };
+  kids.forEach(el => { el.dataset.cfTab = tabOf(el); });
+  const bar = document.createElement('div');
+  bar.className = 'cf-tabs';
+  bar.setAttribute('role', 'tablist');
+  bar.innerHTML = TABS.map(([k, n, ic]) => `<button type="button" role="tab" data-k="${k}"><span class="material-symbols-outlined" aria-hidden="true">${ic}</span>${n}</button>`).join('');
+  box.parentElement.insertBefore(bar, box);
+  const show = k => {
+    bar.querySelectorAll('button').forEach(b => b.setAttribute('aria-selected', String(b.dataset.k === k)));
+    kids.forEach(el => { const t = el.dataset.cfTab; el.style.display = (t === k || t === 'all') ? '' : 'none'; if (t === k && el.tagName === 'DETAILS') el.open = true; });
+  };
+  bar.addEventListener('click', e => { const b = e.target.closest('button[data-k]'); if (b) show(b.dataset.k); });
+  show('basic');
+  const st = document.createElement('style');
+  st.textContent = '.cf-tabs{display:flex;gap:6px;overflow-x:auto;padding:4px;margin-bottom:14px;border-radius:999px;background:rgba(255,255,255,.7);border:1px solid #E3DCCB;position:sticky;top:60px;z-index:20;-webkit-backdrop-filter:blur(10px);backdrop-filter:blur(10px)}'
+    + '.cf-tabs button{flex:1 0 auto;display:inline-flex;align-items:center;justify-content:center;gap:6px;height:42px;padding:0 14px;border-radius:999px;font-weight:700;font-size:13px;color:#6B6150;white-space:nowrap}'
+    + '.cf-tabs button .material-symbols-outlined{font-size:18px}'
+    + '.cf-tabs button[aria-selected="true"]{background:#1C1A16;color:#FBF8F1}'
+    + '#save-btn{position:sticky;bottom:84px;z-index:20}@media(min-width:1024px){#save-btn{bottom:16px}}';
+  document.head.appendChild(st);
+})();
 </script>
 </body></html>

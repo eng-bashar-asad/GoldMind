@@ -16,7 +16,7 @@ test('search result opens its own day and highlights the entry', async ({ page }
   } });
   await page.goto('/daily-cashbox-ar.html');
   await page.waitForFunction(() => typeof allEntries !== 'undefined' && allEntries.length === 2);
-  await page.locator('button', { hasText: 'بحث بالحركات' }).click();
+  await page.locator('#dcSearchBtn').click();
   await page.fill('#searchKeywordInput', 'أحمد');
   await page.locator('#searchPanel button', { hasText: 'بحث' }).click();
   const result = page.locator('#searchResults a').first();

@@ -15,6 +15,7 @@ test('voucher edit form lists each piece with its barcode and photo', async ({ p
         weight_grams: 9.21, accounting_weight_grams: 9.21, karat: 18, gold_24k_equivalent: 6.91, fab_fee_per_gram: 10, fab_fee_amount: 92.1, created_at: ago(2) },
     ],
   } });
+  await page.addInitScript(() => { window.ldCards = true; }); // movement cards open (on the computer they start folded under the statement)
   await page.goto('/ledger-ar.html?trader=t1');
   await page.locator('button', { hasText: 'تعديل' }).first().click();
   const form = page.locator('#edit-batch-form-b1');
@@ -39,6 +40,7 @@ test('voucher edit: «إرجاع للمخزن» returns one piece and keeps the 
     ],
   }, rpc: { trader_return_piece: (b) => { asked.push(b); return { body: { ok: true, barcode: '000713' } }; } } });
   page.on('dialog', d => d.accept());
+  await page.addInitScript(() => { window.ldCards = true; }); // movement cards open (on the computer they start folded under the statement)
   await page.goto('/ledger-ar.html?trader=t1');
   await page.locator('button', { hasText: 'تعديل' }).first().click();
   const form = page.locator('#edit-batch-form-b1');
@@ -62,6 +64,7 @@ test('single give-out row: «إرجاع للمخزن» returns the piece on its 
     ],
   }, rpc: { trader_return_piece: (b) => { asked.push(b); return { body: { ok: true } }; } } });
   page.on('dialog', d => { expect(d.message()).toContain('000729'); d.accept(); });
+  await page.addInitScript(() => { window.ldCards = true; }); // movement cards open (on the computer they start folded under the statement)
   await page.goto('/ledger-ar.html?trader=t1');
   await page.locator('button', { hasText: 'إرجاع للمخزن' }).first().click();
   await expect.poll(() => asked.length).toBe(1);

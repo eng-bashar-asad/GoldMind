@@ -21,7 +21,7 @@ function setup(page, { owner, branches = 1 }) {
 test('owner edits organization data and it is saved to the organization', async ({ page }) => {
   const calls = await setup(page, { owner: true });
   await page.goto('/company-settings-ar.html');
-  await page.locator('#org-section summary').click();
+  await page.locator('#org-section').evaluate(d => { d.open = true; }); // settings tabs open their sections already
   await expect(page.locator('#store-tax')).toHaveValue('100099655000003'); // from the organization, not the store copy
   await expect(page.locator('#store-emirate')).toHaveValue('SHJ');
   await expect(page.locator('#org-readonly-note')).toHaveClass(/\bhidden\b/);
@@ -39,7 +39,7 @@ test('owner edits organization data and it is saved to the organization', async 
 test('non-owner sees organization data read-only; branch emirate shows with several branches', async ({ page }) => {
   const calls = await setup(page, { owner: false, branches: 2 });
   await page.goto('/company-settings-ar.html');
-  await page.locator('#org-section summary').click();
+  await page.locator('#org-section').evaluate(d => { d.open = true; }); // settings tabs open their sections already
   await expect(page.locator('#org-readonly-note')).not.toHaveClass(/\bhidden\b/);
   await expect(page.locator('#store-tax')).toBeDisabled();
   await expect(page.locator('#branch-emirate-wrap')).not.toHaveClass(/\bhidden\b/);

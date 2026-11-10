@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=55"></script>
-<script src="theme.js?v=84"></script>
+<script src="theme.js?v=85"></script>
 <script src="gm-profit.js?v=7"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -115,7 +115,7 @@
 
 <!-- Customer detail -->
 <div id="customer-detail-view" class="hidden py-6 flex flex-col gap-4">
-<a id="backToCustomers" href="customers-ar.html" class="text-[12px] text-secondary font-semibold self-start">→ كل الزبائن</a>
+<a id="backToCustomers" href="customers-ar.html" class="text-[12px] text-secondary font-semibold self-start">→ كل العملاء</a>
 
 <!-- computer (approved design "DCustomer"): one header row with the balances, a compact action bar -->
 <div id="cdHead" class="cd-pc cd-wide">
@@ -127,7 +127,7 @@
 </div>
 </div>
 <div id="cdBar" class="cd-pc cd-wide" role="toolbar" aria-label="عمليات الحساب">
-<button type="button" class="cd-act cd-dark" onclick="toggleSettleForm()"><span class="material-symbols-outlined">payments</span>دفعة من الزبون</button>
+<button type="button" class="cd-act cd-dark" onclick="toggleSettleForm()"><span class="material-symbols-outlined">payments</span>دفعة من العميل</button>
 <button type="button" class="cd-act" onclick="toggleCashOutForm()"><span class="material-symbols-outlined">output</span>صرف مبلغ</button>
 <button type="button" class="cd-act" onclick="toggleDiscountForm()"><span class="material-symbols-outlined">sell</span>خصم على الدين</button>
 <a class="cd-act" id="cdDepositLink" href="deposits-ar.html"><span class="material-symbols-outlined">bookmark_added</span>سند عربون</a>
@@ -224,7 +224,7 @@
 </button>
 </div>
 <button type="button" onclick="gmPartyProfitPopup('customer', currentCustomerId, document.getElementById('detail-customer-name').textContent)" class="gm-profit-btn cd-phone w-full h-11 border rounded-xl items-center justify-center gap-2 text-[13px] font-semibold" style="color:#3F6B47;border-color:#3F6B47">
-<span class="material-symbols-outlined text-[18px]">trending_up</span> أرباحي مع هذا الزبون
+<span class="material-symbols-outlined text-[18px]">trending_up</span> أرباحي مع هذا العميل
 </button>
 <a id="printStatementLink" href="#" target="_blank" class="cd-phone w-full h-11 border border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
 <span class="material-symbols-outlined text-[18px]">print</span> طباعة كشف حساب
@@ -519,7 +519,7 @@ const ORG_BRANCHES = {}; // id -> {name, can_open_invoices}
 // another branch of the organization: its name, and whether this user may open its invoices
 const otherBranch = sid => sid && sid !== GOLDMIND_STORE_ID ? (ORG_BRANCHES[sid] || { name: 'فرع آخر', can_open_invoices: false }) : null;
 const branchTag = sid => { const b = otherBranch(sid); return b ? `<span class="text-[11px] text-on-surface-variant mr-1">(${gmEscapeHtml(b.name || 'فرع آخر')})</span>` : ''; };
-const INV_TYPE = { sale: 'فاتورة بيع', return: 'مرتجع مبيعات', buyRetail: 'شراء من الزبون', buyTrader: 'فاتورة شراء' };
+const INV_TYPE = { sale: 'فاتورة بيع', return: 'مرتجع مبيعات', buyRetail: 'شراء من العميل', buyTrader: 'فاتورة شراء' };
 const PAY_LABEL = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'دفعة جزئية' };
 async function gmLoadCustomerInvoices(customerId) {
   if (!invoicesByCustomer[customerId]) {

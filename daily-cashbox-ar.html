@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=55"></script>
-<script src="theme.js?v=84"></script>
+<script src="theme.js?v=85"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -37,6 +37,12 @@
     .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
 .dc-entered-btn{color:#6B6150;border-radius:999px;padding:2px 8px}
 .dc-entered-btn[aria-pressed="true"]{color:#8A6A1C;background:rgba(212,175,55,.16)}
+/* the five actions as one row of icon buttons on the phone; on the computer they stay a column */
+@media (max-width:1023px){ .dc-actions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+  .dc-actions>button{height:64px!important;flex-direction:column;gap:2px!important;font-size:11px;padding:0 2px;min-width:0;overflow:hidden;border-width:1px!important;border-radius:14px!important}
+  .dc-actions>button#dcCountBtn{display:flex} }
+@media (min-width:1024px){ .dc-actions{display:flex;flex-direction:column;gap:12px} }
+#cashbox-table tr[data-src="man"] .dc-src{display:none}
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <style>
@@ -232,25 +238,27 @@
 <option value="">بدون ربط</option>
 </select>
 </div>
-<button onclick="submitEntry()" id="submitBtn" class="w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ العملية</button>
+<button onclick="submitEntry()" id="submitBtn" class="gm-cta w-full h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">حفظ العملية</button>
 <p class="text-error text-[12px] hidden mt-2" id="addFormError"></p>
 </div>
 
+<div class="dc-actions">
 <button onclick="toggleReportPanel()" class="w-full h-12 bg-secondary text-on-secondary rounded-xl flex items-center justify-center gap-2 font-semibold">
-<span class="material-symbols-outlined">share</span> إرسال جدول اليوم عبر واتساب
+<span class="material-symbols-outlined">share</span> <span>واتساب</span>
 </button>
 <button onclick="openPrintView()" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
-<span class="material-symbols-outlined">receipt_long</span> عرض كشف قابل للطباعة
+<span class="material-symbols-outlined">receipt_long</span> <span>طباعة</span>
 </button>
 <button onclick="toggleRangePanel()" id="dcRangeBtn" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
-<span class="material-symbols-outlined">date_range</span> تحميل كشف بفترة محددة
+<span class="material-symbols-outlined">date_range</span> <span>كشف بفترة</span>
 </button>
 <button onclick="dcOpenCount()" id="dcCountBtn" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
-<span class="material-symbols-outlined">calculate</span> عدّ الدرج
+<span class="material-symbols-outlined">calculate</span> <span>عدّ الدرج</span>
 </button>
 <button onclick="toggleSearchPanel()" id="dcSearchBtn" class="w-full h-12 border-2 border-outline-variant text-on-background rounded-xl flex items-center justify-center gap-2 font-semibold">
-<span class="material-symbols-outlined">search</span> بحث بالحركات
+<span class="material-symbols-outlined">search</span> <span>بحث</span>
 </button>
+</div>
 <div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="searchPanel">
 <div class="relative mb-3">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="searchKeywordInput">كلمة البحث (بالوصف أو نوع العملية)</label>
@@ -828,7 +836,7 @@ function dcSource(e) {
     const op = e.operation_type || '';
     if (op.includes('عربون')) return { kind: 'vch', label: 'عربون' };
     if (e.cm && e.cm.trader_movement_id) return { kind: 'vch', label: 'سند تاجر' };
-    if (e.cm && e.cm.cd && e.cm.cd.length) return { kind: 'vch', label: 'سند زبون' };
+    if (e.cm && e.cm.cd && e.cm.cd.length) return { kind: 'vch', label: 'سند عميل' };
     return { kind: 'vch', label: 'سند' };
   }
   return { kind: 'man', label: 'يدوي' };
@@ -925,7 +933,7 @@ async function gmLoadDaySales() {
     const total = rows.reduce((t, r) => t + Number(r.total_amount || 0), 0);
     const debt = rows.reduce((t, r) => t + Math.max(0, Number(r.total_amount || 0) - Number(r.amount_paid || 0)), 0);
     box.innerHTML = `<div class="flex justify-between font-bold text-[13px] mb-2"><span>مبيعات اليوم</span><span class="font-data-mono">${fmt(total)}</span></div>`
-      + (debt > 0.009 ? `<div class="flex justify-between text-error font-semibold mb-2"><span>منها دين على الزبائن</span><span class="font-data-mono">${fmt(debt)}</span></div>` : '')
+      + (debt > 0.009 ? `<div class="flex justify-between text-error font-semibold mb-2"><span>منها دين على العملاء</span><span class="font-data-mono">${fmt(debt)}</span></div>` : '')
       + rows.map(r => {
           const d = Number(r.total_amount || 0) - Number(r.amount_paid || 0);
           return `<a href="invoice-print-ar.html?id=${r.id}" class="flex justify-between gap-2 py-1.5 border-t border-outline-variant">

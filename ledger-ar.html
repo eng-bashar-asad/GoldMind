@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=55"></script>
-<script src="theme.js?v=84"></script>
+<script src="theme.js?v=85"></script>
 <script src="gm-profit.js?v=7"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -122,6 +122,52 @@ body.gm-no-vedit .gm-vedit{display:none!important}
 .ld-act{height:40px;border-radius:10px;border:1px solid #CBBF9E;background:#fff;font-size:13px;font-weight:700;color:#211D17;display:flex;align-items:center;justify-content:center;gap:4px;text-decoration:none}
 .ld-act.dark{background:#1C1A16;color:#FBF8F1;border-color:#1C1A16}
 .ld-kv{display:flex;justify-content:space-between;gap:8px;font-size:12.5px;padding:6px 0;border-bottom:1px solid #EFE7D2}.ld-kv:last-child{border-bottom:0}
+</style>
+<style>
+/* solid action buttons, most used first */
+.ld-ops{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.ld-ops .ld-op{height:64px;border:1px solid #E3DCCB;background:#fff;border-radius:14px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;font-size:12px;font-weight:700;color:#1C1A16;box-shadow:0 2px 6px -4px rgba(70,48,10,.3)}
+.ld-ops .ld-op:hover{border-color:#B4955A}
+.ld-ops .ld-op .material-symbols-outlined{font-size:21px}
+/* statement table */
+.ld-st{width:100%;border-collapse:collapse;font-size:13px;background:#fff;border:1px solid #E3DCCB;border-radius:14px;overflow:hidden}
+.ld-st th{font-size:11.5px;font-weight:700;color:#6B6150;text-align:right;padding:9px 10px;background:#F7F2E6;border-bottom:1px solid #E3DCCB;white-space:nowrap}
+.ld-st td{white-space:nowrap;padding:8px 10px;border-bottom:1px solid #F1EBDD;vertical-align:middle}
+.ld-st tr:last-child td{border-bottom:0}
+.ld-st .n{font-family:"Times New Roman",serif;direction:ltr;unicode-bidi:isolate;white-space:nowrap;text-align:left}
+.ld-st tbody tr{cursor:pointer}.ld-st tbody tr:hover td{background:#FDFAF2}
+.ld-st .bal{font-weight:700}
+.ld-st thead tr.grp th{background:#fff;border-bottom:0;padding-bottom:0;text-align:center;font-size:12px;color:#1C1A16}
+.ld-st th.gg,.ld-st td.g{background:#FFFBF0}.ld-st thead tr.grp th.gg{border-top:3px solid #D4A017}
+.ld-st th.gc,.ld-st td.c{background:#F7FAF5}.ld-st thead tr.grp th.gc{border-top:3px solid #3F6B47}
+.ld-st th.gb{background:#F4EFE3}.ld-st thead tr.grp th.gb{border-top:3px solid #1C1A16}
+.ld-st td.bal{background:#FBF8F1}
+.ld-st .strong{font-weight:700}
+.ld-st .sub{font-size:10.5px;color:#8a7f6a}
+.ld-dir{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:700;border-radius:999px;padding:2px 9px 2px 7px;white-space:nowrap}
+.ld-dir .material-symbols-outlined{font-size:15px}
+.ld-st tfoot td{background:#F7F2E6;border-top:2px solid #E3DCCB;font-weight:600}
+.ld-st td.desc{white-space:normal;min-width:200px}
+.ld-fin-m{display:none}
+@media (max-width:700px){.ld-fin-m{display:flex;align-items:center;gap:14px;justify-content:space-between;margin-top:8px;padding:12px 14px;border-radius:14px;background:#1C1A16;color:#F4EFE3;font-size:15px}.ld-fin-m span{font-size:12.5px;opacity:.8}.ld-fin-m .text-success{color:#7BD88F}.ld-fin-m .text-error{color:#FF9B8F}}
+@media (max-width:700px){
+ .ld-st,.ld-st tbody,.ld-st tfoot{display:block;min-width:0!important;width:100%}
+ .ld-st thead{display:none}
+ .ld-st tbody tr{display:grid;grid-template-columns:1fr 1fr;gap:2px 12px;padding:10px 12px;border-bottom:1px solid #E3DCCB}
+ .ld-st tbody td{padding:0!important;border:0!important;background:none!important;white-space:normal}
+ .ld-st tbody td:empty{display:none}
+ .ld-st tbody td.dir{grid-column:1/-1;order:-2}.ld-st tbody td.desc{grid-column:1/-1;order:-1;min-width:0;margin-bottom:4px}
+ .ld-st tbody td[data-l]::before{content:attr(data-l) ': ';font-size:11px;color:#8a7f6a;font-weight:500}
+ .ld-st tbody td.bal{border-top:1px dashed #E3DCCB!important;padding-top:4px!important;margin-top:2px}
+ .ld-st tfoot tr{display:grid;grid-template-columns:1fr 1fr 1fr;gap:4px;padding:8px 12px}
+ .ld-st tfoot td{border:0;padding:0!important}.ld-st tfoot td:empty{display:none}
+ .ld-st tfoot td[colspan="4"]{grid-column:1/-1}
+ .ld-st tfoot td[data-l]::before{content:attr(data-l);display:block;font-size:10.5px;color:#8a7f6a;font-weight:500}
+ .ld-st tfoot{display:flex;flex-direction:column}.ld-st tfoot tr:first-child{order:0}
+ .ld-st tfoot td.fin{display:none}
+}
+.ld-run{font-size:11.5px;color:#6B6150;margin-top:4px}
+@media (min-width:1024px){ #movements-list.ld-collapsed{display:none} }
 </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
@@ -372,31 +418,15 @@ function goToStatementPrint() {
 <p class="text-[10px] text-outline mt-1" id="cashDebtHint">قيمة موجبة (خضراء) = التاجر مديون للمحل. قيمة سالبة (حمراء) = المحل مديون للتاجر. الذهب دائماً بمكافئ عيار ٢٤ الصافي؛ الذهب والمصنعية دينان منفصلان تماماً.</p>
 </div>
 
-<div class="grid grid-cols-2 gap-2">
-<button onclick="toggleSettleForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
-<span class="material-symbols-outlined text-[19px]">handshake</span> تسوية / دفعة
-</button>
-<button onclick="toggleReceiveStockForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
-<span class="material-symbols-outlined text-[19px]">move_to_inbox</span> إدخال بضاعة
-</button>
-<button onclick="toggleGiveStockForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
-<span class="material-symbols-outlined text-[19px]">local_shipping</span> إخراج بضاعة
-</button>
-<button onclick="toggleTraderOpeningBalanceForm()" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
-<span class="material-symbols-outlined text-[19px]">history</span> رصيد سابق
-</button>
-<button onclick="openTraderCashForm('out')" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
-<span class="material-symbols-outlined text-[19px]">north_east</span> صرف كاش
-</button>
-<button onclick="openTraderCashForm('in')" class="h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex flex-col items-center justify-center gap-0.5 text-[12px]">
-<span class="material-symbols-outlined text-[19px]">south_west</span> قبض كاش
-</button>
-<button onclick="openTraderDiscountForm()" class="col-span-2 h-12 border-2 border-dashed border-outline-variant text-on-surface-variant rounded-xl flex items-center justify-center gap-2 text-[13px]">
-<span class="material-symbols-outlined text-[19px]">sell</span> خصم على الحساب النقدي
-</button>
-<button onclick="openTraderConvertForm()" class="col-span-2 h-12 border-2 border-dashed border-secondary text-secondary rounded-xl flex items-center justify-center gap-2 text-[13px] font-semibold">
-<span class="material-symbols-outlined text-[19px]">currency_exchange</span> تسكير عملات (تحويل رصيد الذهب إلى كاش)
-</button>
+<div class="ld-ops">
+<button onclick="toggleGiveStockForm()" class="ld-op"><span class="material-symbols-outlined" style="color:#B45309" aria-hidden="true">local_shipping</span>إخراج بضاعة</button>
+<button onclick="toggleReceiveStockForm()" class="ld-op"><span class="material-symbols-outlined" style="color:#1D4ED8" aria-hidden="true">move_to_inbox</span>إدخال بضاعة</button>
+<button onclick="toggleSettleForm()" class="ld-op"><span class="material-symbols-outlined" style="color:#15803D" aria-hidden="true">handshake</span>تسوية / دفعة</button>
+<button onclick="openTraderCashForm('in')" class="ld-op"><span class="material-symbols-outlined" style="color:#15803D" aria-hidden="true">south_west</span>قبض كاش</button>
+<button onclick="openTraderCashForm('out')" class="ld-op"><span class="material-symbols-outlined" style="color:#B3261E" aria-hidden="true">north_east</span>صرف كاش</button>
+<button onclick="openTraderDiscountForm()" class="ld-op"><span class="material-symbols-outlined" style="color:#7E22CE" aria-hidden="true">sell</span>خصم نقدي</button>
+<button onclick="toggleTraderOpeningBalanceForm()" class="ld-op"><span class="material-symbols-outlined" style="color:#6B6150" aria-hidden="true">history</span>رصيد سابق</button>
+<button onclick="openTraderConvertForm()" class="ld-op"><span class="material-symbols-outlined" style="color:#B4955A" aria-hidden="true">currency_exchange</span>تسكير عملات</button>
 </div>
 
 <!-- computer: the give-out voucher's totals, always in view while scanning (filled with #gs-preview) -->
@@ -1258,6 +1288,70 @@ function showTraderDetail(traderId) {
     }
   });
 
+  // running balances, oldest → newest (gold in 24k grams, money in the store currency); + = the trader owes us
+  // oldest first, whatever order the list came in (ties keep their list order)
+  const ldAsc = moves.map((m, i) => [m, i]).sort((x, y) => (new Date(x[0].created_at) - new Date(y[0].created_at)) || (y[1] - x[1])).map(x => x[0]);
+  const ldRun = {}; { let g = 0, f = 0;
+    ldAsc.forEach(m => { const sg = m.movement_type === 'debt_increase' ? -1 : 1; g += sg * Number(m.gold_24k_equivalent || 0); f += sg * Number(m.fab_fee_amount || 0); ldRun[m.id] = { g, f }; }); }
+  // same convention as the balance card above: green = positive, red = negative
+  const ldCls = v => v > 0.005 ? 'text-success' : v < -0.005 ? 'text-error' : '';
+  const ldBal = v => `<span class="${ldCls(v)}">${Math.abs(v) < 0.005 ? '0' : fmt(Math.abs(v)) + ' غ'}</span>`;
+  const ldMoney = v => `<span class="${ldCls(v)}">${Math.abs(v) < 0.005 ? '0' : fmtMoney(Math.abs(v))}</span>`;
+  let ldTbl = document.getElementById('ldStatement');
+  if (!ldTbl) { ldTbl = document.createElement('div'); ldTbl.id = 'ldStatement'; ldTbl.className = 'mt-4 overflow-x-auto'; ldTbl.style.gridColumn = '1 / -1'; document.getElementById('trader-detail-view').appendChild(ldTbl); }
+  // one line per voucher (a multi-piece voucher or invoice is summed); out = from the shop to the trader
+  // debt_decrease = the trader owes more (goods/cash went out to him); debt_increase = it came in from him
+  const ldDir = m => m.source === 'opening_balance' ? 'open'
+    : (m.source === 'discount' || m.source === 'gold_to_cash') ? 'adj'
+    : m.movement_type === 'debt_decrease' ? 'out' : 'in';
+  const ldGroups = [];
+  ldAsc.forEach(m => { const k = m.batch_id || m.invoice_id; const last = ldGroups[ldGroups.length - 1];
+    if (k && last && last.k === k) last.rows.push(m); else ldGroups.push({ k, rows: [m] }); });
+  const tot = { out: { g: 0, g24: 0, f: 0 }, in: { g: 0, g24: 0, f: 0 } };
+  // [label, icon, plain colour (print/PDF), soft background, gloss ink + chip classes]
+  const DIR = { out: ['صادر للتاجر', 'north_west', '#B45309', '#FFF4E5', 'gm-ink-amber', 'bg-amber-50'], in: ['وارد من التاجر', 'south_east', '#1D4ED8', '#EAF2FF', 'gm-ink-blue', 'bg-blue-50'], open: ['رصيد سابق', 'history', '#6B6150', '#F4EFE3', 'text-primary', 'bg-secondary-container'], adj: ['تسوية حساب', 'tune', '#7E22CE', '#F5EEFF', 'gm-ink-violet', 'bg-blue-50'] };
+  const rowsHtml = ldGroups.map(gp => {
+    const f0 = gp.rows[0], last = gp.rows[gp.rows.length - 1], d = ldDir(f0), D = DIR[d];
+    const w = gp.rows.reduce((t, r) => t + Number(r.weight_grams || 0), 0);
+    const wa = gp.rows.reduce((t, r) => t + Number(r.accounting_weight_grams != null ? r.accounting_weight_grams : (r.weight_grams || 0)), 0);
+    const g24 = gp.rows.reduce((t, r) => t + Number(r.gold_24k_equivalent || 0), 0);
+    const fee = gp.rows.reduce((t, r) => t + Number(r.fab_fee_amount || 0), 0);
+    const ks = [...new Set(gp.rows.map(r => r.karat).filter(Boolean))];
+    const isStock = /stock_|scrap_/.test(f0.source || '');
+    const perG = isStock && wa > 0 && fee > 0 ? fee / wa : null;
+    if (tot[d]) { tot[d].g += w; tot[d].g24 += g24; tot[d].f += fee; }
+    const r = ldRun[last.id];
+    const n = gp.rows.length;
+    return `<tr onclick="const c=document.getElementById('trader-move-${f0.id}')||document.getElementById('trader-batch-${f0.batch_id}')||document.getElementById('trader-invgroup-${f0.invoice_id}');document.getElementById('movements-list').classList.remove('ld-collapsed');window.ldCards=true;if(c){c.scrollIntoView({behavior:'smooth',block:'center'});c.style.outline='2px solid #D4A017';setTimeout(()=>c.style.outline='',2000)}">
+      <td class="n" data-l="التاريخ">${gmFormatDateTime(last.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+      <td data-l="السند">${f0.voucher_no ? `<span class="n">${gmEscapeHtml(f0.voucher_no)}</span>` : '—'}</td>
+      <td class="dir"><span class="ld-dir ${D[5]}" style="color:${D[2]};background-color:${D[3]}"><span class="material-symbols-outlined ${D[4]}" aria-hidden="true">${D[1]}</span><span class="${D[4]}">${D[0]}</span></span></td>
+      <td class="desc"><b>${movementLabel(f0).replace(/\s*\(.*\)$/, '')}</b>${n > 1 ? ` <span class="text-on-surface-variant">— ${n} قطع</span>` : ''}${f0.notes ? `<div class="text-[11.5px] text-on-surface-variant">${gmEscapeHtml(f0.notes.slice(0, 70))}</div>` : ''}</td>
+      <td class="n g" data-l="الوزن القائم">${w ? fmt(w) : ''}${w && Math.abs(wa - w) > 0.005 ? `<div class="sub">محاسبي ${fmt(wa)}</div>` : ''}</td>
+      <td class="n g" data-l="العيار">${w ? (ks.length === 1 ? ks[0] : ks.length ? 'مختلط' : '') : ''}</td>
+      <td class="n g strong" data-l="مكافئ عيار 24"><span class="${D[4]}" style="color:${D[2]}">${g24 ? fmt(g24) : ''}</span></td>
+      <td class="n c" data-l="مصنعية / غ">${perG ? fmtMoney(perG) : ''}</td>
+      <td class="n c strong" data-l="المبلغ"><span class="${D[4]}" style="color:${D[2]}">${fee ? fmtMoney(fee) : ''}</span></td>
+      <td class="n bal" data-l="رصيد الذهب بعدها">${ldBal(r.g)}</td><td class="n bal" data-l="الرصيد النقدي بعدها">${ldMoney(r.f)}</td></tr>`;
+  }).join('');
+  ldTbl.innerHTML = `<div class="flex items-center justify-between mb-2"><b class="text-[15px]">كشف الحساب</b>
+      <button type="button" class="text-[12px] font-semibold underline" onclick="window.ldCards=document.getElementById('movements-list').classList.toggle('ld-collapsed')===false">إظهار / إخفاء تفاصيل الحركات وتعديلها</button></div>
+    <table class="ld-st"><thead>
+      <tr class="grp"><th colspan="4"></th><th colspan="3" class="gg">الذهب</th><th colspan="2" class="gc">المصنعية والنقد</th><th colspan="2" class="gb">الرصيد بعدها</th></tr>
+      <tr><th>التاريخ</th><th>السند</th><th>الاتجاه</th><th>البيان</th>
+        <th class="n gg">الوزن القائم (غ)</th><th class="n gg">العيار</th><th class="n gg">مكافئ عيار 24 (غ)</th>
+        <th class="n gc">مصنعية / غ</th><th class="n gc">المبلغ</th>
+        <th class="n gb">ذهب عيار 24</th><th class="n gb">نقدي</th></tr></thead>
+    <tbody>${rowsHtml}</tbody>
+    <tfoot>
+      <tr><td colspan="4"><span class="ld-dir ${DIR.out[5]}" style="color:${DIR.out[2]};background-color:${DIR.out[3]}"><span class="material-symbols-outlined ${DIR.out[4]}">north_west</span><span class="${DIR.out[4]}">إجمالي الصادر للتاجر</span></span></td>
+        <td class="n" data-l="الوزن">${fmt(tot.out.g)}</td><td></td><td class="n strong" data-l="مكافئ 24"><span class="${DIR.out[4]}" style="color:${DIR.out[2]}">${fmt(tot.out.g24)}</span></td><td></td><td class="n strong" data-l="المبلغ"><span class="${DIR.out[4]}" style="color:${DIR.out[2]}">${fmtMoney(tot.out.f)}</span></td><td colspan="2" rowspan="2" class="n bal fin" data-l="الرصيد النهائي" style="font-size:15px">${ldBal(traderGoldBalance(traderId))}<br>${ldMoney(traderFeeBalance(traderId))}</td></tr>
+      <tr><td colspan="4"><span class="ld-dir ${DIR.in[5]}" style="color:${DIR.in[2]};background-color:${DIR.in[3]}"><span class="material-symbols-outlined ${DIR.in[4]}">south_east</span><span class="${DIR.in[4]}">إجمالي الوارد من التاجر</span></span></td>
+        <td class="n" data-l="الوزن">${fmt(tot.in.g)}</td><td></td><td class="n strong" data-l="مكافئ 24"><span class="${DIR.in[4]}" style="color:${DIR.in[2]}">${fmt(tot.in.g24)}</span></td><td></td><td class="n strong" data-l="المبلغ"><span class="${DIR.in[4]}" style="color:${DIR.in[2]}">${fmtMoney(tot.in.f)}</span></td></tr>
+    </tfoot></table>
+    <div class="ld-fin-m"><span>الرصيد النهائي</span><b>${ldBal(traderGoldBalance(traderId))}</b><b>${ldMoney(traderFeeBalance(traderId))}</b></div>
+    <p class="text-[11.5px] text-on-surface-variant mt-2">الرصيد بنفس ألوان بطاقة الحساب أعلى الصفحة. كل سند متعدد القطع في سطر واحد بمجموعه؛ اضغط السطر لرؤية قطعه وتعديله.</p>`;
+  listEl.classList.toggle('ld-collapsed', !window.ldCards); // stays open once the user opened the cards
   listEl.innerHTML = renderGroups.map(group => {
     if (group.kind === 'invoice') {
       const rows = group.rows;
@@ -1365,6 +1459,7 @@ function showTraderDetail(traderId) {
           <span class="text-[11px] text-on-surface-variant flex items-center gap-2">${gmVoucherChip(m)}${date}</span>
         </div>
         <p class="text-[12px] font-data-mono">${weightLine}${feeLine}</p>
+        <p class="ld-run lg:hidden">الرصيد بعدها: ذهب <b class="font-data-mono">${ldBal(ldRun[m.id].g)}</b> · نقد <b class="font-data-mono">${ldMoney(ldRun[m.id].f)}</b></p>
         ${m.notes ? `<p class="text-[12px] text-on-surface-variant mt-1">${gmEscapeHtml(m.notes)}</p>` : ''}
         ${(m.source === 'cash_in' || m.source === 'cash_out') && m.linked_cash_movement_id ? voucherDateBlock(m.id, m.linked_cash_movement_id, m.created_at) : ''}
         ${m.invoice && m.invoice.invoice_number ? `<a href="invoice-print-ar.html?id=${m.invoice_id}" class="text-[11px] text-secondary font-semibold underline mt-1 inline-block" onclick="event.stopPropagation()">عرض فاتورة الشراء: ${gmEscapeHtml(m.invoice.invoice_number)} ←</a>` : ''}

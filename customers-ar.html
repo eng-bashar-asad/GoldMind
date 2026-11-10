@@ -8,11 +8,11 @@
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
 <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
-<title>الزبائن | GoldMind</title>
+<title>العملاء | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=55"></script>
-<script src="theme.js?v=84"></script>
+<script src="theme.js?v=85"></script>
 <script src="gm-report.js?v=5"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -81,20 +81,20 @@
 <button onclick="gmSmartBack('index-ar.html')" aria-label="رجوع" class="cursor-pointer p-2 hover:bg-surface-container-low rounded-full flex items-center justify-center">
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
 </button>
-<h1 class="font-headline-md text-headline-md font-bold">الزبائن</h1>
+<h1 class="font-headline-md text-headline-md font-bold">العملاء</h1>
 </div>
 <a href="customer-debt-table-ar.html" class="h-10 px-3 rounded-lg border border-outline-variant text-[13px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined">table_chart</span>جدول الديون</a>
-<a href="customer-add-ar.html" id="add-btn" class="hidden h-10 px-3 rounded-lg bg-primary text-on-primary text-[13px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined">person_add</span>زبون جديد</a>
+<a href="customer-add-ar.html" id="add-btn" class="hidden h-10 px-3 rounded-lg bg-primary text-on-primary text-[13px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined">person_add</span>عميل جديد</a>
 </div>
 </header>
 <main class="pb-32 max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8 py-4 flex flex-col gap-3">
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
-<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية عرض الزبائن.</div>
+<div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية عرض العملاء.</div>
 <div id="page-content" class="hidden flex flex-col gap-3">
 <!-- totals for the shown kind (design "MCustomers") -->
 <div class="grid grid-cols-2 gap-2 lg:max-w-xl" id="sums">
-<div class="cu-sum"><span>لنا على الزبائن</span><b class="font-data-mono text-success" id="sumOwed">0.00</b></div>
-<div class="cu-sum"><span>علينا للزبائن</span><b class="font-data-mono text-error" id="sumCredit">0.00</b></div>
+<div class="cu-sum"><span>لنا على العملاء</span><b class="font-data-mono text-success" id="sumOwed">0.00</b></div>
+<div class="cu-sum"><span>علينا للعملاء</span><b class="font-data-mono text-error" id="sumCredit">0.00</b></div>
 </div>
 <div class="relative lg:max-w-xl">
 <span class="material-symbols-outlined absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">search</span>
@@ -102,8 +102,8 @@
 </div>
 <!-- individuals and companies are never listed together -->
 <div class="grid grid-cols-2 gap-1 p-1 bg-surface-container-low border border-outline-variant rounded-xl text-[14px]" id="kinds">
-<button type="button" data-k="person" class="kind h-10 rounded-lg font-bold">زبائن أفراد</button>
-<button type="button" data-k="company" class="kind h-10 rounded-lg font-bold">زبائن شركات</button>
+<button type="button" data-k="person" class="kind h-10 rounded-lg font-bold">عملاء أفراد</button>
+<button type="button" data-k="company" class="kind h-10 rounded-lg font-bold">عملاء شركات</button>
 </div>
 <div class="flex flex-wrap gap-2 text-[13px]" id="bals">
 <button type="button" data-b="all" class="bal h-9 px-4 rounded-full border border-outline-variant font-semibold">الكل</button>
@@ -114,13 +114,15 @@
 </div>
 <div class="text-[12px] text-on-surface-variant" id="count"></div>
 <div id="list" class="flex flex-col gap-2"></div>
-<!-- computer: the picked customer beside the list (design "قائمة الزبائن") -->
+<!-- computer: the picked customer beside the list (design "قائمة العملاء") -->
 <aside id="cuSide" class="cu-side hidden" aria-live="polite"></aside>
 </div>
 </main>
 <nav class="gm-bottom-tabs"></nav>
-<a class="gm-fab hidden" id="add-fab" href="customer-add-ar.html" aria-label="زبون جديد" title="زبون جديد"><span class="material-symbols-outlined">person_add</span></a>
+<a class="gm-fab hidden" id="add-fab" href="customer-add-ar.html" aria-label="عميل جديد" title="عميل جديد"><span class="material-symbols-outlined">person_add</span></a>
 <script>
+// Arabic plural for days
+function gmDays(n){n=Number(n)||0;return n===0?'اليوم':n===1?'يوم واحد':n===2?'يومين':(n%100>=3&&n%100<=10)?n+' أيام':n+' يوماً';}
 let SINCE = {}; // customer -> date of the oldest unpaid debt (first in, first paid)
 let CUSTOMERS = [], BAL = {}, KIND = new URLSearchParams(location.search).get('kind') === 'company' ? 'company' : 'person', BALF = 'all', CAN_EDIT = false, CUR = '';
 const esc = v => gmEscapeHtml(v == null ? '' : String(v));
@@ -149,7 +151,7 @@ function render() {
   const list = CUSTOMERS.filter(c =>
     KIND_OK[KIND](c) && BAL_OK[BALF](BAL[c.id] || 0, c) &&
     (!q || (c.name || '').toLowerCase().includes(q) || (qd.length >= 3 && digits(c.phone).includes(qd))));
-  document.getElementById('count').textContent = gmCountLabel(list.length, KIND === 'company' ? ['شركة', 'شركتان', 'شركات'] : ['زبون', 'زبونان', 'زبائن']);
+  document.getElementById('count').textContent = gmCountLabel(list.length, KIND === 'company' ? ['شركة', 'شركتان', 'شركات'] : ['عميل', 'عميلان', 'عملاء']);
   // totals for this kind (individuals or companies), whatever the chip
   let owed = 0, credit = 0;
   CUSTOMERS.filter(KIND_OK[KIND]).forEach(c => { const b = BAL[c.id] || 0; if (b > 0.005) owed += b; else if (b < -0.005) credit -= b; });
@@ -166,13 +168,13 @@ function render() {
         <span class="min-w-0 flex-1">
         <span class="block font-bold text-[14px] truncate">${esc(c.name)}</span>
         <span class="block text-[12px] text-on-surface-variant font-data-mono" dir="ltr" style="text-align:right">${esc(c.phone || '')}</span>
-        ${Math.abs(b) > 0.005 ? `<span class="block text-[12px] font-semibold ${b > 0 ? 'text-success' : 'text-error'}">${b > 0 ? 'لنا عنده' : 'علينا له'} ${fmt(Math.abs(b))} ${CUR}${age != null ? ` <span class="font-normal text-on-surface-variant">· منذ ${age} يوماً</span>` : ''}</span>` : ''}
+        ${Math.abs(b) > 0.005 ? `<span class="block text-[12px] font-semibold ${b > 0 ? 'text-success' : 'text-error'}">${b > 0 ? 'لنا عنده' : 'علينا له'} ${fmt(Math.abs(b))} ${CUR}${age != null ? ` <span class="font-normal text-on-surface-variant">· ${age ? 'منذ ' + gmDays(age) : 'اليوم'}</span>` : ''}</span>` : ''}
         </span>
       </a>
       <a href="customer-debts-print-ar.html?id=${c.id}" aria-label="كشف حساب ${esc(c.name)}" class="w-10 h-10 rounded-lg border border-outline-variant flex items-center justify-center"><span class="material-symbols-outlined">receipt_long</span></a>
       ${CAN_EDIT ? `<a href="customer-edit-ar.html?id=${c.id}" class="h-10 px-3 rounded-lg border border-primary text-primary text-[13px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined">edit</span>تعديل</a>` : ''}
     </div>`;
-  }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد زبائن مطابقون.</p>';
+  }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>';
 }
 
 // oldest unpaid debt per customer: payments settle the oldest debts first
@@ -201,19 +203,19 @@ function balCell(b) {
 }
 function renderTable(list) {
   const rows = list.slice().sort((a, b) => (BAL[b.id] || 0) - (BAL[a.id] || 0)).slice(0, 500);
-  if (!rows.length) { document.getElementById('list').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد زبائن مطابقون.</p>'; document.getElementById('cuSide').classList.add('hidden'); return; }
+  if (!rows.length) { document.getElementById('list').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>'; document.getElementById('cuSide').classList.add('hidden'); return; }
   if (!PICK || !rows.some(c => c.id === PICK)) PICK = rows[0].id;
-  document.getElementById('list').innerHTML = `<table class="cu-t"><thead><tr><th>الزبون</th><th>الهاتف</th><th>آخر حركة</th><th>عمر الدين</th><th>ذهب</th><th style="text-align:left">الرصيد</th></tr></thead><tbody>` +
+  document.getElementById('list').innerHTML = `<table class="cu-t"><thead><tr><th>العميل</th><th>الهاتف</th><th>آخر حركة</th><th>عمر الدين</th><th>ذهب</th><th style="text-align:left">الرصيد</th></tr></thead><tbody>` +
     rows.map(c => {
       const a = ageOf(c), g = GOLD[c.id] || 0;
       return `<tr data-id="${c.id}" class="${c.id === PICK ? 'on' : ''}" tabindex="0">
         <td><span class="flex items-center gap-2.5"><span class="cu-av" style="width:34px;height:34px;font-size:13px">${esc(gmInitials(c.name))}</span><b>${esc(c.name)}</b>${c.is_company ? ' <span class="cu-tag">شركة</span>' : ''}</span></td>
         <td class="font-data-mono" dir="ltr" style="text-align:right">${esc(c.phone || '')}</td>
         <td class="font-data-mono">${dm(LAST[c.id])}</td>
-        <td>${a != null ? `<span class="cu-age${a >= 30 ? ' old' : ''}">${a} يوماً</span>` : '—'}</td>
+        <td>${a != null ? `<span class="cu-age${a >= 30 ? ' old' : ''}">${gmDays(a)}</span>` : '—'}</td>
         <td class="font-data-mono">${Math.abs(g) > 0.0005 ? fmt(Math.abs(g)) + ' غ' : '—'}</td>
         <td style="text-align:left">${balCell(BAL[c.id] || 0)}</td></tr>`;
-    }).join('') + '</tbody></table><p class="text-[12px] text-on-surface-variant px-3 py-2">الضغط على السطر يعرض الزبون بالجنب؛ الضغط مرتين يفتح حسابه الكامل.</p>';
+    }).join('') + '</tbody></table><p class="text-[12px] text-on-surface-variant px-3 py-2">الضغط على السطر يعرض العميل بالجنب؛ الضغط مرتين يفتح حسابه الكامل.</p>';
   renderSide();
 }
 function renderSide() {
@@ -243,7 +245,7 @@ function renderSide() {
       ${c.id_number ? `<div class="cu-kv"><span class="text-on-surface-variant">الهوية</span><span class="font-data-mono">${esc(c.id_number)}${c.id_expiry_date ? ' · تنتهي ' + esc(c.id_expiry_date) : ''}</span></div>` : ''}
       ${c.nationality ? `<div class="cu-kv"><span class="text-on-surface-variant">الجنسية</span><span>${esc(c.nationality)}</span></div>` : ''}
       ${c.tax_number ? `<div class="cu-kv"><span class="text-on-surface-variant">الرقم الضريبي</span><span class="font-data-mono" dir="ltr">${esc(c.tax_number)}</span></div>` : ''}
-      <div class="cu-kv" style="border:0"><span class="text-on-surface-variant">زبون منذ</span><span class="font-data-mono">${c.created_at ? new Date(c.created_at).getFullYear() : '—'}</span></div>
+      <div class="cu-kv" style="border:0"><span class="text-on-surface-variant">عميل منذ</span><span class="font-data-mono">${c.created_at ? new Date(c.created_at).getFullYear() : '—'}</span></div>
       ${CAN_EDIT ? `<a href="customer-edit-ar.html?id=${c.id}" class="text-[12.5px] font-bold" style="color:#7A6640">تعديل البيانات</a>` : ''}
     </section>`;
   el.classList.remove('hidden');

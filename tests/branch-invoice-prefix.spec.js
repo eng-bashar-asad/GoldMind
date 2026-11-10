@@ -18,7 +18,7 @@ function setup(page, { branches, store = {} }) {
 test('several branches: the code is typed in capitals and saved on the branch', async ({ page }) => {
   const calls = await setup(page, { branches: 2 });
   await page.goto('/company-settings-ar.html');
-  await page.locator('details:has(#store-license) summary').click();
+  await page.locator('details:has(#store-license)').evaluate(d => { d.open = true; }); // settings tabs open their sections already
   await expect(page.locator('#branch-code-wrap')).not.toHaveClass(/\bhidden\b/);
   await page.locator('#store-branch-code').fill('dxb1');
   await expect(page.locator('#store-branch-code')).toHaveValue('DXB');

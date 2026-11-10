@@ -14,7 +14,7 @@ test('trader discount can be back-dated, other forms are not', async ({ page }) 
   page.on('request', r => { if (r.url().includes('/rpc/trader_discount')) sent.push(r.headers()['x-gm-op-date'] || null); });
   page.on('dialog', d => d.accept());
   await page.goto('/ledger-ar.html?trader=t1');
-  await page.click('button:has-text("خصم على الحساب النقدي")');
+  await page.click('button:has-text("خصم نقدي")');
   const date = page.locator('#trader-discount-form .gm-opdate input');
   await expect(date).toBeVisible();
   // today -> no header
@@ -23,7 +23,7 @@ test('trader discount can be back-dated, other forms are not', async ({ page }) 
   await expect.poll(() => sent.length).toBe(1);
   expect(sent[0]).toBeNull();
   // past date -> header
-  await page.click('button:has-text("خصم على الحساب النقدي")');
+  await page.click('button:has-text("خصم نقدي")');
   await date.fill('2026-09-15');
   await date.dispatchEvent('change');
   await expect(page.locator('#trader-discount-form .gm-opdate-note')).toContainText('بتاريخ سابق');

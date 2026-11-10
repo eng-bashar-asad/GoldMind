@@ -19,7 +19,7 @@
     { t: 'الفواتير والعملاء', i: 'receipt_long', l: [
       ['invoices-list-ar.html', 'list_alt', 'كل الفواتير', 'view_invoices'],
       ['invoices-archive-ar.html', 'inventory', 'الأرشيف الشامل', 'view_invoices'],
-      ['customers-ar.html', 'person', 'الزبائن (أفراد وشركات)', 'view_customers'],
+      ['customers-ar.html', 'person', 'العملاء (أفراد وشركات)', 'view_customers'],
       ['ledger-ar.html', 'handshake', 'التجار', 'view_traders'],
       ['deposits-ar.html', 'bookmark_added', 'سندات العربون', 'edit_customers|manage_daily_cashbox'],
       ['repairs-ar.html', 'build', 'الصيانة والتصليح', 'view_repairs'] ] },
@@ -299,7 +299,7 @@
       .gm-dsplit>.gm-side{grid-column:1;grid-row:1/span 30;position:sticky;top:84px}
       .gm-dsplit>.gm-full{grid-column:1/-1}
     }
-    /* phone bottom tabs (designs MHome / MStock / MCustomers): الرئيسية، المخزن، [بيع]، الزبائن، الفواتير.
+    /* phone bottom tabs (designs MHome / MStock / MCustomers): الرئيسية، المخزن، [بيع]، العملاء، الفواتير.
        A page puts <nav class="gm-bottom-tabs"></nav>; it is filled below. */
     .gm-bottom-tabs{position:fixed;bottom:0;inset-inline:0;z-index:50;display:flex;align-items:center;padding:0 6px env(safe-area-inset-bottom);height:calc(68px + env(safe-area-inset-bottom));background:var(--gm-bg-elevated,#fff);background:#FFFFFF;border-top:1px solid #E4DAC0;box-shadow:0 -2px 10px rgba(28,26,22,.05)}
     .gm-tab{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:48px;font-size:10.5px;color:#6B6355;text-decoration:none}
@@ -371,7 +371,7 @@
   function esc(s) { return String(s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
   var TABS = [['index-ar.html', 'dashboard', 'الرئيسية'], ['inventory-list-ar.html', 'inventory_2', 'المخزن'], null,
-    ['customers-ar.html', 'person', 'الزبائن'], ['invoices-list-ar.html', 'receipt_long', 'الفواتير']];
+    ['customers-ar.html', 'person', 'العملاء'], ['invoices-list-ar.html', 'receipt_long', 'الفواتير']];
   function fillTabs() {
     document.querySelectorAll('nav.gm-bottom-tabs').forEach(function (n) {
       if (n.children.length) return;
@@ -752,7 +752,7 @@
     if (pal) return pal;
     pal = document.createElement('div'); pal.className = 'gm-pal-ov'; pal.setAttribute('role', 'dialog'); pal.setAttribute('aria-label', 'بحث');
     pal.innerHTML = '<div class="gm-pal"><div class="gm-pal-in"><span class="material-symbols-outlined" style="color:#8c6a22">search</span>'
-      + '<input type="text" autocomplete="off" enterkeyhint="go" placeholder="ابحث عن صفحة أو زبون أو تاجر أو باركود…" aria-label="بحث"/><kbd>Esc</kbd><button type="button" aria-label="إغلاق البحث">إغلاق</button></div>'
+      + '<input type="text" autocomplete="off" enterkeyhint="go" placeholder="ابحث عن صفحة أو عميل أو تاجر أو باركود…" aria-label="بحث"/><kbd>Esc</kbd><button type="button" aria-label="إغلاق البحث">إغلاق</button></div>'
       + '<div class="gm-pal-list" role="listbox"></div></div>';
     document.body.appendChild(pal);
     var input = pal.querySelector('input');
@@ -829,7 +829,7 @@
       ].map(function (p) { return Promise.resolve(p).catch(function () { return {}; }); }));
       if (seq !== palSeq) return;
       groups.push({ t: 'قطع', rows: ((r[2] && r[2].data) || []).map(function (p) { return { href: 'piece-edit-ar.html?id=' + p.id, i: 'qr_code_2', t: p.barcode + (p.description_ar ? ' — ' + p.description_ar : ''), s: p.weight_grams != null ? Number(p.weight_grams).toFixed(2) + ' غ' : '' }; }) });
-      groups.push({ t: 'زبائن', rows: ((r[0] && r[0].data) || []).map(function (c) { return { href: 'customer-debts-ar.html?open=' + encodeURIComponent(c.id), i: 'person', t: c.name, s: c.phone || '' }; }) });
+      groups.push({ t: 'عملاء', rows: ((r[0] && r[0].data) || []).map(function (c) { return { href: 'customer-debts-ar.html?open=' + encodeURIComponent(c.id), i: 'person', t: c.name, s: c.phone || '' }; }) });
       groups.push({ t: 'تجار', rows: ((r[1] && r[1].data) || []).map(function (t) { return { href: 'ledger-ar.html?trader=' + encodeURIComponent(t.id), i: 'storefront', t: t.name }; }) });
       palPaint(groups);
     } catch (e) { /* pages stay listed */ }
@@ -895,7 +895,7 @@
     var html = '<div class="gn-head"><b>GoldMind</b><button type="button" class="gn-mini" aria-label="تصغير القائمة" title="تصغير / توسيع القائمة"><span class="material-symbols-outlined">dock_to_left</span></button><button type="button" class="gn-x" aria-label="إغلاق القائمة"><span class="material-symbols-outlined">close</span></button></div>'
       + '<div class="gn-style" role="radiogroup" aria-label="شكل القائمة"><button type="button" role="radio" data-st="light"><span class="material-symbols-outlined">light_mode</span>فاتحة</button><button type="button" role="radio" data-st="dark"><span class="material-symbols-outlined">dark_mode</span>غامقة</button></div>'
       + '<div class="gn-pages"><span>الصفحات</span><div class="gn-style" role="radiogroup" aria-label="شكل الصفحات"><button type="button" role="radio" data-gl="1">زجاجية</button><button type="button" role="radio" data-gl="0">عادية</button></div></div>'
-      + '<button type="button" class="gn-search" aria-label="بحث (Ctrl+K)"><span class="material-symbols-outlined">search</span><span class="gn-st">ابحث عن صفحة أو زبون أو باركود…</span><kbd>Ctrl K</kbd></button><nav>'
+      + '<button type="button" class="gn-search" aria-label="بحث (Ctrl+K)"><span class="material-symbols-outlined">search</span><span class="gn-st">ابحث عن صفحة أو عميل أو باركود…</span><kbd>Ctrl K</kbd></button><nav>'
       + '<div class="gn-sec"><span>المفضّلة</span><button type="button" class="gn-favedit">تعديل</button></div><div class="gn-favlist"></div><div class="gn-sec"><span>كل الصفحات</span></div>';
     GROUPS.forEach(function (g) {
       var here = g.l.some(function (x) { return x[0] === page; });

@@ -1627,3 +1627,123 @@ function gmClosePhotoViewer() {
     if (el && el.type === 'number' && e.target === el) el.blur();
   }, { passive: true });
 })();
+
+// ===== design study 2026-11-10 =====
+(function () {
+  var st = document.createElement('style');
+  st.textContent =
+    // one look for the main action on every screen
+    '.gm-cta{position:relative;overflow:hidden;background:linear-gradient(125deg,#7a5a16 0%,#c89a3c 18%,#f6e2a6 30%,#d4a64a 42%,#8a6a1f 58%,#e2bd67 76%,#fff0bf 88%,#b58a33 100%)!important;background-size:220% 220%!important;color:#2A1F08!important;border:0!important;box-shadow:0 6px 16px -6px rgba(122,90,22,.55),inset 0 1px 0 rgba(255,255,255,.55)!important}';
+    // data pages: the big logo behind the content is much fainter
+  document.head.appendChild(st);
+  if (!/(^|\/)(index-ar|login-entry-ar|login-2fa-ar|landing-ar)\.html/.test(location.pathname)) document.documentElement.classList.add('gm-data-page');
+})();
+
+// ===== Gloss colours (بشار, 2026-11-10): no flat red/green/blue/yellow — words, icons, chips,
+// buttons and cards use gradient, shiny colours. Screen only: print pages and PDF captures
+// (html2canvas cannot draw gradient text) get the plain colours back via html.gm-plain.
+(function () {
+  var root = document.documentElement;
+  if (/print/i.test(location.pathname)) return;
+  root.classList.add('gm-gloss');
+  // PDF export: switch the gloss off while html2canvas draws the page
+  var h2c;
+  try {
+    Object.defineProperty(window, 'html2canvas', { configurable: true, get: function () { return h2c; }, set: function (fn) {
+      h2c = typeof fn !== 'function' ? fn : function () {
+        root.classList.add('gm-plain');
+        var p = fn.apply(this, arguments);
+        var off = function () { root.classList.remove('gm-plain'); };
+        if (p && p.then) p.then(off, off); else off();
+        return p;
+      };
+    } });
+  } catch (e) { /* already defined: leave it */ }
+
+  var G = 'html.gm-gloss:not(.gm-plain) ';
+  var noBg = ':not([class*="bg-"]):not(input):not(select):not(textarea):not(option)';
+  // gradient "inks": dark enough to read, with a lighter glint in the middle
+  var INK = {
+    green:  'linear-gradient(120deg,#065F46 0%,#0F9F7A 45%,#14B8A6 60%,#047857 100%)',
+    red:    'linear-gradient(120deg,#9F1239 0%,#E11D48 45%,#F97362 62%,#B42318 100%)',
+    blue:   'linear-gradient(120deg,#1E3A8A 0%,#4F46E5 45%,#0EA5E9 65%,#1D4ED8 100%)',
+    amber:  'linear-gradient(120deg,#7C4A03 0%,#C47F0B 40%,#E8B53A 58%,#9A5B05 100%)',
+    violet: 'linear-gradient(120deg,#5B21B6 0%,#9333EA 50%,#DB2777 100%)',
+    accent: 'linear-gradient(120deg,var(--gm-secondary) 0%,var(--gm-accent) 48%,color-mix(in srgb,var(--gm-accent) 55%,#fff) 60%,var(--gm-secondary) 100%)',
+    ink:    'linear-gradient(120deg,var(--gm-primary) 0%,color-mix(in srgb,var(--gm-primary) 72%,var(--gm-accent)) 55%,var(--gm-primary) 100%)'
+  };
+  // table cells usually carry their own background, so the ink goes on what is inside them;
+  // !important so a page's own `background:` shorthand can't leave the text invisible
+  var text = function (sel, ink) {
+    return sel.split(',').map(function (s) { s = s.trim(); return G + s + noBg + ':not(td):not(th),' + G + s + ':is(td,th) > :not([class*="bg-"])'; }).join(',') +
+      '{background-image:' + ink + '!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;color:transparent}';
+  };
+  // soft chips / blocks: a tinted gradient with a white reflection on top
+  var GLASS = 'linear-gradient(180deg,rgba(255,255,255,.7) 0%,rgba(255,255,255,0) 55%)';
+  var chip = function (sel, a, b, line) {
+    return sel.split(',').map(function (s) { return G + s.trim(); }).join(',') +
+      '{background-image:' + GLASS + ',linear-gradient(135deg,' + a + ' 0%,' + b + ' 100%)!important;' + (line ? 'border-color:' + line + ';' : '') +
+      'box-shadow:inset 0 1px 0 rgba(255,255,255,.85),0 1px 2px rgba(0,0,0,.04)}';
+  };
+  // solid buttons: deep gradient + glossy top half
+  var solid = function (sel, a, b) {
+    return sel.split(',').map(function (s) { return G + s.trim(); }).join(',') +
+      '{background-image:linear-gradient(180deg,rgba(255,255,255,.22) 0%,rgba(255,255,255,.04) 48%,rgba(0,0,0,0) 52%),linear-gradient(135deg,' + a + ' 0%,' + b + ' 100%)!important;' +
+      'box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 6px 14px -8px ' + a + '}';
+  };
+  var btn = function (cls) { return ['button.' + cls, 'a.' + cls, 'label.' + cls, '[role=button].' + cls, 'span.' + cls + '.rounded-full', '.' + cls + '.rounded-full'].join(','); };
+  var css = [
+    // the transparent fill is inherited: anything inside a gradient word that has a colour or a
+    // background of its own gets its normal fill back (zero specificity, so a gradient rule on it still wins)
+    ':where(html.gm-gloss) :where([class*="text-"],[class*="dc-amt"],[style*="color"]) :where([class*="text-"],[class*="bg-"],[style*="color"],[style*="background"],button,input,select,textarea){-webkit-text-fill-color:currentColor}',
+    // words
+    text('.gm-ink-green,.text-success,.text-green-600,.text-green-700,.text-green-800,.text-emerald-700,.text-emerald-800,.text-teal-700', INK.green),
+    text('.gm-ink-red,.text-error,.text-red-400,.text-red-600,.text-red-700,.text-red-800,.text-rose-700', INK.red),
+    text('.gm-ink-blue,.text-blue-700,.text-indigo-800,.text-sky-700', INK.blue),
+    text('.gm-ink-amber,.text-amber-700,.text-amber-800,.text-amber-900,.text-orange-700,.text-yellow-700', INK.amber),
+    // hard-coded page colours (inline styles and a few page classes)
+    text('.dc-amt-in,[style*="color:#1B5E20" i]:not([style*="background" i]),[style*="color: #1B5E20" i]:not([style*="background" i]),[style*="color:#15803D" i]:not([style*="background" i]),[style*="color: #15803D" i]:not([style*="background" i]),[style*="color:#2E7D32" i]:not([style*="background" i]),[style*="color: #2E7D32" i]:not([style*="background" i]),[style*="color:#16A34A" i]:not([style*="background" i]),[style*="color: #16A34A" i]:not([style*="background" i]),[style*="color:#047857" i]:not([style*="background" i]),[style*="color: #047857" i]:not([style*="background" i]),[style*="color:#166534" i]:not([style*="background" i]),[style*="color: #166534" i]:not([style*="background" i])', INK.green),
+    text('.dc-amt-out,[style*="color:#B91C1C" i]:not([style*="background" i]),[style*="color: #B91C1C" i]:not([style*="background" i]),[style*="color:#B3261E" i]:not([style*="background" i]),[style*="color: #B3261E" i]:not([style*="background" i]),[style*="color:#C62828" i]:not([style*="background" i]),[style*="color: #C62828" i]:not([style*="background" i]),[style*="color:#DC2626" i]:not([style*="background" i]),[style*="color: #DC2626" i]:not([style*="background" i]),[style*="color:#991B1B" i]:not([style*="background" i]),[style*="color: #991B1B" i]:not([style*="background" i])', INK.red),
+    text('[style*="color:#B45309" i]:not([style*="background" i]),[style*="color: #B45309" i]:not([style*="background" i]),[style*="color:#9A3412" i]:not([style*="background" i]),[style*="color: #9A3412" i]:not([style*="background" i])', INK.amber),
+    text('[style*="color:#1D4ED8" i]:not([style*="background" i]),[style*="color: #1D4ED8" i]:not([style*="background" i])', INK.blue),
+    chip('.dc-tag.ok', '#E6F8EF', '#CDEFE3', ''),
+    chip('.dc-tag.warn', '#FFF3DA', '#F9DFA6', ''),
+    text('.gm-ink-violet,.text-purple-700,.text-violet-700', INK.violet),
+    text('.text-secondary,h1:not([class*="text-"]),h2:not([class*="text-"])', INK.accent),
+    text('.text-primary', INK.ink),
+    // icons with no colour of their own, on light cards, take the theme's metal
+    text(':is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-surface-container,.bg-white,main) .material-symbols-outlined:not([class*="text-"]):not(:is(.bg-primary,.bg-secondary,.bg-error,.bg-success,.gm-cta,[class*="bg-green-6"],[class*="bg-green-7"],[class*="bg-amber-6"]) *)', INK.accent),
+    // chips and soft blocks
+    chip('.bg-green-50,.bg-emerald-50', '#ECFDF5', '#D5F5EC', '#A7E8D2'),
+    chip('.bg-green-100,.bg-success-container', '#DDF8EC', '#C3EEE2', '#9FDDC8'),
+    chip('.bg-red-50', '#FFF1F2', '#FFE0DB', '#FBC6C0'),
+    chip('.bg-red-100,.bg-error-container', '#FFE4E6', '#FECDCA', '#F9AFAA'),
+    chip('.bg-amber-50,.bg-yellow-50', '#FFF8E6', '#FCEBC2', '#F2D795'),
+    chip('.bg-amber-100,.bg-amber-200', '#FFF0C8', '#F8DC97', '#E9C46A'),
+    chip('.bg-blue-50,.bg-sky-50', '#EEF2FF', '#DDEBFF', '#BFD3FB'),
+    chip('.bg-secondary-container', 'color-mix(in srgb,var(--gm-accent) 14%,#fff)', 'color-mix(in srgb,var(--gm-accent) 30%,#fff)', ''),
+    // solid buttons and badges
+    solid(btn('bg-primary'), 'var(--gm-primary)', 'color-mix(in srgb,var(--gm-primary) 62%,var(--gm-accent))'),
+    solid(btn('bg-secondary'), 'var(--gm-secondary)', 'color-mix(in srgb,var(--gm-accent) 80%,#fff)'),
+    solid(btn('bg-error') + ',' + btn('bg-red-600'), '#9F1239', '#F43F5E'),
+    solid(btn('bg-success') + ',' + btn('bg-green-600') + ',' + btn('bg-green-700'), '#047857', '#14B8A6'),
+    solid(btn('bg-amber-600'), '#9A5B05', '#E8B53A'),
+    // cards: pearl gradient, a faint diagonal reflection and a gold-tinted shadow
+    G + ':is(.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white):not(input):not(select):not(textarea):not(button)' +
+      '{background-image:linear-gradient(112deg,rgba(255,255,255,0) 0 34%,rgba(255,255,255,.65) 40%,rgba(255,255,255,0) 47%),linear-gradient(160deg,#fff 0%,color-mix(in srgb,var(--gm-surface-low,#EFE7D2) 38%,#fff) 100%);' +
+      'box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.04),0 10px 26px -18px color-mix(in srgb,var(--gm-accent) 70%,transparent)}',
+    // selected options (radio/checkbox chips, tabs) shine in the theme's metal
+    G + ':is(label,button)[class*="has-[:checked]"]:has(:checked),' + G + '[aria-selected="true"]:not(option),' + G + '[aria-pressed="true"]' +
+      '{background-image:' + GLASS + ',linear-gradient(135deg,color-mix(in srgb,var(--gm-accent) 22%,#fff),color-mix(in srgb,var(--gm-accent) 42%,#fff))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px color-mix(in srgb,var(--gm-accent) 55%,transparent)}',
+    // a slow wave across page titles and the main action
+    '@keyframes gmWave{0%{background-position:0% 50%}100%{background-position:200% 50%}}',
+    G + 'h1:not([class*="text-"])' + noBg + ',' + G + 'h1.text-primary' + noBg + '{background-size:200% 100%;animation:gmWave 7s linear infinite}',
+    G + '.gm-cta{animation:gmWave 6s linear infinite}',
+    '@media (prefers-reduced-motion:reduce){' + G + 'h1,' + G + '.gm-cta{animation:none}}',
+  ].join('\n');
+  css = '@media screen{' + css + '}';
+  var st = document.createElement('style');
+  st.id = 'gm-gloss';
+  st.textContent = css;
+  (document.head || root).appendChild(st);
+})();

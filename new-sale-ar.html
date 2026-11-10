@@ -16,7 +16,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=55"></script>
-<script src="theme.js?v=84"></script>
+<script src="theme.js?v=85"></script>
 <script src="gm-invoice-edit.js?v=4"></script>
 <script id="tailwind-config">
         tailwind.config = {
@@ -211,7 +211,7 @@
 <span class="material-symbols-outlined text-[18px] hidden" id="ounce-chip-icon">expand_more</span>
 </button>
 <div id="ounce-editor" class="hidden mt-2 bg-emerald-50 border border-emerald-200 rounded-xl p-3 space-y-2">
-<p class="text-[11px] text-emerald-700 leading-5">يُحسب ربح الفاتورة على هذا السعر. إذا غيّرته وحفظته، يتغيّر في كل البرنامج (صفحة سعر الذهب وكل الفواتير القادمة) إلى أن يغيّره شخص يملك الصلاحية. للاستخدام الداخلي فقط، ولا يظهر في فاتورة الزبون.</p>
+<p class="text-[11px] text-emerald-700 leading-5">يُحسب ربح الفاتورة على هذا السعر. إذا غيّرته وحفظته، يتغيّر في كل البرنامج (صفحة سعر الذهب وكل الفواتير القادمة) إلى أن يغيّره شخص يملك الصلاحية. للاستخدام الداخلي فقط، ولا يظهر في فاتورة العميل.</p>
 <div class="grid grid-cols-2 gap-3">
 <div class="relative">
 <label class="absolute -top-2 right-3 bg-emerald-50 px-1 text-[10px] font-semibold text-emerald-700" for="ounce-edit-price">سعر الأونصة (دولار)</label>
@@ -235,7 +235,7 @@
 </button>
 <div class="flex flex-wrap items-center gap-2 bg-surface-container-lowest border border-outline-variant rounded-xl px-3 py-2 text-[13px]" id="pay-cur-bar">
 <span class="font-semibold">عملة الأسعار</span>
-<select id="pay-cur" class="h-9 min-w-[11rem] border border-outline-variant rounded-lg px-2 bg-surface-container-lowest" onchange="gmSetPayCur(this.value)"></select>
+<select id="pay-cur" class="h-9 min-w-[15rem] border border-outline-variant rounded-lg px-2 bg-surface-container-lowest" onchange="gmSetPayCur(this.value)"></select>
 <span id="pay-rate-wrap" class="hidden items-center gap-1">سعر الصرف: 1 <span id="pay-rate-base"></span> =
 <input id="pay-rate" type="number" step="any" min="0" inputmode="decimal" class="w-28 h-9 border border-outline-variant rounded-lg px-2 text-left font-data-mono" oninput="gmSetPayRate(this.value)"/>
 <span id="pay-rate-sym"></span></span>
@@ -459,7 +459,7 @@
 </div>
 
 <div id="mixed-payment-fields" class="hidden flex-col gap-3 mt-3 bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
-<p class="text-[11.5px] text-on-surface-variant leading-5">اكتب ما دفعه الزبون الآن (نقداً و/أو فيزا، وبأي عملة) — ويُسجَّل الباقي ديناً عليه تلقائياً في حسابه. كل عملة تدخل الصندوق اليومي بعملتها.</p>
+<p class="text-[11.5px] text-on-surface-variant leading-5">اكتب ما دفعه العميل الآن (نقداً و/أو فيزا، وبأي عملة) — ويُسجَّل الباقي ديناً عليه تلقائياً في حسابه. كل عملة تدخل الصندوق اليومي بعملتها.</p>
 <div class="grid grid-cols-2 gap-3">
 <div>
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-1">المبلغ نقداً</label>
@@ -482,11 +482,11 @@
 <span class="text-[13px] font-bold font-data-mono text-success" id="mixed-later"></span>
 </div>
 <div class="hidden justify-between items-center px-3 py-2 border-b border-outline-variant" id="mixed-credit-row">
-<span class="text-[12px] text-on-surface-variant">يُخصم من رصيد الزبون (عربون)</span>
+<span class="text-[12px] text-on-surface-variant">يُخصم من رصيد العميل (عربون)</span>
 <span class="text-[13px] font-bold font-data-mono text-success" id="mixed-credit"></span>
 </div>
 <div class="flex justify-between items-center px-3 py-2" id="mixed-remaining-row">
-<span class="text-[12px] text-on-surface-variant" id="mixed-remaining-label">المتبقي كدين على الزبون</span>
+<span class="text-[12px] text-on-surface-variant" id="mixed-remaining-label">المتبقي كدين على العميل</span>
 <span class="text-[13px] font-bold font-data-mono" id="mixed-remaining-note">0.00 AED</span>
 </div>
 </div>
@@ -494,11 +494,11 @@
 
 <div id="nsChangeBox" class="ns-change hidden">
 <label>المبلغ المستلم<input id="nsReceived" type="number" inputmode="decimal" step="0.01" min="0" dir="ltr" class="font-data-mono" aria-label="المبلغ المستلم" oninput="nsChange()"/></label>
-<div><span>الباقي للزبون</span><b id="nsChangeOut" class="font-data-mono">—</b></div>
+<div><span>الباقي للعميل</span><b id="nsChangeOut" class="font-data-mono">—</b></div>
 </div>
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
-<button id="save-invoice-btn" class="sticky bottom-[76px] md:bottom-4 z-30 w-full py-4 bg-[#7A6640] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
+<button id="save-invoice-btn" class="gm-cta sticky bottom-[76px] md:bottom-4 z-30 w-full py-4 bg-[#7A6640] text-white font-bold text-body-lg font-body-lg rounded-xl shadow-lg flex items-center justify-center gap-3 active:scale-95 transition-all">
 <span class="material-symbols-outlined">save</span>
                 حفظ الفاتورة
             </button>
@@ -1296,7 +1296,7 @@
             note.textContent = 'لا يبقى دين — يُغطّى من رصيده';
             note.className = 'text-[13px] font-bold font-data-mono text-success';
         } else if (fromCredit > 0.009) {
-            label.textContent = 'المتبقي كدين على الزبون';
+            label.textContent = 'المتبقي كدين على العميل';
             note.textContent = gmMoney(remaining - fromCredit) + ' ' + CUR;
             note.className = 'text-[13px] font-bold font-data-mono text-error';
         } else if (Math.abs(remaining) < 0.01) {
@@ -1304,7 +1304,7 @@
             note.textContent = 'لا يوجد متبقي — مدفوعة بالكامل';
             note.className = 'text-[13px] font-bold font-data-mono text-success';
         } else if (remaining > 0) {
-            label.textContent = 'المتبقي كدين على الزبون';
+            label.textContent = 'المتبقي كدين على العميل';
             note.textContent = gmMoney(remaining) + ' ' + CUR;
             note.className = 'text-[13px] font-bold font-data-mono text-error';
         } else {
@@ -1385,7 +1385,7 @@
             if (!selectedCustomer || selectedCustomer.id !== c.id) return;
             (deps || []).forEach(d => (Array.isArray(d.items) ? d.items : []).forEach(it => { if (it && it.barcode) DEP_BARCODES.push(String(it.barcode)); }));
             const depFor = DEP_BARCODES.length ? ' — العربون محجوز للقطعة <span dir="ltr">' + DEP_BARCODES.map(gmEscapeHtml).join('، ') + '</span>' : '';
-            box.innerHTML = '<b>للزبون عندنا رصيد ' + gmMoney(CUST_CREDIT) + ' ' + CUR + '</b> (عربون أو دفعة سابقة)' + depFor + '.'
+            box.innerHTML = '<b>للعميل عندنا رصيد ' + gmMoney(CUST_CREDIT) + ' ' + CUR + '</b> (عربون أو دفعة سابقة)' + depFor + '.'
                 + '<div class="flex flex-col gap-1.5 mt-2" role="radiogroup" aria-label="الرصيد بهذه الفاتورة">'
                 + '<label class="flex items-center gap-2 cursor-pointer min-h-[36px]"><input type="radio" name="credit-use" value="use" onchange="CREDIT_CHOICE=this.value; if (selectedPaymentMethod===\'mixed\') onMixedAmountInput();"/> <span><b>يُخصم من العربون</b> — يدفع الباقي فقط</span></label>'
                 + '<label class="flex items-center gap-2 cursor-pointer min-h-[36px]"><input type="radio" name="credit-use" value="keep" onchange="CREDIT_CHOICE=this.value; if (selectedPaymentMethod===\'mixed\') onMixedAmountInput();"/> <span><b>يدفع المبلغ كاملاً للصندوق</b> — يبقى العربون لقطعته</span></label>'
@@ -1410,7 +1410,7 @@
         const elsewhere = Math.round((data || []).filter(r => r.store_id !== GOLDMIND_STORE_ID).reduce((a, r) => a + net(r), 0) * 100) / 100;
         const since = (data || []).filter(r => r.movement_type === 'debt_increase')
             .map(r => r.created_at).sort()[0];
-        box.innerHTML = '<b>تنبيه: على الزبون دين سابق ' + gmMoney(owed) + ' ' + CUR + '</b>'
+        box.innerHTML = '<b>تنبيه: على العميل دين سابق ' + gmMoney(owed) + ' ' + CUR + '</b>'
             + (since ? ' — أقدم دين منذ ' + gmEscapeHtml(new Date(since).toLocaleDateString('ar-AE')) : '')
             + (elsewhere > 0.009 ? '<br>منه ' + gmMoney(elsewhere) + ' ' + CUR + ' في فرع آخر.' : '');
         box.classList.remove('hidden');
@@ -2231,7 +2231,7 @@
         EDIT_LATER = await gmInvoiceLaterPaid(inv);
         const banner = document.getElementById('edit-banner');
         banner.innerHTML = '<b>تعديل الفاتورة <span dir="ltr">' + gmEscapeHtml(inv.invoice_number) + '</span></b> — رقمها وتاريخها ثابتان (' + gmEscapeHtml(gmFormatDateTime(inv.created_at)) + ').<br>'
-            + 'عدّل السعر بالضغط عليه، احذف قطعة بـ ✕ فتعود متوفرة بالمخزن، أو أضف قطعة. يُسجَّل فرق المبلغ في الصندوق أو دين الزبون بتاريخ اليوم.';
+            + 'عدّل السعر بالضغط عليه، احذف قطعة بـ ✕ فتعود متوفرة بالمخزن، أو أضف قطعة. يُسجَّل فرق المبلغ في الصندوق أو دين العميل بتاريخ اليوم.';
         banner.classList.remove('hidden');
         (inv.items || []).forEach(l => cart.push({
             cartId: ++cartCounter, line: l,

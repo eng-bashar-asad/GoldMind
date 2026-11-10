@@ -15,7 +15,7 @@ test('trader page: discount form sends the right side', async ({ page }) => {
   page.on('dialog', d => d.accept());
   await page.goto('/ledger-ar.html?trader=t1');
   await expect(page.locator('#trader-move-m2')).toContainText('خصم لصالح التاجر');
-  await page.click('button:has-text("خصم على الحساب النقدي")');
+  await page.click('button:has-text("خصم نقدي")');
   await expect(page.locator('#td-balance')).toContainText('التاجر مديون للمحل');
   await page.click('.td-for[data-for="shop"]');
   await page.fill('#td-amount', '25');

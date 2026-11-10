@@ -24,7 +24,7 @@ test('invoice profit button and customer period profit', async ({ page }) => {
   await expect(page).toHaveURL(/customer-debts/);            // stayed on the page
   await expect(page.locator('#gm-profit-total')).toHaveText('280.00');
   await page.locator('#gm-profit-modal button[aria-label="إغلاق"]').click();
-  await page.click('button:has-text("أرباحي مع هذا الزبون")');
+  await page.click('button:has-text("أرباحي مع هذا العميل")');
   await expect(page.locator('#gm-pp-total')).toHaveText('250.00'); // 280 − 30 discount
   expect(errs.filter(e => !e.includes('_getFinalPath'))).toEqual([]); // storage listing isn't faked
 });

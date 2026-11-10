@@ -58,6 +58,7 @@ test('trader page: change the date of a cash receipt from the row', async ({ pag
     trader_movements: [{ id: 'tm1', store_id: STORE, trader_id: 't1', movement_type: 'debt_increase', source: 'cash_in', fab_fee_amount: 100, gold_24k_equivalent: 0, created_at: '2026-10-05T10:00:00Z' }],
     cash_movements: [{ id: 'cm7', store_id: STORE, trader_movement_id: 'tm1' }],
   } });
+  await page.addInitScript(() => { window.ldCards = true; }); // movement cards open (on the computer they start folded under the statement)
   await page.goto('/ledger-ar.html?trader=t1');
   await page.click('button:has-text("تعديل التاريخ")');
   await page.fill('#vd-in-tm1', '2026-10-03');

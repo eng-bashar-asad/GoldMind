@@ -30,7 +30,7 @@ test('overdue customer and trader debts are listed; a cleared debt is not', asyn
   const card = page.locator('#debtAlertBox details');
   await expect(card).not.toHaveAttribute('open', '');
   await expect(card.locator('summary')).toContainText('ديون تجاوزت 15 يوماً');
-  await expect(card.locator('summary')).toContainText('1 زبائن · 1 تجار');
+  await expect(card.locator('summary')).toContainText('1 عملاء · 1 تجار');
   await expect(card.locator('summary .dchev')).toHaveCount(1);
   await expect(card.locator('a', { hasText: 'ديمة' })).toBeHidden();
   await card.locator('summary').click();
@@ -42,7 +42,7 @@ test('overdue customer and trader debts are listed; a cleared debt is not', asyn
   await expect(page.locator('#dskDebtCard')).not.toHaveClass(/\bhidden\b/);
   await expect(page.locator('#dskDebtRows a', { hasText: 'ديمة' })).toHaveAttribute('href', 'customer-debts-ar.html?open=c1');
   await expect(page.locator('#dskDebtTotalEl')).toHaveText('500.00');
-  await expect(page.locator('#dskDebtSubEl')).toHaveText('كل الفروع · 1 زبون');
+  await expect(page.locator('#dskDebtSubEl')).toHaveText('كل الفروع · 1 عميل');
 });
 
 // Alerts are for individual customers: traders (wholesale) only when turned on in company settings.

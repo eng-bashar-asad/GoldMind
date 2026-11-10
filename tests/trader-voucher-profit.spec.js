@@ -17,6 +17,7 @@ test('voucher profit popup', async ({ page }) => {
     gold_prices: [{ store_id: STORE, karat: 24, price_per_gram: 120 }],
     trader_movements: [mv('1'), mv('2')]
   } });
+  await page.addInitScript(() => { window.ldCards = true; }); // movement cards open (on the computer they start folded under the statement)
   await page.goto('/ledger-ar.html?trader=t1');
   const btn = page.locator('#trader-batch-b1 button', { hasText: 'ربح السند' });
   await expect(btn).toBeVisible();
@@ -38,6 +39,7 @@ test('trader period profit and voucher pieces link', async ({ page }) => {
     gold_prices: [{ store_id: STORE, karat: 24, price_per_gram: 120 }],
     trader_movements: [mv('1'), mv('2')]
   } });
+  await page.addInitScript(() => { window.ldCards = true; }); // movement cards open (on the computer they start folded under the statement)
   await page.goto('/ledger-ar.html?trader=t1');
   await expect(page.locator('#trader-batch-b1 a', { hasText: 'القطع' })).toHaveAttribute('href', /batch=b1/);
   await page.click('button:has-text("أرباحي مع التاجر")');

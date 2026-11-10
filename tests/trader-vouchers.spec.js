@@ -17,6 +17,7 @@ const db = (role, permissions) => ({
 
 test('owner: voucher number on the card, edit and return buttons shown', async ({ page }) => {
   await install(page, { generic: true, db: db('owner', {}) });
+  await page.addInitScript(() => { window.ldCards = true; }); // movement cards open (on the computer they start folded under the statement)
   await page.goto('/ledger-ar.html?trader=t1');
   const chip = page.locator('a[href*="trader-voucher-print-ar.html?no=TOUT-000001"]');
   await expect(chip).toBeVisible();
@@ -26,6 +27,7 @@ test('owner: voucher number on the card, edit and return buttons shown', async (
 
 test('staff without «edit_vouchers»: sees the voucher, no edit / delete / return', async ({ page }) => {
   await install(page, { generic: true, db: db('staff', { view_traders: true, edit_traders: true }) });
+  await page.addInitScript(() => { window.ldCards = true; }); // movement cards open (on the computer they start folded under the statement)
   await page.goto('/ledger-ar.html?trader=t1');
   await expect(page.locator('a[href*="TOUT-000001"]')).toBeVisible();
   await expect(page.locator('#trader-move-m1 button', { hasText: 'إرجاع للمخزن' })).toBeHidden();

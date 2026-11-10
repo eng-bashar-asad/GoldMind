@@ -16,11 +16,11 @@ test('customers page: retail list, search, edit, menu entry', async ({ page }) =
   } });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/customers-ar.html');
-  await expect(page.locator('#count')).toHaveText('زبونان');           // retail only by default
+  await expect(page.locator('#count')).toHaveText('عميلان');           // retail only by default
   await expect(page.locator('#list')).toContainText('لنا عنده 500.00 USD');
   await expect(page.locator('#list .text-success', { hasText: 'لنا عنده' })).toHaveCount(1); // same colours as the traders
   await page.fill('#q', '0955');
-  await expect(page.locator('#count')).toHaveText('1 زبون');
+  await expect(page.locator('#count')).toHaveText('1 عميل');
   await expect(page.locator('#list a:has-text("تعديل")')).toHaveAttribute('href', 'customer-edit-ar.html?id=c2');
   await page.fill('#q', '');
   await page.click('.kind[data-k="company"]');
@@ -28,14 +28,14 @@ test('customers page: retail list, search, edit, menu entry', async ({ page }) =
   await expect(page.locator('#list')).not.toContainText('ريما');          // companies never mixed with individuals
   await page.click('.kind[data-k="person"]');
   await page.click('.bal[data-b="debt"]');
-  await expect(page.locator('#count')).toHaveText('1 زبون');
+  await expect(page.locator('#count')).toHaveText('1 عميل');
   await page.click('.bal[data-b="credit"]');
-  await expect(page.locator('#count')).toHaveText('1 زبون');
+  await expect(page.locator('#count')).toHaveText('1 عميل');
   await expect(page.locator('#list')).toContainText('علينا له 200.00 USD');
   await page.click('.bal[data-b="open"]');
-  await expect(page.locator('#count')).toHaveText('زبونان');
+  await expect(page.locator('#count')).toHaveText('عميلان');
   await page.waitForSelector('#gmNav a[href="customers-ar.html"]', { state: 'attached' });
-  expect(await page.locator('#gmNav a[href="customers-ar.html"]').textContent()).toContain('الزبائن');
+  expect(await page.locator('#gmNav a[href="customers-ar.html"]').textContent()).toContain('العملاء');
   expect(await page.locator('#gmNav a[href="ledger-ar.html"]').textContent()).toContain('التجار');
   expect(errs).toEqual([]);
 });
@@ -113,9 +113,9 @@ test('customers list: totals for us / for them, and how old the oldest unpaid de
   await page.goto('/customers-ar.html');
   await expect(page.locator('#sumOwed')).toHaveText('200.00 USD');
   await expect(page.locator('#sumCredit')).toHaveText('80.00 USD');
-  await expect(page.locator('#list')).toContainText('منذ 10 يوماً');   // the 40-day debt was paid first
+  await expect(page.locator('#list')).toContainText('منذ 10 أيام');   // the 40-day debt was paid first
   await expect(page.locator('#add-fab')).not.toHaveClass(/\bhidden\b/);
-  await expect(page.locator('nav.gm-bottom-tabs a.gm-tab-on')).toHaveText(/الزبائن/);
+  await expect(page.locator('nav.gm-bottom-tabs a.gm-tab-on')).toHaveText(/العملاء/);
 });
 
 test('customers on the computer: a table (largest debt first) and the picked customer beside it', async ({ page }) => {

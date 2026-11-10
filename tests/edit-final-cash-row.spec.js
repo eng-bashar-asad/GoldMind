@@ -69,7 +69,7 @@ test('daily cashbox lists the day\'s sales with the debt part, even fully on cre
   await page.goto('/daily-cashbox-ar.html');
   const box = page.locator('#day-sales');
   await expect(box).toContainText('13,900.00');
-  await expect(box).toContainText('منها دين على الزبائن');
+  await expect(box).toContainText('منها دين على العملاء');
   await expect(box).toContainText('2,200.00');
   await expect(box).toContainText('INV-1');
 });

@@ -75,7 +75,7 @@ test('home on the computer: today\'s movements as a table coloured by kind; glos
   await expect(rows).toHaveCount(2);
   await expect(page.locator('#dskMovesTable tr[data-href="invoice-print-ar.html?id=i1"]')).toContainText('رامي');
   await expect(page.locator('#dskMovesTable tr[data-href="invoice-print-ar.html?id=i1"] .t')).toHaveText('بيع');
-  await expect(rows.filter({ hasText: 'دفعة من العميل' }).locator('.t')).toHaveText('دفعة زبون');
+  await expect(rows.filter({ hasText: 'دفعة من العميل' }).locator('.t')).toHaveText('دفعة عميل');
   await expect(page.locator('#dskActionStrip .gm-gi').first()).toBeVisible();
   await expect(page.locator('#mobActionStrip .gm-gi').last()).toBeAttached(); // the «تخصيص» tile
 });
