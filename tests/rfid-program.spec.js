@@ -68,3 +68,12 @@ test('computer: scanning while the Zebra is not connected opens the port picker 
   await expect(page.locator('#rpStatus')).toContainText('تمت البرمجة');
   expect(await page.evaluate(() => window.__w.length)).toBe(1);
 });
+
+test('an old label code with letters and spaces is found whatever the spacing', async ({ page }) => {
+  await open(page, true);
+  await page.evaluate(() => { const p = { ...RP.pieces[0], id: 'old1', barcode: 'M B 459  W', rfid_encoded_at: null }; RP.pieces.push(p); RP.byCode['M B 459  W'] = p; RP.byTight['MB459W'] = p; });
+  await page.fill('#rpCode', 'mb459w');
+  await page.press('#rpCode', 'Enter');
+  await expect(page.locator('#rpStatus')).not.toContainText('غير موجود');
+  await expect(page.locator('#rpStatus')).toContainText('M B 459');
+});

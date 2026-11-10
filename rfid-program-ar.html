@@ -104,6 +104,8 @@ const esc = v => gmEscapeHtml(v == null ? '' : String(v));
 
 function rpEpcOf(p) { return p.rfid_epc || GMZebra.buildEpcHex(p.barcode, GOLDMIND_STORE_ID); }
 function rpNorm(code) { return String(code || '').trim().toUpperCase(); }
+// old labels have letters and spaces («M B 459  W»); a scanner or a typist rarely gives the same spacing
+const rpTight = code => rpNorm(code).replace(/[\s\-_.]+/g, '');
 
 function rpTone(ok) {
   try {
@@ -134,7 +136,7 @@ function rpTab(btn) {
 function rpRenderList() {
   const q = rpNorm(document.getElementById('rpFilter').value);
   let rows = RP.tab === 'todo' ? RP.pieces.filter(p => !p.rfid_encoded_at) : RP.session.map(id => RP.pieces.find(p => p.id === id)).filter(Boolean);
-  if (q) rows = rows.filter(p => rpNorm(p.barcode).includes(q) || rpNorm(p.description_ar).includes(q));
+  if (q) rows = rows.filter(p => rpNorm(p.barcode).includes(q) || rpTight(p.barcode).includes(rpTight(q)) || rpNorm(p.description_ar).includes(q));
   const el = document.getElementById('rpList');
   if (!rows.length) { el.innerHTML = '<p class="text-center text-[color:var(--gm-on-surface-variant)] py-6">' + (RP.tab === 'todo' ? 'كل القطع مبرمجة.' : 'لم تُبرمج شرائح في هذه الجلسة بعد.') + '</p>'; return; }
   el.innerHTML = rows.slice(0, 200).map(p => '<button type="button" class="flex items-center gap-3 py-2 text-start w-full" onclick="rpPick(\'' + esc(p.barcode) + '\')">'
@@ -179,7 +181,7 @@ async function rpProgram(raw) {
   if (!code || RP.busy) return;
   // saving the chip on the piece needs «تعديل القطعة»: check before writing anything on the label
   if (!RP.canEdit) { rpTone(false); rpStatus('err', 'ليس لديك صلاحية «تعديل القطع» — اطلبها من المدير قبل برمجة الشرائح.'); return; }
-  const p = RP.byCode[code];
+  const p = RP.byCode[code] || RP.byTight[rpTight(code)]; // exact first, then ignoring spaces (only when one piece fits)
   const input = document.getElementById('rpCode');
   if (!p) { rpTone(false); rpStatus('err', 'الباركود <b class="num">' + esc(code) + '</b> غير موجود بين قطع المخزن المتوفرة.'); input.select(); return; }
   if (p.rfid_encoded_at && !confirm('القطعة ' + p.barcode + ' مبرمجة من قبل. إعادة كتابة شريحتها؟')) { input.value = ''; input.focus(); return; }
@@ -248,7 +250,11 @@ window.addEventListener('pagehide', () => { if (rpCam) { try { rpCam.stop(); } c
     .eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved']).order('barcode'));
   if (res.error) { rpStatus('err', 'تعذّر تحميل القطع: ' + esc(res.error.message)); return; }
   RP.pieces = res.data || [];
-  RP.pieces.forEach(p => { RP.byCode[rpNorm(p.barcode)] = p; if (p.rfid_encoded_at) RP.byEpc[rpEpcOf(p)] = p; });
+  RP.byTight = {};
+  RP.pieces.forEach(p => {
+    RP.byCode[rpNorm(p.barcode)] = p; if (p.rfid_encoded_at) RP.byEpc[rpEpcOf(p)] = p;
+    const k = rpTight(p.barcode); RP.byTight[k] = k in RP.byTight ? null : p; // two pieces with the same tight code: no guess
+  });
   rpCounts(); rpRenderList();
   document.getElementById('rpCode').focus();
 })();
