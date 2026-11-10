@@ -88,6 +88,8 @@
    and the history list gets its own light card */
 html:not(.gm-light-canvas) .gm-on-canvas, html:not(.gm-light-canvas) #gmPieceTitle{color:#F4F1EA!important}
 html:not(.gm-light-canvas) #gmPieceBarcode{color:#C9CED8!important}
+/* opening the edit box scrolls to it: stop below the fixed header, not under it */
+#gmEditBox{scroll-margin-top:76px}
 html:not(.gm-light-canvas) #piece-log-list{background:#FFFDF8!important;border-radius:20px;padding:12px 26px 12px 12px}
 html:not(.gm-light-canvas) #piece-log-list.gm-tl:before{right:13px}
 html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
@@ -145,7 +147,7 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <div class="flex justify-between items-center px-4 w-full h-16">
 <div class="flex items-center gap-3">
 <button onclick="gmSmartBack('inventory-list-ar.html')" class="gm-back" aria-label="رجوع"><span class="material-symbols-outlined">arrow_forward</span></button>
-<h1 class="gm-on-canvas" style="margin:0;font-size:18px;font-weight:700;color:#1F1A12;">بيانات القطعة</h1>
+<h1 class="gm-on-canvas" style="margin:0;font-size:18px;font-weight:700;color:#1F1A12;">بيانات القطعة<span id="gmHeadCode" dir="ltr" class="font-data-mono" style="display:inline-block;font-size:14px;font-weight:600;opacity:.8;margin:0 10px;unicode-bidi:isolate"></span></h1>
 </div>
 <div id="pcNav" class="hidden items-center gap-1">
 <button type="button" id="pcPrev" class="gm-hit w-10 h-10 rounded-full flex items-center justify-center" aria-label="القطعة السابقة" title="القطعة السابقة (→)"><span class="material-symbols-outlined">chevron_right</span></button>
@@ -942,6 +944,7 @@ function gmRenderPieceView() {
   const p = currentPiece; if (!p) return;
   document.getElementById('gmPieceTitle').textContent = [p.piece_type, p.category1].filter(Boolean).join(' · ') || 'قطعة';
   document.getElementById('gmPieceBarcode').textContent = p.barcode || '';
+  document.getElementById('gmHeadCode').textContent = p.barcode || ''; // stays in the fixed header while the page scrolls
   const st = GM_STATUS[p.status] || [p.status, '#EDE7DA', '#6B6150'];
   const chip = document.getElementById('gmPieceStatus');
   chip.textContent = st[0]; chip.style.background = st[1]; chip.style.color = st[2];
