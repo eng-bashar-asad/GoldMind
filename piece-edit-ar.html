@@ -334,6 +334,8 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <option value="given_to_trader" disabled="">معطاة لتاجر (من سند إخراج بضاعة — عدّل من صفحة سجل حركات التاجر)</option>
 <option value="at_intermediary" disabled="">عند وسيط تعديل (من صفحة إخراج وإدخال بضاعة)</option>
 <option value="reworked" disabled="">حُوّلت لقطع جديدة</option>
+<option value="gifted" disabled="">هدية (من صفحة الهدايا)</option>
+<option value="cancelled">ملغاة</option>
 </select>
 </div>
 </div>
@@ -700,7 +702,10 @@ async function load() {
   document.getElementById('center-stone-carat').value = piece.center_stone_carat != null ? piece.center_stone_carat : '';
   document.getElementById('center-stone-price').value = piece.center_stone_price_per_carat != null ? piece.center_stone_price_per_carat : '';
   document.getElementById('zircon-carat').value = piece.zircon_carat != null ? piece.zircon_carat : '';
-  document.getElementById('status').value = piece.status;
+  // a status the list doesn't know (older data) is kept as it is: saving must never blank it
+  const stSel = document.getElementById('status');
+  stSel.value = piece.status;
+  if (piece.status && stSel.value !== piece.status) { stSel.add(new Option(piece.status, piece.status)); stSel.value = piece.status; }
   setColor(piece.color || 'Gold');
   loadClassificationOptions('piece-type', 'type', 'النوع', piece.piece_type || '');
   loadClassificationOptions('category1', 'category1', 'صنف ١', piece.category1 || '');
@@ -799,7 +804,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   const centerStoneCarat = centerStoneCaratInput === '' ? null : parseFloat(centerStoneCaratInput);
   const centerStonePriceInput = document.getElementById('center-stone-price').value;
   const centerStonePrice = centerStonePriceInput === '' ? null : parseFloat(centerStonePriceInput);
-  const status = document.getElementById('status').value;
+  const status = document.getElementById('status').value || (currentPiece && currentPiece.status) || 'available';
 
   if (!weight || weight <= 0) { showMessage('فضلاً أدخل وزناً صحيحاً.', true); return; }
 
