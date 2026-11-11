@@ -4,7 +4,7 @@ const { test, expect } = require('@playwright/test');
 const { install, STORE, USER, STAFF } = require('./fake-backend');
 const O = { store_id: STORE, trader_id: 't0' };
 test('statement: a two-piece voucher is one line, directions and balances are right', async ({ page }) => {
-  await install(page, { generic: true, db: {
+  await install(page, { generic: true, realCdn: true, db: {
     stores: [{ id: STORE, name: 'محل', currency: 'USD' }],
     staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
     user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
@@ -17,6 +17,9 @@ test('statement: a two-piece voucher is one line, directions and balances are ri
   await page.goto('/ledger-ar.html?trader=t0');
   const rows = page.locator('#ldStatement tbody tr');
   await expect(rows).toHaveCount(2);
+  // on the computer it sits right under the account card, not a screen further down (row gaps × 40 spanned rows)
+  const top = await page.locator('#ldStatement').evaluate(e => e.getBoundingClientRect().top);
+  expect(top).toBeLessThan(700);
   await expect(rows.nth(0)).toContainText('صادر للتاجر');
   await expect(rows.nth(0)).toContainText('2 قطع');
   await expect(rows.nth(0).locator('td[data-l="الوزن القائم"]')).toContainText('12');
