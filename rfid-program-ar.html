@@ -181,6 +181,8 @@ async function rpProgram(raw) {
   if (!code || RP.busy) return;
   // saving the chip on the piece needs «تعديل القطعة»: check before writing anything on the label
   if (!RP.canEdit) { rpTone(false); rpStatus('err', 'ليس لديك صلاحية «تعديل القطع» — اطلبها من المدير قبل برمجة الشرائح.'); return; }
+  // a code read before the piece list finished loading (old error: «reading '000571'»)
+  if (!RP.byTight) { rpTone(false); rpStatus('err', 'جارٍ تحميل قطع المخزن، انتظر لحظة ثم أعد قراءة الباركود.'); return; }
   const p = RP.byCode[code] || RP.byTight[rpTight(code)]; // exact first, then ignoring spaces (only when one piece fits)
   const input = document.getElementById('rpCode');
   if (!p) { rpTone(false); rpStatus('err', 'الباركود <b class="num">' + esc(code) + '</b> غير موجود بين قطع المخزن المتوفرة.'); input.select(); return; }
@@ -250,11 +252,12 @@ window.addEventListener('pagehide', () => { if (rpCam) { try { rpCam.stop(); } c
     .eq('store_id', GOLDMIND_STORE_ID).in('status', ['available', 'reserved']).order('barcode'));
   if (res.error) { rpStatus('err', 'تعذّر تحميل القطع: ' + esc(res.error.message)); return; }
   RP.pieces = res.data || [];
-  RP.byTight = {};
+  const byTight = {};
   RP.pieces.forEach(p => {
     RP.byCode[rpNorm(p.barcode)] = p; if (p.rfid_encoded_at) RP.byEpc[rpEpcOf(p)] = p;
-    const k = rpTight(p.barcode); RP.byTight[k] = k in RP.byTight ? null : p; // two pieces with the same tight code: no guess
+    const k = rpTight(p.barcode); byTight[k] = k in byTight ? null : p; // two pieces with the same tight code: no guess
   });
+  RP.byTight = byTight; // set last: its presence means the list is ready
   rpCounts(); rpRenderList();
   document.getElementById('rpCode').focus();
 })();
