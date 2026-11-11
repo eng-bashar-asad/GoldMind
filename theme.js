@@ -1695,24 +1695,22 @@ function gmClosePhotoViewer() {
   var css = [
     // the transparent fill is inherited: anything inside a gradient word that has a colour or a
     // background of its own gets its normal fill back (zero specificity, so a gradient rule on it still wins)
-    ':where(html.gm-gloss) :where([class*="text-"],[class*="dc-amt"],[style*="color"]) :where([class*="text-"],[class*="bg-"],[style*="color"],[style*="background"],button,input,select,textarea){-webkit-text-fill-color:currentColor}',
+    ':where(html.gm-gloss) :where(.text-primary,.text-secondary,.text-success,.text-error,.dc-amt-in,.dc-amt-out,.gm-ink-green,.gm-ink-red,.gm-ink-blue,.gm-ink-amber,.gm-ink-violet,h1,h2) :where(.text-white,.text-on-surface,.text-on-surface-variant,.text-outline,.text-on-primary,.text-on-secondary,[class*="bg-"],button,input,select,textarea){-webkit-text-fill-color:currentColor}',
     // words
     text('.gm-ink-green,.text-success,.text-green-600,.text-green-700,.text-green-800,.text-emerald-700,.text-emerald-800,.text-teal-700', INK.green),
     text('.gm-ink-red,.text-error,.text-red-400,.text-red-600,.text-red-700,.text-red-800,.text-rose-700', INK.red),
     text('.gm-ink-blue,.text-blue-700,.text-indigo-800,.text-sky-700', INK.blue),
     text('.gm-ink-amber,.text-amber-700,.text-amber-800,.text-amber-900,.text-orange-700,.text-yellow-700', INK.amber),
     // hard-coded page colours (inline styles and a few page classes)
-    text('.dc-amt-in,[style*="color:#1B5E20" i]:not([style*="background" i]),[style*="color: #1B5E20" i]:not([style*="background" i]),[style*="color:#15803D" i]:not([style*="background" i]),[style*="color: #15803D" i]:not([style*="background" i]),[style*="color:#2E7D32" i]:not([style*="background" i]),[style*="color: #2E7D32" i]:not([style*="background" i]),[style*="color:#16A34A" i]:not([style*="background" i]),[style*="color: #16A34A" i]:not([style*="background" i]),[style*="color:#047857" i]:not([style*="background" i]),[style*="color: #047857" i]:not([style*="background" i]),[style*="color:#166534" i]:not([style*="background" i]),[style*="color: #166534" i]:not([style*="background" i])', INK.green),
-    text('.dc-amt-out,[style*="color:#B91C1C" i]:not([style*="background" i]),[style*="color: #B91C1C" i]:not([style*="background" i]),[style*="color:#B3261E" i]:not([style*="background" i]),[style*="color: #B3261E" i]:not([style*="background" i]),[style*="color:#C62828" i]:not([style*="background" i]),[style*="color: #C62828" i]:not([style*="background" i]),[style*="color:#DC2626" i]:not([style*="background" i]),[style*="color: #DC2626" i]:not([style*="background" i]),[style*="color:#991B1B" i]:not([style*="background" i]),[style*="color: #991B1B" i]:not([style*="background" i])', INK.red),
-    text('[style*="color:#B45309" i]:not([style*="background" i]),[style*="color: #B45309" i]:not([style*="background" i]),[style*="color:#9A3412" i]:not([style*="background" i]),[style*="color: #9A3412" i]:not([style*="background" i])', INK.amber),
-    text('[style*="color:#1D4ED8" i]:not([style*="background" i]),[style*="color: #1D4ED8" i]:not([style*="background" i])', INK.blue),
+    text('.dc-amt-in', INK.green),
+    text('.dc-amt-out', INK.red),
     chip('.dc-tag.ok', '#E6F8EF', '#CDEFE3', ''),
     chip('.dc-tag.warn', '#FFF3DA', '#F9DFA6', ''),
     text('.gm-ink-violet,.text-purple-700,.text-violet-700', INK.violet),
     text('.text-secondary,h1:not([class*="text-"]),h2:not([class*="text-"])', INK.accent),
     text('.text-primary', INK.ink),
     // icons with no colour of their own, on light cards, take the theme's metal
-    text(':is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-surface-container,.bg-white,main) .material-symbols-outlined:not([class*="text-"]):not(:is(.bg-primary,.bg-secondary,.bg-error,.bg-success,.gm-cta,[class*="bg-green-6"],[class*="bg-green-7"],[class*="bg-amber-6"]) *)', INK.accent),
+    text(':is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-white) > .material-symbols-outlined:not([class*="text-"]),:is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-white) > :not(button) > .material-symbols-outlined:not([class*="text-"])', INK.accent),
     // chips and soft blocks
     chip('.bg-green-50,.bg-emerald-50', '#ECFDF5', '#D5F5EC', '#A7E8D2'),
     chip('.bg-green-100,.bg-success-container', '#DDF8EC', '#C3EEE2', '#9FDDC8'),
@@ -1731,15 +1729,11 @@ function gmClosePhotoViewer() {
     // cards: pearl gradient, a faint diagonal reflection and a gold-tinted shadow
     G + ':is(.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white):not(input):not(select):not(textarea):not(button)' +
       '{background-image:linear-gradient(112deg,rgba(255,255,255,0) 0 34%,rgba(255,255,255,.65) 40%,rgba(255,255,255,0) 47%),linear-gradient(160deg,#fff 0%,color-mix(in srgb,var(--gm-surface-low,#EFE7D2) 38%,#fff) 100%);' +
-      'box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.04),0 10px 26px -18px color-mix(in srgb,var(--gm-accent) 70%,transparent)}',
+      'box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.04),0 4px 10px -8px color-mix(in srgb,var(--gm-accent) 60%,transparent)}',
     // selected options (radio/checkbox chips, tabs) shine in the theme's metal
     G + ':is(label,button)[class*="has-[:checked]"]:has(:checked),' + G + '[aria-selected="true"]:not(option),' + G + '[aria-pressed="true"]' +
       '{background-image:' + GLASS + ',linear-gradient(135deg,color-mix(in srgb,var(--gm-accent) 22%,#fff),color-mix(in srgb,var(--gm-accent) 42%,#fff))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px color-mix(in srgb,var(--gm-accent) 55%,transparent)}',
     // a slow wave across page titles and the main action
-    '@keyframes gmWave{0%{background-position:0% 50%}100%{background-position:200% 50%}}',
-    G + 'h1:not([class*="text-"])' + noBg + ',' + G + 'h1.text-primary' + noBg + '{background-size:200% 100%;animation:gmWave 7s linear infinite}',
-    G + '.gm-cta{animation:gmWave 6s linear infinite}',
-    '@media (prefers-reduced-motion:reduce){' + G + 'h1,' + G + '.gm-cta{animation:none}}',
   ].join('\n');
   css = '@media screen{' + css + '}';
   var st = document.createElement('style');
