@@ -75,3 +75,36 @@ test('scrap from an individual lands in the karat scrap box with seller ID', asy
   expect(docs.map(d => d.document_category).sort()).toEqual(['seller_id_back', 'seller_id_front']);
   expect(docs.every(d => d.owner_type === 'invoice' && d.owner_id === 'inv-scrap')).toBe(true);
 });
+
+// Bashar 2026-11-12: «سند مشتريات من زبائن أفراد» in SYP — typed in SYP, stored in the shop's currency
+// with pay_currency/pay_fx_rate (the cash box then records SYP).
+test('scrap bought in SYP: amounts typed in SYP, sent in the shop currency with the rate', async ({ page }) => {
+  const posts = {};
+  await install(page, {
+    db: {
+      stores: [{ id: STORE, currency: 'USD', name: 'محل', secondary_currency: 'SYP', secondary_currency_rate: 14000 }],
+      staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'Owner' }],
+      user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+      gold_prices: [{ store_id: STORE, karat: 21, price_per_gram: 100 }],
+      traders: [],
+    },
+    rpc: { post_purchase_invoice: (args) => { posts.rpc = args; return { body: { id: 'inv-syp', invoice_number: 'PINV-2026-000010' } }; } },
+  });
+  page.on('dialog', d => d.accept());
+  await page.goto('/create-invoice-v2-ar.html');
+  await page.click('#tabRetail');
+  await expect(page.locator('#pcur option')).toHaveCount(6);
+  await page.selectOption('#pcur', 'SYP');
+  await expect(page.locator('#pcur-rate')).toHaveValue('14000'); // the store's SYP rate by default
+  await page.fill('#retail-name', 'زبون');
+  await page.selectOption('#manual-karat', '21');
+  await page.fill('#manual-weight', '10');
+  await page.fill('#manual-price', '12600000');
+  await expect(page.locator('#scrap-ref')).toContainText('14,000,000 SYP'); // 10 g × 100 USD × 14000
+  await page.click('button[onclick="addManualToCart()"]');
+  await expect(page.locator('#grand-total')).toHaveText('12600000.00 SYP');
+  await page.click('#save-invoice-btn');
+  await expect.poll(() => posts.rpc && posts.rpc.p).toBeTruthy();
+  expect(posts.rpc.p).toMatchObject({ pay_currency: 'SYP', pay_fx_rate: 14000 });
+  expect(posts.rpc.p.items[0]).toMatchObject({ price: 900, weight: 10, karat: 21 });
+});

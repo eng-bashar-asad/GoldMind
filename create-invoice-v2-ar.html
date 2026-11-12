@@ -67,6 +67,16 @@
 <button class="tab-btn flex-1 py-2.5 rounded-md text-sm font-semibold" id="tabRetail" onclick="setPurchaseType('buyRetail')">شراء من فرد</button>
 </div>
 
+<!-- Prices and payment in another currency, like the sale screen (بشار 2026-11-12: buy in SYP) -->
+<div class="flex flex-wrap items-center gap-2 bg-surface-container-lowest border border-outline-variant rounded-xl px-3 py-2 text-[13px]" id="pcur-bar">
+<label for="pcur" class="font-semibold">عملة الأسعار والدفع</label>
+<select id="pcur" class="h-9 min-w-[12rem] border border-outline-variant rounded-lg px-2 bg-surface-container-lowest" onchange="gmSetPCur(this.value)"></select>
+<span id="pcur-rate-wrap" class="hidden items-center gap-1">سعر الصرف: 1 <span id="pcur-base"></span> =
+<input id="pcur-rate" type="number" step="any" min="0" inputmode="decimal" class="w-28 h-9 border border-outline-variant rounded-lg px-2 text-left font-data-mono" oninput="gmSetPRate(this.value)" aria-label="سعر الصرف"/>
+<span id="pcur-sym"></span></span>
+<p id="pcur-hint" class="hidden w-full text-[11.5px] text-on-surface-variant">اكتب الأسعار بهذه العملة؛ تُحفظ الفاتورة بعملة المحل حسب سعر الصرف، ويُسجَّل المبلغ في الصندوق بهذه العملة.</p>
+</div>
+
 <!-- Trader / Seller Info -->
 <section class="bg-surface-container-lowest border border-outline-variant p-4 rounded-xl shadow-sm">
 <h2 class="font-label-md text-label-md text-on-surface-variant uppercase tracking-wider mb-4" id="counterparty-label">معلومات التاجر</h2>
@@ -384,7 +394,7 @@
 </div>
 <div class="pt-2 flex justify-between items-end">
 <span class="text-primary font-bold font-headline-md text-headline-md">الإجمالي النقدي المدفوع الآن</span>
-<span class="text-primary font-bold text-headline-md font-headline-md" id="grand-total">0.00 AED</span>
+<span class="text-primary font-bold text-headline-md font-headline-md" id="grand-total">0.00</span>
 </div>
 </div>
 
@@ -458,6 +468,42 @@
     // close shouldn't lose all of it. attachmentFile (a File object) can't
     // survive localStorage, so it's intentionally left out of the draft —
     // the person re-attaches it if needed after restoring.
+    // ---------- Currency of the prices / payment ----------
+    // Amounts are typed in PCUR.code; the invoice is stored in the shop's currency (amount / rate)
+    // with pay_currency + pay_fx_rate, so the cash box records the payment in PCUR.code.
+    const PCUR = { base: 'USD', code: null, rate: 0 };
+    const gmPCurOn = () => !!(PCUR.code && PCUR.code !== PCUR.base);
+    const gmPCurSym = () => gmPCurOn() ? PCUR.code : PCUR.base;
+    function gmSetPCur(code) {
+        PCUR.code = code && code !== PCUR.base ? code : null;
+        const on = gmPCurOn();
+        const wrap = document.getElementById('pcur-rate-wrap');
+        wrap.classList.toggle('hidden', !on); wrap.classList.toggle('inline-flex', on);
+        document.getElementById('pcur-hint').classList.toggle('hidden', !on);
+        document.getElementById('pcur-sym').textContent = on ? PCUR.code : '';
+        if (on && !(PCUR.rate > 0)) {
+            const sec = window.__gmPSecondary || {};
+            PCUR.rate = sec.code === PCUR.code && sec.rate > 0 ? sec.rate : 0;
+            document.getElementById('pcur-rate').value = PCUR.rate || '';
+        }
+        if (typeof renderCart === 'function') renderCart();
+        if (typeof updateScrapRef === 'function') updateScrapRef();
+    }
+    function gmSetPRate(v) { PCUR.rate = Number(v) || 0; saveDraftToLocalStorage(); if (typeof updateScrapRef === 'function') updateScrapRef(); }
+    (async function __loadPCurrencies() {
+        await requireGoldMindSession('login-entry-ar.html');
+        const { data } = await goldmindClient.from('stores').select('currency, secondary_currency, secondary_currency_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
+        PCUR.base = (data && data.currency || 'AED').toUpperCase();
+        window.__gmPSecondary = data && data.secondary_currency ? { code: data.secondary_currency.toUpperCase(), rate: Number(data.secondary_currency_rate) || 0 } : {};
+        const codes = [PCUR.base, window.__gmPSecondary.code, 'SYP', 'USD', 'EUR', 'AED', 'TRY', 'SAR'].filter((c, i, a) => c && a.indexOf(c) === i);
+        const sel = document.getElementById('pcur');
+        sel.innerHTML = codes.map(c => `<option value="${c}">${c}${c === PCUR.base ? ' (عملة المحل)' : ''}</option>`).join('');
+        document.getElementById('pcur-base').textContent = PCUR.base;
+        const d = window.__gmPDraftCur;
+        if (d && d.code) { PCUR.rate = Number(d.rate) || 0; document.getElementById('pcur-rate').value = PCUR.rate || ''; sel.value = d.code; }
+        gmSetPCur(sel.value);
+    })();
+
     const DRAFT_KEY = 'gm_purchase_draft_' + GOLDMIND_STORE_ID;
 
     function saveDraftToLocalStorage() {
@@ -468,6 +514,7 @@
             }
             localStorage.setItem(DRAFT_KEY, JSON.stringify({
                 cart, cartCounter, purchaseType, selectedTrader, selectedPaymentMethod,
+                pcur: gmPCurOn() ? { code: PCUR.code, rate: PCUR.rate } : null,
                 savedAt: new Date().toISOString()
             }));
         } catch (e) { /* storage unavailable (private mode, quota) — silently skip, not critical */ }
@@ -490,6 +537,11 @@
 
         cart.push(...draft.cart);
         cartCounter = draft.cartCounter || draft.cart.length;
+        if (draft.pcur && draft.pcur.code) {
+            window.__gmPDraftCur = draft.pcur;
+            const sel = document.getElementById('pcur');
+            if (sel.options.length) { PCUR.rate = Number(draft.pcur.rate) || 0; document.getElementById('pcur-rate').value = PCUR.rate || ''; sel.value = draft.pcur.code; gmSetPCur(sel.value); }
+        }
         if (draft.purchaseType) setPurchaseType(draft.purchaseType);
         selectedPaymentMethod = draft.selectedPaymentMethod || 'cash';
         if (draft.selectedTrader) pickTrader(draft.selectedTrader);
@@ -610,11 +662,14 @@
             document.getElementById('itemModeHint').textContent = 'ذهب كسر يُحفظ بالوزن في مستودع «كسر ' + karat + '» حسب العيار.';
         }
         if (!show) return;
-        const ref = weight * perGram;
-        let txt = 'قيمته حسب سعر اليوم (عيار ' + karat + '): ' + gmMoney(ref);
+        // the day's price is in the shop's currency: shown in the purchase currency when another one is chosen
+        const fx = gmPCurOn() && PCUR.rate > 0 ? PCUR.rate : 1;
+        const fm = v => fx !== 1 ? v.toLocaleString('en-US', { maximumFractionDigits: 2 }) + ' ' + PCUR.code : gmMoney(v);
+        const ref = weight * perGram * fx;
+        let txt = 'قيمته حسب سعر اليوم (عيار ' + karat + '): ' + fm(ref);
         if (price > 0) txt += ' — المبلغ المدفوع = ' + Math.round(price / ref * 100) + '% من هذه القيمة'
             // the profit part only for the owner / profit-report permission
-            + (window.__ciCanProfit ? ' — ' + (ref - price >= 0 ? 'ربح شراء الكسر: ' : 'خسارة شراء الكسر: ') + gmMoney(Math.abs(ref - price)) + ' (يظهر بتقرير الأرباح ولا يدخل الصندوق)' : '');
+            + (window.__ciCanProfit ? ' — ' + (ref - price >= 0 ? 'ربح شراء الكسر: ' : 'خسارة شراء الكسر: ') + fm(Math.abs(ref - price)) + ' (يظهر بتقرير الأرباح ولا يدخل الصندوق)' : '');
         el.textContent = txt;
     }
     ['manual-karat', 'manual-weight', 'manual-price'].forEach(id => {
@@ -1135,7 +1190,7 @@
         const body = document.getElementById('cart-body');
         if (cart.length === 0) {
             body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
-            document.getElementById('grand-total').textContent = '0.00 AED';
+            document.getElementById('grand-total').textContent = '0.00 ' + gmPCurSym();
             document.getElementById('fab-fee-total-row').classList.add('hidden');
             document.getElementById('fab-fee-total-row').classList.remove('flex');
             document.getElementById('fab-fee-vat-total-row').classList.add('hidden');
@@ -1173,7 +1228,7 @@
             </tr>
         `; }).join('');
         const total = cart.reduce((sum, item) => sum + item.price, 0);
-        document.getElementById('grand-total').textContent = total.toFixed(2) + ' AED';
+        document.getElementById('grand-total').textContent = total.toFixed(2) + ' ' + gmPCurSym();
 
         const fabFeeTotal = cart.reduce((sum, item) => sum + (item.fabFee || 0), 0);
         const fabFeeVatTotal = cart.reduce((sum, item) => sum + (item.fabFeeVat || 0), 0);
@@ -1191,7 +1246,7 @@
         const showTraderDebt = purchaseType === 'buyTrader' && selectedPaymentMethod === 'credit' && traderDebtTotal > 0;
         document.getElementById('trader-debt-total-row').classList.toggle('hidden', !showTraderDebt);
         document.getElementById('trader-debt-total-row').classList.toggle('flex', showTraderDebt);
-        document.getElementById('trader-debt-total').textContent = traderDebtTotal.toFixed(2) + ' AED';
+        document.getElementById('trader-debt-total').textContent = traderDebtTotal.toFixed(2) + ' ' + gmPCurSym();
         saveDraftToLocalStorage();
     }
 
@@ -1219,8 +1274,13 @@
             return;
         }
 
+        if (gmPCurOn() && !(PCUR.rate > 0)) {
+            showMessage('أدخل سعر صرف ' + PCUR.code + ' مقابل ' + PCUR.base + ' أولاً.', true);
+            document.getElementById('pcur-rate').focus();
+            return;
+        }
         const confirmTotal = cart.reduce((sum, item) => sum + item.price, 0);
-        if (!confirm('هل أنت متأكد من ترحيل فاتورة الشراء هذه بقيمة ' + confirmTotal.toFixed(2) + '؟\nبعد الترحيل تحصل الفاتورة على رقم رسمي ثابت ولن تتمكن من تعديلها — لكن يمكنك إلغاؤها لاحقاً عند الحاجة.')) {
+        if (!confirm('هل أنت متأكد من ترحيل فاتورة الشراء هذه بقيمة ' + confirmTotal.toFixed(2) + ' ' + gmPCurSym() + (gmPCurOn() ? ' (= ' + (confirmTotal / PCUR.rate).toFixed(2) + ' ' + PCUR.base + ')' : '') + '؟\nبعد الترحيل تحصل الفاتورة على رقم رسمي ثابت ولن تتمكن من تعديلها — لكن يمكنك إلغاؤها لاحقاً عند الحاجة.')) {
             return;
         }
 
@@ -1262,6 +1322,8 @@
 
         // Everything else (invoice, new pieces/lots, items, cash out, trader
         // debt) is written by ONE database transaction: all of it or none.
+        // typed in PCUR.code → stored in the shop's currency
+        const toBase = (v, dp = 2) => { const n = Number(v) || 0; if (!gmPCurOn()) return n; const f = Math.pow(10, dp); return Math.round(n / PCUR.rate * f) / f; };
         const { data: posted, error: postError } = await goldmindClient.rpc('post_purchase_invoice', { p: {
             store_id: GOLDMIND_STORE_ID,
             client_ref: purchaseRef,
@@ -1274,22 +1336,24 @@
             seller_id_number: purchaseType === 'buyRetail' ? (document.getElementById('seller-id-number').value.trim() || null) : null,
             attachment_url: attachmentUrl,
             bulk_photos: bulkPhotoUrls,
+            pay_currency: gmPCurOn() ? PCUR.code : null,
+            pay_fx_rate: gmPCurOn() ? PCUR.rate : null,
             items: cart.map(item => ({
                 mode: item.mode || 'piece',
-                price: item.price || 0,
+                price: toBase(item.price || 0),
                 karat: item.karat,
                 weight: item.weight,
-                fab_fee: item.fabFee || 0,
-                fab_fee_vat: item.fabFeeVat || 0,
-                fab_per_gram: item.fabPerGram || 0,
+                fab_fee: toBase(item.fabFee || 0),
+                fab_fee_vat: toBase(item.fabFeeVat || 0),
+                fab_per_gram: toBase(item.fabPerGram || 0, 4),
                 description: item.description,
                 box_name: item.boxName || null,
                 diamond_carat: item.diamondCarat,
-                diamond_price_per_carat: item.diamondPricePerCarat,
+                diamond_price_per_carat: item.diamondPricePerCarat == null ? item.diamondPricePerCarat : toBase(item.diamondPricePerCarat, 4),
                 has_gold: !!item.hasGold,
                 gold_weight: item.goldWeight,
                 gold_karat: item.goldKarat,
-                gold_fab_cost: item.goldFabCost,
+                gold_fab_cost: item.goldFabCost == null || item.goldFabCost === '' ? item.goldFabCost : toBase(item.goldFabCost, 4),
                 shape: item.shape, clarity: item.clarity, cut: item.cut, color: item.color,
                 cert_lab: item.certLab, cert_number: item.certNumber
             }))
@@ -1301,6 +1365,12 @@
         }
         window.__purchaseRef = null;
         const invoiceRow = { id: posted.id, invoice_number: posted.invoice_number };
+        // ponytail: until the database update 20261112170000_purchase_pay_currency.sql is run, the server
+        // ignores the currency (the purchase is still right in the shop's currency, the cash box shows it there).
+        if (gmPCurOn()) {
+            const { data: chk } = await goldmindClient.from('invoices').select('pay_currency').eq('id', posted.id).maybeSingle();
+            if (chk && !chk.pay_currency) alert('حُفظت الفاتورة بعملة المحل (' + PCUR.base + '). لتُسجَّل في الصندوق بعملة ' + PCUR.code + ' يلزم تحديث قاعدة البيانات أولاً.');
+        }
 
         // Seller ID photos (optional). The purchase is already saved, so a failed
         // upload only warns; the photos can be retaken from the invoice page.

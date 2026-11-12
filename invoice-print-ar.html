@@ -740,7 +740,8 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
         } else {
         const itemsBody = document.getElementById('items-body');
         // a sale priced in another currency (e.g. SYP) prints entirely in it
-        const payRate = (!isPurchaseDoc && invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) ? Number(invoice.pay_fx_rate) : 0;
+        // (a purchase from an individual too, since 2026-11-12; a trader purchase keeps its own layout in the shop's currency)
+        const payRate = (invoice.type !== 'buyTrader' && invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) ? Number(invoice.pay_fx_rate) : 0;
         // exchange invoice: the returned pieces first, under their own heading, shown without a minus
         const isExchange = !!invoice.is_exchange;
         const printItems = isExchange ? [...(items || [])].sort((a, b) => (Number(a.line_total) < 0 ? 0 : 1) - (Number(b.line_total) < 0 ? 0 : 1)) : (items || []);
@@ -785,8 +786,8 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
             // at save time in create-invoice-v2-ar.html (0 for buyRetail;
             // VAT-on-fabrication-fee-only for buyTrader) — this also covers
             // the fabrication fee amount, which never appears in line_total.
-            sumTax = Number(invoice.vat_amount || 0);
-            sumTotal = Number(invoice.total_amount || sumTotal);
+            sumTax = Number(invoice.vat_amount || 0) * (payRate || 1);
+            sumTotal = invoice.total_amount ? Number(invoice.total_amount) * (payRate || 1) : sumTotal;
             sumBeforeTax = sumTotal - sumTax;
         }
         } // end of the non-buyTrader items rendering branch
@@ -819,7 +820,7 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 
         const PAY_SYM = { SYP: 'SYP', EUR: 'EUR', USD: 'USD', AED: 'AED', TRY: 'TRY', SAR: 'SAR' };
         const payFmt = v => Number(v).toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 2 }) + ' ' + (PAY_SYM[invoice.pay_currency] || invoice.pay_currency);
-        const money = v => (!isPurchaseDoc && invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) ? payFmt(v) : gmFormatDualCurrency(v, store);
+        const money = v => (invoice.type !== 'buyTrader' && invoice.pay_currency && Number(invoice.pay_fx_rate) > 0) ? payFmt(v) : gmFormatDualCurrency(v, store);
         if (invoice.is_exchange) {
             // the total is the difference: say who owes whom instead of printing a minus
             document.getElementById('sum-total-label').textContent = sumTotal > 0.004 ? 'الفرق المستحق على الزبون' : sumTotal < -0.004 ? 'الفرق المردود للزبون' : 'بدون فرق';
