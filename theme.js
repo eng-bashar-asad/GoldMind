@@ -411,7 +411,7 @@ const GOLDMIND_THEMES = {
   var css = [
     '@media screen{',
     // the walnut canvas with gold grain
-    T + ' body{background-color:#3B2414!important;background-image:url("theme-royal-wood.webp")!important;background-size:600px 900px!important;background-repeat:repeat!important}',
+    T + ' body{background-color:#3B2414!important;background-image:url("theme-royal-wood.webp?v=2")!important;background-size:600px 900px!important;background-repeat:repeat!important}',
     T + ' .dsk-app{--dsk-bg:transparent!important}',
     T + ' .dsk-toolbar-label{color:#EAD7A8}',
     // side menu: beige (light) or navy (dark) instead of glass over the walnut
