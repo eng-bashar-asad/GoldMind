@@ -375,7 +375,80 @@ const GOLDMIND_THEMES = {
       '--gm-avatar-grad': 'linear-gradient(135deg, #DA7756 0%, #8B94A3 55%, #1B2C46 100%)'
     }
   },
+  'royal-walnut': {
+    // «الملكي» (بشار 2026-11-12): burnt-walnut canvas with sharp gold grain (theme-royal-wood.webp),
+    // beige data boxes framed in navy, navy top bars with a gold rule, gold for what matters.
+    label: 'الملكي',
+    swatch: ['#16305C', '#C9962B', '#3B2414'],
+    lightCanvas: false,
+    vars: {
+      '--gm-bg': '#3B2414',
+      '--gm-bg-elevated': '#3B2414',
+      '--gm-surface-lowest': '#F3E9D6',
+      '--gm-surface-low': '#E7D7B8',
+      '--gm-primary': '#16305C',
+      '--gm-on-primary': '#F3E9D6',
+      '--gm-accent': '#C9962B',
+      '--gm-on-accent': '#2A1A08',
+      '--gm-secondary': '#8A5C14',
+      '--gm-on-surface': '#2E1C0E',
+      '--gm-on-surface-variant': '#6E5232',
+      '--gm-outline-variant': '#3C5A8C',
+      '--gm-shadow-color': 'rgba(20, 10, 4, 0.55)',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #0E1F3D 0%, #16305C 30%, #C9962B 50%, #16305C 70%, #0E1F3D 100%)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #16305C 0%, #C9962B 100%)'
+    }
+  },
 };
+
+// «الملكي»: the pieces a palette alone can't give (texture, navy bars, framed beige boxes).
+(function () {
+  var T = 'html[data-gm-theme="royal-walnut"]';
+  var NAVY = 'linear-gradient(160deg,#22427A 0%,#16305C 45%,#0E1F3D 100%)';
+  var GOLDX = 'linear-gradient(100deg,#8A5C14,#E9C15A 30%,#FBE7A1 50%,#E9C15A 70%,#8A5C14)';
+  var BEIGE = 'linear-gradient(160deg,#F7EFE0 0%,#EADCC0 100%)';
+  var G = 'html.gm-gloss:not(.gm-plain)[data-gm-theme="royal-walnut"]';
+  var css = [
+    '@media screen{',
+    // the walnut canvas with gold grain
+    T + ' body{background-color:#3B2414!important;background-image:url("theme-royal-wood.webp")!important;background-size:600px 900px!important;background-repeat:repeat!important}',
+    T + ' .dsk-app{--dsk-bg:transparent!important}',
+    T + ' .dsk-toolbar-label{color:#EAD7A8}',
+    // side menu: beige (light) or navy (dark) instead of glass over the walnut
+    T + ' #gmNav.gn-light{background:linear-gradient(160deg,#F7EFE0,#E6D5B2)!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important;border-left:2px solid #16305C}',
+    T + ' #gmNav:not(.gn-light){background:' + NAVY + '!important;border-left:2px solid #C9962B}',
+    // top bars: navy with a gold rule; their words turn gold/beige
+    T + ' header.bg-surface-container-lowest,' + T + ' header.bg-surface,' + T + ' header.bg-background{background:' + NAVY + '!important;border-bottom:2px solid #C9962B!important;color:#F3E9D6}',
+    T + ' header.bg-surface-container-lowest :is(.text-primary,.text-on-surface,.text-on-surface-variant,.text-secondary),' + T + ' header.bg-surface-container-lowest .material-symbols-outlined{color:#EAD7A8}',
+    G + ' header.bg-surface-container-lowest :is(.text-primary,.text-secondary,h1,h2):not([class*="bg-"]):not(button){background-image:' + GOLDX + '!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;color:transparent}',
+    // data boxes: beige, framed in navy
+    T + ' :is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl).bg-surface-container-lowest:not(input):not(select):not(textarea):not(button),' + T + ' :is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl).bg-white:not(input):not(select):not(textarea):not(button)' +
+      '{background-image:' + BEIGE + '!important;border:2px solid #16305C!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 10px 22px -14px rgba(0,0,0,.8)!important}',
+    // buttons that are boxes too (operation tiles, tool pills): beige with a navy line
+    T + ' button:is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white){background-image:' + BEIGE + '!important;border:1.5px solid #16305C!important}',
+    T + ' :is(.gmt-pill,.gmt-panel){background-color:#EFE3CC!important;border:2px solid #16305C}',
+    // the black "hero" cards of the home / cash box pages turn navy with a gold frame
+    T + ' :is(.gm-hero,.dc-kpi.dark,.dsk-stat-dark,.dc-pb1){background:' + NAVY + '!important;border:2px solid #C9962B!important}',
+    // cash-box action row on the phone: beige tiles (whatsapp keeps its gold)
+    T + ' .dc-actions>button:not([class*="bg-secondary"]){background:' + BEIGE + '!important;border:1.5px solid #16305C!important;color:#16305C}',
+    // framed boxes drawn with only a border (settings groups and the like) need the beige too
+    T + ' :is(div,section,form,fieldset).border:is(.rounded-lg,.rounded-xl,.rounded-2xl):not([class*="bg-"]):not(.border-dashed){background-image:' + BEIGE + ';border-color:#16305C!important}',
+    // empty-state / hint boxes drawn with a dashed line straight on the canvas
+    T + ' .border-dashed:not([class*="bg-"]){background-color:rgba(243,233,214,.92)}',
+    // the navy boxes (bg-primary) get a gold frame and gold figures
+    T + ' :is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl).bg-primary:not(button){background-image:' + NAVY + '!important;border:2px solid #C9962B!important}',
+    // icons inside beige boxes stay navy (the gloss layer would make them gold)
+    G + ' :is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-white) > .material-symbols-outlined:not([class*="text-"]),' + G + ' :is(.bg-surface-container-lowest,.bg-surface-container-low,.bg-white) > :not(button) > .material-symbols-outlined:not([class*="text-"])' +
+      '{background-image:linear-gradient(160deg,#22427A,#0E1F3D)!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;color:transparent}',
+    // inputs on the beige boxes: light fields with a navy line
+    T + ' :is(input,select,textarea):not([type=checkbox]):not([type=radio]){border-color:#3C5A8C}',
+    '}'
+  ].join('\n');
+  var st = document.createElement('style');
+  st.id = 'gm-theme-royal';
+  st.textContent = css;
+  (document.head || document.documentElement).appendChild(st);
+})();
 
 function goldmindApplyTheme(name) {
   const theme = GOLDMIND_THEMES[name] || GOLDMIND_THEMES['warm-ingot'];
@@ -457,7 +530,8 @@ gmEnsureStatShimmerStyle();
 (function () {
   const style = document.createElement('style');
   style.id = 'gm-native-lists';
-  style.textContent = '@media screen { html body .gm-cfix-light { color: #F3F4F6 !important; } html body .gm-cfix-dark { color: #1F1A12 !important; } }' +
+  style.textContent = '@media screen { html body .gm-cfix-light { color: #F3F4F6 !important; } html body .gm-cfix-dark { color: #1F1A12 !important; }' +
+    ' html body :is(.gm-cfix-light,.gm-cfix-dark) { -webkit-text-fill-color: currentColor !important; background-image: none !important; } }' +
     'select option, select optgroup, datalist option { background-color: #ffffff; color: #1a1c1e; }' +
     'select option:disabled { color: #8a8f98; }' +
     'select option:checked { background-color: #E8DFC8; color: #1a1c1e; }';
@@ -477,7 +551,8 @@ gmEnsureStatShimmerStyle();
   function bgOf(el) {
     for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
       const cs = getComputedStyle(e);
-      if (cs.backgroundImage && cs.backgroundImage !== 'none') return null; // gradient / picture: can't judge
+      if (e === el && /text/.test(cs.webkitBackgroundClip || cs.backgroundClip || '')) continue; // a gradient word: its "background" is its ink
+      if (cs.backgroundImage && cs.backgroundImage !== 'none' && e !== document.body) return null; // gradient / picture: can't judge (a textured page canvas counts as its colour)
       const c = rgb(cs.backgroundColor);
       if (c && (c[3] === undefined || c[3] > .6)) return c;
     }
@@ -487,6 +562,8 @@ gmEnsureStatShimmerStyle();
     const dark = !document.documentElement.classList.contains('gm-light-canvas');
     const fixed = document.querySelectorAll('.gm-cfix-light, .gm-cfix-dark');
     if (!dark) { fixed.forEach(e => e.classList.remove('gm-cfix-light', 'gm-cfix-dark')); return; }
+    // the gold-grain walnut canvas is busy, so text on it needs more contrast than on a flat colour
+    const minR = document.documentElement.getAttribute('data-gm-theme') === 'royal-walnut' ? 3.2 : 1.8;
     const els = document.body ? document.body.getElementsByTagName('*') : [];
     for (let i = 0; i < els.length && i < 6000; i++) {
       const el = els[i];
@@ -495,10 +572,13 @@ gmEnsureStatShimmerStyle();
       let own = /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
       if (!own) for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) { own = true; break; }
       if (!own || !el.getClientRects().length) continue;
-      const fg = rgb(getComputedStyle(el).color), bg = bgOf(el);
+      const ecs = getComputedStyle(el);
+      let fg = rgb(ecs.color); const bg = bgOf(el);
+      // gradient words (gloss colours) have a transparent colour: judge them by their ink's first colour
+      if (fg && fg[3] !== undefined && fg[3] < .3 && /text/.test(ecs.webkitBackgroundClip || ecs.backgroundClip || '')) { const m = (ecs.backgroundImage || '').match(/rgba?\([^)]*\)/); fg = m ? rgb(m[0]) : null; }
       if (!fg || !bg || (fg[3] !== undefined && fg[3] < .3)) continue;
       const L1 = lum(fg), L2 = lum(bg);
-      if ((Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05) < 1.8) el.classList.add(L2 < .35 ? 'gm-cfix-light' : 'gm-cfix-dark');
+      if ((Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05) < minR) el.classList.add(L2 < .35 ? 'gm-cfix-light' : 'gm-cfix-dark');
     }
   }
   let t = null;
