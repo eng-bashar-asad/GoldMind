@@ -49,4 +49,8 @@ test('stock in: each new piece has a «تصوير» button (webcam / phone camer
   await row.locator('button:has-text("تصوير")').click();
   await expect(row.locator('.ph-prev')).toBeVisible();
   expect(await row.evaluate(r => photoOf(r.querySelector('[data-f="photo"]')).name)).toBe('cam.jpg');
+  // or a picture already on the computer
+  await expect(row.locator('button:has-text("من الجهاز")')).toBeVisible();
+  await row.locator('.ph-file').setInputFiles({ name: 'disk.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([255, 216, 255]) });
+  expect(await row.evaluate(r => photoOf(r.querySelector('[data-f="photo"]')).name)).toBe('disk.jpg');
 });

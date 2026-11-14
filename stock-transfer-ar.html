@@ -167,6 +167,8 @@ function msg(id, t, bad) { const e = document.getElementById(id); e.textContent 
 function photoField(attr) {
   return `<div class="flex items-center gap-2">
     <button type="button" onclick="takePhoto(this)" class="h-10 px-3 rounded-lg border border-primary text-primary font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">photo_camera</span>تصوير</button>
+    <button type="button" onclick="this.parentElement.querySelector('.ph-file').click()" class="h-10 px-3 rounded-lg border border-outline-variant font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">upload</span>من الجهاز</button>
+    <input type="file" accept="image/*" class="ph-file hidden" onchange="const i = this.parentElement.querySelector('input[data-f], input[data-e]'); i.__file = this.files[0] || null; showPhotoPrev(i, i.__file)"/>
     <img class="ph-prev hidden w-10 h-10 rounded object-cover border border-outline-variant"/>
     <input type="file" accept="image/*" capture="environment" class="hidden" ${attr} onchange="this.__file = null; showPhotoPrev(this, this.files[0])"/>
   </div>`;
@@ -177,7 +179,7 @@ function showPhotoPrev(inp, file) {
   img.src = URL.createObjectURL(file); img.classList.remove('hidden');
 }
 async function takePhoto(btn) {
-  const inp = btn.parentElement.querySelector('input[type=file]');
+  const inp = btn.parentElement.querySelector('input[data-f], input[data-e]');
   if (typeof GMCamera !== 'undefined' && GMCamera.isSupported()) {
     const file = await GMCamera.capture();
     if (file === false) return; // closed
