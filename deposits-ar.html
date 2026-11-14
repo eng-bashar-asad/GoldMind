@@ -282,7 +282,7 @@ function showVoucher(id) {
     <div class="mb-3">استلمنا من السيد/السيدة: <b>${esc(d.customer && d.customer.name)}</b>${d.customer && d.customer.phone ? ` — <bdi dir="ltr">${esc(d.customer.phone)}</bdi>` : ''}</div>
     <div class="mb-3 p-2 rounded border text-center">مبلغ وقدره <b class="text-[16px]">${money(d.amount)}</b> ${d.method === 'bank' ? '(تحويل / بطاقة)' : '(نقداً)'}<br/>عربوناً لحجز القطع التالية:</div>
     <table class="mb-3"><thead><tr><th>#</th><th>القطعة</th><th>الباركود</th><th>العيار</th><th>الوزن</th><th>السعر المتفق عليه</th></tr></thead><tbody>
-      ${items.map((i, n) => `<tr><td>${n + 1}</td><td>${esc(i.description)}</td><td dir="ltr">${esc(i.barcode)}</td><td>${i.karat ? esc(i.karat) : ''}</td><td>${i.weight ? esc(i.weight) + ' غ' : ''}</td><td>${i.price ? money(i.price) : ''}</td></tr>`).join('')}
+      ${items.map((i, n) => `<tr><td>${n + 1}</td><td>${esc(i.description)}</td><td dir="ltr">${esc(i.barcode)}${i.barcode && d.status === 'active' ? `<button type="button" onclick="releasePiece(${n})" class="no-print block mx-auto mt-1 text-[11px] text-primary font-semibold underline">فك الحجز</button>` : ''}</td><td>${i.karat ? esc(i.karat) : ''}</td><td>${i.weight ? esc(i.weight) + ' غ' : ''}</td><td>${i.price ? money(i.price) : ''}</td></tr>`).join('')}
     </tbody></table>
     ${priced > 0 ? `<div class="flex justify-between mb-1"><span>السعر الإجمالي المتفق عليه</span><b>${money(priced)}</b></div>
       <div class="flex justify-between mb-1"><span>العربون المدفوع</span><b>${money(d.amount)}</b></div>
@@ -328,6 +328,18 @@ function cancelEdit() {
   document.getElementById('form-title').textContent = 'سند عربون جديد';
   document.getElementById('cancel-edit').classList.add('hidden');
   document.getElementById('save-btn').textContent = 'حفظ العربون وطباعة السند';
+}
+// Free one reserved piece (the customer changed his mind about colour or model): the piece goes back on
+// sale; the deposit, the daily cash box and the customer's account stay exactly as they are.
+async function releasePiece(n) {
+  const d = OPEN; if (!d) return;
+  const it = (d.items || [])[n]; if (!it || !it.barcode) return;
+  if (!confirm('فك حجز القطعة ' + it.barcode + '؟ ترجع متوفرة للبيع، ويبقى العربون ' + money(d.amount) + ' للزبون كما هو.')) return;
+  const items = d.items.map((x, i) => i === n ? { ...x, barcode: null, description: (x.description || x.barcode) + ' — فُكّ الحجز (' + x.barcode + ')' } : x);
+  const { error } = await goldmindClient.rpc('update_customer_deposit', { p_deposit: d.id, p: { amount: Number(d.amount), items, notes: d.notes || '' } });
+  if (error) return alert('تعذّر: ' + error.message);
+  await loadDeposits();
+  showVoucher(d.id);
 }
 function closeVoucher() { document.getElementById('voucher-modal').classList.add('hidden'); OPEN = null; }
 

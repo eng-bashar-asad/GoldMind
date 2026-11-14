@@ -74,3 +74,24 @@ test('deposit: typing a barcode fills at once; a deposit can be edited in place'
   expect(calls.some(c => c.name === 'create_customer_deposit' || c.name === 'refund_customer_deposit')).toBe(false);
   expect(errs).toEqual([]);
 });
+
+test('deposit voucher: «فك الحجز» frees one piece, amount untouched', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const deposits = [{ id: 'd1', store_id: STORE, deposit_number: 'DEP-000001', customer_id: 'cu1', amount: 2000, method: 'cash', in_cashbox: true,
+    items: [{ barcode: '000709', description: 'مباريم' }, { description: 'طقم' }], notes: null, status: 'active', created_at: '2026-10-17T10:00:00Z',
+    customer: { name: 'وفاء', phone: '0999' }, staff: { full_name: 'بشار' } }];
+  let sent = null;
+  await install(page, {
+    db: base({ customers: [{ id: 'cu1', store_id: STORE, name: 'وفاء', phone: '0999' }], pieces: [], customer_deposits: deposits }),
+    rpc: { customer_deposit_remaining: () => ({ body: [{ deposit_id: 'd1', remaining: 2000 }] }), update_customer_deposit: a => { sent = a; return { body: null }; } }
+  });
+  page.on('dialog', d => d.accept());
+  await page.goto('/deposits-ar.html');
+  await page.click('text=DEP-000001');
+  await page.click('text=فك الحجز');
+  await expect.poll(() => sent).not.toBeNull();
+  expect(sent.p.amount).toBe(2000);
+  expect(sent.p.items[0].barcode).toBeNull();
+  expect(sent.p.items[0].description).toContain('000709');
+  expect(errs).toEqual([]);
+});
