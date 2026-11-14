@@ -39,3 +39,38 @@ test('deposit: barcode fills the piece, price stays empty, cashbox option is sen
   expect(sent).toMatchObject({ customer_id: 'cu1', amount: 200, to_cashbox: false, items: [{ barcode: '000709', karat: 18, weight: 9.21 }] });
   expect(errs).toEqual([]);
 });
+
+test('deposit: typing a barcode fills at once; a deposit can be edited in place', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const deposits = [{ id: 'd1', store_id: STORE, deposit_number: 'DEP-000001', customer_id: 'cu1', amount: 200, method: 'cash', in_cashbox: true,
+    items: [{ barcode: '000709', description: 'خاتم' }], notes: null, status: 'active', created_at: '2026-10-17T10:00:00Z',
+    customer: { name: 'هلا الهفل', phone: '0999' }, staff: { full_name: 'بشار' } }];
+  const calls = await install(page, {
+    db: base({
+      customers: [{ id: 'cu1', store_id: STORE, name: 'هلا الهفل', phone: '0999' }],
+      pieces: [{ id: 'p2', store_id: STORE, barcode: '000848', piece_type: 'سوار', description_ar: 'إسوارة', karat: 21, weight_grams: 12.5, status: 'available' }],
+      customer_deposits: deposits
+    }),
+    rpc: {
+      customer_deposit_remaining: () => ({ body: [{ deposit_id: 'd1', remaining: 200 }] }),
+      update_customer_deposit: a => { Object.assign(deposits[0], { amount: a.p.amount, items: a.p.items }); return { body: null }; }
+    }
+  });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/deposits-ar.html');
+  await page.locator('[data-f="barcode"]').pressSequentially('848'); // no blur, no Enter
+  await expect(page.locator('[data-f="description"]')).toHaveValue('إسوارة · 21K · 12.5 غ');
+
+  await page.click('text=DEP-000001');
+  await page.click('text=تعديل العربون');
+  await expect(page.locator('#form-title')).toContainText('DEP-000001');
+  await expect(page.locator('#customer-input')).toBeDisabled();
+  await expect(page.locator('[data-f="barcode"]').first()).toHaveValue('000709');
+  await page.fill('#amount-input', '350');
+  await page.click('#save-btn');
+  await expect(page.locator('#voucher')).toContainText('350');
+  const sent = JSON.parse(calls.find(c => c.name === 'update_customer_deposit').body);
+  expect(sent).toMatchObject({ p_deposit: 'd1', p: { amount: 350, items: [{ barcode: '000709' }] } });
+  expect(calls.some(c => c.name === 'create_customer_deposit' || c.name === 'refund_customer_deposit')).toBe(false);
+  expect(errs).toEqual([]);
+});

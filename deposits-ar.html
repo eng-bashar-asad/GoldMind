@@ -70,7 +70,7 @@
 <p class="text-[12px] text-on-surface-variant leading-5 lg:col-span-2">العربون مبلغ يدفعه العميل لحجز قطعة. يدخل المبلغ إلى الصندوق اليومي ويُسجَّل رصيداً للعميل، ويُخصم تلقائياً من فاتورته عند الشراء. يستلم العميل سنداً مطبوعاً يضمن حقه.</p>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3">
-<h2 class="font-semibold text-[13px]">سند عربون جديد</h2>
+<div class="flex items-center justify-between"><h2 class="font-semibold text-[13px]" id="form-title">سند عربون جديد</h2><button type="button" id="cancel-edit" onclick="cancelEdit()" class="hidden text-[12px] text-primary font-semibold">إلغاء التعديل</button></div>
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="customer-input">العميل</label>
 <input class="w-full h-12 border border-outline-variant rounded-lg px-3 text-right" id="customer-input" list="customers-dl" placeholder="اكتب اسم العميل أو رقم هاتفه" autocomplete="off"/>
@@ -127,7 +127,7 @@
 </div>
 
 <script>
-let STORE = {}, CUSTOMERS = [], DEPOSITS = [], CUR = '', OPEN = null;
+let STORE = {}, CUSTOMERS = [], DEPOSITS = [], CUR = '', OPEN = null, EDIT = null;
 const esc = v => gmEscapeHtml(v == null ? '' : String(v));
 const money = v => Number(v || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + CUR;
 const custLabel = c => c.name + (c.phone ? ' — ' + c.phone : '');
@@ -138,7 +138,7 @@ function addItemRow(it) {
   row.className = 'item-row grid grid-cols-6 gap-1 p-2 rounded-lg bg-surface-container-low';
   row.innerHTML = `
     <input class="col-span-6 h-10 border border-outline-variant rounded-lg px-2 text-right text-[13px]" data-f="description" placeholder="وصف القطعة — مثال: طقم ألماس، سوار حرف س" value="${esc(it.description)}"/>
-    <input class="col-span-2 h-10 border border-outline-variant rounded-lg px-2 font-data-mono text-[12px]" dir="ltr" data-f="barcode" placeholder="الباركود" value="${esc(it.barcode)}" onchange="fillDepositItem(this)"/>
+    <input class="col-span-2 h-10 border border-outline-variant rounded-lg px-2 font-data-mono text-[12px]" dir="ltr" data-f="barcode" placeholder="الباركود" value="${esc(it.barcode)}" oninput="queueDepositItem(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();fillDepositItem(this)}" onchange="fillDepositItem(this)"/>
     <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="karat" placeholder="عيار" type="number" value="${esc(it.karat)}"/>
     <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="weight" placeholder="غرام" type="number" step="0.01" value="${esc(it.weight)}"/>
     <input class="col-span-1 h-10 border border-outline-variant rounded-lg px-1 font-data-mono text-[12px]" dir="ltr" data-f="price" placeholder="السعر" type="number" step="0.01" value="${esc(it.price)}"/>
@@ -146,21 +146,29 @@ function addItemRow(it) {
   document.getElementById('items').appendChild(row);
 }
 
-// Barcode typed/scanned: fill what the piece is (description, karat, weight). Price stays optional.
+// Barcode typed/scanned: fill what the piece is (description, karat, weight) as soon as typing pauses.
+function queueDepositItem(input) {
+  clearTimeout(input._t);
+  input._t = setTimeout(() => fillDepositItem(input), 350);
+}
 async function fillDepositItem(input) {
+  clearTimeout(input._t);
   const row = input.closest('.item-row'), code = gmTidyBarcode(input.value);
-  if (!code) return;
+  if (!code || input.dataset.done === code) return;
+  input.dataset.done = code;
   // gmBarcodeVariants also tries the zero-padded form, so typing 348 finds 000348
-  const { data } = await goldmindClient.from('pieces').select('barcode, piece_type, karat, weight_grams, status')
+  const { data } = await goldmindClient.from('pieces').select('barcode, piece_type, description_ar, karat, weight_grams, status')
     .eq('store_id', GOLDMIND_STORE_ID).in('barcode', gmBarcodeVariants(code)).limit(1);
   const p = (data || [])[0];
-  if (!p) return showDepositNote('لم تُعثر على قطعة بهذا الباركود. اكتب وصفها يدوياً.');
-  input.value = p.barcode;
+  if (gmTidyBarcode(input.value) !== code) return; // user kept typing meanwhile
+  if (!p) { delete input.dataset.done; return showDepositNote('لم تُعثر على قطعة بهذا الباركود. اكتب وصفها يدوياً.'); }
+  document.getElementById('save-error').classList.add('hidden');
+  input.value = p.barcode; input.dataset.done = gmTidyBarcode(p.barcode);
   const f = name => row.querySelector(`[data-f="${name}"]`);
-  if (!f('description').value.trim()) f('description').value = [p.piece_type, p.karat ? p.karat + 'K' : '', p.weight_grams ? p.weight_grams + ' غ' : ''].filter(Boolean).join(' · ');
+  if (!f('description').value.trim()) f('description').value = [p.description_ar || p.piece_type, p.karat ? p.karat + 'K' : '', p.weight_grams ? p.weight_grams + ' غ' : ''].filter(Boolean).join(' · ');
   f('karat').value = p.karat || '';
   f('weight').value = p.weight_grams || '';
-  if (p.status !== 'available') showDepositNote('تنبيه: حالة هذه القطعة «' + p.status + '» وليست متوفرة.');
+  if (p.status !== 'available' && !(EDIT && p.status === 'reserved')) showDepositNote('تنبيه: حالة هذه القطعة «' + p.status + '» وليست متوفرة.');
 }
 function showDepositNote(text) {
   const err = document.getElementById('save-error');
@@ -187,11 +195,21 @@ async function saveDeposit() {
   const cust = findCustomer(document.getElementById('customer-input').value);
   const amount = parseFloat(document.getElementById('amount-input').value);
   const items = readItems();
-  if (!cust) return fail('اختر العميل من القائمة');
+  if (!cust && !EDIT) return fail('اختر العميل من القائمة');
   if (!(amount > 0)) return fail('أدخل مبلغ العربون');
   if (!items.length) return fail('اكتب وصف القطعة المحجوزة على الأقل');
   const btn = document.getElementById('save-btn');
   btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  if (EDIT) {
+    const id = EDIT.id;
+    const { error } = await goldmindClient.rpc('update_customer_deposit', { p_deposit: id, p: {
+      amount, items, notes: document.getElementById('notes-input').value.trim() } });
+    btn.disabled = false;
+    if (error) { btn.textContent = 'حفظ التعديل'; return fail(/update_customer_deposit/.test(error.message) ? 'تعديل العربون يحتاج تحديث قاعدة البيانات أولاً.' : 'تعذّر الحفظ: ' + error.message); }
+    cancelEdit();
+    await loadDeposits();
+    return showVoucher(id);
+  }
   const { data, error } = await goldmindClient.rpc('create_customer_deposit', { p: {
     store_id: GOLDMIND_STORE_ID, // recorded on this branch (and its cash box)
     customer_id: cust.id, amount, method: document.getElementById('method-input').value, items,
@@ -272,9 +290,44 @@ function showVoucher(id) {
     ${d.notes ? `<div class="mb-3 text-[12px]">ملاحظات: ${esc(d.notes)}</div>` : ''}
     <div class="text-[11px] text-gray-600 mb-6">يُخصم هذا العربون من قيمة الفاتورة عند استلام القطع. يُرجى الاحتفاظ بهذا السند.</div>
     <div class="flex justify-between text-[12px]"><span>المستلم: ${esc(d.staff && d.staff.full_name)}</span><span>توقيع العميل: ..................</span></div>
+    ${d.status === 'active' ? '<button type="button" onclick="editDeposit()" class="no-print mt-5 w-full h-10 border border-primary text-primary rounded-lg text-[12px] font-semibold">تعديل العربون</button>' : ''}
     ${d.status === 'active' && d.left >= Number(d.amount) - 0.009 ? `<button type="button" onclick="refundDeposit()" class="no-print mt-5 w-full h-10 border border-error text-error rounded-lg text-[12px] font-semibold">استرجاع العربون للعميل (يخرج المبلغ من الصندوق)</button>` : ''}`;
   const m = document.getElementById('voucher-modal');
   m.classList.remove('hidden');
+}
+// Load a deposit back into the form. Customer, payment method and cash-box choice stay as recorded.
+function editDeposit() {
+  if (!OPEN) return;
+  EDIT = OPEN;
+  closeVoucher();
+  const c = CUSTOMERS.find(x => x.id === EDIT.customer_id);
+  const ci = document.getElementById('customer-input');
+  ci.value = c ? custLabel(c) : ((EDIT.customer && EDIT.customer.name) || ''); ci.disabled = true;
+  document.getElementById('amount-input').value = Number(EDIT.amount);
+  document.getElementById('amount-input').disabled = EDIT.left < Number(EDIT.amount) - 0.009; // used on an invoice
+  document.getElementById('method-input').value = EDIT.method; document.getElementById('method-input').disabled = true;
+  document.getElementById('to-cashbox').checked = EDIT.in_cashbox !== false; document.getElementById('to-cashbox').disabled = true;
+  document.getElementById('notes-input').value = EDIT.notes || '';
+  document.getElementById('items').innerHTML = '';
+  (EDIT.items && EDIT.items.length ? EDIT.items : [{}]).forEach(addItemRow);
+  document.querySelectorAll('#items [data-f="barcode"]').forEach(i => { if (i.value) i.dataset.done = gmTidyBarcode(i.value); });
+  document.getElementById('form-title').textContent = 'تعديل العربون ' + EDIT.deposit_number;
+  document.getElementById('cancel-edit').classList.remove('hidden');
+  document.getElementById('save-btn').textContent = 'حفظ التعديل';
+  document.getElementById('save-error').classList.add('hidden');
+  document.getElementById('form-title').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function cancelEdit() {
+  EDIT = null;
+  ['customer-input', 'amount-input', 'method-input', 'to-cashbox'].forEach(id => { document.getElementById(id).disabled = false; });
+  document.getElementById('customer-input').value = '';
+  document.getElementById('amount-input').value = '';
+  document.getElementById('notes-input').value = '';
+  document.getElementById('items').innerHTML = '';
+  addItemRow();
+  document.getElementById('form-title').textContent = 'سند عربون جديد';
+  document.getElementById('cancel-edit').classList.add('hidden');
+  document.getElementById('save-btn').textContent = 'حفظ العربون وطباعة السند';
 }
 function closeVoucher() { document.getElementById('voucher-modal').classList.add('hidden'); OPEN = null; }
 
