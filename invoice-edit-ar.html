@@ -11,7 +11,7 @@
 <title>تعديل الفاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=55"></script>
+<script src="supabase-config.js?v=56"></script>
 <script src="theme.js?v=89"></script>
 <script src="gm-invoice-edit.js?v=4"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -99,10 +99,7 @@
 </div>
 <p id="mixedNote" class="col-span-2 text-[12px] font-semibold"></p>
 </div>
-<div id="depBox" class="hidden mt-3 p-3 rounded-lg border border-outline-variant bg-surface-container-low">
-<p id="depText" class="text-[12px] font-semibold mb-2"></p>
-<button type="button" id="depBtn" onclick="gmSwitchDeposit()" class="w-full h-10 border border-primary text-primary rounded-lg text-[12px] font-semibold"></button>
-</div>
+<div id="depBox" class="hidden mt-3 p-3 rounded-lg border border-outline-variant bg-surface-container-low"></div>
 </div>
 
 <!-- Items -->
@@ -540,37 +537,9 @@ async function load() {
 
   renderItems();
   document.getElementById('page-content').classList.remove('hidden');
-  gmLoadDepositChoice();
+  gmDepositChoice(document.getElementById('depBox'), invoice);
 }
 
-// Paid from the customer's earlier deposit (عربون) or in full in cash? Switched on the server right away.
-let DEP_USED = 0;
-async function gmLoadDepositChoice() {
-  if (!invoice || invoice.type !== 'sale' || !invoice.customer_id || invoice.status === 'cancelled' || invoice.pay_breakdown || invoice.pay_currency) return;
-  const g = 'dep_' + invoice.id.replace(/-/g, '').slice(0, 12);
-  const { data: rows } = await goldmindClient.from('daily_cash_log').select('amount').eq('link_group', g).eq('operation_type', 'عربون سابق');
-  DEP_USED = (rows || []).reduce((t, r) => t + Number(r.amount || 0), 0);
-  const box = document.getElementById('depBox'), txt = document.getElementById('depText'), btn = document.getElementById('depBtn');
-  if (DEP_USED > 0.009) {
-    txt.textContent = 'خُصم من هذه الفاتورة ' + fmt(DEP_USED) + ' من عربون سابق للزبون.';
-    btn.textContent = 'الزبون دفع كامل المبلغ نقداً — أبقِ العربون له';
-  } else {
-    const { data: credit } = await goldmindClient.rpc('customer_credit', { sid: invoice.store_id, cust: invoice.customer_id });
-    if (!(Number(credit) > 0.009)) return;
-    txt.textContent = 'للزبون عربون / رصيد ' + fmt(credit) + ' لم يُخصم من هذه الفاتورة.';
-    btn.textContent = 'اخصم من العربون بدل النقد';
-  }
-  box.classList.remove('hidden');
-}
-async function gmSwitchDeposit() {
-  const use = !(DEP_USED > 0.009);
-  if (!confirm(use ? 'خصم عربون الزبون من المبلغ النقدي لهذه الفاتورة؟' : 'اعتبار الفاتورة مدفوعة نقداً بالكامل وإرجاع ' + fmt(DEP_USED) + ' إلى عربون الزبون؟')) return;
-  const btn = document.getElementById('depBtn'); btn.disabled = true;
-  const { error } = await goldmindClient.rpc('invoice_set_deposit', { p_invoice: invoice.id, p_use: use });
-  btn.disabled = false;
-  if (error) { alert(/invoice_set_deposit/.test(error.message) ? 'هذا الخيار يحتاج تحديث قاعدة البيانات أولاً.' : 'تعذّر: ' + error.message); return; }
-  location.reload();
-}
 
 load();
 </script>

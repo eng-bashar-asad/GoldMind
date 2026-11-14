@@ -21,8 +21,24 @@ for (const used of [true, false]) test('invoice edit: deposit switch — ' + (us
   });
   page.on('dialog', d => d.accept());
   await page.goto('/invoice-edit-ar.html?id=s1');
-  await expect(page.locator('#depText')).toContainText(used ? '1,000.00' : '500.00');
-  await page.click('#depBtn');
+  await expect(page.locator('#depBox')).toContainText(used ? '1,000.00' : '500.00');
+  await page.click('#depBox button');
   await expect.poll(() => sent).toEqual({ p_invoice: 's1', p_use: !used });
+  expect(errs).toEqual([]);
+});
+
+test('sale-screen edit (computer) also offers the deposit switch', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  let sent = null;
+  await install(page, {
+    db: db({ daily_cash_log: [{ id: 'l1', store_id: STORE, link_group: 'dep_s1', operation_type: 'عربون سابق', direction: 'out', amount: 1000 }],
+      gold_prices: [], diamond_pieces: [], gold_stock_lots: [] }),
+    rpc: { customer_credit: () => ({ body: 0 }), invoice_set_deposit: a => { sent = a; return { body: 1000 }; } }
+  });
+  page.on('dialog', d => d.accept());
+  await page.goto('/new-sale-ar.html?edit=s1');
+  await expect(page.locator('#dep-box')).toContainText('1,000.00');
+  await page.click('#dep-box button');
+  await expect.poll(() => sent).toEqual({ p_invoice: 's1', p_use: false });
   expect(errs).toEqual([]);
 });

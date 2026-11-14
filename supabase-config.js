@@ -1256,3 +1256,37 @@ window.addEventListener('unhandledrejection', function (e) {
     const r = e && e.reason;
     gmReportError(r && r.message ? r.message : String(r), null, null, r && r.stack);
 });
+
+// Sale invoice edit: was it paid partly from the customer's earlier deposit (عربون), or in full in cash?
+// Fills `box` with the current state and a button that switches it on the server (invoice_set_deposit).
+async function gmDepositChoice(box, inv) {
+  if (!box || !inv || inv.type !== 'sale' || !inv.customer_id || inv.status === 'cancelled' || inv.pay_breakdown || inv.pay_currency) return;
+  const money = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const g = 'dep_' + String(inv.id).replace(/-/g, '').slice(0, 12);
+  const { data: rows } = await goldmindClient.from('daily_cash_log').select('amount').eq('link_group', g).eq('operation_type', 'عربون سابق');
+  const used = (rows || []).reduce((t, r) => t + Number(r.amount || 0), 0);
+  let text, label;
+  if (used > 0.009) {
+    text = 'خُصم من هذه الفاتورة ' + money(used) + ' من عربون سابق للزبون.';
+    label = 'الزبون دفع كامل المبلغ نقداً — أبقِ العربون له';
+  } else {
+    const { data: credit } = await goldmindClient.rpc('customer_credit', { sid: inv.store_id, cust: inv.customer_id });
+    if (!(Number(credit) > 0.009)) return;
+    text = 'للزبون عربون / رصيد ' + money(credit) + ' لم يُخصم من هذه الفاتورة.';
+    label = 'اخصم من العربون بدل النقد';
+  }
+  box.innerHTML = '<p class="dep-text text-[12px] font-semibold mb-2"></p><button type="button" class="dep-btn w-full h-10 border border-primary text-primary rounded-lg text-[12px] font-semibold"></button>';
+  box.querySelector('.dep-text').textContent = text;
+  const btn = box.querySelector('.dep-btn');
+  btn.textContent = label;
+  btn.onclick = async () => {
+    const use = !(used > 0.009);
+    if (!confirm(use ? 'خصم عربون الزبون من المبلغ النقدي لهذه الفاتورة؟' : 'اعتبار الفاتورة مدفوعة نقداً بالكامل وإرجاع ' + money(used) + ' إلى عربون الزبون؟')) return;
+    btn.disabled = true;
+    const { error } = await goldmindClient.rpc('invoice_set_deposit', { p_invoice: inv.id, p_use: use });
+    btn.disabled = false;
+    if (error) { alert(/invoice_set_deposit/.test(error.message) ? 'هذا الخيار يحتاج تحديث قاعدة البيانات أولاً.' : 'تعذّر: ' + error.message); return; }
+    location.reload();
+  };
+  box.classList.remove('hidden');
+}

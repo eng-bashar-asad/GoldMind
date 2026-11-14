@@ -15,7 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@100..900&amp;display=swap" rel="stylesheet"/>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=55"></script>
+<script src="supabase-config.js?v=56"></script>
 <script src="theme.js?v=89"></script>
 <script src="gm-invoice-edit.js?v=4"></script>
 <script id="tailwind-config">
@@ -2232,7 +2232,9 @@
         const banner = document.getElementById('edit-banner');
         banner.innerHTML = '<b>تعديل الفاتورة <span dir="ltr">' + gmEscapeHtml(inv.invoice_number) + '</span></b> — رقمها وتاريخها ثابتان (' + gmEscapeHtml(gmFormatDateTime(inv.created_at)) + ').<br>'
             + 'عدّل السعر بالضغط عليه، احذف قطعة بـ ✕ فتعود متوفرة بالمخزن، أو أضف قطعة. يُسجَّل فرق المبلغ في الصندوق أو دين العميل بتاريخ اليوم.';
+        banner.insertAdjacentHTML('beforeend', '<div id="dep-box" class="hidden mt-3 p-3 rounded-lg border border-outline-variant bg-surface-container-low"></div>');
         banner.classList.remove('hidden');
+        gmDepositChoice(document.getElementById('dep-box'), inv);
         (inv.items || []).forEach(l => cart.push({
             cartId: ++cartCounter, line: l,
             piece: l.piece_id ? { id: l.piece_id, barcode: l.barcode, description_ar: l.description } : null,
