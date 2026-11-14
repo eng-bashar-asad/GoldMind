@@ -872,8 +872,25 @@ function traderFeeBalance(traderId) {
   return moves.reduce((sum, m) => sum + (m.movement_type === 'debt_increase' ? -Number(m.fab_fee_amount || 0) : Number(m.fab_fee_amount || 0)), 0);
 }
 
+// The open trader is kept in the address (?trader=…&from=list), so coming back from a voucher or a
+// piece reopens the same account instead of the list of all traders (بشار 2026-11-14).
+function ldSetUrl(traderId) {
+  try {
+    const u = new URL(location.href);
+    if (traderId) {
+      if (u.searchParams.get('trader') === traderId) return; // opened straight on this trader: keep as is
+      u.searchParams.set('trader', traderId); u.searchParams.set('from', 'list');
+    } else { u.searchParams.delete('trader'); u.searchParams.delete('from'); }
+    const before = location.pathname + location.search;
+    history.replaceState(history.state, '', u);
+    const st = JSON.parse(sessionStorage.getItem('gm_nav_stack') || '[]');
+    if (st[st.length - 1] === before) { st[st.length - 1] = location.pathname + location.search; sessionStorage.setItem('gm_nav_stack', JSON.stringify(st)); }
+  } catch (e) { /* ignore */ }
+}
+
 function showTradersList() {
   currentTraderId = null;
+  ldSetUrl(null);
   document.getElementById('page-title').textContent = 'سجل التجار';
   document.getElementById('trader-detail-view').classList.add('hidden');
   document.getElementById('traders-list-view').classList.remove('hidden');
@@ -1225,6 +1242,7 @@ function showTraderDetail(traderId) {
   currentTraderId = traderId;
   const trader = traders.find(t => t.id === traderId);
   if (!trader) return;
+  ldSetUrl(traderId);
 
   document.getElementById('page-title').textContent = trader.name;
   document.getElementById('traders-list-view').classList.add('hidden');
@@ -3331,8 +3349,8 @@ async function submitSettlement() {
 
 function goBack() {
   // opened straight on a trader (?trader=…) from another page: go back there
-  const opened = new URLSearchParams(location.search).get('trader');
-  if (currentTraderId && opened !== currentTraderId) { showTradersList(); return; }
+  const q = new URLSearchParams(location.search);
+  if (currentTraderId && (q.get('trader') !== currentTraderId || q.get('from') === 'list')) { showTradersList(); scrollTo(0, 0); return; }
   gmSmartBack(currentTraderId ? 'ledger-ar.html' : 'index-ar.html');
 }
 

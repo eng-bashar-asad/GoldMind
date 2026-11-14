@@ -198,7 +198,7 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
 <header class="docked full-width top-0 z-50 sticky" style="background:var(--gm-bg-elevated,#F3EEDF);">
 <div class="flex justify-between items-center px-margin-mobile w-full h-16 gap-2">
 <div class="flex items-center gap-3">
-<button onclick="gmSmartBack('index-ar.html')" aria-label="رجوع" class="w-11 h-11 rounded-2xl flex items-center justify-center" style="background:#1F1A12;color:#F3E3B5;">
+<button onclick="gmInvBack()" aria-label="رجوع" class="w-11 h-11 rounded-2xl flex items-center justify-center" style="background:#1F1A12;color:#F3E3B5;">
 <span class="material-symbols-outlined" style="font-size: 24px;">arrow_forward</span>
 </button>
 <h1 class="gm-on-canvas" style="margin:0;font-size:19px;font-weight:700;color:#1F1A12;">المخزن</h1>
@@ -834,6 +834,17 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
     // The back button above the karat/batch cards: where it goes depends
     // on how deep we are (batch-scoped karats -> that box's batch list;
     // box-scoped karats or the batch list itself -> the top level).
+    // The header / phone back steps up one level inside the stock (search → list, pieces → boxes)
+    // and leaves the page only from its top level (بشار 2026-11-14).
+    function gmInvBack() {
+        const sr = document.getElementById('search-results-view');
+        if (sr && !sr.classList.contains('hidden')) { closeSearch(); return; }
+        const pl = document.getElementById('piece-list-view');
+        if (pl && !pl.classList.contains('hidden')) { backFromPieceList(); window.scrollTo(0, 0); return; }
+        const kb = document.getElementById('karat-boxes-back');
+        if (kb && !kb.classList.contains('hidden')) { backFromKaratLevel(); window.scrollTo(0, 0); return; }
+        gmSmartBack('index-ar.html');
+    }
     function backFromKaratLevel() {
         if (currentPrefixScope) showBoxPrefixes(currentBoxScope);
         else showTopLevel();
