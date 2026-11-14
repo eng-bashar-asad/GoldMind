@@ -59,12 +59,19 @@ body.gm-no-vedit .gm-vedit{display:none!important}
 .gs-nm{min-width:0}.gs-nm b{display:block;font-size:12.5px;line-height:1.3}.gs-nm span{display:block;font-size:11px;color:#8C8270;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gs-k,.gs-24{text-align:center}
 .gs-nm .gs-kph{display:none}
+.gs-nmw{display:flex;align-items:center;gap:8px;min-width:0}
+.gs-th{flex:none;width:44px;height:44px;border-radius:8px;overflow:hidden;border:1px solid var(--gm-outline-variant);background:#F7F2E6;padding:0;cursor:zoom-in}
+.gs-th img{width:100%;height:100%;object-fit:cover;display:block}
+.gs-th .material-symbols-outlined{font-size:20px;color:#A89C83;line-height:44px}
+.gs-big{grid-column:1/-1;position:relative;margin-top:6px;border-radius:12px;overflow:hidden;background:#F7F2E6;border:1px solid var(--gm-outline-variant)}
+.gs-big img{width:100%;max-height:70vh;object-fit:contain;display:block}
+.gs-big button{position:absolute;top:8px;left:8px;width:40px;height:40px;border-radius:50%;background:rgba(0,0,0,.65);color:#fff;display:flex;align-items:center;justify-content:center}
 .gs-del{width:32px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:8px;color:#ba1a1a}
 .gs-del:hover{background:#FBE9E7}
 @media (max-width:639px){
   .gs-row,.gs-row.priced{grid-template-columns:repeat(3,minmax(0,1fr));position:relative;padding:8px}
   .gs-row.hd,.gs-n,.gs-k,.gs-24{display:none}
-  .gs-nm{grid-column:1/-1;padding-inline-end:40px}
+  .gs-nmw{grid-column:1/-1;padding-inline-end:40px}
   .gs-row.priced .gs-f{grid-column:1/-1}
   .gs-row .gs-fl{display:block;font-size:10px;color:#6B6355;margin-bottom:2px}
   .gs-nm .gs-kph{display:inline}
@@ -2908,15 +2915,22 @@ function renderGiveStockCart(previewOnly) {
     + giveStockCart.slice().reverse().map((it, i) => `
     <div class="gs-row${priced ? ' priced' : ''}">
       <span class="gs-n">${n - i}</span>
-      <div class="gs-nm"><b class="font-data-mono" dir="ltr" style="text-align:right">${gmEscapeHtml(it.barcode)}</b><span>${it.description ? gmEscapeHtml(it.description) : ''}<span class="gs-kph"> · عيار ${it.karat}</span></span></div>
+      <div class="gs-nmw">${it.photo
+        ? `<button type="button" class="gs-th" onclick="gsToggleBig(${it.cartId})" aria-label="تكبير صورة ${gmEscapeHtml(it.barcode)}"><img src="${gmEscapeHtml(it.photo)}" alt="" loading="lazy"/></button>`
+        : `<span class="gs-th" style="cursor:default;text-align:center" title="لا توجد صورة"><span class="material-symbols-outlined">no_photography</span></span>`}
+        <div class="gs-nm"><b class="font-data-mono" dir="ltr" style="text-align:right">${gmEscapeHtml(it.barcode)}</b><span>${it.description ? gmEscapeHtml(it.description) : ''}<span class="gs-kph"> · عيار ${it.karat}</span></span></div></div>
       <span class="gs-k font-data-mono">${it.karat}</span>
       ${priced
         ? `<label class="gs-f"><span class="gs-fl">السعر على التاجر — كلفتها علينا ${fmtMoney(gsPieceCost(it))}</span>${num(it, ['price', 'السعر'], it.price || '')}</label>`
         : field(it, ['grossWeight', 'القائم'], it.grossWeight) + field(it, ['accountingWeight', 'المحاسبي'], it.accountingWeight) + field(it, ['fabPerGram', 'مصنعية/غ'], it.fabPerGram)
           + `<span class="gs-24 font-data-mono">${fmt(gsBillW(it) * ((it.karat || 0) / 24))}</span>`}
       <button type="button" class="gs-del" onclick="removeGiveStockCartItem(${it.cartId})" aria-label="حذف ${gmEscapeHtml(it.barcode)}"><span class="material-symbols-outlined text-[18px]">delete</span></button>
+      ${it.photo && gsBig.has(it.cartId) ? `<div class="gs-big"><img src="${gmEscapeHtml(it.photo)}" alt="صورة القطعة ${gmEscapeHtml(it.barcode)}"/><button type="button" onclick="gsToggleBig(${it.cartId})" aria-label="تصغير الصورة"><span class="material-symbols-outlined">close</span></button></div>` : ''}
     </div>`).join('') + '</div>';
 }
+// a piece's photo opens large in its own row (tap the thumbnail), the ✕ shrinks it back
+const gsBig = new Set();
+function gsToggleBig(id) { gsBig.has(id) ? gsBig.delete(id) : gsBig.add(id); renderGiveStockCart(); }
 
 // computer: the totals box sits in the right column (sticky); phone: under the list as before
 function gsPlacePreview() {
