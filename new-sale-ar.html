@@ -419,6 +419,7 @@
 <tbody id="cart-body" class="divide-y divide-outline-variant font-data-mono text-data-mono">
 <tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>
 </tbody>
+<tfoot id="cart-foot" class="font-data-mono text-data-mono border-t border-outline-variant"></tfoot>
 </table>
 </div>
 </section>
@@ -1985,6 +1986,7 @@
             body.innerHTML = '<tr id="cart-empty-row"><td colspan="5" class="px-4 py-4 text-center text-on-surface-variant font-body-md">لم تُضف أي قطعة بعد</td></tr>';
             document.getElementById('grand-total').textContent = '0.00 ' + CUR;
             document.getElementById('grand-weight').textContent = '0.00 غ';
+            document.getElementById('cart-foot').innerHTML = '';
             document.getElementById('save-invoice-btn').removeAttribute('data-total');
             saveDraftToLocalStorage();
             return;
@@ -2014,6 +2016,16 @@
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         const byCur = gmCartByCur(), curs = Object.keys(byCur);
         const totalText = curs.map(c => gmMoney(byCur[c].f) + ' ' + gmSymOf(c)).join(' + ');
+        // totals row under the lines: pieces, gross and accounting gold weight, amount
+        const gold = cart.filter(i => i.mode !== 'diamond');
+        const gw = gold.reduce((t, i) => t + (Number(i.weight) || 0), 0);
+        const aw = gold.reduce((t, i) => t + (Number(i.accountingWeight ?? i.weight) || 0), 0);
+        document.getElementById('cart-foot').innerHTML = (`<tr id="cart-total-row" class="bg-surface-container-high font-semibold">
+            <td class="px-3 py-3 font-body-md">المجموع <span class="text-[11px] text-on-surface-variant font-normal">(${cart.length} ${cart.length === 1 ? 'قطعة' : cart.length === 2 ? 'قطعتان' : cart.length <= 10 ? 'قطع' : 'قطعة'})</span></td>
+            <td></td>
+            <td class="px-2 py-3 text-left"><div>${gw.toFixed(2)} غ</div>${Math.abs(aw - gw) > 0.004 ? `<div class="text-[11px] text-on-surface-variant font-normal">${aw.toFixed(2)} محاسبي</div>` : ''}</td>
+            <td class="px-2 py-3 text-left" colspan="2">${totalText}</td>
+        </tr>`);
         document.getElementById('grand-total').textContent = totalText;
         const foreign = curs.some(c => c !== BASE_CODE);
         const gtb = document.getElementById('grand-total-base');

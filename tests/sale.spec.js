@@ -177,3 +177,18 @@ test('phone: total bar at the bottom, «الدفع» opens the payment sheet wit
   await page.waitForURL(/invoice-print-ar\.html\?id=inv-9/);
   expect(posted[0]).toMatchObject({ payment_method: 'bank' });
 });
+
+test('sale cart: a totals row shows pieces, gross and accounting weight', async ({ page }) => {
+  await install(page, { generic: true });
+  await page.goto('/new-sale-ar.html');
+  await page.waitForFunction(() => typeof renderCart === 'function');
+  await page.evaluate(() => {
+    cart.push({ cartId: 1, barcode: '000684', karat: 18, weight: 7.89, accountingWeight: 7.78, price: 1000, description: 'حلق' },
+              { cartId: 2, barcode: '000253', karat: 18, weight: 2.7, accountingWeight: 2.7, price: 300, description: 'خاتم' });
+    renderCart();
+  });
+  const row = page.locator('#cart-total-row');
+  await expect(row).toContainText('قطعتان');
+  await expect(row).toContainText('10.59 غ');
+  await expect(row).toContainText('10.48 محاسبي');
+});
