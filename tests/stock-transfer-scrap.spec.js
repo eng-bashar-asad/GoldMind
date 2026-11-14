@@ -29,3 +29,24 @@ test('stock out: scrap from «كسر 21» goes in the voucher, limited to what t
   await expect.poll(() => sent).not.toBeNull();
   expect(sent).toMatchObject({ target_party_id: 'w1', piece_ids: [], p_scrap: [{ karat: 21, weight: 50.5 }] });
 });
+
+test('stock in: each new piece has a «تصوير» button (webcam / phone camera)', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'محل', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    stock_parties: [{ id: 'w1', store_id: STORE, name: 'ورشة', kind: 'intermediary' }],
+    gold_stock_lots: [], gold_prices: [], stock_vouchers: [], stock_voucher_lines: [], traders: [], pieces: [], diamond_pieces: [], piece_classification_options: [],
+  } });
+  // a webcam that returns one frame
+  await page.route('**/gm-camera.js*', r => r.fulfill({ contentType: 'application/javascript',
+    body: "var GMCamera = { isSupported: () => true, capture: async () => new File([new Uint8Array([255, 216, 255])], 'cam.jpg', { type: 'image/jpeg' }) };" }));
+  await page.goto('/stock-transfer-ar.html');
+  await page.selectOption('#party-select', 'p:w1');
+  await page.evaluate(() => showTab('in'));
+  await page.click('#new-pieces-box button:has-text("قطعة")');
+  const row = page.locator('.new-row').last();
+  await row.locator('button:has-text("تصوير")').click();
+  await expect(row.locator('.ph-prev')).toBeVisible();
+  expect(await row.evaluate(r => photoOf(r.querySelector('[data-f="photo"]')).name)).toBe('cam.jpg');
+});
