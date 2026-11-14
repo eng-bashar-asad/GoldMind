@@ -54,3 +54,30 @@ test('stock in: each new piece has a «تصوير» button (webcam / phone camer
   await row.locator('.ph-file').setInputFiles({ name: 'disk.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([255, 216, 255]) });
   expect(await row.evaluate(r => photoOf(r.querySelector('[data-f="photo"]')).name)).toBe('disk.jpg');
 });
+
+test('voucher list shows piece barcodes and finds a voucher by barcode', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'محل', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    stock_parties: [{ id: 'w1', store_id: STORE, name: 'ورشة', kind: 'intermediary' }],
+    stock_vouchers: [
+      { id: 'v1', store_id: STORE, party_id: 'w1', voucher_number: 'OUT-00001', direction: 'out', created_at: '2026-11-14T10:00:00Z' },
+      { id: 'v2', store_id: STORE, party_id: 'w1', voucher_number: 'IN-00002', direction: 'in', created_at: '2026-11-14T11:00:00Z' }],
+    stock_voucher_lines: [
+      { id: 'a', voucher_id: 'v1', store_id: STORE, party_id: 'w1', direction: 'out', barcode: '000515', karat: 18, weight_grams: 5, cost_value: 0 },
+      { id: 'b', voucher_id: 'v2', store_id: STORE, party_id: 'w1', direction: 'in', barcode: null, karat: 21, weight_grams: 3, cost_value: 0 }],
+    gold_stock_lots: [], gold_prices: [], traders: [], pieces: [], diamond_pieces: [], piece_classification_options: [],
+  } });
+  await page.goto('/stock-transfer-ar.html');
+  await expect(page.locator('#all-vouchers')).toContainText('000515');
+  await expect(page.locator('#all-vouchers')).toContainText('كسر 21');
+  await page.fill('#v-search', '515');
+  await expect(page.locator('#all-vouchers > [role=button]')).toHaveCount(1);
+  await expect(page.locator('#all-vouchers')).toContainText('OUT-00001');
+  await page.click('#all-vouchers > [role=button]');           // opens under its party, expanded
+  await expect(page.locator('#party-select')).toHaveValue('p:w1');
+  await expect(page.locator('#vd-v1')).toBeVisible();
+  expect(errs).toEqual([]);
+});

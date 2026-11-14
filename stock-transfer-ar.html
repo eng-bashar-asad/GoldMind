@@ -141,7 +141,8 @@
 </div>
 
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
-<div class="px-4 py-3 border-b border-outline-variant"><h2 class="font-semibold text-[13px]">كل سندات الإخراج والإدخال</h2></div>
+<div class="px-4 py-3 border-b border-outline-variant flex flex-col gap-2"><h2 class="font-semibold text-[13px]">كل سندات الإخراج والإدخال</h2>
+<input id="v-search" type="search" oninput="queueVoucherSearch()" placeholder="ابحث برقم السند أو باركود القطعة أو الجهة أو الملاحظة" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px]"/></div>
 <div id="all-vouchers" class="divide-y divide-outline-variant"></div>
 </div>
 
@@ -558,20 +559,52 @@ async function saveIn() {
   if (vid && confirm('هل تريد طباعة السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
 }
 
+// The list shows each voucher's piece barcodes; the search finds a voucher by its number, a piece barcode,
+// the party or the notes — barcodes and numbers are looked up on the server, so older vouchers are found too.
+// A voucher in the full list opens under its party, expanded, where its pieces can be edited.
+async function openVoucherFromAll(partyId, vid) {
+  const sel = document.getElementById('party-select');
+  if (sel.value !== 'p:' + partyId) { sel.value = 'p:' + partyId; await onPartyChange(); }
+  const head = document.querySelector(`#vouchers [onclick*="${vid}"]`), box = document.getElementById('vd-' + vid);
+  if (!head || !box) return;
+  if (box.classList.contains('hidden')) await toggleVoucher(vid, head);
+  head.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+function queueVoucherSearch() { clearTimeout(queueVoucherSearch.t); queueVoucherSearch.t = setTimeout(loadAllVouchers, 350); }
 async function loadAllVouchers() {
-  const { data } = await goldmindClient.from('stock_vouchers')
-    .select('id, voucher_number, direction, notes, created_at, party:party_id(name, kind), staff:created_by(full_name)')
-    .eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }).limit(100);
-  const rows = data || [];
+  const q = (document.getElementById('v-search') || {}).value ? document.getElementById('v-search').value.trim() : '';
+  const sel = 'id, party_id, voucher_number, direction, notes, created_at, party:party_id(name, kind), staff:created_by(full_name)';
+  let rows;
+  if (q) {
+    const like = '%' + q.replace(/[%_]/g, ' ') + '%';
+    const [{ data: byLine }, { data: byNum }, { data: byNote }] = await Promise.all([
+      goldmindClient.from('stock_voucher_lines').select('voucher_id').eq('store_id', GOLDMIND_STORE_ID).in('barcode', gmBarcodeVariants(gmTidyBarcode(q))).limit(200),
+      goldmindClient.from('stock_vouchers').select('id').eq('store_id', GOLDMIND_STORE_ID).ilike('voucher_number', like).limit(200),
+      goldmindClient.from('stock_vouchers').select('id').eq('store_id', GOLDMIND_STORE_ID).ilike('notes', like).limit(200)
+    ]);
+    const byText = [...(byNum || []), ...(byNote || [])];
+    const partyIds = parties.filter(p => (p.name || '').includes(q)).map(p => p.id);
+    const { data: byParty } = partyIds.length ? await goldmindClient.from('stock_vouchers').select('id').eq('store_id', GOLDMIND_STORE_ID).in('party_id', partyIds).limit(200) : { data: [] };
+    const ids = [...new Set([...(byLine || []).map(r => r.voucher_id), ...(byText || []).map(r => r.id), ...(byParty || []).map(r => r.id)])];
+    rows = ids.length ? ((await goldmindClient.from('stock_vouchers').select(sel).in('id', ids).order('created_at', { ascending: false })).data || []) : [];
+  } else {
+    rows = (await goldmindClient.from('stock_vouchers').select(sel).eq('store_id', GOLDMIND_STORE_ID).order('created_at', { ascending: false }).limit(100)).data || [];
+  }
+  const codes = {};
+  if (rows.length) {
+    const { data: lines } = await goldmindClient.from('stock_voucher_lines').select('voucher_id, barcode, karat').in('voucher_id', rows.map(v => v.id));
+    (lines || []).forEach(l => { const c = l.barcode || (l.karat ? 'كسر ' + l.karat : ''); if (c) (codes[l.voucher_id] = codes[l.voucher_id] || []).push(c); });
+  }
   document.getElementById('all-vouchers').innerHTML = rows.length ? rows.map(v => `
-    <a href="stock-voucher-print-ar.html?id=${v.id}" target="_blank" class="p-3 flex items-center gap-3 hover:bg-surface-container-low">
+    <div role="button" tabindex="0" onclick="openVoucherFromAll('${v.party_id}','${v.id}')" onkeydown="if(event.key==='Enter')openVoucherFromAll('${v.party_id}','${v.id}')" class="p-3 flex items-center gap-3 cursor-pointer hover:bg-surface-container-low">
       <span class="material-symbols-outlined ${v.direction === 'out' ? 'text-error' : 'text-success'}">${v.direction === 'out' ? 'upload' : 'download'}</span>
       <div class="flex-1 min-w-0">
         <div class="font-semibold text-[13px]"><span class="font-data-mono">${esc(v.voucher_number)}</span> · ${v.direction === 'out' ? 'إخراج إلى' : 'إدخال من'} ${esc(v.party ? v.party.name : '')} <span class="text-on-surface-variant font-normal text-[11px]">(${v.party ? KIND[v.party.kind] || '' : ''})</span></div>
         <div class="text-[11px] text-on-surface-variant">${gmFormatDateTime(v.created_at)}${v.staff && v.staff.full_name ? ' · ' + esc(v.staff.full_name) : ''}${v.notes ? ' · ' + esc(v.notes) : ''}</div>
+        ${codes[v.id] ? `<div class="text-[11px] mt-0.5"><span class="text-on-surface-variant">القطع:</span> <span class="font-data-mono" dir="ltr">${codes[v.id].map(esc).join('، ')}</span></div>` : ''}
       </div>
-      <span class="material-symbols-outlined text-primary">print</span>
-    </a>`).join('') : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد سندات بعد — اختر جهة من الأعلى وأنشئ أول سند.</p>';
+      <a href="stock-voucher-print-ar.html?id=${v.id}" target="_blank" title="طباعة" aria-label="طباعة" onclick="event.stopPropagation()" class="text-primary gm-hit"><span class="material-symbols-outlined">print</span></a>
+    </div>`).join('') : (q ? '<p class="p-4 text-center text-on-surface-variant text-sm">لا يوجد سند فيه «' + esc(q) + '».</p>' : '<p class="p-4 text-center text-on-surface-variant text-sm">لا توجد سندات بعد — اختر جهة من الأعلى وأنشئ أول سند.</p>');
 }
 
 (async function load() {
