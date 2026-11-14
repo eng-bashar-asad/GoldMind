@@ -549,30 +549,25 @@
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', watchEmpty); else watchEmpty();
 
   // ---- Enter moves to the next field (every screen) ----
-  // Enter: next visible, enabled field in the same form / dialog / section; on the last field it
-  // presses the form's save button. Shift+Enter: back one field. Left alone: barcode/search boxes,
+  // Enter: next visible, enabled field in the same form / dialog / open overlay, else anywhere on the
+  // page below it (sections and cards don't stop it). It never presses a button: on the last field
+  // Enter does nothing (a real <form> still submits). Shift+Enter: back one field. Left alone: barcode/search boxes,
   // fields with their own Enter (inline onkeydown, or a handler that called preventDefault),
   // textareas, and anything inside [data-gm-enter="off"].
   var ENTER_SKIP = /barcode|باركود|search|بحث|scan|مسح/i;
-  var SAVE_RE = /^(حفظ|ترحيل|تسجيل|إضافة|أضف|تأكيد|إصدار|إنشاء)/;
+  
   function gmFields(scope) {
     return Array.prototype.filter.call(scope.querySelectorAll('input, select, textarea'), function (el) {
       if (el.disabled || el.readOnly || el.tabIndex < 0) return false;
       if (/^(hidden|button|submit|reset|file|checkbox|radio|range|color|image)$/i.test(el.type || '')) return false;
-      if (el.closest('[data-gm-enter="off"], [hidden], .hidden')) return false;
-      return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length);
+      if (el.closest('[data-gm-enter="off"]')) return false;
+      // what is actually on screen counts ("hidden lg:block" wrappers are visible on a computer)
+      return !!(el.offsetWidth || el.offsetHeight || el.getClientRects().length) && getComputedStyle(el).visibility !== 'hidden';
     });
   }
   function gmEnterScope(el) {
-    return el.closest('form, [role=dialog], dialog, [data-gm-opdate], [data-enter-scope]')
-      || el.closest('section, .gm-card, main') || document.body;
-  }
-  function gmSaveButton(scope) {
-    var bs = Array.prototype.filter.call(scope.querySelectorAll('button, [type=submit]'), function (b) {
-      return !b.disabled && (b.offsetWidth || b.offsetHeight) && !b.closest('[data-gm-enter="off"]');
-    });
-    return bs.find(function (b) { return b.type === 'submit' || b.hasAttribute('data-gm-save'); })
-      || bs.find(function (b) { return SAVE_RE.test((b.textContent || '').trim()); });
+    return el.closest('form, [role=dialog], dialog, [aria-modal=true], [data-gm-opdate], [data-enter-scope], .fixed.inset-0')
+      || document.body;
   }
   window.gmEnterNext = function (el, back) {
     var scope = gmEnterScope(el), list = gmFields(scope), i = list.indexOf(el);
@@ -583,11 +578,7 @@
       if (next.select && /^(text|number|tel|email|search|url|password|)$/i.test(next.type || '')) { try { next.select(); } catch (x) { /* number inputs */ } }
       return true;
     }
-    if (back) return false;
-    if (el.form) return false; // a real form: the browser's own Enter submits it
-    var save = gmSaveButton(scope);
-    if (save) { save.click(); return true; }
-    return false;
+    return false; // last field: nothing to move to (a real form: the browser's own Enter submits it)
   };
   document.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter' || e.defaultPrevented || e.isComposing || e.ctrlKey || e.metaKey || e.altKey) return;
