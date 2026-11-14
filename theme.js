@@ -1812,7 +1812,10 @@ function gmClosePhotoViewer() {
       'box-shadow:inset 0 1px 0 #fff,0 1px 2px rgba(0,0,0,.04),0 4px 10px -8px color-mix(in srgb,var(--gm-accent) 60%,transparent)}',
     // selected options (radio/checkbox chips, tabs) shine in the theme's metal
     G + ':is(label,button)[class*="has-[:checked]"]:has(:checked),' + G + '[aria-selected="true"]:not(option),' + G + '[aria-pressed="true"]' +
-      '{background-image:' + GLASS + ',linear-gradient(135deg,color-mix(in srgb,var(--gm-accent) 22%,#fff),color-mix(in srgb,var(--gm-accent) 42%,#fff))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px color-mix(in srgb,var(--gm-accent) 55%,transparent)}',
+      '{background-image:' + GLASS + ',linear-gradient(135deg,color-mix(in srgb,var(--gm-accent) 22%,#fff),color-mix(in srgb,var(--gm-accent) 42%,#fff))!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.9),0 0 0 1px color-mix(in srgb,var(--gm-accent) 55%,transparent);color:#1F1A12!important}',
+    // the shine is light, so the words on it are black (a dark tile's cream text vanished on it — بشار 2026-11-14)
+    G + ':is(label,button)[class*="has-[:checked]"]:has(:checked) :is(span,b,strong,small,em,i:not(.material-symbols-outlined)),' + G + '[aria-selected="true"]:not(option) :is(span,b,strong,small,em),' + G + '[aria-pressed="true"] :is(span,b,strong,small,em)' +
+      '{color:#1F1A12!important;-webkit-text-fill-color:#1F1A12!important;background-image:none!important}',
     // a slow wave across page titles and the main action
   ].join('\n');
   css = '@media screen{' + css + '}';
