@@ -34,3 +34,26 @@ test('receive from trader: piece + bulk go to stock and account together', async
   expect(sent.p_vat_rate).toBe(5);
   expect(errs).toEqual([]);
 });
+
+// بشار 2026-11-14: goods in can go straight into the scrap box of their karat.
+test('receive from trader: a line «إلى صندوق الكسر» lands in كسر <karat>', async ({ page }) => {
+  let sent = null;
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'AED', vat_rate: 0 }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'تاجر أ' }], trader_movements: [],
+    pieces: [{ id: 'a', store_id: STORE, barcode: '000001', box_name: 'واجهة 1', status: 'available', karat: 18 }],
+  }, rpc: { trader_receive_stock: a => { sent = a; return { body: { barcodes: [] } }; } } });
+  page.on('dialog', d => d.accept().catch(() => {}));
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/ledger-ar.html?trader=t1&action=receive');
+  await page.waitForFunction(() => !document.getElementById('receive-stock-form').classList.contains('hidden') && typeof rsBoxes !== 'undefined' && rsBoxes && rsBoxes.length);
+  const line = page.locator('#rs-lines-list > div').nth(0);
+  await line.locator('select').nth(0).selectOption('scrap');
+  await expect(line).toContainText('كسر 18');
+  await line.locator('input[type=number]').nth(0).fill('42.5');
+  await page.click('#rs-btn');
+  await expect.poll(() => sent).not.toBeNull();
+  expect(sent.p_lines[0]).toMatchObject({ kind: 'bulk', weight: 42.5, karat: 18, box_name: 'كسر 18', description_ar: null });
+});

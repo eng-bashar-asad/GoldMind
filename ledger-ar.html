@@ -2544,19 +2544,21 @@ function renderReceiveStockLines(previewOnly) {
         <div>
           <label class="block text-[10px] text-on-surface-variant mb-0.5">النوع</label>
           <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="updateReceiveStockLine(${l.lineId}, 'kind', this.value)">
-            <option value="piece" ${l.kind !== 'bulk' ? 'selected' : ''}>قطعة بباركود</option>
+            <option value="piece" ${l.kind === 'piece' || !l.kind ? 'selected' : ''}>قطعة بباركود</option>
             <option value="bulk" ${l.kind === 'bulk' ? 'selected' : ''}>وزن بالجملة (للإنتاج لاحقاً)</option>
+            <option value="scrap" ${l.kind === 'scrap' ? 'selected' : ''}>إلى صندوق الكسر</option>
           </select>
         </div>
-        <div>
+        ${l.kind === 'scrap' ? `<div><label class="block text-[10px] text-on-surface-variant mb-0.5">الصندوق</label>
+          <div class="h-9 flex items-center px-2 rounded bg-surface-container-low text-[12px] font-semibold">كسر ${l.karat || ''}</div></div>` : `<div>
           <label class="block text-[10px] text-on-surface-variant mb-0.5">${l.kind === 'bulk' ? 'الصندوق (اختياري)' : 'الصندوق *'}</label>
           <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="rsPickBox(${l.lineId}, this.value)">
             <option value="">— اختر —</option>${(rsBoxes || ['قطع ذهبية']).map(b => `<option ${b === l.boxName ? 'selected' : ''}>${gmEscapeHtml(b)}</option>`).join('')}
             <option value="__new">+ صندوق جديد…</option>
           </select>
-        </div>
+        </div>`}
       </div>
-      ${l.kind !== 'bulk' ? `<input class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" placeholder="وصف القطعة (اختياري)" value="${gmEscapeHtml(l.description || '')}" oninput="updateReceiveStockLine(${l.lineId}, 'description', this.value)"/>` : ''}
+      ${l.kind !== 'bulk' && l.kind !== 'scrap' ? `<input class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" placeholder="وصف القطعة (اختياري)" value="${gmEscapeHtml(l.description || '')}" oninput="updateReceiveStockLine(${l.lineId}, 'description', this.value)"/>` : ''}
       <div class="grid grid-cols-2 gap-2">
         <div>
           <label class="block text-[10px] text-on-surface-variant mb-0.5">العيار</label>
@@ -2592,11 +2594,14 @@ async function submitReceiveStock() {
 
   const validLines = receiveStockLines.filter(l => l.grossWeight > 0);
   if (validLines.length === 0) return fail('أضف سطراً واحداً على الأقل بوزن قائم صحيح');
-  if (validLines.some(l => l.kind !== 'bulk' && !l.boxName)) return fail('اختر الصندوق لكل قطعة');
+  if (validLines.some(l => l.kind !== 'bulk' && l.kind !== 'scrap' && !l.boxName)) return fail('اختر الصندوق لكل قطعة');
 
   const lines = validLines.map(l => ({
-    kind: l.kind === 'bulk' ? 'bulk' : 'piece', karat: l.karat, weight: l.grossWeight, acc_weight: receiveStockEffectiveAcc(l),
-    fab_per_gram: l.fabPerGram, box_name: l.boxName || null, description_ar: l.kind === 'bulk' ? null : (l.description || '').trim() || null
+    // «إلى صندوق الكسر»: a weight lot in the scrap box of its karat (كسر 18 / كسر 21 …), where the
+    // stock page and «إخراج من صندوق الكسر» look for it (بشار 2026-11-14)
+    kind: l.kind === 'bulk' || l.kind === 'scrap' ? 'bulk' : 'piece', karat: l.karat, weight: l.grossWeight, acc_weight: receiveStockEffectiveAcc(l),
+    fab_per_gram: l.fabPerGram, box_name: l.kind === 'scrap' ? 'كسر ' + l.karat : (l.boxName || null),
+    description_ar: l.kind === 'bulk' || l.kind === 'scrap' ? null : (l.description || '').trim() || null
   }));
   const btn = document.getElementById('rs-btn');
   btn.disabled = true;
@@ -2612,7 +2617,8 @@ async function submitReceiveStock() {
 
   const codes = (data && data.barcodes) || [];
   alert('تم الاستلام' + (codes.length ? '\nالقطع الجديدة: ' + codes.join('، ') + '\nاطبع ملصقاتها من صفحة المخزن.' : '')
-    + (lines.some(l => l.kind === 'bulk') ? '\nالوزن بالجملة في «الذهب بالوزن» — حوّله إلى قطع من «إنتاج القطع من رصيد الجملة».' : ''));
+    + (lines.some((l, i) => l.kind === 'bulk' && !/^كسر /.test(l.box_name || '')) ? '\nالوزن بالجملة في «الذهب بالوزن» — حوّله إلى قطع من «إنتاج القطع من رصيد الجملة».' : '')
+    + (lines.some(l => /^كسر /.test(l.box_name || '')) ? '\nالكسر المستلم دخل صندوق الكسر.' : ''));
   clearReceiveStockDraft();
   resetReceiveStockLines();
   document.getElementById('receive-stock-form').classList.add('hidden');
