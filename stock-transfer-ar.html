@@ -95,6 +95,13 @@
 <button onclick="addOutPiece()" class="w-12 h-12 bg-primary text-white rounded-lg flex items-center justify-center" type="button"><span class="material-symbols-outlined">add</span></button>
 </div>
 <p class="text-error text-[12px] hidden" id="out-msg"></p>
+<!-- weight from a scrap box (بشار 2026-11-14) -->
+<div id="out-scrap-box" class="flex flex-wrap items-end gap-2 p-2 rounded-lg border border-dashed border-outline-variant text-[12px]">
+<span class="w-full font-semibold">أو من صندوق الكسر</span>
+<label class="flex flex-col gap-1">الصندوق<select id="out-scrap-k" class="h-10 min-w-[10rem] border border-outline-variant rounded px-2"></select></label>
+<label class="flex flex-col gap-1">الوزن (غ)<input id="out-scrap-w" type="number" step="0.001" min="0" class="h-10 w-28 border border-outline-variant rounded px-2 font-data-mono"/></label>
+<button type="button" onclick="addOutScrap()" class="h-10 px-3 bg-primary text-white rounded-lg flex items-center gap-1"><span class="material-symbols-outlined text-[18px]">add</span>أضف الكسر</button>
+</div>
 <div id="out-list" class="flex flex-col gap-2"></div>
 <div id="out-total" class="text-[12px] font-semibold"></div>
 <input id="out-recipient" class="hidden w-full h-12 border border-outline-variant rounded-lg px-3 text-right" placeholder="لمن الهدية؟ (اسم الشخص)"/>
@@ -114,7 +121,8 @@
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 space-y-3" id="new-pieces-box">
 <div class="flex items-center justify-between">
 <h3 class="font-semibold text-[13px]">قطع جديدة (بعد التعديل)</h3>
-<button type="button" onclick="addNewRow()" class="text-[12px] font-semibold text-primary flex items-center gap-1"><span class="material-symbols-outlined">add</span>قطعة</button>
+<span class="flex gap-3"><button type="button" onclick="addNewRow()" class="text-[12px] font-semibold text-primary flex items-center gap-1"><span class="material-symbols-outlined">add</span>قطعة</button>
+<button type="button" onclick="addScrapInRow()" class="text-[12px] font-semibold text-primary flex items-center gap-1"><span class="material-symbols-outlined">add</span>كسر إلى صندوق الكسر</button></span>
 </div>
 <div id="new-rows" class="flex flex-col gap-3"></div>
 </div>
@@ -144,7 +152,7 @@
 </div>
 
 <script>
-let parties = [], traders = [], prices = {}, CUR = '', current = null, outCart = [], newRowSeq = 0, partyLines = [];
+let parties = [], traders = [], prices = {}, CUR = '', current = null, outCart = [], outScrap = [], scrapHave = {}, newRowSeq = 0, partyLines = [];
 const opts = { type: [], category1: [], category2: [] };
 let boxes = [], lastBox = '';
 const n = (v, d = 2) => Number(v || 0).toFixed(d);
@@ -194,7 +202,7 @@ async function onPartyChange() {
   document.getElementById('party-work').classList.toggle('hidden', !current);
   document.getElementById('party-balance').innerHTML = '';
   if (!current) return;
-  outCart = []; renderOut();
+  outCart = []; outScrap = []; renderOut();
   document.getElementById('new-rows').innerHTML = '';
   document.getElementById('new-pieces-box').classList.toggle('hidden', current.kind !== 'intermediary');
   // gifts only go out (undo from the gifts page); no "in" tab
@@ -352,6 +360,29 @@ async function addOutPiece() {
   if (outCart.some(x => x.id === p.id)) { msg('out-msg', 'القطعة مضافة من قبل'); return; }
   outCart.push(p); inp.value = ''; renderOut();
 }
+// weight from the scrap boxes «كسر <karat>»
+async function loadScrapHave() {
+  const { data } = await goldmindClient.from('gold_stock_lots').select('karat, box_name, weight_grams_remaining')
+    .eq('store_id', GOLDMIND_STORE_ID).like('box_name', 'كسر %').gt('weight_grams_remaining', 0);
+  scrapHave = {};
+  (data || []).forEach(l => { const k = parseInt(String(l.box_name).slice(4), 10) || l.karat; scrapHave[k] = (scrapHave[k] || 0) + Number(l.weight_grams_remaining || 0); });
+  const ks = Object.keys(scrapHave).map(Number).sort((a, b) => a - b);
+  document.getElementById('out-scrap-k').innerHTML = ks.length
+    ? ks.map(k => `<option value="${k}">كسر ${k} — ${n(scrapHave[k], 3)} غ</option>`).join('')
+    : '<option value="">صناديق الكسر فارغة</option>';
+}
+function addOutScrap() {
+  msg('out-msg', '');
+  const k = parseInt(document.getElementById('out-scrap-k').value, 10), w = Math.round((parseFloat(document.getElementById('out-scrap-w').value) || 0) * 1000) / 1000;
+  if (!k) { msg('out-msg', 'لا يوجد كسر في الصناديق'); return; }
+  if (!(w > 0)) { msg('out-msg', 'اكتب وزن الكسر'); return; }
+  const used = outScrap.filter(x => x.karat === k).reduce((t, x) => t + x.weight, 0);
+  if (used + w > (scrapHave[k] || 0) + 0.0005) { msg('out-msg', 'صندوق كسر ' + k + ' فيه ' + n(scrapHave[k] || 0, 3) + ' غ فقط'); return; }
+  outScrap.push({ karat: k, weight: w });
+  document.getElementById('out-scrap-w').value = '';
+  renderOut();
+}
+function removeOutScrap(i) { outScrap.splice(i, 1); renderOut(); }
 function removeOut(id) { outCart = outCart.filter(p => p.id !== id); renderOut(); }
 function renderOut() {
   document.getElementById('out-list').innerHTML = outCart.map(p => `
@@ -364,21 +395,40 @@ function renderOut() {
       <div class="text-left text-[12px] font-data-mono">${money(costOf(p))}</div>
       <button type="button" onclick="removeOut('${p.id}')" class="text-error"><span class="material-symbols-outlined">close</span></button>
     </div>`).join('');
-  document.getElementById('out-total').textContent = outCart.length ? `المجموع: ${outCart.length} قطعة · ${n(outCart.reduce((s, p) => s + Number(p.weight_grams), 0), 3)}غ · كلفة ${money(outCart.reduce((s, p) => s + costOf(p), 0))}` : '';
+  document.getElementById('out-list').insertAdjacentHTML('beforeend', outScrap.map((x, i) => `
+    <div class="flex items-center gap-3 p-2 bg-surface-container-low rounded-lg">
+      <div style="width:56px;height:56px" class="rounded-lg border border-outline-variant flex items-center justify-center"><span class="material-symbols-outlined">inventory_2</span></div>
+      <div class="flex-1 min-w-0 text-[12px]"><div class="font-semibold">صندوق كسر ${x.karat}</div><div class="text-on-surface-variant font-data-mono">${n(x.weight, 3)}غ</div></div>
+      <div class="text-left text-[12px] font-data-mono">${money(x.weight * (prices[x.karat] || 0))}</div>
+      <button type="button" onclick="removeOutScrap(${i})" class="text-error"><span class="material-symbols-outlined">close</span></button>
+    </div>`).join(''));
+  const sw = outScrap.reduce((t, x) => t + x.weight, 0), sc = outScrap.reduce((t, x) => t + x.weight * (prices[x.karat] || 0), 0);
+  document.getElementById('out-total').textContent = outCart.length || outScrap.length
+    ? `المجموع: ${outCart.length ? outCart.length + ' قطعة' : ''}${outCart.length && outScrap.length ? ' + ' : ''}${outScrap.length ? 'كسر ' + n(sw, 3) + 'غ' : ''} · ${n(outCart.reduce((s, p) => s + Number(p.weight_grams), 0) + sw, 3)}غ · كلفة ${money(outCart.reduce((s, p) => s + costOf(p), 0) + sc)}`
+    : '';
 }
 async function saveOut() {
   msg('save-error', ''); msg('save-success', '');
-  if (!outCart.length) { msg('save-error', 'أضف قطعة واحدة على الأقل', true); return; }
+  if (!outCart.length && !outScrap.length) { msg('save-error', 'أضف قطعة أو كسراً', true); return; }
+  if (outScrap.length && current.kind === 'gift') { msg('save-error', 'لا يمكن إخراج كسر كهدية', true); return; }
   const recipient = document.getElementById('out-recipient').value.trim();
   if (current.kind === 'gift' && !recipient) { msg('save-error', 'اكتب اسم مستلم الهدية', true); return; }
   if (!confirm(current.kind === 'gift'
       ? 'إخراج ' + outCart.length + ' قطعة هدية إلى ' + recipient + '؟ ستُسجَّل كلفتها مصروفَ هدايا.'
-      : 'إخراج ' + outCart.length + ' قطعة إلى ' + current.name + '؟')) return;
+      : 'إخراج ' + [outCart.length ? outCart.length + ' قطعة' : '', outScrap.length ? n(outScrap.reduce((t, x) => t + x.weight, 0), 3) + ' غ كسر' : ''].filter(Boolean).join(' و') + ' إلى ' + current.name + '؟')) return;
   const btn = document.getElementById('out-btn'); btn.disabled = true;
-  const { data: vid, error } = await goldmindClient.rpc('stock_out_to_party', { target_party_id: current.id, piece_ids: outCart.map(p => p.id), p_notes: document.getElementById('out-notes').value.trim() || null, p_recipient: recipient || null });
+  const args = { target_party_id: current.id, piece_ids: outCart.map(p => p.id), p_notes: document.getElementById('out-notes').value.trim() || null, p_recipient: recipient || null };
+  // with scrap: the v2 function (supabase/migrations/20261114170000_stock_out_scrap.sql)
+  const { data: vid, error } = outScrap.length
+    ? await goldmindClient.rpc('stock_out_to_party_v2', { ...args, p_scrap: outScrap })
+    : await goldmindClient.rpc('stock_out_to_party', args);
   btn.disabled = false;
-  if (error) { msg('save-error', 'تعذّر الحفظ: ' + error.message, true); return; }
-  outCart = []; renderOut(); document.getElementById('out-notes').value = ''; document.getElementById('out-recipient').value = '';
+  if (error) {
+    const missing = /stock_out_to_party_v2|function .* does not exist|PGRST202/i.test((error.message || '') + (error.code || ''));
+    msg('save-error', missing ? 'إخراج الكسر يحتاج تحديث قاعدة البيانات أولاً (ملف 20261114170000_stock_out_scrap.sql).' : 'تعذّر الحفظ: ' + error.message, true);
+    return;
+  }
+  outCart = []; outScrap = []; renderOut(); loadScrapHave(); document.getElementById('out-notes').value = ''; document.getElementById('out-recipient').value = '';
   msg('save-success', current.kind === 'gift' ? 'أُخرجت الهدية وسُجِّلت كلفتها مصروفاً' : 'حُفظ سند الإخراج', false);
   refreshParty(); loadAllVouchers();
   if (vid && confirm('هل تريد طباعة السند؟')) window.open('stock-voucher-print-ar.html?id=' + vid, '_blank');
@@ -435,6 +485,12 @@ function addNewRow() {
     <p class="scrap-note hidden col-span-2 text-[11px] text-on-surface-variant leading-5">يدخل هذا الوزن صندوق الكسر ذهباً فقط، ومصنعيته (بمصنعية القطعة الأصلية للغرام) تُسجَّل مصروفاً «خسارة مصنعية».</p>
     <button type="button" onclick="this.closest('.new-row').remove()" class="self-end h-10 rounded border border-error text-error">حذف</button>`;
   document.getElementById('new-rows').appendChild(div);
+}
+// a new line already pointed at the scrap box of a karat (the option sits inside the box list too)
+function addScrapInRow() {
+  addNewRow();
+  const row = document.getElementById('new-rows').lastElementChild, sel = row.querySelector('[data-f="box_name"]');
+  sel.value = '__scrap:18'; scrapRow(row);
 }
 async function saveIn() {
   msg('save-error', ''); msg('save-success', '');
@@ -501,6 +557,7 @@ async function loadAllVouchers() {
   document.getElementById('loading-state').classList.add('hidden');
   const has = k => me && (me.role === 'owner' || (me.permissions && me.permissions[k] === true));
   if (!has('stock_transfers')) { document.getElementById('no-access').classList.remove('hidden'); return; }
+  loadScrapHave();
   const code = (store && store.currency || 'AED').toUpperCase();
   CUR = ({ AED: 'AED', USD: 'USD', SAR: 'SAR', SYP: 'SYP' })[code] || code;
   const [{ data: ps }, { data: ts }, { data: gp }, { data: cls }] = await Promise.all([
