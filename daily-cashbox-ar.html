@@ -1158,7 +1158,9 @@ async function deleteModalEntry() {
 
 function openPrintView() {
   const dateStr = localDateStr(selectedDate);
-  window.open('daily-cashbox-print-ar.html?date=' + dateStr, '_blank');
+  const url = 'daily-cashbox-print-ar.html?date=' + dateStr;
+  if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) window.location.href = url; // stay inside the app (a new window can open the phone's browser)
+  else window.open(url, '_blank');
 }
 
 // Separate from the single-day flow above -- opens the print page with a

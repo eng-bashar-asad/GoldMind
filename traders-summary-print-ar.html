@@ -234,9 +234,13 @@ async function shareTradersPdfNative(btn) {
 load();
 
 if (gmIsNativeApp()) {
-  document.getElementById('print-btn').classList.add('hidden');
+  // the app prints through Android's print service (GMPrint, see supabase-config.js);
+  // only an old app without it falls back to PDF only
+  const canPrint = !!(window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.GMPrint);
+  if (!canPrint) document.getElementById('print-btn').classList.add('hidden');
   const hintEl = document.getElementById('nativePdfHint');
-  hintEl.textContent = 'اضغط "تحميل PDF" لحفظ الملف أو مشاركته عبر واتساب مباشرة.';
+  hintEl.textContent = canPrint ? 'اضغط "طباعة" للطباعة على الطابعة أو حفظها PDF، أو "تحميل PDF" لمشاركته عبر واتساب.'
+    : 'اضغط "تحميل PDF" لحفظ الملف أو مشاركته عبر واتساب مباشرة.';
   hintEl.classList.remove('hidden');
 }
 
