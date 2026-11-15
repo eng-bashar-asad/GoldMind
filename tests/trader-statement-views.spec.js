@@ -122,3 +122,17 @@ test('phone: mixed-karat voucher weight tile shows every karat in full', async (
   await expect(tile).toHaveClass(/stc-multi/);
   expect(await tile.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true); // nothing hidden
 });
+
+// بشار 2026-11-15: tapping a piece photo in the statement opens it large
+test('phone: tapping a piece photo opens it large', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('gm_stmt_view', 'details'); } catch (e) {} });
+  const d = db();
+  d.trader_movements.forEach(m => { if (m.piece_id) m.photo_url = 'https://example.com/p.svg'; });
+  (d.inventory_pieces || []).forEach(p => { p.photo_url = 'https://example.com/p.svg'; });
+  await page.route(/example\.com/, r => r.fulfill({ contentType: 'image/svg+xml', body: '<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"/>' }));
+  await install(page, { db: d });
+  await page.goto('/trader-statement-print-ar.html?trader=t1');
+  await page.locator('img.stc-ph').first().click();
+  await expect(page.locator('#gm-photo-viewer')).toBeVisible();
+});

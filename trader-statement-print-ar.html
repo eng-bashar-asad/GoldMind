@@ -258,7 +258,7 @@ function stRenderCards(lines, last, sgn) {
         const rate = stFeePerGram(l.g.rows);
         const pieces = ST_VIEW === 'details' ? l.g.rows.filter(m => m.piece_id).map(m => {
             const p = ST_PIECES[m.piece_id] || {}, name = stShort(m.notes) || p.barcode || '';
-            const ph = ST_PHOTOS && p.photo_url ? `<img class="stc-ph" src="${gmEscapeHtml(p.photo_url)}" alt=""/>` : '';
+            const ph = ST_PHOTOS && p.photo_url ? `<img class="stc-ph" src="${gmEscapeHtml(p.photo_url)}" alt="صورة القطعة" onclick="event.stopPropagation();window.gmPhotoViewer?gmPhotoViewer(this.src):window.open(this.src)" style="cursor:zoom-in"/>` : '';
             const ret = ST_CAN_RETURN && m.source === 'stock_given' ? `<button type="button" class="stc-ret" data-what="${gmEscapeHtml(name)}" onclick="stReturnPiece('${m.id}', this)"><span class="material-symbols-outlined">undo</span>إرجاع للمخزن</button>` : '';
             return `<div class="stc-p">${ph}<div style="flex-grow:1;min-width:0;display:flex;flex-direction:column;gap:6px">
                 <div style="display:flex;justify-content:space-between;align-items:center;gap:8px"><div class="stc-pn">${gmEscapeHtml(name)}</div>${m.karat ? `<span class="stc-k">ع${m.karat}</span>` : ''}</div>
@@ -300,7 +300,7 @@ function stRenderLedger() {
         // details view: every piece under its voucher, with photo and the return button
         const subs = l.g.rows.map(m => {
             const p = ST_PIECES[m.piece_id] || {};
-            const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph" src="${gmEscapeHtml(p.photo_url)}" alt=""/>` : '';
+            const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph" src="${gmEscapeHtml(p.photo_url)}" alt="صورة القطعة" onclick="event.stopPropagation();window.gmPhotoViewer?gmPhotoViewer(this.src):window.open(this.src)" style="cursor:zoom-in"/>` : '';
             const ret = ST_CAN_RETURN && m.source === 'stock_given' && m.piece_id ? `<button type="button" class="st-ret no-print" onclick="stReturnPiece('${m.id}', this)">↩ إرجاع للمخزن</button>` : '';
             return `<tr class="st-p">
                 <td></td>
