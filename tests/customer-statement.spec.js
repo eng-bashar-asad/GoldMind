@@ -34,24 +34,26 @@ test('statement: running balance, invoice pieces, WhatsApp PDF', async ({ page }
   await page.goto('/customer-debts-print-ar.html?id=cu1');
   const rows = page.locator('#rows > tr:not(.items-row)');
   await expect(rows).toHaveCount(3);
-  await expect(rows.nth(0)).toContainText('فاتورة بيع INV-5');
-  await expect(rows.nth(0)).toContainText('4,100.00');
-  await expect(rows.nth(0).locator('td').nth(3)).toHaveText('200.00');     // paid at the counter
-  await expect(rows.nth(0).locator('td').nth(4)).toHaveText('3,900.00');
+  // newest on top; the running balance still runs oldest → newest
+  await expect(rows.nth(2)).toContainText('فاتورة بيع INV-5');
+  await expect(rows.nth(2)).toContainText('4,100.00');
+  await expect(rows.nth(2).locator('td').nth(3)).toHaveText('200.00');     // paid at the counter
+  await expect(rows.nth(2).locator('td').nth(4)).toHaveText('3,900.00');
   await expect(rows.nth(1)).toContainText('دفعة من العميل');
   await expect(rows.nth(1).locator('td').nth(4)).toHaveText('0.00');
-  await expect(rows.nth(2)).toContainText('عربون DEP-000001');
+  await expect(rows.nth(0)).toContainText('عربون DEP-000001');
+  await expect(rows.nth(0).locator('td').nth(4)).toHaveText('-200.00');
   await expect(page.locator('#bal-label')).toHaveText('رصيد للعميل لدى المحل');
   await expect(page.locator('#bal-value')).toContainText('200.00');
-  await rows.nth(0).click();
+  await rows.nth(2).click();
   await expect(page.locator('#items-i5')).toContainText('طقم ذهب');
   await expect(page.locator('#items-i5')).toContainText('25.50 غ');
 
-  // period filter: payments before the start become the opening balance
+  // period filter: payments before the start become the opening balance (bottom row)
   await page.fill('#from', '2026-09-29');
   await page.click('button:has-text("عرض")');
-  await expect(page.locator('#rows > tr').first()).toContainText('رصيد سابق حتى بداية الفترة');
-  await expect(page.locator('#rows > tr').first()).toContainText('3,900.00');
+  await expect(page.locator('#rows > tr').last()).toContainText('رصيد سابق حتى بداية الفترة');
+  await expect(page.locator('#rows > tr').last()).toContainText('3,900.00');
 
   await page.evaluate(() => { window.__pdf = null; const orig = window.gmSavePdf; window.gmSavePdf = async (w, n, t, text) => { window.__pdf = { n, text }; return 'downloaded'; }; });
   await page.click('#wa-btn');

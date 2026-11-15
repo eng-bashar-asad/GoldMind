@@ -1742,21 +1742,27 @@ function gmClosePhotoViewer() {
 
   var G = 'html.gm-gloss:not(.gm-plain) ';
   var noBg = ':not([class*="bg-"]):not(input):not(select):not(textarea):not(option)';
-  // gradient "inks": dark enough to read, with a lighter glint in the middle
+  // gradient "inks": one calm wave per word/number — dark at both ends, a soft shine in the middle
+  // (بشار 2026-11-15: the old off-centre bright glint hurt the eyes)
+  var wave = function (edge, mid, shine) { return 'linear-gradient(110deg,' + edge + ' 0%,' + mid + ' 32%,' + shine + ' 50%,' + mid + ' 68%,' + edge + ' 100%)'; };
   var INK = {
-    green:  'linear-gradient(120deg,#065F46 0%,#0F9F7A 45%,#14B8A6 60%,#047857 100%)',
-    red:    'linear-gradient(120deg,#9F1239 0%,#E11D48 45%,#F97362 62%,#B42318 100%)',
-    blue:   'linear-gradient(120deg,#1E3A8A 0%,#4F46E5 45%,#0EA5E9 65%,#1D4ED8 100%)',
-    amber:  'linear-gradient(120deg,#7C4A03 0%,#C47F0B 40%,#E8B53A 58%,#9A5B05 100%)',
-    violet: 'linear-gradient(120deg,#5B21B6 0%,#9333EA 50%,#DB2777 100%)',
-    accent: 'linear-gradient(120deg,var(--gm-secondary) 0%,var(--gm-accent) 48%,color-mix(in srgb,var(--gm-accent) 55%,#fff) 60%,var(--gm-secondary) 100%)',
-    ink:    'linear-gradient(120deg,var(--gm-primary) 0%,color-mix(in srgb,var(--gm-primary) 72%,var(--gm-accent)) 55%,var(--gm-primary) 100%)'
+    green:  wave('#065F46', '#0A7356', '#178F6C'),
+    red:    wave('#8E1330', '#A91D3A', '#C8394F'),
+    blue:   wave('#1E3A8A', '#284BAE', '#3F67CC'),
+    amber:  wave('#7C4A03', '#955C08', '#B57A17'),
+    violet: wave('#5B21B6', '#6D2BD0', '#8A4DE6'),
+    accent: wave('var(--gm-secondary)', 'var(--gm-accent)', 'color-mix(in srgb,var(--gm-accent) 75%,#fff)'),
+    ink:    wave('var(--gm-primary)', 'color-mix(in srgb,var(--gm-primary) 85%,var(--gm-accent))', 'color-mix(in srgb,var(--gm-primary) 65%,var(--gm-accent))')
   };
+  var INKED = [];
   // table cells usually carry their own background, so the ink goes on what is inside them;
-  // !important so a page's own `background:` shorthand can't leave the text invisible
+  // !important so a page's own `background:` shorthand can't leave the text invisible.
+  // The wave is sized to the words themselves (--gm-ink-x/-w, measured below), not the whole block width.
   var text = function (sel, ink) {
+    INKED.push(sel);
     return sel.split(',').map(function (s) { s = s.trim(); return G + s + noBg + ':not(td):not(th),' + G + s + ':is(td,th) > :not([class*="bg-"])'; }).join(',') +
-      '{background-image:' + ink + '!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;color:transparent}';
+      '{background-image:' + ink + '!important;-webkit-background-clip:text!important;background-clip:text!important;-webkit-text-fill-color:transparent;color:transparent;' +
+      'background-size:var(--gm-ink-w,100%) 100%!important;background-position:var(--gm-ink-x,0px) 0!important;background-repeat:no-repeat!important}';
   };
   // soft chips / blocks: a tinted gradient with a white reflection on top
   var GLASS = 'linear-gradient(180deg,rgba(255,255,255,.7) 0%,rgba(255,255,255,0) 55%)';
@@ -1823,4 +1829,32 @@ function gmClosePhotoViewer() {
   st.id = 'gm-gloss';
   st.textContent = css;
   (document.head || root).appendChild(st);
+
+  // A block element (a <p> or <div> holding a number) is as wide as the card, so the wave would be
+  // stretched over the empty space and the number only got a slice of it. Fit the wave to the text box.
+  var SEL = INKED.join(',');
+  var fitOne = function (el) {
+    if (/^inline/.test(getComputedStyle(el).display)) return; // inline boxes already hug their text
+    var r = document.createRange(); r.selectNodeContents(el);
+    var t = r.getBoundingClientRect(), b = el.getBoundingClientRect();
+    if (!t.width || !b.width) return;
+    el.style.setProperty('--gm-ink-x', Math.round(t.left - b.left - el.clientLeft) + 'px');
+    el.style.setProperty('--gm-ink-w', Math.ceil(t.width) + 'px');
+  };
+  var queued = 0;
+  var fitAll = function () {
+    queued = 0;
+    if (!document.body) return;
+    document.querySelectorAll(SEL).forEach(function (el) {
+      if (/^T[DH]$/.test(el.tagName)) Array.prototype.forEach.call(el.children, fitOne); else fitOne(el);
+    });
+  };
+  var queue = function () { if (!queued) queued = requestAnimationFrame(fitAll); };
+  var start = function () {
+    queue();
+    new MutationObserver(queue).observe(document.body, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class'] });
+    addEventListener('resize', queue);
+    if (document.fonts && document.fonts.ready) document.fonts.ready.then(queue);
+  };
+  if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
 })();

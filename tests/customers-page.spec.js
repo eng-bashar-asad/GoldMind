@@ -143,3 +143,25 @@ test('customers on the computer: a table (largest debt first) and the picked cus
   await expect(rows).toHaveCount(1);
   await expect(rows.first()).toContainText('20 يوماً');
 });
+
+// بشار 2026-11-15: the shiny wave on a coloured number fits the number itself, not the whole card width
+test('coloured amount: the gradient wave hugs the number', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ريما', phone: '0944', is_company: false }],
+    invoices: [],
+    customer_debts: [{ id: 'd2', store_id: STORE, customer_id: 'c1', movement_type: 'debt_decrease', source: 'payment', cash_amount: 200, created_at: '2026-10-03T10:00:00Z' }],
+    customer_phones: [], company_kyc_documents: [], customer_deposits: []
+  } });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/customer-debts-ar.html?open=c1');
+  const amt = page.locator('#movements-list p.text-error', { hasText: '-200.00' });
+  await expect(amt).toHaveCount(1);
+  await page.waitForFunction(() => document.querySelector('#movements-list p.text-error').style.getPropertyValue('--gm-ink-w'));
+  const { w, box } = await amt.evaluate(el => ({ w: parseFloat(el.style.getPropertyValue('--gm-ink-w')), box: el.clientWidth }));
+  expect(w).toBeGreaterThan(20);
+  expect(w).toBeLessThan(box / 2);
+  if (process.env.SHOT) await page.screenshot({ path: '/home/claude/shot-mobile.png' });
+});

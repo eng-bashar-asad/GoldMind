@@ -6,7 +6,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=56"></script>
-<script src="theme.js?v=90"></script>
+<script src="theme.js?v=91"></script>
 <script src="gm-report.js?v=5"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <style>
@@ -150,19 +150,23 @@ function render() {
   });
   bal = opening;
   const tbody = document.getElementById('rows');
-  let html = range && Math.abs(opening) > 0.005 ? `<tr><td></td><td><b>رصيد سابق حتى بداية الفترة</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${signed(opening)}</b></td></tr>` : '';
+  // balance runs oldest → newest, but the newest row is shown on top (بشار 2026-11-15), the opening balance at the bottom
+  const out = [];
   shown.forEach(r => {
     bal += r.debit - r.credit; sumD += r.debit; sumC += r.credit;
     const inv = r.inv;
-    html += `<tr class="${inv ? 'inv-row' : ''}" ${inv ? `onclick="toggleItems('${inv.id}')"` : ''}>
+    let html = `<tr class="${inv ? 'inv-row' : ''}" ${inv ? `onclick="toggleItems('${inv.id}')"` : ''}>
       <td class="font-data-mono text-gray-500"><bdi dir="ltr">${day(r.at)}</bdi></td>
       <td>${inv ? `<span class="no-print material-symbols-outlined align-middle text-[16px] text-amber-600">expand_more</span>` : ''}${esc(r.label)}</td>
       <td class="num">${r.debit ? fmt(r.debit) : ''}</td>
       <td class="num text-green-700">${r.credit ? fmt(r.credit) : ''}</td>
       <td class="num font-bold">${signed(bal)}</td></tr>`;
     if (inv) html += `<tr class="items-row hidden" id="items-${inv.id}"><td colspan="5"></td></tr>`;
+    out.push(html);
   });
-  tbody.innerHTML = html;
+  out.reverse();
+  if (range && Math.abs(opening) > 0.005) out.push(`<tr><td></td><td><b>رصيد سابق حتى بداية الفترة</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${signed(opening)}</b></td></tr>`);
+  tbody.innerHTML = out.join('');
   document.getElementById('empty').classList.toggle('hidden', shown.length > 0);
   document.getElementById('sum-debit').textContent = fmt(sumD) + ' ' + CUR;
   document.getElementById('sum-credit').textContent = fmt(sumC) + ' ' + CUR;
