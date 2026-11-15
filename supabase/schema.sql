@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict ulDhwDYLqWGSx5sdzToHCmZeTC70XQpTU1vpNnhjbgUZFtqTTLLYd8Re1zbtgmL
+\restrict vjsKayivBVEdOzJJcubS2V5huznGYcUmXkyAx7Fd2Na7l7zAfezxvvZtKzMV5Ua
 
 
 SET statement_timeout = 0;
@@ -2574,6 +2574,111 @@ $$;
 
 
 --
+-- Name: invoice_set_deposit(uuid, boolean); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.invoice_set_deposit(p_invoice uuid, p_use boolean) RETURNS numeric
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare inv record; g text; dep numeric; cm record; me uuid; x numeric; cur text; left_amt numeric; r record; t numeric; row_id uuid;
+begin
+  select i.*, coalesce(c.name, '') cname into inv from invoices i left join customers c on c.id = i.customer_id
+     where i.id = p_invoice for update of i;
+       if inv.id is null or inv.type <> 'sale' then raise exception 'الفاتورة غير موجودة'; end if;
+         if not has_permission('edit_invoice', inv.store_id) then raise exception 'ليس لديك صلاحية تعديل الفواتير' using errcode = '42501'; end if;
+           if inv.status = 'cancelled' then raise exception 'الفاتورة ملغاة'; end if;
+             if inv.customer_id is null then raise exception 'الفاتورة بلا زبون'; end if;
+               if inv.pay_breakdown is not null or inv.pay_currency is not null then
+                   raise exception 'هذه الفاتورة مدفوعة بعدة عملات؛ عدّل الدفع من خانات الدفع.';
+                     end if;
+                       select id into me from staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
+                         select coalesce(nullif(upper(currency), ''), 'AED') into cur from stores where id = inv.store_id;
+                           g := 'dep_' || substr(replace(p_invoice::text, '-', ''), 1, 12);
+                             select coalesce(sum(amount), 0) into dep from daily_cash_log where link_group = g and operation_type = 'عربون سابق' and direction = 'out';
+                               select * into cm from cash_movements where invoice_id = p_invoice and direction = 'in' and not coalesce(edit_delta, false)
+                                  order by created_at limit 1;
+
+                                    if not p_use then
+                                        if dep <= 0.009 then raise exception 'هذه الفاتورة لم يُخصم منها عربون'; end if;
+                                            delete from daily_cash_log where link_group = g and operation_type = 'عربون سابق';
+                                                if cm.id is not null then
+                                                      update cash_movements set amount = round(amount + dep, 2),
+                                                                   description = 'تحصيل فاتورة بيع ' || inv.invoice_number || ' (' || to_char(amount + dep, 'FM999,999,990.00') || ' نقداً)'
+                                                                          where id = cm.id;
+                                                                                update daily_cash_log set link_group = null, notes = 'تحصيل ' || inv.invoice_number || ' (' || to_char(cm.amount + dep, 'FM999,999,990.00') || ' نقداً)'
+                                                                                       where cash_movement_id = cm.id;
+                                                                                           else
+                                                                                                 -- paid only from the deposit: the drawer gets a real cash movement; its mirrored row replaces the deposit row
+                                                                                                       delete from daily_cash_log where link_group = g;
+                                                                                                             insert into cash_movements (store_id, box, direction, amount, description, created_by, invoice_id)
+                                                                                                                     values (inv.store_id, 'main', 'in', dep, 'تحصيل فاتورة بيع ' || inv.invoice_number || ' (' || to_char(dep, 'FM999,999,990.00') || ' نقداً)', me, p_invoice);
+                                                                                                                         end if;
+                                                                                                                             -- the deposit no longer pays the invoice: take back the sale's leftover debt and its allocation, up to dep
+                                                                                                                                 t := dep;
+                                                                                                                                     for r in select d.id, d.cash_amount, d.entered_at from customer_debts d
+                                                                                                                                                   where d.invoice_id = p_invoice and d.movement_type = 'debt_increase' and d.source is null
+                                                                                                                                                                 order by d.entered_at desc loop
+                                                                                                                                                                       exit when t <= 0.009;
+                                                                                                                                                                             x := least(t, r.cash_amount);
+                                                                                                                                                                                   if r.cash_amount - x <= 0.009 then delete from customer_debts where id = r.id;
+                                                                                                                                                                                         else update customer_debts set cash_amount = round(cash_amount - x, 2) where id = r.id; end if;
+                                                                                                                                                                                               t := t - x;
+                                                                                                                                                                                                   end loop;
+                                                                                                                                                                                                       t := dep;
+                                                                                                                                                                                                           for r in select d.id, d.cash_amount from customer_debts d
+                                                                                                                                                                                                                         where d.invoice_id = p_invoice and d.source = 'allocation' and d.movement_type = 'debt_decrease'
+                                                                                                                                                                                                                                       order by d.entered_at desc loop
+                                                                                                                                                                                                                                             exit when t <= 0.009;
+                                                                                                                                                                                                                                                   x := least(t, r.cash_amount);
+                                                                                                                                                                                                                                                         if r.cash_amount - x <= 0.009 then delete from customer_debts where id = r.id;
+                                                                                                                                                                                                                                                               else update customer_debts set cash_amount = round(cash_amount - x, 2) where id = r.id; end if;
+                                                                                                                                                                                                                                                                     t := t - x;
+                                                                                                                                                                                                                                                                         end loop;
+                                                                                                                                                                                                                                                                             t := dep;
+                                                                                                                                                                                                                                                                                 for r in select d.id, d.cash_amount from customer_debts d
+                                                                                                                                                                                                                                                                                               where d.customer_id = inv.customer_id and d.invoice_id is null and d.source = 'allocation' and d.movement_type = 'debt_increase'
+                                                                                                                                                                                                                                                                                                               and d.notes = 'تخصيص دفعة للفاتورة ' || inv.invoice_number
+                                                                                                                                                                                                                                                                                                                             order by d.entered_at desc loop
+                                                                                                                                                                                                                                                                                                                                   exit when t <= 0.009;
+                                                                                                                                                                                                                                                                                                                                         x := least(t, r.cash_amount);
+                                                                                                                                                                                                                                                                                                                                               if r.cash_amount - x <= 0.009 then delete from customer_debts where id = r.id;
+                                                                                                                                                                                                                                                                                                                                                     else update customer_debts set cash_amount = round(cash_amount - x, 2) where id = r.id; end if;
+                                                                                                                                                                                                                                                                                                                                                           t := t - x;
+                                                                                                                                                                                                                                                                                                                                                               end loop;
+                                                                                                                                                                                                                                                                                                                                                                   if inv.payment_method = 'mixed' then
+                                                                                                                                                                                                                                                                                                                                                                         update invoices set cash_paid_amount = round(coalesce(cash_paid_amount, 0) + dep, 2) where id = p_invoice;
+                                                                                                                                                                                                                                                                                                                                                                             end if;
+                                                                                                                                                                                                                                                                                                                                                                                 return dep;
+                                                                                                                                                                                                                                                                                                                                                                                   end if;
+
+                                                                                                                                                                                                                                                                                                                                                                                     -- use the deposit
+                                                                                                                                                                                                                                                                                                                                                                                       if dep > 0.009 then raise exception 'هذه الفاتورة مخصوم منها عربون مسبقاً'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                         if cm.id is null then raise exception 'لا يوجد مبلغ نقدي على هذه الفاتورة ليُخصم من العربون'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                           x := round(least(customer_credit(inv.store_id, inv.customer_id), cm.amount), 2);
+                                                                                                                                                                                                                                                                                                                                                                                             if x <= 0.009 then raise exception 'لا يوجد عربون أو رصيد للزبون'; end if;
+                                                                                                                                                                                                                                                                                                                                                                                               if cm.amount - x <= 0.009 then
+                                                                                                                                                                                                                                                                                                                                                                                                   delete from cash_movements where id = cm.id; -- its daily row goes with it
+                                                                                                                                                                                                                                                                                                                                                                                                     else
+                                                                                                                                                                                                                                                                                                                                                                                                         update cash_movements set amount = round(amount - x, 2),
+                                                                                                                                                                                                                                                                                                                                                                                                                    description = 'تحصيل جزئي لفاتورة بيع ' || inv.invoice_number || ' (' || to_char(amount - x, 'FM999,999,990.00') || ' نقداً)'
+                                                                                                                                                                                                                                                                                                                                                                                                                         where id = cm.id;
+                                                                                                                                                                                                                                                                                                                                                                                                                             update daily_cash_log set amount = round(amount - x, 2),
+                                                                                                                                                                                                                                                                                                                                                                                                                                        notes = 'تحصيل جزئي ' || inv.invoice_number || ' (' || to_char(cm.amount - x, 'FM999,999,990.00') || ' نقداً)'
+                                                                                                                                                                                                                                                                                                                                                                                                                                             where cash_movement_id = cm.id;
+                                                                                                                                                                                                                                                                                                                                                                                                                                               end if;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                 update invoices set amount_paid = round(coalesce(amount_paid, 0) - x, 2), status = 'unpaid',
+                                                                                                                                                                                                                                                                                                                                                                                                                                                          cash_paid_amount = case when payment_method = 'mixed' then round(coalesce(cash_paid_amount, 0) - x, 2) else cash_paid_amount end
+                                                                                                                                                                                                                                                                                                                                                                                                                                                             where id = p_invoice;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                               -- same as a sale left partly unpaid: the trigger pays it from the credit and writes the «عربون سابق» rows
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                 insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                     values (inv.store_id, inv.customer_id, p_invoice, 'debt_increase', x, 0,
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                 'متبقي فاتورة بيع ' || inv.invoice_number || ' (من العربون)', me);
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   return x;
+                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   end $$;
+
+
+--
 -- Name: invoices_currency_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -3101,7 +3206,7 @@ $$;
 CREATE FUNCTION public.post_purchase_invoice(p jsonb) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
-    AS $$
+    AS $_$
 declare
   sid uuid := nullif(p->>'store_id','')::uuid;
   ref uuid := nullif(p->>'client_ref','')::uuid;
@@ -3111,6 +3216,8 @@ declare
   sid_type text := nullif(p->>'seller_id_type','');
   photos jsonb := case when jsonb_typeof(p->'bulk_photos') = 'array' and jsonb_array_length(p->'bulk_photos') > 0 then p->'bulk_photos' end;
   me uuid; inv_id uuid; inv_no text; ex record;
+  pcur text := nullif(upper(trim(p->>'pay_currency')), '');
+  prate numeric := nullif(p->>'pay_fx_rate', '')::numeric;
   it jsonb; mode text; price numeric; w numeric; k int; fee numeric; fee_vat numeric; carat numeric; ppc numeric;
   has_gold boolean;
   total numeric := 0; fab_total numeric := 0; vat_total numeric := 0;
@@ -3139,6 +3246,11 @@ begin
   if jsonb_typeof(p->'items') is distinct from 'array' or jsonb_array_length(p->'items') = 0 then
     raise exception 'الفاتورة فارغة — أضف قطعة واحدة على الأقل';
   end if;
+  if pcur is not null then
+    if pcur !~ '^[A-Z]{3}$' then raise exception 'رمز عملة غير صحيح'; end if;
+    if pcur = (select upper(coalesce(currency, 'AED')) from stores where id = sid) then pcur := null; prate := null;
+    elsif prate is null or prate <= 0 then raise exception 'أدخل سعر صرف صحيحاً لعملة %', pcur; end if;
+  else prate := null; end if;
   select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
 
   for it in select * from jsonb_array_elements(p->'items') loop
@@ -3172,14 +3284,14 @@ begin
   inv_no := next_invoice_number(sid, 'PINV');
   insert into invoices (store_id, invoice_number, type, trader_id, counterparty_name, seller_id_type, seller_id_number,
       payment_method, fabrication_fees, vat_amount, total_amount, amount_paid, status, attachment_url, bulk_photos,
-      created_by, client_ref)
+      created_by, client_ref, pay_currency, pay_fx_rate)
     values (sid, inv_no, typ, tid,
       case when typ = 'buyRetail' then nullif(trim(p->>'counterparty_name'), '') end,
       case when typ = 'buyRetail' then sid_type end,
       case when typ = 'buyRetail' then nullif(trim(p->>'seller_id_number'), '') end,
       pm, fab_total, case when typ = 'buyTrader' then vat_total else 0 end, total,
       case when pm = 'cash' then total else 0 end, case when pm = 'cash' then 'paid' else 'unpaid' end,
-      nullif(p->>'attachment_url', ''), photos, me, ref)
+      nullif(p->>'attachment_url', ''), photos, me, ref, pcur, prate)
     returning id into inv_id;
 
   for it in select * from jsonb_array_elements(p->'items') loop
@@ -3269,7 +3381,7 @@ exception when unique_violation then
     if found then return jsonb_build_object('id', ex.id, 'invoice_number', ex.invoice_number, 'duplicate', true); end if;
   end if;
   raise;
-end $$;
+end $_$;
 
 
 --
@@ -5193,6 +5305,60 @@ $$;
 
 
 --
+-- Name: stock_out_to_party_v2(uuid, uuid[], text, text, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.stock_out_to_party_v2(target_party_id uuid, piece_ids uuid[], p_notes text DEFAULT NULL::text, p_recipient text DEFAULT NULL::text, p_scrap jsonb DEFAULT '[]'::jsonb) RETURNS uuid
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  declare
+    pt record; actor uuid; vid uuid; num text; ln jsonb; k int; w numeric; need numeric; lot record; take numeric; gp numeric; have numeric;
+      n_scrap int := coalesce(jsonb_array_length(case when jsonb_typeof(p_scrap) = 'array' then p_scrap end), 0);
+      begin
+        select * into pt from public.stock_parties where id = target_party_id;
+          if pt is null then raise exception 'الجهة غير موجودة'; end if;
+            if not public.has_permission('stock_transfers', pt.store_id) then raise exception 'ليس لديك صلاحية إخراج/إدخال البضاعة' using errcode = '42501'; end if;
+              if n_scrap = 0 then -- pieces only: exactly the old function
+                  return public.stock_out_to_party(target_party_id, piece_ids, p_notes, p_recipient);
+                    end if;
+                      if pt.kind = 'gift' then raise exception 'لا يمكن إخراج كسر كهدية'; end if;
+                        if piece_ids is not null and array_length(piece_ids, 1) is not null then
+                            vid := public.stock_out_to_party(target_party_id, piece_ids, p_notes, p_recipient); -- the voucher with its pieces
+                              else
+                                  select id into actor from public.staff where user_id = auth.uid() and store_id = pt.store_id limit 1;
+                                      perform 1 from public.stores where id = pt.store_id for update;
+                                          num := 'OUT-' || lpad((select count(*) + 1 from public.stock_vouchers where store_id = pt.store_id and direction = 'out')::text, 5, '0');
+                                              insert into public.stock_vouchers (store_id, party_id, direction, voucher_number, notes, created_by)
+                                                    values (pt.store_id, pt.id, 'out', num, nullif(trim(p_notes), ''), actor) returning id into vid;
+                                                      end if;
+                                                        select voucher_number into num from public.stock_vouchers where id = vid;
+                                                          for ln in select * from jsonb_array_elements(p_scrap) loop
+                                                              k := (ln->>'karat')::int; w := round(nullif(ln->>'weight', '')::numeric, 3);
+                                                                  if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+                                                                      if w is null or w <= 0 then raise exception 'وزن الكسر غير صحيح'; end if;
+                                                                          select coalesce(sum(weight_grams_remaining), 0) into have from public.gold_stock_lots
+                                                                               where store_id = pt.store_id and box_name = 'كسر ' || k and weight_grams_remaining > 0;
+                                                                                   if have + 0.0005 < w then raise exception 'صندوق كسر % فيه % غ فقط', k, trim(to_char(have, 'FM999990.000')); end if;
+                                                                                       need := w;
+                                                                                           for lot in select id, weight_grams_remaining from public.gold_stock_lots
+                                                                                                           where store_id = pt.store_id and box_name = 'كسر ' || k and weight_grams_remaining > 0
+                                                                                                                           order by created_at, id for update loop
+                                                                                                                                 exit when need <= 0;
+                                                                                                                                       take := least(need, lot.weight_grams_remaining);
+                                                                                                                                             update public.gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining - take, 3) where id = lot.id;
+                                                                                                                                                   need := need - take;
+                                                                                                                                                       end loop;
+                                                                                                                                                           select price_per_gram into gp from public.gold_prices where store_id = pt.store_id and karat = k;
+                                                                                                                                                               insert into public.stock_voucher_lines (voucher_id, store_id, party_id, direction, piece_id, barcode, karat, weight_grams,
+                                                                                                                                                                       accounting_weight_grams, fab_per_gram, gold_price_per_gram, cost_value)
+                                                                                                                                                                             values (vid, pt.store_id, pt.id, 'out', null, 'كسر ' || k, k, w, w, 0, gp, round(w * coalesce(gp, 0), 2));
+                                                                                                                                                                               end loop;
+                                                                                                                                                                                 return vid;
+                                                                                                                                                                                 end $$;
+
+
+--
 -- Name: store_legal(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5759,6 +5925,56 @@ begin
   new.voucher_no := coalesce(v, gm_next_voucher_no(new.store_id, pf));
   return new;
 end $$;
+
+
+--
+-- Name: update_customer_deposit(uuid, jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.update_customer_deposit(p_deposit uuid, p jsonb) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare d record; amt numeric; left_amt numeric; new_items jsonb := coalesce(p->'items', '[]'::jsonb);
+begin
+  select * into d from customer_deposits where id = p_deposit for update;
+    if d is null then raise exception 'العربون غير موجود'; end if;
+      if not (has_permission('edit_customers', d.store_id) or has_permission('manage_daily_cashbox', d.store_id)) then
+          raise exception 'ليس لديك صلاحية' using errcode = '42501';
+            end if;
+              if d.status <> 'active' then raise exception 'هذا العربون مُسترجَع، لا يمكن تعديله'; end if;
+                if jsonb_typeof(new_items) <> 'array' or jsonb_array_length(new_items) = 0 then
+                    raise exception 'اكتب وصف القطعة المحجوزة على الأقل';
+                      end if;
+                        amt := round(coalesce(nullif(p->>'amount', '')::numeric, d.amount), 2);
+                          if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+
+                            if amt <> d.amount then
+                                select remaining into left_amt from customer_deposit_remaining(d.store_id) where deposit_id = d.id;
+                                    if coalesce(left_amt, 0) < d.amount - 0.009 then
+                                          raise exception 'هذا العربون استُخدم في فاتورة، فلا يمكن تغيير مبلغه. يمكنك تعديل القطع والملاحظات فقط.';
+                                              end if;
+                                                  if d.in_cashbox then
+                                                        update cash_movements set amount = amt
+                                                               where store_id = d.store_id and direction = 'in' and invoice_id is null
+                                                                        and description like 'عربون ' || d.deposit_number || ' %';
+                                                                            end if;
+                                                                                update customer_debts set cash_amount = amt
+                                                                                     where store_id = d.store_id and customer_id = d.customer_id and source = 'deposit'
+                                                                                            and notes = 'عربون ' || d.deposit_number;
+                                                                                              end if;
+
+                                                                                                -- pieces dropped from the deposit go back on sale, newly added ones get reserved
+                                                                                                  update pieces set status = 'available', reserved_customer_id = null
+                                                                                                     where store_id = d.store_id and status = 'reserved' and reserved_customer_id = d.customer_id
+                                                                                                          and barcode in (select nullif(trim(x->>'barcode'), '') from jsonb_array_elements(coalesce(d.items, '[]'::jsonb)) x)
+                                                                                                               and barcode not in (select coalesce(nullif(trim(x->>'barcode'), ''), '') from jsonb_array_elements(new_items) x);
+                                                                                                                 update pieces set status = 'reserved', reserved_customer_id = d.customer_id
+                                                                                                                    where store_id = d.store_id and status = 'available'
+                                                                                                                         and barcode in (select nullif(trim(x->>'barcode'), '') from jsonb_array_elements(new_items) x);
+
+                                                                                                                           update customer_deposits set amount = amt, items = new_items, notes = nullif(trim(p->>'notes'), '') where id = d.id;
+                                                                                                                           end $$;
 
 
 --
@@ -12832,6 +13048,15 @@ GRANT ALL ON FUNCTION public.has_permission(perm text, target_store_id uuid) TO 
 
 
 --
+-- Name: FUNCTION invoice_set_deposit(p_invoice uuid, p_use boolean); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.invoice_set_deposit(p_invoice uuid, p_use boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.invoice_set_deposit(p_invoice uuid, p_use boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.invoice_set_deposit(p_invoice uuid, p_use boolean) TO service_role;
+
+
+--
 -- Name: FUNCTION invoices_currency_guard(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -13364,6 +13589,14 @@ GRANT ALL ON FUNCTION public.stock_out_to_party(target_party_id uuid, piece_ids 
 
 
 --
+-- Name: FUNCTION stock_out_to_party_v2(target_party_id uuid, piece_ids uuid[], p_notes text, p_recipient text, p_scrap jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.stock_out_to_party_v2(target_party_id uuid, piece_ids uuid[], p_notes text, p_recipient text, p_scrap jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.stock_out_to_party_v2(target_party_id uuid, piece_ids uuid[], p_notes text, p_recipient text, p_scrap jsonb) TO service_role;
+
+
+--
 -- Name: FUNCTION store_legal(p_store_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -13572,6 +13805,15 @@ GRANT ALL ON FUNCTION public.trg_trader_received_sync() TO service_role;
 
 GRANT ALL ON FUNCTION public.trg_trader_voucher_no() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_trader_voucher_no() TO service_role;
+
+
+--
+-- Name: FUNCTION update_customer_deposit(p_deposit uuid, p jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.update_customer_deposit(p_deposit uuid, p jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.update_customer_deposit(p_deposit uuid, p jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.update_customer_deposit(p_deposit uuid, p jsonb) TO service_role;
 
 
 --
@@ -14366,5 +14608,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict ulDhwDYLqWGSx5sdzToHCmZeTC70XQpTU1vpNnhjbgUZFtqTTLLYd8Re1zbtgmL
+\unrestrict vjsKayivBVEdOzJJcubS2V5huznGYcUmXkyAx7Fd2Na7l7zAfezxvvZtKzMV5Ua
 
