@@ -61,7 +61,8 @@
     .stc-tiles { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
     .stc-tile { background: #fafafa; border: 1px solid #f4f4f5; border-radius: 8px; padding: 8px; min-width: 0; }
     .stc-tile small { display: block; font-size: 11px; color: #52525b; }
-    .stc-tile b { display: block; font-size: 15px; text-align: right; direction: ltr; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stc-tile b { display: block; font-size: 15px; text-align: right; direction: ltr; white-space: nowrap; }
+    .stc-tile b.stc-multi { font-size: 12.5px; line-height: 1.45; } /* several karats: one smaller line each, never cut with «...» */
     .stc-foot { display: flex; justify-content: space-between; gap: 8px; font-size: 12px; color: #52525b; flex-wrap: wrap; }
     .stc-foot b { color: #09090b; direction: ltr; unicode-bidi: isolate; }
     .stc-p { padding: 12px 16px; display: flex; gap: 12px; border-top: 1px solid #f4f4f5; }
@@ -242,7 +243,7 @@ function stWeightTile(rows) {
     rows.forEach(m => { const k = Number(m.karat), w = stGross(m); if (k && w > 0) byK[k] = (byK[k] || 0) + w; });
     const ks = Object.keys(byK);
     if (!ks.length) return null;
-    return { label: ks.length === 1 ? 'الوزن القائم ع' + ks[0] : 'الوزن القائم', value: ks.length === 1 ? fmt(byK[ks[0]]) + ' g' : ks.map(k => k + ': ' + fmt(byK[k])).join(' · ') };
+    return { label: ks.length === 1 ? 'الوزن القائم ع' + ks[0] : 'الوزن القائم', value: ks.length === 1 ? fmt(byK[ks[0]]) + ' g' : ks.map(k => '<div>' + fmt(byK[k]) + ' g <span dir="rtl">ع' + k + '</span></div>').join(''), multi: ks.length > 1 };
 }
 function stRenderCards(lines, last, sgn) {
     const el = document.getElementById('stCards');
@@ -251,7 +252,7 @@ function stRenderCards(lines, last, sgn) {
     const cards = lines.map(l => {
         const f = l.f, out = f.movement_type !== 'debt_increase';
         const wt = stWeightTile(l.g.rows);
-        const tiles = [wt ? `<div class="stc-tile"><small>${wt.label}</small><b class="font-data-mono">${wt.value}</b></div>` : '',
+        const tiles = [wt ? `<div class="stc-tile"><small>${wt.label}</small><b class="font-data-mono${wt.multi ? ' stc-multi' : ''}">${wt.value}</b></div>` : '',
             Math.abs(l.gold) >= 0.005 ? `<div class="stc-tile"><small>ذهب عيار 24</small><b class="font-data-mono" style="color:${tone(l.gold)}">${mv(l.gold)}</b></div>` : '',
             Math.abs(l.cash) >= 0.005 ? `<div class="stc-tile"><small>${l.g.rows.some(m => m.piece_id) ? 'المصنعية' : 'نقد'}</small><b class="font-data-mono" style="color:${tone(l.cash)}">${mv(l.cash)}</b></div>` : ''].filter(Boolean).join('');
         const rate = stFeePerGram(l.g.rows);

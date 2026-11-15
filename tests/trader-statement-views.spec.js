@@ -107,3 +107,18 @@ test('phone: statement as cards, with the standing-weight tile and return button
   await cards.first().locator('button.stc-ret').first().click();
   await expect.poll(() => calls.some(c => c.name === 'trader_return_piece')).toBe(true);
 });
+
+// بشار 2026-11-15: a voucher with two karats shows each karat's weight on its own smaller line — never cut with «...»
+test('phone: mixed-karat voucher weight tile shows every karat in full', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem('gm_stmt_view', 'details'); } catch (e) {} });
+  const d = db();
+  d.trader_movements[1].karat = 24; d.trader_movements[1].weight_grams = 1250.5; // big number on a second karat
+  await install(page, { db: d });
+  await page.goto('/trader-statement-print-ar.html?trader=t1');
+  const tile = page.locator('#stCards section.stc').first().locator('.stc-tile b').first();
+  await expect(tile).toContainText('ع18');
+  await expect(tile).toContainText('1,250.50 g');
+  await expect(tile).toHaveClass(/stc-multi/);
+  expect(await tile.evaluate(el => el.scrollWidth <= el.clientWidth + 1)).toBe(true); // nothing hidden
+});
