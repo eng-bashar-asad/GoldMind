@@ -1549,7 +1549,7 @@ function showTraderDetail(traderId) {
         </div>` : ''}
         ${isManualSettlement ? `
         ${gmBranchTag(m)}<div class="flex gap-2 mt-2 pt-2 border-t border-outline-variant${gmForeign(m) ? ' hidden' : ''}">
-          <button onclick="toggleEditSettlement('${m.id}')" class="gm-vedit flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>
+          ${m.source === 'gold_to_cash' ? '' : `<button onclick="toggleEditSettlement('${m.id}')" class="gm-vedit flex-1 h-8 border border-outline-variant rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">edit</span> تعديل</button>`}
           <button onclick="deleteSettlementMovement('${m.id}', ${settlementIsCash})" class="gm-vedit flex-1 h-8 border border-error text-error rounded-lg text-[11px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined text-[14px]">delete</span> حذف</button>
         </div>
         <div class="hidden mt-3 pt-3 border-t border-outline-variant flex-col gap-2" id="edit-settle-form-${m.id}">
@@ -2062,9 +2062,11 @@ async function deleteSettlementMovement(movementId, wasCash) {
   const warnMsg = wasCash
     ? 'هل تريد حذف هذه التسوية؟ إذا كانت مرتبطة بحركة صندوق، فستُحذف معها. هذا الإجراء نهائي.'
     : 'هل تريد حذف هذه التسوية؟ هذا الإجراء نهائي.';
-  if (!confirm(warnMsg)) return;
-
   const m = (movementsByTrader[currentTraderId] || []).find(x => x.id === movementId);
+  // a conversion voucher is a gold row + a cash row; the database deletes both together
+  if (!confirm(m && m.source === 'gold_to_cash'
+    ? 'هل تريد حذف سند تسكير العملات كاملاً؟ سيعود رصيد الذهب والرصيد النقدي كما كانا قبل التسكير. هذا الإجراء نهائي.'
+    : warnMsg)) return;
   const linkedId = m && m.linked_cash_movement_id;
 
   const { error } = await goldmindClient.from('trader_movements').delete().eq('id', movementId);
