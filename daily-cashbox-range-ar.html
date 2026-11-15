@@ -239,12 +239,13 @@ function crRender() {
   const kvs = (obj, cls, sign) => R.curs.filter(c => Math.abs(tot(obj, c)) > 0.0001).map(c => `<b class="n ${cls}">${sign}${fmt(tot(obj, c))}</b>${curTag(c)}`).join('<br>') || '<span class="mut">—</span>';
   const bals = obj => R.curs.map(c => `<b class="n">${fmt(tot(obj, c))}</b>${curTag(c)}`).join('<br>');
 
-  document.getElementById('crDays').innerHTML = R.days.map(d => {
+  // newest day on top, newest movement on top inside each day (balances still run oldest → newest)
+  document.getElementById('crDays').innerHTML = [...R.days].reverse().map(d => {
     const cal = `<div class="cal glass-dark"><b>${pad(d.date.getDate())}</b><small>${MONTH[d.date.getMonth()]}</small></div>`;
     if (!d.rows.length) return `<article class="cr-day cr-empty glass" data-day="${d.key}">
       <aside class="cr-side gold-glass"><div class="flex items-center gap-3">${cal}<div><b class="text-[15px]">${WEEK[d.date.getDay()]}</b><div class="text-[12px] mut">لا حركات</div></div></div></aside>
       <div class="flex items-center px-4 py-3 text-[13px] mut">يوم بلا حركات — الرصيد بقي&nbsp;${bals(d.end)}</div></article>`;
-    const rows = d.rows.map(e => {
+    const rows = [...d.rows].reverse().map(e => {
       const p = partnerOf(e), g = e.link_group ? groups.get(e.link_group) : null;
       const style = g != null ? ` style="--lk-bg:${LK_BG[g]};--lk-ink:${LK_INK[g]}"` : '';
       const chip = p ? `<span class="cr-chip" style="color:${LK_INK[g]}" role="button" tabindex="0" onclick="event.stopPropagation();crGoTo('${p.id}')" onkeydown="if(event.key==='Enter'){event.stopPropagation();crGoTo('${p.id}')}" title="انتقل إلى الحركة المربوطة"><span class="material-symbols-outlined ms">link</span>${esc((p.operation_type || '').slice(0, 26))} · ${esc(crDayLabel(new Date(p.created_at)))}</span>` : '';

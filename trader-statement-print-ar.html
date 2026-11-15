@@ -256,7 +256,7 @@ function stRenderCards(lines, last, sgn) {
             Math.abs(l.gold) >= 0.005 ? `<div class="stc-tile"><small>ذهب عيار 24</small><b class="font-data-mono" style="color:${tone(l.gold)}">${mv(l.gold)}</b></div>` : '',
             Math.abs(l.cash) >= 0.005 ? `<div class="stc-tile"><small>${l.g.rows.some(m => m.piece_id) ? 'المصنعية' : 'نقد'}</small><b class="font-data-mono" style="color:${tone(l.cash)}">${mv(l.cash)}</b></div>` : ''].filter(Boolean).join('');
         const rate = stFeePerGram(l.g.rows);
-        const pieces = ST_VIEW === 'details' ? l.g.rows.filter(m => m.piece_id).map(m => {
+        const pieces = ST_VIEW === 'details' ? l.g.rows.filter(m => m.piece_id).reverse().map(m => {
             const p = ST_PIECES[m.piece_id] || {}, name = stShort(m.notes) || p.barcode || '';
             const ph = ST_PHOTOS && p.photo_url ? `<img class="stc-ph" src="${gmEscapeHtml(p.photo_url)}" alt="صورة القطعة" onclick="event.stopPropagation();window.gmPhotoViewer?gmPhotoViewer(this.src):window.open(this.src)" style="cursor:zoom-in"/>` : '';
             const ret = ST_CAN_RETURN && m.source === 'stock_given' ? `<button type="button" class="stc-ret" data-what="${gmEscapeHtml(name)}" onclick="stReturnPiece('${m.id}', this)"><span class="material-symbols-outlined">undo</span>إرجاع للمخزن</button>` : '';
@@ -283,7 +283,8 @@ function stRenderLedger() {
     const col = v => v >= 0 ? '#3F6B47' : '#8A3B32';
     const mv = v => Math.abs(v) < 0.005 ? '—' : (v > 0 ? '+' : '') + fmt(v);
     const sgn = m => m.movement_type === 'debt_increase' ? -1 : 1;
-    const lines = ST_LINES.filter(l => ST_KIND === 'all' || l.kind === ST_KIND);
+    // newest voucher on top, newest piece on top inside it; balances were computed oldest → newest (بشار 2026-11-15)
+    const lines = ST_LINES.filter(l => ST_KIND === 'all' || l.kind === ST_KIND).slice().reverse();
     const html = lines.map(l => {
         const f = l.f;
         const main = `<tr class="st-m">
@@ -298,7 +299,7 @@ function stRenderLedger() {
             <td class="font-data-mono font-bold" style="color:${col(l.balC)}">${fmt(l.balC)}</td></tr>`;
         if (ST_VIEW !== 'details' || !l.g.rows.some(m => m.piece_id)) return main;
         // details view: every piece under its voucher, with photo and the return button
-        const subs = l.g.rows.map(m => {
+        const subs = l.g.rows.slice().reverse().map(m => {
             const p = ST_PIECES[m.piece_id] || {};
             const ph = ST_PHOTOS && p.photo_url ? `<img class="st-ph" src="${gmEscapeHtml(p.photo_url)}" alt="صورة القطعة" onclick="event.stopPropagation();window.gmPhotoViewer?gmPhotoViewer(this.src):window.open(this.src)" style="cursor:zoom-in"/>` : '';
             const ret = ST_CAN_RETURN && m.source === 'stock_given' && m.piece_id ? `<button type="button" class="st-ret no-print" onclick="stReturnPiece('${m.id}', this)">↩ إرجاع للمخزن</button>` : '';

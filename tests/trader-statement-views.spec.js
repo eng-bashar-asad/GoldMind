@@ -25,8 +25,9 @@ test('one ledger: a line per voucher, running balances, vouchers vs details, pho
   await expect(rows.locator('tr.st-p')).toHaveCount(0);
   await expect(rows).toContainText('إعطاء بضاعة · 2 قطعة · عيار 18');
   await expect(rows).toContainText('22.50');     // gold 24k, trader owes the shop
-  await expect(rows.locator('tr.st-m').first().locator('td').nth(3)).toHaveText('30.00'); // standing weight 18k: 10 + 20
-  await expect(rows.locator('tr.st-m').nth(1).locator('td').nth(3)).toHaveText('—');       // cash: no weight
+  // newest on top (بشار 2026-11-15): same time here, so the later-entered cash line comes first
+  await expect(rows.locator('tr.st-m').nth(1).locator('td').nth(3)).toHaveText('30.00'); // standing weight 18k: 10 + 20
+  await expect(rows.locator('tr.st-m').nth(0).locator('td').nth(3)).toHaveText('—');       // cash: no weight
   await expect(rows).toContainText('450.00');    // making
   await expect(rows).toContainText('-100.00');   // cash the shop paid out: shop owes trader
   await expect(page.locator('#stLedgerFoot')).toContainText('22.50');
@@ -35,7 +36,7 @@ test('one ledger: a line per voucher, running balances, vouchers vs details, pho
 
   await page.click('#stOpts [data-view=details]');
   await expect(rows.locator('tr.st-p')).toHaveCount(2);
-  await expect(rows.locator('tr.st-p').first().locator('td').nth(3)).toHaveText('10.00');
+  await expect(rows.locator('tr.st-p').last().locator('td').nth(3)).toHaveText('10.00');   // first piece of the voucher at the bottom
   await expect(rows).toContainText('000436 (خاتم)');
   await expect(rows).not.toContainText('إخراج بضاعة');
   await expect(rows.locator('img.st-ph')).toHaveCount(1);
@@ -62,7 +63,7 @@ test('return one piece to stock from the statement', async ({ page }) => {
   page.on('dialog', d => d.accept());
   await page.goto('/trader-statement-print-ar.html?trader=t1');
   await page.click('#stOpts [data-view=details]');
-  const btn = page.locator('#stLedgerRows tr.st-p button.st-ret').first();
+  const btn = page.locator('#stLedgerRows tr.st-p button.st-ret').last();
   await expect(btn).toBeVisible();
   await btn.click();
   await expect.poll(() => calls.some(c => c.name === 'trader_return_piece')).toBe(true);
@@ -86,7 +87,7 @@ test('statement shows the making cost per gram before the total making cost', as
   await page.goto('/trader-statement-print-ar.html?trader=t1');
   const heads = await page.locator('.stmt-table thead th').allTextContents();
   expect(heads.indexOf('مصنعية/غ')).toBe(heads.findIndex(h => h.startsWith('نقد')) - 1);
-  await expect(page.locator('#stLedgerRows tr.st-m').first().locator('td').nth(5)).toHaveText('15.00');
+  await expect(page.locator('#stLedgerRows tr.st-m', { hasText: 'إعطاء بضاعة' }).locator('td').nth(5)).toHaveText('15.00');
   await page.click('#stOpts [data-view=details]');
   await expect(page.locator('#stLedgerRows tr.st-p').first().locator('td').nth(5)).toHaveText('15.00');
 });
@@ -100,11 +101,12 @@ test('phone: statement as cards, with the standing-weight tile and return button
   await page.goto('/trader-statement-print-ar.html?trader=t1');
   const cards = page.locator('#stCards section.stc');
   await expect(cards).toHaveCount(2);
-  await expect(cards.first()).toContainText('الوزن القائم ع18');
-  await expect(cards.first().locator('.stc-tile').first()).toContainText('30.00 g');
-  await expect(cards.first().locator('.stc-p')).toHaveCount(2);
+  const give = cards.filter({ hasText: 'إعطاء بضاعة' });
+  await expect(give).toContainText('الوزن القائم ع18');
+  await expect(give.locator('.stc-tile').first()).toContainText('30.00 g');
+  await expect(give.locator('.stc-p')).toHaveCount(2);
   await expect(page.locator('#stCards .stc-end')).toContainText('350.00');
-  await cards.first().locator('button.stc-ret').first().click();
+  await give.locator('button.stc-ret').first().click();
   await expect.poll(() => calls.some(c => c.name === 'trader_return_piece')).toBe(true);
 });
 
@@ -116,7 +118,7 @@ test('phone: mixed-karat voucher weight tile shows every karat in full', async (
   d.trader_movements[1].karat = 24; d.trader_movements[1].weight_grams = 1250.5; // big number on a second karat
   await install(page, { db: d });
   await page.goto('/trader-statement-print-ar.html?trader=t1');
-  const tile = page.locator('#stCards section.stc').first().locator('.stc-tile b').first();
+  const tile = page.locator('#stCards section.stc', { hasText: 'إعطاء بضاعة' }).locator('.stc-tile b').first();
   await expect(tile).toContainText('ع18');
   await expect(tile).toContainText('1,250.50 g');
   await expect(tile).toHaveClass(/stc-multi/);

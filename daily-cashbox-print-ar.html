@@ -215,13 +215,13 @@ async function load() {
     if (!clustersByKey.has(key)) clustersByKey.set(key, { group: e.link_group || null, members: [] });
     clustersByKey.get(key).members.push(e);
   });
-  const clusters = [...clustersByKey.values()];
+  const clusters = [...clustersByKey.values()].reverse(); // newest on top
 
   const outEntries = [];
   const inEntries = [];
   clusters.forEach(cluster => {
-    const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
-    const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+    const outMembers = cluster.members.filter(e => e.direction === 'out').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    const inMembers = cluster.members.filter(e => e.direction === 'in').sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
     // Same always-filled approach as the in-app page: no padding between
     // clusters, so an unbalanced cluster never opens a blank row in the
     // middle of the sheet. Each cell keeps its OWN entry's link color

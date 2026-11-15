@@ -195,7 +195,7 @@ function ssPick(sid) { SS.pick = SS.pick === sid ? null : sid; ssRender(); if (S
 // statement of one staff member: every invoice in the period
 function ssRenderDetail() {
   const box = document.getElementById('ssDetail');
-  const list = SS.invoices.filter(i => i.sid === SS.pick);
+  const list = SS.invoices.filter(i => i.sid === SS.pick).reverse(); // newest invoice on top
   if (!SS.pick || !list.length) { box.classList.add('hidden'); box.innerHTML = ''; return; }
   const nm = (SS.staff[SS.pick] && SS.staff[SS.pick].full_name) || '';
   const t = list.reduce((a, i) => { a.w24 += i.t.w24; a.weight += i.t.weight; a.value += i.t.value; a.profit += i.t.profit; return a; }, { w24: 0, weight: 0, value: 0, profit: 0 });

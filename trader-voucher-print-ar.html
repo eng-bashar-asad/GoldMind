@@ -173,7 +173,8 @@ console.assert(tvBalance([{ movement_type: 'debt_decrease', gold_24k_equivalent:
     return esc(String(r.notes || '').replace(/^\s*(إخراج|إعطاء|استلام|إدخال)\s+(بضاعة|قطع|قطعة)\s*[—–-]\s*/, '') || '—');
   };
   const dash = '<span class="text-gray-400">—</span>';
-  document.getElementById('lines').innerHTML = rows.map((r, i) => `<tr>
+  document.getElementById('lines').innerHTML = [...rows].reverse().map((r, i) => // last entered line on top (بشار 2026-11-15)
+ `<tr>
       <td class="py-1 num">${i + 1}</td>
       <td class="py-1">${what(r)}</td>
       <td class="py-1 text-center num">${r.karat ? r.karat + 'K' : dash}</td>

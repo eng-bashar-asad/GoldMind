@@ -400,7 +400,7 @@ async function build(from, to) {
   if (document.getElementById('fr-show-list').checked && invoices.length) {
     h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<div class="fr-wide"></div><table class="fr-t">
       <tr><th>الرقم</th>${FR.scope.multi() ? '<th>الفرع</th>' : ''}<th>النوع</th><th>التاريخ</th><th>الدفع</th><th class="n">المبلغ</th></tr>
-      ${invoices.map(i => `<tr style="font-size:11.5px;"><td dir="ltr" style="text-align:right;white-space:nowrap;">${esc(String(i.invoice_number || '').replace(/-20\d\d-0*/, '-'))}</td>${FR.scope.multi() ? '<td>' + esc(FR.scope.nameOf(i.store_id)) + '</td>' : ''}<td>${TYPE[i.type] || esc(i.type)}</td><td style="white-space:nowrap;" dir="ltr">${gmFormatDateTime(i.created_at, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td><td>${PAY[i.payment_method] || esc(i.payment_method || '')}</td><td class="n">${n2((i.type === 'return' ? -1 : 1) * Number(i.total_amount || 0))}</td></tr>`).join('')}
+      ${[...invoices].reverse().map(i => `<tr style="font-size:11.5px;"><td dir="ltr" style="text-align:right;white-space:nowrap;">${esc(String(i.invoice_number || '').replace(/-20\d\d-0*/, '-'))}</td>${FR.scope.multi() ? '<td>' + esc(FR.scope.nameOf(i.store_id)) + '</td>' : ''}<td>${TYPE[i.type] || esc(i.type)}</td><td style="white-space:nowrap;" dir="ltr">${gmFormatDateTime(i.created_at, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td><td>${PAY[i.payment_method] || esc(i.payment_method || '')}</td><td class="n">${n2((i.type === 'return' ? -1 : 1) * Number(i.total_amount || 0))}</td></tr>`).join('')}
     </table>`);
   }
   return h;

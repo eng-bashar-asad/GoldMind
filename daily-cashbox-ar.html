@@ -123,7 +123,7 @@
   #dcKpis .dc-kpi:not(.dark) i, #dcKpis .dc-kpi.io{display:none}
   .dc-wrap{border:0;background:transparent;overflow:visible}
   #cashbox-table thead{display:none}
-  #cashbox-table tbody{display:flex;flex-direction:column-reverse;gap:8px}
+  #cashbox-table tbody{display:flex;flex-direction:column;gap:8px} /* rows already come newest first */
   #cashbox-table tbody tr{display:grid;grid-template-columns:auto auto minmax(0,1fr) auto;grid-template-areas:"op op op amt" "t src . bal";column-gap:6px;align-items:center;background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant);border-radius:12px;padding:10px 12px}
   #cashbox-table tbody tr.dc-linked{border-inline-start-width:4px}
   #cashbox-table tbody td{display:block;padding:0;border:0}
@@ -783,7 +783,7 @@ function renderAll() {
   document.querySelector('.dc-tools').classList.toggle('hidden', entriesToShow.length === 0);
   if (!entriesToShow.length) { bodyEl.innerHTML = ''; document.getElementById('dcFoot').innerHTML = ''; dcApplyFilter(); return; }
 
-  // oldest first; each row shows its currency's balance right after it
+  // balances run oldest → newest, but the newest row is shown on top (بشار 2026-11-15)
   const rows = [...entriesToShow].sort((a, b) => new Date(a.created_at) - new Date(b.created_at) || String(a.id).localeCompare(String(b.id)));
   const run = {};
   if (!showFullHistory) currencyBalances.forEach(b => { run[b.cur] = b.opening; });
@@ -820,7 +820,7 @@ function renderAll() {
       <td class="dc-n dc-b dc-bal">${showFullHistory ? '' : `<span dir="ltr" class="font-data-mono">${fmt(run[cur])}</span>`}</td>
       <td class="dc-act" onclick="event.stopPropagation()"><button type="button" onclick="dcRowAct('open','${e.id}')"><span class="material-symbols-outlined" aria-hidden="true">open_in_new</span>فتح</button><button type="button" onclick="dcRowAct('link','${e.id}')"><span class="material-symbols-outlined" aria-hidden="true">link</span>ربط</button><button type="button" onclick="dcRowAct('print','${e.id}')"><span class="material-symbols-outlined" aria-hidden="true">print</span>طباعة</button></td>
     </tr>`;
-  }).join('');
+  }).reverse().join('');
   document.getElementById('dcFoot').innerHTML = Object.entries(totals).map(([cur, t]) => `<tr>
       <td colspan="3" class="dc-fl">مجموع ${showFullHistory ? 'كل العمليات' : 'اليوم'} · ${cur} · ${t.n} حركة</td>
       <td class="dc-n dc-amt-in" data-k="داخل"><span dir="ltr" class="font-data-mono">${fmt(t.tin)}</span></td>

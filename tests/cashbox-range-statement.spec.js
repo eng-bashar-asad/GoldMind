@@ -24,9 +24,10 @@ test('days as cards with running balances; a linked row points to its partner on
   await expect(days).toHaveCount(3);
   await expect(page.locator('#crSummary')).toContainText('1,000.00');      // opening = before the period
   await expect(page.locator('#crSummary')).toContainText('1,350.00');      // closing
-  await expect(days.nth(0).locator('.cr-close')).toContainText('1,150.00');
+  // newest day on top (بشار 2026-11-15): 8th, 7th, 6th
+  await expect(days.nth(2).locator('.cr-close')).toContainText('1,150.00');
   await expect(days.nth(1).locator('.cr-kv').first()).toContainText('1,150.00'); // next day opens where the last closed
-  await expect(days.nth(2)).toContainText('يوم بلا حركات');
+  await expect(days.nth(0)).toContainText('يوم بلا حركات');
   // linked across days: same tint, and a chip naming the partner and its day
   const dep = page.locator('#r-dep'), inv = page.locator('#r-inv');
   await expect(dep).toHaveClass(/\blk\b/);

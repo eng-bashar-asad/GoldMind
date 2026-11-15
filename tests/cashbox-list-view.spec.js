@@ -21,15 +21,16 @@ test('computer: balance after each row, tiles, filters, totals', async ({ page }
   await page.goto('/daily-cashbox-ar.html');
   const rows = page.locator('#cashbox-table-body > tr');
   await expect(rows).toHaveCount(2);
-  await expect(rows.nth(0).locator('.dc-b')).toHaveText('1,500.00');
-  await expect(rows.nth(1).locator('.dc-b')).toHaveText('1,300.00');
-  await expect(rows.nth(0).locator('.dc-src')).toHaveText('فاتورة');
-  await expect(rows.nth(1).locator('.dc-src')).toHaveText('يدوي');
+  // newest on top (بشار 2026-11-15); the balance after each row still runs oldest → newest
+  await expect(rows.nth(1).locator('.dc-b')).toHaveText('1,500.00');
+  await expect(rows.nth(0).locator('.dc-b')).toHaveText('1,300.00');
+  await expect(rows.nth(1).locator('.dc-src')).toHaveText('فاتورة');
+  await expect(rows.nth(0).locator('.dc-src')).toHaveText('يدوي');
   await expect(page.locator('#dcKpis .io').first()).toContainText('500.00');
   await expect(page.locator('#dcFoot')).toContainText('1,300.00');
   await page.locator('#dcDirSeg button', { hasText: 'صادر' }).click();
-  await expect(rows.nth(0)).toBeHidden();
-  await expect(rows.nth(1)).toBeVisible();
+  await expect(rows.nth(1)).toBeHidden();
+  await expect(rows.nth(0)).toBeVisible();
   await page.locator('#dcDirSeg button', { hasText: 'الكل' }).click();
   await page.fill('#dcFilterQ', 'لا شيء هنا');
   await expect(page.locator('#dcNoMatch')).not.toHaveClass(/\bhidden\b/);
