@@ -23,11 +23,20 @@
     return isNative() && window.Capacitor.Plugins ? window.Capacitor.Plugins.NativeBiometric : null;
   }
   function listKey() { return isNative() ? ACCOUNTS_KEY : PASSKEY_KEY; }
+  // A name that tells the devices apart: phone model + app/browser + date («تطبيق أندرويد — SM-S918B — 15/11/2026»).
+  // The person can rename it later on the account-security page.
   function deviceName() {
-    if (isNative()) return 'تطبيق أندرويد';
     var ua = navigator.userAgent;
-    var d = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android'
-      : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'متصفح';
+    var m = ua.match(/Android [\d.]+; ([^;)]+?)(?: Build\/|\))/);
+    var model = m && !/^(K|wv)$/.test(m[1].trim()) ? m[1].trim() : '';
+    var d;
+    if (isNative()) d = 'تطبيق أندرويد' + (model ? ' — ' + model : '');
+    else {
+      var os = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' + (model ? ' ' + model : '')
+        : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : 'جهاز';
+      var br = /Edg\//.test(ua) ? 'Edge' : /OPR\//.test(ua) ? 'Opera' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : /Firefox\//.test(ua) ? 'Firefox' : '';
+      d = os + (br ? ' · ' + br : '');
+    }
     return d + ' — ' + new Date().toLocaleDateString('en-GB');
   }
   function loadLib() {

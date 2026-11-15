@@ -13,7 +13,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=56"></script>
 <script src="theme.js?v=91"></script>
-<script src="gm-biometric.js?v=2"></script>
+<script src="gm-biometric.js?v=3"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -172,6 +172,9 @@ async function loadBio(userId) {
   const list = document.getElementById('bioDevices');
   if (rows.length === 0) { list.innerHTML = '<p class="text-outline">لا توجد أجهزة مسجّلة.</p>'; return; }
   list.innerHTML = '';
+  // the Android app remembers which key is its own → mark «هذا الجهاز»
+  let mine = [];
+  try { mine = (JSON.parse(localStorage.getItem('gm_bio_accounts') || '[]') || []).map(a => a.key_id).filter(Boolean); } catch (e) { mine = []; }
   rows.forEach(r => {
     const row = document.createElement('div');
     row.className = 'flex items-center justify-between gap-2 bg-surface-container-low rounded-lg px-3 py-2';
@@ -179,10 +182,32 @@ async function loadBio(userId) {
     const name = document.createElement('div');
     name.className = 'font-semibold';
     name.textContent = r.device_name || 'جهاز';
+    if (mine.includes(r.id)) {
+      const me = document.createElement('span');
+      me.className = 'text-[11px] font-semibold rounded-full px-2 py-0.5 ms-2';
+      me.style.cssText = 'background:#E1EADB;color:#2F5233';
+      me.textContent = 'هذا الجهاز';
+      name.appendChild(me);
+    }
+    const kind = document.createElement('div');
+    kind.className = 'text-[11px] text-outline';
+    kind.textContent = r.kind === 'auth_device_keys' ? 'بصمة تطبيق أندرويد' : 'مفتاح دخول (Passkey) من المتصفح — Face ID / Touch ID / Windows Hello';
     const when = document.createElement('div');
     when.className = 'text-[11px] text-outline';
-    when.textContent = 'آخر استخدام: ' + (r.last_used_at ? gmFormatDateTime(r.last_used_at) : 'لم يُستخدم بعد');
-    info.append(name, when);
+    when.textContent = 'سُجّل: ' + gmFormatDateTime(r.created_at) + ' · آخر استخدام: ' + (r.last_used_at ? gmFormatDateTime(r.last_used_at) : 'لم يُستخدم بعد');
+    info.append(name, kind, when);
+    const ren = document.createElement('button');
+    ren.type = 'button';
+    ren.className = 'text-primary text-[12px] font-semibold min-h-[44px] px-2';
+    ren.textContent = 'تسمية';
+    ren.setAttribute('aria-label', 'تغيير اسم ' + (r.device_name || 'الجهاز'));
+    ren.onclick = async () => {
+      const v = (prompt('اكتب اسماً يميّز هذا الجهاز (مثلاً: هاتفي سامسونج، كمبيوتر المحل):', r.device_name || '') || '').trim();
+      if (!v || v === r.device_name) return;
+      const { error } = await goldmindClient.rpc('rename_auth_device', { p_kind: r.kind, p_id: r.id, p_name: v });
+      if (error) { alert('تعذّر الحفظ: ' + error.message); return; }
+      loadBio(userId);
+    };
     const del = document.createElement('button');
     del.type = 'button';
     del.className = 'text-error text-[12px] font-semibold min-h-[44px] px-2';
@@ -194,7 +219,10 @@ async function loadBio(userId) {
       if (error) { alert('تعذّر الحذف: ' + error.message); return; }
       loadBio(userId);
     };
-    row.append(info, del);
+    const acts = document.createElement('div');
+    acts.className = 'flex items-center shrink-0';
+    acts.append(ren, del);
+    row.append(info, acts);
     list.appendChild(row);
   });
 }

@@ -214,3 +214,26 @@ test('android app, not turned on yet: login screen explains how to turn it on', 
   await expect(page.locator('#step-start')).toContainText('سجّل الدخول مرة واحدة بكلمة السر');
   await expect(page.locator('#step-start [data-bio-accounts] button')).toHaveCount(0);
 });
+
+// بشار 2026-11-15: each device shows its kind and dates, «هذا الجهاز» on the phone itself, and can be renamed
+test('device list: kind, dates, «هذا الجهاز», rename', async ({ page }) => {
+  const calls = await install(page, { db: {
+    stores: [{ id: STORE, name: 'محل' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01', username: 'BasharAsad' }],
+    auth_passkeys: [{ id: 'pk1', user_id: USER, device_name: 'Windows · Edge — 01/11/2026', created_at: '2026-11-01T10:00:00Z', last_used_at: null }],
+    auth_device_keys: [{ id: 'dk1', user_id: USER, device_name: 'تطبيق أندرويد', created_at: '2026-09-27T10:00:00Z', last_used_at: '2026-11-15T04:40:00Z' },
+      { id: 'dk2', user_id: USER, device_name: 'تطبيق أندرويد', created_at: '2026-09-20T10:00:00Z', last_used_at: null }] },
+    rpc: { rename_auth_device: () => ({ body: null }) } });
+  await page.addInitScript(() => localStorage.setItem('gm_bio_accounts', JSON.stringify([{ user_id: 'u', label: 'x', key_id: 'dk1' }])));
+  await page.goto('/account-security-ar.html');
+  const list = page.locator('#bioDevices');
+  await expect(list).toContainText('هذا الجهاز');
+  await expect(list.locator('> div', { hasText: 'هذا الجهاز' })).toContainText('بصمة تطبيق أندرويد');
+  await expect(list).toContainText('سُجّل:');
+  await expect(list).toContainText('Passkey');
+  page.once('dialog', d => d.accept('هاتفي سامسونج'));
+  await list.locator('> div', { hasText: 'هذا الجهاز' }).locator('button', { hasText: 'تسمية' }).click();
+  await expect.poll(() => calls.some(c => c.name === 'rename_auth_device')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'rename_auth_device').body)).toEqual({ p_kind: 'auth_device_keys', p_id: 'dk1', p_name: 'هاتفي سامسونج' });
+});
