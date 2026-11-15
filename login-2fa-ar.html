@@ -23,8 +23,9 @@
   <p id="info" class="text-[13px] leading-6 mb-4" style="color:rgba(255,255,255,.8)">جارِ إرسال رمز التحقق إلى بريدك الإلكتروني...</p>
   <form id="form" class="flex flex-col gap-3" autocomplete="off">
     <label for="code" class="text-[13px] font-semibold" style="color:rgba(255,255,255,.85)">رمز التحقق (8 أرقام)</label>
-    <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" pattern="[0-9]{8}" dir="ltr"
+    <input id="code" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]{8}" dir="ltr"
       class="w-full h-14 rounded-lg text-center text-2xl font-bold" style="background:#0f232a;color:#fff;border:1px solid rgba(212,175,55,.4)" required/>
+    <button id="pasteBtn" type="button" class="h-11 rounded-lg font-semibold border flex items-center justify-center gap-2" style="border-color:rgba(212,175,55,.5);color:#F5D77A">لصق الرمز المنسوخ</button>
     <p id="timer" class="text-[12px]" style="color:rgba(255,255,255,.65)"></p>
     <p id="err" class="hidden text-[13px] font-semibold rounded-lg p-2" style="background:#3b1a1a;color:#fca5a5"></p>
     <button id="verifyBtn" type="submit" class="gold-gradient h-12 rounded-lg font-bold">تأكيد</button>
@@ -85,6 +86,14 @@ $('form').addEventListener('submit', async e => {
 });
 $('code').addEventListener('input', () => { const v = $('code').value.replace(/\D/g, '').slice(0, 8); $('code').value = v; if (v.length === 8) $('form').requestSubmit(); });
 $('resendBtn').addEventListener('click', send);
+// one tap after "Copy code" in the email: read the clipboard, keep the digits, confirm straight away
+$('pasteBtn').addEventListener('click', async () => {
+  let t = '';
+  try { t = await navigator.clipboard.readText(); } catch (e) { /* no clipboard access */ }
+  const v = String(t || '').replace(/\D/g, '');
+  if (v.length !== 8) { showErr('لم نجد رمزاً من 8 أرقام في الحافظة — انسخ الرمز من البريد أولاً، أو الصقه بالضغط المطوّل داخل الخانة.'); $('code').focus(); return; }
+  showErr(''); $('code').value = v; $('form').requestSubmit();
+});
 $('outBtn').addEventListener('click', async () => { await goldmindClient.auth.signOut(); location.replace('login-entry-ar.html'); });
 
 (async () => {

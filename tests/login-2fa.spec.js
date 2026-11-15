@@ -20,7 +20,9 @@ test('password session is sent to the code page and comes back after the right c
   await expect(page.locator('#timer')).toContainText('ثانية');
   await page.fill('#code', '11112222');
   await expect(page.locator('#err')).toContainText('الرمز غير صحيح');
-  await page.fill('#code', '12345678');
+  // "Copy code" in the email, then one tap on the paste button confirms (spaces in the copy are dropped)
+  await page.evaluate(() => { navigator.clipboard.readText = async () => '1234 5678'; });
+  await page.click('#pasteBtn');
   await expect(page).toHaveURL(/accounting-check-ar\.html$/);
   expect(fn.some(b => b.action === 'send')).toBe(true);
   expect(fn.filter(b => b.action === 'verify').map(b => b.code)).toEqual(['11112222', '12345678']);

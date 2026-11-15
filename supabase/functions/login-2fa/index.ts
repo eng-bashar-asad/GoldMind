@@ -62,18 +62,22 @@ Deno.serve(async (req) => {
       const key = Deno.env.get("BREVO_API_KEY");
       if (!key) { console.error("BREVO_API_KEY missing"); return json({ error: "تعذّر إرسال الرمز حالياً" }, 500); }
       const theCode = code8();
+      // Shaped like the big services' code emails (English keywords + the code in the subject and a
+      // plain-text part), so Gmail and phones recognise it and offer their one-tap "Copy code" button.
       const html = `<div dir="rtl" style="font-family:Arial,sans-serif;background:#0f172a;padding:32px;color:#fff;">
         <div style="max-width:440px;margin:0 auto;background:#1e293b;border-radius:12px;padding:28px;border:1px solid rgba(212,175,55,0.3);text-align:center;">
           <h2 style="color:#D4AF37;margin-top:0;">رمز الدخول إلى GoldMind</h2>
-          <p>استخدم هذا الرمز لإكمال تسجيل الدخول:</p>
+          <p style="margin:0 0 6px;">استخدم هذا الرمز لإكمال تسجيل الدخول:</p>
+          <p dir="ltr" style="margin:0;color:#94a3b8;font-size:13px;">Your GoldMind verification code:</p>
           <p style="font-size:34px;letter-spacing:6px;font-weight:bold;direction:ltr;background:#0f172a;border-radius:8px;padding:14px;margin:18px 0;">${theCode}</p>
           <p>الرمز صالح لمدة <b>دقيقة واحدة</b> فقط.</p>
           <p style="font-size:12px;color:#94a3b8;">إذا لم تحاول تسجيل الدخول الآن، فقد تكون كلمة السر الخاصة بك معروفة لشخص آخر — غيّرها فوراً.</p>
         </div></div>`;
+      const text = `Your GoldMind verification code is: ${theCode}\nرمز الدخول إلى GoldMind: ${theCode}\nThe code expires in 1 minute. الرمز صالح لمدة دقيقة واحدة.\nIf you did not try to sign in, change your password now.`;
       const res = await fetch("https://api.brevo.com/v3/smtp/email", {
         method: "POST",
         headers: { "api-key": key, "Content-Type": "application/json", Accept: "application/json" },
-        body: JSON.stringify({ sender: { name: "GoldMind", email: SENDER_EMAIL }, to: [{ email }], subject: "رمز الدخول: " + theCode, htmlContent: html }),
+        body: JSON.stringify({ sender: { name: "GoldMind", email: SENDER_EMAIL }, to: [{ email }], subject: "GoldMind verification code: " + theCode + " — رمز الدخول", htmlContent: html, textContent: text }),
       });
       if (!res.ok) { console.error("brevo", res.status, await res.text().catch(() => "")); return json({ error: "تعذّر إرسال الرمز، حاول مرة أخرى" }, 502); }
       await admin.from("login_2fa").upsert({
