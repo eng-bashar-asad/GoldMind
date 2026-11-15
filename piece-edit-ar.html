@@ -358,7 +358,7 @@ html:not(.gm-light-canvas) .gm-tl>div:before{box-shadow:0 0 0 3px #FFFDF8}
 <div class="pc-3"><div><span>ألماس Di</span><b id="pcDi" class="font-data-mono">—</b></div><div><span>حجر مركزي Cs</span><b id="pcCs" class="font-data-mono">—</b></div><div><span>زيركون Z</span><b id="pcZ" class="font-data-mono">—</b></div></div>
 </section>
 <section id="pcPrice" class="pc-card"><h2>السعر الآن</h2>
-<div class="pc-3"><div><span>قيمة الذهب</span><b id="pcGoldVal" class="font-data-mono">—</b></div><div><span>المصنعية</span><b id="pcFabVal" class="font-data-mono">—</b></div><div><span>سعر البيع المقترح</span><b id="pcSuggest" class="font-data-mono" style="color:#1B5E20">—</b></div></div>
+<div class="pc-3"><div><span>قيمة الذهب</span><b id="pcGoldVal" class="font-data-mono">—</b></div><div><span>كلفة المصنعية</span><b id="pcFabVal" class="font-data-mono">—</b></div><div><span>سعر البيع المقترح</span><b id="pcSuggest" class="font-data-mono" style="color:#1B5E20">—</b></div></div>
 </section>
 </div>
 
@@ -981,15 +981,13 @@ function gmRenderDesk(p) {
   const mv = document.getElementById('pcMoveBtn');
   mv.href = 'branch-transfers-ar.html' + (p.barcode ? '?barcode=' + encodeURIComponent(p.barcode) : '');
   mv.classList.toggle('hidden', p.status !== 'available');
-  // ponytail: suggested price = gold value + label making charge (same multiplier/addend as the printed label) + stones,
-  // all on the accounting weight. The sale screen stays the real price.
+  // suggested price = gold value + the piece's ACTUAL making cost (cost/gram × accounting weight, no label
+  // multiplier/addend — بشار 2026-11-15) + stones. The sale screen stays the real price.
   gmLoadDeskPrices();
   const price = gmGoldPerGram && gmGoldPerGram[p.karat];
   if (!price) { ['pcGoldVal', 'pcFabVal', 'pcSuggest'].forEach(id => set(id, '—')); return; }
-  const mult = currentStore && currentStore.label_mc_multiplier != null ? Number(currentStore.label_mc_multiplier) : 1;
-  const add = currentStore && currentStore.label_mc_addend != null ? Number(currentStore.label_mc_addend) : 0;
   const gold = acc * price;
-  const fab = p.cost_fabrication_per_gram != null ? acc * (Number(p.cost_fabrication_per_gram) * mult + add) : 0;
+  const fab = acc * (Number(p.cost_fabrication_per_gram) || 0);
   const stones = (Number(p.accent_diamond_carat) || 0) * (Number(p.accent_diamond_price_per_carat) || 0)
     + (Number(p.center_stone_carat) || 0) * (Number(p.center_stone_price_per_carat) || 0);
   set('pcGoldVal', gmMoney(gold)); set('pcFabVal', gmMoney(fab)); set('pcSuggest', gmMoney(gold + fab + stones));

@@ -26,8 +26,8 @@ test('give a piece at a fixed price: no gold debt, price as cash, cost saved', a
   await page.fill('#gs-cart-list input[type=number]', '4500');
   await expect(page.locator('#gs-preview-price')).toContainText('4,500');
   await page.click('#gs-btn');
-  await expect.poll(() => calls.some(c => c.method === 'POST' && c.name === 'trader_movements')).toBe(true);
-  const [r] = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'trader_movements').body);
+  await expect.poll(() => calls.some(c => c.name === 'trader_give_stock_voucher')).toBe(true);
+  const [r] = JSON.parse(calls.find(c => c.name === 'trader_give_stock_voucher').body).p_rows;
   expect([r.gold_24k_equivalent, r.fab_fee_amount, r.sale_cost, r.source, r.piece_id]).toEqual([0, 4500, 3700, 'stock_given', 'p1']);
   expect(errs).toEqual([]);
 });

@@ -51,11 +51,13 @@ test('piece page on the computer: compact specs, suggested price, transfer link,
   d.pieces = [{ id: 'p1', store_id: STORE, barcode: '000120', karat: 21, weight_grams: 5.4, accounting_weight_grams: 5, cost_fabrication_per_gram: 10, color: 'Gold', status: 'available', piece_type: 'خاتم', box_name: 'قطع ذهبية' }];
   d.piece_movements = [{ id: 'm1', store_id: STORE, piece_id: 'p1', event_type: 'created', note: 'إدخال', created_at: '2026-10-10T10:00:00Z' }];
   d.piece_classification_options = []; d.zebra_label_fields = [];
+  d.stores[0].label_mc_multiplier = 4; d.stores[0].label_mc_addend = 10;   // label making must NOT leak into the price card
   await install(page, { db: d });
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/piece-edit-ar.html?id=p1');
   await expect(page.locator('#pcAcc')).toHaveText('5.00 غ');
   await expect(page.locator('#pcBranch')).toHaveText('محل');
+  await expect(page.locator('#pcFabVal')).toHaveText('50.00');             // actual making: 5 g × 10
   await expect(page.locator('#pcSuggest')).toHaveText('1,550.00');          // 5 × 300 + 5 × 10
   await expect(page.locator('#pcStones')).toHaveClass(/\bhidden\b/);        // no stones → no card
   await expect(page.locator('#pcMoveBtn')).toHaveAttribute('href', 'branch-transfers-ar.html?barcode=000120');

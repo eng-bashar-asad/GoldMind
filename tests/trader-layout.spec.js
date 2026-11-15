@@ -75,8 +75,8 @@ test('give-out: this voucher billed on the gross weight when chosen (not saved o
   await expect(page.locator('#gs-preview-gold')).toContainText('7.50');        // 10 × 18/24
   expect(calls.some(c => c.method === 'PATCH' && c.name === 'traders')).toBe(false);
   await page.click('#gs-btn');
-  await expect.poll(() => calls.some(c => c.method === 'POST' && c.name === 'trader_movements')).toBe(true);
-  const [r] = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'trader_movements').body);
+  await expect.poll(() => calls.some(c => c.name === 'trader_give_stock_voucher')).toBe(true);
+  const [r] = JSON.parse(calls.find(c => c.name === 'trader_give_stock_voucher').body).p_rows;
   expect(r.gold_24k_equivalent).toBe(7.5);
 });
 

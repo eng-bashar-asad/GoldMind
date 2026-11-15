@@ -47,7 +47,7 @@ test('trader account: give scrap from the box at cost', async ({ page }) => {
     gold_stock_lots: [
       { id: 'l1', store_id: STORE, karat: 18, box_name: 'كسر 18', weight_grams_remaining: 200, items: [{ weight_grams: 200, line_total: 70000, invoice: { type: 'buyRetail' } }] },
       { id: 'l2', store_id: STORE, karat: 18, box_name: 'كسر 18', weight_grams_remaining: 50, items: [{ weight_grams: 50, line_total: 18000, invoice: { type: 'buyRetail' } }, { weight_grams: 10, line_total: 99999, invoice: { type: 'sale' } }] } ] }),
-    rpc: { give_scrap_to_trader: () => ({ body: { id: 'm', cost: 88000 } }) } });
+    rpc: { trader_give_stock_voucher: () => ({ body: { ok: true } }) } });
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/ledger-ar.html?trader=t1&action=give');
   await page.waitForFunction(() => typeof currentTraderId !== 'undefined' && currentTraderId === 't1');
@@ -59,6 +59,43 @@ test('trader account: give scrap from the box at cost', async ({ page }) => {
   await expect(page.locator('#gsc-preview')).toContainText('187.50 غ');       // 250 × 18/24
   page.on('dialog', d => d.accept());
   await page.click('#gsc-btn');
-  await expect.poll(() => calls.some(c => c.name === 'give_scrap_to_trader')).toBe(true);
-  expect(JSON.parse(calls.find(c => c.name === 'give_scrap_to_trader').body)).toMatchObject({ p_trader: 't1', p_karat: 18, p_weight: 250 });
+  await expect.poll(() => calls.some(c => c.name === 'trader_give_stock_voucher')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'trader_give_stock_voucher').body)).toMatchObject({ p_trader: 't1', p_rows: [], p_scrap: [{ karat: 18, weight: 250 }] });
+});
+
+// بشار 2026-11-15: one voucher to a trader with bulk weight + كسر 18 + كسر 21, saved together in one call
+test('trader account: pieces/bulk/scrap of several karats in ONE voucher', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const calls = await install(page, { db: base({
+    traders: [{ id: 't1', store_id: STORE, name: 'عمار' }], trader_movements: [], cash_movements: [],
+    gold_stock_lots: [
+      { id: 'l1', store_id: STORE, karat: 18, box_name: 'كسر 18', weight_grams_remaining: 137.5, items: [] },
+      { id: 'l2', store_id: STORE, karat: 21, box_name: 'كسر 21', weight_grams_remaining: 412.89, items: [] } ] }),
+    rpc: { trader_give_stock_voucher: () => ({ body: { ok: true, lines: 3 } }) } });
+  page.on('dialog', d => d.accept());
+  await page.goto('/ledger-ar.html?trader=t1&action=give');
+  await page.waitForFunction(() => typeof currentTraderId !== 'undefined' && currentTraderId === 't1');
+  await page.evaluate(() => { if (document.getElementById('give-stock-form').classList.contains('hidden')) toggleGiveStockForm(); setGiveStockMode('bulk'); });
+  await page.fill('#gsb-weight', '20'); await page.selectOption('#gsb-karat', '18'); await page.fill('#gsb-fab', '10');
+  await page.click('button:has-text("إضافة السطر للسند")');
+  await page.click('#gs-mode-scrap-btn');
+  await expect(page.locator('#gsc-weight')).toHaveValue('412.89');                    // biggest karat first, whole box
+  await page.selectOption('#gsc-karat', '18'); await page.fill('#gsc-weight', '100');
+  await page.click('button:has-text("إضافة الكسر للسند")');
+  await page.fill('#gsc-weight', '40');                                                 // over what's left of كسر 18
+  await page.click('button:has-text("إضافة الكسر للسند")');
+  await expect(page.locator('#gsc-error')).toContainText('أكبر من المتبقي');
+  await page.selectOption('#gsc-karat', '21'); await page.fill('#gsc-weight', '372.31');
+  await page.click('button:has-text("إضافة الكسر للسند")');
+  await expect(page.locator('#gsc-lines > div')).toHaveCount(2);
+  await expect(page.locator('#gs-voucher-sum')).toContainText('1 سطر بالجملة');
+  await expect(page.locator('#gs-voucher-sum')).toContainText('كسر 21: 372.31 غ');
+  await page.click('#gsc-btn');
+  await expect.poll(() => calls.filter(c => c.name === 'trader_give_stock_voucher').length).toBe(1);
+  const v = JSON.parse(calls.find(c => c.name === 'trader_give_stock_voucher').body);
+  expect(v.p_rows.map(r => [r.weight_grams, r.karat, r.source])).toEqual([[20, 18, 'stock_given']]);
+  expect(v.p_scrap.map(l => [l.karat, l.weight])).toEqual([[18, 100], [21, 372.31]]);
+  expect(v.p_batch).toBeTruthy();
+  expect(calls.some(c => c.method === 'POST' && c.name === 'trader_movements')).toBe(false); // nothing saved outside the one call
+  expect(errs).toEqual([]);
 });

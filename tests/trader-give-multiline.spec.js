@@ -27,12 +27,12 @@ test('give stock by weight: several lines, one voucher', async ({ page }) => {
   await expect(page.locator('#gsb-lines > div')).toHaveCount(2);
   await expect(page.locator('#gsb-preview-fee-label')).toContainText('3 سطر');
   await page.click('#gsb-btn');
-  await expect.poll(() => calls.some(c => c.method === 'POST' && c.name === 'trader_movements')).toBe(true);
-  const rows = JSON.parse(calls.find(c => c.method === 'POST' && c.name === 'trader_movements').body);
+  await expect.poll(() => calls.some(c => c.name === 'trader_give_stock_voucher')).toBe(true);
+  const voucher = JSON.parse(calls.find(c => c.name === 'trader_give_stock_voucher').body);
+  const rows = voucher.p_rows;
   expect(rows).toHaveLength(3);
   expect(rows.map(r => [r.weight_grams, r.karat, r.fab_fee_per_gram, r.cost_fab_per_gram])).toEqual([[100, 18, 10, 6], [50, 21, 25, null], [10, 18, 30, null]]);
-  expect(new Set(rows.map(r => r.batch_id)).size).toBe(1);
-  expect(rows[0].batch_id).toBeTruthy();
+  expect(voucher.p_batch).toBeTruthy();                  // one voucher for all lines
   expect(rows.every(r => r.source === 'stock_given' && r.movement_type === 'debt_decrease')).toBe(true);
   expect(errs).toEqual([]);
 });
