@@ -45,3 +45,50 @@ test('add-piece in production mode takes the weight from the scrap box on the se
   await expect(page.locator('#gm-prod-banner')).toContainText('30.21 غ');
   expect(errs).toEqual([]);
 });
+
+// بشار 2026-11-15: «مصدر القطعة» on the add-piece screen — from a trader (posted to his account on save,
+// a new trader can be added on the spot) or from the scrap box; the rest of the form is unchanged.
+test('add-piece: source «من تاجر» posts each saved piece to the trader, new trader on the spot', async ({ page }) => {
+  const errs = []; page.on('pageerror', e => errs.push(e.message));
+  const db = base([]);
+  db.traders = [{ id: 't1', store_id: db.stores[0].id, name: 'مهند' }];
+  db.stores[0].vat_rate = 5;
+  const calls = await install(page, { generic: true, db, rpc: {
+      next_piece_barcode: () => ({ body: '000901' }),
+      trader_receive_piece: () => ({ body: { ok: true } }) } });
+  page.on('dialog', d => d.accept(d.message().includes('اسم') ? 'سامر' : ''));
+  await page.route(/rest\/v1\/traders/, r => r.request().method() === 'POST' ? r.fulfill({ json: { id: 't2', name: 'سامر' } }) : r.fallback());
+  await page.goto('/inventory-add.html');
+  await expect(page.locator('#piece-source option[value="t:t1"]')).toHaveText('مهند');
+  await page.selectOption('#piece-source', '__new_trader__');               // + إضافة تاجر جديد
+  await expect(page.locator('#piece-source option', { hasText: 'سامر' })).toHaveCount(1);
+  await page.selectOption('#piece-source', 't:t1');
+  await expect(page.locator('#source-note')).toContainText('مهند');
+  await expect(page.locator('#source-note')).toContainText('5%');
+  await page.fill('#weight', '10');
+  await page.click('#save-btn');
+  await expect.poll(() => calls.filter(c => c.name === 'trader_receive_piece').length).toBe(1);
+  const body = JSON.parse(calls.find(c => c.name === 'trader_receive_piece').body);
+  expect(body).toMatchObject({ p_trader: 't1', p_vat_rate: 5 });
+  expect(body.p_batch).toBeTruthy();
+  await expect(page.locator('#save-message')).toContainText('حساب مهند');
+  expect(errs).toEqual([]);
+});
+
+test('add-piece: source «كسر عيار 18» takes the weight from that scrap box', async ({ page }) => {
+  const calls = await install(page, { generic: true, rpc: {
+      next_piece_barcode: () => ({ body: '000902' }),
+      production_take: () => ({ body: { ok: true } }) },
+    db: base([lot('l1', 'كسر 18', 18, 18.25, '2026-10-01T00:00:00Z')]) });
+  await page.goto('/inventory-add.html');
+  await page.selectOption('#piece-source', 's:18');
+  await expect(page.locator('#gm-prod-banner')).toContainText('18.25 غ');
+  await expect(page.locator('#karat')).toBeDisabled();
+  await page.fill('#weight', '5');
+  await page.click('#save-btn');
+  await expect.poll(() => calls.filter(c => c.name === 'production_take').length).toBe(1);
+  expect(JSON.parse(calls.find(c => c.name === 'production_take').body)).toMatchObject({ p_box: 'كسر 18' });
+  await page.selectOption('#piece-source', '');                               // back to normal entry
+  await expect(page.locator('#karat')).toBeEnabled();
+  await expect(page.locator('#gm-prod-banner')).toHaveClass(/\bhidden\b/);
+});

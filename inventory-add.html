@@ -230,6 +230,17 @@
 </div>
 <!-- Form fields column -->
 <div class="lg:col-span-2 xl:col-span-4 flex flex-col gap-6">
+<!-- Piece source (بشار 2026-11-15): normal entry / from a trader (posted to his account on save) / from the scrap box -->
+<section id="source-section" class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4 flex flex-col gap-2">
+<div class="relative">
+<label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[11px] font-semibold text-outline tracking-wider uppercase" for="piece-source">مصدر القطعة</label>
+<select class="w-full h-12 bg-transparent border border-outline-variant rounded-lg px-4 focus:ring-1 focus:ring-primary focus:border-primary outline-none transition-all appearance-none font-label-md text-on-background" id="piece-source">
+<option value="">إدخال عادي</option>
+</select>
+<span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none text-on-surface-variant">expand_more</span>
+</div>
+<p id="source-note" class="hidden text-[12px] text-on-surface-variant px-1"></p>
+</section>
 <div id="gm-prod-banner" class="hidden rounded-xl border border-[#B4955A] bg-[#FBF5E8] px-4 py-3 text-[13px]"></div>
 <!-- Form Fields -->
 <section class="bg-surface-container-lowest border border-outline-variant rounded-xl p-6 flex flex-col gap-3">
@@ -445,7 +456,9 @@
             loadClassificationOptions('category1', 'category1', 'صنف ١');
             loadClassificationOptions('category2', 'category2', 'صنف ٢');
             loadBoxNameOptions();
+            window.gmCanEditTraders = __staffPerm.role === 'owner' || !!(__staffPerm.permissions && __staffPerm.permissions['edit_traders']);
             await gmInitProduction();
+            await gmLoadSourceOptions();
             gmRestoreAddSession();
 
             // Loaded once here and reused for every "print" tap in the
@@ -796,29 +809,94 @@
                 <div class="text-left"><div class="text-[11px] text-on-surface-variant">المتوفر</div><b class="font-data-mono text-[16px]" dir="ltr">${gmProdAvail().toFixed(2)} غ</b></div></div>`;
             el.classList.remove('hidden');
         }
-        async function gmInitProduction() {
-            if (!GM_PROD_PARAM) return;
+        async function gmLoadProd(box, lotId) {
             let q = goldmindClient.from('gold_stock_lots').select('id, karat, box_name, weight_grams_remaining, cost_fabrication_per_gram, created_at')
                 .eq('store_id', GOLDMIND_STORE_ID).gt('weight_grams_remaining', 0).order('created_at');
-            q = __qs.get('prod') ? q.eq('box_name', __qs.get('prod')) : q.eq('id', __qs.get('lot'));
+            q = box ? q.eq('box_name', box) : q.eq('id', lotId);
             const { data } = await q;
-            if (!data || !data.length) { alert('لا يوجد وزن متوفر للإنتاج.'); location.href = 'stock-production-ar.html'; return; }
-            const label = __qs.get('prod') || (data[0].box_name || ('ذهب عيار ' + data[0].karat));
-            GM_PROD = { label, karat: data[0].karat, lots: data };
-            document.title = 'إنتاج قطع | جولد مايند';
-            document.querySelector('header h1').textContent = 'إنتاج قطع — ' + label;
+            if (!data || !data.length) return false;
+            GM_PROD = { label: box || (data[0].box_name || ('ذهب عيار ' + data[0].karat)), karat: data[0].karat, lots: data, box: box || null, lot: box ? null : lotId };
             const k = document.getElementById('karat');
             k.value = String(GM_PROD.karat); k.disabled = true;
             const w = gmProdAvail();
             const avgCost = w ? data.reduce((t, l) => t + Number(l.weight_grams_remaining) * Number(l.cost_fabrication_per_gram || 0), 0) / w : 0;
             if (avgCost > 0 && !document.getElementById('fab-cost').value) document.getElementById('fab-cost').value = avgCost.toFixed(2);
             gmRenderProdBanner();
+            return true;
         }
+        function gmClearProd() {
+            GM_PROD = null;
+            document.getElementById('karat').disabled = false;
+            document.getElementById('gm-prod-banner').classList.add('hidden');
+        }
+        async function gmInitProduction() {
+            if (!GM_PROD_PARAM) return;
+            if (!(await gmLoadProd(__qs.get('prod'), __qs.get('lot')))) { alert('لا يوجد وزن متوفر للإنتاج.'); location.href = 'stock-production-ar.html'; return; }
+            document.title = 'إنتاج قطع | جولد مايند';
+            document.querySelector('header h1').textContent = 'إنتاج قطع — ' + GM_PROD.label;
+        }
+
+        // ---------- Piece source row ----------
+        let gmTraders = [];
+        let GM_SRC_TRADER = null;        // { id, name } while «من تاجر» is chosen
+        let gmVatRate = 0;               // store VAT on making, same default as «إدخال بضاعة»
+        let gmTraderBatch = {};          // trader id -> one voucher id for this session, so his pieces group as one voucher
+        const NEW_TRADER = '__new_trader__';
+        async function gmLoadSourceOptions() {
+            const section = document.getElementById('source-section');
+            if (GM_PROD_PARAM) { section.classList.add('hidden'); return; } // opened from «إنتاج القطع»: the source is fixed
+            const [{ data: tr }, { data: st }] = await Promise.all([
+                window.gmCanEditTraders ? goldmindClient.from('traders').select('id, name').eq('store_id', GOLDMIND_STORE_ID).order('name') : Promise.resolve({ data: [] }),
+                goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle()
+            ]);
+            gmTraders = tr || [];
+            gmVatRate = st && st.vat_rate != null ? Number(st.vat_rate) || 0 : 0;
+            gmRenderSourceSelect('');
+        }
+        function gmRenderSourceSelect(value) {
+            const sel = document.getElementById('piece-source');
+            const traders = window.gmCanEditTraders
+                ? `<optgroup label="من تاجر">${gmTraders.map(t => `<option value="t:${t.id}">${gmEscapeHtml(t.name)}</option>`).join('')}<option value="${NEW_TRADER}">+ إضافة تاجر جديد...</option></optgroup>`
+                : '';
+            sel.innerHTML = '<option value="">إدخال عادي</option>' + traders +
+                '<optgroup label="من صندوق الكسر">' + [18, 21, 22, 24].map(k => `<option value="s:${k}">كسر عيار ${k}</option>`).join('') + '</optgroup>';
+            sel.value = value;
+        }
+        function gmSourceNote(text) {
+            const el = document.getElementById('source-note');
+            el.textContent = text || '';
+            el.classList.toggle('hidden', !text);
+        }
+        async function gmOnSourceChange() {
+            const sel = document.getElementById('piece-source');
+            let v = sel.value;
+            if (v === NEW_TRADER) {
+                const name = (prompt('اسم التاجر الجديد:') || '').trim();
+                if (!name) { sel.value = GM_SRC_TRADER ? 't:' + GM_SRC_TRADER.id : ''; return; }
+                const phone = (prompt('رقم هاتف التاجر (اختياري):') || '').replace(/[^\d+]/g, '') || null;
+                const { data, error } = await goldmindClient.from('traders').insert({ store_id: GOLDMIND_STORE_ID, name, phone }).select('id, name').single();
+                if (error) { alert('تعذّر إضافة التاجر: ' + error.message); sel.value = ''; v = ''; }
+                else {
+                    gmTraders.push(data); gmTraders.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+                    v = 't:' + data.id; gmRenderSourceSelect(v);
+                }
+            }
+            if (currentBatchId) { currentBatchId = null; gmSaveAddSession(); } // a new intake voucher for the new source
+            GM_SRC_TRADER = null; gmClearProd(); gmSourceNote('');
+            if (v.startsWith('t:')) {
+                GM_SRC_TRADER = gmTraders.find(t => t.id === v.slice(2)) || null;
+                if (GM_SRC_TRADER) gmSourceNote('كل قطعة تحفظها تُسجَّل فوراً على حساب ' + GM_SRC_TRADER.name + ': الذهب بمكافئ عيار 24 والمصنعية على وزن المحاسبة' + (gmVatRate ? ' (شاملة ضريبة ' + gmVatRate + '%)' : '') + '.');
+            } else if (v.startsWith('s:')) {
+                if (!(await gmLoadProd('كسر ' + v.slice(2)))) { alert('لا يوجد وزن متوفر في صندوق كسر عيار ' + v.slice(2) + '.'); sel.value = ''; }
+            }
+        }
+        document.getElementById('piece-source').addEventListener('change', gmOnSourceChange);
+
         // the server takes the piece's weight from the box (oldest first) and
         // remembers which purchases it came from, so a later weight edit or a
         // delete moves the difference back automatically
         async function gmConsumeProduction(pieceId, amount) {
-            const { error } = await goldmindClient.rpc('production_take', __qs.get('prod') ? { p_piece: pieceId, p_box: __qs.get('prod') } : { p_piece: pieceId, p_lot: __qs.get('lot') });
+            const { error } = await goldmindClient.rpc('production_take', GM_PROD.box ? { p_piece: pieceId, p_box: GM_PROD.box } : { p_piece: pieceId, p_lot: GM_PROD.lot });
             if (error) return error;
             let left = amount;
             for (const l of GM_PROD.lots) { const a = Math.min(left, Number(l.weight_grams_remaining)); l.weight_grams_remaining = Number(l.weight_grams_remaining) - a; left -= a; }
@@ -909,7 +987,7 @@
         function gmSaveAddSession() {
             try {
                 sessionStorage.setItem(GM_ADD_SESSION_KEY, JSON.stringify({ store: GOLDMIND_STORE_ID, batch: currentBatchId,
-                    ids: sessionPieces.map(p => p.id), at: Date.now() }));
+                    ids: sessionPieces.map(p => p.id), tb: gmTraderBatch, at: Date.now() }));
             } catch (e) { /* storage unavailable: the session just won't survive a reload */ }
         }
         async function gmRestoreAddSession() {
@@ -917,6 +995,7 @@
             try { saved = JSON.parse(sessionStorage.getItem(GM_ADD_SESSION_KEY) || 'null'); } catch (e) { saved = null; }
             if (!saved || saved.store !== GOLDMIND_STORE_ID || !saved.ids || !saved.ids.length || Date.now() - saved.at > 12 * 3600e3) return;
             currentBatchId = saved.batch || null;
+            gmTraderBatch = saved.tb || {};
             const { data } = await goldmindClient.from('pieces').select('*').in('id', saved.ids).eq('store_id', GOLDMIND_STORE_ID);
             const byId = {}; (data || []).forEach(p => { byId[p.id] = p; });
             saved.ids.forEach(id => { if (byId[id]) sessionPieces.push(byId[id]); }); // keeps newest-first order, with any edits made meanwhile
@@ -925,7 +1004,7 @@
         function gmNewAddSession() {
             if (!confirm('بدء سند إدخال جديد؟ القطع المحفوظة تبقى في المخزن، لكن القائمة هنا تبدأ من جديد.')) return;
             try { sessionStorage.removeItem(GM_ADD_SESSION_KEY); } catch (e) { /* ignore */ }
-            sessionPieces.length = 0; currentBatchId = null; renderSessionList();
+            sessionPieces.length = 0; currentBatchId = null; gmTraderBatch = {}; renderSessionList();
         }
 
         function renderSessionList() {
@@ -1104,15 +1183,21 @@
             if (newPiece) {
                 await goldmindClient.from('piece_movements').insert({
                     store_id: GOLDMIND_STORE_ID, piece_id: newPiece.id, event_type: 'created',
-                    note: (GM_PROD ? 'إنتاج من ' + GM_PROD.label : 'إدخال قطعة جديدة') + ' — وزن ' + weight + 'غ، عيار ' + karat, created_by: GOLDMIND_STAFF_ID
+                    note: (GM_PROD ? 'إنتاج من ' + GM_PROD.label : GM_SRC_TRADER ? 'إدخال قطعة من التاجر ' + GM_SRC_TRADER.name : 'إدخال قطعة جديدة') + ' — وزن ' + weight + 'غ، عيار ' + karat, created_by: GOLDMIND_STAFF_ID
                 });
                 if (GM_PROD) {
                     const cErr = await gmConsumeProduction(newPiece.id, weight);
                     if (cErr) alert('حُفظت القطعة لكن تعذّر خصم الوزن من ' + GM_PROD.label + ': ' + cErr.message + ' — راجع الرصيد.');
                 }
+                if (GM_SRC_TRADER) {
+                    const tid = GM_SRC_TRADER.id;
+                    if (!gmTraderBatch[tid]) { gmTraderBatch[tid] = crypto.randomUUID(); }
+                    const { error: tErr } = await goldmindClient.rpc('trader_receive_piece', { p_trader: tid, p_piece: newPiece.id, p_vat_rate: gmVatRate, p_batch: gmTraderBatch[tid] });
+                    if (tErr) alert('حُفظت القطعة ' + barcode + ' لكن تعذّر تسجيلها على حساب ' + GM_SRC_TRADER.name + ': ' + tErr.message + ' — سجّلها من حساب التاجر.');
+                }
             }
 
-            showMessage('تم حفظ القطعة بنجاح! الباركود: ' + barcode, false);
+            showMessage('تم حفظ القطعة بنجاح! الباركود: ' + barcode + (GM_SRC_TRADER ? ' — وسُجّلت على حساب ' + GM_SRC_TRADER.name : ''), false);
             addToSessionList(newPiece);
             document.getElementById('barcode-id').value = '';
             document.getElementById('weight').value = '';
