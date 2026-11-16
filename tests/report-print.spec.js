@@ -101,19 +101,22 @@ test('financial report: debts owed to us, owed by us, deposits and their receipt
   expect(errs).toEqual([]);
 });
 
-test('financial report: stock now split into barcoded pieces and scrap without barcode', async ({ page }) => {
-  db.pieces = [{ store_id: STORE, status: 'available', karat: 18, weight_grams: 100 }, { store_id: STORE, status: 'available', karat: 21, weight_grams: 16 }];
-  db.gold_stock_lots = [{ store_id: STORE, karat: 18, weight_grams_remaining: 25.5 }];
+test('financial report: weights sold to people / traders, made from scrap, scrap in and out with traders', async ({ page }) => {
+  const t = new Date().toISOString();
+  db.trader_movements = [{ store_id: STORE, source: 'stock_given', movement_type: 'debt_increase', karat: 18, weight_grams: 10, created_at: t },
+    { store_id: STORE, source: 'scrap_given', movement_type: 'debt_decrease', karat: 21, weight_grams: 5, created_at: t }];
+  db.gold_stock_lots = [{ store_id: STORE, karat: 18, box_name: 'كسر 18', weight_grams_total: 7, weight_grams_remaining: 7, trader_movement_id: 'm9', created_at: t }];
+  db.piece_lot_draws = [{ store_id: STORE, piece_id: 'p1', created_at: t, lot: { box_name: 'كسر 21' }, piece: { karat: 21, weight_grams: 8 } }];
   try {
     const errs = await setup(page);
     await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
     await page.goto('/financial-report-ar.html');
-    const row = t => page.locator('#fr-body tr', { hasText: t }).first();
-    await expect(row('كسر بلا باركود')).toBeVisible();
-    const cells18 = await page.locator('#fr-body tr').filter({ has: page.locator('td:first-child', { hasText: /^18$/ }) }).first().locator('td').allInnerTexts();
-    expect(cells18.slice(3)).toEqual(['100.00', '25.50', '125.50']); // pieces | scrap | total
-    const tot = await row('المجموع').locator('td').allInnerTexts();
-    expect(tot.slice(3)).toEqual(['116.00', '25.50', '141.50']);
+    await expect(page.locator('#fr-body')).toContainText('كسر مُعطى للتجار');
+    const cells = k => page.locator('#fr-body tr').filter({ has: page.locator('td:first-child', { hasText: new RegExp('^' + k + '$') }) }).first().locator('td').allInnerTexts();
+    // karat | to people | to traders | made from scrap | scrap from traders | scrap to traders
+    expect((await cells(18)).slice(1)).toEqual(['15.03', '10.00', '0.00', '7.00', '0.00']) // 15.03 g sold to people comes from the shared fixture's sale;
+    expect((await cells(21)).slice(1)).toEqual(['0.00', '0.00', '8.00', '0.00', '5.00']);
+    await expect(page.locator('#fr-body')).not.toContainText('كسر بلا باركود');
     expect(errs).toEqual([]);
-  } finally { db.pieces = []; db.gold_stock_lots = []; }
+  } finally { db.trader_movements = []; db.gold_stock_lots = []; db.piece_lot_draws = []; }
 });

@@ -21,7 +21,11 @@
   body { background: #F3EEDF; color: #1F1A12; min-height: 100dvh; }
   /* dark themes (on screen only — print stays as is): the page follows the theme colour; the report cards stay light */
   @media screen {
-    html:not(.gm-light-canvas) body, html:not(.gm-light-canvas) body > header { background: var(--gm-bg) !important; }
+    html:not(.gm-light-canvas):not([data-gm-theme$="-marble"]) body, html:not(.gm-light-canvas):not([data-gm-theme$="-marble"]) body > header { background: var(--gm-bg) !important; }
+    /* marble themes: the page shows the marble; the header is see-through glass over it */
+    html[data-gm-theme$="-marble"] body { background-color: transparent; }
+    html[data-gm-theme$="-marble"] body > header { background: rgba(12,12,14,.55) !important; -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+    html[data-gm-theme="beige-marble"] body > header { background: rgba(255,252,245,.6) !important; }
     html:not(.gm-light-canvas) body > header h1, html:not(.gm-light-canvas) #fr-period, html:not(.gm-light-canvas) #fr-loading,
     html:not(.gm-light-canvas) #fr-controls > label { color: #F4F1EA !important; }
   }
@@ -55,8 +59,9 @@
 <style>
 /* computer: report sections side by side; tiles and the invoice list full width */
 @media screen and (min-width:1024px){
-  #fr-body{display:grid !important;grid-template-columns:1fr 1fr;align-items:start}
-  #fr-body > :not(.fr-sec), #fr-body > .fr-sec:has(.fr-wide){grid-column:1 / -1}
+  #fr-body{display:block !important;columns:2;column-gap:14px}
+  #fr-body > *{break-inside:avoid;margin-bottom:12px}
+  #fr-body > :not(.fr-sec), #fr-body > .fr-sec:has(.fr-wide){column-span:all}
 }
 </style>
 </head>
@@ -183,7 +188,7 @@ async function build(from, to) {
   const S = FR.scope.ids(), q = () => goldmindClient;
   const inPeriod = (t) => t.gte('created_at', from).lt('created_at', to);
 
-  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR, givenR] = await Promise.all([
+  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR, givenR, scrapGivenR, scrapInR, madeR] = await Promise.all([
     gmFetchAllRows(() => inPeriod(q().from('invoices').select('id, store_id, invoice_number, type, payment_method, total_amount, amount_paid, cash_paid_amount, bank_paid_amount, created_at, counterparty_name').in('store_id', S).neq('status', 'cancelled')).order('created_at')),
     inPeriod(q().from('invoices').select('id', { count: 'exact', head: true }).in('store_id', S).eq('status', 'cancelled')),
     gmFetchAllRows(() => inPeriod(q().from('expense_entries').select('amount, description, category:category_id(name)').in('store_id', S))),
@@ -198,9 +203,12 @@ async function build(from, to) {
     q().from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID),
     gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer_id, customer:customer_id(name)').in('store_id', S).lt('created_at', to).order('created_at')),
     // goods given to wholesale traders: their profit, same formula as the profit report (gm-profit.js)
-    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select(GM_TRADER_GIVE_SELECT).in('store_id', S).eq('source', 'stock_given')).order('created_at').order('id'))
+    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select(GM_TRADER_GIVE_SELECT).in('store_id', S).eq('source', 'stock_given')).order('created_at').order('id')),
+    gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('karat, weight_grams').in('store_id', S).eq('source', 'scrap_given')).order('id')),
+    gmFetchAllRows(() => inPeriod(q().from('gold_stock_lots').select('karat, weight_grams_total, box_name').in('store_id', S).like('box_name', 'كسر %').or('trader_movement_id.not.is.null,trader_id.not.is.null')).order('id')),
+    gmFetchAllRows(() => inPeriod(q().from('piece_lot_draws').select('piece_id, lot:lot_id(box_name), piece:piece_id(karat, weight_grams)').in('store_id', S)).order('id'))
   ]);
-  for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR]) if (x.error) throw x.error;
+  for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, scrapGivenR, scrapInR, madeR]) if (x.error) throw x.error;
 
   const invoices = invR.data;
   const byType = t => invoices.filter(i => i.type === t);
@@ -289,6 +297,16 @@ async function build(from, to) {
   const tDecr = sum(tmR.data.filter(m => m.movement_type !== 'debt_increase'), 'gold_24k_equivalent');
   // same sign as ledger-ar.html: positive = traders owe the shop gold
   const tBal = tmAllR.data.reduce((a, m) => a + (m.movement_type === 'debt_increase' ? -1 : 1) * Number(m.gold_24k_equivalent || 0), 0);
+
+  // ---- weights moved in the period (see the «الذهب بالوزن» table)
+  const W = { trSold: {}, made: {}, scrapIn: {}, scrapOut: {} };
+  const addW = (m, k, g) => { if (!k) return; m[k] = (m[k] || 0) + (Number(g) || 0); };
+  (givenR.data || []).forEach(m => addW(W.trSold, m.karat, m.weight_grams));
+  (scrapGivenR.data || []).forEach(m => addW(W.scrapOut, m.karat, m.weight_grams));
+  (scrapInR.data || []).filter(l => /^كسر \d+$/.test((l.box_name || '').trim())).forEach(l => addW(W.scrapIn, l.karat, l.weight_grams_total));
+  const madePieces = new Map();
+  (madeR.data || []).forEach(d => { if (d.piece && d.lot && /^كسر \d+$/.test((d.lot.box_name || '').trim())) madePieces.set(d.piece_id, d.piece); });
+  madePieces.forEach(p => addW(W.made, p.karat, p.weight_grams));
 
   // ---- stock now
   // pieces (barcoded) and scrap/bulk gold without a barcode are shown apart, so the total matches the stock page + the scrap box
@@ -382,7 +400,6 @@ async function build(from, to) {
     ${row(tBal >= 0 ? 'صافي: لنا عند التجار (آخر الفترة)' : 'صافي: علينا للتجار (آخر الفترة)', g2(Math.abs(tBal)), ' class="tot"')}
   </table>`);
 
-  const karats = Array.from(new Set([...Object.keys(soldByKarat), ...Object.keys(boughtByKarat), ...Object.keys(stockByKarat)])).filter(k => k && k !== 'null').sort((a, b) => b - a);
   if (depOpen.length || depInPeriod.length) {
     const shown = deposits.filter(d => depOpen.includes(d) || depInPeriod.includes(d));
     h += sec('bookmark_added', 'إيصالات العربون', `<table class="fr-t">
@@ -390,12 +407,17 @@ async function build(from, to) {
       ${shown.map(d => `<tr><td dir="ltr" style="text-align:right">${esc(d.deposit_number)}</td><td>${esc(d.customer && d.customer.name)}</td><td>${esc((d.items || []).map(i => i.description || i.barcode).join('، '))}</td><td>${d.status === 'refunded' && !(d.left > 0.009) ? 'مُسترجَع' : !(d.left > 0.009) ? 'استُخدم في فاتورة' : d.left < Number(d.amount) - 0.009 ? 'الباقي ' + money(d.left) : 'قائم'}</td><td class="n">${money(d.amount)}</td></tr>`).join('')}
     </table>`, 'العربون القائم مبلغ دفعه العميل لحجز قطعة، ويُخصم من فاتورته عند الشراء.');
   }
-  h += sec('diamond', 'الذهب بالوزن', karats.length ? `<div class="fr-wide"></div><table class="fr-t fr-tight">
-    <tr><th>العيار</th><th class="n">مباع</th><th class="n">مشترى</th><th class="n">قطع</th><th class="n">كسر بلا باركود</th><th class="n">بالمخزن الآن</th></tr>
-    ${karats.map(k => `<tr><td>${esc(k)}</td><td class="n">${n2((soldByKarat[k] || {}).g)}</td><td class="n">${n2((boughtByKarat[k] || {}).g)}</td><td class="n">${n2(piecesByKarat[k])}</td><td class="n">${n2(lotsByKarat[k])}</td><td class="n">${n2(stockByKarat[k])}</td></tr>`).join('')}
-    <tr class="tot"><td>المجموع</td><td></td><td></td><td class="n">${n2(sumOf(piecesByKarat))}</td><td class="n">${n2(sumOf(lotsByKarat))}</td><td class="n">${n2(sumOf(stockByKarat))}</td></tr>
-    <tr class="tot"><td colspan="5">المخزن الآن بعيار 24</td><td class="n">${n2(stock24)}</td></tr>
-  </table>` : '<p class="fr-note">لا توجد حركة ذهب.</p>', 'الأوزان بالغرام (الوزن القائم). «قطع» = القطع المتوفرة بالباركود (نفس رقم صفحة المخزن)، و«كسر بلا باركود» = ما بقي في صناديق الكسر والذهب غير المقطّع. «بالمخزن الآن» هو الرصيد الحالي، وليس في تاريخ نهاية الفترة.');
+  // weights moved in the period, per karat (بشار 2026-11-16): sold to individuals, sold to traders,
+  // pieces made from scrap, scrap received from traders, scrap given to traders
+  const wk = Array.from(new Set([...Object.keys(soldByKarat), ...Object.keys(W.trSold), ...Object.keys(W.made), ...Object.keys(W.scrapIn), ...Object.keys(W.scrapOut)]))
+    .filter(k => k && k !== 'null' && k !== 'undefined').sort((a, b) => b - a);
+  const wcol = [k => (soldByKarat[k] || {}).g, k => W.trSold[k], k => W.made[k], k => W.scrapIn[k], k => W.scrapOut[k]];
+  const wsum = f => wk.reduce((a, k) => a + (Number(f(k)) || 0), 0);
+  h += sec('diamond', 'الذهب بالوزن', wk.length ? `<div class="fr-wide"></div><table class="fr-t fr-tight">
+    <tr><th>العيار</th><th class="n">مباع للأفراد</th><th class="n">مباع للتجار</th><th class="n">قطع أُنتجت من الكسر</th><th class="n">كسر مستلم من التجار</th><th class="n">كسر مُعطى للتجار</th></tr>
+    ${wk.map(k => `<tr><td>${esc(k)}</td>${wcol.map(f => `<td class="n">${n2(f(k))}</td>`).join('')}</tr>`).join('')}
+    ${wk.length > 1 ? `<tr class="tot"><td>المجموع</td>${wcol.map(f => `<td class="n">${n2(wsum(f))}</td>`).join('')}</tr>` : ''}
+  </table>` : '<p class="fr-note">لا توجد حركة ذهب في هذه الفترة.</p>', 'الأوزان بالغرام (الوزن القائم) خلال الفترة. «مباع للأفراد» من فواتير البيع بعد خصم المرتجعات، و«مباع للتجار» البضاعة المُخرجة للتجار على الحساب. «قطع أُنتجت من الكسر» وزن القطع المصنوعة من صناديق الكسر. «كسر مستلم من التجار» ما دخل صناديق الكسر من تسكير ذهب أو استلام، و«كسر مُعطى للتجار» ما خرج منها لهم.');
 
   if (document.getElementById('fr-show-list').checked && invoices.length) {
     h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<div class="fr-wide"></div><table class="fr-t">
