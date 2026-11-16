@@ -3,8 +3,10 @@
 <html class="dark" dir="rtl" lang="ar"><head>
 <meta charset="utf-8"/>
 <link rel="manifest" href="manifest.json"/>
+<link rel="preload" as="image" href="goldmind-hero.jpg"/>
+<script src="gm-hero.js?v=1" defer></script>
 <link rel="apple-touch-icon" href="apple-touch-icon.png"/>
-<meta name="theme-color" content="#0f232a"/>
+<meta name="theme-color" content="#020307"/>
 <meta name="mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-capable" content="yes"/>
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
@@ -16,32 +18,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
 <style>
         html { font-size: 87.5%; }
-    .logo-tilt-wrap { position: relative; width: 58%; max-width: 230px; margin: 0 auto 0.75rem auto; aspect-ratio: 1033 / 1204; padding: 0; overflow: hidden; }
-    .logo-tilt-wrap { animation: gmLogoArrive 0.9s cubic-bezier(.2,.8,.2,1) both; }
-    @keyframes gmLogoArrive {
-      0%   { opacity: 0; transform: scale(0.82); filter: brightness(1.6) saturate(0.6); }
-      60%  { opacity: 1; }
-      100% { opacity: 1; transform: scale(1); filter: brightness(1) saturate(1); }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .logo-tilt-wrap { animation: none; }
-    }
-    .logo-tilt-inner { width: 100%; height: 100%; position: relative; }
-    .logo-tilt-img { width: 100%; height: 100%; display: block; border: 0; pointer-events: none; object-fit: contain; }
-    .logo-tilt-glare { position: absolute; inset: 0; opacity: 0; transition: opacity 0.2s ease-out; pointer-events: none; mix-blend-mode: screen; }
-    .logo-auto-shine {
-        position: absolute; inset-block: 0; left: -33%; width: 33%; pointer-events: none;
-        background: linear-gradient(100deg, transparent, rgba(255,255,255,0.6), transparent);
-        animation: gmLogoAutoShine 7s ease-in-out infinite;
-    }
-    @keyframes gmLogoAutoShine {
-        0%, 72% { transform: translateX(-400%) skewX(-18deg); opacity: 0; }
-        76% { opacity: .8; }
-        94%, 100% { transform: translateX(500%) skewX(-18deg); opacity: 0; }
-    }
-    @media (prefers-reduced-motion: reduce) {
-      .logo-auto-shine { animation: none; display: none; }
-    }
 
         :root {
             --royal-gold: #FFD700;
@@ -246,25 +222,13 @@
 <script src="gm-particle-transition.js"></script>
 </head>
 <body class="text-white min-h-screen flex flex-col items-center justify-center p-4">
-<!-- Atmospheric Background Animation -->
-<div class="fixed inset-0 z-0 opacity-40 pointer-events-none" style="background:
-    radial-gradient(circle at 15% 20%, rgba(255,215,0,0.10) 0%, transparent 45%),
-    radial-gradient(circle at 85% 15%, rgba(180,149,90,0.14) 0%, transparent 40%),
-    radial-gradient(circle at 50% 90%, rgba(255,215,0,0.06) 0%, transparent 50%);">
-</div>
+
 <!-- Main Login Container -->
 <main class="relative z-10 w-full max-w-[440px] flex flex-col items-center">
 <!-- Brand Identity -->
-<div class="mb-10 text-center animate-fade-in">
-<div class="logo-tilt-wrap" id="logoTiltWrap">
-<div class="logo-tilt-inner" id="logoTiltInner">
-<img src="logo-transparent.png?v=20260923" class="logo-tilt-img" id="logoTiltObject" alt="GoldMind"/>
-<div class="logo-tilt-glare"></div>
-<div class="logo-auto-shine"></div>
-</div>
-<div class="absolute inset-0 rounded-full animate-pulse bg-primary/10 blur-xl -z-10"></div>
-</div>
-<p class="text-xl text-primary/80 opacity-90 mt-2">مرحباً بك في جولد مايند</p>
+<div class="mb-4 text-center animate-fade-in">
+<h1 class="sr-only">GoldMind — Gold Accounting Intelligence</h1>
+<p class="text-base text-white/85" style="text-shadow:0 1px 6px #000,0 0 2px #000">مرحباً بك في جولد مايند</p>
 </div>
 <!-- Login Form Card -->
 <div class="glass-panel w-full p-8 rounded-xl shadow-2xl space-y-8 animate-fade-in">
@@ -321,7 +285,7 @@
 </form>
 <!-- Footer / Language Switcher -->
 <footer class="mt-12 flex flex-col items-center gap-6 text-primary/40">
-<p class="text-xs">© ٢٠٢٤ جولد مايند لإدارة محلات الذهب. جميع الحقوق محفوظة.</p>
+<p class="text-xs">© 2026 جولد مايند لإدارة محلات الذهب. جميع الحقوق محفوظة.</p>
 </footer>
 </main>
 <!-- Side Decorative elements -->
@@ -725,45 +689,4 @@ if ('serviceWorker' in navigator) {
 }
 </script>
 
-<script>
-(function initLogoParallax() {
-  if (!window.matchMedia || !window.matchMedia('(pointer: fine)').matches) return;
-  const wrap = document.getElementById('logoTiltWrap');
-  const inner = document.getElementById('logoTiltInner');
-  const obj = document.getElementById('logoTiltObject');
-  if (!wrap || !inner || !obj) return;
-  const glare = inner.querySelector('.logo-tilt-glare');
-  const maxShift = 14;
-  let layerBack, layerMid, layerFront;
-
-  function bindLayers() {
-    const doc = obj.contentDocument;
-    if (!doc) return;
-    layerBack = doc.getElementById('layer-back');
-    layerMid = doc.getElementById('layer-mid');
-    layerFront = doc.getElementById('layer-front');
-  }
-  obj.addEventListener('load', bindLayers);
-  bindLayers();
-
-  window.addEventListener('mousemove', function (e) {
-    const dx = Math.max(-1, Math.min(1, (e.clientX - window.innerWidth / 2) / (window.innerWidth / 2)));
-    const dy = Math.max(-1, Math.min(1, (e.clientY - window.innerHeight / 2) / (window.innerHeight / 2)));
-    if (layerBack) layerBack.style.transform = 'translate(' + (dx * maxShift * 0.3) + 'px,' + (dy * maxShift * 0.3) + 'px)';
-    if (layerMid) layerMid.style.transform = 'translate(' + (dx * maxShift * 0.6) + 'px,' + (dy * maxShift * 0.6) + 'px)';
-    if (layerFront) layerFront.style.transform = 'translate(' + (dx * maxShift) + 'px,' + (dy * maxShift) + 'px)';
-    if (glare) {
-      glare.style.opacity = '0.35';
-      glare.style.background = 'radial-gradient(circle at ' + (50 + dx * 30) + '% ' + (50 + dy * 30) + '%, rgba(255,255,255,0.35), transparent 60%)';
-    }
-  });
-
-  wrap.addEventListener('mouseleave', function () {
-    if (layerBack) layerBack.style.transform = 'translate(0px,0px)';
-    if (layerMid) layerMid.style.transform = 'translate(0px,0px)';
-    if (layerFront) layerFront.style.transform = 'translate(0px,0px)';
-    if (glare) glare.style.opacity = '0';
-  });
-})();
-</script>
 </body></html>
