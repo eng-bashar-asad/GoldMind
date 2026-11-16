@@ -412,6 +412,29 @@ const GOLDMIND_THEMES = {
       '--gm-outline': '#8C826E'
     }
   },
+  'beige-marble': {
+    // «الرخام البيج» (بشار 2026-11-16): warm beige marble with taupe and gold veins (theme-beige-marble.jpg),
+    // white cards in a thin gold frame, espresso words, gold accents. A light theme like the default.
+    label: 'الرخام البيج',
+    swatch: ['#EFE6D6', '#B8954A', '#2A2116'],
+    lightCanvas: true,
+    vars: {
+      '--gm-bg': '#EFE6D6',
+      '--gm-bg-elevated': '#EFE6D6',
+      '--gm-surface-lowest': '#FFFFFF',
+      '--gm-surface-low': '#F6EFE2',
+      '--gm-primary': '#2A2116',
+      '--gm-on-primary': '#F8F1E3',
+      '--gm-accent': '#B8954A',
+      '--gm-on-accent': '#FFFFFF',
+      '--gm-secondary': '#8A6A2E',
+      '--gm-on-surface': '#2A2116',
+      '--gm-on-surface-variant': '#6E6250',
+      '--gm-outline-variant': '#DCCDAE',
+      '--gm-shadow-color': 'rgba(90, 66, 26, 0.18)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #8A6A2E 0%, #B8954A 55%, #E2C88A 100%)'
+    }
+  },
 };
 
 // «الرخام الأسود»: black marble canvas, charcoal cards with a thin gold frame, gold titles, dark fields.
@@ -533,6 +556,33 @@ const GOLDMIND_THEMES = {
   ].join('\n');
   var st = document.createElement('style');
   st.id = 'gm-theme-marble';
+  st.textContent = css;
+  (document.head || document.documentElement).appendChild(st);
+})();
+
+// «الرخام البيج»: beige marble canvas, white cards framed in a thin gold line, soft cream bars with a gold rule.
+(function () {
+  var T = 'html[data-gm-theme="beige-marble"]';
+  var FRAME = 'rgba(184,149,74,.38)';
+  var BAR = 'linear-gradient(180deg,rgba(255,252,245,.96) 0%,rgba(248,241,228,.96) 100%)';
+  var css = [
+    '@media screen{',
+    T + ' body{background-color:#EFE6D6!important;background-image:url("theme-beige-marble.jpg")!important;background-size:900px 900px!important;background-repeat:repeat!important}',
+    T + ' .dsk-app{--dsk-bg:transparent!important}',
+    T + ' header:is(.bg-surface-container-lowest,.bg-surface,.bg-background,.bg-white){background:' + BAR + '!important;border-bottom:1px solid rgba(184,149,74,.55)!important}',
+    T + ' :is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white):not(input):not(select):not(textarea):not(button)' +
+      '{border:1px solid ' + FRAME + '!important;box-shadow:0 10px 26px -18px rgba(90,66,26,.45),inset 0 1px 0 #fff!important}',
+    T + ' button:is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white){border:1px solid ' + FRAME + '!important}',
+    T + ' nav.gm-bottom-tabs{border-top:1px solid rgba(184,149,74,.55)!important}',
+    T + ' :is(thead,th){background-color:#F3EADA}',
+    // «زجاجية» mode paints its own art behind frosted cards — here the marble is that background
+    T + '.gm-glass.gm-light-canvas{background:#EFE6D6 url("theme-beige-marble.jpg") repeat 0 0/900px 900px!important}',
+    T + '.gm-glass.gm-light-canvas #gmGlassBg{display:none!important}',
+    T + '.gm-glass.gm-light-canvas :is(.bg-surface-container-lowest,.bg-white):is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):not(input):not(select):not(textarea){border-color:' + FRAME + '!important}',
+    '}'
+  ].join('\n');
+  var st = document.createElement('style');
+  st.id = 'gm-theme-beige';
   st.textContent = css;
   (document.head || document.documentElement).appendChild(st);
 })();
