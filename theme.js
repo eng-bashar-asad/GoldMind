@@ -251,7 +251,7 @@ function gmCollapseInvoiceRows(entries) {
     if (!groups.has(key)) { groups.set(key, []); out.push(key); }
     groups.get(key).push(e);
   }
-  return out.flatMap(x => {
+  return gmMergeSaleDebt(out.flatMap(x => {
     if (typeof x !== 'string') return [x];
     const rows = groups.get(x);
     if (rows.length === 1) return rows;
@@ -262,8 +262,38 @@ function gmCollapseInvoiceRows(entries) {
     const undo = /^(إلغاء|استعادة) فاتورة\s*/;
     const base = rows.find(r => !undo.test(r.notes || r.description || '')) || { ...rows[0], notes: rows[0].notes && rows[0].notes.replace(undo, ''), description: rows[0].description && rows[0].description.replace(undo, 'فاتورة ') };
     return [{ ...base, id: last.id, created_at: last.created_at, direction: net > 0 ? 'in' : 'out', amount: Math.round(Math.abs(net) * 100) / 100, merged: rows.length }];
-  });
+  }));
 }
+// A sale left partly on debt (بشار 2026-11-16): no "+X بالدين / −X دين على" pair. The sale row
+// shows the whole invoice (paid + debt) and is linked to one «باقي على الزبون» row with the debt.
+// Display only — the saved rows stay, totals are unchanged. Merged only when paid + debt equals
+// the invoice total (an invoice edited later keeps its rows apart). Rows need e.cm.inv for that.
+function gmMergeSaleDebt(rows) {
+  const day = e => gmFormatDateTime(e.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const debtIn = rows.filter(e => e.direction === 'in' && /^debt_/.test(e.link_group || '') && / — بالدين$/.test(e.notes || ''));
+  if (!debtIn.length) return rows;
+  const drop = new Set(), patch = new Map();
+  for (const d of debtIn) {
+    const num = d.notes.replace(/ — بالدين$/, '').trim();
+    const sale = rows.find(e => e !== d && e.direction === 'in' && e.cm && e.cm.inv && e.currency === d.currency && !e.link_group
+      && day(e) === day(d) && (e.notes || '').includes(num) && !patch.has(e.id));
+    if (!sale) continue;
+    const inv = sale.cm.inv, fx = inv.pay_currency && Number(inv.pay_fx_rate) > 0 ? Number(inv.pay_fx_rate) : 1;
+    const full = Number(sale.amount) + Number(d.amount);
+    if (Math.abs(full - Number(inv.total_amount) * fx) > 0.05) continue;
+    drop.add(d.id);
+    patch.set(sale.id, { amount: Math.round(full * 100) / 100, link_group: d.link_group });
+  }
+  return rows.filter(e => !drop.has(e.id)).map(e => patch.has(e.id) ? { ...e, ...patch.get(e.id) }
+    : e.direction === 'out' && /^debt_/.test(e.link_group || '') && /^دين على /.test(e.operation_type || '')
+      ? { ...e, operation_type: e.operation_type.replace(/^دين على /, 'باقي على ') } : e);
+}
+// ponytail: quick self-check — 12,500 paid + 100 debt on a 12,600 invoice → one 12,600 row + «باقي على» 100
+console.assert((() => { const t = '2026-11-15T16:58:31Z', r = gmMergeSaleDebt([
+  { id: 'p', direction: 'in', amount: 12500, currency: 'USD', created_at: t, notes: 'تحصيل جزئي INV-1 (12500 نقداً)', cm: { invoice_id: 'a', inv: { total_amount: 12600 } } },
+  { id: 'd', direction: 'in', amount: 100, currency: 'USD', created_at: t, notes: 'INV-1 — بالدين', link_group: 'debt_a' },
+  { id: 'o', direction: 'out', amount: 100, currency: 'USD', created_at: t, notes: 'INV-1', operation_type: 'دين على سعيد', link_group: 'debt_a' }]);
+  return r.map(e => e.direction + e.amount + (e.link_group || '')).join() === 'in12600debt_a,out100debt_a' && r[1].operation_type === 'باقي على سعيد'; })(), 'gmMergeSaleDebt');
 // Same rule for cash_movements lists (home "حركات اليوم", main box), which come newest-first.
 function gmCollapseMovements(list) {
   const asc = (list || []).map(m => ({ ...m, cm: { invoice_id: m.invoice_id } })).reverse();
