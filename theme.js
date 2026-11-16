@@ -399,6 +399,43 @@ const GOLDMIND_THEMES = {
       '--gm-avatar-grad': 'linear-gradient(135deg, #16305C 0%, #C9962B 100%)'
     }
   },
+  'black-marble': {
+    // «الرخام الأسود» (بشار 2026-11-16): black marble with gold veins (theme-black-marble.jpg),
+    // charcoal cards framed in a thin gold line, gold for titles and what matters — like his mockups.
+    label: 'الرخام الأسود',
+    swatch: ['#0B0B0D', '#D4AF37', '#1C1C21'],
+    lightCanvas: false,
+    shimmer: true,
+    vars: {
+      '--gm-bg': '#0B0B0D',
+      '--gm-bg-elevated': '#0B0B0D',
+      '--gm-surface-lowest': '#17171B',
+      '--gm-surface-low': '#202025',
+      '--gm-primary': '#1C1913',
+      '--gm-on-primary': '#F2DE9E',
+      '--gm-accent': '#D4AF37',
+      '--gm-on-accent': '#16120A',
+      '--gm-secondary': '#B8954A',
+      '--gm-on-surface': '#EEE7D6',
+      '--gm-on-surface-variant': '#ABA08A',
+      '--gm-outline-variant': '#4B4232',
+      '--gm-shadow-color': 'rgba(0, 0, 0, 0.7)',
+      '--gm-shimmer-grad': 'linear-gradient(120deg, #0B0B0D 0%, #8A6A22 30%, #D4AF37 46%, #FBE7A1 52%, #D4AF37 58%, #8A6A22 75%, #0B0B0D 100%)',
+      '--gm-avatar-grad': 'linear-gradient(135deg, #8A6A22 0%, #D4AF37 55%, #1C1913 100%)',
+      // brighter glossy inks for dark cards
+      '--gmi-g1': '#2FB487', '--gmi-g2': '#4CD3A2', '--gmi-g3': '#9BF0CF',
+      '--gmi-r1': '#E0566A', '--gmi-r2': '#F27A8A', '--gmi-r3': '#FFB3BD',
+      '--gmi-b1': '#5B8DEF', '--gmi-b2': '#7FA7F5', '--gmi-b3': '#BCD2FB',
+      '--gmi-a1': '#C9962B', '--gmi-a2': '#E2B84E', '--gmi-a3': '#F7DE9A',
+      '--gmi-v1': '#A57BF0', '--gmi-v2': '#BC9AF5', '--gmi-v3': '#DCCBFB',
+      '--gmi-i1': '#B8902F', '--gmi-i2': '#E2C46A', '--gmi-i3': '#FBEBB4',
+      // names some pages use with a cream fallback (cash-box filters and totals, phone action bar)
+      '--gm-surface-container-low': '#1C1C21',
+      '--gm-background': '#0B0B0D',
+      '--gm-on-background': '#EEE7D6',
+      '--gm-outline': '#8C826E'
+    }
+  },
 };
 
 // «الملكي»: the pieces a palette alone can't give (texture, navy bars, framed beige boxes).
@@ -450,9 +487,136 @@ const GOLDMIND_THEMES = {
   (document.head || document.documentElement).appendChild(st);
 })();
 
+// «الرخام الأسود»: black marble canvas, charcoal cards with a thin gold frame, gold titles, dark fields.
+// Pages were written for light cards, so the usual light utility classes are mapped to their dark twins here.
+(function () {
+  var T = 'html[data-gm-theme="black-marble"]';
+  var CARD = 'linear-gradient(160deg,#1E1E23 0%,#15151A 100%)';
+  var BAR = 'linear-gradient(180deg,#141418 0%,#0E0E11 100%)';
+  var FRAME = 'rgba(212,175,55,.30)';
+  var GOLD = '#E2C46A', INK = '#EEE7D6', MUTED = '#ABA08A';
+  var TT = T + '[data-gm-theme]:not(.gm-x)'; // outranks the glossy layer (html.gm-gloss:not(.gm-plain) …)
+  var css = [
+    '@media screen{',
+    T + ' body{background-color:#0B0B0D!important;background-image:url("theme-black-marble.jpg")!important;background-size:900px 900px!important;background-repeat:repeat!important;color:' + INK + '}',
+    T + ' .dsk-app{--dsk-bg:transparent!important}',
+    T + ' .dsk-toolbar-label{color:' + GOLD + '}',
+    // gold is the "primary" colour for words, icons and lines; solid primary buttons stay dark bronze with gold words
+    T + ' .text-primary{color:' + GOLD + '!important}',
+    T + ' :is(.border-primary,.border-primary\\/30,.border-primary\\/40){border-color:rgba(212,175,55,.55)!important}',
+    T + ' .bg-primary:not(.rounded-lg.p-4):not(.rounded-xl.p-4){background-image:linear-gradient(160deg,#2A2416,#1A1710)!important;border:1px solid rgba(212,175,55,.55)}',
+    T + ' .gm-cta{background-image:linear-gradient(135deg,#F3D57A 0%,#D4AF37 50%,#B08A2E 100%)!important;color:#16120A!important;border:0}',
+    // top bars and side menu: near-black with a gold rule
+    T + ' header:is(.bg-surface-container-lowest,.bg-surface,.bg-background,.bg-white){background:' + BAR + '!important;border-bottom:1px solid rgba(212,175,55,.45)!important}',
+    T + ' #gmNav{background:' + BAR + '!important;border-left:1px solid rgba(212,175,55,.45)}',
+    T + ' #gmNav.gn-light{background:' + BAR + '!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}',
+    // cards / boxes: charcoal with a thin gold frame
+    T + ' :is(.bg-surface-container-lowest,.bg-white):not(input):not(select):not(textarea){background-color:#17171B!important}',
+    T + ' :is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white):not(input):not(select):not(textarea):not(button)' +
+      '{background-image:' + CARD + '!important;border:1px solid ' + FRAME + '!important;box-shadow:0 12px 28px -16px rgba(0,0,0,.9),inset 0 1px 0 rgba(255,255,255,.04)!important}',
+    T + ' button:is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white){background-image:' + CARD + '!important;border:1px solid ' + FRAME + '!important}',
+    T + ' :is(.bg-surface-container-low,.bg-gray-50,.bg-gray-100,.bg-slate-50,.bg-stone-50,.bg-neutral-50){background-color:#202025!important}',
+    T + ' :is(.bg-gray-200,.bg-slate-100,.bg-stone-100){background-color:#2A2A31!important}',
+    T + ' :is(.hover\\:bg-gray-50,.hover\\:bg-gray-100,.hover\\:bg-surface-container-low):hover{background-color:#26262C!important}',
+    T + ' :is(.gmt-pill,.gmt-panel){background-color:#1C1C21!important;border:1px solid ' + FRAME + '}',
+    T + ' :is(div,section,form,fieldset).border:is(.rounded-lg,.rounded-xl,.rounded-2xl):not([class*="bg-"]):not(.border-dashed){background-color:rgba(23,23,27,.94);border-color:' + FRAME + '!important}',
+    T + ' .border-dashed:not([class*="bg-"]){background-color:rgba(23,23,27,.9)}',
+    // words written for white cards
+    T + ' :is(.text-black,.text-gray-900,.text-gray-800,.text-gray-700,.text-slate-900,.text-slate-800,.text-slate-700,.text-stone-800,.text-neutral-800,.text-on-surface){color:' + INK + '!important}',
+    T + ' :is(.text-gray-600,.text-gray-500,.text-slate-600,.text-slate-500,.text-stone-500,.text-on-surface-variant){color:' + MUTED + '!important}',
+    T + ' :is(.text-gray-400,.text-slate-400,.text-outline){color:#8C826E!important}',
+    T + ' :is(.border-gray-100,.border-gray-200,.border-gray-300,.border-slate-200,.border-outline-variant,.divide-gray-100>*,.divide-gray-200>*,.divide-outline-variant>*){border-color:#3A3428!important}',
+    // tables
+    T + ' :is(thead,th){background-color:#1C1913!important;color:' + GOLD + '!important}',
+    T + ' tbody tr:nth-child(even){background-color:rgba(255,255,255,.02)}',
+    // fields: dark with a bronze line, light words
+    T + ' :is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]){background-color:#111114!important;color:' + INK + '!important;border-color:#4B4232!important}',
+    T + ' :is(input,textarea)::placeholder{color:#7D7462!important;opacity:1}',
+    T + ' :is(input,select,textarea):focus{border-color:#D4AF37!important;box-shadow:0 0 0 1px #D4AF37!important}',
+    T + ' select option{background:#17171B;color:' + INK + '}',
+    // checkboxes keep بشار's rule: empty = frame only, ticked = solid box (gold here, the light-on-dark equivalent of black)
+    T + ' input[type=checkbox]{background-color:transparent!important;border-color:' + GOLD + '!important}',
+    T + ' input[type=checkbox]:checked{background-color:' + GOLD + '!important;background-image:none!important}',
+    // modals / sheets and their backdrops
+    T + ' :is(.bg-white\\/95,.bg-white\\/90,.bg-white\\/80){background-color:rgba(23,23,27,.95)!important}',
+    '}',
+    // the home page's own boxes (tiles, KPI cards, calculator / currency blocks, online-staff chip)
+    T + ' :is(.gm-mcard,.gm-card,.quick-action-icon,.gm-qg,.dsk-action,#gmOnlineBtn,#gmOnlineBtnDsk,.gmc-seg,.gmc-gold-host,.gmc-block){background:' + CARD + '!important;border:1px solid ' + FRAME + '!important;color:' + INK + '}',
+    T + ' nav.gm-bottom-tabs{background:' + BAR + '!important;border-top:1px solid rgba(212,175,55,.45)!important}',
+    T + ' #gmNav .gn-a{color:#D9CBA6}',
+    // the side menu's light mode keeps its own word colours — on the marble they must be light too
+    T + ' #gmNav.gn-light{color:#E6DABA!important;border:0!important}',
+    T + ' #gmNav.gn-light :is(.gn-h,a.gn-a){color:#E6DABA!important}',
+    T + ' #gmNav.gn-light :is(.gn-h .gn-ic,a.gn-a .material-symbols-outlined){color:#D4AF37!important}',
+    T + ' #gmNav.gn-light .gn-head b{color:' + GOLD + '!important}',
+    T + ' #gmNav.gn-light :is(.gn-x,.gn-mini){background:rgba(255,255,255,.08)!important;color:#E6DABA!important}',
+    T + ' #gmNav.gn-light .gn-h .gn-chev{color:#ABA08A!important}',
+    T + ' #gmNav.gn-light :is(.gn-head,.gn-foot){border-color:rgba(212,175,55,.25)!important}',
+    T + ' #gmNav .gn-a.here{background:rgba(212,175,55,.14)!important;color:' + GOLD + '!important;border:1px solid rgba(212,175,55,.4)}',
+    T + ' #gmNav a.gn-a.here .material-symbols-outlined{color:' + GOLD + '!important}',
+    T + ' .gmt-pill :is(b,strong){color:' + INK + '!important}',
+    T + ' .gmt-pill :is(small,.gmt-sub){color:' + MUTED + '!important}',
+    // words on gold chips/buttons stay dark
+    T + ' :is(.bg-accent,.bg-secondary,.gold-gradient) :is(.text-primary,.material-symbols-outlined:not([class*="text-"])),' + T + ' :is(.bg-accent,.bg-secondary).text-primary{color:#16120A!important}',
+    // status colours written for white cards → their light twins
+    T + ' :is(.text-green-600,.text-green-700,.text-green-800,.text-emerald-600,.text-emerald-700,.text-emerald-800,.text-success){color:#4CD3A2!important}',
+    T + ' :is(.text-red-600,.text-red-700,.text-red-800,.text-rose-700,.text-error){color:#F27A8A!important}',
+    T + ' :is(.text-amber-600,.text-amber-700,.text-amber-800,.text-yellow-700,.text-yellow-800,.text-orange-700){color:#E2B84E!important}',
+    T + ' :is(.text-blue-600,.text-blue-700,.text-blue-800,.text-sky-700,.text-indigo-700){color:#7FA7F5!important}',
+    // light status chips → dark tinted chips (their words above are now light)
+    T + ' :is(.bg-green-50,.bg-green-100,.bg-emerald-50,.bg-emerald-100){background-color:rgba(76,211,162,.14)!important}',
+    T + ' :is(.bg-red-50,.bg-red-100,.bg-rose-50,.bg-error-container){background-color:rgba(242,122,138,.14)!important}',
+    T + ' :is(.bg-amber-50,.bg-amber-100,.bg-yellow-50,.bg-yellow-100,.bg-orange-50){background-color:rgba(226,184,78,.14)!important}',
+    T + ' :is(.bg-blue-50,.bg-blue-100,.bg-sky-50,.bg-indigo-50){background-color:rgba(127,167,245,.14)!important}',
+    // the glossy layer paints these chips with light gradients — the marble wants dark tints
+    TT + ' :is(.bg-green-50,.bg-emerald-50,.bg-green-100,.bg-success-container,.bg-red-50,.bg-red-100,.bg-error-container,.bg-amber-50,.bg-yellow-50,.bg-amber-100,.bg-amber-200,.bg-blue-50,.bg-sky-50,.bg-secondary-container,.dc-tag.ok,.dc-tag.warn){background-image:none!important;box-shadow:none!important}',
+    T + ' :is(.bg-success-container,.dc-tag.ok){background-color:rgba(76,211,162,.14)!important}',
+    T + ' :is(.bg-amber-200,.dc-tag.warn){background-color:rgba(226,184,78,.16)!important}',
+    T + ' .bg-secondary-container{background-color:rgba(212,175,55,.14)!important}',
+    T + ' :is(.border-green-200,.border-red-200,.border-amber-200,.border-blue-200,.border-emerald-200){border-color:rgba(212,175,55,.25)!important}',
+    // phone bottom tabs, home KPI numbers, computer KPI colours, the range page's gold-glass day headers
+    T + ' nav.gm-bottom-tabs .gm-tab{color:#BDB29A}',
+    T + ' nav.gm-bottom-tabs .gm-tab.gm-tab-on{color:' + GOLD + '!important}',
+    T + ' .gm-mcard .gm-metric-value{color:' + INK + '!important}',
+    T + ' #dskTodaySalesEl{color:#4CD3A2!important}',
+    T + ' #dskDebtTotalEl{color:#F27A8A!important}',
+    T + ' .gold-glass{background:' + CARD + '!important;box-shadow:none!important;border:1px solid ' + FRAME + '}',
+    T + ' button.bg-surface-container-lowest{color:' + INK + '!important}',
+    T + ' button.bg-surface-container-lowest .material-symbols-outlined:not([class*="text-"]){color:' + GOLD + '!important}',
+    T + ' td[style*="#1B5E20"]{color:#4CD3A2!important}',
+    T + ' td[style*="#8A1D17"]{color:#F27A8A!important}',
+    T + ' .dsk-age.old{background:rgba(242,122,138,.14)!important;color:#F27A8A!important}',
+    T + ' :is(.text-amber-900,.text-yellow-900,.text-orange-800){color:#E2B84E!important}',
+    T + ' :is(.text-green-900,.text-emerald-900){color:#4CD3A2!important}',
+    T + ' :is(.text-red-900,.text-rose-900){color:#F27A8A!important}',
+    T + ' .glass{background:' + CARD + '!important;border:1px solid ' + FRAME + '!important}',
+    T + ' #gmNav a.gn-a.here .gn-badge:not(.red):not(.amber):not(.dot){color:' + GOLD + '!important;background:rgba(212,175,55,.15)!important}',
+    TT + ' .gm-cta{background-image:linear-gradient(135deg,#F3D57A 0%,#D4AF37 50%,#B08A2E 100%)!important;color:#16120A!important}',
+    // page-specific boxes written as white cards (trader account, cash box, sale, customers, stock)
+    T + ' :is(.ld-op,.gm-row,.gm-hbtn,.cu-tile,.cu-act,.summary-card,.type-pill,.cf-tabs,.gm-dist,.gm-inv-q,.ns-x,.ns-pb-btn,#ns-pay,.gm-gicon){background:' + CARD + '!important;border-color:' + FRAME + '!important;color:' + INK + '!important}',
+    T + ' .dc-seg button[aria-pressed="true"]{background:rgba(212,175,55,.18)!important;color:' + GOLD + '!important}',
+    T + ' .gm-status button{background:' + CARD + '!important;border-color:' + FRAME + '!important;color:' + INK + '!important}',
+    T + ' .gm-status button[aria-pressed="true"]{background:rgba(212,175,55,.18)!important;color:' + GOLD + '!important;border-color:rgba(212,175,55,.6)!important}',
+    T + ' .cf-tabs button.on,' + T + ' :is(.st-seg,.cf-tabs) button[aria-pressed="true"]{background:rgba(212,175,55,.18)!important;color:' + GOLD + '!important}',
+    T + ' :is(table.ld-st,table.ld-t) :is(td,tr){background-color:transparent!important}',
+    T + ' :is(table.ld-st,table.ld-t){background:rgba(20,20,24,.92)!important;border-color:' + FRAME + '!important}',
+    T + ' :is(table.ld-st,table.ld-t) td{border-color:#2E2A22!important}',
+    // printing always stays white paper
+    '@media print{' + T + ' body{background:#fff!important;color:#000!important}}'
+  ].join('\n');
+  var st = document.createElement('style');
+  st.id = 'gm-theme-marble';
+  st.textContent = css;
+  (document.head || document.documentElement).appendChild(st);
+})();
+
 function goldmindApplyTheme(name) {
   const theme = GOLDMIND_THEMES[name] || GOLDMIND_THEMES['warm-ingot'];
   const root = document.documentElement;
+  // clear variables only another theme sets (e.g. the marble theme's brighter inks), then set this theme's
+  Object.keys(GOLDMIND_THEMES).forEach(function (n) {
+    Object.keys(GOLDMIND_THEMES[n].vars).forEach(function (key) { if (!(key in theme.vars)) root.style.removeProperty(key); });
+  });
   Object.keys(theme.vars).forEach(function (key) {
     root.style.setProperty(key, theme.vars[key]);
   });
@@ -563,7 +727,7 @@ gmEnsureStatShimmerStyle();
     const fixed = document.querySelectorAll('.gm-cfix-light, .gm-cfix-dark');
     if (!dark) { fixed.forEach(e => e.classList.remove('gm-cfix-light', 'gm-cfix-dark')); return; }
     // the gold-grain walnut canvas is busy, so text on it needs more contrast than on a flat colour
-    const minR = document.documentElement.getAttribute('data-gm-theme') === 'royal-walnut' ? 3.2 : 1.8;
+    const minR = /^(royal-walnut|black-marble)$/.test(document.documentElement.getAttribute('data-gm-theme')) ? 3.2 : 1.8;
     const els = document.body ? document.body.getElementsByTagName('*') : [];
     for (let i = 0; i < els.length && i < 6000; i++) {
       const el = els[i];
@@ -1746,13 +1910,14 @@ function gmClosePhotoViewer() {
   // (بشار 2026-11-15: the old off-centre bright glint hurt the eyes)
   var wave = function (edge, mid, shine) { return 'linear-gradient(110deg,' + edge + ' 0%,' + mid + ' 32%,' + shine + ' 50%,' + mid + ' 68%,' + edge + ' 100%)'; };
   var INK = {
-    green:  wave('#065F46', '#0A7356', '#178F6C'),
-    red:    wave('#8E1330', '#A91D3A', '#C8394F'),
-    blue:   wave('#1E3A8A', '#284BAE', '#3F67CC'),
-    amber:  wave('#7C4A03', '#955C08', '#B57A17'),
-    violet: wave('#5B21B6', '#6D2BD0', '#8A4DE6'),
+    // each wave reads --gmi-* first, so a dark theme («الرخام الأسود») can brighten them for dark cards
+    green:  wave('var(--gmi-g1,#065F46)', 'var(--gmi-g2,#0A7356)', 'var(--gmi-g3,#178F6C)'),
+    red:    wave('var(--gmi-r1,#8E1330)', 'var(--gmi-r2,#A91D3A)', 'var(--gmi-r3,#C8394F)'),
+    blue:   wave('var(--gmi-b1,#1E3A8A)', 'var(--gmi-b2,#284BAE)', 'var(--gmi-b3,#3F67CC)'),
+    amber:  wave('var(--gmi-a1,#7C4A03)', 'var(--gmi-a2,#955C08)', 'var(--gmi-a3,#B57A17)'),
+    violet: wave('var(--gmi-v1,#5B21B6)', 'var(--gmi-v2,#6D2BD0)', 'var(--gmi-v3,#8A4DE6)'),
     accent: wave('var(--gm-secondary)', 'var(--gm-accent)', 'color-mix(in srgb,var(--gm-accent) 75%,#fff)'),
-    ink:    wave('var(--gm-primary)', 'color-mix(in srgb,var(--gm-primary) 85%,var(--gm-accent))', 'color-mix(in srgb,var(--gm-primary) 65%,var(--gm-accent))')
+    ink:    wave('var(--gmi-i1,var(--gm-primary))', 'var(--gmi-i2,color-mix(in srgb,var(--gm-primary) 85%,var(--gm-accent)))', 'var(--gmi-i3,color-mix(in srgb,var(--gm-primary) 65%,var(--gm-accent)))')
   };
   var INKED = [];
   // table cells usually carry their own background, so the ink goes on what is inside them;
