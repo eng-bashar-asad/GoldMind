@@ -28,13 +28,30 @@
     html[data-gm-theme="beige-marble"] body > header { background: rgba(255,252,245,.6) !important; }
     html:not(.gm-light-canvas) body > header h1, html:not(.gm-light-canvas) #fr-period, html:not(.gm-light-canvas) #fr-loading,
     html:not(.gm-light-canvas) #fr-controls > label { color: #F4F1EA !important; }
+    /* dark themes: the cards are dark glass with a thin gold frame — no bright white boxes on a dark page */
+    html:not(.gm-light-canvas) .fr-sec, html:not(.gm-light-canvas) .fr-card { background: rgba(22,20,16,.86); color: #EDE6D3; border-color: rgba(214,178,94,.32); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+    html:not(.gm-light-canvas) .fr-mut, html:not(.gm-light-canvas) .fr-note, html:not(.gm-light-canvas) .fr-t th { color: #B9AF98 !important; }
+    html:not(.gm-light-canvas) .fr-t td, html:not(.gm-light-canvas) .fr-t th { border-top-color: rgba(214,178,94,.16); }
+    html:not(.gm-light-canvas) .fr-t tr.tot td { border-top-color: rgba(214,178,94,.5); }
+    html:not(.gm-light-canvas) .fr-sec h2 .material-symbols-outlined { color: #D6B25E; }
+    html:not(.gm-light-canvas) .pos { color: #6FD38A; } html:not(.gm-light-canvas) .neg { color: #F08A7E; }
+    html:not(.gm-light-canvas) .fr-chip { background: rgba(22,20,16,.86); color: #EDE6D3; border-color: rgba(214,178,94,.45); }
+    html:not(.gm-light-canvas) .fr-chip[aria-pressed="true"] { background: #D6B25E; color: #1A1408; border-color: #D6B25E; }
   }
   .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 20px; vertical-align: middle; }
-  .fr-chip { height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid #C9B98F; background: #FFFDF8; font-size: 13px; font-weight: 600; white-space: nowrap; }
+  .fr-chip { height: 36px; padding: 0 14px; border-radius: 18px; border: 1px solid #C9B98F; background: #F8F1E1; font-size: 13px; font-weight: 600; white-space: nowrap; }
   .fr-chip[aria-pressed="true"] { background: #1F1A12; color: #F3EEDF; border-color: #1F1A12; }
-  .fr-card { background: #FFFDF8; border-radius: 18px; padding: 14px; }
-  .fr-sec { background: #FFFDF8; border-radius: 18px; padding: 14px 14px 6px; break-inside: avoid; }
-  .fr-sec h2 { font-size: 15px; font-weight: 700; margin: 0 0 8px; display: flex; align-items: center; gap: 6px; }
+  .fr-card { background: #F8F1E1; border-radius: 16px; padding: 10px 12px; border: 1px solid #E6D9B8; }
+  .fr-sec { background: #F8F1E1; border-radius: 16px; padding: 10px 12px 4px; break-inside: avoid; border: 1px solid #E6D9B8; }
+  .fr-sec h2 { font-size: 15px; font-weight: 700; margin: 0 0 6px; }
+  /* every section opens and closes with its arrow (بشار 2026-11-16) */
+  .fr-tog { width: 100%; display: flex; align-items: center; gap: 6px; min-height: 36px; background: none; border: 0; padding: 0; font: inherit; color: inherit; text-align: right; cursor: pointer; }
+  .fr-tog .fr-chev { margin-inline-start: auto; transition: transform .2s ease; }
+  .fr-sec.closed .fr-chev { transform: rotate(-90deg); }
+  .fr-sec.closed > .fr-in { display: none; }
+  .fr-sec.closed { padding-bottom: 10px; }
+  .fr-sec.closed h2 { margin: 0; }
+  .fr-mut { color: #6B6150; }
   .fr-sec h2 .material-symbols-outlined { color: #8A6A1C; }
   .fr-t { width: 100%; border-collapse: collapse; font-size: 13px; }
   .fr-t td, .fr-t th { padding: 7px 4px; border-top: 1px solid #EDE4CC; text-align: right; }
@@ -53,16 +70,25 @@
     .gm-print-only { display: block !important; }
     body { background: #fff !important; }
     main { max-width: none !important; padding: 0 !important; }
-    .fr-sec, .fr-card { border: 1px solid #ccc; }
+    .fr-sec, .fr-card { border: 1px solid #ccc; background: #fff !important; color: #111 !important; }
+    .fr-sec.closed > .fr-in { display: block !important; }
   }
+  .gm-pdf .fr-sec.closed > .fr-in { display: block !important; }
+  .gm-pdf .fr-sec, .gm-pdf .fr-card { background: #fff !important; color: #111 !important; }
+  html .gm-pdf .fr-mut, html .gm-pdf .fr-note, html .gm-pdf .fr-t th { color: #6B6150 !important; }
+  html .gm-pdf .pos { color: #1e7d32; } html .gm-pdf .neg { color: #b3261e; }
+  .gm-pdf .fr-chev { display: none; }
 </style>
 <style>
 /* computer: report sections side by side; tiles and the invoice list full width */
 @media screen and (min-width:1024px){
-  #fr-body{display:block !important;columns:2;column-gap:14px}
-  #fr-body > *{break-inside:avoid;margin-bottom:12px}
+  #fr-body{display:block !important;columns:3;column-gap:12px}
+  #fr-body > *{break-inside:avoid;margin-bottom:10px}
   #fr-body > :not(.fr-sec), #fr-body > .fr-sec:has(.fr-wide){column-span:all}
+  #fr-tiles{grid-template-columns:repeat(5,minmax(0,1fr)) !important}
+  #fr-tiles > .col-span-2{grid-column:auto}
 }
+@media screen and (min-width:1500px){ #fr-body{columns:4} }
 </style>
 </head>
 <body>
@@ -73,7 +99,7 @@
 </div>
 </header>
 
-<main class="max-w-2xl lg:max-w-7xl mx-auto px-4 lg:px-8 pb-24">
+<main class="max-w-2xl lg:max-w-[1680px] mx-auto px-4 lg:px-8 pb-24">
 <div id="fr-loading" class="py-16 text-center text-sm" style="color:#6B6150;">جارِ التحميل...</div>
 <div id="fr-noaccess" class="hidden py-16 text-center text-sm" style="color:#b3261e;">ليس لديك صلاحية عرض التقارير.</div>
 
@@ -94,7 +120,7 @@
 <label class="flex items-center gap-2 text-[13px]"><input type="checkbox" id="fr-show-list" checked class="rounded"/> إظهار قائمة الفواتير بالتفصيل</label>
 <div class="grid grid-cols-2 gap-2">
 <button type="button" onclick="window.print()" class="h-11 rounded-xl font-bold text-[14px] flex items-center justify-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined">print</span>طباعة</button>
-<button type="button" onclick="gmReportPdf(document.getElementById('fr-sheet'), 'التقرير-المالي-' + (window.__frRange ? window.__frRange.fromStr + '_' + window.__frRange.toStr : '') + '.pdf', this)" class="h-11 rounded-xl font-bold text-[14px] border flex items-center justify-center gap-1" style="border-color:#C9B98F;background:#FFFDF8;"><span class="material-symbols-outlined">picture_as_pdf</span>PDF</button>
+<button type="button" onclick="gmReportPdf(document.getElementById('fr-sheet'), 'التقرير-المالي-' + (window.__frRange ? window.__frRange.fromStr + '_' + window.__frRange.toStr : '') + '.pdf', this)" class="fr-chip h-11 rounded-xl font-bold text-[14px] border flex items-center justify-center gap-1" style="height:44px;border-radius:12px;"><span class="material-symbols-outlined">picture_as_pdf</span>PDF</button>
 </div>
 </div>
 
@@ -105,7 +131,10 @@
 <div style="font-size:11px;text-align:left;line-height:1.6;"><div id="fr-period-p"></div><div id="fr-printed"></div></div>
 </div>
 </div>
-<p id="fr-period" class="text-[13px] font-semibold no-print" style="color:#6B6150;"></p>
+<div class="no-print flex items-center justify-between gap-2 flex-wrap">
+<p id="fr-period" class="text-[13px] font-semibold fr-mut" style="margin:0"></p>
+<div class="flex gap-2"><button type="button" class="fr-chip" onclick="frSetAll(true)"><span class="material-symbols-outlined" style="font-size:18px">unfold_more</span> فتح الكل</button><button type="button" class="fr-chip" onclick="frSetAll(false)"><span class="material-symbols-outlined" style="font-size:18px">unfold_less</span> طيّ الكل</button></div>
+</div>
 <div id="fr-body" class="flex flex-col gap-3"></div>
 </div>
 </main>
@@ -123,7 +152,27 @@ const g2 = v => (Number(v) || 0).toLocaleString('en-US', { minimumFractionDigits
 const money = v => n2(v) + (FR.cur ? ' ' + FR.cur : '');
 const cls = v => (Number(v) || 0) < 0 ? 'neg' : 'pos';
 const row = (label, val, extra) => `<tr${extra || ''}><td>${label}</td><td class="n">${val}</td></tr>`;
-const sec = (icon, title, inner, note) => `<section class="fr-sec"><h2><span class="material-symbols-outlined">${icon}</span>${title}</h2>${note ? `<p class="fr-note">${note}</p>` : ''}${inner}</section>`;
+const sec = (icon, title, inner, note) => `<section class="fr-sec" data-k="${esc(String(title).replace(/<[^>]*>/g, ''))}"><h2><button type="button" class="fr-tog" aria-expanded="true"><span class="material-symbols-outlined">${icon}</span>${title}<span class="material-symbols-outlined fr-chev no-print" aria-hidden="true">expand_more</span></button></h2><div class="fr-in">${note ? `<p class="fr-note">${note}</p>` : ''}${inner}</div></section>`;
+// open/closed sections are remembered on this device
+const FR_CLOSED_KEY = 'gm_fr_closed';
+function frClosed() { try { return new Set(JSON.parse(localStorage.getItem(FR_CLOSED_KEY) || '[]')); } catch (e) { return new Set(); } }
+function frApplyClosed() {
+  const shut = frClosed();
+  document.querySelectorAll('#fr-body .fr-sec').forEach(sc => { const c = shut.has(sc.dataset.k); sc.classList.toggle('closed', c); sc.querySelector('.fr-tog').setAttribute('aria-expanded', String(!c)); });
+}
+function frSetAll(open) {
+  const keys = [...document.querySelectorAll('#fr-body .fr-sec')].map(sc => sc.dataset.k);
+  try { localStorage.setItem(FR_CLOSED_KEY, JSON.stringify(open ? [] : keys)); } catch (e) {}
+  frApplyClosed();
+}
+document.addEventListener('click', e => {
+  const b = e.target.closest('#fr-body .fr-tog'); if (!b) return;
+  const sc = b.closest('.fr-sec'), shut = frClosed();
+  sc.classList.toggle('closed');
+  sc.classList.contains('closed') ? shut.add(sc.dataset.k) : shut.delete(sc.dataset.k);
+  b.setAttribute('aria-expanded', String(!sc.classList.contains('closed')));
+  try { localStorage.setItem(FR_CLOSED_KEY, JSON.stringify([...shut])); } catch (e) {}
+});
 const PAY = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'جزئي (نقدي + بنك + دين)' };
 const TYPE = { sale: 'بيع', return: 'مرتجع', buyTrader: 'شراء من تاجر', buyRetail: 'شراء من فرد' };
 
@@ -177,6 +226,7 @@ async function load(r) {
   body.innerHTML = '<div class="py-10 text-center text-sm" style="color:#6B6150;">جارِ تجهيز التقرير...</div>';
   try {
     body.innerHTML = await build(from, to);
+    frApplyClosed();
   } catch (e) {
     body.innerHTML = `<div class="fr-card text-sm" style="color:#b3261e;">تعذّر تجهيز التقرير: ${esc(e.message || e)}</div>`;
   }
@@ -345,13 +395,13 @@ async function build(from, to) {
   let h = '';
   // profit line: sales → profit − expenses = net. Purchases are their own item
   // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
-  const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px]" style="color:#6B6150;">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px]" style="color:#6B6150;">${t[4]}</div>` : ''}</div>`;
+  const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px] fr-mut">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px] fr-mut">${t[4]}</div>` : ''}</div>`;
   const tiles = canProfit
     ? [['صافي المبيعات', money(netSales), ''], ['ربح المبيعات' + (wsProfit ? ' (زبائن + جملة)' : ''), money(salesProfitAll), cls(salesProfitAll)],
        ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات' + (wsProfit ? ' + ربح الجملة' : '') + (scrapProfit ? ' + ربح الكسر' : '') + ' − المصاريف' + (discTotal ? ' − خصومات الديون' : '') + (trDiscShop || trDiscTrader ? ' ± خصومات التجار' : ''), money(netProfit), cls(netProfit)]]
     : [['صافي المبيعات', money(netSales), ''], ['المصاريف', money(expTotal), '']];
   tiles.push(['المشتريات', money(buysTotal), '', 'col-span-2', 'بند مستقل — لا تُخصم من الربح (شراء ذهب يدخل المخزن)']);
-  h += `<div class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
+  h += `<div id="fr-tiles" class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
 
   h += sec('point_of_sale', 'المبيعات', `<table class="fr-t">
     ${row('عدد فواتير البيع', sales.length)}

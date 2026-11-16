@@ -125,3 +125,20 @@ test('financial report: weights sold to people / traders, made from scrap, scrap
     expect(errs).toEqual([]);
   } finally { db.trader_movements = []; db.gold_stock_lots = []; db.piece_lot_draws = []; db.pieces = []; db.stock_voucher_lines = []; }
 });
+
+// sections open/close with their arrow, the choice is remembered; printing shows them all (بشار 2026-11-16)
+test('financial report: a section closes with its arrow and stays closed after reload', async ({ page }) => {
+  const errs = await setup(page);
+  await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
+  await page.goto('/financial-report-ar.html');
+  const sales = page.locator('#fr-body .fr-sec[data-k="المبيعات"]');
+  await expect(sales.locator('.fr-in')).toBeVisible();
+  await sales.locator('.fr-tog').click();
+  await expect(sales).toHaveClass(/\bclosed\b/);
+  await expect(sales.locator('.fr-in')).toBeHidden();
+  await page.reload();
+  await expect(page.locator('#fr-body .fr-sec[data-k="المبيعات"]')).toHaveClass(/\bclosed\b/);
+  await page.getByText('فتح الكل').click();
+  await expect(page.locator('#fr-body .fr-sec.closed')).toHaveCount(0);
+  expect(errs).toEqual([]);
+});
