@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#0f172a"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>كشف صندوق الكسر | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="supabase-config.js?v=56"></script>
+<script src="theme.js?v=96"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = { darkMode: "class", theme: { extend: {
+          "colors": {
+                  "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+                  "error": "#ba1a1a", "on-secondary": "#ffffff",
+                  "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)", "on-primary": "var(--gm-on-primary)",
+                  "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)", "surface-container-lowest": "var(--gm-surface-lowest)",
+                  "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "on-background": "var(--gm-on-primary)", "outline": "#76777d"
+          },
+          "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"] },
+          "spacing": { "margin-desktop": "40px", "margin-mobile": "16px", "container-max": "1100px" }
+        } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { min-height: max(884px, 100dvh); }
+    .sb-num { font-family: 'IBM Plex Sans', sans-serif; direction: ltr; white-space: nowrap; }
+    .sb-row { display: grid; grid-template-columns: 1fr auto auto; gap: 4px 14px; align-items: center; width: 100%; text-align: right;
+      padding: 12px 16px; border-bottom: 1px solid var(--gm-outline-variant); background: transparent; }
+    .sb-row:last-child { border-bottom: 0; }
+    .sb-row .t { font-weight: 700; font-size: 13.5px; }
+    .sb-row .s { font-size: 11.5px; color: var(--gm-on-surface-variant); }
+    .sb-row .g { font-weight: 700; font-size: 14.5px; }
+    .sb-row .b { font-size: 11.5px; color: var(--gm-on-surface-variant); min-width: 84px; text-align: left; }
+    .sb-in { color: #15803d; } .sb-out { color: #b42318; }
+    button.sb-row { cursor: pointer; transition: transform .16s ease, box-shadow .16s ease; }
+    @media (hover: hover) { button.sb-row:hover { transform: scale(1.01); box-shadow: 0 8px 20px -8px rgba(0,0,0,.35), inset 0 0 0 1.5px var(--gm-primary); position: relative; z-index: 1; } }
+    .sb-tag { display: inline-flex; align-items: center; gap: 2px; font-size: 10.5px; font-weight: 600; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--gm-outline-variant); margin-inline-start: 6px; }
+    @media print { .no-print { display: none !important; } header { position: static !important; } body { background: #fff !important; min-height: 0; } }
+</style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col overflow-x-hidden">
+<main class="flex-1 pb-24 md:pb-8 flex flex-col">
+<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full h-16 sticky top-0 z-40 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<button onclick="gmSmartBack('inventory-list-ar.html')" class="no-print cursor-pointer active:opacity-80 font-bold min-w-[44px] min-h-[44px]" style="direction:ltr;font-size:32px;line-height:1;" aria-label="رجوع">&#8594;</button>
+<h1 class="font-headline-md text-[18px] font-bold text-primary">كشف صندوق الكسر</h1>
+</div>
+<button onclick="window.print()" class="no-print h-9 px-3 flex items-center gap-1 rounded-lg border border-outline-variant text-[12px] font-semibold"><span class="material-symbols-outlined">print</span> طباعة</button>
+</header>
+<div class="px-margin-mobile md:px-margin-desktop py-5 md:py-8 max-w-container-max mx-auto w-full space-y-4">
+
+<div class="no-print bg-surface-container-lowest border border-outline-variant rounded-xl p-4 grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
+<label class="block col-span-2 md:col-span-1"><span class="block text-[11px] font-semibold text-on-surface-variant mb-1">الصندوق</span>
+<select id="sb-box" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]"></select></label>
+<label class="block"><span class="block text-[11px] font-semibold text-on-surface-variant mb-1">من تاريخ</span>
+<input type="date" id="sb-from" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]"/></label>
+<label class="block"><span class="block text-[11px] font-semibold text-on-surface-variant mb-1">إلى تاريخ</span>
+<input type="date" id="sb-to" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]"/></label>
+<button onclick="sbRender()" class="col-span-2 md:col-span-1 h-11 bg-primary text-on-primary rounded-lg text-sm font-semibold">عرض</button>
+</div>
+
+<p id="sb-period" class="text-[13px] font-semibold text-on-surface-variant"></p>
+<div id="sb-tiles" class="grid grid-cols-2 md:grid-cols-4 gap-3"></div>
+<div id="sb-state" class="text-center text-on-surface-variant text-sm py-10">جارِ التحميل...</div>
+<section id="sb-list" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden"></section>
+<p class="no-print text-[11.5px] text-on-surface-variant">اضغط على أي حركة لفتحها. حركات التجار (تسكير ذهب، إخراج كسر، استلام) يُعدَّل وزنها من هنا مباشرة؛ الفواتير والقطع تُفتح في شاشتها.</p>
+</div>
+</main>
+
+<!-- one movement: details + edit -->
+<div id="sb-sheet" class="hidden fixed inset-0 bg-black/50 z-[60] items-end md:items-center justify-center" onclick="if (event.target === this) sbClose()">
+<div class="bg-surface-container-lowest text-on-surface w-full md:max-w-md rounded-t-2xl md:rounded-2xl p-5 space-y-3" role="dialog" aria-modal="true" aria-labelledby="sb-sh-title">
+<div class="flex items-start justify-between gap-3">
+<div><h3 id="sb-sh-title" class="font-bold text-[15px]"></h3><p id="sb-sh-sub" class="text-[12px] text-on-surface-variant mt-0.5"></p></div>
+<button onclick="sbClose()" class="min-w-[44px] min-h-[44px] flex items-center justify-center" aria-label="إغلاق"><span class="material-symbols-outlined">close</span></button>
+</div>
+<div id="sb-sh-body" class="space-y-3"></div>
+<p id="sb-sh-err" class="hidden text-error text-[12px]" role="alert"></p>
+</div>
+</div>
+
+<script>
+// Every gram in or out of one scrap box (كسر 18 / 21 / …), newest first with the balance after
+// each row (بشار 2026-11-16). Rows come from scrap_box_statement() — one row per document, so an
+// edited voucher shows its new weight in place. Trader vouchers are edited here (edit_scrap_movement).
+const w3 = n => (Math.round(Number(n || 0) * 1000) / 1000).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+const dayKey = d => new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Dubai' }).format(new Date(d));
+let SB = { rows: [], canEdit: false, open: null };
+
+async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const { data: me } = await goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  const perms = (me && me.permissions) || {}, owner = me && me.role === 'owner';
+  if (!(owner || perms.add_piece || perms.view_reports || perms.edit_traders)) { alert('ليس لديك صلاحية الدخول لهذه الشاشة.'); location.href = 'index-ar.html'; return; }
+  SB.canEdit = !!(owner || perms.edit_traders);
+  const { data: lots } = await goldmindClient.from('gold_stock_lots').select('box_name').eq('store_id', GOLDMIND_STORE_ID).like('box_name', 'كسر %');
+  const boxes = [...new Set((lots || []).map(l => (l.box_name || '').trim()).filter(b => /^كسر \d+$/.test(b)))]
+    .sort((a, b) => Number(a.split(' ')[1]) - Number(b.split(' ')[1]));
+  const sel = document.getElementById('sb-box');
+  if (!boxes.length) { document.getElementById('sb-state').textContent = 'لا توجد صناديق كسر بعد.'; return; }
+  sel.innerHTML = boxes.map(b => `<option value="${gmEscapeHtml(b)}">${gmEscapeHtml(b)}</option>`).join('');
+  const q = new URLSearchParams(location.search);
+  if (q.get('box') && boxes.includes(q.get('box'))) sel.value = q.get('box');
+  sel.addEventListener('change', () => { history.replaceState(null, '', '?box=' + encodeURIComponent(sel.value)); sbLoad(); });
+  sbLoad();
+}
+
+async function sbLoad() {
+  const box = document.getElementById('sb-box').value;
+  const st = document.getElementById('sb-state');
+  st.textContent = 'جارِ التحميل...'; st.classList.remove('hidden');
+  document.getElementById('sb-list').classList.add('hidden');
+  const { data, error } = await goldmindClient.rpc('scrap_box_statement', { p_store: GOLDMIND_STORE_ID, p_box: box });
+  if (error) { st.textContent = 'تعذّر التحميل: ' + error.message; return; }
+  // balance runs oldest → newest; the list shows newest on top
+  const rows = (data || []).map(r => ({ ...r, grams: Number(r.grams) }))
+    .sort((a, b) => new Date(a.at) - new Date(b.at) || (a.kind === 'opening') - (b.kind === 'opening'));
+  let run = 0; rows.forEach(r => { run = Math.round((run + r.grams) * 1000) / 1000; r.bal = run; });
+  SB.rows = rows;
+  sbRender();
+}
+
+function sbRender() {
+  const box = document.getElementById('sb-box').value;
+  const from = document.getElementById('sb-from').value, to = document.getElementById('sb-to').value;
+  const st = document.getElementById('sb-state'), list = document.getElementById('sb-list');
+  const inP = r => (!from || dayKey(r.at) >= from) && (!to || dayKey(r.at) <= to);
+  const shown = SB.rows.filter(inP);
+  const before = SB.rows.filter(r => from && dayKey(r.at) < from);
+  const opening = before.length ? before[before.length - 1].bal : 0;
+  const tin = shown.filter(r => r.grams > 0).reduce((s, r) => s + r.grams, 0), tout = -shown.filter(r => r.grams < 0).reduce((s, r) => s + r.grams, 0);
+  const now = SB.rows.length ? SB.rows[SB.rows.length - 1].bal : 0;
+  document.getElementById('sb-period').textContent = box + (from || to ? ' — من ' + (from ? from.split('-').reverse().join('/') : 'البداية') + ' إلى ' + (to ? to.split('-').reverse().join('/') : 'اليوم') : ' — كل الحركات');
+  const tile = (l, v, cls) => `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3"><div class="text-[11px] text-on-surface-variant mb-1">${l}</div><div class="font-bold text-[17px] sb-num ${cls || ''}" style="text-align:right">${v}</div></div>`;
+  document.getElementById('sb-tiles').innerHTML = (from ? tile('رصيد أول الفترة', w3(opening) + ' غ') : '') + tile('داخل', w3(tin) + ' غ', 'sb-in') + tile('صادر', w3(tout) + ' غ', 'sb-out') + tile('الرصيد الحالي', w3(now) + ' غ');
+  if (!shown.length) { st.textContent = 'لا توجد حركات في هذه الفترة.'; st.classList.remove('hidden'); list.classList.add('hidden'); return; }
+  st.classList.add('hidden');
+  list.innerHTML = [...shown].reverse().map(r => {
+    const i = SB.rows.indexOf(r);
+    const d = new Date(r.at).toLocaleDateString('en-GB', { timeZone: 'Asia/Dubai' });
+    const tag = r.editable && SB.canEdit ? '<span class="sb-tag"><span class="material-symbols-outlined" style="font-size:12px">edit</span>قابل للتعديل</span>' : '';
+    const clickable = r.kind !== 'opening' && r.kind !== 'other' && r.kind !== 'lot';
+    const inner = `<span class="min-w-0"><span class="t block truncate">${gmEscapeHtml(r.title || '')}${tag}</span><span class="s block truncate">${d}${r.sub ? ' · ' + gmEscapeHtml(r.sub) : ''}</span></span>
+      <span class="g sb-num ${r.grams > 0 ? 'sb-in' : 'sb-out'}">${r.grams > 0 ? '+' : '−'}${w3(Math.abs(r.grams))} غ</span>
+      <span class="b sb-num">الرصيد ${w3(r.bal)}</span>`;
+    return clickable ? `<button type="button" class="sb-row" data-i="${i}" onclick="sbOpen(${i})">${inner}</button>` : `<div class="sb-row">${inner}</div>`;
+  }).join('');
+  list.classList.remove('hidden');
+}
+
+function sbOpen(i) {
+  const r = SB.rows[i]; if (!r) return;
+  SB.open = r;
+  document.getElementById('sb-sh-title').textContent = r.title || '';
+  document.getElementById('sb-sh-sub').textContent = new Date(r.at).toLocaleDateString('en-GB', { timeZone: 'Asia/Dubai' }) + (r.sub ? ' · ' + r.sub : '') + ' · ' + (r.grams > 0 ? 'داخل ' : 'صادر ') + w3(Math.abs(r.grams)) + ' غ';
+  document.getElementById('sb-sh-err').classList.add('hidden');
+  const link = (href, icon, label) => `<a href="${href}" class="w-full h-11 border border-outline-variant rounded-lg text-[13px] font-semibold flex items-center justify-center gap-1"><span class="material-symbols-outlined">${icon}</span>${label}</a>`;
+  let body = '';
+  if (r.kind === 'trader') {
+    if (r.editable && SB.canEdit) {
+      const hint = r.source === 'scrap_given' ? 'الوزن الذي خرج من الصندوق للتاجر. يرجع الوزن القديم للصندوق ثم يُسحب الوزن الجديد.'
+        : r.source === 'settlement' ? 'الوزن الذي دخل الصندوق بعيار ' + (r.karat || '') + '. يتعدّل رصيد التاجر من الذهب معه.'
+        : 'الوزن المستلم من التاجر. يتعدّل حسابه معه.';
+      body += `<label class="block"><span class="block text-[12px] font-semibold text-on-surface-variant mb-1" for="sb-w">الوزن (غ)</span>
+        <input id="sb-w" type="number" inputmode="decimal" step="0.001" min="0.001" dir="ltr" value="${Math.abs(r.grams)}" class="w-full h-12 border border-outline-variant rounded-lg px-3 text-[16px] sb-num bg-transparent"/></label>
+        <p class="text-[11.5px] text-on-surface-variant">${hint}</p>
+        <button id="sb-save" onclick="sbSave()" class="w-full h-12 bg-primary text-on-primary rounded-lg text-[14px] font-bold">حفظ التعديل</button>`;
+    }
+    if (r.trader_id) body += link('ledger-ar.html?trader=' + encodeURIComponent(r.trader_id), 'account_balance_wallet', 'فتح حساب التاجر');
+  } else if (r.kind === 'invoice') body = link('invoice-print-ar.html?id=' + encodeURIComponent(r.ref_id), 'receipt_long', 'فتح الفاتورة');
+  else if (r.kind === 'piece') body = link('piece-edit-ar.html?id=' + encodeURIComponent(r.ref_id), 'diamond', 'فتح القطعة');
+  else if (r.kind === 'transfer') body = link('branch-transfers-ar.html', 'swap_horiz', 'فتح التحويلات بين الفروع');
+  document.getElementById('sb-sh-body').innerHTML = body || '<p class="text-[12.5px] text-on-surface-variant">لا يوجد سند لهذه الحركة.</p>';
+  const s = document.getElementById('sb-sheet'); s.classList.remove('hidden'); s.classList.add('flex');
+}
+function sbClose() { const s = document.getElementById('sb-sheet'); s.classList.add('hidden'); s.classList.remove('flex'); SB.open = null; }
+
+async function sbSave() {
+  const r = SB.open; if (!r) return;
+  const err = document.getElementById('sb-sh-err'); err.classList.add('hidden');
+  const w = Number(document.getElementById('sb-w').value);
+  if (!(w > 0) || w > 100000) { err.textContent = 'أدخل وزناً صحيحاً أكبر من صفر.'; err.classList.remove('hidden'); return; }
+  if (Math.abs(w - Math.abs(r.grams)) < 0.0005) { sbClose(); return; }
+  const btn = document.getElementById('sb-save'); btn.disabled = true; btn.textContent = 'جارِ الحفظ...';
+  const { error } = await goldmindClient.rpc('edit_scrap_movement', { p_movement: r.ref_id, p_weight: w, p_notes: null });
+  btn.disabled = false; btn.textContent = 'حفظ التعديل';
+  if (error) { err.textContent = 'تعذّر الحفظ: ' + error.message; err.classList.remove('hidden'); return; }
+  sbClose();
+  sbLoad();
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') sbClose(); });
+init();
+</script>
+</body></html>

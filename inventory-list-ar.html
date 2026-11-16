@@ -1044,7 +1044,9 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         }));
         const detail = document.getElementById('lot-detail');
         if (openLotBox && groups[openLotBox]) {
-            detail.innerHTML = groups[openLotBox].map(l => {
+            // a scrap box has a full in/out statement (بشار 2026-11-16)
+            const stmt = /^كسر \d+$/.test(openLotBox) ? `<a href="scrap-box-ar.html?box=${encodeURIComponent(openLotBox)}" class="flex items-center justify-between gap-2 px-4 min-h-[48px] font-bold text-[13.5px]" style="border-bottom:1px solid #E8E0CF;color:#8A6A1C;"><span class="flex items-center gap-2"><span class="material-symbols-outlined text-[20px]">receipt_long</span>كشف حركات ${gmEscapeHtml(openLotBox)} — الداخل والصادر وتعديلها</span><span class="material-symbols-outlined">chevron_left</span></a>` : '';
+            detail.innerHTML = stmt + groups[openLotBox].map(l => {
                 const num = LOT_INVOICES[l.source_invoice_id];
                 const d = gmFormatDateTime(l.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' });
                 const partial = Number(l.weight_grams_remaining) < Number(l.weight_grams_total);
