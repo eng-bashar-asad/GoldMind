@@ -135,6 +135,9 @@ test('customers on the computer: a table (largest debt first) and the picked cus
   const rows = page.locator('#list tr[data-id]');
   await expect(rows).toHaveCount(2);
   await expect(rows.first()).toHaveAttribute('data-id', 'c2');               // 900 before 100
+  await expect(page.locator('#list tr.on')).toHaveCount(0);                  // nothing picked until a click
+  await expect(page.locator('#cuSide')).toContainText('اضغط على عميل');
+  await rows.first().click();
   await expect(page.locator('#cuSide')).toContainText('هلا');
   await rows.nth(1).click();
   await expect(page.locator('#cuSide')).toContainText('سورية');

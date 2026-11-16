@@ -204,7 +204,8 @@ function balCell(b) {
 function renderTable(list) {
   const rows = list.slice().sort((a, b) => (BAL[b.id] || 0) - (BAL[a.id] || 0)).slice(0, 500);
   if (!rows.length) { document.getElementById('list').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>'; document.getElementById('cuSide').classList.add('hidden'); return; }
-  if (!PICK || !rows.some(c => c.id === PICK)) PICK = rows[0].id;
+  // no customer is picked until one is clicked (بشار 2026-11-16) — the side shows a hint instead
+  if (PICK && !rows.some(c => c.id === PICK)) PICK = null;
   document.getElementById('list').innerHTML = `<table class="cu-t"><thead><tr><th>العميل</th><th>الهاتف</th><th>آخر حركة</th><th>عمر الدين</th><th>ذهب</th><th style="text-align:left">الرصيد</th></tr></thead><tbody>` +
     rows.map(c => {
       const a = ageOf(c), g = GOLD[c.id] || 0;
@@ -220,7 +221,7 @@ function renderTable(list) {
 }
 function renderSide() {
   const c = CUSTOMERS.find(x => x.id === PICK), el = document.getElementById('cuSide');
-  if (!c) { el.classList.add('hidden'); return; }
+  if (!c) { el.classList.remove('hidden'); el.innerHTML = '<section class="cu-card text-center text-[13px] text-on-surface-variant py-8"><span class="material-symbols-outlined" style="font-size:32px;opacity:.6">touch_app</span><p class="mt-2">اضغط على عميل لعرض بطاقته هنا.</p><p class="mt-1 text-[12px]">الضغط مرتين يفتح حسابه الكامل.</p></section>'; return; }
   const b = BAL[c.id] || 0, g = GOLD[c.id] || 0;
   const wa = c.phone ? gmWhatsAppUrl(c.phone, null, 'مرحباً ' + c.name + '، رصيد حسابكم لدينا: ' + fmt(Math.abs(b)) + ' ' + CUR) : '';
   const LBL = { payment: 'دفعة', discount: 'خصم على الدين', cash_out: 'صرف مبلغ', deposit: 'عربون', deposit_refund: 'استرجاع عربون', opening_balance: 'رصيد سابق' };
