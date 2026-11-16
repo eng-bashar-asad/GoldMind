@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict vjsKayivBVEdOzJJcubS2V5huznGYcUmXkyAx7Fd2Na7l7zAfezxvvZtKzMV5Ua
+\restrict VRaeOOFuh37iq75pGH6dp55IywxxpX9WbVDyOY8Xj3GqhluIYbJkieNh5FBebHa
 
 
 SET statement_timeout = 0;
@@ -4301,6 +4301,29 @@ $$;
 
 
 --
+-- Name: rename_auth_device(text, uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.rename_auth_device(p_kind text, p_id uuid, p_name text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare n text := nullif(left(trim(regexp_replace(coalesce(p_name, ''), '[<>]', '', 'g')), 60), '');
+begin
+  if auth.uid() is null then raise exception 'سجّل الدخول أولاً' using errcode = '42501'; end if;
+  if n is null then raise exception 'اكتب اسماً للجهاز'; end if;
+  if p_kind = 'auth_device_keys' then
+    update auth_device_keys set device_name = n where id = p_id and user_id = auth.uid();
+  elsif p_kind = 'auth_passkeys' then
+    update auth_passkeys set device_name = n where id = p_id and user_id = auth.uid();
+  else
+    raise exception 'نوع غير معروف';
+  end if;
+  if not found then raise exception 'الجهاز غير موجود'; end if;
+end $$;
+
+
+--
 -- Name: replace_piece_chip(uuid, text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5537,6 +5560,51 @@ end $$;
 
 
 --
+-- Name: trader_give_stock_voucher(uuid, jsonb, jsonb, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trader_give_stock_voucher(p_trader uuid, p_rows jsonb DEFAULT '[]'::jsonb, p_scrap jsonb DEFAULT '[]'::jsonb, p_batch uuid DEFAULT NULL::uuid) RETURNS jsonb
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+declare s jsonb; r jsonb; pids uuid[]; sid uuid; n int := 0;
+begin
+  if coalesce(jsonb_array_length(p_rows), 0) + coalesce(jsonb_array_length(p_scrap), 0) = 0 then raise exception 'السند فارغ'; end if;
+  select store_id into sid from traders where id = p_trader;
+  if sid is null then raise exception 'التاجر غير موجود'; end if;
+
+  for s in select * from jsonb_array_elements(coalesce(p_scrap, '[]')) loop
+    r := give_scrap_to_trader(p_trader, (s->>'karat')::int, (s->>'weight')::numeric, nullif(s->>'notes', ''));
+    update trader_movements set batch_id = p_batch where id = (r->>'id')::uuid;
+    n := n + 1;
+  end loop;
+
+  if coalesce(jsonb_array_length(p_rows), 0) > 0 then
+    if exists (select 1 from jsonb_array_elements(p_rows) e where (e->>'trader_id')::uuid is distinct from p_trader or e->>'source' <> 'stock_given') then
+      raise exception 'سطر لا يخص هذا التاجر';
+    end if;
+    insert into trader_movements (batch_id, store_id, trader_id, piece_id, movement_type, weight_grams, karat, accounting_weight_grams,
+      gold_24k_equivalent, fab_fee_per_gram, fab_fee_amount, sale_cost, cost_fab_per_gram, source, notes)
+    select p_batch, x.store_id, x.trader_id, x.piece_id, x.movement_type, x.weight_grams, x.karat, x.accounting_weight_grams,
+      x.gold_24k_equivalent, x.fab_fee_per_gram, x.fab_fee_amount, x.sale_cost, x.cost_fab_per_gram, x.source, x.notes
+    from jsonb_to_recordset(p_rows) as x(store_id uuid, trader_id uuid, piece_id uuid, movement_type text, weight_grams numeric, karat int,
+      accounting_weight_grams numeric, gold_24k_equivalent numeric, fab_fee_per_gram numeric, fab_fee_amount numeric, sale_cost numeric,
+      cost_fab_per_gram numeric, source text, notes text);
+    n := n + jsonb_array_length(p_rows);
+
+    select array_agg((e->>'piece_id')::uuid) into pids from jsonb_array_elements(p_rows) e where nullif(e->>'piece_id', '') is not null;
+    if pids is not null then
+      update pieces set status = 'given_to_trader' where id = any(pids) and store_id = sid;
+      insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+      select sid, unnest(pids), 'given_to_trader', 'إعطاء بضاعة للتاجر',
+             (select id from staff where user_id = auth.uid() and store_id = sid limit 1);
+    end if;
+  end if;
+  return jsonb_build_object('ok', true, 'lines', n);
+end $$;
+
+
+--
 -- Name: trader_gold_to_cash(uuid, numeric, integer, numeric, text, text); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5561,6 +5629,57 @@ begin
     (t.store_id, t.id, case when p_direction = 'we_owe_gold' then 'debt_decrease' else 'debt_increase' end, w, k, g24, 0, 'gold_to_cash', note, ref, me),
     (t.store_id, t.id, case when p_direction = 'we_owe_gold' then 'debt_increase' else 'debt_decrease' end, 0, null, 0, cash, 'gold_to_cash', note, ref, me);
   return cash;
+end $$;
+
+
+--
+-- Name: trader_gold_to_cash_delete_pair(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trader_gold_to_cash_delete_pair() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+begin
+  if old.source = 'gold_to_cash' and old.batch_ref is not null then
+    delete from trader_movements
+     where trader_id = old.trader_id and source = 'gold_to_cash' and batch_ref = old.batch_ref and id <> old.id;
+  end if;
+  return old;
+end $$;
+
+
+--
+-- Name: trader_receive_piece(uuid, uuid, numeric, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trader_receive_piece(p_trader uuid, p_piece uuid, p_vat_rate numeric DEFAULT 0, p_batch uuid DEFAULT NULL::uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare t record; pc record; me uuid; aw numeric; fab numeric; vat numeric := coalesce(p_vat_rate, 0); mid uuid;
+begin
+  select id, gm_acting_store(store_id) as store_id, name into t from traders where id = p_trader;
+  if t is null then raise exception 'التاجر غير موجود'; end if;
+  if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+  select id, store_id, barcode, weight_grams, accounting_weight_grams, karat, cost_fabrication_per_gram into pc from pieces where id = p_piece;
+  if pc is null or pc.store_id <> t.store_id then raise exception 'القطعة غير موجودة'; end if;
+  if pc.karat not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+  if vat < 0 or vat > 100 then raise exception 'نسبة ضريبة غير صحيحة'; end if;
+  if exists (select 1 from trader_movements where piece_id = p_piece and source = 'stock_received') then
+    raise exception 'القطعة مسجّلة على حساب تاجر مسبقاً';
+  end if;
+  aw := coalesce(nullif(pc.accounting_weight_grams, 0), pc.weight_grams);
+  fab := greatest(coalesce(pc.cost_fabrication_per_gram, 0), 0);
+  select id into me from staff where user_id = auth.uid() and store_id = t.store_id limit 1;
+  insert into trader_movements (store_id, trader_id, movement_type, weight_grams, karat, gold_24k_equivalent, accounting_weight_grams,
+    fab_fee_per_gram, fab_fee_amount, source, batch_id, notes, created_by, piece_id)
+  values (t.store_id, t.id, 'debt_increase', pc.weight_grams, pc.karat, round(aw * pc.karat / 24.0, 3), aw, fab, round(aw * fab * (1 + vat / 100), 2),
+    'stock_received', p_batch, 'استلام بضاعة من التاجر — باركود ' || pc.barcode, me, pc.id)
+  returning id into mid;
+  insert into piece_movements (store_id, piece_id, event_type, note, created_by)
+  values (t.store_id, pc.id, 'stock_in', 'استلام من التاجر ' || t.name, me);
+  return jsonb_build_object('ok', true, 'movement_id', mid);
 end $$;
 
 
@@ -9574,6 +9693,13 @@ CREATE TRIGGER trg_gold_prices_currency_guard BEFORE INSERT OR UPDATE OF price_p
 
 
 --
+-- Name: trader_movements trg_gold_to_cash_delete_pair; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_gold_to_cash_delete_pair AFTER DELETE ON public.trader_movements FOR EACH ROW WHEN ((old.source = 'gold_to_cash'::text)) EXECUTE FUNCTION public.trader_gold_to_cash_delete_pair();
+
+
+--
 -- Name: invoices trg_invoice_bank_part_sync; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -13355,6 +13481,15 @@ GRANT ALL ON FUNCTION public.register_new_company(company_name text, terms_accep
 
 
 --
+-- Name: FUNCTION rename_auth_device(p_kind text, p_id uuid, p_name text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.rename_auth_device(p_kind text, p_id uuid, p_name text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.rename_auth_device(p_kind text, p_id uuid, p_name text) TO authenticated;
+GRANT ALL ON FUNCTION public.rename_auth_device(p_kind text, p_id uuid, p_name text) TO service_role;
+
+
+--
 -- Name: FUNCTION replace_piece_chip(p_piece_id uuid, p_old_epc text, p_new_epc text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -13667,12 +13802,39 @@ GRANT ALL ON FUNCTION public.trader_discount(p_trader uuid, p_for text, p_amount
 
 
 --
+-- Name: FUNCTION trader_give_stock_voucher(p_trader uuid, p_rows jsonb, p_scrap jsonb, p_batch uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.trader_give_stock_voucher(p_trader uuid, p_rows jsonb, p_scrap jsonb, p_batch uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.trader_give_stock_voucher(p_trader uuid, p_rows jsonb, p_scrap jsonb, p_batch uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.trader_give_stock_voucher(p_trader uuid, p_rows jsonb, p_scrap jsonb, p_batch uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text); Type: ACL; Schema: public; Owner: -
 --
 
 REVOKE ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO authenticated;
 GRANT ALL ON FUNCTION public.trader_gold_to_cash(p_trader uuid, p_weight numeric, p_karat integer, p_price numeric, p_direction text, p_notes text) TO service_role;
+
+
+--
+-- Name: FUNCTION trader_gold_to_cash_delete_pair(); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.trader_gold_to_cash_delete_pair() FROM PUBLIC;
+GRANT ALL ON FUNCTION public.trader_gold_to_cash_delete_pair() TO authenticated;
+GRANT ALL ON FUNCTION public.trader_gold_to_cash_delete_pair() TO service_role;
+
+
+--
+-- Name: FUNCTION trader_receive_piece(p_trader uuid, p_piece uuid, p_vat_rate numeric, p_batch uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.trader_receive_piece(p_trader uuid, p_piece uuid, p_vat_rate numeric, p_batch uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.trader_receive_piece(p_trader uuid, p_piece uuid, p_vat_rate numeric, p_batch uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.trader_receive_piece(p_trader uuid, p_piece uuid, p_vat_rate numeric, p_batch uuid) TO service_role;
 
 
 --
@@ -14608,5 +14770,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict vjsKayivBVEdOzJJcubS2V5huznGYcUmXkyAx7Fd2Na7l7zAfezxvvZtKzMV5Ua
+\unrestrict VRaeOOFuh37iq75pGH6dp55IywxxpX9WbVDyOY8Xj3GqhluIYbJkieNh5FBebHa
 
