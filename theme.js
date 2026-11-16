@@ -444,23 +444,23 @@ const GOLDMIND_THEMES = {
   },
   'beige-marble': {
     // «الرخام البيج» (بشار 2026-11-16): warm beige marble with taupe and gold veins (theme-beige-marble.jpg),
-    // white cards in a thin gold frame, espresso words, gold accents. A light theme like the default.
+    // cream cards in a thin gold frame (darker sand canvas since 2026-11-16 so it is clearly apart from the default), espresso words, gold accents. A light theme like the default.
     label: 'الرخام البيج',
-    swatch: ['#EFE6D6', '#B8954A', '#2A2116'],
+    swatch: ['#CDB693', '#B8954A', '#2A2116'],
     lightCanvas: true,
     vars: {
-      '--gm-bg': '#EFE6D6',
-      '--gm-bg-elevated': '#EFE6D6',
-      '--gm-surface-lowest': '#FFFFFF',
-      '--gm-surface-low': '#F6EFE2',
+      '--gm-bg': '#CDB693',
+      '--gm-bg-elevated': '#CDB693',
+      '--gm-surface-lowest': '#FAF3E4',
+      '--gm-surface-low': '#F0E4CC',
       '--gm-primary': '#2A2116',
       '--gm-on-primary': '#F8F1E3',
       '--gm-accent': '#B8954A',
       '--gm-on-accent': '#FFFFFF',
       '--gm-secondary': '#8A6A2E',
       '--gm-on-surface': '#2A2116',
-      '--gm-on-surface-variant': '#6E6250',
-      '--gm-outline-variant': '#DCCDAE',
+      '--gm-on-surface-variant': '#5C503E',
+      '--gm-outline-variant': '#CBB58A',
       '--gm-shadow-color': 'rgba(90, 66, 26, 0.18)',
       '--gm-avatar-grad': 'linear-gradient(135deg, #8A6A2E 0%, #B8954A 55%, #E2C88A 100%)'
     }
@@ -594,19 +594,22 @@ const GOLDMIND_THEMES = {
 (function () {
   var T = 'html[data-gm-theme="beige-marble"]';
   var FRAME = 'rgba(184,149,74,.38)';
-  var BAR = 'linear-gradient(180deg,rgba(255,252,245,.96) 0%,rgba(248,241,228,.96) 100%)';
+  var BAR = 'linear-gradient(180deg,rgba(248,239,220,.96) 0%,rgba(238,226,202,.96) 100%)';
   var css = [
     '@media screen{',
-    T + ' body{background-color:#EFE6D6!important;background-image:url("theme-beige-marble.jpg")!important;background-size:900px 900px!important;background-repeat:repeat!important}',
+    T + ' body{background-color:#CDB693!important;background-image:url("theme-beige-marble.jpg?v=2")!important;background-size:900px 900px!important;background-repeat:repeat!important}',
     T + ' .dsk-app{--dsk-bg:transparent!important}',
     T + ' header:is(.bg-surface-container-lowest,.bg-surface,.bg-background,.bg-white){background:' + BAR + '!important;border-bottom:1px solid rgba(184,149,74,.55)!important}',
     T + ' :is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white):not(input):not(select):not(textarea):not(button)' +
-      '{border:1px solid ' + FRAME + '!important;box-shadow:0 10px 26px -18px rgba(90,66,26,.45),inset 0 1px 0 #fff!important}',
+      '{border:1px solid ' + FRAME + '!important;box-shadow:0 10px 26px -18px rgba(90,66,26,.55),inset 0 1px 0 rgba(255,255,255,.7)!important}',
     T + ' button:is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white){border:1px solid ' + FRAME + '!important}',
     T + ' nav.gm-bottom-tabs{border-top:1px solid rgba(184,149,74,.55)!important}',
-    T + ' :is(thead,th){background-color:#F3EADA}',
+    T + ' :is(thead,th){background-color:#EDE0C5}',
+    // words written straight on the sand marble: deep espresso-gold so they read on the darker canvas
+    T + ' .gm-on-canvas{color:#3E2C10!important;-webkit-text-fill-color:#3E2C10!important;background-image:none!important;text-shadow:0 1px 0 rgba(255,248,232,.55)!important}',
+    T + ' .text-secondary{color:#6E5220!important}',
     // «زجاجية» mode paints its own art behind frosted cards — here the marble is that background
-    T + '.gm-glass.gm-light-canvas{background:#EFE6D6 url("theme-beige-marble.jpg") repeat 0 0/900px 900px!important}',
+    T + '.gm-glass.gm-light-canvas{background:#CDB693 url("theme-beige-marble.jpg?v=2") repeat 0 0/900px 900px!important}',
     T + '.gm-glass.gm-light-canvas #gmGlassBg{display:none!important}',
     T + '.gm-glass.gm-light-canvas :is(.bg-surface-container-lowest,.bg-white):is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):not(input):not(select):not(textarea){border-color:' + FRAME + '!important}',
     '}'
@@ -723,7 +726,15 @@ gmEnsureStatShimmerStyle();
     for (let e = el; e && e !== document.documentElement; e = e.parentElement) {
       const cs = getComputedStyle(e);
       if (e === el && /text/.test(cs.webkitBackgroundClip || cs.backgroundClip || '')) continue; // a gradient word: its "background" is its ink
-      if (cs.backgroundImage && cs.backgroundImage !== 'none' && e !== document.body) return null; // gradient / picture: can't judge (a textured page canvas counts as its colour)
+      if (cs.backgroundImage && cs.backgroundImage !== 'none' && e !== document.body) {
+        // a colour gradient (a card or button painted by the theme): judge by the average of its colours
+        if (/url\(/.test(cs.backgroundImage)) return null; // a picture: can't judge
+        const r = e.getBoundingClientRect();
+        if (r.width * r.height > innerWidth * innerHeight * .25) return null; // a big wrapper's wash: can't judge
+        const stops = (cs.backgroundImage.match(/rgba?\([^)]*\)|color\([^)]*\)/g) || []).map(rgb).filter(c => c && (c[3] === undefined || c[3] > .5));
+        if (stops.length) return [0, 1, 2].map(i => stops.reduce((a, c) => a + c[i], 0) / stops.length);
+        return null;
+      }
       const c = rgb(cs.backgroundColor);
       if (c && (c[3] === undefined || c[3] > .6)) return c;
     }
@@ -732,9 +743,11 @@ gmEnsureStatShimmerStyle();
   function pass() {
     const dark = !document.documentElement.classList.contains('gm-light-canvas');
     const fixed = document.querySelectorAll('.gm-cfix-light, .gm-cfix-dark');
-    if (!dark) { fixed.forEach(e => e.classList.remove('gm-cfix-light', 'gm-cfix-dark')); return; }
-    // the gold-veined marble canvas is busy, so text on it needs more contrast than on a flat colour
-    const minR = document.documentElement.getAttribute('data-gm-theme') === 'black-marble' ? 3.2 : 1.8;
+    if (!dark) { fixed.forEach(e => e.classList.remove('gm-cfix-light', 'gm-cfix-dark')); return; } // light themes are designed by hand
+    // every word must read (بشار 2026-11-16): dark themes need a clear contrast, the gold-veined marble
+    // canvases a little more
+    const th = document.documentElement.getAttribute('data-gm-theme') || '';
+    const minR = /marble/.test(th) ? 3.6 : 3.0;
     const els = document.body ? document.body.getElementsByTagName('*') : [];
     for (let i = 0; i < els.length && i < 6000; i++) {
       const el = els[i];
@@ -749,14 +762,18 @@ gmEnsureStatShimmerStyle();
       if (fg && fg[3] !== undefined && fg[3] < .3 && /text/.test(ecs.webkitBackgroundClip || ecs.backgroundClip || '')) { const m = (ecs.backgroundImage || '').match(/rgba?\([^)]*\)/); fg = m ? rgb(m[0]) : null; }
       if (!fg || !bg || (fg[3] !== undefined && fg[3] < .3)) continue;
       const L1 = lum(fg), L2 = lum(bg);
-      if ((Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05) < minR) el.classList.add(L2 < .35 ? 'gm-cfix-light' : 'gm-cfix-dark');
+      if ((Math.max(L1, L2) + .05) / (Math.min(L1, L2) + .05) < minR) el.classList.add(L2 < .3 ? 'gm-cfix-light' : 'gm-cfix-dark');
     }
   }
   let t = null;
   const later = () => { clearTimeout(t); t = setTimeout(pass, 250); };
   function start() {
     later(); setTimeout(pass, 1500);
-    new MutationObserver(muts => { if (muts.some(m => m.type === 'childList' || (m.attributeName === 'class' && m.target === document.documentElement))) later(); })
+    new MutationObserver(muts => {
+      if (muts.some(m => m.attributeName === 'class' && m.target === document.documentElement))
+        document.querySelectorAll('.gm-cfix-light, .gm-cfix-dark').forEach(e => e.classList.remove('gm-cfix-light', 'gm-cfix-dark'));
+      if (muts.some(m => m.type === 'childList' || (m.attributeName === 'class' && m.target === document.documentElement))) later();
+    })
       .observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start); else start();
