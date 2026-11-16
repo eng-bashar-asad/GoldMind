@@ -2030,3 +2030,16 @@ function gmClosePhotoViewer() {
   };
   if (document.body) start(); else document.addEventListener('DOMContentLoaded', start);
 })();
+
+// Clickable table rows (بشار 2026-11-16): on hover the row keeps its own colours (no light fill that
+// hides light text on dark themes) and lifts out a little with a gold edge, so it reads as "open me".
+(function () {
+  var st = document.createElement('style');
+  st.id = 'gm-row-lift';
+  st.textContent = 'tr.gm-lift{transition:transform .18s ease,box-shadow .18s ease;transform-origin:center}' +
+    '@media (hover:hover){tr.gm-lift:hover{transform:scale(1.012) translateY(-1px);position:relative;z-index:1;' +
+    'box-shadow:0 10px 24px -8px rgba(0,0,0,.45),inset 0 0 0 1.5px var(--gm-primary,#D4AF37)}}' +
+    'tr.gm-lift:active{transform:scale(.996)}' +
+    '@media (prefers-reduced-motion:reduce){tr.gm-lift,tr.gm-lift:hover{transition:none;transform:none}}';
+  (document.head || document.documentElement).appendChild(st);
+})();
