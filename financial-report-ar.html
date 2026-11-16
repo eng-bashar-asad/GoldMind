@@ -188,7 +188,7 @@ async function build(from, to) {
   const S = FR.scope.ids(), q = () => goldmindClient;
   const inPeriod = (t) => t.gte('created_at', from).lt('created_at', to);
 
-  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR, givenR, scrapGivenR, scrapInR, madeR] = await Promise.all([
+  const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR, givenR, scrapGivenR, scrapInR, newPiecesR] = await Promise.all([
     gmFetchAllRows(() => inPeriod(q().from('invoices').select('id, store_id, invoice_number, type, payment_method, total_amount, amount_paid, cash_paid_amount, bank_paid_amount, created_at, counterparty_name').in('store_id', S).neq('status', 'cancelled')).order('created_at')),
     inPeriod(q().from('invoices').select('id', { count: 'exact', head: true }).in('store_id', S).eq('status', 'cancelled')),
     gmFetchAllRows(() => inPeriod(q().from('expense_entries').select('amount, description, category:category_id(name)').in('store_id', S))),
@@ -206,9 +206,9 @@ async function build(from, to) {
     gmFetchAllRows(() => inPeriod(q().from('trader_movements').select(GM_TRADER_GIVE_SELECT).in('store_id', S).eq('source', 'stock_given')).order('created_at').order('id')),
     gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('karat, weight_grams').in('store_id', S).eq('source', 'scrap_given')).order('id')),
     gmFetchAllRows(() => inPeriod(q().from('gold_stock_lots').select('karat, weight_grams_total, box_name').in('store_id', S).like('box_name', 'كسر %').or('trader_movement_id.not.is.null,trader_id.not.is.null')).order('id')),
-    gmFetchAllRows(() => inPeriod(q().from('piece_lot_draws').select('piece_id, lot:lot_id(box_name), piece:piece_id(karat, weight_grams)').in('store_id', S)).order('id'))
+    gmFetchAllRows(() => inPeriod(q().from('pieces').select('id, karat, weight_grams').in('store_id', S).neq('status', 'cancelled')).order('id'))
   ]);
-  for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, scrapGivenR, scrapInR, madeR]) if (x.error) throw x.error;
+  for (const x of [invR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, scrapGivenR, scrapInR, newPiecesR]) if (x.error) throw x.error;
 
   const invoices = invR.data;
   const byType = t => invoices.filter(i => i.type === t);
@@ -299,14 +299,28 @@ async function build(from, to) {
   const tBal = tmAllR.data.reduce((a, m) => a + (m.movement_type === 'debt_increase' ? -1 : 1) * Number(m.gold_24k_equivalent || 0), 0);
 
   // ---- weights moved in the period (see the «الذهب بالوزن» table)
-  const W = { trSold: {}, made: {}, scrapIn: {}, scrapOut: {} };
+  const W = { trSold: {}, made: {}, fromTr: {}, fresh: {}, scrapIn: {}, scrapOut: {} };
   const addW = (m, k, g) => { if (!k) return; m[k] = (m[k] || 0) + (Number(g) || 0); };
   (givenR.data || []).forEach(m => addW(W.trSold, m.karat, m.weight_grams));
   (scrapGivenR.data || []).forEach(m => addW(W.scrapOut, m.karat, m.weight_grams));
   (scrapInR.data || []).filter(l => /^كسر \d+$/.test((l.box_name || '').trim())).forEach(l => addW(W.scrapIn, l.karat, l.weight_grams_total));
-  const madePieces = new Map();
-  (madeR.data || []).forEach(d => { if (d.piece && d.lot && /^كسر \d+$/.test((d.lot.box_name || '').trim())) madePieces.set(d.piece_id, d.piece); });
-  madePieces.forEach(p => addW(W.made, p.karat, p.weight_grams));
+  // pieces entered in the period, by where they came from: made from a scrap box, from a trader's goods
+  // (received from him, or made from his bulk weight), or new goods entered by hand. A piece that only
+  // came back in from a modification (stock-in voucher) is not new goods and is left out.
+  const newPieces = newPiecesR.data || [], npIds = newPieces.map(p => p.id);
+  const [npDraws, npTrader, npBack] = npIds.length ? await Promise.all([
+    inChunks(npIds, ids => q().from('piece_lot_draws').select('piece_id, lot:lot_id(box_name)').in('piece_id', ids)),
+    inChunks(npIds, ids => q().from('trader_movements').select('piece_id').eq('source', 'stock_received').in('piece_id', ids)),
+    inChunks(npIds, ids => q().from('stock_voucher_lines').select('piece_id').eq('direction', 'in').in('piece_id', ids))
+  ]) : [[], [], []];
+  const fromScrap = new Set(npDraws.filter(d => d.lot && /^كسر \d+$/.test((d.lot.box_name || '').trim())).map(d => d.piece_id));
+  const fromTrader = new Set([...npDraws.map(d => d.piece_id), ...npTrader.map(m => m.piece_id)]);
+  const cameBack = new Set(npBack.map(l => l.piece_id));
+  newPieces.forEach(p => {
+    if (fromScrap.has(p.id)) addW(W.made, p.karat, p.weight_grams);
+    else if (fromTrader.has(p.id)) addW(W.fromTr, p.karat, p.weight_grams);
+    else if (!cameBack.has(p.id)) addW(W.fresh, p.karat, p.weight_grams);
+  });
 
   // ---- stock now
   // pieces (barcoded) and scrap/bulk gold without a barcode are shown apart, so the total matches the stock page + the scrap box
@@ -409,15 +423,15 @@ async function build(from, to) {
   }
   // weights moved in the period, per karat (بشار 2026-11-16): sold to individuals, sold to traders,
   // pieces made from scrap, scrap received from traders, scrap given to traders
-  const wk = Array.from(new Set([...Object.keys(soldByKarat), ...Object.keys(W.trSold), ...Object.keys(W.made), ...Object.keys(W.scrapIn), ...Object.keys(W.scrapOut)]))
+  const wk = Array.from(new Set([...Object.keys(soldByKarat), ...Object.keys(W.fresh), ...Object.keys(W.made), ...Object.keys(W.fromTr), ...Object.keys(W.trSold), ...Object.keys(W.scrapIn), ...Object.keys(W.scrapOut)]))
     .filter(k => k && k !== 'null' && k !== 'undefined').sort((a, b) => b - a);
-  const wcol = [k => (soldByKarat[k] || {}).g, k => W.trSold[k], k => W.made[k], k => W.scrapIn[k], k => W.scrapOut[k]];
+  const wcol = [k => W.fresh[k], k => W.made[k], k => W.fromTr[k], k => (soldByKarat[k] || {}).g, k => W.trSold[k], k => W.scrapIn[k], k => W.scrapOut[k]];
   const wsum = f => wk.reduce((a, k) => a + (Number(f(k)) || 0), 0);
   h += sec('diamond', 'الذهب بالوزن', wk.length ? `<div class="fr-wide"></div><table class="fr-t fr-tight">
-    <tr><th>العيار</th><th class="n">مباع للأفراد</th><th class="n">مباع للتجار</th><th class="n">قطع أُنتجت من الكسر</th><th class="n">كسر مستلم من التجار</th><th class="n">كسر مُعطى للتجار</th></tr>
+    <tr><th>العيار</th><th class="n">بضاعة جديدة مُدخلة</th><th class="n">قطع أُنتجت من الكسر</th><th class="n">قطع أُضيفت من بضاعة التجار</th><th class="n">مباع للأفراد</th><th class="n">مباع للتجار</th><th class="n">كسر مستلم من التجار</th><th class="n">كسر مُعطى للتجار</th></tr>
     ${wk.map(k => `<tr><td>${esc(k)}</td>${wcol.map(f => `<td class="n">${n2(f(k))}</td>`).join('')}</tr>`).join('')}
     ${wk.length > 1 ? `<tr class="tot"><td>المجموع</td>${wcol.map(f => `<td class="n">${n2(wsum(f))}</td>`).join('')}</tr>` : ''}
-  </table>` : '<p class="fr-note">لا توجد حركة ذهب في هذه الفترة.</p>', 'الأوزان بالغرام (الوزن القائم) خلال الفترة. «مباع للأفراد» من فواتير البيع بعد خصم المرتجعات، و«مباع للتجار» البضاعة المُخرجة للتجار على الحساب. «قطع أُنتجت من الكسر» وزن القطع المصنوعة من صناديق الكسر. «كسر مستلم من التجار» ما دخل صناديق الكسر من تسكير ذهب أو استلام، و«كسر مُعطى للتجار» ما خرج منها لهم.');
+  </table>` : '<p class="fr-note">لا توجد حركة ذهب في هذه الفترة.</p>', 'الأوزان بالغرام (الوزن القائم) خلال الفترة. «بضاعة جديدة مُدخلة» القطع المضافة يدوياً (لا تشمل القطع العائدة من التعديل)، و«قطع أُضيفت من بضاعة التجار» القطع المستلمة من التجار أو المصنوعة من وزنهم بالجملة. «مباع للأفراد» من فواتير البيع بعد خصم المرتجعات، و«مباع للتجار» البضاعة المُخرجة للتجار على الحساب. «قطع أُنتجت من الكسر» القطع المصنوعة من صناديق الكسر. «كسر مستلم من التجار» ما دخل صناديق الكسر من تسكير ذهب أو استلام، و«كسر مُعطى للتجار» ما خرج منها لهم.');
 
   if (document.getElementById('fr-show-list').checked && invoices.length) {
     h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<div class="fr-wide"></div><table class="fr-t">

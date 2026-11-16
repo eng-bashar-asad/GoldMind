@@ -106,17 +106,22 @@ test('financial report: weights sold to people / traders, made from scrap, scrap
   db.trader_movements = [{ store_id: STORE, source: 'stock_given', movement_type: 'debt_increase', karat: 18, weight_grams: 10, created_at: t },
     { store_id: STORE, source: 'scrap_given', movement_type: 'debt_decrease', karat: 21, weight_grams: 5, created_at: t }];
   db.gold_stock_lots = [{ store_id: STORE, karat: 18, box_name: 'كسر 18', weight_grams_total: 7, weight_grams_remaining: 7, trader_movement_id: 'm9', created_at: t }];
-  db.piece_lot_draws = [{ store_id: STORE, piece_id: 'p1', created_at: t, lot: { box_name: 'كسر 21' }, piece: { karat: 21, weight_grams: 8 } }];
+  // p1 made from scrap 21, p2 received from a trader, p3 entered by hand, p4 came back from a modification
+  db.pieces = [{ id: 'p1', store_id: STORE, karat: 21, weight_grams: 8, status: 'available', created_at: t }, { id: 'p2', store_id: STORE, karat: 18, weight_grams: 4, status: 'sold', created_at: t },
+    { id: 'p3', store_id: STORE, karat: 18, weight_grams: 6, status: 'available', created_at: t }, { id: 'p4', store_id: STORE, karat: 18, weight_grams: 9, status: 'available', created_at: t }];
+  db.piece_lot_draws = [{ store_id: STORE, piece_id: 'p1', created_at: t, lot: { box_name: 'كسر 21' } }];
+  db.trader_movements.push({ store_id: STORE, source: 'stock_received', movement_type: 'debt_increase', piece_id: 'p2', karat: 18, weight_grams: 4, created_at: t });
+  db.stock_voucher_lines = [{ store_id: STORE, piece_id: 'p4', direction: 'in' }];
   try {
     const errs = await setup(page);
     await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
     await page.goto('/financial-report-ar.html');
     await expect(page.locator('#fr-body')).toContainText('كسر مُعطى للتجار');
     const cells = k => page.locator('#fr-body tr').filter({ has: page.locator('td:first-child', { hasText: new RegExp('^' + k + '$') }) }).first().locator('td').allInnerTexts();
-    // karat | to people | to traders | made from scrap | scrap from traders | scrap to traders
-    expect((await cells(18)).slice(1)).toEqual(['15.03', '10.00', '0.00', '7.00', '0.00']) // 15.03 g sold to people comes from the shared fixture's sale;
-    expect((await cells(21)).slice(1)).toEqual(['0.00', '0.00', '8.00', '0.00', '5.00']);
+    // karat | new goods | made from scrap | from traders' goods | to people | to traders | scrap from traders | scrap to traders
+    expect((await cells(18)).slice(1)).toEqual(['6.00', '0.00', '4.00', '15.03', '10.00', '7.00', '0.00']); // 15.03 g sold to people: the shared fixture's sale
+    expect((await cells(21)).slice(1)).toEqual(['0.00', '8.00', '0.00', '0.00', '0.00', '0.00', '5.00']);
     await expect(page.locator('#fr-body')).not.toContainText('كسر بلا باركود');
     expect(errs).toEqual([]);
-  } finally { db.trader_movements = []; db.gold_stock_lots = []; db.piece_lot_draws = []; }
+  } finally { db.trader_movements = []; db.gold_stock_lots = []; db.piece_lot_draws = []; db.pieces = []; db.stock_voucher_lines = []; }
 });
