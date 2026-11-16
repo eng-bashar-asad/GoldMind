@@ -27,14 +27,42 @@ html, body { background-color: var(--gm-hero-bg) !important; }
 /* the form sits on the reflective floor, under the GoldMind wordmark */
 .gm-hero-spacer { height: calc(min(100vw, 560px) * .84); flex-shrink: 0; }
 body.gm-hero-page { justify-content: flex-start !important; }
-.glass-panel { background: rgba(10,11,15,.72) !important; border: 1px solid rgba(212,175,55,.28) !important; backdrop-filter: blur(10px); }
+/* sign-in card in the artwork's style (بشار 2026-11-16): black glass, bevelled gold frame, molten-gold buttons */
+.gm-hero-page .glass-panel { position: relative; background: linear-gradient(160deg, rgba(22,20,14,.86), rgba(6,7,10,.9) 55%, rgba(14,12,8,.9)) !important;
+  border: 1px solid transparent !important; backdrop-filter: blur(12px); border-radius: 18px !important;
+  box-shadow: 0 30px 80px -20px rgba(0,0,0,.9), 0 0 60px -25px rgba(232,190,90,.35), inset 0 1px 0 rgba(255,236,170,.12) !important; }
+.gm-hero-page .glass-panel::before { content: ""; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none;
+  background: linear-gradient(135deg, #FFF1B8, #C9982E 25%, #5E4312 50%, #E9C35E 75%, #8A6418);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
+.gm-hero-page .glass-panel h2 { font-size: 1.45rem; background: linear-gradient(180deg, #FFF3C4, #E7C25B 55%, #A87A1E); -webkit-background-clip: text; background-clip: text; color: transparent !important; }
+.gm-hero-page .gold-gradient { position: relative; overflow: hidden; color: #1A1206 !important; border-radius: 12px !important;
+  background: linear-gradient(180deg, #FCEBA6 0%, #E8C25A 38%, #C8962C 70%, #9C6F1B 100%) !important;
+  box-shadow: inset 0 1px 0 rgba(255,250,220,.85), inset 0 -2px 0 rgba(90,60,10,.45), 0 10px 26px -10px rgba(232,180,60,.6) !important; }
+.gm-hero-page .gold-gradient::after { content: ""; position: absolute; inset: 0; pointer-events: none;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,.55) 50%, transparent 60%); background-size: 260% 100%; animation: gmBtnShine 6s ease-in-out infinite; }
+@keyframes gmBtnShine { 0%, 70% { background-position: 130% 0; } 100% { background-position: -30% 0; } }
+.gm-hero-page .gm-btn-line { border-radius: 12px !important; color: #F3DC92 !important; border: 1px solid rgba(232,194,90,.55) !important;
+  background: linear-gradient(180deg, rgba(232,194,90,.10), rgba(232,194,90,.02)) !important; }
+.gm-hero-page .gm-btn-line:hover { background: linear-gradient(180deg, rgba(232,194,90,.18), rgba(232,194,90,.05)) !important; }
+.gm-hero-page .gm-bi { display: inline-flex; align-items: center; justify-content: center; gap: .6rem; }
+.gm-hero-page .gm-bi .material-symbols-outlined { font-size: 1.5rem; }
+.gm-hero-page input { border-radius: 10px; }
 @media (min-width: 1024px) and (min-aspect-ratio: 4/3) {
   /* computer: the artwork fills the left side, the login on the right */
-  .gm-hero { position: fixed; top: 50%; left: 0; width: min(62vw, 100vh); transform: translateY(-50%);
-    -webkit-mask-image: linear-gradient(to right, #000 72%, transparent 100%), linear-gradient(to bottom, #000 85%, transparent 100%);
-    -webkit-mask-composite: source-in; mask-image: linear-gradient(to right, #000 72%, transparent 100%), linear-gradient(to bottom, #000 85%, transparent 100%); mask-composite: intersect; }
+  /* artwork pulled in from the left edge so it sits nearer the middle and reads bigger */
+  .gm-hero { position: fixed; top: 50%; left: clamp(0px, 7vw, 130px); width: min(64vw, 104vh); transform: translateY(-50%);
+    -webkit-mask-image: linear-gradient(to right, transparent 0, #000 9%, #000 72%, transparent 100%), linear-gradient(to bottom, #000 85%, transparent 100%);
+    -webkit-mask-composite: source-in; mask-image: linear-gradient(to right, transparent 0, #000 9%, #000 72%, transparent 100%), linear-gradient(to bottom, #000 85%, transparent 100%); mask-composite: intersect; }
   body.gm-hero-page { justify-content: center !important; align-items: flex-start !important; padding-inline-start: max(4vw, 32px); }
   .gm-hero-spacer { display: none; }
+  /* the sign-in column is bigger on a computer so it matches the artwork */
+  body.gm-hero-page main { max-width: 520px !important; }
+  .gm-hero-page .glass-panel { padding: 2.75rem 2.5rem !important; }
+  .gm-hero-page .glass-panel h2 { font-size: 1.9rem; }
+  .gm-hero-page .glass-panel h2 + p { font-size: 1.05rem; }
+  .gm-hero-page .glass-panel .gm-bi { font-size: 1.2rem; }
+  .gm-hero-page .glass-panel button.py-5 { padding-block: 1.45rem; font-size: 1.3rem; }
+  .gm-hero-page main > .text-center p { font-size: 1.25rem; letter-spacing: .3px; color: #F1DE9E !important; }
 }
 @media (prefers-reduced-motion: reduce) {
   .gm-hero img, .gm-hero-shine, .gm-hero-glow, .gm-hero-sparks i { animation: none !important; }
