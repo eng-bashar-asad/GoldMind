@@ -1,0 +1,167 @@
+-- Customer receipt (دفعة من العميل) and payment (صرف للعميل): three ways (بشار 2026-11-16)
+--   cash  نقداً  — in/out of the daily box as before
+--   card  فيزا   — shown in the daily box (the amount, and a «فيزا» row the other way so the drawer
+--                  is unchanged), the money is booked in the bank box
+--   none  لا يدخل الصندوق اليومي — only the customer's account changes; no cash movement at all
+-- 'bank' is still accepted (old screens) and behaves as before.
+
+-- the daily-box rows for one customer/trader/expense cash movement
+create or replace function public.gm_cash_daily_rows(p_store uuid, p_kind text, p_method text, p_amount numeric, p_cur text,
+  p_op text, p_notes text, p_by uuid, p_cm uuid)
+returns void language plpgsql security definer set search_path = public as $$
+declare g text := 'card_' || substr(replace(p_cm::text, '-', ''), 1, 12);
+begin
+  if p_method = 'cash' then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
+    values (p_store, p_op, p_kind, p_amount, p_cur, p_notes, p_by, p_cm);
+  elsif p_method = 'card' then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id, link_group)
+    values (p_store, p_op || ' — فيزا', p_kind, p_amount, p_cur, p_notes, p_by, p_cm, g),
+           (p_store, 'فيزا / تحويل بنكي', case when p_kind = 'in' then 'out' else 'in' end, p_amount, p_cur,
+            'دُفع بالفيزا — لا يدخل الدرج', p_by, p_cm, g);
+  end if;
+end $$;
+revoke execute on function public.gm_cash_daily_rows(uuid, text, text, numeric, text, text, text, uuid, uuid) from public, anon, authenticated;
+
+create or replace function public.record_customer_payment(p_customer uuid, p_amount numeric, p_method text default 'cash', p_notes text default null, p_store uuid default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text; meth text := coalesce(p_method, 'cash'); cur text;
+begin
+  select id, store_id, name into c from customers where id = p_customer;
+  if c is null then raise exception 'العميل غير موجود'; end if;
+  st := coalesce(p_store, c.store_id);
+  if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
+  if not (has_permission('edit_customers', st) or has_permission('manage_daily_cashbox', st)) then
+    raise exception 'ليس لديك صلاحية تسجيل دفعات العملاء' using errcode = '42501';
+  end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  if meth not in ('cash', 'bank', 'card', 'none') then raise exception 'طريقة دفع غير معروفة'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
+  select coalesce(nullif(upper(currency), ''), 'AED') into cur from stores where id = st;
+  note := coalesce(nullif(trim(p_notes), ''), 'دفعة من العميل');
+  if meth <> 'none' then
+    insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (st, case when meth in ('bank', 'card') then 'bank' else 'main' end, 'in', amt,
+            'دفعة من العميل ' || c.name || case meth when 'bank' then ' (تحويل/بطاقة)' when 'card' then ' (فيزا)' else '' end, me)
+    returning id into cm;
+    perform gm_cash_daily_rows(st, 'in', meth, amt, cur, 'دفعة من عميل', c.name || ' — ' || note, me, cm);
+  else
+    note := note || ' (لا يدخل الصندوق اليومي)';
+  end if;
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+  values (st, c.id, 'debt_decrease', amt, 0, note, 'payment', me, cm);
+  return jsonb_build_object('ok', true);
+end $$;
+
+create or replace function public.customer_cash_out(p_customer uuid, p_amount numeric, p_method text default 'cash', p_notes text default null, p_store uuid default null)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text; meth text := coalesce(p_method, 'cash'); cur text;
+begin
+  select id, store_id, name into c from customers where id = p_customer;
+  if c is null then raise exception 'العميل غير موجود'; end if;
+  st := coalesce(p_store, c.store_id);
+  if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
+  if not (has_permission('edit_customers', st) or has_permission('manage_daily_cashbox', st)) then
+    raise exception 'ليس لديك صلاحية صرف مبالغ للعملاء' using errcode = '42501';
+  end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  if meth not in ('cash', 'bank', 'card', 'none') then raise exception 'طريقة دفع غير معروفة'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
+  select coalesce(nullif(upper(currency), ''), 'AED') into cur from stores where id = st;
+  note := coalesce(nullif(trim(p_notes), ''), 'صرف للعميل');
+  if meth <> 'none' then
+    insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (st, case when meth in ('bank', 'card') then 'bank' else 'main' end, 'out', amt,
+            'صرف للعميل ' || c.name || case meth when 'bank' then ' (تحويل/بطاقة)' when 'card' then ' (فيزا)' else '' end, me)
+    returning id into cm;
+    perform gm_cash_daily_rows(st, 'out', meth, amt, cur, 'صرف لعميل', c.name || ' — ' || note, me, cm);
+  else
+    note := note || ' (لا يدخل الصندوق اليومي)';
+  end if;
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+  values (st, c.id, 'debt_increase', amt, 0, note, 'cash_out', me, cm);
+  return jsonb_build_object('ok', true);
+end $$;
+
+-- the same three ways for a voucher in another currency (customer part); trader/expense unchanged
+create or replace function public.cash_voucher(p jsonb)
+returns jsonb language plpgsql security definer set search_path = public as $$
+declare sid uuid := (p->>'store_id')::uuid; kind text := p->>'kind'; party text := p->>'party';
+  pid uuid := nullif(p->>'party_id', '')::uuid; amt numeric := round(coalesce(nullif(p->>'amount', '')::numeric, 0), 2);
+  cur text := upper(coalesce(nullif(p->>'currency', ''), '')); rate numeric := nullif(p->>'fx_rate', '')::numeric;
+  method text := coalesce(nullif(p->>'method', ''), 'cash'); daily boolean := coalesce((p->>'daily')::boolean, true);
+  descr text := nullif(trim(p->>'notes'), ''); base_cur text; base_amt numeric; fx boolean; me uuid; cm uuid; c record; t record; cat record;
+  fxnote text := ''; note text; mid uuid; eid uuid;
+begin
+  if kind not in ('in', 'out') then raise exception 'نوع السند غير معروف'; end if;
+  if method not in ('cash', 'bank', 'card', 'none') or (method = 'none' and party <> 'customer') then raise exception 'طريقة دفع غير معروفة'; end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  if not is_store_member(sid) then raise exception 'ليس لديك صلاحية' using errcode = '42501'; end if;
+  select coalesce(nullif(upper(currency), ''), 'AED') into base_cur from stores where id = sid;
+  if cur = '' then cur := base_cur; end if;
+  fx := cur <> base_cur;
+  if fx then
+    if rate is null or rate <= 0 then raise exception 'أدخل سعر صرف % مقابل %', cur, base_cur; end if;
+    base_amt := round(amt / rate, 2);
+    fxnote := ' (' || trim(to_char(amt, 'FM999,999,999,990.00')) || ' ' || cur || ' بسعر ' || trim(to_char(rate, 'FM999,999,990.####')) || ')';
+  else
+    base_amt := amt;
+  end if;
+  select id into me from staff where user_id = auth.uid() and store_id = sid limit 1;
+
+  if party = 'customer' then
+    select id, store_id, name into c from customers where id = pid and store_id in (select org_store_ids(sid));
+    if c is null then raise exception 'اختر الزبون'; end if;
+    if not (has_permission('edit_customers', sid) or has_permission('manage_daily_cashbox', sid)) then raise exception 'ليس لديك صلاحية سندات الزبائن' using errcode = '42501'; end if;
+    note := coalesce(descr, case when kind = 'in' then 'دفعة من العميل' else 'صرف للعميل' end) || fxnote;
+    if method <> 'none' then
+      insert into cash_movements (store_id, box, direction, amount, description, created_by, fx_amount, fx_currency)
+        values (sid, case when method in ('bank', 'card') then 'bank' else 'main' end, kind, base_amt,
+                case when kind = 'in' then 'دفعة من العميل ' else 'صرف للعميل ' end || c.name
+                  || case method when 'bank' then ' (تحويل/بطاقة)' when 'card' then ' (فيزا)' else '' end,
+                me, case when fx then amt end, case when fx then cur end) returning id into cm;
+      if daily then
+        perform gm_cash_daily_rows(sid, kind, method, amt, cur, case when kind = 'in' then 'دفعة من عميل' else 'صرف لعميل' end, c.name || ' — ' || note, me, cm);
+      end if;
+    else
+      note := note || ' (لا يدخل الصندوق اليومي)';
+    end if;
+    insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+      values (sid, c.id, case when kind = 'in' then 'debt_decrease' else 'debt_increase' end, base_amt, 0, note,
+              case when kind = 'in' then 'payment' else 'cash_out' end, me, cm);
+
+  elsif party = 'trader' then
+    select id, store_id, name into t from traders where id = pid and store_id in (select org_store_ids(sid));
+    if t is null then raise exception 'اختر التاجر'; end if;
+    if not has_permission('edit_traders', sid) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+    note := coalesce(descr, case when kind = 'out' then 'صرف كاش للتاجر' else 'قبض كاش من التاجر' end) || fxnote;
+    insert into trader_movements (store_id, trader_id, movement_type, weight_grams, karat, gold_24k_equivalent, fab_fee_amount, source, notes, created_by)
+      values (sid, t.id, case when kind = 'out' then 'debt_decrease' else 'debt_increase' end, 0, null, 0, base_amt,
+              case when kind = 'out' then 'cash_out' else 'cash_in' end, note, me) returning id into mid;
+    insert into cash_movements (store_id, box, direction, amount, description, created_by, trader_movement_id, fx_amount, fx_currency)
+      values (sid, case when method in ('bank', 'card') then 'bank' else 'main' end, kind, base_amt,
+              case when kind = 'out' then 'صرف كاش للتاجر ' else 'قبض كاش من التاجر ' end || t.name, me, mid,
+              case when fx then amt end, case when fx then cur end) returning id into cm;
+    if daily then
+      perform gm_cash_daily_rows(sid, kind, method, amt, cur, case when kind = 'out' then 'صرف كاش لتاجر' else 'قبض كاش من تاجر' end, t.name || ' — ' || note, me, cm);
+    end if;
+
+  elsif party = 'expense' then
+    if kind <> 'out' then raise exception 'المصروف يكون سند صرف فقط'; end if;
+    if not gm_can_expense(sid) then raise exception 'ليس لديك صلاحية تسجيل المصاريف' using errcode = '42501'; end if;
+    select id, name into cat from expense_categories where id = nullif(p->>'category_id', '')::uuid and store_id = sid;
+    if cat is null then raise exception 'اختر نوع المصروف'; end if;
+    insert into expense_entries (store_id, category_id, amount, description, created_by)
+      values (sid, cat.id, base_amt, coalesce(descr, cat.name) || fxnote, me) returning id into eid;
+    insert into cash_movements (store_id, box, direction, amount, description, created_by, fx_amount, fx_currency)
+      values (sid, case when method in ('bank', 'card') then 'bank' else 'main' end, 'out', base_amt, 'مصروف ' || cat.name || coalesce(': ' || descr, '') || fxnote,
+              me, case when fx then amt end, case when fx then cur end) returning id into cm;
+    update expense_entries set cash_movement_id = cm where id = eid;
+    if daily then
+      perform gm_cash_daily_rows(sid, 'out', method, amt, cur, 'مصروف: ' || cat.name, coalesce(descr, '') || fxnote, me, cm);
+    end if;
+  else
+    raise exception 'اختر الطرف: زبون أو تاجر أو مصروف';
+  end if;
+  return jsonb_build_object('ok', true, 'cash_movement_id', cm, 'base_amount', base_amt, 'base_currency', base_cur);
+end $$;

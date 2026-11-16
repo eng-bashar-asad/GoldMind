@@ -52,3 +52,20 @@ test('expense payment, and trader voucher opened from the trader page', async ({
   await page.click('.seg.kind [data-kind="in"]');
   await expect(page.locator('.seg.party [data-party="expense"]')).toBeDisabled();
 });
+
+// customer receipt/payment by card, or kept out of the daily box (بشار 2026-11-16)
+test('customer voucher: «فيزا» and «خارج الصندوق»; «خارج الصندوق» is for customers only', async ({ page }) => {
+  const calls = await install(page, { generic: true, db: db(), rpc: { cash_voucher: () => ({ body: { ok: true } }) } });
+  page.on('dialog', d => d.accept());
+  await page.goto('/cash-voucher-ar.html');
+  await page.fill('#cv-who-search', 'حسن');
+  await page.fill('#cv-amount', '50');
+  await page.click('.seg.method [data-method="none"]');
+  await expect(page.locator('#cv-method-hint')).toContainText('حساب الزبون فقط');
+  await page.click('#cv-btn');
+  await expect(page.locator('#cv-ok')).toBeVisible();
+  expect(JSON.parse(calls.find(c => c.name === 'cash_voucher').body).p).toMatchObject({ party: 'customer', method: 'none', amount: 50 });
+  await page.click('.seg.party [data-party="trader"]');
+  await expect(page.locator('.seg.method [data-method="none"]')).toBeDisabled();
+  await expect(page.locator('.seg.method [data-method="cash"]')).toHaveClass(/\bon\b/);
+});

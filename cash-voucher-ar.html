@@ -38,6 +38,7 @@
     .seg { display: flex; border: 1px solid var(--gm-outline-variant); border-radius: 12px; overflow: hidden; }
     .seg button { flex: 1; height: 46px; font-size: 14px; font-weight: 700; background: var(--gm-surface-lowest); color: var(--gm-on-surface-variant); }
     .seg button.on { background: var(--gm-primary); color: var(--gm-on-primary); }
+    .seg.method button { font-size: 12.5px; padding-inline: 4px; line-height: 1.2; }
     .seg.kind button.on[data-kind="in"] { background: #3F6B47; color: #fff; }
     .seg.kind button.on[data-kind="out"] { background: #8A3B32; color: #fff; }
     .fld { width: 100%; height: 46px; border: 1px solid var(--gm-outline-variant); border-radius: 10px; padding: 0 12px; font-size: 15px; background: var(--gm-surface-lowest); color: var(--gm-on-surface); }
@@ -90,8 +91,11 @@
   <span class="lbl">طريقة الدفع</span>
   <div class="seg method">
     <button type="button" data-method="cash" class="on" onclick="cvMethod('cash')">نقدي (الصندوق)</button>
-    <button type="button" data-method="bank" onclick="cvMethod('bank')">تحويل / بطاقة</button>
+    <button type="button" data-method="card" onclick="cvMethod('card')">فيزا</button>
+    <button type="button" data-method="bank" onclick="cvMethod('bank')">تحويل بنكي</button>
+    <button type="button" data-method="none" onclick="cvMethod('none')">خارج الصندوق</button>
   </div>
+  <p id="cv-method-hint" class="text-[11.5px] text-on-surface-variant mt-1">يدخل أو يخرج من درج الصندوق اليومي.</p>
 
   <label class="lbl" for="cv-notes">ملاحظة</label>
   <input id="cv-notes" class="fld" placeholder="اختياري"/>
@@ -121,9 +125,20 @@ function cvParty(p) {
   CV.party = p; seg('party', 'party', p);
   document.getElementById('cv-who-lbl').textContent = { customer: 'الزبون', trader: 'التاجر', expense: 'نوع المصروف' }[p];
   document.getElementById('cv-who-search').value = '';
+  const none = document.querySelector('.seg.method [data-method="none"]');
+  none.disabled = p !== 'customer'; none.style.opacity = p === 'customer' ? 1 : .4;
+  if (p !== 'customer' && CV.method === 'none') cvMethod('cash');
   cvFillWho();
 }
-function cvMethod(m) { CV.method = m; seg('method', 'method', m); }
+// cash: in/out of the daily box · card: shown in the daily box, the drawer is unchanged · bank: not in the
+// daily box · none (customers only): only the customer's account changes (بشار 2026-11-16)
+const CV_METHOD_HINT = { cash: 'يدخل أو يخرج من درج الصندوق اليومي.', card: 'يظهر في الحركة اليومية مع سطر «فيزا» مقابل، ولا يغيّر رصيد الدرج.',
+  bank: 'تحويل إلى البنك — لا يظهر في الحركة اليومية.', none: 'لا يدخل الصندوق اليومي ولا البنك — يتغيّر حساب الزبون فقط.' };
+function cvMethod(m) {
+  if (m === 'none' && CV.party !== 'customer') m = 'cash';
+  CV.method = m; seg('method', 'method', m);
+  document.getElementById('cv-method-hint').textContent = CV_METHOD_HINT[m] || '';
+}
 function cvFillWho(selectId) {
   const q = document.getElementById('cv-who-search').value.trim().toLowerCase();
   const list = (CV.lists[CV.party] || []).filter(x => !q || (x.name || '').toLowerCase().includes(q) || (x.phone || '').includes(q));

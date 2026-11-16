@@ -37,3 +37,20 @@ test('a payment taken here is sent with this branch', async ({ page }) => {
   await expect.poll(() => calls.some(c => c.name === 'record_customer_payment')).toBe(true);
   expect(JSON.parse(calls.find(c => c.name === 'record_customer_payment').body)).toMatchObject({ p_customer: 'cu1', p_amount: 400, p_store: STORE });
 });
+
+// receipt by card / payment kept out of the daily box (بشار 2026-11-16)
+test('customer receipt and payment offer cash, card and «لا تدخل الصندوق اليومي»', async ({ page }) => {
+  const calls = await install(page, { db: db(), rpc: { org_branches: () => ({ body: branches }), record_customer_payment: () => ({ body: { ok: true } }), customer_cash_out: () => ({ body: { ok: true } }) } });
+  page.on('dialog', d => d.accept());
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/customer-debts-ar.html?open=cu1');
+  await expect(page.locator('#detail-customer-name')).not.toBeEmpty();
+  expect(await page.locator('#settle-method option').evaluateAll(o => o.map(x => x.value))).toEqual(['cash', 'card', 'none']);
+  expect(await page.locator('#cashout-method option').evaluateAll(o => o.map(x => x.value))).toEqual(['cash', 'card', 'none']);
+  await page.evaluate(() => toggleSettleForm());
+  await page.fill('#settle-amount', '400');
+  await page.selectOption('#settle-method', 'card');
+  await page.click('#settle-btn');
+  await expect.poll(() => calls.some(c => c.name === 'record_customer_payment')).toBe(true);
+  expect(JSON.parse(calls.find(c => c.name === 'record_customer_payment').body)).toMatchObject({ p_amount: 400, p_method: 'card' });
+});
