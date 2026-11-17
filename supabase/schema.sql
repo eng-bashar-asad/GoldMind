@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VRaeOOFuh37iq75pGH6dp55IywxxpX9WbVDyOY8Xj3GqhluIYbJkieNh5FBebHa
+\restrict DVahHajHb451eOEdNUbWRfPv3cXONfu6B5blzPwDdjUTcdgmE69vesQamlPkrez
 
 
 SET statement_timeout = 0;
@@ -654,9 +654,6 @@ CREATE FUNCTION public.cash_voucher(p jsonb) RETURNS jsonb
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
--- One receipt/payment voucher (سند قبض / سند صرف) for a customer, a trader or an expense,
--- in any currency: the account is kept in the store currency (amount ÷ rate), the cash box
--- gets the money in the currency it was actually paid in.
 declare sid uuid := (p->>'store_id')::uuid; kind text := p->>'kind'; party text := p->>'party';
   pid uuid := nullif(p->>'party_id', '')::uuid; amt numeric := round(coalesce(nullif(p->>'amount', '')::numeric, 0), 2);
   cur text := upper(coalesce(nullif(p->>'currency', ''), '')); rate numeric := nullif(p->>'fx_rate', '')::numeric;
@@ -665,7 +662,7 @@ declare sid uuid := (p->>'store_id')::uuid; kind text := p->>'kind'; party text 
   fxnote text := ''; note text; mid uuid; eid uuid;
 begin
   if kind not in ('in', 'out') then raise exception 'نوع السند غير معروف'; end if;
-  if method not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
+  if method not in ('cash', 'bank', 'card', 'none') or (method = 'none' and party <> 'customer') then raise exception 'طريقة دفع غير معروفة'; end if;
   if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
   if not is_store_member(sid) then raise exception 'ليس لديك صلاحية' using errcode = '42501'; end if;
   select coalesce(nullif(upper(currency), ''), 'AED') into base_cur from stores where id = sid;
@@ -685,13 +682,17 @@ begin
     if c is null then raise exception 'اختر الزبون'; end if;
     if not (has_permission('edit_customers', sid) or has_permission('manage_daily_cashbox', sid)) then raise exception 'ليس لديك صلاحية سندات الزبائن' using errcode = '42501'; end if;
     note := coalesce(descr, case when kind = 'in' then 'دفعة من العميل' else 'صرف للعميل' end) || fxnote;
-    insert into cash_movements (store_id, box, direction, amount, description, created_by, fx_amount, fx_currency)
-      values (sid, case when method = 'bank' then 'bank' else 'main' end, kind, base_amt,
-              case when kind = 'in' then 'دفعة من العميل ' else 'صرف للعميل ' end || c.name || case when method = 'bank' then ' (تحويل/بطاقة)' else '' end,
-              me, case when fx then amt end, case when fx then cur end) returning id into cm;
-    if method = 'cash' and daily then
-      insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
-        values (sid, case when kind = 'in' then 'دفعة من عميل' else 'صرف لعميل' end, kind, amt, cur, c.name || ' — ' || note, me, cm);
+    if method <> 'none' then
+      insert into cash_movements (store_id, box, direction, amount, description, created_by, fx_amount, fx_currency)
+        values (sid, case when method in ('bank', 'card') then 'bank' else 'main' end, kind, base_amt,
+                case when kind = 'in' then 'دفعة من العميل ' else 'صرف للعميل ' end || c.name
+                  || case method when 'bank' then ' (تحويل/بطاقة)' when 'card' then ' (فيزا)' else '' end,
+                me, case when fx then amt end, case when fx then cur end) returning id into cm;
+      if daily then
+        perform gm_cash_daily_rows(sid, kind, method, amt, cur, case when kind = 'in' then 'دفعة من عميل' else 'صرف لعميل' end, c.name || ' — ' || note, me, cm);
+      end if;
+    else
+      note := note || ' (لا يدخل الصندوق اليومي)';
     end if;
     insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
       values (sid, c.id, case when kind = 'in' then 'debt_decrease' else 'debt_increase' end, base_amt, 0, note,
@@ -706,12 +707,11 @@ begin
       values (sid, t.id, case when kind = 'out' then 'debt_decrease' else 'debt_increase' end, 0, null, 0, base_amt,
               case when kind = 'out' then 'cash_out' else 'cash_in' end, note, me) returning id into mid;
     insert into cash_movements (store_id, box, direction, amount, description, created_by, trader_movement_id, fx_amount, fx_currency)
-      values (sid, case when method = 'bank' then 'bank' else 'main' end, kind, base_amt,
+      values (sid, case when method in ('bank', 'card') then 'bank' else 'main' end, kind, base_amt,
               case when kind = 'out' then 'صرف كاش للتاجر ' else 'قبض كاش من التاجر ' end || t.name, me, mid,
               case when fx then amt end, case when fx then cur end) returning id into cm;
-    if method = 'cash' and daily then
-      insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
-        values (sid, case when kind = 'out' then 'صرف كاش لتاجر' else 'قبض كاش من تاجر' end, kind, amt, cur, t.name || ' — ' || note, me, cm);
+    if daily then
+      perform gm_cash_daily_rows(sid, kind, method, amt, cur, case when kind = 'out' then 'صرف كاش لتاجر' else 'قبض كاش من تاجر' end, t.name || ' — ' || note, me, cm);
     end if;
 
   elsif party = 'expense' then
@@ -722,12 +722,11 @@ begin
     insert into expense_entries (store_id, category_id, amount, description, created_by)
       values (sid, cat.id, base_amt, coalesce(descr, cat.name) || fxnote, me) returning id into eid;
     insert into cash_movements (store_id, box, direction, amount, description, created_by, fx_amount, fx_currency)
-      values (sid, case when method = 'bank' then 'bank' else 'main' end, 'out', base_amt, 'مصروف ' || cat.name || coalesce(': ' || descr, '') || fxnote,
+      values (sid, case when method in ('bank', 'card') then 'bank' else 'main' end, 'out', base_amt, 'مصروف ' || cat.name || coalesce(': ' || descr, '') || fxnote,
               me, case when fx then amt end, case when fx then cur end) returning id into cm;
     update expense_entries set cash_movement_id = cm where id = eid;
-    if method = 'cash' and daily then
-      insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
-        values (sid, 'مصروف: ' || cat.name, 'out', amt, cur, coalesce(descr, '') || fxnote, me, cm);
+    if daily then
+      perform gm_cash_daily_rows(sid, 'out', method, amt, cur, 'مصروف: ' || cat.name, coalesce(descr, '') || fxnote, me, cm);
     end if;
   else
     raise exception 'اختر الطرف: زبون أو تاجر أو مصروف';
@@ -1107,31 +1106,33 @@ CREATE FUNCTION public.customer_cash_out(p_customer uuid, p_amount numeric, p_me
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                                                                                                                                                                                                                                                                                                                                                                                                                         declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text;
-                                                                                                                                                                                                                                                                                                                                                                                                                         begin
-                                                                                                                                                                                                                                                                                                                                                                                                                           select id, store_id, name into c from customers where id = p_customer;
-                                                                                                                                                                                                                                                                                                                                                                                                                             if c is null then raise exception 'العميل غير موجود'; end if;
-                                                                                                                                                                                                                                                                                                                                                                                                                               st := coalesce(p_store, c.store_id);
-                                                                                                                                                                                                                                                                                                                                                                                                                                 if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
-                                                                                                                                                                                                                                                                                                                                                                                                                                   if not (has_permission('edit_customers', st) or has_permission('manage_daily_cashbox', st)) then
-                                                                                                                                                                                                                                                                                                                                                                                                                                       raise exception 'ليس لديك صلاحية صرف مبالغ للعملاء' using errcode = '42501';
-                                                                                                                                                                                                                                                                                                                                                                                                                                         end if;
-                                                                                                                                                                                                                                                                                                                                                                                                                                           if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
-                                                                                                                                                                                                                                                                                                                                                                                                                                             if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
-                                                                                                                                                                                                                                                                                                                                                                                                                                               select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                 note := coalesce(nullif(trim(p_notes), ''), 'صرف للعميل');
-                                                                                                                                                                                                                                                                                                                                                                                                                                                   insert into cash_movements (store_id, box, direction, amount, description, created_by)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                       values (st, case when p_method = 'bank' then 'bank' else 'main' end, 'out', amt,
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                   'صرف للعميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                       returning id into cm;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                         if coalesce(p_method, 'cash') = 'cash' then
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                             insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   values (st, 'صرف لعميل', 'out', amt, c.name || ' — ' || note, me, cm);
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     end if;
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           values (st, c.id, 'debt_increase', amt, 0, note, 'cash_out', me, cm);
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             return jsonb_build_object('ok', true);
-                                                                                                                                                                                                                                                                                                                                                                                                                                                                                             end $$;
+declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text; meth text := coalesce(p_method, 'cash'); cur text;
+begin
+  select id, store_id, name into c from customers where id = p_customer;
+  if c is null then raise exception 'العميل غير موجود'; end if;
+  st := coalesce(p_store, c.store_id);
+  if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
+  if not (has_permission('edit_customers', st) or has_permission('manage_daily_cashbox', st)) then
+    raise exception 'ليس لديك صلاحية صرف مبالغ للعملاء' using errcode = '42501';
+  end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  if meth not in ('cash', 'bank', 'card', 'none') then raise exception 'طريقة دفع غير معروفة'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
+  select coalesce(nullif(upper(currency), ''), 'AED') into cur from stores where id = st;
+  note := coalesce(nullif(trim(p_notes), ''), 'صرف للعميل');
+  if meth <> 'none' then
+    insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (st, case when meth in ('bank', 'card') then 'bank' else 'main' end, 'out', amt,
+            'صرف للعميل ' || c.name || case meth when 'bank' then ' (تحويل/بطاقة)' when 'card' then ' (فيزا)' else '' end, me)
+    returning id into cm;
+    perform gm_cash_daily_rows(st, 'out', meth, amt, cur, 'صرف لعميل', c.name || ' — ' || note, me, cm);
+  else
+    note := note || ' (لا يدخل الصندوق اليومي)';
+  end if;
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+  values (st, c.id, 'debt_increase', amt, 0, note, 'cash_out', me, cm);
+  return jsonb_build_object('ok', true);
+end $$;
 
 
 --
@@ -1383,6 +1384,66 @@ CREATE FUNCTION public.delete_last_sale_invoice(target_invoice_id uuid) RETURNS 
                                                                                                                                                                                                                                                                                                                                                                                               return inv.invoice_number;
                                                                                                                                                                                                                                                                                                                                                                                               end;
                                                                                                                                                                                                                                                                                                                                                                                               $_$;
+
+
+--
+-- Name: edit_scrap_movement(uuid, numeric, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.edit_scrap_movement(p_movement uuid, p_weight numeric, p_notes text DEFAULT NULL::text) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare m record; w numeric := round(coalesce(p_weight, 0), 3); lk int; d record; lot record; left_w numeric; take numeric; avail numeric;
+        aw numeric;
+begin
+  select * into m from trader_movements where id = p_movement for update;
+  if m.id is null then raise exception 'الحركة غير موجودة'; end if;
+  if not has_permission('edit_traders', m.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
+  if w <= 0 then raise exception 'أدخل وزناً صحيحاً'; end if;
+  perform gm_scrap_ref_set('trader', m.id);
+
+  if m.source = 'scrap_given' then
+    for d in select id, lot_id, grams from trader_scrap_draws where movement_id = m.id loop
+      update gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining + d.grams, 3) where id = d.lot_id;
+    end loop;
+    delete from trader_scrap_draws where movement_id = m.id;
+    select coalesce(sum(weight_grams_remaining), 0) into avail from gold_stock_lots
+     where store_id = m.store_id and box_name = 'كسر ' || m.karat and weight_grams_remaining > 0;
+    if w > avail + 0.0005 then raise exception 'الوزن أكبر من الموجود في صندوق كسر % (% غ)', m.karat, round(avail, 3); end if;
+    left_w := w;
+    for lot in select id, weight_grams_remaining rem from gold_stock_lots
+                where store_id = m.store_id and box_name = 'كسر ' || m.karat and weight_grams_remaining > 0
+                order by created_at, id for update loop
+      exit when left_w <= 0.0005;
+      take := least(lot.rem, left_w);
+      update gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining - take, 3) where id = lot.id;
+      insert into trader_scrap_draws (store_id, movement_id, lot_id, grams) values (m.store_id, m.id, lot.id, round(take, 3));
+      left_w := left_w - take;
+    end loop;
+    perform set_config('gm.scrap_regive', '1', true);
+    update trader_movements set weight_grams = w, accounting_weight_grams = w, gold_24k_equivalent = round(w * m.karat / 24.0, 3),
+      notes = format('إخراج كسر عيار %s: %s غ', m.karat, w)
+              || coalesce(' — ' || nullif(trim(coalesce(p_notes, substring(m.notes from ' — (.*)$'))), ''), '')
+     where id = m.id;
+    perform set_config('gm.scrap_regive', '', true);
+  elsif m.source = 'settlement' then
+    select karat into lk from gold_stock_lots where trader_movement_id = m.id limit 1;
+    if lk is null then raise exception 'هذه التسوية لم تُدخل ذهباً إلى صندوق'; end if;
+    update trader_movements set gold_24k_equivalent = round(w * lk / 24.0, 3),
+      weight_grams = round(w * lk / coalesce(nullif(m.karat, 0), lk), 3) where id = m.id;
+  elsif m.source = 'stock_received' and m.gold_stock_lot_id is not null then
+    aw := case when m.accounting_weight_grams is null or m.accounting_weight_grams = m.weight_grams then w
+               else round(m.accounting_weight_grams * w / nullif(m.weight_grams, 0), 3) end;
+    update trader_movements set weight_grams = w, accounting_weight_grams = aw,
+      gold_24k_equivalent = round(aw * m.karat / 24.0, 3), fab_fee_amount = round(aw * coalesce(fab_fee_per_gram, 0), 2) where id = m.id;
+  else
+    raise exception 'هذه الحركة لا تُعدَّل من هنا — افتح سندها';
+  end if;
+  if p_notes is not null and m.source <> 'scrap_given' then
+    update trader_movements set notes = nullif(trim(p_notes), '') where id = m.id;
+  end if;
+end $_$;
 
 
 --
@@ -1717,6 +1778,29 @@ $$;
 
 
 --
+-- Name: gm_cash_daily_rows(uuid, text, text, numeric, text, text, text, uuid, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_cash_daily_rows(p_store uuid, p_kind text, p_method text, p_amount numeric, p_cur text, p_op text, p_notes text, p_by uuid, p_cm uuid) RETURNS void
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare g text := 'card_' || replace(p_cm::text, '-', '');
+begin
+  if p_method = 'cash' then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
+    values (p_store, p_op, p_kind, p_amount, p_cur, p_notes, p_by, p_cm);
+  elsif p_method = 'card' then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id, link_group)
+    values (p_store, p_op || ' — فيزا', p_kind, p_amount, p_cur, p_notes, p_by, p_cm, g);
+    insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, link_group)
+    values (p_store, 'فيزا / تحويل بنكي', case when p_kind = 'in' then 'out' else 'in' end, p_amount, p_cur,
+            'دُفع بالفيزا — لا يدخل الدرج', p_by, g);
+  end if;
+end $$;
+
+
+--
 -- Name: gm_cash_log_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -1825,6 +1909,12 @@ begin
             me, g);
     a := a - take; covered := covered + take;
   end loop;
+  if a > 0.009 then
+    insert into daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, link_group)
+    values (inv.store_id, 'عربون سابق', 'out', round(a, 2), cur,
+            'رصيد مدفوع سابقاً — ' || inv.cname || ' · فاتورة ' || inv.invoice_number, me, g);
+    covered := covered + round(a, 2);
+  end if;
   if covered <= 0.009 then return; end if;
   select l.id into row_id from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id
    where m.invoice_id = p_invoice and not coalesce(m.edit_delta, false) and l.direction = 'in' and upper(l.currency) = cur
@@ -2235,6 +2325,15 @@ begin
   new.gold_price_per_gram := round(pr, 2);
   return new;
 end $$;
+
+
+--
+-- Name: gm_scrap_ref_set(text, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_scrap_ref_set(p_kind text, p_id uuid) RETURNS void
+    LANGUAGE plpgsql
+    AS $$ begin perform set_config('gm.scrap_ref', p_kind || ':' || p_id::text, true); end $$;
 
 
 --
@@ -3941,31 +4040,33 @@ CREATE FUNCTION public.record_customer_payment(p_customer uuid, p_amount numeric
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-                                                                                                                                                                                                                                                                                                                                                     declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text;
-                                                                                                                                                                                                                                                                                                                                                     begin
-                                                                                                                                                                                                                                                                                                                                                       select id, store_id, name into c from customers where id = p_customer;
-                                                                                                                                                                                                                                                                                                                                                         if c is null then raise exception 'العميل غير موجود'; end if;
-                                                                                                                                                                                                                                                                                                                                                           st := coalesce(p_store, c.store_id);
-                                                                                                                                                                                                                                                                                                                                                             if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
-                                                                                                                                                                                                                                                                                                                                                               if not (has_permission('edit_customers', st) or has_permission('manage_daily_cashbox', st)) then
-                                                                                                                                                                                                                                                                                                                                                                   raise exception 'ليس لديك صلاحية تسجيل دفعات العملاء' using errcode = '42501';
-                                                                                                                                                                                                                                                                                                                                                                     end if;
-                                                                                                                                                                                                                                                                                                                                                                       if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
-                                                                                                                                                                                                                                                                                                                                                                         if coalesce(p_method, 'cash') not in ('cash', 'bank') then raise exception 'طريقة دفع غير معروفة'; end if;
-                                                                                                                                                                                                                                                                                                                                                                           select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
-                                                                                                                                                                                                                                                                                                                                                                             note := coalesce(nullif(trim(p_notes), ''), 'دفعة من العميل');
-                                                                                                                                                                                                                                                                                                                                                                               insert into cash_movements (store_id, box, direction, amount, description, created_by)
-                                                                                                                                                                                                                                                                                                                                                                                   values (st, case when p_method = 'bank' then 'bank' else 'main' end, 'in', amt,
-                                                                                                                                                                                                                                                                                                                                                                                               'دفعة من العميل ' || c.name || case when p_method = 'bank' then ' (تحويل/بطاقة)' else '' end, me)
-                                                                                                                                                                                                                                                                                                                                                                                                   returning id into cm;
-                                                                                                                                                                                                                                                                                                                                                                                                     if coalesce(p_method, 'cash') = 'cash' then
-                                                                                                                                                                                                                                                                                                                                                                                                         insert into daily_cash_log (store_id, operation_type, direction, amount, notes, created_by, cash_movement_id)
-                                                                                                                                                                                                                                                                                                                                                                                                               values (st, 'دفعة من عميل', 'in', amt, c.name || ' — ' || note, me, cm);
-                                                                                                                                                                                                                                                                                                                                                                                                                 end if;
-                                                                                                                                                                                                                                                                                                                                                                                                                   insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
-                                                                                                                                                                                                                                                                                                                                                                                                                       values (st, c.id, 'debt_decrease', amt, 0, note, 'payment', me, cm);
-                                                                                                                                                                                                                                                                                                                                                                                                                         return jsonb_build_object('ok', true);
-                                                                                                                                                                                                                                                                                                                                                                                                                         end $$;
+declare c record; st uuid; me uuid; amt numeric := round(coalesce(p_amount, 0), 2); cm uuid; note text; meth text := coalesce(p_method, 'cash'); cur text;
+begin
+  select id, store_id, name into c from customers where id = p_customer;
+  if c is null then raise exception 'العميل غير موجود'; end if;
+  st := coalesce(p_store, c.store_id);
+  if st not in (select org_store_ids(c.store_id)) then raise exception 'العميل ليس من هذه المنشأة'; end if;
+  if not (has_permission('edit_customers', st) or has_permission('manage_daily_cashbox', st)) then
+    raise exception 'ليس لديك صلاحية تسجيل دفعات العملاء' using errcode = '42501';
+  end if;
+  if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
+  if meth not in ('cash', 'bank', 'card', 'none') then raise exception 'طريقة دفع غير معروفة'; end if;
+  select id into me from staff where user_id = auth.uid() and store_id = st limit 1;
+  select coalesce(nullif(upper(currency), ''), 'AED') into cur from stores where id = st;
+  note := coalesce(nullif(trim(p_notes), ''), 'دفعة من العميل');
+  if meth <> 'none' then
+    insert into cash_movements (store_id, box, direction, amount, description, created_by)
+    values (st, case when meth in ('bank', 'card') then 'bank' else 'main' end, 'in', amt,
+            'دفعة من العميل ' || c.name || case meth when 'bank' then ' (تحويل/بطاقة)' when 'card' then ' (فيزا)' else '' end, me)
+    returning id into cm;
+    perform gm_cash_daily_rows(st, 'in', meth, amt, cur, 'دفعة من عميل', c.name || ' — ' || note, me, cm);
+  else
+    note := note || ' (لا يدخل الصندوق اليومي)';
+  end if;
+  insert into customer_debts (store_id, customer_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by, cash_movement_id)
+  values (st, c.id, 'debt_decrease', amt, 0, note, 'payment', me, cm);
+  return jsonb_build_object('ok', true);
+end $$;
 
 
 --
@@ -4667,6 +4768,62 @@ begin
   end if;
   return rid;
 end $$;
+
+
+--
+-- Name: scrap_box_statement(uuid, text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.scrap_box_statement(p_store uuid, p_box text) RETURNS TABLE(kind text, ref_id uuid, at timestamp with time zone, grams numeric, title text, sub text, trader_id uuid, source text, karat integer, editable boolean)
+    LANGUAGE sql STABLE
+    SET search_path TO 'public'
+    AS $$
+  with l as (select * from scrap_box_log where store_id = p_store and box_name = p_box),
+  r as (
+    select l.id, l.created_at, l.grams, l.note, l.karat,
+           coalesce(l.ref_kind, x.k, 'other') k, coalesce(l.ref_id, x.rid) rid
+      from l left join lateral (
+        select 'trader' k, d.movement_id rid from trader_scrap_draws d where d.lot_id = l.lot_id and d.created_at = l.created_at
+        union all select 'piece', d.piece_id from piece_lot_draws d where d.lot_id = l.lot_id and d.created_at = l.created_at
+        union all select 'trader', m.id from trader_movements m where m.store_id = p_store and coalesce(m.entered_at, m.created_at) = l.created_at
+        union all select 'invoice', i.id from invoices i where i.store_id = p_store and i.created_at = l.created_at
+        union all select 'transfer', b.id from branch_transfers b where (b.from_store_id = p_store or b.to_store_id = p_store)
+                  and (b.created_at = l.created_at or b.received_at = l.created_at)
+        limit 1) x on l.ref_kind is null
+  ),
+  g as (
+    select k, rid, case when rid is null then id end solo, min(created_at) at, round(sum(grams), 3) grams,
+           max(note) note, max(karat) karat
+      from r group by k, rid, case when rid is null then id end
+    having abs(sum(grams)) > 0.0005
+  )
+  select g.k, g.rid,
+         coalesce(case g.k when 'trader' then m.created_at when 'invoice' then i.created_at end, g.at),
+         g.grams,
+         case g.k
+           when 'trader' then case m.source when 'settlement' then 'تسكير ذهب من التاجر' when 'scrap_given' then 'إخراج كسر للتاجر'
+                                when 'stock_received' then 'استلام من التاجر' when 'stock_given' then 'إخراج للتاجر' else 'سند تاجر' end
+                              || coalesce(' ' || t.name, '')
+           when 'invoice' then case i.type when 'buyRetail' then 'شراء كسر' when 'sale' then 'بيع' when 'return' then 'مرتجع مبيعات'
+                                when 'buyTrader' then 'شراء من تاجر' else 'فاتورة' end
+                              || coalesce(' — ' || nullif(coalesce(c.name, i.counterparty_name), ''), '')
+           when 'piece' then 'صنع قطعة ' || coalesce(p.barcode, '')
+           when 'transfer' then 'تحويل بين الفروع ' || coalesce(b.transfer_number, '')
+           when 'opening' then 'رصيد سابق'
+           when 'lot' then 'إدخال للصندوق'
+           else case when g.grams > 0 then 'إدخال للصندوق' else 'إخراج من الصندوق' end end,
+         case g.k when 'trader' then coalesce(m.voucher_no, '') when 'invoice' then i.invoice_number
+                  when 'piece' then p.description_ar else g.note end,
+         m.trader_id, m.source, g.karat,
+         (g.k = 'trader' and m.source in ('settlement', 'scrap_given', 'stock_received'))
+    from g
+    left join trader_movements m on g.k = 'trader' and m.id = g.rid
+    left join traders t on t.id = m.trader_id
+    left join invoices i on g.k = 'invoice' and i.id = g.rid
+    left join customers c on c.id = i.customer_id
+    left join pieces p on g.k = 'piece' and p.id = g.rid
+    left join branch_transfers b on g.k = 'transfer' and b.id = g.rid;
+$$;
 
 
 --
@@ -5781,6 +5938,24 @@ end $$;
 
 
 --
+-- Name: trg_cash_card_pair(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_cash_card_pair() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare g text := 'card_' || replace(old.id::text, '-', '');
+begin
+  if tg_op = 'DELETE' then
+    delete from daily_cash_log where link_group = g and cash_movement_id is null;
+    return old;
+  end if;
+  return new;
+end $$;
+
+
+--
 -- Name: trg_cash_movement_deleted_bank_sync(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5829,6 +6004,22 @@ begin
     if new.source is null then perform gm_sale_debt_to_daily(new.invoice_id, new.cash_amount); end if;
   end if;
   return null;
+end $$;
+
+
+--
+-- Name: trg_daily_card_pair_amount(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_daily_card_pair_amount() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.link_group like 'card\_%' and new.cash_movement_id is not null and new.amount is distinct from old.amount then
+    update daily_cash_log set amount = new.amount where link_group = new.link_group and cash_movement_id is null;
+  end if;
+  return new;
 end $$;
 
 
@@ -5931,6 +6122,44 @@ end $_$;
 
 
 --
+-- Name: trg_scrap_box_log(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_scrap_box_log() RETURNS trigger
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+declare r text := nullif(current_setting('gm.scrap_ref', true), ''); rk text; rid uuid;
+begin
+  if r is not null then rk := split_part(r, ':', 1); rid := nullif(split_part(r, ':', 2), '')::uuid; end if;
+  if tg_op in ('UPDATE', 'DELETE') and coalesce(old.box_name, '') like 'كسر %' then
+    if tg_op = 'DELETE' or new.box_name is distinct from old.box_name then
+      if abs(coalesce(old.weight_grams_remaining, 0)) > 0.0005 then
+        insert into scrap_box_log (store_id, lot_id, box_name, karat, grams, ref_kind, ref_id)
+        values (old.store_id, old.id, old.box_name, old.karat, -old.weight_grams_remaining, rk, rid);
+      end if;
+      if tg_op = 'DELETE' then return old; end if;
+    end if;
+  end if;
+  if coalesce(new.box_name, '') not like 'كسر %' then return new; end if;
+  if tg_op = 'INSERT' or new.box_name is distinct from old.box_name then
+    if rk is null then
+      rk := case when new.trader_movement_id is not null then 'trader' when new.source_invoice_id is not null then 'invoice' else 'lot' end;
+      rid := coalesce(new.trader_movement_id, new.source_invoice_id, new.id);
+    end if;
+    if abs(coalesce(new.weight_grams_remaining, 0)) > 0.0005 then
+      insert into scrap_box_log (store_id, lot_id, box_name, karat, grams, ref_kind, ref_id)
+      values (new.store_id, new.id, new.box_name, new.karat, new.weight_grams_remaining, rk, rid);
+    end if;
+  elsif abs(coalesce(new.weight_grams_remaining, 0) - coalesce(old.weight_grams_remaining, 0)) > 0.0005 then
+    insert into scrap_box_log (store_id, lot_id, box_name, karat, grams, ref_kind, ref_id)
+    values (new.store_id, new.id, new.box_name, new.karat, round(new.weight_grams_remaining - old.weight_grams_remaining, 3), rk, rid);
+  end if;
+  return new;
+end $$;
+
+
+--
 -- Name: trg_scrap_given_guard(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -5941,11 +6170,13 @@ CREATE FUNCTION public.trg_scrap_given_guard() RETURNS trigger
 declare d record; n int := 0;
 begin
   if tg_op = 'UPDATE' then
-    if new.weight_grams is distinct from old.weight_grams or new.karat is distinct from old.karat then
-      raise exception 'لا يمكن تعديل وزن إخراج الكسر — احذف الحركة (يرجع الوزن لصندوق الكسر) ثم أخرجه من جديد';
+    if (new.weight_grams is distinct from old.weight_grams or new.karat is distinct from old.karat)
+       and coalesce(current_setting('gm.scrap_regive', true), '') <> '1' then
+      raise exception 'لتعديل وزن إخراج الكسر افتح كشف صندوق الكسر واضغط على الحركة';
     end if;
     return new;
   end if;
+  perform gm_scrap_ref_set('trader', old.id);
   for d in select lot_id, grams from trader_scrap_draws where movement_id = old.id loop
     update gold_stock_lots set weight_grams_remaining = round(weight_grams_remaining + d.grams, 3) where id = d.lot_id;
     n := n + 1;
@@ -5965,25 +6196,26 @@ CREATE FUNCTION public.trg_settlement_lot_sync() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare lt record;
+declare lt record; nt numeric; used numeric;
 begin
   if tg_op = 'UPDATE' and new.weight_grams is not distinct from old.weight_grams and new.karat is not distinct from old.karat
      and new.gold_24k_equivalent is not distinct from old.gold_24k_equivalent then
     return new;
   end if;
+  perform gm_scrap_ref_set('trader', old.id);
   for lt in select * from gold_stock_lots where trader_movement_id = old.id for update loop
-    if lt.weight_grams_remaining <> lt.weight_grams_total then
-      raise exception 'الذهب المستلم بهذه التسوية استُعمل من المستودع (إنتاج أو بيع) — لا يمكن تعديله أو حذفه. عدّل الحساب بتسوية جديدة.';
-    end if;
+    used := lt.weight_grams_total - lt.weight_grams_remaining;
     if tg_op = 'UPDATE' then
-      update gold_stock_lots set
-        weight_grams_total = round(coalesce(new.gold_24k_equivalent, 0) * 24 / lt.karat, 3),
-        weight_grams_remaining = round(coalesce(new.gold_24k_equivalent, 0) * 24 / lt.karat, 3)
-       where id = lt.id;
+      nt := round(coalesce(new.gold_24k_equivalent, 0) * 24 / lt.karat, 3);
+      if nt < used - 0.0005 then
+        raise exception 'الوزن الجديد (% غ) أقل من المستعمل من هذا الذهب (% غ)', nt, round(used, 3);
+      end if;
+      update gold_stock_lots set weight_grams_total = nt, weight_grams_remaining = round(nt - used, 3) where id = lt.id;
     else
-      update gold_stock_lots set weight_grams_remaining = 0,
-        notes = coalesce(notes, '') || ' — أُلغي بإلغاء التسوية'
-       where id = lt.id;
+      if used > 0.0005 then
+        raise exception 'الذهب المستلم بهذه التسوية استُعمل من المستودع (إنتاج أو بيع) — لا يمكن حذفه. عدّل وزنه بدلاً من ذلك.';
+      end if;
+      update gold_stock_lots set weight_grams_remaining = 0, notes = coalesce(notes, '') || ' — أُلغي بإلغاء التسوية' where id = lt.id;
     end if;
   end loop;
   return case when tg_op = 'UPDATE' then new else old end;
@@ -5998,11 +6230,12 @@ CREATE FUNCTION public.trg_trader_received_sync() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare pc record; lt record; aw numeric := coalesce(new.accounting_weight_grams, new.weight_grams);
+declare pc record; lt record; aw numeric := coalesce(new.accounting_weight_grams, new.weight_grams); used numeric;
 begin
   if new.weight_grams is not distinct from old.weight_grams and new.karat is not distinct from old.karat
      and new.accounting_weight_grams is not distinct from old.accounting_weight_grams
      and new.fab_fee_per_gram is not distinct from old.fab_fee_per_gram then return new; end if;
+  perform gm_scrap_ref_set('trader', new.id);
   if new.piece_id is not null then
     select * into pc from pieces where id = new.piece_id for update;
     if pc.id is not null then
@@ -6014,8 +6247,14 @@ begin
   if new.gold_stock_lot_id is not null then
     select * into lt from gold_stock_lots where id = new.gold_stock_lot_id for update;
     if lt.id is not null then
-      if lt.weight_grams_remaining <> lt.weight_grams_total then raise exception 'الوزن بالجملة استُعمل (بيع أو إنتاج) — لا يمكن تعديله. عدّل الحساب بتسوية.'; end if;
-      update gold_stock_lots set weight_grams_total = new.weight_grams, weight_grams_remaining = new.weight_grams, karat = new.karat,
+      used := lt.weight_grams_total - lt.weight_grams_remaining;
+      if used > 0.0005 and new.karat is distinct from old.karat then
+        raise exception 'استُعمل جزء من هذا الذهب — لا يمكن تغيير عياره. يمكن تعديل الوزن فقط.';
+      end if;
+      if new.weight_grams < used - 0.0005 then
+        raise exception 'الوزن الجديد (% غ) أقل من المستعمل من هذا الذهب (% غ)', new.weight_grams, round(used, 3);
+      end if;
+      update gold_stock_lots set weight_grams_total = new.weight_grams, weight_grams_remaining = round(new.weight_grams - used, 3), karat = new.karat,
         cost_fabrication_per_gram = coalesce(new.fab_fee_per_gram, cost_fabrication_per_gram) where id = lt.id;
     end if;
   end if;
@@ -7414,6 +7653,44 @@ CREATE TABLE public.rfid_write_jobs (
 
 
 --
+-- Name: scrap_box_log; Type: TABLE; Schema: public; Owner: -
+--
+
+CREATE TABLE public.scrap_box_log (
+    id bigint NOT NULL,
+    store_id uuid NOT NULL,
+    lot_id uuid,
+    box_name text NOT NULL,
+    karat integer,
+    grams numeric NOT NULL,
+    ref_kind text,
+    ref_id uuid,
+    note text,
+    created_at timestamp with time zone DEFAULT now() NOT NULL,
+    created_by uuid DEFAULT auth.uid()
+);
+
+
+--
+-- Name: scrap_box_log_id_seq; Type: SEQUENCE; Schema: public; Owner: -
+--
+
+CREATE SEQUENCE public.scrap_box_log_id_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+--
+-- Name: scrap_box_log_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
+--
+
+ALTER SEQUENCE public.scrap_box_log_id_seq OWNED BY public.scrap_box_log.id;
+
+
+--
 -- Name: staff; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -7914,6 +8191,13 @@ CREATE TABLE public.zebra_label_fields (
 
 
 --
+-- Name: scrap_box_log id; Type: DEFAULT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scrap_box_log ALTER COLUMN id SET DEFAULT nextval('public.scrap_box_log_id_seq'::regclass);
+
+
+--
 -- Name: audit_log audit_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
@@ -8375,6 +8659,14 @@ ALTER TABLE ONLY public.repair_tickets
 
 ALTER TABLE ONLY public.rfid_write_jobs
     ADD CONSTRAINT rfid_write_jobs_pkey PRIMARY KEY (id);
+
+
+--
+-- Name: scrap_box_log scrap_box_log_pkey; Type: CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scrap_box_log
+    ADD CONSTRAINT scrap_box_log_pkey PRIMARY KEY (id);
 
 
 --
@@ -9336,6 +9628,20 @@ CREATE INDEX rfid_write_jobs_piece_id_fk_idx ON public.rfid_write_jobs USING btr
 
 
 --
+-- Name: scrap_box_log_box; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX scrap_box_log_box ON public.scrap_box_log USING btree (store_id, box_name, created_at);
+
+
+--
+-- Name: scrap_box_log_lot; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX scrap_box_log_lot ON public.scrap_box_log USING btree (lot_id, created_at);
+
+
+--
 -- Name: staff_presence_store_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9623,6 +9929,13 @@ CREATE TRIGGER trg_branch_subscription_due BEFORE INSERT ON public.subscriptions
 
 
 --
+-- Name: cash_movements trg_cash_card_pair; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_cash_card_pair AFTER DELETE ON public.cash_movements FOR EACH ROW EXECUTE FUNCTION public.trg_cash_card_pair();
+
+
+--
 -- Name: daily_cash_log trg_cash_log_guard; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -9669,6 +9982,13 @@ CREATE TRIGGER trg_customer_debts_currency BEFORE INSERT ON public.customer_debt
 --
 
 CREATE TRIGGER trg_customer_deposits_currency BEFORE INSERT ON public.customer_deposits FOR EACH ROW EXECUTE FUNCTION public.fill_currency_from_store();
+
+
+--
+-- Name: daily_cash_log trg_daily_card_pair_amount; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_daily_card_pair_amount AFTER UPDATE OF amount ON public.daily_cash_log FOR EACH ROW EXECUTE FUNCTION public.trg_daily_card_pair_amount();
 
 
 --
@@ -9795,6 +10115,13 @@ CREATE TRIGGER trg_piece_draws_delete BEFORE DELETE ON public.pieces FOR EACH RO
 --
 
 CREATE TRIGGER trg_piece_draws_weight BEFORE UPDATE OF weight_grams ON public.pieces FOR EACH ROW EXECUTE FUNCTION public.trg_piece_draws_weight();
+
+
+--
+-- Name: gold_stock_lots trg_scrap_box_log; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_scrap_box_log AFTER INSERT OR DELETE OR UPDATE OF weight_grams_remaining, box_name ON public.gold_stock_lots FOR EACH ROW EXECUTE FUNCTION public.trg_scrap_box_log();
 
 
 --
@@ -10838,6 +11165,14 @@ ALTER TABLE ONLY public.rfid_write_jobs
 
 ALTER TABLE ONLY public.rfid_write_jobs
     ADD CONSTRAINT rfid_write_jobs_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
+
+
+--
+-- Name: scrap_box_log scrap_box_log_store_id_fkey; Type: FK CONSTRAINT; Schema: public; Owner: -
+--
+
+ALTER TABLE ONLY public.scrap_box_log
+    ADD CONSTRAINT scrap_box_log_store_id_fkey FOREIGN KEY (store_id) REFERENCES public.stores(id) ON DELETE CASCADE;
 
 
 --
@@ -12047,6 +12382,19 @@ CREATE POLICY "run_inventory_count can insert expected snapshot" ON public.inven
 
 
 --
+-- Name: scrap_box_log; Type: ROW SECURITY; Schema: public; Owner: -
+--
+
+ALTER TABLE public.scrap_box_log ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: scrap_box_log scrap_box_log_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY scrap_box_log_read ON public.scrap_box_log FOR SELECT USING (public.is_store_member(store_id));
+
+
+--
 -- Name: stock_parties sp_insert; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -12765,6 +13113,15 @@ GRANT ALL ON FUNCTION public.delete_last_sale_invoice(target_invoice_id uuid) TO
 
 
 --
+-- Name: FUNCTION edit_scrap_movement(p_movement uuid, p_weight numeric, p_notes text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.edit_scrap_movement(p_movement uuid, p_weight numeric, p_notes text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.edit_scrap_movement(p_movement uuid, p_weight numeric, p_notes text) TO authenticated;
+GRANT ALL ON FUNCTION public.edit_scrap_movement(p_movement uuid, p_weight numeric, p_notes text) TO service_role;
+
+
+--
 -- Name: FUNCTION ensure_store_organization(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -12877,6 +13234,14 @@ GRANT ALL ON FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) TO
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO anon;
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO authenticated;
 GRANT ALL ON FUNCTION public.gm_can_expense(sid uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_cash_daily_rows(p_store uuid, p_kind text, p_method text, p_amount numeric, p_cur text, p_op text, p_notes text, p_by uuid, p_cm uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_cash_daily_rows(p_store uuid, p_kind text, p_method text, p_amount numeric, p_cur text, p_op text, p_notes text, p_by uuid, p_cm uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_cash_daily_rows(p_store uuid, p_kind text, p_method text, p_amount numeric, p_cur text, p_op text, p_notes text, p_by uuid, p_cm uuid) TO service_role;
 
 
 --
@@ -13049,6 +13414,14 @@ GRANT ALL ON FUNCTION public.gm_sale_debt_to_daily(p_invoice uuid, p_amount nume
 REVOKE ALL ON FUNCTION public.gm_scrap_price_at_purchase() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO authenticated;
 GRANT ALL ON FUNCTION public.gm_scrap_price_at_purchase() TO service_role;
+
+
+--
+-- Name: FUNCTION gm_scrap_ref_set(p_kind text, p_id uuid); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.gm_scrap_ref_set(p_kind text, p_id uuid) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_scrap_ref_set(p_kind text, p_id uuid) TO service_role;
 
 
 --
@@ -13607,6 +13980,14 @@ GRANT ALL ON FUNCTION public.save_expense_category(p_store uuid, p_name text, p_
 
 
 --
+-- Name: FUNCTION scrap_box_statement(p_store uuid, p_box text); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.scrap_box_statement(p_store uuid, p_box text) TO authenticated;
+GRANT ALL ON FUNCTION public.scrap_box_statement(p_store uuid, p_box text) TO service_role;
+
+
+--
 -- Name: FUNCTION seed_default_zebra_label_fields(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -13864,6 +14245,14 @@ GRANT ALL ON FUNCTION public.trg_branch_subscription_due() TO service_role;
 
 
 --
+-- Name: FUNCTION trg_cash_card_pair(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_cash_card_pair() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_cash_card_pair() TO service_role;
+
+
+--
 -- Name: FUNCTION trg_cash_movement_deleted_bank_sync(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -13887,6 +14276,14 @@ GRANT ALL ON FUNCTION public.trg_cash_movement_updated_daily_sync() TO service_r
 REVOKE ALL ON FUNCTION public.trg_customer_debts_allocate() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_customer_debts_allocate() TO service_role;
+
+
+--
+-- Name: FUNCTION trg_daily_card_pair_amount(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_daily_card_pair_amount() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_daily_card_pair_amount() TO service_role;
 
 
 --
@@ -13932,6 +14329,14 @@ GRANT ALL ON FUNCTION public.trg_piece_draws_delete() TO service_role;
 REVOKE ALL ON FUNCTION public.trg_piece_draws_weight() FROM PUBLIC;
 GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO authenticated;
 GRANT ALL ON FUNCTION public.trg_piece_draws_weight() TO service_role;
+
+
+--
+-- Name: FUNCTION trg_scrap_box_log(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_scrap_box_log() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_scrap_box_log() TO service_role;
 
 
 --
@@ -14565,6 +14970,24 @@ GRANT ALL ON TABLE public.rfid_write_jobs TO service_role;
 
 
 --
+-- Name: TABLE scrap_box_log; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.scrap_box_log TO anon;
+GRANT SELECT,REFERENCES,TRIGGER,TRUNCATE,MAINTAIN ON TABLE public.scrap_box_log TO authenticated;
+GRANT ALL ON TABLE public.scrap_box_log TO service_role;
+
+
+--
+-- Name: SEQUENCE scrap_box_log_id_seq; Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON SEQUENCE public.scrap_box_log_id_seq TO anon;
+GRANT ALL ON SEQUENCE public.scrap_box_log_id_seq TO authenticated;
+GRANT ALL ON SEQUENCE public.scrap_box_log_id_seq TO service_role;
+
+
+--
 -- Name: TABLE staff; Type: ACL; Schema: public; Owner: -
 --
 
@@ -14770,5 +15193,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VRaeOOFuh37iq75pGH6dp55IywxxpX9WbVDyOY8Xj3GqhluIYbJkieNh5FBebHa
+\unrestrict DVahHajHb451eOEdNUbWRfPv3cXONfu6B5blzPwDdjUTcdgmE69vesQamlPkrez
 
