@@ -459,8 +459,9 @@ const GOLDMIND_THEMES = {
       '--gm-on-accent': '#FFFFFF',
       '--gm-secondary': '#8A6A2E',
       '--gm-on-surface': '#2A2116',
-      '--gm-on-surface-variant': '#5C503E',
-      '--gm-outline-variant': '#CBB58A',
+      '--gm-on-surface-variant': '#4E4232',
+      // lines and frames must show on the sand marble too (#CBB58A vanished into it — بشار 2026-11-17)
+      '--gm-outline-variant': '#A88B55',
       '--gm-shadow-color': 'rgba(90, 66, 26, 0.18)',
       '--gm-avatar-grad': 'linear-gradient(135deg, #8A6A2E 0%, #B8954A 55%, #E2C88A 100%)'
     }
@@ -610,6 +611,8 @@ const GOLDMIND_THEMES = {
     T + ' .text-secondary{color:#6E5220!important}',
     // form fields on the sand marble: a cream box with a clear brown frame, so every field is visible (بشار 2026-11-17)
     T + ' :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]),select,textarea){background-color:rgba(255,250,238,.92)!important;border:1px solid #A88B55!important;color:#2A2116!important;-webkit-text-fill-color:#2A2116}',
+    // outlined buttons/links sitting on the marble: a light cream fill so each one reads as a button
+    T + ' :is(button,a,label,[role=button]).border-outline-variant:not([class*="bg-"]){background-color:rgba(255,250,238,.55)!important}',
     T + ' :is(input,select,textarea)::placeholder{color:#8A7A5E!important;-webkit-text-fill-color:#8A7A5E!important;opacity:1}',
     T + ' :is(input,select,textarea):focus{border-color:#8A6A1C!important;box-shadow:0 0 0 3px rgba(184,149,74,.35)!important;outline:none}',
     // «زجاجية» mode paints its own art behind frosted cards — here the marble is that background
