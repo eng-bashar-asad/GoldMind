@@ -26,3 +26,21 @@ test('inventory: status filter is scoped to the open box', async ({ page }) => {
   await expect(page.locator('#piece-count')).toHaveText('1 قطعة');
   expect(errs).toEqual([]);
 });
+
+// «مباعة» split into sold to people / sold to traders (بشار 2026-11-17)
+test('inventory: separate tiles for sold to people and sold to traders', async ({ page }) => {
+  const pc = (id, status) => ({ id, store_id: STORE, barcode: id, weight_grams: 2, karat: 18, status, box_name: 'قطع ذهبية', created_at: '2026-10-01T00:00:00Z' });
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    pieces: [pc('a', 'available'), pc('b', 'sold'), pc('c', 'given_to_trader'), pc('d', 'given_to_trader')], gold_stock_lots: [] } });
+  await page.goto('/inventory-list-ar.html');
+  await expect(page.locator('#gmStatusTiles [data-st="sold"]')).toContainText('مباعة لأفراد');
+  await expect(page.locator('#gmStatusTiles [data-st="sold"] b')).toHaveText('1');
+  await expect(page.locator('#gmStatusTiles [data-st="given_to_trader"]')).toContainText('مباعة لتجار');
+  await expect(page.locator('#gmStatusTiles [data-st="given_to_trader"] b')).toHaveText('2');
+  await page.evaluate(() => enterBox('قطع ذهبية'));
+  await page.click('#gmStatusTiles [data-st="given_to_trader"]');
+  await expect(page.locator('#piece-count')).toHaveText('2 قطعة');
+});
