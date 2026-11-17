@@ -16,6 +16,6 @@ test('layout panel hides and sizes boxes, saved on the account', async ({ page }
   await expect(page.locator('a.dsk-stat[href="inventory-list-ar.html"]')).toHaveClass(/\bdsk-off\b/);
   await page.locator('#dskLayoutRows button[data-k="sales"][data-size="l"]').click();
   await expect(page.locator('#dskTodaySalesEl').locator('xpath=ancestor::div[contains(@class,"dsk-stat")][1]')).toHaveClass(/\bdsk-sz-l\b/);
-  await expect.poll(() => calls.some(c => c.name === 'user_profiles' && c.method === 'PATCH' && /home_prefs/.test(c.body || ''))).toBe(true);
+  await expect.poll(() => calls.some(c => c.name === 'gm_merge_home_prefs' && /"boxes"/.test(c.body || ''))).toBe(true);
   await expect(page.locator('#dskActionStrip .dsk-action').first()).toHaveAttribute('draggable', 'true');
 });

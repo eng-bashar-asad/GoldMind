@@ -655,8 +655,10 @@
     var f = favs(), i = f.indexOf(href);
     if (i === -1) f.push(href); else f.splice(i, 1);
     lsSet(FAV_KEY, JSON.stringify(f));
+    if (typeof gmSaveAccountPref === 'function') gmSaveAccountPref('nav_favs');
     renderFavs();
   }
+  window.addEventListener('gm-prefs-pulled', function () { renderFavs(); }); // favourites saved on another device
 
   // Badges: small counts beside pages that need attention. Cached for 2 minutes per tab.
   var badges = {};
@@ -920,6 +922,7 @@
       var mini = !document.documentElement.classList.contains('gm-mini');
       document.documentElement.classList.toggle('gm-mini', mini);
       try { localStorage.setItem('gm_nav_mini', mini ? '1' : ''); } catch (e) { /* ignore */ }
+      if (typeof gmSaveAccountPref === 'function') gmSaveAccountPref('nav_mini');
     });
     // in the small bar a link shows its name on hover
     d.querySelectorAll('a.gn-a').forEach(function (a) { a.title = (a.children[1] || a).textContent.trim(); });

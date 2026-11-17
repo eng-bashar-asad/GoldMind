@@ -275,6 +275,58 @@ function gmGoTwoFactor(next) {
     location.replace('login-2fa-ar.html?next=' + encodeURIComponent(here));
 }
 
+// ---- Display preferences follow the account (Bashar 2026-11-17) ----
+// Theme, side-menu size and favourites, and the home quick-access buttons are kept in
+// user_profiles.home_prefs, so a phone, another computer, or the Windows app (which forgets
+// local storage when it closes) all show the same. Local storage stays the fast copy.
+function gmPrefKeys() {
+    const sid = window.GOLDMIND_STAFF_ID || 'default'; // same key the home page uses
+    return {
+        theme: 'goldmind_theme', nav_mini: 'gm_nav_mini', nav_favs: 'gm_nav_favs',
+        quick: 'goldmind_quick_actions_' + sid, mquick: 'goldmind_mobile_quick_actions_v4_' + sid,
+    };
+}
+const GM_JSON_PREFS = ['nav_favs', 'quick', 'mquick'];
+function gmLocalPref(name) {
+    try {
+        const raw = localStorage.getItem(gmPrefKeys()[name]);
+        if (raw === null) return undefined;
+        return GM_JSON_PREFS.includes(name) ? JSON.parse(raw) : raw;
+    } catch (e) { return undefined; }
+}
+let gmPrefPending = {}, gmPrefTimer = null;
+// Call after the user changes one of the preferences above.
+function gmSaveAccountPref(name) {
+    const v = gmLocalPref(name);
+    if (v === undefined) return;
+    gmPrefPending[name] = v;
+    clearTimeout(gmPrefTimer);
+    gmPrefTimer = setTimeout(function () {
+        const p = gmPrefPending; gmPrefPending = {};
+        goldmindClient.rpc('gm_merge_home_prefs', { p: p }).then(function (r) {
+            if (r && r.error) console.warn('prefs not saved', r.error.message);
+        });
+    }, 500);
+}
+// The account's copy wins; preferences the account doesn't have yet are sent up from this device.
+function gmPullAccountPrefs(hp) {
+    hp = hp || {};
+    const keys = gmPrefKeys(), seed = {};
+    let changed = false;
+    Object.keys(keys).forEach(function (name) {
+        const local = gmLocalPref(name);
+        if (!(name in hp)) { if (local !== undefined) seed[name] = local; return; }
+        const v = hp[name];
+        if (JSON.stringify(v) === JSON.stringify(local)) return;
+        try { localStorage.setItem(keys[name], GM_JSON_PREFS.includes(name) ? JSON.stringify(v) : String(v)); } catch (e) { return; }
+        changed = true;
+        if (name === 'theme' && typeof goldmindApplyTheme === 'function') goldmindApplyTheme(String(v));
+        if (name === 'nav_mini') document.documentElement.classList.toggle('gm-mini', v === '1');
+    });
+    if (Object.keys(seed).length) goldmindClient.rpc('gm_merge_home_prefs', { p: seed }).then(function () {});
+    if (changed) window.dispatchEvent(new CustomEvent('gm-prefs-pulled'));
+}
+
 async function requireGoldMindSession(redirectTo) {
     let session = null;
     if (navigator.onLine) {
@@ -296,7 +348,8 @@ async function requireGoldMindSession(redirectTo) {
     // or staff), regardless of how they signed up. Skipped only on the gate
     // page itself to avoid a redirect loop.
     if (navigator.onLine && !window.location.pathname.endsWith('privacy-accept-ar.html')) {
-        const { data: profile } = await goldmindClient.from('user_profiles').select('privacy_accepted_at').eq('id', session.user.id).maybeSingle();
+        const { data: profile } = await goldmindClient.from('user_profiles').select('privacy_accepted_at, home_prefs').eq('id', session.user.id).maybeSingle();
+        gmPullAccountPrefs(profile && profile.home_prefs);
         if (!profile || !profile.privacy_accepted_at) {
             const here = window.location.pathname.split('/').pop() || 'index-ar.html';
             window.location.href = 'privacy-accept-ar.html?return=' + encodeURIComponent(here);

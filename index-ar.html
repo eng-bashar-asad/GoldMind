@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=102"></script>
+<script src="theme.js?v=103"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -652,7 +652,7 @@
 </style>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=56"></script>
+<script src="supabase-config.js?v=57"></script>
 <script src="gm-logo.js?v=2" defer></script>
 <script src="gm-biometric.js?v=3"></script>
 <script src="gm-home-charts.js?v=3" defer></script>
@@ -1284,6 +1284,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
     if (draft.length === 0) return;
     selection = draft.slice();
     try { localStorage.setItem('goldmind_quick_actions_' + (window.GOLDMIND_STAFF_ID || 'default'), JSON.stringify(selection)); } catch (e) {}
+    if (typeof gmSaveAccountPref === 'function') gmSaveAccountPref('quick');
     renderStrip();
     panelEl.classList.remove('open');
   });
@@ -1294,6 +1295,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
     if (order.length !== selection.length) return;
     selection = order; draft = selection.slice();
     try { localStorage.setItem('goldmind_quick_actions_' + (window.GOLDMIND_STAFF_ID || 'default'), JSON.stringify(selection)); } catch (x) {}
+    if (typeof gmSaveAccountPref === 'function') gmSaveAccountPref('quick');
   });
 
   renderStrip(); // optimistic default pass so the strip isn't empty while the session/permissions are still loading
@@ -1673,6 +1675,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
     if (draft.length === 0) return;
     selection = draft.slice();
     try { localStorage.setItem('goldmind_mobile_quick_actions_v4_' + (window.GOLDMIND_STAFF_ID || 'default'), JSON.stringify(selection)); } catch (e) {}
+    if (typeof gmSaveAccountPref === 'function') gmSaveAccountPref('mquick');
     renderStrip();
     closeOverlay();
   });
@@ -3011,7 +3014,8 @@ if ('serviceWorker' in navigator) {
       goldmindClient.auth.getSession().then(function (r) {
         var u = r && r.data && r.data.session && r.data.session.user; if (!u) return;
         var quick = null; try { quick = JSON.parse(localStorage.getItem('goldmind_quick_actions_' + (window.GOLDMIND_STAFF_ID || 'default')) || 'null'); } catch (e) {}
-        goldmindClient.from('user_profiles').update({ home_prefs: { boxes: prefs, quick: quick } }).eq('id', u.id).then(function () {});
+        // merge, so the theme and other account preferences in home_prefs are kept
+        goldmindClient.rpc('gm_merge_home_prefs', { p: { boxes: prefs, quick: quick } }).then(function () {});
       });
     }, 400);
   }
