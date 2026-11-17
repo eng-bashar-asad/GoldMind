@@ -24,4 +24,9 @@ test('a new type renews the label description and is logged', async ({ page }) =
   const body = JSON.parse(calls.find(c => c.method === 'PATCH' && /\/pieces/.test(c.url)).body);
   expect(body).toMatchObject({ piece_type: 'حلق', description_ar: 'حلق', description_en: 'Earring' });
   await expect.poll(() => calls.some(c => c.method === 'POST' && /piece_movements/.test(c.url) && (c.body || '').includes('النوع: عقد ← حلق'))).toBe(true);
+  // a sold piece's invoice line carrying the old name is renamed too
+  const line = calls.find(c => c.method === 'PATCH' && /\/invoice_items/.test(c.url));
+  expect(JSON.parse(line.body)).toMatchObject({ description: 'حلق', description_en: 'Earring' });
+  expect(decodeURIComponent(line.url)).toContain('piece_id=eq.p1');
+  expect(decodeURIComponent(line.url)).toMatch(/description=in\.\(.*عقد/);
 });

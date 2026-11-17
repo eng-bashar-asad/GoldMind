@@ -834,6 +834,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   }
 
   const newType = document.getElementById('piece-type').value || null, typeChanged = newType !== (currentPiece.piece_type || null);
+  let invoiceLineWarn = '';
   const { error } = await goldmindClient.from('pieces').update({
     barcode: barcode || null,
     weight_grams: weight,
@@ -864,6 +865,18 @@ document.getElementById('save-btn').addEventListener('click', async () => {
     if ((currentPiece.barcode || '') !== barcode) changes.push('الباركود تغيّر');
     if (photoUrl !== currentPiece.photo_url) changes.push('الصورة تغيّرت');
     if (typeChanged) changes.push('النوع: ' + (currentPiece.piece_type || '—') + ' ← ' + (newType || '—'));
+    // a sold piece: its invoice line shows the old name too (بشار 2026-11-17) — rename the lines
+    // that still carry the old type/description; a line with its own wording is left as written
+    if (typeChanged && newType) {
+      const oldNames = [currentPiece.description_ar, currentPiece.piece_type].filter(Boolean);
+      if (oldNames.length) {
+        const { data: lines, error: lineErr } = await goldmindClient.from('invoice_items')
+          .update({ description: newType, description_en: classificationEn[newType] || null })
+          .eq('piece_id', currentPiece.id).in('description', oldNames).select('id');
+        if (lineErr) invoiceLineWarn = 'حُفظت القطعة، لكن تعذّر تحديث اسمها في الفاتورة: ' + lineErr.message;
+        else if (lines && lines.length) changes.push('الاسم في الفاتورة تحدّث');
+      }
+    }
     if (changes.length) {
       await goldmindClient.from('piece_movements').insert({
         store_id: GOLDMIND_STORE_ID, piece_id: currentPiece.id,
@@ -901,7 +914,7 @@ document.getElementById('save-btn').addEventListener('click', async () => {
   selectedPhotoFile = null;
   photoRemoved = false;
 
-  showMessage('تم حفظ التعديلات بنجاح!', false);
+  showMessage(invoiceLineWarn || 'تم حفظ التعديلات بنجاح!', !!invoiceLineWarn);
   pcDirty = false;
   gmRenderPieceView();
   loadPieceLog();
