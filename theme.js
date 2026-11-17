@@ -484,7 +484,7 @@ const GOLDMIND_THEMES = {
     // gold is the "primary" colour for words, icons and lines; solid primary buttons stay dark bronze with gold words
     T + ' .text-primary{color:' + GOLD + '!important}',
     T + ' :is(.border-primary,.border-primary\\/30,.border-primary\\/40){border-color:rgba(212,175,55,.55)!important}',
-    T + ' .bg-primary:not(.rounded-lg.p-4):not(.rounded-xl.p-4){background-image:linear-gradient(160deg,#2A2416,#1A1710)!important;border:1px solid rgba(212,175,55,.55)}',
+    T + ' .bg-primary:not(.rounded-lg.p-4):not(.rounded-xl.p-4):not(.gm-cta){background-image:linear-gradient(160deg,#2A2416,#1A1710)!important;border:1px solid rgba(212,175,55,.55)}',
     T + ' .gm-cta{background-image:linear-gradient(135deg,#F3D57A 0%,#D4AF37 50%,#B08A2E 100%)!important;color:#16120A!important;border:0}',
     // top bars and side menu: near-black with a gold rule
     T + ' header:is(.bg-surface-container-lowest,.bg-surface,.bg-background,.bg-white){background:' + BAR + '!important;border-bottom:1px solid rgba(212,175,55,.45)!important}',
@@ -704,12 +704,19 @@ gmEnsureStatShimmerStyle();
 (function () {
   const style = document.createElement('style');
   style.id = 'gm-native-lists';
-  style.textContent = '@media screen { html body .gm-cfix-light { color: #F3F4F6 !important; } html body .gm-cfix-dark { color: #1F1A12 !important; }' +
-    ' html body :is(.gm-cfix-light,.gm-cfix-dark) { -webkit-text-fill-color: currentColor !important; background-image: none !important; } }' +
+  style.textContent = '@media screen { html:root body .gm-cfix-light.gm-cfix-light:not(.gm-z):not(.gm-z) { color: #F3F4F6 !important; } html:root body .gm-cfix-dark.gm-cfix-dark:not(.gm-z):not(.gm-z) { color: #1F1A12 !important; }' +
+    ' html:root body :is(.gm-cfix-light,.gm-cfix-dark):not(.gm-z):not(.gm-z):not(.gm-z) { -webkit-text-fill-color: currentColor !important; background-image: none !important; } }' +
     'select option, select optgroup, datalist option { background-color: #ffffff; color: #1a1c1e; }' +
     'select option:disabled { color: #8a8f98; }' +
     'select option:checked { background-color: #E8DFC8; color: #1a1c1e; }';
   document.head.appendChild(style);
+})();
+
+// «المخمل» (velvet-wine): titles written straight on the wine canvas take a light gold ink so they read
+(function () {
+  var st = document.createElement('style'); st.id = 'gm-velvet-titles';
+  st.textContent = '@media screen{html[data-gm-theme="velvet-wine"] :is(.gm-on-canvas,.gm-sec,body > header h1,body > header h2){--gmi-i1:#D9B66A;--gmi-i2:#E8CC86;--gmi-i3:#F7E6B5;color:#F1DDA4}}';
+  (document.head || document.documentElement).appendChild(st);
 })();
 
 // Contrast guard (dark themes): text written for white cards (dark navy / wine) that ends up
@@ -757,7 +764,8 @@ gmEnsureStatShimmerStyle();
       if (!own) for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) { own = true; break; }
       if (!own || !el.getClientRects().length) continue;
       const ecs = getComputedStyle(el);
-      let fg = rgb(ecs.color); const bg = bgOf(el);
+      // what is painted is the fill colour when a rule sets one (it can differ from `color`)
+      let fg = rgb(ecs.webkitTextFillColor && !/text/.test(ecs.webkitBackgroundClip || '') ? ecs.webkitTextFillColor : ecs.color); const bg = bgOf(el);
       // gradient words (gloss colours) have a transparent colour: judge them by their ink's first colour
       if (fg && fg[3] !== undefined && fg[3] < .3 && /text/.test(ecs.webkitBackgroundClip || ecs.backgroundClip || '')) { const m = (ecs.backgroundImage || '').match(/rgba?\([^)]*\)/); fg = m ? rgb(m[0]) : null; }
       if (!fg || !bg || (fg[3] !== undefined && fg[3] < .3)) continue;
@@ -2027,8 +2035,10 @@ function gmClosePhotoViewer() {
     var r = document.createRange(); r.selectNodeContents(el);
     var t = r.getBoundingClientRect(), b = el.getBoundingClientRect();
     if (!t.width || !b.width) return;
-    el.style.setProperty('--gm-ink-x', Math.round(t.left - b.left - el.clientLeft) + 'px');
-    el.style.setProperty('--gm-ink-w', Math.ceil(t.width) + 'px');
+    // letters such as the Arabic alif reach a little past the text box: give the wave a margin on both sides
+    var pad = Math.ceil(parseFloat(getComputedStyle(el).fontSize) * .3) || 4;
+    el.style.setProperty('--gm-ink-x', Math.round(t.left - b.left - el.clientLeft - pad) + 'px');
+    el.style.setProperty('--gm-ink-w', Math.ceil(t.width + 2 * pad) + 'px');
   };
   var queued = 0;
   var fitAll = function () {

@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=56"></script>
-<script src="theme.js?v=98"></script>
+<script src="theme.js?v=101"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -111,6 +111,13 @@
 .dc-dot{display:inline-block;width:8px;height:8px;border-radius:999px;margin-inline-end:6px;vertical-align:middle}
 .dc-src{display:inline-block;border:1px solid var(--gm-outline-variant);border-radius:999px;padding:1px 8px;font-size:11px;font-weight:600;white-space:nowrap;color:var(--gm-on-surface-variant)}
 .dc-amt-in{color:#15803D;font-weight:700}.dc-amt-out{color:#B91C1C;font-weight:700}
+.dc-dir{display:none}
+html:root body #cashbox-table tbody .dc-amt-in.dc-amt-in{color:#15803D!important;-webkit-text-fill-color:#15803D!important;background-image:none!important}
+html:root body #cashbox-table tbody .dc-amt-out.dc-amt-out{color:#B91C1C!important;-webkit-text-fill-color:#B91C1C!important;background-image:none!important}
+/* black marble (dark cards), cards without a link colour: brighter green / red so they read on the dark card */
+html:root[data-gm-theme="black-marble"] body #cashbox-table tbody tr:not(.dc-linked) .dc-amt-in.dc-amt-in{color:#5FD68A!important;-webkit-text-fill-color:#5FD68A!important}
+html:root[data-gm-theme="black-marble"] body #cashbox-table tbody tr:not(.dc-linked) .dc-amt-out.dc-amt-out{color:#FF8A7A!important;-webkit-text-fill-color:#FF8A7A!important}
+html:root body #cashbox-table tbody :is(.dc-amt-in,.dc-amt-out) *{color:inherit!important;-webkit-text-fill-color:inherit!important;background-image:none!important}
 .dc-bal{font-weight:600}
 #dcFoot td{font-weight:700;background:var(--gm-surface-container-low,#F7F2E6);border-bottom:0}
 @media (max-width:1023px){
@@ -131,7 +138,9 @@
   #cashbox-table .dc-op{grid-area:op;min-width:0}
   #cashbox-table .dc-t{grid-area:t;font-size:11.5px}
   #cashbox-table .dc-s{grid-area:src}
-  #cashbox-table .dc-i, #cashbox-table .dc-o{grid-area:amt;font-size:15px}
+  #cashbox-table .dc-i, #cashbox-table .dc-o{grid-area:amt;font-size:15px;text-align:left}
+  #cashbox-table .dc-dir{display:flex;align-items:center;justify-content:flex-end;gap:2px;font-size:11px;font-weight:700;margin-bottom:1px}
+  #cashbox-table .dc-dir .material-symbols-outlined{font-size:15px}
   #cashbox-table .dc-b{grid-area:bal;font-size:11px;color:var(--gm-on-surface-variant);font-weight:400}
   #cashbox-table .dc-b::before{content:"الرصيد "}
   #cashbox-table tfoot{display:block;margin-top:8px}
@@ -803,7 +812,9 @@ function renderAll() {
     const style = (bg ? `background:${bg};color:#1a1c1e;border-color:${dot};` : '') + hl;
     const meta = bg ? 'opacity-70' : 'text-on-surface-variant';
     const time = gmFormatDateTime(e.created_at, showFullHistory ? { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' } : { hour: '2-digit', minute: '2-digit' });
-    const money = `<span dir="ltr" class="font-data-mono">${fmt(amt)}</span> <span class="text-[10px] font-normal ${meta}">${cur}</span>`;
+    // in or out must be clear at a glance (بشار 2026-11-17): a label with an arrow and the sign, in green / red
+    const isIn = e.direction === 'in';
+    const money = `<span class="dc-dir">${isIn ? 'داخل' : 'صادر'}<span class="material-symbols-outlined" aria-hidden="true">${isIn ? 'south_west' : 'north_east'}</span></span><span dir="ltr" class="font-data-mono">${isIn ? '+' : '−'}${fmt(amt)}</span> <span class="text-[10px] font-normal ${meta}">${cur}</span>`;
     const hay = [e.operation_type, dcNote(e), e.staff && e.staff.full_name, src.label, fmt(amt)].join(' ');
     return `<tr class="${bg ? 'dc-linked' : ''}${e.id === dcOpenId ? ' dc-open' : ''}" data-id="${e.id}" data-dir="${e.direction}" data-src="${src.kind}" data-q="${gmEscapeHtml(hay)}" onclick="openEditModal('${e.id}')"${style ? ` style="${style}"` : ''}>
       <td class="dc-t font-data-mono" dir="ltr">${time}</td>
