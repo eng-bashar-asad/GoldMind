@@ -608,6 +608,10 @@ const GOLDMIND_THEMES = {
     // words written straight on the sand marble: deep espresso-gold so they read on the darker canvas
     T + ' .gm-on-canvas{color:#3E2C10!important;-webkit-text-fill-color:#3E2C10!important;background-image:none!important;text-shadow:0 1px 0 rgba(255,248,232,.55)!important}',
     T + ' .text-secondary{color:#6E5220!important}',
+    // form fields on the sand marble: a cream box with a clear brown frame, so every field is visible (بشار 2026-11-17)
+    T + ' :is(input:not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]):not([type=file]):not([type=hidden]),select,textarea){background-color:rgba(255,250,238,.92)!important;border:1px solid #A88B55!important;color:#2A2116!important;-webkit-text-fill-color:#2A2116}',
+    T + ' :is(input,select,textarea)::placeholder{color:#8A7A5E!important;-webkit-text-fill-color:#8A7A5E!important;opacity:1}',
+    T + ' :is(input,select,textarea):focus{border-color:#8A6A1C!important;box-shadow:0 0 0 3px rgba(184,149,74,.35)!important;outline:none}',
     // «زجاجية» mode paints its own art behind frosted cards — here the marble is that background
     T + '.gm-glass.gm-light-canvas{background:#CDB693 url("theme-beige-marble.jpg?v=2") repeat 0 0/900px 900px!important}',
     T + '.gm-glass.gm-light-canvas #gmGlassBg{display:none!important}',
