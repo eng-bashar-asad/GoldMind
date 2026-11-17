@@ -6,6 +6,8 @@
   var css = `/* ===== Brand hero (بشار 2026-11-16): the GoldMind G artwork behind the login, with motion ===== */
 :root { --gm-hero-bg: #020307; }
 html, body { background-color: var(--gm-hero-bg) !important; }
+/* the form waits for the artwork so the screen doesn't flash its old layout first */
+body:not(.gm-hero-page) > main { visibility: hidden; }
 .gm-hero { position: absolute; top: 0; left: 50%; width: min(100vw, 560px); aspect-ratio: 1; transform: translateX(-50%); overflow: hidden; pointer-events: none; z-index: 0;
   -webkit-mask-image: linear-gradient(to right, transparent, #000 9%, #000 91%, transparent), linear-gradient(to bottom, #000 80%, transparent);
   -webkit-mask-composite: source-in;
@@ -70,6 +72,9 @@ body.gm-hero-page { justify-content: flex-start !important; }
 }`;
   var st = document.createElement('style'); st.id = 'gm-hero-style'; st.textContent = css;
   (document.head || document.documentElement).appendChild(st);
+  // runs from <head> (not deferred): fetch the artwork right away
+  var pl = document.createElement('link'); pl.rel = 'preload'; pl.as = 'image'; pl.href = 'goldmind-hero.jpg';
+  (document.head || document.documentElement).appendChild(pl);
   function mount() {
     if (document.querySelector('.gm-hero')) return;
     var main = document.querySelector('main'); if (!main) return;
