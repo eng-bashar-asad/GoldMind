@@ -1,0 +1,57 @@
+name: Build Windows app (Calculator Pro)
+# The Windows shell in desktop/: a working calculator that opens GoldMind after a secret key
+# sequence (Bashar 2026-11-17). The program's pages load from the live site, so this only needs
+# rebuilding when desktop/ itself changes. Download link:
+#   https://github.com/eng-bashar-asad/GoldMind/releases/download/desktop-latest/CalculatorPro-Setup.exe
+# ponytail: unsigned installer (SmartScreen warns on first run); add code signing + the Tauri
+# updater if this is ever distributed widely.
+on:
+  push:
+    branches: [main]
+    paths: ['desktop/**', '.github/workflows/build-windows.yml']
+  workflow_dispatch: {}
+
+concurrency:
+  group: build-windows-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: windows-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+
+      - name: Set up Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: '22'
+
+      # Rust is preinstalled on the Windows runner.
+      - name: Rust toolchain
+        run: rustup default stable
+
+      - name: Build installer
+        working-directory: desktop
+        run: npx --yes @tauri-apps/cli@2.12.5 build --bundles nsis
+
+      - name: Collect installer
+        shell: bash
+        run: |
+          mkdir -p out
+          cp desktop/src-tauri/target/release/bundle/nsis/*-setup.exe out/CalculatorPro-Setup.exe
+          ls -la out
+
+      - name: Publish/refresh download release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2.6.2
+        with:
+          tag_name: desktop-latest
+          name: "Calculator Pro for Windows (latest)"
+          body: "Built from commit ${{ github.sha }}. Download CalculatorPro-Setup.exe and run it."
+          files: out/CalculatorPro-Setup.exe
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
