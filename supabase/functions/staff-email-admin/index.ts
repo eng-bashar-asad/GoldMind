@@ -11,6 +11,11 @@
 // action="update": changes that staff member's login email. This is a
 //                   real credential change — it takes effect immediately
 //                   and the old email can no longer be used to sign in.
+// action="set_username": changes the username they sign in with (بشار 2026-11-18).
+// action="set_password": sets a new password chosen by the manager. Passwords are
+//                   never readable — this is the only way to "give" one.
+// get also returns the username, and whether the email is only the private
+// placeholder of a username-only account (@staff.goldmind.app, never emailed).
 //
 // DEPLOY:
 //   supabase functions deploy staff-email-admin --project-ref puzkfwbmipldzgwofhjg
@@ -34,7 +39,7 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    const { action, store_id, staff_id, new_email: rawNewEmail } = await req.json();
+    const { action, store_id, staff_id, new_email: rawNewEmail, new_username: rawUsername, new_password: newPassword } = await req.json();
 
     if (!action || !store_id || !staff_id) {
       return json({ error: 'بيانات ناقصة' }, 400);
@@ -71,27 +76,63 @@ serve(async (req) => {
       .from('staff').select('id, user_id, role').eq('id', staff_id).eq('store_id', store_id).maybeSingle();
     if (!targetStaff || !targetStaff.user_id) return json({ error: 'الموظف غير موجود' }, 404);
 
+    const PLACEHOLDER = '@staff.goldmind.app';
+
     if (action === 'get') {
-      const { data: userRes, error: getErr } = await admin.auth.admin.getUserById(targetStaff.user_id);
+      const [{ data: userRes, error: getErr }, { data: prof }] = await Promise.all([
+        admin.auth.admin.getUserById(targetStaff.user_id),
+        admin.from('user_profiles').select('username').eq('id', targetStaff.user_id).maybeSingle(),
+      ]);
       if (getErr || !userRes?.user) return json({ error: 'تعذّر جلب البريد الإلكتروني: ' + (getErr?.message || '') }, 400);
-      return json({ email: userRes.user.email || null });
+      const email = userRes.user.email || null;
+      return json({ email, username: prof?.username || null, placeholder: !!email && email.toLowerCase().endsWith(PLACEHOLDER) });
+    }
+
+    // Changing a login (email, username, password) — same guards for all three.
+    // Only the owner may change the owner's login; a manager with manage_staff
+    // must not be able to take over the owner account.
+    if (targetStaff.role === 'owner' && !isOwner) {
+      return json({ error: 'لا يمكن تغيير بيانات دخول مالك الشركة إلا من المالك نفسه' }, 403);
+    }
+    // The login is shared by every company this person belongs to, so one
+    // company must not change it when the account is also used elsewhere.
+    const [{ data: otherStores }, { data: isPlatformAdmin }] = await Promise.all([
+      admin.from('staff').select('id').eq('user_id', targetStaff.user_id).neq('store_id', store_id).limit(1),
+      admin.from('platform_admins').select('id').eq('id', targetStaff.user_id).maybeSingle(),
+    ]);
+    if ((otherStores && otherStores.length > 0) || isPlatformAdmin) {
+      return json({ error: 'هذا الحساب مرتبط بشركات أخرى، ولا يمكن تغيير بيانات دخوله من هنا. يستطيع صاحب الحساب تغييرها بنفسه.' }, 403);
+    }
+
+    if (action === 'set_password') {
+      const pw = String(newPassword || '');
+      if (pw.length < 8 || pw.length > 72) return json({ error: 'كلمة المرور يجب أن تكون من 8 إلى 72 خانة' }, 400);
+      const { error: pwErr } = await admin.auth.admin.updateUserById(targetStaff.user_id, { password: pw });
+      if (pwErr) return json({ error: 'تعذّر تغيير كلمة المرور: ' + pwErr.message }, 400);
+      return json({ success: true });
+    }
+
+    if (action === 'set_username') {
+      const username = String(rawUsername || '').trim();
+      if (!/^[a-zA-Z0-9_.]{3,20}$/.test(username)) {
+        return json({ error: 'اسم المستخدم يجب أن يكون 3-20 خانة (حروف إنجليزية/أرقام/_ فقط، بدون مسافات)' }, 400);
+      }
+      const { data: taken } = await admin.from('user_profiles').select('id').ilike('username', username.replace(/[_%\\]/g, '\\$&')).neq('id', targetStaff.user_id).maybeSingle();
+      if (taken) return json({ error: 'اسم المستخدم هذا مستخدم في حساب آخر' }, 400);
+      const { error: upErr } = await admin.from('user_profiles').upsert({ id: targetStaff.user_id, username }, { onConflict: 'id' });
+      if (upErr) return json({ error: 'تعذّر حفظ اسم المستخدم: ' + upErr.message }, 400);
+      // a username-only account's private email follows the new username (it's never shown or emailed)
+      const { data: userRes } = await admin.auth.admin.getUserById(targetStaff.user_id);
+      const cur = (userRes?.user?.email || '').toLowerCase();
+      if (cur.endsWith(PLACEHOLDER)) {
+        await admin.auth.admin.updateUserById(targetStaff.user_id, {
+          email: `${username.toLowerCase()}.${String(store_id).slice(0, 8)}${PLACEHOLDER}`, email_confirm: true,
+        });
+      }
+      return json({ success: true, username });
     }
 
     if (action === 'update') {
-      // Only the owner may change the owner's login; a manager with
-      // manage_staff must not be able to take over the owner account.
-      if (targetStaff.role === 'owner' && !isOwner) {
-        return json({ error: 'لا يمكن تغيير البريد الإلكتروني لمالك الشركة إلا من المالك نفسه' }, 403);
-      }
-      // The login is shared by every company this person belongs to, so one
-      // company must not change it when the account is also used elsewhere.
-      const [{ data: otherStores }, { data: isPlatformAdmin }] = await Promise.all([
-        admin.from('staff').select('id').eq('user_id', targetStaff.user_id).neq('store_id', store_id).limit(1),
-        admin.from('platform_admins').select('id').eq('id', targetStaff.user_id).maybeSingle(),
-      ]);
-      if ((otherStores && otherStores.length > 0) || isPlatformAdmin) {
-        return json({ error: 'هذا الحساب مرتبط بشركات أخرى، ولا يمكن تغيير بريده الإلكتروني من هنا. يستطيع صاحب الحساب تغييره بنفسه.' }, 403);
-      }
       if (!rawNewEmail || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(rawNewEmail)) {
         return json({ error: 'صيغة البريد الإلكتروني غير صحيحة' }, 400);
       }

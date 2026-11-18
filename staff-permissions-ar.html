@@ -221,8 +221,23 @@
 <p id="detailBasicsSuccess" class="text-[12px] hidden mb-2" style="color:#2e7d32;">✓ تم الحفظ</p>
 <button onclick="saveStaffDetailBasics()" class="w-full h-10 bg-primary text-on-primary rounded-lg text-[12px] font-semibold mb-4">حفظ الاسم والأرقام</button>
 
+<!-- login details (بشار 2026-11-18): the username they sign in with, and a new password set by the manager
+     (a password can never be read back, only replaced) -->
+<div class="border-t border-outline-variant pt-3 mb-4">
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="detailUsername">اسم المستخدم للدخول</label>
+<input id="detailUsername" type="text" dir="ltr" autocomplete="off" placeholder="جارِ التحميل..." class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-1 bg-background text-on-background"/>
+<p class="text-[10.5px] text-on-surface-variant mb-2">3-20 خانة: حروف إنجليزية وأرقام و _ فقط.</p>
+<button onclick="saveStaffDetailUsername()" class="w-full h-10 border border-primary text-primary rounded-lg text-[12px] font-semibold mb-3">حفظ اسم المستخدم</button>
+
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="detailPassword">كلمة مرور جديدة</label>
+<input id="detailPassword" type="text" dir="ltr" autocomplete="new-password" placeholder="8 خانات على الأقل" class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-1 bg-background text-on-background"/>
+<p class="text-[10.5px] text-on-surface-variant mb-2">لا يمكن عرض كلمة المرور الحالية لأحد. اكتب كلمة جديدة وأعطها للموظف؛ القديمة تتوقف فوراً.</p>
+<p id="detailLoginError" class="text-error text-[12px] hidden mb-2"></p>
+<button onclick="saveStaffDetailPassword()" class="w-full h-10 border border-primary text-primary rounded-lg text-[12px] font-semibold">تعيين كلمة المرور</button>
+</div>
+
 <div class="border-t border-outline-variant pt-3">
-<label class="block text-[11px] font-semibold text-on-surface-variant mb-1">البريد الإلكتروني للدخول</label>
+<label class="block text-[11px] font-semibold text-on-surface-variant mb-1" id="detailEmailLbl">البريد الإلكتروني للدخول</label>
 <input id="detailEmail" type="email" dir="ltr" placeholder="جارِ التحميل..." class="w-full h-10 border border-outline-variant rounded-lg px-3 text-[13px] mb-1 bg-background text-on-background"/>
 <p class="text-[10.5px] text-on-surface-variant mb-2">
 <span class="material-symbols-outlined align-middle" style="font-size:13px;">warning</span>
@@ -361,6 +376,9 @@ function openStaffDetail(staffId) {
 
   const emailInput = document.getElementById('detailEmail');
   emailInput.value = '';
+  ['detailUsername', 'detailPassword'].forEach(id => { document.getElementById(id).value = ''; });
+  document.getElementById('detailUsername').placeholder = 'جارِ التحميل...';
+  detailLoginErr('');
   emailInput.placeholder = 'جارِ التحميل...';
   emailInput.disabled = true;
 
@@ -388,8 +406,45 @@ async function loadStaffEmail(staffId) {
     emailInput.disabled = false;
     return;
   }
-  emailInput.value = data.email || '';
+  // a username-only account has a private placeholder email: don't show it as if it were real
+  emailInput.value = data.placeholder ? '' : (data.email || '');
+  emailInput.placeholder = data.placeholder ? 'لا يوجد بريد — يدخل باسم المستخدم (اختياري)' : '';
+  document.getElementById('detailEmailLbl').textContent = data.placeholder ? 'البريد الإلكتروني (اختياري)' : 'البريد الإلكتروني للدخول';
   emailInput.disabled = false;
+  const u = document.getElementById('detailUsername');
+  u.value = data.username || ''; u.placeholder = data.username ? '' : 'لا يوجد اسم مستخدم — اكتب واحداً';
+}
+
+function detailLoginErr(msg) {
+  const el = document.getElementById('detailLoginError');
+  el.textContent = msg || ''; el.classList.toggle('hidden', !msg);
+}
+
+async function saveStaffDetailUsername() {
+  if (!detailStaffId) return;
+  detailLoginErr('');
+  const username = document.getElementById('detailUsername').value.trim();
+  if (!/^[a-zA-Z0-9_.]{3,20}$/.test(username)) return detailLoginErr('اسم المستخدم يجب أن يكون 3-20 خانة (حروف إنجليزية/أرقام/_ فقط، بدون مسافات)');
+  const { data, error } = await goldmindClient.functions.invoke('staff-email-admin', {
+    body: { action: 'set_username', store_id: GOLDMIND_STORE_ID, staff_id: detailStaffId, new_username: username }
+  });
+  if (error || !data || data.error) return detailLoginErr('تعذّر حفظ اسم المستخدم: ' + (data?.error || error?.message || ''));
+  showToast('تم حفظ اسم المستخدم: ' + data.username);
+}
+
+async function saveStaffDetailPassword() {
+  if (!detailStaffId) return;
+  detailLoginErr('');
+  const pw = document.getElementById('detailPassword').value;
+  if (pw.length < 8) return detailLoginErr('كلمة المرور يجب أن تكون 8 خانات على الأقل');
+  const staff = allStaffData.find(s => s.id === detailStaffId);
+  if (!confirm(`تعيين كلمة مرور جديدة لـ "${staff ? staff.full_name : 'الموظف'}"؟\nكلمة المرور القديمة تتوقف فوراً.`)) return;
+  const { data, error } = await goldmindClient.functions.invoke('staff-email-admin', {
+    body: { action: 'set_password', store_id: GOLDMIND_STORE_ID, staff_id: detailStaffId, new_password: pw }
+  });
+  if (error || !data || data.error) return detailLoginErr('تعذّر تغيير كلمة المرور: ' + (data?.error || error?.message || ''));
+  document.getElementById('detailPassword').value = '';
+  showToast('تم تعيين كلمة المرور الجديدة');
 }
 
 async function saveStaffDetailBasics() {
