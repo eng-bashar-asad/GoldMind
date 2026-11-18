@@ -1,4 +1,4 @@
-const CACHE_NAME = 'goldmind-shell-v413';
+const CACHE_NAME = 'goldmind-shell-v414';
 // Inside the installed app (Capacitor serves the bundled files from https://localhost) the files are
 // already on the phone, and this worker survives an app update: it kept serving the PREVIOUS version's
 // cached theme.js / build-info.json on the first launch after updating, so the update bar came back
@@ -11,7 +11,7 @@ const SHELL_ASSETS = [
   './icon-192.png',
   './icon-512.png',
   './supabase-config.js?v=58',
-  './theme.js?v=104',
+  './theme.js?v=105',
   './gm-invoice-edit.js?v=4',
   './index-ar.html',
   './new-sale-ar.html',
@@ -29,7 +29,7 @@ const SHELL_ASSETS = [
   './gm-home-tools.js?v=2',
   './gm-profit.js?v=7',
   './gm-report.js?v=4',
-  './gm-nav.js?v=31'
+  './gm-nav.js?v=32'
 ];
 // Versioned libraries and fonts from these CDNs are safe to keep offline.
 // Supabase itself is NEVER cached here (live data must always be fresh; the

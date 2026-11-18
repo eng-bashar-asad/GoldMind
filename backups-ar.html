@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html class="light" dir="rtl" lang="ar"><head>
+<meta charset="utf-8"/>
+<link rel="manifest" href="manifest.json"/>
+<link rel="apple-touch-icon" href="apple-touch-icon.png"/>
+<meta name="theme-color" content="#020307"/>
+<meta name="mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>النسخ الاحتياطية | GoldMind</title>
+<script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
+<script src="supabase-config.js?v=58"></script>
+<script src="theme.js?v=105"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
+<script id="tailwind-config">
+        tailwind.config = { darkMode: "class", theme: { extend: {
+          "colors": {
+                  "on-surface-variant": "var(--gm-on-surface-variant)", "secondary": "var(--gm-secondary)",
+                  "error": "#ba1a1a", "on-secondary": "#ffffff",
+                  "on-surface": "var(--gm-on-surface)", "surface-container-low": "var(--gm-surface-low)", "on-primary": "var(--gm-on-primary)",
+                  "background": "var(--gm-bg-elevated)", "outline-variant": "var(--gm-outline-variant)", "surface-container-lowest": "var(--gm-surface-lowest)",
+                  "surface": "var(--gm-bg-elevated)", "primary": "var(--gm-primary)", "on-background": "var(--gm-on-primary)", "outline": "#76777d"
+          },
+          "fontFamily": { "body-md": ["Inter"], "data-mono": ["IBM Plex Sans"], "headline-md": ["Inter"] },
+          "spacing": { "margin-desktop": "40px", "margin-mobile": "16px", "container-max": "1100px" }
+        } } }
+    </script>
+<style>
+    html { font-size: 87.5%; }
+    .material-symbols-outlined { font-variation-settings: 'FILL' 0, 'wght' 400; font-size: 18px; }
+    body { min-height: max(884px, 100dvh); }
+    .bk-num { font-family: 'IBM Plex Sans', sans-serif; direction: ltr; white-space: nowrap; }
+    .bk-file { display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; padding: 12px 16px;
+      border-bottom: 1px solid var(--gm-outline-variant); text-align: right; min-height: 52px; }
+    .bk-file:last-child { border-bottom: 0; }
+    .bk-file.on { background: rgba(212,175,55,.14); }
+    .bk-row { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--gm-outline-variant); }
+    .bk-row:last-child { border-bottom: 0; }
+    .bk-row .t { font-weight: 700; font-size: 13.5px; }
+    .bk-row .s { font-size: 11.5px; color: var(--gm-on-surface-variant); }
+    .bk-tag { display: inline-block; font-size: 10.5px; font-weight: 700; padding: 1px 7px; border-radius: 999px; margin-inline-start: 6px; }
+    .bk-gone { background: rgba(198,40,40,.12); color: #B42318; }
+    .bk-here { background: rgba(46,125,50,.12); color: #2E7D32; }
+    .bk-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+    .bk-seg button { height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--gm-outline-variant); font-size: 12.5px; font-weight: 600; }
+    .bk-seg button[aria-pressed="true"] { background: var(--gm-primary); color: var(--gm-on-primary); border-color: var(--gm-primary); }
+</style>
+</head>
+<body class="bg-background font-body-md text-on-surface antialiased min-h-screen flex flex-col overflow-x-hidden">
+<main class="flex-1 pb-24 md:pb-8 flex flex-col">
+<header class="bg-surface-container-lowest text-primary flex justify-between items-center px-margin-mobile md:px-margin-desktop w-full h-16 sticky top-0 z-40 border-b border-outline-variant">
+<div class="flex items-center gap-3">
+<button onclick="gmSmartBack('settings-ar.html')" class="cursor-pointer active:opacity-80 font-bold min-w-[44px] min-h-[44px]" style="direction:ltr;font-size:32px;line-height:1;" aria-label="رجوع">&#8594;</button>
+<h1 class="font-headline-md text-[18px] font-bold text-primary">النسخ الاحتياطية</h1>
+</div>
+<button id="bk-now" onclick="bkNow()" class="h-10 px-3 flex items-center gap-1 rounded-lg border border-outline-variant text-[12.5px] font-semibold"><span class="material-symbols-outlined">backup</span> نسخة الآن</button>
+</header>
+<div class="px-margin-mobile md:px-margin-desktop py-5 md:py-8 max-w-container-max mx-auto w-full space-y-4">
+
+<p class="text-[12.5px] text-on-surface-variant leading-relaxed">تُحفظ نسخة كاملة من بيانات الشركة كل يوم الساعة 3 فجراً بتوقيت بلد الشركة، وكل يوم في ملف مستقل باسم تاريخه. افتح نسخة يوم معيّن لترى ما كان فيها، واسترجع أي حركة أو زبون أو تاجر حُذف بعد ذلك اليوم.</p>
+
+<div class="grid md:grid-cols-[280px_1fr] gap-4 items-start">
+  <section class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+    <div class="px-4 py-3 border-b border-outline-variant font-bold text-[14px]">النسخ المحفوظة</div>
+    <div id="bk-files"><p class="p-4 text-[13px] text-on-surface-variant">جارِ التحميل…</p></div>
+  </section>
+
+  <section id="bk-view" class="bg-surface-container-lowest border border-outline-variant rounded-xl overflow-hidden">
+    <div class="px-4 py-3 border-b border-outline-variant space-y-3">
+      <div class="flex items-center justify-between gap-2 flex-wrap">
+        <b id="bk-title" class="text-[14px]">اختر نسخة من القائمة</b>
+        <label class="flex items-center gap-2 text-[12.5px]"><input id="bk-all" type="checkbox" class="rounded" onchange="bkRender()"/> عرض كل ما في النسخة (لا المحذوف فقط)</label>
+      </div>
+      <div id="bk-tabs" class="bk-seg" role="group" aria-label="نوع البيانات"></div>
+      <input id="bk-q" type="search" placeholder="ابحث بالاسم أو المبلغ أو الملاحظة…" oninput="bkRender()" class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px] bg-background text-on-surface"/>
+    </div>
+    <div id="bk-rows"><p class="p-4 text-[13px] text-on-surface-variant">بعد فتح نسخة تظهر هنا العناصر الموجودة فيها والمحذوفة الآن.</p></div>
+  </section>
+</div>
+</div>
+</main>
+
+<script>
+// Daily backups (بشار 2026-11-18): files come from the daily-backup edge function (03:00 company
+// time, one file per day). Opening one shows, per kind, the items that were in it and are gone now;
+// «استرجاع» brings one back (with its cash/daily-box rows) through the same function.
+const BK_KINDS = [
+  { t: 'trader_movements', l: 'حركات التجار' }, { t: 'customer_debts', l: 'حركات الزبائن' },
+  { t: 'cash_movements', l: 'الصندوق' }, { t: 'expense_entries', l: 'المصاريف' },
+  { t: 'customers', l: 'الزبائن' }, { t: 'traders', l: 'التجار' } ];
+const BK = { files: [], file: null, snap: null, kind: 'trader_movements', current: {} };
+const fmt = n => Number(n || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 3 });
+const esc = s => gmEscapeHtml(String(s == null ? '' : s));
+const dateOf = v => v ? new Intl.DateTimeFormat('en-GB', { timeZone: 'Asia/Dubai', day: '2-digit', month: '2-digit', year: 'numeric' }).format(new Date(v)) : '';
+
+async function bkCall(body) {
+  const { data, error } = await goldmindClient.functions.invoke('daily-backup', { body: { store_id: GOLDMIND_STORE_ID, ...body } });
+  if (error || !data || data.error) throw new Error((data && data.error) || (error && error.message) || 'خطأ');
+  return data;
+}
+
+function bkLabel(name) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})(?:_(\d{2})(\d{2}))?/.exec(name);
+  if (!m) return name;
+  return `${m[3]}/${m[2]}/${m[1]}` + (m[4] ? ` — يدوية ${m[4]}:${m[5]}` : '');
+}
+
+async function bkList() {
+  const el = document.getElementById('bk-files');
+  try {
+    BK.files = (await bkCall({ action: 'list' })).files || [];
+  } catch (e) { el.innerHTML = `<p class="p-4 text-[13px] text-error">تعذّر تحميل النسخ: ${esc(e.message)}</p>`; return; }
+  if (!BK.files.length) { el.innerHTML = '<p class="p-4 text-[13px] text-on-surface-variant">لا توجد نسخ بعد. أول نسخة تلقائية تُحفظ الليلة الساعة 3 فجراً، أو اضغط «نسخة الآن».</p>'; return; }
+  el.innerHTML = BK.files.map(f => `<button type="button" class="bk-file ${BK.file === f.name ? 'on' : ''}" onclick="bkOpen('${esc(f.name)}')">
+      <span class="font-semibold text-[13.5px]">${esc(bkLabel(f.name))}</span>
+      <span class="text-[11.5px] text-on-surface-variant bk-num">${f.size ? (f.size / 1024 / 1024).toFixed(2) + ' MB' : ''}</span></button>`).join('');
+}
+
+async function bkNow() {
+  const b = document.getElementById('bk-now'); b.disabled = true;
+  try { await bkCall({ action: 'backup_now' }); (window.gmNotify || alert)('تم حفظ نسخة احتياطية الآن', 'ok'); await bkList(); }
+  catch (e) { alert('تعذّر حفظ النسخة: ' + e.message); }
+  b.disabled = false;
+}
+
+async function bkOpen(name) {
+  BK.file = name; BK.snap = null; bkList();
+  document.getElementById('bk-title').textContent = 'نسخة ' + bkLabel(name);
+  document.getElementById('bk-rows').innerHTML = '<p class="p-4 text-[13px] text-on-surface-variant">جارِ فتح النسخة…</p>';
+  try {
+    const { url } = await bkCall({ action: 'url', file: name });
+    const res = await fetch(url);
+    const text = await new Response(res.body.pipeThrough(new DecompressionStream('gzip'))).text();
+    BK.snap = JSON.parse(text).tables || {};
+    await bkLoadCurrent();
+    bkTabs(); bkRender();
+  } catch (e) { document.getElementById('bk-rows').innerHTML = `<p class="p-4 text-[13px] text-error">تعذّر فتح النسخة: ${esc(e.message)}</p>`; }
+}
+
+// which ids of each kind exist today (so the page can tell what was deleted since)
+async function bkLoadCurrent() {
+  BK.current = {};
+  await Promise.all(BK_KINDS.map(async k => {
+    const { data } = await gmFetchAllRows(() => goldmindClient.from(k.t).select('id').eq('store_id', GOLDMIND_STORE_ID));
+    BK.current[k.t] = new Set((data || []).map(r => r.id));
+  }));
+}
+
+function bkTabs() {
+  document.getElementById('bk-tabs').innerHTML = BK_KINDS.map(k => {
+    const rows = (BK.snap[k.t] || []), gone = rows.filter(r => !BK.current[k.t].has(r.id)).length;
+    return `<button type="button" aria-pressed="${BK.kind === k.t}" onclick="BK.kind='${k.t}';bkTabs();bkRender()">${k.l}${gone ? ` <span class="bk-tag bk-gone">${gone} محذوف</span>` : ''}</button>`;
+  }).join('');
+}
+
+const nameOf = (tbl, id) => { const r = (BK.snap[tbl] || []).find(x => x.id === id); return r ? r.name : ''; };
+const SRC = { stock_given: 'إخراج بضاعة', stock_received: 'إدخال بضاعة', scrap_given: 'إخراج كسر', settlement: 'تسوية', cash_in: 'قبض كاش', cash_out: 'صرف كاش',
+  gold_to_cash: 'تحويل ذهب لنقد', opening_balance: 'رصيد سابق', discount: 'خصم' };
+
+function bkDescribe(t, r) {
+  if (t === 'trader_movements') return { t: (nameOf('traders', r.trader_id) || 'تاجر') + ' — ' + (SRC[r.source] || r.source || 'حركة') + (r.voucher_no ? ' ' + r.voucher_no : ''),
+    s: [Number(r.weight_grams) ? fmt(r.weight_grams) + ' غ عيار ' + (r.karat || '') : '', Number(r.fab_fee_amount) ? fmt(r.fab_fee_amount) : '', r.notes].filter(Boolean).join(' · ') };
+  if (t === 'customer_debts') return { t: (nameOf('customers', r.customer_id) || 'زبون') + ' — ' + (r.movement_type === 'debt_increase' ? 'عليه' : 'له'),
+    s: [Number(r.cash_amount) ? fmt(r.cash_amount) : '', Number(r.gold_grams_24k) ? fmt(r.gold_grams_24k) + ' غ' : '', r.notes].filter(Boolean).join(' · ') };
+  if (t === 'cash_movements') return { t: (r.direction === 'in' ? 'داخل' : 'صادر') + ' ' + fmt(r.amount) + (r.box === 'bank' ? ' (البنك)' : ''), s: r.description || '' };
+  if (t === 'expense_entries') return { t: 'مصروف ' + fmt(r.amount), s: r.description || '' };
+  return { t: r.name || '—', s: r.phone || '' };
+}
+
+function bkRender() {
+  if (!BK.snap) return;
+  const t = BK.kind, all = document.getElementById('bk-all').checked, q = document.getElementById('bk-q').value.trim().toLowerCase();
+  let rows = (BK.snap[t] || []).map(r => ({ r, gone: !BK.current[t].has(r.id), d: bkDescribe(t, r) }));
+  if (!all) rows = rows.filter(x => x.gone);
+  if (q) rows = rows.filter(x => (x.d.t + ' ' + x.d.s).toLowerCase().includes(q));
+  rows.sort((a, b) => String(b.r.created_at || '').localeCompare(String(a.r.created_at || '')));
+  const el = document.getElementById('bk-rows');
+  if (!rows.length) { el.innerHTML = `<p class="p-4 text-[13px] text-on-surface-variant">${all ? 'لا توجد عناصر' : 'لم يُحذف شيء من هذا النوع منذ هذه النسخة'}.</p>`; return; }
+  el.innerHTML = rows.slice(0, 300).map(x => `<div class="bk-row">
+      <div><div class="t">${esc(x.d.t)}<span class="bk-tag ${x.gone ? 'bk-gone' : 'bk-here'}">${x.gone ? 'محذوف الآن' : 'موجود'}</span></div>
+        <div class="s"><span class="bk-num">${esc(dateOf(x.r.created_at))}</span>${x.d.s ? ' · ' + esc(x.d.s) : ''}</div></div>
+      ${x.gone ? `<button type="button" class="h-10 px-3 rounded-lg border border-outline-variant text-[12.5px] font-semibold" onclick="bkRestore('${t}','${esc(x.r.id)}')">استرجاع</button>` : '<span></span>'}
+    </div>`).join('') + (rows.length > 300 ? '<p class="p-3 text-[12px] text-on-surface-variant">يظهر أول 300 — استخدم البحث للوصول إلى غيرها.</p>' : '');
+}
+
+async function bkRestore(table, id) {
+  const r = (BK.snap[table] || []).find(x => x.id === id); if (!r) return;
+  const d = bkDescribe(table, r);
+  if (!confirm(`استرجاع هذا العنصر كما كان في النسخة؟\n\n${d.t}\n${d.s}\n\nيُسترجع معه ما حُذف معه (سطور السند نفسه وحركة الصندوق المرتبطة).`)) return;
+  try {
+    const res = await bkCall({ action: 'restore', file: BK.file, table, id });
+    (window.gmNotify || alert)(`تم الاسترجاع (${res.rows} سطر)`, 'ok');
+    await bkLoadCurrent(); bkTabs(); bkRender();
+  } catch (e) { alert('تعذّر الاسترجاع: ' + e.message); }
+}
+
+(async function init() {
+  const session = await requireGoldMindSession('login-entry-ar.html');
+  if (!session) return;
+  const { data: me } = await goldmindClient.from('staff').select('role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+  if (!me || me.role !== 'owner') { alert('النسخ الاحتياطية متاحة لمالك الشركة فقط.'); location.href = 'index-ar.html'; return; }
+  bkList();
+})();
+</script>
+</body>
+</html>

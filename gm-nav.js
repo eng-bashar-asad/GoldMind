@@ -64,6 +64,7 @@
       ['theme-picker-ar.html', 'palette', 'مظهر التطبيق'],
       ['account-security-ar.html', 'lock', 'الأمان وكلمة المرور'],
       ['fiscal-year-close-ar.html', 'event_repeat', 'إغلاق السنة المالية', 'edit_settings'],
+      ['backups-ar.html', 'backup', 'النسخ الاحتياطية', 'owner_only_backups'],
       ['subscription-ar.html', 'workspace_premium', 'الاشتراك', 'manage_subscription'],
       ['support-contact-ar.html', 'support_agent', 'تواصل مع الدعم'],
       ['#tz', 'schedule', 'المنطقة الزمنية للعرض'] ] },
