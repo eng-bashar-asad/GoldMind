@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict DVahHajHb451eOEdNUbWRfPv3cXONfu6B5blzPwDdjUTcdgmE69vesQamlPkrez
+\restrict aVdFOmYglU0X4HxRsuH6sP1Kgo5IBAlQ5wWU0sN8pdLrLKBSdGsldwuVO7EZIbv
 
 
 SET statement_timeout = 0;
@@ -2122,6 +2122,21 @@ CREATE FUNCTION public.gm_is_store_owner(p_store uuid) RETURNS boolean
     SET search_path TO 'public'
     AS $$
   select exists (select 1 from public.staff where user_id = auth.uid() and store_id = p_store and role = 'owner');
+$$;
+
+
+--
+-- Name: gm_merge_home_prefs(jsonb); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_merge_home_prefs(p jsonb) RETURNS void
+    LANGUAGE sql
+    SET search_path TO ''
+    AS $$
+  insert into public.user_profiles (id, home_prefs)
+  values ((select auth.uid()), coalesce(p, '{}'::jsonb))
+  on conflict (id) do update
+    set home_prefs = coalesce(public.user_profiles.home_prefs, '{}'::jsonb) || coalesce(p, '{}'::jsonb);
 $$;
 
 
@@ -13331,6 +13346,15 @@ GRANT ALL ON FUNCTION public.gm_is_store_owner(p_store uuid) TO service_role;
 
 
 --
+-- Name: FUNCTION gm_merge_home_prefs(p jsonb); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_merge_home_prefs(p jsonb) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_merge_home_prefs(p jsonb) TO authenticated;
+GRANT ALL ON FUNCTION public.gm_merge_home_prefs(p jsonb) TO service_role;
+
+
+--
 -- Name: FUNCTION gm_next_voucher_no(p_store uuid, p_prefix text); Type: ACL; Schema: public; Owner: -
 --
 
@@ -15193,5 +15217,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict DVahHajHb451eOEdNUbWRfPv3cXONfu6B5blzPwDdjUTcdgmE69vesQamlPkrez
+\unrestrict aVdFOmYglU0X4HxRsuH6sP1Kgo5IBAlQ5wWU0sN8pdLrLKBSdGsldwuVO7EZIbv
 
