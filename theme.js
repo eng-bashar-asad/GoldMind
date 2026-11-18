@@ -767,6 +767,8 @@ gmEnsureStatShimmerStyle();
       const el = els[i];
       if (el.classList.contains('gm-cfix-light') || el.classList.contains('gm-cfix-dark')) continue;
       if (/^(SCRIPT|STYLE|SVG|svg|path|IMG|CANVAS|OPTION|BR)$/.test(el.tagName)) continue;
+      // date boxes draw their text in an overlay that already takes the box's own colour
+      if (el.classList.contains('gm-date-native') || el.classList.contains('gm-date-overlay')) continue;
       let own = /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName);
       if (!own) for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) { own = true; break; }
       if (!own || !el.getClientRects().length) continue;
@@ -1852,7 +1854,12 @@ function gmClosePhotoViewer() {
     const o = el.__gmDateOverlay; if (!o) return;
     const t = fmt(el.value);
     o.textContent = t || 'يوم/شهر/سنة';
-    o.style.color = t ? '' : '#9a9a9a';
+    // the overlay sits on the box's own fill: paint it in the box's text colour (on dark themes the box
+    // is dark inside a light panel, so inheriting the panel's colour left dark-on-dark, بشار 2026-11-18)
+    el.classList.remove('gm-date-native');
+    const ink = getComputedStyle(el).color;
+    el.classList.add('gm-date-native');
+    o.style.color = t ? ink : '#9a9a9a';
   }
   function setup(el) {
     if (el.__gmDateOverlay || el.type !== 'date' || el.hasAttribute('data-gm-date')) return;
@@ -1883,7 +1890,7 @@ function gmClosePhotoViewer() {
     set(v) { desc.set.call(this, v); if (this.__gmDateOverlay) sync(this); }
   });
   const st = document.createElement('style');
-  st.textContent = 'input.gm-date-native{color:transparent !important;caret-color:transparent}' +
+  st.textContent = 'html:root body input.gm-date-native.gm-date-native:not(.gm-z):not(.gm-z):not(.gm-z){color:transparent !important;-webkit-text-fill-color:transparent !important;caret-color:transparent}' +
     'input.gm-date-native::-webkit-datetime-edit{color:transparent !important}' +
     'input.gm-date-native::-webkit-calendar-picker-indicator{opacity:.7;cursor:pointer}';
   (document.head || document.documentElement).appendChild(st);
