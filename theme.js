@@ -771,6 +771,9 @@ gmEnsureStatShimmerStyle();
       if (!own) for (const n of el.childNodes) if (n.nodeType === 3 && n.nodeValue.trim()) { own = true; break; }
       if (!own || !el.getClientRects().length) continue;
       const ecs = getComputedStyle(el);
+      // a badge that paints its own gradient (letter avatars) is designed with its text: leave it
+      // (the fix would also wipe that gradient — the trader initials lost their circle, بشار 2026-11-18)
+      if (ecs.backgroundImage && ecs.backgroundImage !== 'none' && !/text/.test(ecs.webkitBackgroundClip || ecs.backgroundClip || '')) continue;
       // what is painted is the fill colour when a rule sets one (it can differ from `color`)
       let fg = rgb(ecs.webkitTextFillColor && !/text/.test(ecs.webkitBackgroundClip || '') ? ecs.webkitTextFillColor : ecs.color); const bg = bgOf(el);
       // gradient words (gloss colours) have a transparent colour: judge them by their ink's first colour
