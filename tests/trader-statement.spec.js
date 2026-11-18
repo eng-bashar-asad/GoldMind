@@ -20,11 +20,12 @@ test('statement: a two-piece voucher is one line, directions and balances are ri
   // on the computer it sits right under the account card, not a screen further down (row gaps × 40 spanned rows)
   const top = await page.locator('#ldStatement').evaluate(e => e.getBoundingClientRect().top);
   expect(top).toBeLessThan(700);
-  await expect(rows.nth(0)).toContainText('صادر للتاجر');
-  await expect(rows.nth(0)).toContainText('2 قطع');
-  await expect(rows.nth(0).locator('td[data-l="الوزن القائم"]')).toContainText('12');
-  await expect(rows.nth(0).locator('td[data-l="المبلغ"]')).toContainText('120');
-  await expect(rows.nth(1)).toContainText('وارد من التاجر');
-  await expect(rows.nth(1).locator('td[data-l="الرصيد النقدي بعدها"]')).toContainText('70');
-  await expect(rows.nth(1).locator('td[data-l="رصيد الذهب بعدها"]')).toContainText('9');
+  // newest on top (بشار 2026-11-18): the 03/11 receipt first, the 01/11 voucher under it
+  await expect(rows.nth(1)).toContainText('صادر للتاجر');
+  await expect(rows.nth(1)).toContainText('2 قطع');
+  await expect(rows.nth(1).locator('td[data-l="الوزن القائم"]')).toContainText('12');
+  await expect(rows.nth(1).locator('td[data-l="المبلغ"]')).toContainText('120');
+  await expect(rows.nth(0)).toContainText('وارد من التاجر');
+  await expect(rows.nth(0).locator('td[data-l="الرصيد النقدي بعدها"]')).toContainText('70');
+  await expect(rows.nth(0).locator('td[data-l="رصيد الذهب بعدها"]')).toContainText('9');
 });

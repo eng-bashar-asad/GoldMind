@@ -1342,7 +1342,8 @@ function showTraderDetail(traderId) {
   const tot = { out: { g: 0, g24: 0, f: 0 }, in: { g: 0, g24: 0, f: 0 } };
   // [label, icon, plain colour (print/PDF), soft background, gloss ink + chip classes]
   const DIR = { out: ['صادر للتاجر', 'north_west', '#B45309', '#FFF4E5', 'gm-ink-amber', 'bg-amber-50'], in: ['وارد من التاجر', 'south_east', '#1D4ED8', '#EAF2FF', 'gm-ink-blue', 'bg-blue-50'], open: ['رصيد سابق', 'history', '#6B6150', '#F4EFE3', 'text-primary', 'bg-secondary-container'], adj: ['تسوية حساب', 'tune', '#7E22CE', '#F5EEFF', 'gm-ink-violet', 'bg-blue-50'] };
-  const rowsHtml = ldGroups.map(gp => {
+  // newest on top (بشار 2026-11-18); the running balance is still worked out oldest → newest
+  const rowsHtml = ldGroups.slice().reverse().map(gp => {
     const f0 = gp.rows[0], last = gp.rows[gp.rows.length - 1], d = ldDir(f0), D = DIR[d];
     const w = gp.rows.reduce((t, r) => t + Number(r.weight_grams || 0), 0);
     const wa = gp.rows.reduce((t, r) => t + Number(r.accounting_weight_grams != null ? r.accounting_weight_grams : (r.weight_grams || 0)), 0);
