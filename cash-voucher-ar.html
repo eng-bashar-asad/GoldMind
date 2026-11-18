@@ -126,16 +126,17 @@ function cvParty(p) {
   document.getElementById('cv-who-lbl').textContent = { customer: 'الزبون', trader: 'التاجر', expense: 'نوع المصروف' }[p];
   document.getElementById('cv-who-search').value = '';
   const none = document.querySelector('.seg.method [data-method="none"]');
-  none.disabled = p !== 'customer'; none.style.opacity = p === 'customer' ? 1 : .4;
-  if (p !== 'customer' && CV.method === 'none') cvMethod('cash');
+  // outside the box: customers and traders (traders since بشار 2026-11-18); an expense always leaves a box
+  none.disabled = p === 'expense'; none.style.opacity = p === 'expense' ? .4 : 1;
+  if (p === 'expense' && CV.method === 'none') cvMethod('cash');
   cvFillWho();
 }
 // cash: in/out of the daily box · card: shown in the daily box, the drawer is unchanged · bank: not in the
-// daily box · none (customers only): only the customer's account changes (بشار 2026-11-16)
+// daily box · none (customers and traders): only the account changes (بشار 2026-11-16, traders 2026-11-18)
 const CV_METHOD_HINT = { cash: 'يدخل أو يخرج من درج الصندوق اليومي.', card: 'يظهر في الحركة اليومية مع سطر «فيزا» مقابل، ولا يغيّر رصيد الدرج.',
-  bank: 'تحويل إلى البنك — لا يظهر في الحركة اليومية.', none: 'لا يدخل الصندوق اليومي ولا البنك — يتغيّر حساب الزبون فقط.' };
+  bank: 'تحويل إلى البنك — لا يظهر في الحركة اليومية.', none: 'لا يدخل الصندوق اليومي ولا البنك — يتغيّر حساب الطرف فقط.' };
 function cvMethod(m) {
-  if (m === 'none' && CV.party !== 'customer') m = 'cash';
+  if (m === 'none' && CV.party === 'expense') m = 'cash';
   CV.method = m; seg('method', 'method', m);
   document.getElementById('cv-method-hint').textContent = CV_METHOD_HINT[m] || '';
 }
