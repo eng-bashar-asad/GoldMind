@@ -49,11 +49,17 @@ test('statement: running balance, invoice pieces, WhatsApp PDF', async ({ page }
   await expect(page.locator('#items-i5')).toContainText('طقم ذهب');
   await expect(page.locator('#items-i5')).toContainText('25.50 غ');
 
-  // period filter: payments before the start become the opening balance (bottom row)
+  // period filter (بشار 2026-11-19): by default only the period's own movements, no opening balance
   await page.fill('#from', '2026-09-29');
   await page.click('button:has-text("عرض")');
+  await expect(page.locator('#rows')).not.toContainText('رصيد سابق حتى بداية الفترة');
+  await expect(page.locator('#bal-label')).toContainText('صافي الفترة');
+  await expect(page.locator('#period-label')).toContainText('حركات الفترة فقط');
+  // «مع الرصيد السابق»: payments before the start become the opening balance (bottom row)
+  await page.selectOption('#bal-mode', 'carry');
   await expect(page.locator('#rows > tr').last()).toContainText('رصيد سابق حتى بداية الفترة');
   await expect(page.locator('#rows > tr').last()).toContainText('3,900.00');
+  await expect(page.locator('#period-label')).toContainText('مع الرصيد السابق');
 
   await page.evaluate(() => { window.__pdf = null; const orig = window.gmSavePdf; window.gmSavePdf = async (w, n, t, text) => { window.__pdf = { n, text }; return 'downloaded'; }; });
   await page.click('#wa-btn');

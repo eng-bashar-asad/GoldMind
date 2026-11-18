@@ -43,6 +43,10 @@
 <div class="no-print max-w-md lg:max-w-3xl mx-auto mt-4 px-4 flex flex-wrap items-end gap-2 text-[13px]">
 <label class="flex flex-col gap-1">من<input type="date" id="from" class="h-10 border border-gray-300 rounded-lg px-2"/></label>
 <label class="flex flex-col gap-1">إلى<input type="date" id="to" class="h-10 border border-gray-300 rounded-lg px-2"/></label>
+<label class="flex flex-col gap-1">الرصيد<select id="bal-mode" onchange="render()" class="h-10 border border-gray-300 rounded-lg px-2">
+  <option value="period">الفترة المحددة فقط</option>
+  <option value="carry">مع الرصيد السابق</option>
+</select></label>
 <button onclick="render()" class="h-10 px-4 rounded-lg bg-black text-white font-semibold">عرض</button>
 <button onclick="document.getElementById('from').value='';document.getElementById('to').value='';render()" class="h-10 px-3 rounded-lg border border-gray-300">كل الفترة</button>
 <label class="flex items-center gap-2 h-10"><input type="checkbox" id="all-items" onchange="toggleAllItems()" class="w-5 h-5"/> إظهار قطع كل الفواتير</label>
@@ -139,16 +143,18 @@ function render() {
   const from = document.getElementById('from').value, to = document.getElementById('to').value;
   const range = from || to ? gmRangeISO(from || '1970-01-01', to || gmDateStrInTz(Date.now())) : null;
   const all = buildRows();
+  // a period can be shown on its own (default) or carried on from the balance before it (بشار 2026-11-19)
+  const carry = !range || document.getElementById('bal-mode').value === 'carry';
   let bal = 0, opening = 0, gold = 0, sumD = 0, sumC = 0;
   const shown = [];
   all.forEach(r => {
     const t = new Date(r.at).getTime();
-    gold += r.gold || 0;
-    if (range && t < Date.parse(range.from)) { opening += r.debit - r.credit; return; }
+    if (range && t < Date.parse(range.from)) { opening += r.debit - r.credit; if (carry) gold += r.gold || 0; return; }
     if (range && t >= Date.parse(range.to)) return;
+    gold += r.gold || 0;
     shown.push(r);
   });
-  bal = opening;
+  bal = carry ? opening : 0;
   const tbody = document.getElementById('rows');
   // balance runs oldest → newest, but the newest row is shown on top (بشار 2026-11-15), the opening balance at the bottom
   const out = [];
@@ -165,20 +171,22 @@ function render() {
     out.push(html);
   });
   out.reverse();
-  if (range && Math.abs(opening) > 0.005) out.push(`<tr><td></td><td><b>رصيد سابق حتى بداية الفترة</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${signed(opening)}</b></td></tr>`);
+  if (range && carry && Math.abs(opening) > 0.005) out.push(`<tr><td></td><td><b>رصيد سابق حتى بداية الفترة</b></td><td class="num"></td><td class="num"></td><td class="num"><b>${signed(opening)}</b></td></tr>`);
   tbody.innerHTML = out.join('');
   document.getElementById('empty').classList.toggle('hidden', shown.length > 0);
   document.getElementById('sum-debit').textContent = fmt(sumD) + ' ' + CUR;
   document.getElementById('sum-credit').textContent = fmt(sumC) + ' ' + CUR;
   const balBox = document.getElementById('bal-box');
   document.getElementById('bal-value').textContent = fmt(Math.abs(bal)) + ' ' + CUR;
-  document.getElementById('bal-label').textContent = bal > 0.005 ? 'المستحق على العميل' : bal < -0.005 ? 'رصيد للعميل لدى المحل' : 'الحساب مسدَّد';
+  document.getElementById('bal-label').textContent = !carry
+    ? (bal > 0.005 ? 'صافي الفترة: على العميل' : bal < -0.005 ? 'صافي الفترة: للعميل' : 'صافي الفترة: صفر')
+    : (bal > 0.005 ? 'المستحق على العميل' : bal < -0.005 ? 'رصيد للعميل لدى المحل' : 'الحساب مسدَّد');
   balBox.className = 'rounded-lg p-2 border ' + (bal > 0.005 ? 'border-red-300 bg-red-50 text-red-700' : 'border-green-300 bg-green-50 text-green-800');
   const g = document.getElementById('gold-line');
   g.classList.toggle('hidden', Math.abs(gold) < 0.0005);
   g.textContent = gold > 0 ? 'ذهب مستحق على العميل: ' + gold.toFixed(3) + ' غ (عيار 24)' : 'ذهب للعميل لدى المحل: ' + Math.abs(gold).toFixed(3) + ' غ (عيار 24)';
   document.getElementById('period-label').innerHTML = range
-    ? `الفترة: <bdi dir="ltr">${esc(from || '…')}</bdi> — <bdi dir="ltr">${esc(to || gmDateStrInTz(Date.now()))}</bdi>` : 'كل الحركات';
+    ? `الفترة: <bdi dir="ltr">${esc(from || '…')}</bdi> — <bdi dir="ltr">${esc(to || gmDateStrInTz(Date.now()))}</bdi>` + (carry ? ' (مع الرصيد السابق)' : ' (حركات الفترة فقط)') : 'كل الحركات';
   if (document.getElementById('all-items').checked) toggleAllItems();
 }
 
