@@ -511,6 +511,7 @@ function goToStatementPrint() {
 <div>
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1">العيار</label>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="tob-gold-karat">
+<option value="14">14</option>
 <option selected value="18">18</option>
 <option value="21">21</option>
 <option value="22">22</option>
@@ -648,6 +649,7 @@ function goToStatementPrint() {
 <div class="relative mb-3">
 <label class="absolute -top-2 right-3 bg-surface-container-lowest px-1 text-[10px] font-semibold text-outline" for="gsb-karat">العيار</label>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="gsb-karat" onchange="renderGiveStockBulkPreview()">
+<option value="14">14</option>
 <option selected value="18">18</option>
 <option value="21">21</option>
 <option value="22">22</option>
@@ -692,6 +694,7 @@ function goToStatementPrint() {
 <div class="grid grid-cols-2 gap-3">
 <input class="w-full h-11 border border-outline-variant rounded-lg px-3 font-data-mono" id="settle-weight" placeholder="الوزن (غ)" step="0.01" type="number" oninput="settleBoxPreview()"/>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3" id="settle-karat" onchange="settleBoxDefault()">
+<option value="14">14</option>
 <option selected value="18">18</option>
 <option value="21">21</option>
 <option value="22">22</option>
@@ -704,6 +707,7 @@ function goToStatementPrint() {
 <label class="block text-[11px] font-semibold text-on-surface-variant mb-1" for="settle-box">إدخال الذهب المستلم إلى المستودع</label>
 <select class="w-full h-11 border border-outline-variant rounded-lg px-3 text-[13px]" id="settle-box" onchange="settleBoxPreview()">
 <option value="">لا يُدخل للمخزون</option>
+<option value="14">كسر 14</option>
 <option value="18">كسر 18</option>
 <option value="21">كسر 21</option>
 <option value="22">كسر 22</option>
@@ -1453,6 +1457,7 @@ function showTraderDetail(traderId) {
                   <option value="22" ${r.karat == 22 ? 'selected' : ''}>22</option>
                   <option value="21" ${r.karat == 21 ? 'selected' : ''}>21</option>
                   <option value="18" ${r.karat == 18 ? 'selected' : ''}>18</option>
+                <option value="14" ${r.karat == 14 ? 'selected' : ''}>14</option>
                 </select>
                 <input id="edit-batch-fee-${group.batchId}-${idx}" type="number" step="0.01" dir="ltr" placeholder="مصنعية/غ" class="col-span-3 h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.fab_fee_per_gram || ''}"/>
               </div>
@@ -1515,6 +1520,7 @@ function showTraderDetail(traderId) {
             <input id="edit-ob-weight-${m.id}" type="number" step="0.001" dir="ltr" placeholder="الوزن (غ)" class="h-10 border border-outline-variant rounded-lg px-3 text-center text-[13px] font-data-mono" value="${m.weight_grams || ''}"/>
             <select id="edit-ob-karat-${m.id}" class="h-10 border border-outline-variant rounded-lg px-3 text-center text-[13px]">
               <option value="24">24</option><option value="22">22</option><option value="21">21</option><option value="18">18</option>
+            <option value="14">14</option>
             </select>
           </div>
           <textarea id="edit-ob-notes-${m.id}" class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]">${gmEscapeHtml(m.notes || '')}</textarea>
@@ -1535,6 +1541,7 @@ function showTraderDetail(traderId) {
           <div class="grid grid-cols-2 gap-2">
             <input id="edit-sm-weight-${m.id}" type="number" step="0.01" dir="ltr" placeholder="الوزن القائم (غ)" class="h-10 border border-outline-variant rounded-lg px-3 text-center text-[13px] font-data-mono" value="${m.weight_grams || ''}"/>
             <select id="edit-sm-karat-${m.id}" class="h-10 border border-outline-variant rounded-lg px-3 text-center text-[13px]">
+              <option value="14" ${m.karat == 14 ? 'selected' : ''}>14</option>
               <option value="18" ${m.karat == 18 ? 'selected' : ''}>18</option>
               <option value="21" ${m.karat == 21 ? 'selected' : ''}>21</option>
               <option value="22" ${m.karat == 22 ? 'selected' : ''}>22</option>
@@ -1570,6 +1577,7 @@ function showTraderDetail(traderId) {
           <div id="edit-settle-gold-wrap-${m.id}" class="hidden grid grid-cols-2 gap-2">
             <input id="edit-settle-weight-${m.id}" type="number" step="0.001" dir="ltr" placeholder="الوزن (غ)" class="h-10 border border-outline-variant rounded-lg px-3 text-center text-[13px] font-data-mono" value="${m.weight_grams || ''}"/>
             <select id="edit-settle-karat-${m.id}" class="h-10 border border-outline-variant rounded-lg px-3 text-center text-[13px]">
+              <option value="14" ${m.karat == 14 ? 'selected' : ''}>14</option>
               <option value="18" ${m.karat == 18 ? 'selected' : ''}>18</option>
               <option value="21" ${m.karat == 21 ? 'selected' : ''}>21</option>
               <option value="22" ${m.karat == 22 ? 'selected' : ''}>22</option>
@@ -2456,7 +2464,7 @@ async function rsScanInvoice(input) {
   try {
     const ex = await gmReadInvoicePhoto(file);
     const num = v => { const n = parseFloat(v); return isFinite(n) && n > 0 ? n : 0; };
-    const karatOf = k => { k = Math.round(num(k)); return [18, 21, 22, 24].includes(k) ? k : 18; };
+    const karatOf = k => { k = Math.round(num(k)); return [14, 18, 21, 22, 24].includes(k) ? k : 18; };
     let items = (ex.items || []).filter(it => num(it.gross_weight_grams) || num(it.net_weight_grams));
     if (!items.length && num(ex.weight_grams)) items = [{ description: ex.description, karat: ex.karat, gross_weight_grams: ex.weight_grams, fab_fee_total: ex.fabrication_fee }];
     if (!items.length) throw new Error((ex.confidence_note ? ex.confidence_note + ' — ' : '') + 'لم أجد أسطر أوزان في الصورة. املأ الأسطر يدوياً.');
@@ -2577,6 +2585,7 @@ function renderReceiveStockLines(previewOnly) {
         <div>
           <label class="block text-[10px] text-on-surface-variant mb-0.5">العيار</label>
           <select class="w-full h-9 border border-outline-variant rounded px-2 text-[12px]" onchange="updateReceiveStockLine(${l.lineId}, 'karat', this.value)">
+            <option value="14" ${l.karat == 14 ? 'selected' : ''}>14</option>
             <option value="18" ${l.karat == 18 ? 'selected' : ''}>18</option>
             <option value="21" ${l.karat == 21 ? 'selected' : ''}>21</option>
             <option value="22" ${l.karat == 22 ? 'selected' : ''}>22</option>
