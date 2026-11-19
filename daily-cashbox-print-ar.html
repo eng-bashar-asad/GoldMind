@@ -34,6 +34,20 @@
         page-break-inside: avoid;
         break-inside: avoid;
     }
+    /* link colors: pastel fill on paper and light themes; on dark themes on screen only a colored edge,
+       so the sheet stays one calm dark surface instead of a patchwork (بشار 2026-11-19) */
+    .cb-lk, .cb-lk2 { background-color: var(--lk); }
+    @media screen {
+      html:not(.gm-light-canvas) body .cb-lk2 { background-color: transparent; }
+      html:not(.gm-light-canvas) body .cb-lk { background-color: transparent; box-shadow: inset -4px 0 0 var(--lk); }
+    }
+    .cb-n { white-space: nowrap; }
+    .cb-cur { font-size: .78em; font-weight: 600; opacity: .75; white-space: nowrap; }
+    /* phone: four narrow columns — smaller type, the currency under the amount */
+    @media screen and (max-width: 640px) {
+      .cb-c { font-size: 13px; padding: 8px 8px !important; line-height: 1.45; }
+      .cb-a .cb-cur { display: block; }
+    }
     @media print {
         .no-print { display: none !important; }
         body { background: #fff !important; }
@@ -237,13 +251,15 @@ async function load() {
   for (let i = 0; i < rowCount; i++) {
     const o = outEntries[i];
     const inn = inEntries[i];
-    const inBg = inn && gmLinkColorFor(inn.link_group) ? `background-color:${gmLinkColorFor(inn.link_group)};` : '';
-    const outBg = o && gmLinkColorFor(o.link_group) ? `background-color:${gmLinkColorFor(o.link_group)};` : '';
+    // link color: a pastel fill on light themes, a thin colored edge on dark ones (see .cb-lk)
+    const inBg = inn && gmLinkColorFor(inn.link_group) ? `--lk:${gmLinkColorFor(inn.link_group)};` : '';
+    const outBg = o && gmLinkColorFor(o.link_group) ? `--lk:${gmLinkColorFor(o.link_group)};` : '';
+    const amt = e => `<span class="cb-n">${fmt(e.amount)}</span> <span class="cb-cur">${e.currency}</span>`;
     rowsHtml += `<div class="flex">
-      <div class="py-1.5 px-3 border-t border-outline-variant font-semibold" style="width:28%;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (gmCashNote(inn) ? ' — ' + gmEscapeHtml(gmCashNote(inn)) : '') : ''}</div>
-      <div class="py-1.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="width:22%;${inBg}" dir="ltr">${inn ? fmt(inn.amount) + ' ' + inn.currency : ''}</div>
-      <div class="py-1.5 px-3 border-t border-r border-outline-variant font-semibold" style="width:28%;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (gmCashNote(o) ? ' — ' + gmEscapeHtml(gmCashNote(o)) : '') : ''}</div>
-      <div class="py-1.5 px-3 border-t border-r border-outline-variant font-bold text-left" style="width:22%;${outBg}" dir="ltr">${o ? fmt(o.amount) + ' ' + o.currency : ''}</div>
+      <div class="cb-c cb-d py-1.5 px-3 border-t border-outline-variant font-semibold${inBg ? ' cb-lk' : ''}" style="width:28%;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (gmCashNote(inn) ? ' — ' + gmEscapeHtml(gmCashNote(inn)) : '') : ''}</div>
+      <div class="cb-c cb-a py-1.5 px-3 border-t border-r border-outline-variant font-bold text-left${inBg ? ' cb-lk2' : ''}" style="width:22%;${inBg}" dir="ltr">${inn ? amt(inn) : ''}</div>
+      <div class="cb-c cb-d py-1.5 px-3 border-t border-r border-outline-variant font-semibold${outBg ? ' cb-lk' : ''}" style="width:28%;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (gmCashNote(o) ? ' — ' + gmEscapeHtml(gmCashNote(o)) : '') : ''}</div>
+      <div class="cb-c cb-a py-1.5 px-3 border-t border-r border-outline-variant font-bold text-left${outBg ? ' cb-lk2' : ''}" style="width:22%;${outBg}" dir="ltr">${o ? amt(o) : ''}</div>
     </div>`;
   }
   if (dayEntries.length === 0) {
