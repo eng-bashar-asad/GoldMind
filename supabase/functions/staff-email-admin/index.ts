@@ -64,7 +64,7 @@ serve(async (req) => {
 
     const { data: callerStaff } = await admin
       .from('staff').select('role, permissions')
-      .eq('user_id', callerUser.id).eq('store_id', store_id).maybeSingle();
+      .eq('user_id', callerUser.id).eq('store_id', store_id).is('suspended_at', null).maybeSingle(); // a suspended manager can't
 
     const isOwner = callerStaff?.role === 'owner';
     const canManageStaff = isOwner || callerStaff?.permissions?.manage_staff === true;

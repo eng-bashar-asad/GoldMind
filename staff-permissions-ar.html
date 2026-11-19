@@ -11,7 +11,7 @@
 <title>الموظفون والصلاحيات | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=58"></script>
+<script src="supabase-config.js?v=59"></script>
 <script src="theme.js?v=107"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -221,6 +221,12 @@
 <p id="detailBasicsSuccess" class="text-[12px] hidden mb-2" style="color:#2e7d32;">✓ تم الحفظ</p>
 <button onclick="saveStaffDetailBasics()" class="w-full h-10 bg-primary text-on-primary rounded-lg text-[12px] font-semibold mb-4">حفظ الاسم والأرقام</button>
 
+<!-- «إيقاف مؤقت» (بشار 2026-11-18): the staff member keeps all data but cannot sign in to this company -->
+<div id="detailSuspendBox" class="border-t border-outline-variant pt-3 mb-4">
+<p id="detailSuspendState" class="text-[12px] text-on-surface-variant mb-2"></p>
+<button id="detailSuspendBtn" onclick="toggleStaffSuspend()" class="w-full h-10 rounded-lg text-[12px] font-semibold border"></button>
+</div>
+
 <!-- login details (بشار 2026-11-18): the username they sign in with, and a new password set by the manager
      (a password can never be read back, only replaced) -->
 <div class="border-t border-outline-variant pt-3 mb-4">
@@ -341,7 +347,7 @@ function renderStaffCard(staff) {
         <button type="button" onclick="openStaffDetail('${staff.id}')" class="text-right block w-full">
           <p class="font-label-md text-label-md font-semibold text-on-surface truncate underline decoration-dotted decoration-outline">${gmEscapeHtml(staff.full_name) || 'بدون اسم'}</p>
         </button>
-        <p class="text-[11px] text-on-surface-variant">${isOwner ? 'مالك المتجر — كل الصلاحيات' : (staff.user_id ? 'موظف' : 'موظف بدون حساب دخول')}</p>
+        <p class="text-[11px] text-on-surface-variant">${isOwner ? 'مالك المتجر — كل الصلاحيات' : (staff.user_id ? 'موظف' : 'موظف بدون حساب دخول')}${staff.suspended_at ? ' <span class="inline-block text-[10.5px] font-bold px-2 rounded-full" style="background:rgba(198,40,40,.14);color:#B42318">موقوف مؤقتاً</span>' : ''}</p>
       </div>
       ${(!isOwner && staff.id !== currentStaffId) ? `<button type="button" onclick="deleteStaff('${staff.id}', '${gmEscapeHtml(staff.full_name || 'هذا الموظف').replace(/'/g, "\\'")}')" class="text-error shrink-0" title="حذف الموظف">
         <span class="material-symbols-outlined" style="font-size:20px;">person_remove</span>
@@ -377,6 +383,7 @@ function openStaffDetail(staffId) {
   const emailInput = document.getElementById('detailEmail');
   emailInput.value = '';
   ['detailUsername', 'detailPassword'].forEach(id => { document.getElementById(id).value = ''; });
+  renderSuspend();
   document.getElementById('detailUsername').placeholder = 'جارِ التحميل...';
   detailLoginErr('');
   emailInput.placeholder = 'جارِ التحميل...';
@@ -413,6 +420,32 @@ async function loadStaffEmail(staffId) {
   emailInput.disabled = false;
   const u = document.getElementById('detailUsername');
   u.value = data.username || ''; u.placeholder = data.username ? '' : 'لا يوجد اسم مستخدم — اكتب واحداً';
+}
+
+function renderSuspend() {
+  const st = allStaffData.find(x => x.id === detailStaffId);
+  const box = document.getElementById('detailSuspendBox');
+  if (!st || st.role === 'owner' || st.id === currentStaffId) { box.classList.add('hidden'); return; }
+  box.classList.remove('hidden');
+  const on = !!st.suspended_at, btn = document.getElementById('detailSuspendBtn');
+  document.getElementById('detailSuspendState').textContent = on
+    ? 'الحساب موقوف مؤقتاً منذ ' + gmFormatDateTime(st.suspended_at, { day: '2-digit', month: '2-digit', year: 'numeric' }) + ' — بياناته محفوظة ولا يستطيع الدخول.'
+    : 'إيقاف مؤقت: تبقى بيانات الموظف وحركاته كما هي، لكنه لا يستطيع الدخول إلى هذه الشركة حتى تعيد تفعيله.';
+  btn.textContent = on ? 'إعادة تفعيل الحساب' : 'إيقاف مؤقت';
+  btn.style.cssText = on ? 'border-color:#2E7D32;color:#2E7D32' : 'border-color:#B42318;color:#B42318';
+}
+
+async function toggleStaffSuspend() {
+  const st = allStaffData.find(x => x.id === detailStaffId); if (!st) return;
+  const on = !!st.suspended_at;
+  if (!confirm(on ? `إعادة تفعيل حساب "${st.full_name}"؟ يستطيع الدخول من جديد فوراً.`
+                  : `إيقاف حساب "${st.full_name}" مؤقتاً؟\nلا تُحذف بياناته، لكنه لن يستطيع الدخول حتى تعيد تفعيله.`)) return;
+  const value = on ? null : new Date().toISOString();
+  const { error } = await goldmindClient.from('staff').update({ suspended_at: value }).eq('id', st.id).eq('store_id', GOLDMIND_STORE_ID);
+  if (error) { showToast('تعذّر الحفظ: ' + error.message, true); return; }
+  st.suspended_at = value;
+  showToast(on ? 'تمت إعادة تفعيل الحساب' : 'تم إيقاف الحساب مؤقتاً');
+  renderSuspend(); loadStaff();
 }
 
 function detailLoginErr(msg) {
@@ -901,7 +934,7 @@ async function loadStaff() {
   }
 
   const { data: staffRows, error } = await goldmindClient
-    .from('staff').select('id, full_name, role, permissions, whatsapp_phone, contact_phone, user_id')
+    .from('staff').select('id, full_name, role, permissions, whatsapp_phone, contact_phone, user_id, suspended_at')
     .eq('store_id', GOLDMIND_STORE_ID)
     .order('role', { ascending: false });
 

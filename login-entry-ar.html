@@ -107,7 +107,7 @@
     </script>
 <style> body { min-height: max(884px, 100dvh); } </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=58"></script>
+<script src="supabase-config.js?v=59"></script>
 <script src="theme.js?v=107"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js" integrity="sha384-ZZ1pncU3bQe8y31yfZdMFdSpttDoPmOZg2wguVK9almUodir1PghgT0eY7Mrty8H" crossorigin="anonymous"></script>
 <script src="gm-particle-transition.js"></script>
@@ -123,6 +123,7 @@
 
 <div class="glass-panel w-full p-6 rounded-xl shadow-2xl space-y-6 overflow-hidden" id="wizardCard">
 
+<div class="hidden bg-red-500/10 border border-red-400/40 text-red-200 text-sm font-semibold rounded-lg px-4 py-3 mb-4 text-center" id="suspendedNotice" role="alert">عفواً، تم إيقاف حسابك من قبل الإدارة.</div>
 <div class="hidden bg-amber-500/10 border border-amber-400/30 text-amber-200 text-xs rounded-lg px-4 py-3 mb-4 text-center" id="idleNotice">تم تسجيل خروجك تلقائياً بسبب عدم النشاط لأكثر من 5 دقائق. فضلاً سجّل الدخول مرة أخرى.</div>
 
 <!-- STEP: start -->
@@ -303,6 +304,7 @@ function goToStep(stepId, direction) {
     const prefillUsername = params.get('username');
     if (prefillUsername) document.getElementById('quickIdentifier').value = prefillUsername;
     else if (prefillEmail) document.getElementById('quickIdentifier').value = prefillEmail;
+    if (params.get('suspended') === '1') document.getElementById('suspendedNotice').classList.remove('hidden');
     if (params.get('idle') === '1') {
         goToStep('quick');
         document.getElementById('idleNotice').classList.remove('hidden');

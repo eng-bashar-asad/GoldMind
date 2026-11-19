@@ -327,6 +327,13 @@ function gmPullAccountPrefs(hp) {
     if (changed) window.dispatchEvent(new CustomEvent('gm-prefs-pulled'));
 }
 
+// «إيقاف مؤقت» (بشار 2026-11-18): the management suspended this account in this company
+async function gmSuspendedOut() {
+    try { ['gm_membership', 'goldmind_active_store'].forEach(k => localStorage.removeItem(k)); } catch (e) { /* ignore */ }
+    try { await goldmindClient.auth.signOut(); } catch (e) { /* ignore */ }
+    window.location.href = 'login-entry-ar.html?suspended=1';
+}
+
 async function requireGoldMindSession(redirectTo) {
     let session = null;
     if (navigator.onLine) {
@@ -365,10 +372,13 @@ async function requireGoldMindSession(redirectTo) {
         } catch (e) { /* ignore */ }
     }
     if (!GOLDMIND_STORE_ID) {
-        const { data: memberships } = await goldmindClient
+        const { data: allRows } = await goldmindClient
             .from('staff')
-            .select('id, store_id')
+            .select('id, store_id, suspended_at')
             .eq('user_id', session.user.id);
+        // a suspended membership (إيقاف مؤقت) cannot be used; only suspended ones → tell them and sign out
+        const memberships = (allRows || []).filter(m => !m.suspended_at);
+        if (allRows && allRows.length && !memberships.length) { await gmSuspendedOut(); return null; }
 
         if (memberships && memberships.length === 1) {
             GOLDMIND_STORE_ID = memberships[0].store_id;
@@ -384,6 +394,11 @@ async function requireGoldMindSession(redirectTo) {
                 return null;
             }
         }
+    }
+    // suspended after the company was chosen (or remembered on this device)
+    if (navigator.onLine && GOLDMIND_STAFF_ID) {
+        const { data: mine } = await goldmindClient.from('staff').select('suspended_at').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
+        if (mine && mine.suspended_at) { await gmSuspendedOut(); return null; }
     }
     if (GOLDMIND_STORE_ID && GOLDMIND_STAFF_ID) {
         try { localStorage.setItem('gm_membership', JSON.stringify({ user: session.user.id, store: GOLDMIND_STORE_ID, staff: GOLDMIND_STAFF_ID })); } catch (e) { /* ignore */ }
