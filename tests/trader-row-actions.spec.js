@@ -22,6 +22,8 @@ test('statement row opens its actions inline', async ({ page }) => {
   await expect(strip.locator('button', { hasText: 'تعديل' }).first()).toBeVisible();
   await expect(strip.locator('a', { hasText: 'القطع' })).toBeVisible();
   await expect(page.locator('#movements-list')).toBeHidden();
+  await expect(page.locator('#gm-moves-col > h3')).toBeHidden();
+  await expect(page.getByText('إظهار / إخفاء تفاصيل الحركات')).toHaveCount(0);
   // the edit form opens inside the strip
   await strip.locator('button', { hasText: 'تعديل' }).first().click();
   await expect(strip.locator('#edit-batch-form-b1')).toBeVisible();
