@@ -168,3 +168,20 @@ test('coloured amount: the gradient wave hugs the number', async ({ page }) => {
   expect(w).toBeLessThan(box / 2);
   if (process.env.SHOT) await page.screenshot({ path: '/home/claude/shot-mobile.png' });
 });
+
+// the side panel says which way the money goes (بشار 2026-11-19)
+test('customer side panel: receive from / pay to the customer', async ({ page }) => {
+  await install(page, { db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    customers: [{ id: 'c1', store_id: STORE, name: 'ريما شالاتي', phone: '0944123456', is_company: false }],
+    customer_debts: [],
+  } });
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/customers-ar.html');
+  await page.click('tr[data-id="c1"]');
+  await expect(page.locator('#cuSide a', { hasText: 'قبض دفعة من العميل' })).toHaveAttribute('href', 'customer-debts-ar.html?open=c1&pay=1');
+  await expect(page.locator('#cuSide a', { hasText: 'صرف مبلغ للعميل' })).toHaveAttribute('href', 'customer-debts-ar.html?open=c1&pay=out');
+  await expect(page.locator('#cuSide')).not.toContainText('+ دفعة');
+});

@@ -132,7 +132,7 @@
 </div>
 <div id="cdBar" class="cd-pc cd-wide" role="toolbar" aria-label="عمليات الحساب">
 <button type="button" class="cd-act cd-dark" onclick="toggleSettleForm()"><span class="material-symbols-outlined">payments</span>دفعة من العميل</button>
-<button type="button" class="cd-act" onclick="toggleCashOutForm()"><span class="material-symbols-outlined">output</span>صرف مبلغ</button>
+<button type="button" class="cd-act" onclick="toggleCashOutForm()"><span class="material-symbols-outlined">output</span>صرف مبلغ للعميل</button>
 <button type="button" class="cd-act" onclick="toggleDiscountForm()"><span class="material-symbols-outlined">sell</span>خصم على الدين</button>
 <a class="cd-act" id="cdDepositLink" href="deposits-ar.html"><span class="material-symbols-outlined">bookmark_added</span>سند عربون</a>
 <button type="button" class="cd-act" onclick="toggleOpeningBalanceForm()"><span class="material-symbols-outlined">history</span>رصيد سابق</button>
@@ -405,7 +405,9 @@ async function load() {
   if (openId && customers.some(c => c.id === openId)) {
     showCustomerDetail(openId);
     // "+ دفعة" from the customers list opens the payment form straight away
-    if (new URLSearchParams(window.location.search).get('pay') === '1') { toggleSettleForm(); document.getElementById('settle-amount').focus(); }
+    const pay = new URLSearchParams(window.location.search).get('pay');
+    if (pay === '1') { toggleSettleForm(); document.getElementById('settle-amount').focus(); }
+    else if (pay === 'out') { toggleCashOutForm(); document.getElementById('cashout-amount').focus(); }
   } else {
     gmReplace('customers-ar.html');
   }

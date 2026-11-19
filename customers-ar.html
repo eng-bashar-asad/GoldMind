@@ -64,7 +64,7 @@
     .cu-tile b { display: block; font-size: 19px; }
     .cu-tile.owe { background: #E8F3EA; } .cu-tile.owe span, .cu-tile.owe b { color: #1B5E20; }
     .cu-tile.due { background: #FBE9E7; } .cu-tile.due span, .cu-tile.due b { color: #8A2A1E; }
-    .cu-act { height: 40px; border-radius: 10px; border: 1px solid #CBBF9E; background: #fff; font-size: 13px; font-weight: 700; color: #211D17; display: flex; align-items: center; justify-content: center; }
+    .cu-act { min-height: 44px; padding: 4px 6px; text-align: center; gap: 4px; border-radius: 10px; border: 1px solid #CBBF9E; background: #fff; font-size: 13px; font-weight: 700; color: #211D17; display: flex; align-items: center; justify-content: center; }
     .cu-act.dark { background: #1C1A16; color: #FBF8F1; border-color: #1C1A16; }
     .cu-kv { display: flex; justify-content: space-between; gap: 8px; font-size: 13px; padding: 6px 0; border-bottom: 1px solid #EFE7D2; }
     .cu-sum { background: var(--gm-surface-lowest,#fff); border: 1px solid var(--gm-outline-variant); border-radius: 14px; padding: 10px 12px; }
@@ -224,7 +224,7 @@ function renderSide() {
   if (!c) { el.classList.remove('hidden'); el.innerHTML = '<section class="cu-card text-center text-[13px] text-on-surface-variant py-8"><span class="material-symbols-outlined" style="font-size:32px;opacity:.6">touch_app</span><p class="mt-2">اضغط على عميل لعرض بطاقته هنا.</p><p class="mt-1 text-[12px]">الضغط مرتين يفتح حسابه الكامل.</p></section>'; return; }
   const b = BAL[c.id] || 0, g = GOLD[c.id] || 0;
   const wa = c.phone ? gmWhatsAppUrl(c.phone, null, 'مرحباً ' + c.name + '، رصيد حسابكم لدينا: ' + fmt(Math.abs(b)) + ' ' + CUR) : '';
-  const LBL = { payment: 'دفعة', discount: 'خصم على الدين', cash_out: 'صرف مبلغ', deposit: 'عربون', deposit_refund: 'استرجاع عربون', opening_balance: 'رصيد سابق' };
+  const LBL = { payment: 'دفعة من العميل', cash_out: 'صرف مبلغ للعميل', discount: 'خصم على الدين', deposit: 'عربون', deposit_refund: 'استرجاع عربون', opening_balance: 'رصيد سابق' };
   const moves = (MOVES[c.id] || []).slice(-3).reverse();
   el.innerHTML = `<section class="cu-card">
       <div class="flex items-center gap-3"><span class="cu-av" style="width:48px;height:48px;font-size:19px">${esc(gmInitials(c.name))}</span>
@@ -234,10 +234,12 @@ function renderSide() {
         <div class="cu-tile"><span>ذهب (عيار 24)</span><b class="font-data-mono">${fmt(Math.abs(g))} غ</b></div>
       </div>
       <div class="grid grid-cols-2 gap-2 mt-3">
-        <a class="cu-act dark" href="customer-debts-ar.html?open=${c.id}&pay=1">+ دفعة</a>
+        <!-- the direction is said in words (بشار 2026-11-19): money in from the customer / money out to him -->
+        <a class="cu-act dark" href="customer-debts-ar.html?open=${c.id}&pay=1"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:17px;vertical-align:-3px">south_west</span> قبض دفعة من العميل</a>
+        <a class="cu-act" href="customer-debts-ar.html?open=${c.id}&pay=out"><span class="material-symbols-outlined" aria-hidden="true" style="font-size:17px;vertical-align:-3px">north_east</span> صرف مبلغ للعميل</a>
         <a class="cu-act" href="new-sale-ar.html?customer=${c.id}">فاتورة بيع</a>
         <a class="cu-act" href="customer-debts-print-ar.html?id=${c.id}">كشف حساب</a>
-        ${wa ? `<a class="cu-act" href="${esc(wa)}" target="_blank" rel="noopener">واتساب</a>` : '<span class="cu-act" aria-disabled="true" style="opacity:.45">واتساب</span>'}
+        ${wa ? `<a class="cu-act col-span-2" href="${esc(wa)}" target="_blank" rel="noopener">واتساب</a>` : '<span class="cu-act col-span-2" aria-disabled="true" style="opacity:.45">واتساب</span>'}
       </div>
       <a href="customer-debts-ar.html?open=${c.id}" class="block text-center mt-3 text-[13px] font-bold min-h-[24px] gm-hit" style="color:#7A6640">فتح الحساب الكامل ←</a>
     </section>
