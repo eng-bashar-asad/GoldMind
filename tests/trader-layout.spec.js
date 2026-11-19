@@ -70,6 +70,8 @@ test('give-out: this voucher billed on the gross weight when chosen (not saved o
   await page.fill('#gs-barcode-input', '000034');
   await page.press('#gs-barcode-input', 'Enter');
   await expect(page.locator('#gs-cart-list .gs-row:not(.hd) input').first()).toHaveValue('10'); // standing weight, now an editable field in the row
+  await expect(page.locator('#gs-preview-gold')).toContainText('7.50');        // default gross: 10 × 18/24
+  await page.click('#gs-basis button[data-v="accounting"]');
   await expect(page.locator('#gs-preview-gold')).toContainText('6.00');        // 8 × 18/24
   await page.click('#gs-basis button[data-v="gross"]');
   await expect(page.locator('#gs-preview-gold')).toContainText('7.50');        // 10 × 18/24

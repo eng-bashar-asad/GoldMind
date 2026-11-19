@@ -1355,7 +1355,9 @@ function showTraderDetail(traderId) {
     const fee = gp.rows.reduce((t, r) => t + Number(r.fab_fee_amount || 0), 0);
     const ks = [...new Set(gp.rows.map(r => r.karat).filter(Boolean))];
     const isStock = /stock_|scrap_/.test(f0.source || '');
-    const perG = isStock && wa > 0 && fee > 0 ? fee / wa : null;
+    // billed weight per row = what the voucher charged on (gross or accounting), recovered from its 24K equivalent
+    const wb = gp.rows.reduce((t, r) => t + (Number(r.karat) && Number(r.gold_24k_equivalent) ? Number(r.gold_24k_equivalent) * 24 / Number(r.karat) : Number(r.accounting_weight_grams != null ? r.accounting_weight_grams : (r.weight_grams || 0))), 0);
+    const perG = isStock && wb > 0 && fee > 0 ? fee / wb : null;
     if (tot[d]) { tot[d].g += w; tot[d].g24 += g24; tot[d].f += fee; }
     const r = ldRun[last.id];
     const n = gp.rows.length;
@@ -2688,7 +2690,7 @@ function openGiveStockForm() {
     if (confirm('يوجد سند إخراج بضاعة غير محفوظ (' + draft.giveStockCart.length + ' قطعة) من ' + savedLabel + ' — هل تريد استرجاعه؟')) {
       giveStockCart = gsUniqueCart(draft.giveStockCart); // a saved draft may hold the same piece twice (older bug)
       giveStockCartCounter = draft.giveStockCartCounter || draft.giveStockCart.length;
-      gsBasisVal = draft.basis === 'gross' ? 'gross' : 'accounting';
+      gsBasisVal = draft.basis === 'accounting' ? 'accounting' : 'gross';
       document.getElementById('gs-barcode-input').value = '';
       document.getElementById('gs-barcode-result').innerHTML = '';
       document.getElementById('gs-notes').value = '';
@@ -2703,6 +2705,7 @@ function openGiveStockForm() {
 
 function resetGiveStockCart() {
   giveStockCart = [];
+  gsBasisVal = 'gross'; // every new voucher starts on gross weight
   document.getElementById('gs-barcode-input').value = '';
   document.getElementById('gs-barcode-result').innerHTML = '';
   document.getElementById('gs-notes').value = '';
@@ -2851,7 +2854,7 @@ function gsPieceCost(it) {
 function gsIsPriced() { return ((document.querySelector('input[name="gs-kind"]:checked') || {}).value) === 'بسعر محدد'; }
 
 // Which weight this voucher bills the trader on (chosen each time, not stored on the trader)
-let gsBasisVal = 'accounting';
+let gsBasisVal = 'gross'; // default: bill trader vouchers on gross weight; accounting is opt-in
 function gsBasis() { return gsBasisVal; }
 const gsBillW = it => gsBasis() === 'gross' ? it.grossWeight : it.accountingWeight;
 function gsSetBasis(v) { gsBasisVal = v; renderGiveStockCart(); }
