@@ -86,6 +86,7 @@
 <option value="customerPay">دفعات زبائن</option>
 <option value="return">مرتجع</option>
 <option value="repair">صيانة</option>
+<option value="cancelled">الفواتير الملغاة (لإعادة استخدام رقمها)</option>
 </select>
 </div>
 
@@ -333,7 +334,9 @@ function applyFilters() {
   const type = document.getElementById('typeFilter').value;
 
   let rows = allRows;
-  if (type) { rows = rows.filter(r => r.type === type); KIND_PICK = null; }
+  // «الفواتير الملغاة»: open one and use «إعادة إصدار بنفس الرقم» (بشار 2026-11-19)
+  if (type === 'cancelled') { rows = rows.filter(r => r.status === 'cancelled'); KIND_PICK = null; }
+  else if (type) { rows = rows.filter(r => r.type === type); KIND_PICK = null; }
   if (q) {
     rows = rows.filter(r =>
       (r.number || '').toLowerCase().includes(q) ||

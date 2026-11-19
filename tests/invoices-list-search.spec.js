@@ -36,3 +36,22 @@ test('paid currency and barcodes', async ({ page }) => {
   await expect(page.locator('#results-list tr.inv-row', { hasText: 'INV-26' }).locator('.inv-amount')).toHaveText('1,300,000 SYP');
   await expect(page.locator('#kind-chips button', { hasText: 'بيع' })).toContainText('2');
 });
+
+// «الفواتير الملغاة» (بشار 2026-11-19): find cancelled invoices to reuse their number
+test('filter: cancelled invoices only', async ({ page }) => {
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'ب' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    repair_tickets: [], trader_movements: [], stock_vouchers: [], customer_debts: [], invoice_items: [],
+    invoices: [
+      { id: 'i1', store_id: STORE, invoice_number: 'INV-30', type: 'sale', status: 'paid', total_amount: 100, currency: 'USD', created_at: T },
+      { id: 'i2', store_id: STORE, invoice_number: 'INV-31', type: 'sale', status: 'cancelled', total_amount: 50, currency: 'USD', created_at: T }]
+  } });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/invoices-list-ar.html');
+  await expect(page.locator('a', { hasText: 'INV-30' })).toBeVisible();
+  await page.selectOption('#typeFilter', 'cancelled');
+  await expect(page.locator('a', { hasText: 'INV-31' })).toBeVisible();
+  await expect(page.locator('a', { hasText: 'INV-30' })).toHaveCount(0);
+});
