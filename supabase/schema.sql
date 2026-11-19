@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict aVdFOmYglU0X4HxRsuH6sP1Kgo5IBAlQ5wWU0sN8pdLrLKBSdGsldwuVO7EZIbv
+\restrict fk5MmEuCWdhLoO3UJLODUBvWHf709mjlyOJf1QW8PpNDpqrcOw89F4dbWgAhkac
 
 
 SET statement_timeout = 0;
@@ -662,7 +662,7 @@ declare sid uuid := (p->>'store_id')::uuid; kind text := p->>'kind'; party text 
   fxnote text := ''; note text; mid uuid; eid uuid;
 begin
   if kind not in ('in', 'out') then raise exception 'نوع السند غير معروف'; end if;
-  if method not in ('cash', 'bank', 'card', 'none') or (method = 'none' and party <> 'customer') then raise exception 'طريقة دفع غير معروفة'; end if;
+  if method not in ('cash', 'bank', 'card', 'none') or (method = 'none' and party = 'expense') then raise exception 'طريقة دفع غير معروفة'; end if;
   if amt <= 0 then raise exception 'المبلغ يجب أن يكون أكبر من صفر'; end if;
   if not is_store_member(sid) then raise exception 'ليس لديك صلاحية' using errcode = '42501'; end if;
   select coalesce(nullif(upper(currency), ''), 'AED') into base_cur from stores where id = sid;
@@ -702,16 +702,20 @@ begin
     select id, store_id, name into t from traders where id = pid and store_id in (select org_store_ids(sid));
     if t is null then raise exception 'اختر التاجر'; end if;
     if not has_permission('edit_traders', sid) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
-    note := coalesce(descr, case when kind = 'out' then 'صرف كاش للتاجر' else 'قبض كاش من التاجر' end) || fxnote;
+    note := coalesce(descr, case when kind = 'out' then 'صرف كاش للتاجر' else 'قبض كاش من التاجر' end) || fxnote
+            || case when method = 'none' then ' (لا يدخل الصندوق اليومي)' else '' end;
     insert into trader_movements (store_id, trader_id, movement_type, weight_grams, karat, gold_24k_equivalent, fab_fee_amount, source, notes, created_by)
       values (sid, t.id, case when kind = 'out' then 'debt_decrease' else 'debt_increase' end, 0, null, 0, base_amt,
               case when kind = 'out' then 'cash_out' else 'cash_in' end, note, me) returning id into mid;
-    insert into cash_movements (store_id, box, direction, amount, description, created_by, trader_movement_id, fx_amount, fx_currency)
-      values (sid, case when method in ('bank', 'card') then 'bank' else 'main' end, kind, base_amt,
-              case when kind = 'out' then 'صرف كاش للتاجر ' else 'قبض كاش من التاجر ' end || t.name, me, mid,
-              case when fx then amt end, case when fx then cur end) returning id into cm;
-    if daily then
-      perform gm_cash_daily_rows(sid, kind, method, amt, cur, case when kind = 'out' then 'صرف كاش لتاجر' else 'قبض كاش من تاجر' end, t.name || ' — ' || note, me, cm);
+    -- none (بشار 2026-11-18): settled outside the daily box/bank — only the trader's account changes
+    if method <> 'none' then
+      insert into cash_movements (store_id, box, direction, amount, description, created_by, trader_movement_id, fx_amount, fx_currency)
+        values (sid, case when method in ('bank', 'card') then 'bank' else 'main' end, kind, base_amt,
+                case when kind = 'out' then 'صرف كاش للتاجر ' else 'قبض كاش من التاجر ' end || t.name, me, mid,
+                case when fx then amt end, case when fx then cur end) returning id into cm;
+      if daily then
+        perform gm_cash_daily_rows(sid, kind, method, amt, cur, case when kind = 'out' then 'صرف كاش لتاجر' else 'قبض كاش من تاجر' end, t.name || ' — ' || note, me, cm);
+      end if;
     end if;
 
   elsif party = 'expense' then
@@ -1766,6 +1770,86 @@ CREATE FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) RETURNS 
 
 
 --
+-- Name: gm_backup_key_ok(text); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_backup_key_ok(k text) RETURNS boolean
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$
+  select k is not null and k = (select decrypted_secret from vault.decrypted_secrets where name = 'backup_cron_key');
+$$;
+
+
+--
+-- Name: gm_backup_restore(uuid, text, uuid, jsonb, uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_backup_restore(sid uuid, tbl text, rid uuid, snap jsonb, who uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare main jsonb; rows jsonb := '[]'; r jsonb; n int := 0; present boolean; cash_ids uuid[] := '{}'; ids uuid[] := '{}';
+begin
+  if tbl not in ('trader_movements', 'customer_debts', 'cash_movements', 'expense_entries', 'customers', 'traders', 'daily_cash_log') then
+    raise exception 'هذا النوع لا يُسترجع من هنا';
+  end if;
+  select e into main from jsonb_array_elements(snap->tbl) e where (e->>'id')::uuid = rid and (e->>'store_id')::uuid = sid;
+  if main is null then raise exception 'العنصر غير موجود في هذه النسخة'; end if;
+  if tbl = 'trader_movements' then
+    select coalesce(jsonb_agg(e), '[]') into rows from jsonb_array_elements(snap->'trader_movements') e
+     where (e->>'store_id')::uuid = sid
+       and ((e->>'id')::uuid = rid or (main->>'batch_id' is not null and e->>'batch_id' = main->>'batch_id'))
+       and not exists (select 1 from trader_movements t where t.id = (e->>'id')::uuid);
+  else
+    execute format('select exists(select 1 from public.%I where id = $1)', tbl) into present using rid;
+    if not present then rows := jsonb_build_array(main); end if;
+  end if;
+  if jsonb_array_length(rows) = 0 then raise exception 'هذا العنصر موجود حالياً — لا حاجة لاسترجاعه'; end if;
+  select array_agg((e->>'id')::uuid) into ids from jsonb_array_elements(rows) e;
+  if tbl = 'trader_movements' then
+    select coalesce(array_agg((e->>'id')::uuid), '{}') into cash_ids from jsonb_array_elements(snap->'cash_movements') e
+     where (e->>'trader_movement_id')::uuid = any(ids);
+  elsif tbl in ('customer_debts', 'expense_entries') and main->>'cash_movement_id' is not null then
+    cash_ids := array[(main->>'cash_movement_id')::uuid];
+  elsif tbl = 'cash_movements' then
+    if main->>'invoice_id' is not null then raise exception 'حركة فاتورة — تُسترجع من الفاتورة نفسها'; end if;
+    cash_ids := ids;
+  end if;
+  if tbl <> 'cash_movements' and tbl <> 'trader_movements' then
+    for r in select e from jsonb_array_elements(snap->'cash_movements') e
+              where (e->>'id')::uuid = any(cash_ids) and not exists (select 1 from cash_movements c where c.id = (e->>'id')::uuid) loop
+      insert into cash_movements select * from jsonb_populate_record(null::cash_movements, r); n := n + 1;
+    end loop;
+  end if;
+  for r in select e from jsonb_array_elements(rows) e loop
+    execute format('insert into public.%I select * from jsonb_populate_record(null::public.%I, $1)', tbl, tbl) using r;
+    n := n + 1;
+  end loop;
+  if tbl in ('cash_movements', 'trader_movements') then
+    for r in select e from jsonb_array_elements(snap->'cash_movements') e
+              where (e->>'id')::uuid = any(cash_ids) and not exists (select 1 from cash_movements c where c.id = (e->>'id')::uuid) loop
+      insert into cash_movements select * from jsonb_populate_record(null::cash_movements, r); n := n + 1;
+    end loop;
+  end if;
+  for r in select e from jsonb_array_elements(snap->'daily_cash_log') e
+            where (e->>'cash_movement_id')::uuid = any(cash_ids)
+               or (cash_ids <> '{}' and e->>'link_group' is not null and exists (
+                     select 1 from jsonb_array_elements(snap->'daily_cash_log') d
+                      where (d->>'cash_movement_id')::uuid = any(cash_ids) and d->>'link_group' = e->>'link_group'))
+  loop
+    if not exists (select 1 from daily_cash_log l where l.id = (r->>'id')::uuid) then
+      insert into daily_cash_log select * from jsonb_populate_record(null::daily_cash_log, r); n := n + 1;
+    end if;
+  end loop;
+  insert into audit_log (store_id, staff_id, action_type, description)
+  values (sid, (select id from staff where user_id = who and store_id = sid limit 1), 'backup_restore',
+          'استرجاع من نسخة احتياطية: ' || tbl || ' (' || n || ' سطر)');
+  return jsonb_build_object('ok', true, 'rows', n);
+end $_$;
+
+
+--
 -- Name: gm_can_expense(uuid); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -2508,6 +2592,40 @@ begin
     values (v.store_id, cat_id, loss, dsc, (select id from staff where user_id = auth.uid() and store_id = v.store_id limit 1));
   end if;
 end $$;
+
+
+--
+-- Name: gm_store_snapshot(uuid); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.gm_store_snapshot(sid uuid) RETURNS jsonb
+    LANGUAGE plpgsql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $_$
+declare r record; out jsonb := '{}'; part jsonb;
+begin
+  for r in select c.relname from pg_class c
+           join pg_attribute a on a.attrelid = c.oid and a.attname = 'store_id' and not a.attisdropped
+           where c.relkind = 'r' and c.relnamespace = 'public'::regnamespace
+             and c.relname not in ('client_errors')
+           order by 1
+  loop
+    execute format('select coalesce(jsonb_agg(to_jsonb(t)), ''[]''::jsonb) from public.%I t where t.store_id = $1', r.relname)
+      into part using sid;
+    out := out || jsonb_build_object(r.relname, part);
+  end loop;
+  out := out || jsonb_build_object(
+    'stores', (select coalesce(jsonb_agg(to_jsonb(s)), '[]') from stores s where s.id = sid),
+    'invoice_items', (select coalesce(jsonb_agg(to_jsonb(i)), '[]') from invoice_items i
+                      where i.invoice_id in (select id from invoices where store_id = sid)),
+    'branch_transfers', (select coalesce(jsonb_agg(to_jsonb(b)), '[]') from branch_transfers b
+                         where b.from_store_id = sid or b.to_store_id = sid),
+    'branch_transfer_items', (select coalesce(jsonb_agg(to_jsonb(i)), '[]') from branch_transfer_items i
+                              where i.transfer_id in (select id from branch_transfers where from_store_id = sid or to_store_id = sid)),
+    'repair_gold_lines', (select coalesce(jsonb_agg(to_jsonb(l)), '[]') from repair_gold_lines l
+                          where l.expense_entry_id in (select id from expense_entries where store_id = sid)));
+  return out;
+end $_$;
 
 
 --
@@ -4170,7 +4288,7 @@ CREATE FUNCTION public.record_repair_gold(p jsonb) RETURNS uuid
                                                         descr text := nullif(trim(p->>'description'), '');
                                                         begin
                                                           if not gm_can_expense(sid) or not is_store_member(sid) then raise exception 'ليس لديك صلاحية تسجيل المصاريف' using errcode = '42501'; end if;
-                                                            if kt not in (18, 21, 22, 24) then raise exception 'اختر العيار'; end if;
+                                                            if kt not in (14, 18, 21, 22, 24) then raise exception 'اختر العيار'; end if;
                                                               if w <= 0 then raise exception 'أدخل الغرامات'; end if;
                                                                 select coalesce(sum(weight_grams_remaining), 0) into avail from gold_stock_lots
                                                                    where store_id = sid and box_name = 'كسر ' || kt and weight_grams_remaining > 0;
@@ -5188,7 +5306,7 @@ begin
     wt := (ln->>'weight')::numeric;
     aw := coalesce(nullif(ln->>'acc_weight', '')::numeric, wt);
     fab := coalesce(nullif(ln->>'fab_per_gram', '')::numeric, 0);
-    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if k not in (14, 18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
     if wt is null or wt <= 0 or aw <= 0 or fab < 0 then raise exception 'وزن أو مصنعية غير صحيحة'; end if;
     bc := public.next_piece_barcode(pt.store_id, 'gold');
     insert into public.pieces (store_id, barcode, photo_url, weight_grams, accounting_weight_grams, karat, color, status,
@@ -5255,7 +5373,7 @@ begin
     wt := (ln->>'weight')::numeric;
     aw := coalesce(nullif(ln->>'acc_weight', '')::numeric, wt);
     fab := coalesce(nullif(ln->>'fab_per_gram', '')::numeric, 0);
-    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if k not in (14, 18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
     if wt is null or wt <= 0 or aw <= 0 or fab < 0 then raise exception 'وزن أو مصنعية غير صحيحة'; end if;
     if nullif(trim(ln->>'box_name'), '') is null then raise exception 'اختر الصندوق لكل قطعة جديدة'; end if;
     bc := public.next_piece_barcode(pt.store_id, 'gold');
@@ -5334,7 +5452,7 @@ begin
     continue when coalesce((ln->>'to_scrap')::boolean, false);
     aw := coalesce(nullif(ln->>'acc_weight', '')::numeric, wt);
     fab := coalesce(nullif(ln->>'fab_per_gram', '')::numeric, 0);
-    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if k not in (14, 18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
     if wt is null or wt <= 0 or aw <= 0 or fab < 0 then raise exception 'وزن أو مصنعية غير صحيحة'; end if;
     if nullif(trim(ln->>'box_name'), '') is null then raise exception 'اختر الصندوق لكل قطعة جديدة'; end if;
     bc := public.next_piece_barcode(pt.store_id, 'gold');
@@ -5363,7 +5481,7 @@ begin
     k := (ln->>'karat')::int;
     wt := (ln->>'weight')::numeric;
     continue when not coalesce((ln->>'to_scrap')::boolean, false);
-    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if k not in (14, 18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
     if wt is null or wt <= 0 then raise exception 'وزن غير صحيح'; end if;
     wt := round(wt, 3);
     insert into public.gold_stock_lots (store_id, karat, box_name, weight_grams_total, weight_grams_remaining, cost_fabrication_per_gram, notes, created_by)
@@ -5530,7 +5648,7 @@ CREATE FUNCTION public.stock_out_to_party_v2(target_party_id uuid, piece_ids uui
                                                         select voucher_number into num from public.stock_vouchers where id = vid;
                                                           for ln in select * from jsonb_array_elements(p_scrap) loop
                                                               k := (ln->>'karat')::int; w := round(nullif(ln->>'weight', '')::numeric, 3);
-                                                                  if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+                                                                  if k not in (14, 18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
                                                                       if w is null or w <= 0 then raise exception 'وزن الكسر غير صحيح'; end if;
                                                                           select coalesce(sum(weight_grams_remaining), 0) into have from public.gold_stock_lots
                                                                                where store_id = pt.store_id and box_name = 'كسر ' || k and weight_grams_remaining > 0;
@@ -5792,7 +5910,7 @@ begin
   if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
   if p_direction not in ('we_owe_gold', 'they_owe_gold') then raise exception 'اتجاه غير معروف'; end if;
   if w <= 0 or pr <= 0 then raise exception 'أدخل الوزن وسعر الغرام'; end if;
-  if k not in (18, 21, 22, 24) then raise exception 'عيار غير معروف'; end if;
+  if k not in (14, 18, 21, 22, 24) then raise exception 'عيار غير معروف'; end if;
   select id into me from staff where user_id = auth.uid() and store_id = t.store_id limit 1;
   g24 := round(w * k / 24.0, 3);
   cash := round(w * pr, 2);
@@ -5836,7 +5954,7 @@ begin
   if not has_permission('edit_traders', t.store_id) then raise exception 'ليس لديك صلاحية تعديل حسابات التجار' using errcode = '42501'; end if;
   select id, store_id, barcode, weight_grams, accounting_weight_grams, karat, cost_fabrication_per_gram into pc from pieces where id = p_piece;
   if pc is null or pc.store_id <> t.store_id then raise exception 'القطعة غير موجودة'; end if;
-  if pc.karat not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+  if pc.karat not in (14, 18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
   if vat < 0 or vat > 100 then raise exception 'نسبة ضريبة غير صحيحة'; end if;
   if exists (select 1 from trader_movements where piece_id = p_piece and source = 'stock_received') then
     raise exception 'القطعة مسجّلة على حساب تاجر مسبقاً';
@@ -5877,7 +5995,7 @@ begin
     k := (ln->>'karat')::int; wt := (ln->>'weight')::numeric;
     aw := coalesce(nullif(ln->>'acc_weight', '')::numeric, wt); fab := coalesce(nullif(ln->>'fab_per_gram', '')::numeric, 0);
     kind := coalesce(ln->>'kind', 'piece');
-    if k not in (18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
+    if k not in (14, 18, 21, 22, 24) then raise exception 'عيار غير صحيح'; end if;
     if wt is null or wt <= 0 or aw <= 0 or fab < 0 then raise exception 'وزن أو مصنعية غير صحيحة'; end if;
     pid := null; lid := null;
     if kind = 'piece' then
@@ -7503,7 +7621,7 @@ CREATE TABLE public.pieces (
     purchase_cost numeric,
     zircon_carat numeric,
     reserved_customer_id uuid,
-    CONSTRAINT pieces_karat_check CHECK ((karat = ANY (ARRAY[18, 21, 22, 24]))),
+    CONSTRAINT pieces_karat_check CHECK ((karat = ANY (ARRAY[14, 18, 21, 22, 24]))),
     CONSTRAINT pieces_zircon_carat_check CHECK (((zircon_carat IS NULL) OR (zircon_carat >= (0)::numeric)))
 );
 
@@ -13243,6 +13361,22 @@ GRANT ALL ON FUNCTION public.gm_allocate_customer_credit(sid uuid, cust uuid) TO
 
 
 --
+-- Name: FUNCTION gm_backup_key_ok(k text); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_backup_key_ok(k text) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_backup_key_ok(k text) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_backup_restore(sid uuid, tbl text, rid uuid, snap jsonb, who uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_backup_restore(sid uuid, tbl text, rid uuid, snap jsonb, who uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_backup_restore(sid uuid, tbl text, rid uuid, snap jsonb, who uuid) TO service_role;
+
+
+--
 -- Name: FUNCTION gm_can_expense(sid uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -13489,6 +13623,14 @@ GRANT ALL ON FUNCTION public.gm_staff_guard() TO service_role;
 
 REVOKE ALL ON FUNCTION public.gm_stock_in_rescrap(p_voucher uuid) FROM PUBLIC;
 GRANT ALL ON FUNCTION public.gm_stock_in_rescrap(p_voucher uuid) TO service_role;
+
+
+--
+-- Name: FUNCTION gm_store_snapshot(sid uuid); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.gm_store_snapshot(sid uuid) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.gm_store_snapshot(sid uuid) TO service_role;
 
 
 --
@@ -15217,5 +15359,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict aVdFOmYglU0X4HxRsuH6sP1Kgo5IBAlQ5wWU0sN8pdLrLKBSdGsldwuVO7EZIbv
+\unrestrict fk5MmEuCWdhLoO3UJLODUBvWHf709mjlyOJf1QW8PpNDpqrcOw89F4dbWgAhkac
 
