@@ -80,6 +80,32 @@
     .stmt-table tr.st-p td { font-size: 11px; color: #5b5140; padding: 5px 6px; }
     .st-ret { display: inline-block; white-space: nowrap; margin-top: 4px; font-size: 11px; font-weight: 700; color: #8A3B32; border: 1px solid #8A3B32; border-radius: 8px; padding: 3px 8px; background: #fff; }
     .st-ph { width: 44px; height: 44px; object-fit: cover; border-radius: 6px; display: inline-block; vertical-align: middle; }
+    /* computer «تفاصيل»: the voucher's pieces as a grid of cards under its line (بشار 2026-11-19);
+       the per-piece table rows stay for printing and the PDF */
+    .st-grid-row { display: none; }
+    @media screen and (min-width: 641px) {
+      .stmt-table tr.st-p { display: none; }
+      .stmt-table tr.st-grid-row { display: table-row; }
+      .gm-wide { max-width: 72rem !important; }
+    }
+    .gm-pdf .stmt-table tr.st-p { display: table-row !important; }
+    .gm-pdf .stmt-table tr.st-grid-row { display: none !important; }
+    .stmt-table tr.st-grid-row > td { padding: 12px 4px 16px; text-align: right; }
+    .stg { display: grid; grid-template-columns: repeat(auto-fill, minmax(165px, 1fr)); gap: 12px; }
+    .stg-c { background: #fff; border: 1px solid #e4e4e7; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; }
+    .stg-ph { position: relative; aspect-ratio: 1 / 1; background: #f4f4f5; }
+    .stg-ph img { width: 100%; height: 100%; object-fit: cover; display: block; cursor: zoom-in; }
+    .stg-ph .stg-none { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; color: #a1a1aa; font-size: 34px; }
+    .stg-act { position: absolute; inset: auto 0 0 0; padding: 8px; display: flex; gap: 6px; background: rgba(9,9,11,.55); opacity: 0; transition: opacity .15s; }
+    .stg-c:hover .stg-act, .stg-c:focus-within .stg-act { opacity: 1; }
+    @media (hover: none) { .stg-act { opacity: 1; } }
+    .stg-act button { flex: 1; height: 32px; border-radius: 8px; background: #fff; color: #b91c1c; font-size: 12px; font-weight: 700; display: inline-flex; align-items: center; justify-content: center; gap: 4px; }
+    .stg-act .material-symbols-outlined { font-size: 16px; }
+    .stg-b { padding: 10px 12px; display: flex; flex-direction: column; gap: 8px; }
+    .stg-n { display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+    .stg-n b { font-size: 14px; color: #09090b; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .stg-g { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px 10px; font-size: 11.5px; color: #52525b; }
+    .stg-g b { display: block; font-size: 14px; color: #09090b; font-weight: 700; direction: ltr; text-align: right; }
 </style>
 <style>
 /* Printing: no top/bottom page margin = no room for the browser's own
@@ -106,6 +132,11 @@
   html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) :is(.stc-ph, .stc-k) { border-color: #3A3B42; }
   html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) .stc-ret { background: #24252B; border-color: #3A3B42; color: #FF9C8F; }
   html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) .stc-end { background: #2A2617; color: #F6EBCB; }
+  html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) .stg-c { background: #1C1D22; border-color: #33343B; }
+  html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) .stg-ph { background: #23242A; }
+  html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) :is(.stg-n b, .stg-g b) { color: #F3EFE6; }
+  html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) .stg-g { color: #AAA396; }
+  html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) .stg-act button { background: #24252B; color: #FF9C8F; }
   html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) :is(.text-gray-500, .text-gray-600, .text-zinc-500, .text-zinc-600) { color: #AAA396 !important; }
   html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) :is(.text-gray-900, .text-zinc-900, .text-black) { color: #F3EFE6 !important; }
   html[data-gm-theme="black-marble"] .stmt-sheet:not(.gm-pdf) :is(.bg-white, .bg-gray-50, .bg-zinc-50) { background: #1C1D22 !important; }
@@ -119,7 +150,7 @@
 </head>
 <body class="gm-paper-page">
 <header class="no-print border-b sticky top-0 z-50 bg-white">
-<div class="flex justify-between items-center px-4 w-full h-16 max-w-3xl mx-auto">
+<div id="stHeadWrap" class="flex justify-between items-center px-4 w-full h-16 max-w-3xl mx-auto">
 <div class="flex items-center gap-4">
 <button onclick="gmSmartBack('ledger-ar.html')" class="cursor-pointer p-2 hover:bg-gray-100 rounded-full flex items-center justify-center">
 <span class="material-symbols-outlined font-bold" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 28px;">arrow_forward</span>
@@ -134,7 +165,7 @@
 </div>
 </header>
 
-<main class="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
+<main id="stMain" class="max-w-3xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
 <div id="loading-state" class="py-16 text-center text-sm text-gray-500">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-sm text-red-600">ليس لديك صلاحية الوصول لهذه الشاشة.</div>
 
@@ -339,7 +370,21 @@ function stRenderLedger() {
                 <td class="font-data-mono">${mv(sgn(m) * Number(m.fab_fee_amount || 0))}</td>
                 <td></td><td></td></tr>`;
         }).join('');
-        return main + subs;
+        const cards = l.g.rows.filter(m => m.piece_id).slice().reverse().map(m => {
+            const p = ST_PIECES[m.piece_id] || {}, name = stShort(m.notes) || p.barcode || '';
+            const img = ST_PHOTOS && p.photo_url
+                ? `<img src="${gmEscapeHtml(p.photo_url)}" alt="صورة القطعة" loading="lazy" onclick="window.gmPhotoViewer?gmPhotoViewer(this.src):window.open(this.src)"/>`
+                : '<span class="stg-none material-symbols-outlined" aria-hidden="true">diamond</span>';
+            const act = ST_CAN_RETURN && m.source === 'stock_given'
+                ? `<div class="stg-act"><button type="button" data-what="${gmEscapeHtml(name)}" onclick="stReturnPiece('${m.id}', this)"><span class="material-symbols-outlined">undo</span>إرجاع للمخزن</button></div>` : '';
+            return `<div class="stg-c"><div class="stg-ph">${img}${act}</div><div class="stg-b">
+                <div class="stg-n"><b title="${gmEscapeHtml(name)}">${gmEscapeHtml(name)}</b>${m.karat ? `<span class="stc-k">ع${m.karat}</span>` : ''}</div>
+                <div class="stg-g"><div>القائم<b class="font-data-mono">${fmt(stGross(m))}</b></div><div>ذهب 24<b class="font-data-mono">${fmt(Number(m.gold_24k_equivalent || 0))}</b></div>
+                <div>مصنعية/غ<b class="font-data-mono">${stFeePerGram([m])}</b></div><div>المصنعية<b class="font-data-mono">${fmt(Number(m.fab_fee_amount || 0))}</b></div></div>
+              </div></div>`;
+        }).join('');
+        const grid = cards ? `<tr class="st-grid-row no-print"><td colspan="9"><div class="stg">${cards}</div></td></tr>` : '';
+        return main + subs + grid;
     }).join('');
     const last = ST_LINES[ST_LINES.length - 1];
     stRenderCards(lines, last, sgn);
@@ -399,7 +444,7 @@ async function loadStatement() {
     const batchId = params.get('batch');
     if (batchId) goldQuery = goldQuery.eq('batch_id', batchId); // one voucher: its pieces with photos
     const { data: allMoves } = await goldQuery;
-    if (batchId) { ST_VIEW = 'details'; ST_PHOTOS = true; }
+    if (batchId) { ST_VIEW = 'details'; ST_PHOTOS = true; ['stMain', 'stHeadWrap'].forEach(i => document.getElementById(i).classList.add('gm-wide')); } // one voucher: room for the pieces grid
 
     // ---- Header ----
     document.getElementById('stTraderName').textContent = trader.name;

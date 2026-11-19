@@ -63,7 +63,10 @@ test('return one piece to stock from the statement', async ({ page }) => {
   page.on('dialog', d => d.accept());
   await page.goto('/trader-statement-print-ar.html?trader=t1');
   await page.click('#stOpts [data-view=details]');
-  const btn = page.locator('#stLedgerRows tr.st-p button.st-ret').last();
+  // computer: the pieces are a grid of cards; the return action shows when the mouse is over the card
+  const card = page.locator('#stLedgerRows .stg-c').last();
+  await card.hover();
+  const btn = card.locator('.stg-act button');
   await expect(btn).toBeVisible();
   await btn.click();
   await expect.poll(() => calls.some(c => c.name === 'trader_return_piece')).toBe(true);
