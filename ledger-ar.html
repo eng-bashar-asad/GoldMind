@@ -178,6 +178,14 @@ body.gm-no-vedit .gm-vedit{display:none!important}
 }
 .ld-run{font-size:11.5px;color:#6B6150;margin-top:4px}
 @media (min-width:1024px){ #movements-list.ld-collapsed{display:none} }
+.ld-st tr.ld-row{cursor:pointer}
+.ld-st tr.ld-row>td:first-child::before{content:'▾';font-size:13px;vertical-align:middle;margin-left:4px;opacity:.55;display:inline-block;transition:transform .15s}
+.ld-st tr.ld-open>td:first-child::before{transform:rotate(180deg);opacity:1}
+.ld-st tr.ld-open>td{background:rgba(212,160,23,.10)}
+.ld-st tr.ld-exp>td{padding:6px 12px 10px;background:rgba(212,160,23,.06);text-align:right}
+.ld-exp>td>div{border:0!important;padding:0!important;background:transparent!important;border-radius:0!important}
+.ld-exp>td>div>div.flex.items-center.justify-between.mb-1,.ld-exp>td>div>.grid,.ld-exp>td>div>p.font-data-mono,.ld-exp>td>div>.ld-run{display:none}
+.ld-exp>td>div>div.flex.gap-2{margin-top:0;padding-top:0;border-top:0;max-width:720px}
 </style>
 </head>
 <body class="bg-background text-on-background font-body-md">
@@ -1361,7 +1369,7 @@ function showTraderDetail(traderId) {
     if (tot[d]) { tot[d].g += w; tot[d].g24 += g24; tot[d].f += fee; }
     const r = ldRun[last.id];
     const n = gp.rows.length;
-    return `<tr onclick="const c=document.getElementById('trader-move-${f0.id}')||document.getElementById('trader-batch-${f0.batch_id}')||document.getElementById('trader-invgroup-${f0.invoice_id}');document.getElementById('movements-list').classList.remove('ld-collapsed');window.ldCards=true;if(c){c.scrollIntoView({behavior:'smooth',block:'center'});c.style.outline='2px solid #D4A017';setTimeout(()=>c.style.outline='',2000)}">
+    return `<tr class="ld-row" onclick="ldToggleRow(this,['trader-move-${f0.id}','trader-batch-${f0.batch_id}','trader-invgroup-${f0.invoice_id}'])">
       <td class="n" data-l="التاريخ">${gmFormatDateTime(last.created_at, { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
       <td data-l="السند">${f0.voucher_no ? `<span class="n">${gmEscapeHtml(f0.voucher_no)}</span>` : '—'}</td>
       <td class="dir"><span class="ld-dir ${D[5]}" style="color:${D[2]};background-color:${D[3]}"><span class="material-symbols-outlined ${D[4]}" aria-hidden="true">${D[1]}</span><span class="${D[4]}">${D[0]}</span></span></td>
@@ -2701,6 +2709,32 @@ function openGiveStockForm() {
     clearGiveStockDraft();
   }
   resetGiveStockCart();
+}
+
+// Computer: clicking a statement row opens that movement's own card (actions + edit forms) in a strip right under the row,
+// instead of opening the side «سجل الحركات» column. The card is moved, not copied, so every button and form keeps working.
+function ldCloseExp() {
+  document.querySelectorAll('tr.ld-exp').forEach(x => {
+    const c = x.querySelector('td > div');
+    if (c && c._ldPh && c._ldPh.isConnected) c._ldPh.replaceWith(c);
+    x.remove();
+  });
+  document.querySelectorAll('tr.ld-open').forEach(t => t.classList.remove('ld-open'));
+}
+function ldToggleRow(tr, ids) {
+  const c = ids.map(i => document.getElementById(i)).find(Boolean);
+  if (!matchMedia('(min-width:1024px)').matches) { // phone: the cards are already listed under the table
+    if (c) { c.scrollIntoView({ behavior: 'smooth', block: 'center' }); c.style.outline = '2px solid #D4A017'; setTimeout(() => c.style.outline = '', 2000); }
+    return;
+  }
+  const wasOpen = tr.classList.contains('ld-open');
+  ldCloseExp();
+  if (wasOpen || !c) return;
+  const ph = document.createComment('ld-card'); c.before(ph); c._ldPh = ph;
+  const x = document.createElement('tr'); x.className = 'ld-exp';
+  x.innerHTML = `<td colspan="${tr.children.length}"></td>`;
+  x.firstChild.appendChild(c);
+  tr.after(x); tr.classList.add('ld-open');
 }
 
 function resetGiveStockCart() {
