@@ -1005,6 +1005,8 @@ function goldmindLoadSavedTheme() {
   st.textContent = '@media screen{'
     + 'html:not(.gm-light-canvas) body.bg-gray-100,html:not(.gm-light-canvas) body.gm-paper-page{background:var(--gm-bg)!important}'
     + 'html:not(.gm-light-canvas) body.bg-gray-100>.no-print:not(.sticky):not(.hidden),html:not(.gm-light-canvas) body.gm-paper-page .gm-paper-controls{background:#fff;border-radius:12px;padding:10px 12px;color:#1F1A12}'
+    // black marble: that panel is dark too, like the rest of the page (بشار 2026-11-19)
+    + 'html[data-gm-theme="black-marble"] body.bg-gray-100>.no-print:not(.sticky):not(.hidden),html[data-gm-theme="black-marble"] body.gm-paper-page .gm-paper-controls{background:#1C1D22;color:#ECE6D8;box-shadow:0 0 0 1px rgba(212,175,55,.22)}'
     + '}';
   (document.head || document.documentElement).appendChild(st);
 })();
