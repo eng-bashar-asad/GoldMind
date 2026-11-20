@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fk5MmEuCWdhLoO3UJLODUBvWHf709mjlyOJf1QW8PpNDpqrcOw89F4dbWgAhkac
+\restrict JKquge8u5YZWazFoiDfD5zi54EAqGUT5UWuQqIZ0fdrbPqv8YYiX1AAUEAzh9Z6
 
 
 SET statement_timeout = 0;
@@ -2799,7 +2799,7 @@ CREATE FUNCTION public.has_permission(perm text, target_store_id uuid) RETURNS b
     AS $$
   select coalesce(
     (select role = 'owner' or (permissions ->> perm) = 'true'
-     from public.staff where user_id = auth.uid() and store_id = target_store_id),
+     from public.staff where user_id = auth.uid() and store_id = target_store_id and suspended_at is null),
     false
   );
 $$;
@@ -2965,7 +2965,7 @@ CREATE FUNCTION public.is_store_member(target_store_id uuid) RETURNS boolean
     AS $$
   select exists (
     select 1 from public.staff
-    where user_id = auth.uid() and store_id = target_store_id
+    where user_id = auth.uid() and store_id = target_store_id and suspended_at is null
   );
 $$;
 
@@ -3216,11 +3216,10 @@ CREATE FUNCTION public.my_stores() RETURNS TABLE(store_id uuid, store_name text,
     SET search_path TO 'public'
     AS $$
   select s.store_id, coalesce(nullif(btrim(st.display_name), ''), st.name), s.role
-    from public.staff s
-      join public.stores st on st.id = s.store_id
-        where s.user_id = auth.uid()
-          order by 2;
-          $$;
+    from public.staff s join public.stores st on st.id = s.store_id
+   where s.user_id = auth.uid() and s.suspended_at is null
+   order by 2;
+$$;
 
 
 --
@@ -6356,6 +6355,22 @@ end $$;
 
 
 --
+-- Name: trg_staff_suspend_guard(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.trg_staff_suspend_guard() RETURNS trigger
+    LANGUAGE plpgsql
+    SET search_path TO 'public'
+    AS $$
+begin
+  if new.suspended_at is not null and new.role = 'owner' then
+    raise exception 'لا يمكن إيقاف مالك الشركة';
+  end if;
+  return new;
+end $$;
+
+
+--
 -- Name: trg_trader_received_sync(); Type: FUNCTION; Schema: public; Owner: -
 --
 
@@ -7840,7 +7855,8 @@ CREATE TABLE public.staff (
     permissions jsonb DEFAULT '{}'::jsonb NOT NULL,
     user_id uuid,
     whatsapp_phone text,
-    contact_phone text
+    contact_phone text,
+    suspended_at timestamp with time zone
 );
 
 
@@ -10293,6 +10309,13 @@ CREATE TRIGGER trg_staff_guard BEFORE INSERT OR DELETE OR UPDATE ON public.staff
 
 
 --
+-- Name: staff trg_staff_suspend_guard; Type: TRIGGER; Schema: public; Owner: -
+--
+
+CREATE TRIGGER trg_staff_suspend_guard BEFORE INSERT OR UPDATE OF suspended_at, role ON public.staff FOR EACH ROW EXECUTE FUNCTION public.trg_staff_suspend_guard();
+
+
+--
 -- Name: stores trg_stores_currency_convert_gold; Type: TRIGGER; Schema: public; Owner: -
 --
 
@@ -12569,6 +12592,13 @@ CREATE POLICY "staff can view own organization" ON public.organizations FOR SELE
 
 
 --
+-- Name: staff staff can view own rows; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY "staff can view own rows" ON public.staff FOR SELECT USING ((user_id = ( SELECT auth.uid() AS uid)));
+
+
+--
 -- Name: stores staff can view own store; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -14524,6 +14554,14 @@ GRANT ALL ON FUNCTION public.trg_settlement_lot_sync() TO service_role;
 
 
 --
+-- Name: FUNCTION trg_staff_suspend_guard(); Type: ACL; Schema: public; Owner: -
+--
+
+GRANT ALL ON FUNCTION public.trg_staff_suspend_guard() TO authenticated;
+GRANT ALL ON FUNCTION public.trg_staff_suspend_guard() TO service_role;
+
+
+--
 -- Name: FUNCTION trg_trader_received_sync(); Type: ACL; Schema: public; Owner: -
 --
 
@@ -15359,5 +15397,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fk5MmEuCWdhLoO3UJLODUBvWHf709mjlyOJf1QW8PpNDpqrcOw89F4dbWgAhkac
+\unrestrict JKquge8u5YZWazFoiDfD5zi54EAqGUT5UWuQqIZ0fdrbPqv8YYiX1AAUEAzh9Z6
 
