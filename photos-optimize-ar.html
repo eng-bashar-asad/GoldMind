@@ -60,6 +60,12 @@
     </div>
     <p class="text-[11.5px] text-on-surface-variant">أبقِ الصفحة مفتوحة حتى ينتهي. يمكنك الإيقاف والمتابعة لاحقاً من حيث توقفت.</p>
   </section>
+  <section id="po-clean" class="hidden bg-surface-container-lowest border-2 border-amber-400 rounded-2xl p-4 space-y-3">
+    <h2 class="font-bold text-[15px]">حذف الصور الأصلية الكبيرة</h2>
+    <p class="text-[13px] leading-7">بعد التأكد أن صور القطع تظهر بشكل جيد، احذف النسخ الأصلية الكبيرة التي لم تعد مستخدمة لتوفير مساحة التخزين. لا تُحذف أي صورة مستخدمة في قطعة أو فاتورة أو صيانة أو تحويل.</p>
+    <p id="po-clean-info" class="text-[13px] font-semibold" role="status" aria-live="polite">جارِ الحساب…</p>
+    <button id="po-clean-btn" onclick="poClean()" disabled class="h-12 px-6 rounded-xl border-2 border-red-600 text-red-700 font-bold flex items-center gap-2 disabled:opacity-50"><span class="material-symbols-outlined">delete</span>حذف الأصليات</button>
+  </section>
 </div>
 </main>
 <script>
@@ -121,12 +127,54 @@ async function poRun() {
   await poLoad().catch(() => {});
   st.textContent = msg;
 }
+// Originals that now have a «-gm1200.jpg» copy and are referenced by nothing (pieces, invoice lines, repairs, transfers,
+// diamonds, bulk invoice photos). Listed through storage (the owner's own session), deleted only after a confirm.
+let PO_ORIG = [];
+async function poFindOriginals() {
+  const info = document.getElementById('po-clean-info'), btn = document.getElementById('po-clean-btn');
+  const objs = [];
+  for (let off = 0; ; off += 1000) {
+    const { data, error } = await goldmindClient.storage.from('piece-photos').list(GOLDMIND_STORE_ID, { limit: 1000, offset: off, sortBy: { column: 'name', order: 'asc' } });
+    if (error) throw error;
+    (data || []).forEach(o => o.id && objs.push({ path: GOLDMIND_STORE_ID + '/' + o.name, size: (o.metadata && o.metadata.size) || 0 }));
+    if (!data || data.length < 1000) break;
+  }
+  const small = new Set(objs.filter(o => o.path.endsWith(PO_MARK)).map(o => o.path));
+  const refs = [];
+  const grab = async (table, cols, storeCol = 'store_id') => {
+    const { data } = await gmFetchAllRows(() => goldmindClient.from(table).select(cols).eq(storeCol, GOLDMIND_STORE_ID));
+    (data || []).forEach(r => refs.push(JSON.stringify(r)));
+  };
+  await Promise.all([grab('pieces', 'photo_url'), grab('repair_tickets', 'intake_photo_url, ready_photo_url'), grab('invoices', 'bulk_photos')]);
+  for (const [t, c] of [['diamond_pieces', 'photo_url'], ['branch_transfer_items', 'photo_url']]) { try { await grab(t, c); } catch (e) {} }
+  const { data: inv } = await gmFetchAllRows(() => goldmindClient.from('invoice_items').select('item_photo_url, invoices!inner(store_id)').eq('invoices.store_id', GOLDMIND_STORE_ID).not('item_photo_url', 'is', null));
+  (inv || []).forEach(r => refs.push(r.item_photo_url));
+  const used = refs.join('\n');
+  PO_ORIG = objs.filter(o => !o.path.endsWith(PO_MARK) && small.has(o.path.replace(/\.[^./]+$/, '') + PO_MARK) && !used.includes(o.path));
+  const total = PO_ORIG.reduce((a, o) => a + o.size, 0);
+  info.textContent = PO_ORIG.length ? `${PO_ORIG.length} صورة أصلية غير مستخدمة — ${poMB(total)}` : 'لا توجد صور أصلية للحذف ✓';
+  btn.disabled = !PO_ORIG.length;
+}
+async function poClean() {
+  const total = PO_ORIG.reduce((a, o) => a + o.size, 0);
+  if (!confirm(`سيتم حذف ${PO_ORIG.length} صورة أصلية (${poMB(total)}) نهائياً.\nالصور المحسّنة تبقى كما هي، ولا يمكن التراجع عن الحذف.\nمتابعة؟`)) return;
+  const btn = document.getElementById('po-clean-btn'), info = document.getElementById('po-clean-info');
+  btn.disabled = true; let gone = 0;
+  for (let i = 0; i < PO_ORIG.length; i += 100) {
+    const batch = PO_ORIG.slice(i, i + 100).map(o => o.path);
+    const { error } = await goldmindClient.storage.from('piece-photos').remove(batch);
+    if (error) { info.textContent = 'تعذّر الحذف: ' + error.message; return; }
+    gone += batch.length; info.textContent = `جارِ الحذف… ${gone} من ${PO_ORIG.length}`;
+  }
+  info.textContent = `تم ✓ حُذفت ${gone} صورة أصلية ووُفّرت ${poMB(total)}.`;
+}
 (async function init() {
   const session = await requireGoldMindSession('login-entry-ar.html');
   if (!session) return;
   const { data: me } = await goldmindClient.from('staff').select('role').eq('id', GOLDMIND_STAFF_ID).maybeSingle();
   if (!me || me.role !== 'owner') { alert('تحسين الصور متاح لمالك الشركة فقط.'); location.href = 'index-ar.html'; return; }
   try { await poLoad(); } catch (e) { document.getElementById('po-status').textContent = 'تعذّر تحميل الصور: ' + e.message; }
+  { document.getElementById('po-clean').classList.remove('hidden'); poFindOriginals().catch(e => { document.getElementById('po-clean-info').textContent = 'تعذّر الحساب: ' + e.message; }); }
 })();
 </script>
 </body>
