@@ -665,17 +665,24 @@
   var badges = {};
   function setBadge(href, html) { badges[href] = html; }
   function paintBadges() {
-    var d = document.getElementById('gmNav'); if (!d) return;
-    d.querySelectorAll('a.gn-a > .gn-badge').forEach(function (b) { b.remove(); });
+    var d = document.getElementById('gmNav');
+    if (d) d.querySelectorAll('a.gn-a > .gn-badge').forEach(function (b) { b.remove(); });
+    // the home screen's own computer sidebar (index-ar.html .dsk-nav-link) gets the same badges
+    document.querySelectorAll('a.dsk-nav-link > .gn-badge').forEach(function (b) { b.remove(); });
     Object.keys(badges).forEach(function (href) {
       if (!badges[href]) return;
-      d.querySelectorAll('a.gn-a[href="' + href + '"]').forEach(function (a) {
+      if (d) d.querySelectorAll('a.gn-a[href="' + href + '"]').forEach(function (a) {
         var t = document.createElement('span'); t.innerHTML = badges[href];
         var b = t.firstChild; var star = a.querySelector('.gn-star');
         a.insertBefore(b, star || null);
       });
+      document.querySelectorAll('a.dsk-nav-link[href="' + href + '"]').forEach(function (a) {
+        var t = document.createElement('span'); t.innerHTML = badges[href]; a.appendChild(t.firstChild);
+      });
     });
   }
+  window.gmPaintNavBadges = paintBadges;
+  window.gmRefreshNavBadges = function () { try { sessionStorage.removeItem('gm_nav_badges_' + GOLDMIND_STORE_ID); } catch (e) { /* ignore */ } loadBadges(); };
   async function storeReady() {
     for (var i = 0; i < 20 && (typeof GOLDMIND_STORE_ID === 'undefined' || !GOLDMIND_STORE_ID); i++) await new Promise(function (r) { setTimeout(r, 300); });
     return typeof GOLDMIND_STORE_ID !== 'undefined' && GOLDMIND_STORE_ID && typeof goldmindClient !== 'undefined';
@@ -692,13 +699,16 @@
           goldmindClient.from('pieces').select('id', { count: 'exact', head: true }).eq('store_id', S).eq('status', 'available'),
           goldmindClient.from('inventory_counts').select('status').eq('store_id', S).in('status', ['in_progress', 'completed']),
           goldmindClient.from('repair_tickets').select('id', { count: 'exact', head: true }).eq('store_id', S).eq('status', 'ready'),
-          goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', S)
+          goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', S),
+          // sale invoices still waiting for payment (بشار 2026-11-21: «فواتير بانتظار»)
+          goldmindClient.from('invoices').select('id', { count: 'exact', head: true }).eq('store_id', S).eq('type', 'sale').eq('status', 'unpaid')
         ].map(function (p) { return Promise.resolve(p).catch(function () { return {}; }); }));
         if (q[0] && q[0].count) b['inventory-list-ar.html'] = '<span class="gn-badge">' + q[0].count + '</span>';
         var counts = (q[1] && q[1].data) || [];
         if (counts.some(function (c) { return c.status === 'in_progress'; })) b['inventory-count-ar.html'] = '<span class="gn-badge amber" title="جرد جارٍ">جارٍ</span>';
         else if (counts.length) b['inventory-count-ar.html'] = '<span class="gn-badge amber" title="جرد مغلق ينتظر الترحيل">' + counts.length + '</span>';
-        if (q[2] && q[2].count) b['repairs-ar.html'] = '<span class="gn-badge" title="جاهزة للتسليم">' + q[2].count + '</span>';
+        if (q[2] && q[2].count) b['repairs-ar.html'] = '<span class="gn-badge red" title="صيانة جاهزة للتسليم">' + q[2].count + '</span>';
+        if (q[4] && q[4].count) b['invoices-list-ar.html'] = '<span class="gn-badge red" title="فواتير بانتظار الدفع">' + q[4].count + '</span>';
         var gp = ((q[3] && q[3].data) || []).filter(function (r) { return Number(r.price_per_gram) > 0; }).sort(function (x, y) { return x.karat - y.karat; })[0];
         if (gp) b['gold-price-ar.html'] = '<span class="gn-badge txt" dir="ltr">' + esc(gp.karat + 'K ' + Number(gp.price_per_gram).toFixed(2)) + '</span>';
         badges = b;

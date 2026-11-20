@@ -12,7 +12,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=60"></script>
-<script src="theme.js?v=109"></script>
+<script src="theme.js?v=110"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
@@ -86,6 +86,7 @@
 <option value="customerPay">دفعات زبائن</option>
 <option value="return">مرتجع</option>
 <option value="repair">صيانة</option>
+<option value="unpaid">فواتير بانتظار الدفع</option>
 <option value="cancelled">الفواتير الملغاة (لإعادة استخدام رقمها)</option>
 </select>
 </div>
@@ -336,6 +337,7 @@ function applyFilters() {
   let rows = allRows;
   // «الفواتير الملغاة»: open one and use «إعادة إصدار بنفس الرقم» (بشار 2026-11-19)
   if (type === 'cancelled') { rows = rows.filter(r => r.status === 'cancelled'); KIND_PICK = null; }
+  else if (type === 'unpaid') { rows = rows.filter(r => r.status === 'unpaid' && r.type === 'sale'); KIND_PICK = null; }
   else if (type) { rows = rows.filter(r => r.type === type); KIND_PICK = null; }
   if (q) {
     rows = rows.filter(r =>

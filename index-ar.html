@@ -13,7 +13,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
-<script src="theme.js?v=109"></script>
+<script src="theme.js?v=110"></script>
 <script id="tailwind-config">
       tailwind.config = {
         darkMode: "class",
@@ -187,7 +187,32 @@
         ::-webkit-scrollbar {
             display: none;
         }
-    </style>
+    
+/* ===== Home trends (بشار 2026-11-21): % change chips, last-7-days bars, inventory-count ring ===== */
+.gm-delta{display:inline-flex;align-items:center;gap:3px;font-size:11.5px;font-weight:800;padding:2px 8px;border-radius:999px;white-space:nowrap;direction:ltr;unicode-bidi:isolate}
+.gm-delta:empty{display:none}
+.gm-delta.up{background:rgba(46,125,50,.14);color:#2E7D32}.gm-delta.down{background:rgba(198,40,40,.13);color:#C62828}.gm-delta.flat{background:rgba(120,110,90,.14);color:#6B6150}
+.gm-delta-line{display:flex;align-items:center;gap:6px;margin-top:6px;font-size:11px;color:var(--gm-on-surface-variant,#6B6150);white-space:nowrap;min-width:0;overflow:hidden}
+.gm-delta-line>span:not(.gm-delta){overflow:hidden;text-overflow:ellipsis}
+.gm-mcard .gm-delta-line>span:not(.gm-delta){display:none}
+.gm-wk-row{display:grid;grid-template-columns:minmax(0,1fr);gap:12px}
+.gm-wk-row.has-count{grid-template-columns:minmax(0,1fr)}
+@media (min-width:1024px){.gm-wk-row{margin:14px 0 4px}.gm-wk-row.has-count{grid-template-columns:minmax(0,2.2fr) minmax(0,1fr)}}
+.gm-wk-card{display:block;background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant,#E7DFCC);border-radius:20px;padding:16px 18px;color:inherit;text-decoration:none;min-width:0}
+.gm-wk-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:10px}
+.gm-wk-title{font-size:14px;font-weight:800}.gm-wk-sub{font-size:12px;color:var(--gm-on-surface-variant,#6B6150);margin-top:2px}
+.gm-wk-bars{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:8px;align-items:end;height:150px;direction:ltr}
+.gm-wk-col{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;min-width:0;gap:6px}
+.gm-wk-val{font-size:10.5px;font-weight:700;color:var(--gm-on-surface-variant,#6B6150);white-space:nowrap;direction:ltr;opacity:0;transition:opacity .2s}
+.gm-wk-col.today .gm-wk-val,.gm-wk-col:hover .gm-wk-val{opacity:1}
+.gm-wk-bar{width:100%;max-width:46px;border-radius:10px 10px 6px 6px;min-height:6px;background:linear-gradient(180deg,rgba(212,175,55,.55),rgba(156,122,34,.35));transform-origin:bottom;animation:gmGrow .9s cubic-bezier(.22,1,.36,1) both}
+.gm-wk-col.today .gm-wk-bar{background:linear-gradient(180deg,#FFF0BF,#E3BE5B 45%,#A8801F);box-shadow:0 0 22px rgba(227,190,91,.55),inset 0 1px 0 rgba(255,255,255,.6)}
+.gm-wk-day{font-size:11px;font-weight:600;color:var(--gm-on-surface-variant,#6B6150);direction:rtl}
+.gm-wk-col.today .gm-wk-day{font-weight:800;color:inherit}
+.gm-cnt-card{text-align:center}.gm-cnt-ring{width:132px;height:132px;margin:8px auto 4px;color:var(--gm-on-surface,#1F1A12)}
+.gm-cnt-ring .gm-donut{width:100%;height:100%}
+@media (prefers-reduced-motion: reduce){.gm-wk-bar{animation:none}}
+</style>
 <style>
     body {
       min-height: max(884px, 100dvh);
@@ -298,6 +323,9 @@
   .dsk-nav-fold{display:grid;grid-template-rows:0fr;transition:grid-template-rows .25s cubic-bezier(.22,1,.36,1);}
   .dsk-nav-group.open .dsk-nav-fold{grid-template-rows:1fr;}
   .dsk-nav-fold>.dsk-nav{overflow:hidden;padding-inline-start:10px;}
+  .dsk-nav-link .gn-badge{margin-inline-start:auto;min-width:20px;height:20px;padding:0 6px;border-radius:999px;font-size:11px;font-weight:700;display:inline-flex;align-items:center;justify-content:center;background:rgba(212,175,55,.18);color:#E9CF8B}
+  .dsk-nav-link .gn-badge.red{background:#dc2626;color:#fff}.dsk-nav-link .gn-badge.amber{background:#f59e0b;color:#2a1a00}
+  .dsk-nav-link .gn-badge.dot{min-width:9px;width:9px;height:9px;padding:0;background:#dc2626}.dsk-nav-link .gn-badge.txt{background:transparent;padding:0;font-weight:600;color:inherit;opacity:.75}
   .dsk-nav-link{
     display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:7px;
     font-size:12px;color:#CFC7AC;border-inline-end:2px solid transparent;cursor:pointer;
@@ -1008,6 +1036,10 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
           <div class="dsk-stat-trend flat">قطعة متوفرة بهذا الفرع</div>
         </a>
       </div>
+      <div class="gm-wk-row hidden" id="gmWkRowD">
+  <div class="gm-wk-card"><div class="gm-wk-head"><div><div class="gm-wk-title">مبيعات آخر 7 أيام</div><div class="gm-wk-sub" id="gmWkTotalD"></div></div><span class="gm-delta" id="gmWkDeltaD"></span></div><div class="gm-wk-bars" id="gmWkBarsD"></div></div>
+  <a class="gm-wk-card gm-cnt-card hidden" id="gmCntD" href="inventory-count-ar.html"><div class="gm-wk-title" id="gmCntTitleD">الجرد</div><div class="gm-cnt-ring" id="gmCntRingD"></div><div class="gm-wk-sub" id="gmCntSubD"></div></a>
+</div>
 
       <div class="dsk-toolbar-row">
         <div class="dsk-toolbar-label">الوصول السريع</div>
@@ -1461,6 +1493,11 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <div class="gm-metric" id="gmMetricCash"><span class="gm-metric-label">نقد الصندوق</span>
 <div class="gm-metric-value truncate" style="visibility:hidden;" id="dailyCashboxBalanceEl">0.00</div>
 <div class="gm-metric-sub hidden text-[13px] font-bold font-data-mono mt-1 truncate" id="dailyCashboxOtherCurrenciesEl"></div></div>
+</div>
+</section>
+<section class="mb-4 lg:hidden"><div class="gm-wk-row hidden" id="gmWkRowM">
+  <div class="gm-wk-card"><div class="gm-wk-head"><div><div class="gm-wk-title">مبيعات آخر 7 أيام</div><div class="gm-wk-sub" id="gmWkTotalM"></div></div><span class="gm-delta" id="gmWkDeltaM"></span></div><div class="gm-wk-bars" id="gmWkBarsM"></div></div>
+  <a class="gm-wk-card gm-cnt-card hidden" id="gmCntM" href="inventory-count-ar.html"><div class="gm-wk-title" id="gmCntTitleM">الجرد</div><div class="gm-cnt-ring" id="gmCntRingM"></div><div class="gm-wk-sub" id="gmCntSubM"></div></a>
 </div>
 </section>
 <!-- Real alerts (replaces the old non-functional notifications button) -->
@@ -2030,6 +2067,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
                 }
                 // the side menu shows these counts on every page (gm-nav.js)
                 try { localStorage.setItem('gm_nav_overdue', JSON.stringify({ s: GOLDMIND_STORE_ID, c: items.filter(function (x) { return x.kind === 'customer'; }).length, t: items.filter(function (x) { return x.kind !== 'customer'; }).length })); } catch (e) { /* private mode */ }
+                if (window.gmRefreshNavBadges) window.gmRefreshNavBadges();
                 if (!items.length) return;
                 items.sort(function (a, b) { return b.days - a.days; });
                 const esc = function (t) { return String(t).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); };
@@ -2199,6 +2237,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
                 cashboxTotalsByCurrency[cur] = (cashboxTotalsByCurrency[cur] || 0) + delta;
             });
             const dailyCashboxBalance = cashboxTotalsByCurrency[baseCurrency] || 0;
+            window.gmHomeCashBal = dailyCashboxBalance; window.gmHomeBaseCur = baseCurrency; document.dispatchEvent(new Event('gm-home-cash'));
             document.getElementById('dailyCashboxBalanceEl').textContent = gmFormatDualCurrency(dailyCashboxBalance, store);
             fitStatNumber(document.getElementById('dailyCashboxBalanceEl'));
             const dskCashboxEl = document.getElementById('dskDailyCashboxBalanceEl');
@@ -2776,6 +2815,98 @@ if ('serviceWorker' in navigator) {
 })();
 </script>
 <script>
+/* ===== Home trends (بشار 2026-11-21) =====
+   1) every headline number gets a ▲/▼ % chip against yesterday at the same time of day
+   2) a 7-day sales chart, one bar per day, today lit up
+   3) the inventory count ring (gmDonut from theme.js)                                   */
+(function gmHomeTrends() {
+  var DAY = 86400000, AR_DAYS = ['أحد', 'إثنين', 'ثلاثاء', 'أربعاء', 'خميس', 'جمعة', 'سبت'];
+  function chip(now, before, label) {
+    if (!(now > 0) && !(before > 0)) return '';
+    var cls, txt;
+    if (!(before > 0)) { cls = 'up'; txt = '▲ جديد'; }
+    else { var p = Math.round((now - before) / before * 100); cls = p > 0 ? 'up' : p < 0 ? 'down' : 'flat'; txt = (p > 0 ? '▲ ' : p < 0 ? '▼ ' : '') + Math.abs(p) + '%'; }
+    return '<span class="gm-delta ' + cls + '">' + txt + '</span>' + (label ? '<span>' + label + '</span>' : '');
+  }
+  function put(anchorId, html, cls) {
+    var a = document.getElementById(anchorId); if (!a) return;
+    var id = anchorId + 'Delta', el = document.getElementById(id);
+    if (!el) { el = document.createElement('div'); el.id = id; el.className = 'gm-delta-line ' + (cls || ''); a.insertAdjacentElement('afterend', el); }
+    el.innerHTML = html; el.style.display = html ? '' : 'none';
+  }
+  var fmt = function (v) { return typeof gmFormatNumber === 'function' ? gmFormatNumber(v) : Math.round(v).toLocaleString('en'); };
+  function short(v) { return v >= 1e6 ? (v / 1e6).toFixed(1) + 'M' : v >= 1e4 ? Math.round(v / 1e3) + 'K' : fmt(v); }
+  function drawWeek(days, start) {
+    var max = Math.max.apply(null, days.concat([1])), total = days.reduce(function (a, b) { return a + b; }, 0);
+    ['D', 'M'].forEach(function (k) {
+      var bars = document.getElementById('gmWkBars' + k); if (!bars) return;
+      bars.innerHTML = days.map(function (v, i) {
+        var d = new Date(start.getTime() + i * DAY), today = i === days.length - 1;
+        var h = Math.max(4, Math.round(v / max * 100));
+        return '<div class="gm-wk-col' + (today ? ' today' : '') + '" title="' + AR_DAYS[d.getDay()] + ' ' + d.getDate() + '/' + (d.getMonth() + 1) + ': ' + fmt(v) + '">' +
+          '<span class="gm-wk-val">' + short(v) + '</span><span class="gm-wk-bar" style="height:' + h + '%;animation-delay:' + (i * 60) + 'ms"></span>' +
+          '<span class="gm-wk-day">' + (today ? 'اليوم' : AR_DAYS[d.getDay()]) + '</span></div>';
+      }).join('');
+      document.getElementById('gmWkTotal' + k).textContent = 'المجموع: ' + fmt(total);
+      document.getElementById('gmWkRow' + k).classList.remove('hidden');
+    });
+  }
+  function drawCount(cnt, matched) {
+    if (!cnt) return;
+    var exp = Number(cnt.expected_piece_count) || 0, pct = exp ? matched / exp * 100 : 0, live = cnt.status === 'in_progress';
+    ['D', 'M'].forEach(function (k) {
+      var card = document.getElementById('gmCnt' + k); if (!card) return;
+      document.getElementById('gmCntTitle' + k).textContent = live ? 'الجرد الجاري' : 'آخر جرد';
+      document.getElementById('gmCntRing' + k).innerHTML = gmDonut(pct, Math.round(pct) + '%', matched + ' من ' + exp + ' قطعة');
+      var d = new Date(cnt.started_at || cnt.created_at);
+      document.getElementById('gmCntSub' + k).textContent = live ? 'اضغط لمتابعة المسح' : 'بتاريخ ' + d.getDate() + '/' + (d.getMonth() + 1) + '/' + d.getFullYear();
+      card.classList.remove('hidden'); document.getElementById('gmWkRow' + k).classList.add('has-count'); document.getElementById('gmWkRow' + k).classList.remove('hidden');
+    });
+  }
+  var tries = 0;
+  (function wait() {
+    if (!(typeof GOLDMIND_STORE_ID !== 'undefined' && GOLDMIND_STORE_ID && typeof goldmindClient !== 'undefined')) { if (++tries < 80) setTimeout(wait, 250); return; }
+    var now = new Date(), start = new Date(now); start.setHours(0, 0, 0, 0);
+    var weekStart = new Date(start.getTime() - 6 * DAY), yStart = new Date(start.getTime() - DAY), ySame = new Date(now.getTime() - DAY);
+    var S = GOLDMIND_STORE_ID;
+    Promise.all([
+      goldmindClient.from('invoices').select('total_amount, type, created_at').eq('store_id', S).neq('status', 'cancelled').gte('created_at', weekStart.toISOString()),
+      goldmindClient.from('daily_cash_log').select('direction, amount, currency, created_at').eq('store_id', S).gte('created_at', yStart.toISOString()),
+      goldmindClient.from('inventory_counts').select('id, status, expected_piece_count, started_at, created_at').eq('store_id', S).order('created_at', { ascending: false }).limit(1)
+    ].map(function (p) { return Promise.resolve(p).catch(function () { return {}; }); })).then(function (r) {
+      var inv = (r[0] && r[0].data) || [], days = [0, 0, 0, 0, 0, 0, 0], tS = 0, yS = 0, tN = 0, yN = 0;
+      inv.forEach(function (x) {
+        var t = new Date(x.created_at), amt = Number(x.total_amount || 0), i = Math.floor((t - weekStart) / DAY);
+        if (x.type === 'sale' && i >= 0 && i < 7) days[i] += amt;
+        if (t >= start) { tN++; if (x.type === 'sale') tS += amt; }
+        else if (t >= yStart && t <= ySame) { yN++; if (x.type === 'sale') yS += amt; }
+      });
+      drawWeek(days, weekStart);
+      var vsY = 'مقارنة بنفس الوقت أمس';
+      put('dskTodaySalesEl', chip(tS, yS, vsY)); put('todaySalesEl', chip(tS, yS, 'عن أمس'));
+      put('todayInvoiceCountEl', chip(tN, yN, 'عن أمس'));
+      var wk = days.slice(0, 6).reduce(function (a, b) { return a + b; }, 0) / 6;
+      ['D', 'M'].forEach(function (k) { var e = document.getElementById('gmWkDelta' + k); if (e && wk > 0) e.outerHTML = chip(days[6], wk, '').replace('gm-delta', 'gm-delta" id="gmWkDelta' + k + '" title="مقارنة بمتوسط الأيام الستة السابقة'); });
+      // cash drawer: today's net movement against the opening balance of the day
+      var logs = (r[1] && r[1].data) || [];
+      function cash() {
+        if (typeof window.gmHomeCashBal !== 'number') return;
+        var base = window.gmHomeBaseCur;
+        var net = logs.filter(function (x) { return new Date(x.created_at) >= start && (!x.currency || x.currency === base); })
+          .reduce(function (a, x) { return a + (x.direction === 'in' ? 1 : -1) * Number(x.amount || 0); }, 0);
+        var open = window.gmHomeCashBal - net;
+        var h = open > 0 && net !== 0 ? chip(window.gmHomeCashBal, open, 'منذ بداية اليوم') : '';
+        put('dskDailyCashboxBalanceEl', h); put('dailyCashboxBalanceEl', h);
+      }
+      cash(); document.addEventListener('gm-home-cash', cash);
+      var cnt = r[2] && r[2].data && r[2].data[0];
+      if (cnt) goldmindClient.from('inventory_count_scans').select('id', { count: 'exact', head: true }).eq('count_id', cnt.id).eq('match_status', 'matched')
+        .then(function (q) { drawCount(cnt, (q && q.count) || 0); }, function () {});
+    });
+  })();
+})();
+</script>
+<script>
 /* ===== Home v2: sales/cash hero switch + mini charts ===== */
 (function gmHomeHero() {
   var slot = document.getElementById('gmHeroSlot'), mini = document.getElementById('gmMiniSlot');
@@ -2876,6 +3007,7 @@ if ('serviceWorker' in navigator) {
           return '<a class="dsk-nav-link' + (x[0] === here ? ' active' : '') + '" href="' + x[0] + '"' + (x[3] ? ' data-nav-perm="' + x[3] + '"' : '') + '><span class="material-symbols-outlined dsk-ic">' + x[1] + '</span>' + x[2] + '</a>';
         }).join('') + '</div></div></div>';
     }).join('');
+    if (window.gmPaintNavBadges) window.gmPaintNavBadges();
     nav.querySelectorAll('.dsk-nav-group-head').forEach(function (b) {
       b.addEventListener('click', function () {
         var grp = b.parentNode, open = !grp.classList.contains('open');

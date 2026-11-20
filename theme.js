@@ -1520,7 +1520,7 @@ function gmHardwareBack() {
 (function () {
   if (window.GM_NAV_DISABLED || document.querySelector('script[src^="gm-nav.js"]')) return;
   var sc = document.createElement('script');
-  sc.src = 'gm-nav.js?v=32';
+  sc.src = 'gm-nav.js?v=33';
   document.head.appendChild(sc);
 })();
 
@@ -2090,3 +2090,17 @@ function gmClosePhotoViewer() {
     '@media (prefers-reduced-motion:reduce){tr.gm-lift,tr.gm-lift:hover{transition:none;transform:none}}';
   (document.head || document.documentElement).appendChild(st);
 })();
+
+/* ===== Shared donut (بشار 2026-11-21): a progress ring for the inventory count today, reusable elsewhere.
+   gmDonut(pct 0–100, big centre text, small line under it) → SVG markup string. Colours follow the theme. ===== */
+function gmDonut(pct, center, sub) {
+  var p = Math.max(0, Math.min(100, Number(pct) || 0)), r = 52, c = 2 * Math.PI * r;
+  var esc = function (s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (ch) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch]; }); };
+  return '<svg class="gm-donut" viewBox="0 0 128 128" role="img" aria-label="' + esc(center + ' ' + (sub || '')) + '">' +
+    '<defs><linearGradient id="gmDonutG" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#FFE9A8"/><stop offset=".55" stop-color="#D4AF37"/><stop offset="1" stop-color="#9C7A22"/></linearGradient></defs>' +
+    '<circle cx="64" cy="64" r="' + r + '" fill="none" stroke="currentColor" stroke-opacity=".14" stroke-width="12"/>' +
+    '<circle cx="64" cy="64" r="' + r + '" fill="none" stroke="url(#gmDonutG)" stroke-width="12" stroke-linecap="round" transform="rotate(-90 64 64)"' +
+    ' stroke-dasharray="' + (c * p / 100).toFixed(1) + ' ' + c.toFixed(1) + '" style="transition:stroke-dasharray .9s cubic-bezier(.22,1,.36,1)"/>' +
+    '<text x="64" y="64" text-anchor="middle" font-size="24" font-weight="800" fill="currentColor" dominant-baseline="middle">' + esc(center) + '</text>' +
+    (sub ? '<text x="64" y="88" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".65">' + esc(sub) + '</text>' : '') + '</svg>';
+}

@@ -55,7 +55,7 @@ async function install(page, { db = {}, rpc = {}, generic = false, realCdn = fal
       return route.fulfill({ status: out.status || 200, contentType: 'application/json', body: JSON.stringify(out.body) });
     }
     if (kind === 'rest/v1') {
-      if (req.method() !== 'GET') return route.fulfill({ status: 201, json: [] });
+      if (req.method() !== 'GET' && req.method() !== 'HEAD') return route.fulfill({ status: 201, json: [] });
       let rows = db[name] || (generic ? [genericRow()] : []);
       if (!db[name] && generic) url.searchParams.forEach(() => {}); // generic row matches any filter
       else url.searchParams.forEach((expr, key) => {
@@ -70,7 +70,11 @@ async function install(page, { db = {}, rpc = {}, generic = false, realCdn = fal
         const off = Number(url.searchParams.get('offset')), lim = url.searchParams.get('limit');
         rows = rows.slice(off, lim != null ? off + Number(lim) : undefined);
       } else rows = rows.slice(0, 1000); // like the real server (max rows per request)
-      return route.fulfill({ json: rows });
+      // select(..., { count: 'exact', head: true }) → HEAD with the total in Content-Range
+      const counted = /count=exact/.test(req.headers()['prefer'] || '');
+      const headers = counted ? { 'content-range': (rows.length ? '0-' + (rows.length - 1) : '*') + '/' + rows.length, 'access-control-expose-headers': 'content-range' } : {};
+      if (req.method() === 'HEAD') return route.fulfill({ status: 200, headers, body: '' });
+      return route.fulfill({ json: rows, headers });
     }
     return route.fulfill({ json: {} });
   });
