@@ -154,6 +154,42 @@ async function gmOfflineAnswer(req) {
 
 const goldmindClient = supabase.createClient(GOLDMIND_SUPABASE_URL, GOLDMIND_SUPABASE_KEY, { global: { fetch: gmFetch } });
 
+// Piece photos are shrunk in the browser before upload (بشار 2026-11-20): phone photos were landing at 0.6–4.5 MB
+// each and the 40px list thumbnails downloaded the full file. Longest side 1200px, JPEG 80% ≈ 120–250 KB.
+// Never fails an upload: anything the browser can't decode (e.g. HEIC on Chrome) goes up unchanged.
+async function gmShrinkPhoto(file, maxSide = 1200, quality = 0.8) {
+  try {
+    if (!(file instanceof Blob) || !/^image\/(jpeg|png|webp|bmp)$/i.test(file.type || '')) return file;
+    const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' });
+    const scale = Math.min(1, maxSide / Math.max(bmp.width, bmp.height));
+    if (scale === 1 && file.size <= 300 * 1024) { bmp.close && bmp.close(); return file; }
+    const c = document.createElement('canvas');
+    c.width = Math.round(bmp.width * scale); c.height = Math.round(bmp.height * scale);
+    const ctx = c.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, c.width, c.height); // PNG transparency → white, not black
+    ctx.drawImage(bmp, 0, 0, c.width, c.height); bmp.close && bmp.close();
+    const blob = await new Promise(r => c.toBlob(r, 'image/jpeg', quality));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], (file.name || 'photo').replace(/\.[^.]+$/, '') + '.jpg', { type: 'image/jpeg' });
+  } catch (e) { return file; }
+}
+// One choke point for every page that uploads to piece-photos (add piece, edit, sale, repairs, transfers, diamonds, camera).
+// ponytail: the object path keeps the page's own extension (.png/.heic…) while the body is JPEG; storage serves it
+// as image/jpeg because contentType is set. Upgrade path: build the path from the returned file's name.
+(function gmWrapPhotoUploads() {
+  const st = goldmindClient.storage, from = st.from.bind(st);
+  st.from = function (bucket) {
+    const api = from(bucket);
+    if (bucket !== 'piece-photos') return api;
+    const upload = api.upload.bind(api);
+    api.upload = async (path, body, opts) => {
+      const small = await gmShrinkPhoto(body);
+      return upload(path, small, small !== body ? Object.assign({}, opts, { contentType: 'image/jpeg' }) : opts);
+    };
+    return api;
+  };
+})();
+
 // Mobile app (Capacitor WebView) background/foreground fix: Supabase's
 // built-in auto-refresh relies on a JS timer scheduled ahead of the access
 // token's expiry, but mobile OSes throttle/suspend JS timers while the app

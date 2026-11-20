@@ -11,7 +11,7 @@
 <title>سجل التجار | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=59"></script>
+<script src="supabase-config.js?v=60"></script>
 <script src="theme.js?v=109"></script>
 <script src="gm-profit.js?v=7"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -1454,7 +1454,7 @@ function showTraderDetail(traderId) {
             return `
             <div class="border border-outline-variant rounded-lg p-2">
               <div class="flex items-center gap-2 mb-2">
-                ${pc.photo_url ? `<img src="${gmEscapeHtml(pc.photo_url)}" alt="صورة القطعة" class="w-11 h-11 rounded-md object-cover shrink-0" onclick="event.stopPropagation();window.gmPhotoViewer?gmPhotoViewer(this.src):window.open(this.src)" style="cursor:zoom-in"/>` : ''}
+                ${pc.photo_url ? `<img loading="lazy" decoding="async" src="${gmEscapeHtml(pc.photo_url)}" alt="صورة القطعة" class="w-11 h-11 rounded-md object-cover shrink-0" onclick="event.stopPropagation();window.gmPhotoViewer?gmPhotoViewer(this.src):window.open(this.src)" style="cursor:zoom-in"/>` : ''}
                 <span class="font-data-mono text-[12px] font-semibold">${gmEscapeHtml(pc.barcode || 'بالجملة')}</span>
                 ${first.source === 'stock_given' && r.piece_id ? `<button type="button" onclick="ldReturnPiece('${r.id}', '${group.batchId}', this)" class="gm-vedit ms-auto h-8 px-3 border border-[#3F6B47] text-[#3F6B47] rounded-lg text-[11px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined text-[14px]">undo</span> إرجاع للمخزن</button>` : ''}
               </div>
@@ -2902,14 +2902,14 @@ function renderGsPhotoPanel() {
   const sel = giveStockCart.find(it => it.cartId === gsPhotoSel) || giveStockCart[giveStockCart.length - 1];
   el.innerHTML = `
     <div class="aspect-square w-full rounded-lg overflow-hidden bg-surface-container-low flex items-center justify-center mb-2">
-      ${sel.photo ? `<img src="${gmEscapeHtml(sel.photo)}" alt="صورة القطعة ${gmEscapeHtml(sel.barcode)}" class="w-full h-full object-contain cursor-zoom-in" onclick="window.gmPhotoViewer ? gmPhotoViewer(this.src) : window.open(this.src)"/>`
+      ${sel.photo ? `<img loading="lazy" decoding="async" src="${gmEscapeHtml(sel.photo)}" alt="صورة القطعة ${gmEscapeHtml(sel.barcode)}" class="w-full h-full object-contain cursor-zoom-in" onclick="window.gmPhotoViewer ? gmPhotoViewer(this.src) : window.open(this.src)"/>`
         : '<div class="text-center text-on-surface-variant text-[13px]"><span class="material-symbols-outlined text-[40px] block">no_photography</span>لا توجد صورة لهذه القطعة</div>'}
     </div>
     <div class="font-bold text-[14px] font-data-mono">${gmEscapeHtml(sel.barcode)} <span class="font-normal text-on-surface-variant">${gmEscapeHtml(sel.description || '')}</span></div>
     <div class="text-[12px] text-on-surface-variant mb-2">${fmt(sel.grossWeight)} غ · عيار ${sel.karat || '—'}</div>
     ${giveStockCart.length > 1 ? `<div class="flex flex-wrap gap-1.5">${giveStockCart.map(it => `
       <button type="button" onclick="gsShowPhoto(${it.cartId})" title="${gmEscapeHtml(it.barcode)}" class="w-12 h-12 rounded-md overflow-hidden border-2 ${it === sel ? 'border-primary' : 'border-outline-variant'} bg-surface-container-low flex items-center justify-center">
-        ${it.photo ? `<img src="${gmEscapeHtml(it.photo)}" alt="" class="w-full h-full object-cover"/>` : `<span class="text-[9px] font-data-mono">${gmEscapeHtml(it.barcode)}</span>`}
+        ${it.photo ? `<img loading="lazy" decoding="async" src="${gmEscapeHtml(it.photo)}" alt="" class="w-full h-full object-cover"/>` : `<span class="text-[9px] font-data-mono">${gmEscapeHtml(it.barcode)}</span>`}
       </button>`).join('')}</div>` : ''}`;
   el.classList.remove('hidden');
 }
@@ -2977,7 +2977,7 @@ function renderGiveStockCart(previewOnly) {
         : field(it, ['grossWeight', 'القائم'], it.grossWeight) + field(it, ['accountingWeight', 'المحاسبي'], it.accountingWeight) + field(it, ['fabPerGram', 'مصنعية/غ'], it.fabPerGram)
           + `<span class="gs-24 font-data-mono">${fmt(gsBillW(it) * ((it.karat || 0) / 24))}</span>`}
       <button type="button" class="gs-del" onclick="removeGiveStockCartItem(${it.cartId})" aria-label="حذف ${gmEscapeHtml(it.barcode)}"><span class="material-symbols-outlined text-[18px]">delete</span></button>
-      ${it.photo && gsBig.has(it.cartId) ? `<div class="gs-big"><img src="${gmEscapeHtml(it.photo)}" alt="صورة القطعة ${gmEscapeHtml(it.barcode)}"/><button type="button" onclick="gsToggleBig(${it.cartId})" aria-label="تصغير الصورة"><span class="material-symbols-outlined">close</span></button></div>` : ''}
+      ${it.photo && gsBig.has(it.cartId) ? `<div class="gs-big"><img loading="lazy" decoding="async" src="${gmEscapeHtml(it.photo)}" alt="صورة القطعة ${gmEscapeHtml(it.barcode)}"/><button type="button" onclick="gsToggleBig(${it.cartId})" aria-label="تصغير الصورة"><span class="material-symbols-outlined">close</span></button></div>` : ''}
     </div>`).join('') + '</div>';
 }
 // a piece's photo opens large in its own row (tap the thumbnail), the ✕ shrinks it back

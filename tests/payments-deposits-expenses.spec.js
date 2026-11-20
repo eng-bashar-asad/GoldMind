@@ -172,7 +172,7 @@ test('cash paid out to a customer goes through the server function', async ({ pa
   await page.setViewportSize({ width: 390, height: 844 }); // phone cards (the computer shows a statement table)
   await page.goto('/customer-debts-ar.html?open=cu1');
   await expect(page.locator('#detail-customer-name')).not.toBeEmpty();
-  await page.getByText('صرف مبلغ للعميل').click();
+  await page.locator('button:visible', { hasText: 'صرف مبلغ للعميل' }).first().click();
   await page.fill('#cashout-amount', '300');
   await page.click('#cashout-btn');
   await expect.poll(() => calls.some(c => c.name === 'customer_cash_out')).toBe(true);
@@ -188,7 +188,7 @@ test('customer payout and payment in another currency go through cash_voucher', 
   await page.setViewportSize({ width: 390, height: 844 }); // phone cards (the computer shows a statement table)
   await page.goto('/customer-debts-ar.html?open=cu1');
   await expect(page.locator('#detail-customer-name')).not.toBeEmpty();
-  await page.getByText('صرف مبلغ للعميل').click();
+  await page.locator('button:visible', { hasText: 'صرف مبلغ للعميل' }).first().click();
   await page.fill('#cashout-amount', '1300000');
   await page.selectOption('#cashout-cur', 'SYP');
   await page.fill('#cashout-rate', '13000');
