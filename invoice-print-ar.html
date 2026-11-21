@@ -54,7 +54,7 @@
        bigger type, roomier rows, the frame reaching the bottom of the sheet */
     @media print {
         body.gm-paper-A5 #invoice-sheet, body.gm-paper-A5 #policy-sheet { margin: 7mm !important; padding: 14px !important; }
-        body.gm-paper-A5 #invoice-sheet:not(.hidden), body.gm-paper-A5 #policy-sheet { min-height: calc(100vh - 14mm); }
+        body.gm-paper-A5 #invoice-sheet:not(.hidden), body.gm-paper-A5 #policy-sheet { min-height: calc(100vh - 17mm); box-sizing: border-box; }
         body.gm-paper-A5 #policy-page-wrap { padding: 0 !important; }
         body.gm-paper-A5 #store-name { font-size: 20px !important; }
         body.gm-paper-A5 :is(#doc-type-ar) { font-size: 17px !important; }
@@ -134,17 +134,14 @@ document.addEventListener('click', function (e) { if (!e.target.closest('#more-w
 </script>
 
 <script>
-// Paper size per device (بشار 2026-11-21): «A5»/«A4» fix the printed page to that size so the browser or the
-// phone's print service doesn't lay the invoice out on A4 and shrink it onto A5 paper (half a sheet printed).
+// Paper layout per device (بشار 2026-11-21): «A5» switches to the A5 layout (bigger type, frame to the bottom).
+// The paper itself is NOT forced with @page size: on Windows (Edge/WebView2) a forced size hides the dialog's
+// paper choice and the printer got a size it didn't expect — only part of the policy page came out. The
+// employee picks A5 in the print dialog; the layout follows whatever page that gives.
 function gmSetPaper(v) {
   try { localStorage.setItem('gm_invoice_paper', v); } catch (e) { /* private mode */ }
-  var st = document.getElementById('gm-page-size'); if (st) st.remove();
   document.body.classList.remove('gm-paper-A5', 'gm-paper-A4');
-  if (v === 'A5' || v === 'A4') {
-    st = document.createElement('style'); st.id = 'gm-page-size';
-    st.textContent = '@media print{@page{size:' + v + ' portrait;margin:0}}';
-    document.head.appendChild(st); document.body.classList.add('gm-paper-' + v);
-  }
+  if (v === 'A5' || v === 'A4') document.body.classList.add('gm-paper-' + v);
 }
 (function () { var v = 'auto'; try { v = localStorage.getItem('gm_invoice_paper') || 'auto'; } catch (e) {}
   var sel = document.getElementById('paper-sel'); if (sel) sel.value = v; gmSetPaper(v); })();
