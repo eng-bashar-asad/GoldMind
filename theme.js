@@ -2170,3 +2170,34 @@ function gmDonut(pct, center, sub) {
     '<text x="64" y="64" text-anchor="middle" font-size="24" font-weight="800" fill="currentColor" dominant-baseline="middle">' + esc(center) + '</text>' +
     (sub ? '<text x="64" y="88" text-anchor="middle" font-size="10.5" fill="currentColor" fill-opacity=".65">' + esc(sub) + '</text>' : '') + '</svg>';
 }
+
+/* ===== Skeleton loading (بشار 2026-11-21): while a page fetches, its «جارِ التحميل...» box shows grey shimmering
+   rows shaped like what is coming, in every theme. Pages keep hiding #loading-state exactly as before. ===== */
+(function gmSkeletons() {
+  var css = '.gm-skel{display:grid;gap:10px;padding:6px 0;text-align:initial}' +
+    '.gm-sk-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:16px;background:var(--gm-surface-lowest,#fff);border:1px solid var(--gm-outline-variant,#E7DFCC)}' +
+    '.gm-sk-b{display:block;border-radius:8px;background:linear-gradient(90deg,rgba(140,130,110,.14) 25%,rgba(140,130,110,.28) 37%,rgba(140,130,110,.14) 63%);background-size:400% 100%;animation:gmSk 1.3s ease infinite}' +
+    '.gm-sk-c{width:42px;height:42px;border-radius:12px;flex:none}.gm-sk-l{flex:1;display:grid;gap:8px;min-width:0}' +
+    '@keyframes gmSk{0%{background-position:100% 50%}100%{background-position:0 50%}}' +
+    '@media (prefers-reduced-motion: reduce){.gm-sk-b{animation:none}}';
+  function rows(n) {
+    var h = '';
+    for (var i = 0; i < n; i++) {
+      h += '<div class="gm-sk-row"><span class="gm-sk-b gm-sk-c"></span><span class="gm-sk-l"><span class="gm-sk-b" style="height:12px;width:' + (55 + (i * 17) % 35) + '%"></span>' +
+        '<span class="gm-sk-b" style="height:10px;width:' + (30 + (i * 11) % 25) + '%"></span></span><span class="gm-sk-b" style="height:14px;width:64px;flex:none"></span></div>';
+    }
+    return '<div class="gm-skel" role="status" aria-label="جارِ التحميل">' + h + '</div>';
+  }
+  window.gmSkeletonRows = rows;
+  function apply() {
+    if (!document.getElementById('gm-skel-css')) { var st = document.createElement('style'); st.id = 'gm-skel-css'; st.textContent = css; document.head.appendChild(st); }
+    var boxes = document.querySelectorAll('#loading-state, .dsk-empty, .gmc-empty');
+    for (var i = 0; i < boxes.length; i++) {
+      var b = boxes[i];
+      if (!/^\s*(جارِ|جاري) (ال)?تحميل/.test(b.textContent || '') || b.querySelector('.gm-skel')) continue; // only the plain loading text
+      b.classList.remove('py-16', 'text-center');
+      b.innerHTML = rows(b.id === 'loading-state' ? 6 : 3);
+    }
+  }
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', apply); else apply();
+})();

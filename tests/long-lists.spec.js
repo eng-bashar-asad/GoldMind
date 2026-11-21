@@ -20,7 +20,8 @@ test('customers table on the computer pages by 100 and rows still open the side 
   await page.goto('/customers-ar.html');
   const rows = page.locator('#list tbody tr');
   await expect(rows).toHaveCount(100);
-  while (await page.locator('#list .gm-more').count()) await page.locator('#list .gm-more').click(); // (scrolling to it also loads)
+  // the button loads a page (scrolling to it does too); call it directly so the auto-load can't race the click
+  for (let i = 0; i < 4; i++) await page.evaluate(() => { const b = document.querySelector('#list .gm-more'); if (b) gmShowMore(b); });
   await expect(rows).toHaveCount(230);
   await rows.nth(220).click();
   await expect(page.locator('#cuSide')).toContainText('عميل');
