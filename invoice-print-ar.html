@@ -50,6 +50,21 @@
         #signature-block { margin-top: auto !important; }
         #policy-sheet { min-height: calc(100vh - 20mm); }
     }
+    /* A5 (بشار 2026-11-21): the sheet is laid out for A5 itself instead of an A4 page shrunk onto A5 paper —
+       bigger type, roomier rows, the frame reaching the bottom of the sheet */
+    @media print {
+        body.gm-paper-A5 #invoice-sheet, body.gm-paper-A5 #policy-sheet { margin: 7mm !important; padding: 14px !important; }
+        body.gm-paper-A5 #invoice-sheet:not(.hidden), body.gm-paper-A5 #policy-sheet { min-height: calc(100vh - 14mm); }
+        body.gm-paper-A5 #policy-page-wrap { padding: 0 !important; }
+        body.gm-paper-A5 #store-name { font-size: 20px !important; }
+        body.gm-paper-A5 :is(#doc-type-ar) { font-size: 17px !important; }
+        body.gm-paper-A5 :is(#inv-number, #inv-date, #inv-payment, #inv-creator, #inv-seller-line, #cust-name, #cust-phone) { font-size: 13px !important; }
+        body.gm-paper-A5 :is(#items-table-generic, #items-table-trader) :is(th) { font-size: 11.5px !important; padding-top: 7px !important; padding-bottom: 7px !important; }
+        body.gm-paper-A5 :is(#items-table-generic, #items-table-trader) :is(td) { font-size: 14px !important; padding-top: 10px !important; padding-bottom: 10px !important; }
+        body.gm-paper-A5 :is(#sum-before-tax, #sum-tax, #sum-before-tax-label) { font-size: 13px !important; }
+        body.gm-paper-A5 :is(#sum-total, #sum-total-label) { font-size: 19px !important; }
+        body.gm-paper-A5 #policy-sheet { font-size: 10.5px !important; }
+    }
 </style>
 </head>
 <body class="bg-gray-100 text-gray-900">
@@ -60,6 +75,10 @@
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 26px;">arrow_forward</span>
 </button>
 <div class="flex-1"></div>
+<label class="flex items-center gap-1 text-[12px] font-semibold text-gray-700" title="حجم ورق الطابعة — يُحفظ على هذا الجهاز">
+<span class="material-symbols-outlined text-[18px]" aria-hidden="true">description</span><span class="tb-opt">الورق</span>
+<select id="paper-sel" onchange="gmSetPaper(this.value)" class="h-10 rounded-lg border border-gray-300 bg-white px-2 text-[13px]" aria-label="حجم الورق">
+<option value="auto">تلقائي</option><option value="A5">A5</option><option value="A4">A4</option></select></label>
 <button onclick="window.print()" class="flex items-center gap-1.5 bg-black text-white px-3 h-10 rounded-lg text-sm font-semibold">
 <span class="material-symbols-outlined text-[20px]">print</span>طباعة</button>
 <button onclick="downloadInvoicePdf()" id="download-pdf-btn" class="flex items-center gap-1.5 bg-white text-black border border-gray-300 px-3 h-10 rounded-lg text-sm font-semibold">
@@ -114,6 +133,22 @@ function gmCloseMore() { document.getElementById('more-menu').classList.add('hid
 document.addEventListener('click', function (e) { if (!e.target.closest('#more-wrap')) gmCloseMore(); });
 </script>
 
+<script>
+// Paper size per device (بشار 2026-11-21): «A5»/«A4» fix the printed page to that size so the browser or the
+// phone's print service doesn't lay the invoice out on A4 and shrink it onto A5 paper (half a sheet printed).
+function gmSetPaper(v) {
+  try { localStorage.setItem('gm_invoice_paper', v); } catch (e) { /* private mode */ }
+  var st = document.getElementById('gm-page-size'); if (st) st.remove();
+  document.body.classList.remove('gm-paper-A5', 'gm-paper-A4');
+  if (v === 'A5' || v === 'A4') {
+    st = document.createElement('style'); st.id = 'gm-page-size';
+    st.textContent = '@media print{@page{size:' + v + ' portrait;margin:0}}';
+    document.head.appendChild(st); document.body.classList.add('gm-paper-' + v);
+  }
+}
+(function () { var v = 'auto'; try { v = localStorage.getItem('gm_invoice_paper') || 'auto'; } catch (e) {}
+  var sel = document.getElementById('paper-sel'); if (sel) sel.value = v; gmSetPaper(v); })();
+</script>
 <div id="loading-state" class="py-20 text-center text-gray-500 text-sm">جارِ التحميل...</div>
 <div id="error-state" class="hidden py-20 text-center text-red-600 text-sm px-6"></div>
 <div class="no-print hidden max-w-md lg:max-w-3xl mx-auto mt-3 px-4" id="cancelled-banner">
