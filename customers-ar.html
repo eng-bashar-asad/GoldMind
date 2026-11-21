@@ -11,7 +11,7 @@
 <title>العملاء | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=60"></script>
+<script src="supabase-config.js?v=61"></script>
 <script src="theme.js?v=111"></script>
 <script src="gm-report.js?v=5"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -159,7 +159,7 @@ function render() {
   document.getElementById('sumCredit').textContent = fmt(credit) + ' ' + CUR;
   if (isDesk()) { renderTable(list); return; }
   document.getElementById('cuSide').classList.add('hidden');
-  document.getElementById('list').innerHTML = list.slice(0, 300).map(c => {
+  const card = c => {
     const b = BAL[c.id] || 0;
     const age = b > 0.005 && SINCE[c.id] ? Math.floor((Date.now() - new Date(SINCE[c.id])) / 86400000) : null;
     return `<div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-3 flex items-center gap-3">
@@ -174,7 +174,10 @@ function render() {
       <a href="customer-debts-print-ar.html?id=${c.id}" aria-label="كشف حساب ${esc(c.name)}" class="w-10 h-10 rounded-lg border border-outline-variant flex items-center justify-center"><span class="material-symbols-outlined">receipt_long</span></a>
       ${CAN_EDIT ? `<a href="customer-edit-ar.html?id=${c.id}" class="h-10 px-3 rounded-lg border border-primary text-primary text-[13px] font-semibold flex items-center gap-1"><span class="material-symbols-outlined">edit</span>تعديل</a>` : ''}
     </div>`;
-  }).join('') || '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>';
+  };
+  // every customer is reachable now (it used to stop at 300), 60 at a time
+  document.getElementById('list').innerHTML = list.length ? list.slice(0, 60).map(card).join('') + gmMoreButton(list.slice(60), card)
+    : '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>';
 }
 
 // oldest unpaid debt per customer: payments settle the oldest debts first
@@ -202,12 +205,16 @@ function balCell(b) {
     : '<span class="font-data-mono text-on-surface-variant">0.00</span> <span class="text-[11px] text-on-surface-variant">مسدَّد</span>';
 }
 function renderTable(list) {
-  const rows = list.slice().sort((a, b) => (BAL[b.id] || 0) - (BAL[a.id] || 0)).slice(0, 500);
+  const rows = list.slice().sort((a, b) => (BAL[b.id] || 0) - (BAL[a.id] || 0)); // all of them, drawn 100 at a time
   if (!rows.length) { document.getElementById('list').innerHTML = '<p class="text-center text-on-surface-variant text-sm py-8">لا يوجد عملاء مطابقون.</p>'; document.getElementById('cuSide').classList.add('hidden'); return; }
   // no customer is picked until one is clicked (بشار 2026-11-16) — the side shows a hint instead
   if (PICK && !rows.some(c => c.id === PICK)) PICK = null;
   document.getElementById('list').innerHTML = `<table class="cu-t"><thead><tr><th>العميل</th><th>الهاتف</th><th>آخر حركة</th><th>عمر الدين</th><th>ذهب</th><th style="text-align:left">الرصيد</th></tr></thead><tbody>` +
-    rows.map(c => {
+    rows.slice(0, 100).map(cuRow).join('') + '</tbody></table>' + gmMoreButton(rows.slice(100), cuRow, 'tbody', 100) +
+    '<p class="text-[12px] text-on-surface-variant px-3 py-2">الضغط على السطر يعرض العميل بالجنب؛ الضغط مرتين يفتح حسابه الكامل.</p>';
+  renderSide();
+}
+function cuRow(c) {
       const a = ageOf(c), g = GOLD[c.id] || 0;
       return `<tr data-id="${c.id}" class="${c.id === PICK ? 'on' : ''}" tabindex="0">
         <td><span class="flex items-center gap-2.5"><span class="cu-av" style="width:34px;height:34px;font-size:13px">${esc(gmInitials(c.name))}</span><b>${esc(c.name)}</b>${c.is_company ? ' <span class="cu-tag">شركة</span>' : ''}</span></td>
@@ -216,8 +223,6 @@ function renderTable(list) {
         <td>${a != null ? `<span class="cu-age${a >= 30 ? ' old' : ''}">${gmDays(a)}</span>` : '—'}</td>
         <td class="font-data-mono">${Math.abs(g) > 0.0005 ? fmt(Math.abs(g)) + ' غ' : '—'}</td>
         <td style="text-align:left">${balCell(BAL[c.id] || 0)}</td></tr>`;
-    }).join('') + '</tbody></table><p class="text-[12px] text-on-surface-variant px-3 py-2">الضغط على السطر يعرض العميل بالجنب؛ الضغط مرتين يفتح حسابه الكامل.</p>';
-  renderSide();
 }
 function renderSide() {
   const c = CUSTOMERS.find(x => x.id === PICK), el = document.getElementById('cuSide');

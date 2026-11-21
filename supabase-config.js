@@ -154,6 +154,31 @@ async function gmOfflineAnswer(req) {
 
 const goldmindClient = supabase.createClient(GOLDMIND_SUPABASE_URL, GOLDMIND_SUPABASE_KEY, { global: { fetch: gmFetch } });
 
+// Long lists draw 60 rows at a time (بشار 2026-11-21): the next page is added when the «عرض المزيد» button scrolls
+// into view (or is tapped), so a store with thousands of pieces/customers doesn't paint them all at once.
+// gmMoreButton(rest, renderOne, into) → button HTML ('' when nothing is left); into = 'tbody' adds rows to the table
+// just before the button, otherwise items go right before the button.
+const GM_MORE = {}; let gmMoreSeq = 0;
+function gmMoreButton(rest, renderOne, into, page) {
+  if (!rest || !rest.length) return '';
+  const k = 'm' + (++gmMoreSeq); GM_MORE[k] = { rest: rest.slice(), renderOne, into, page: page || 60 };
+  return `<button type="button" class="gm-more col-span-full w-full h-11 my-2 rounded-xl border border-outline-variant text-[13px] font-semibold" data-k="${k}" onclick="gmShowMore(this)">عرض المزيد (${rest.length})</button>`;
+}
+function gmShowMore(btn) {
+  const m = GM_MORE[btn.dataset.k]; if (!m) { btn.remove(); return; }
+  const html = m.rest.splice(0, m.page).map(m.renderOne).join('');
+  const body = m.into === 'tbody' && btn.previousElementSibling && btn.previousElementSibling.querySelector('tbody');
+  if (body) body.insertAdjacentHTML('beforeend', html); else btn.insertAdjacentHTML('beforebegin', html);
+  if (m.rest.length) btn.textContent = 'عرض المزيد (' + m.rest.length + ')'; else { delete GM_MORE[btn.dataset.k]; btn.remove(); }
+}
+(function gmAutoMore() {
+  if (!('IntersectionObserver' in window) || !('MutationObserver' in window)) return; // the button still works by tap
+  const io = new IntersectionObserver(es => es.forEach(e => { if (e.isIntersecting) gmShowMore(e.target); }), { rootMargin: '400px 0px' });
+  const watch = root => root.querySelectorAll && root.querySelectorAll('.gm-more').forEach(b => io.observe(b));
+  new MutationObserver(ms => ms.forEach(m => m.addedNodes.forEach(n => { if (n.nodeType === 1) { if (n.classList.contains('gm-more')) io.observe(n); else watch(n); } })))
+    .observe(document.documentElement, { childList: true, subtree: true });
+})();
+
 // Piece photos are shrunk in the browser before upload (بشار 2026-11-20): phone photos were landing at 0.6–4.5 MB
 // each and the 40px list thumbnails downloaded the full file. Longest side 1200px, JPEG 80% ≈ 120–250 KB.
 // Never fails an upload: anything the browser can't decode (e.g. HEIC on Chrome) goes up unchanged.

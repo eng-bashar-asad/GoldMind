@@ -12,7 +12,7 @@
 <title>المخزن | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=60"></script>
+<script src="supabase-config.js?v=61"></script>
 <script src="gm-uhf.js?v=6"></script>
 <script src="theme.js?v=111"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -479,10 +479,10 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
         if (!pieces.length) return '';
         // the piece page walks this same list (السابقة / التالية)
         try { sessionStorage.setItem('gm_piece_nav', JSON.stringify(pieces.map(p => p.id))); } catch (_) {}
-        if (!(window.matchMedia && window.matchMedia('(min-width: 1024px)').matches)) return pieces.map(pieceCardHtml).join('');
+        if (!(window.matchMedia && window.matchMedia('(min-width: 1024px)').matches)) return pieces.slice(0, 60).map(pieceCardHtml).join('') + gmMoreButton(pieces.slice(60), pieceCardHtml);
         const th = t => `<th class="px-3 py-2.5 text-right text-[12px] font-bold whitespace-nowrap" style="color:#6B6150;background:#F7F2E6;border-bottom:1px solid #E4DAC0">${t}</th>`;
         const td = (v, extra) => `<td class="px-3 py-2.5 text-[13px] whitespace-nowrap" style="border-bottom:1px solid #EFE7D2" ${extra || ''}>${v}</td>`;
-        const rows = pieces.map(piece => {
+        const rowHtml = piece => {
             const chip = { available: ['#E3F1E6', '#2E7D46'], reserved: ['#FFF1D6', '#8A5A00'], sold: ['#EFE9DD', '#6B6150'], given_to_trader: ['#E8EEF9', '#33517E'] }[piece.status] || ['#EFE9DD', '#6B6150'];
             const typeLabel = [piece.piece_type, piece.category1, piece.category2].filter(Boolean).join(' · ') || piece.description_ar || 'قطعة';
             const photo = piece.photo_url
@@ -496,10 +496,11 @@ html:not(.gm-light-canvas) .gm-on-canvas-sub{color:#C9CED8!important}
                 (canViewAccWeight ? td(`<span class="font-data-mono">${piece.accounting_weight_grams != null ? Number(piece.accounting_weight_grams).toFixed(2) : '—'}</span>`) : '') +
                 td(gmEscapeHtml(piece.box_name || '—')) +
                 td(`<span class="gm-chip" style="background:${chip[0]};color:${chip[1]};">${gmEscapeHtml(statusNames[piece.status] || piece.status || '')}</span>`) + '</tr>';
-        }).join('');
+        };
+        const rows = pieces.slice(0, 60).map(rowHtml).join('');
         return `<div class="col-span-full bg-white border rounded-xl overflow-x-auto" style="border-color:#E4DAC0"><table class="w-full border-collapse">
             <thead><tr>${th('<span class="sr-only">الصورة</span>')}${th('الباركود')}${th('الوصف')}${th('العيار')}${th('الوزن القائم')}${canViewAccWeight ? th('الوزن المحاسبي') : ''}${th('الصندوق')}${th('الحالة')}</tr></thead>
-            <tbody>${rows}</tbody></table></div>`;
+            <tbody>${rows}</tbody></table></div>` + gmMoreButton(pieces.slice(60), rowHtml, 'tbody');
     }
 
     let ALL_PIECES = [];
