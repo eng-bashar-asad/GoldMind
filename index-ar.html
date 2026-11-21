@@ -1495,11 +1495,7 @@ body.gm-drawer-open main.gm-pushable{transform:translateX(-46px) scale(.92);filt
 <div class="gm-metric-sub hidden text-[13px] font-bold font-data-mono mt-1 truncate" id="dailyCashboxOtherCurrenciesEl"></div></div>
 </div>
 </section>
-<section class="mb-4 lg:hidden"><div class="gm-wk-row hidden" id="gmWkRowM">
-  <div class="gm-wk-card"><div class="gm-wk-head"><div><div class="gm-wk-title">مبيعات آخر 7 أيام</div><div class="gm-wk-sub" id="gmWkTotalM"></div></div><span class="gm-delta" id="gmWkDeltaM"></span></div><div class="gm-wk-bars" id="gmWkBarsM"></div></div>
-  <a class="gm-wk-card gm-cnt-card hidden" id="gmCntM" href="inventory-count-ar.html"><div class="gm-wk-title" id="gmCntTitleM">الجرد</div><div class="gm-cnt-ring" id="gmCntRingM"></div><div class="gm-wk-sub" id="gmCntSubM"></div></a>
-</div>
-</section>
+<!-- phone: no week bars / count ring / day-over-day chips (بشار 2026-11-21 — keep the daily-cash actions near the top) -->
 <!-- Real alerts (replaces the old non-functional notifications button) -->
 <div class="hidden flex-col gap-2 mb-5" id="alertsWrap"></div>
 <!-- Summary Cards (Bento Style for Mobile) -->
@@ -2883,8 +2879,7 @@ if ('serviceWorker' in navigator) {
       });
       drawWeek(days, weekStart);
       var vsY = 'مقارنة بنفس الوقت أمس';
-      put('dskTodaySalesEl', chip(tS, yS, vsY)); put('todaySalesEl', chip(tS, yS, 'عن أمس'));
-      put('todayInvoiceCountEl', chip(tN, yN, 'عن أمس'));
+      put('dskTodaySalesEl', chip(tS, yS, vsY));
       var wk = days.slice(0, 6).reduce(function (a, b) { return a + b; }, 0) / 6;
       ['D', 'M'].forEach(function (k) { var e = document.getElementById('gmWkDelta' + k); if (e && wk > 0) e.outerHTML = chip(days[6], wk, '').replace('gm-delta', 'gm-delta" id="gmWkDelta' + k + '" title="مقارنة بمتوسط الأيام الستة السابقة'); });
       // cash drawer: today's net movement against the opening balance of the day
@@ -2896,7 +2891,7 @@ if ('serviceWorker' in navigator) {
           .reduce(function (a, x) { return a + (x.direction === 'in' ? 1 : -1) * Number(x.amount || 0); }, 0);
         var open = window.gmHomeCashBal - net;
         var h = open > 0 && net !== 0 ? chip(window.gmHomeCashBal, open, 'منذ بداية اليوم') : '';
-        put('dskDailyCashboxBalanceEl', h); put('dailyCashboxBalanceEl', h);
+        put('dskDailyCashboxBalanceEl', h);
       }
       cash(); document.addEventListener('gm-home-cash', cash);
       var cnt = r[2] && r[2].data && r[2].data[0];

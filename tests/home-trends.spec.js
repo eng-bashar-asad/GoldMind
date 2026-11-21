@@ -20,7 +20,7 @@ function db() {
     repair_tickets: [{ id: 'r1', store_id: STORE, status: 'ready' }],
   };
 }
-for (const [name, vp] of [['phone', { width: 390, height: 844 }], ['computer', { width: 1440, height: 900 }]]) {
+for (const [name, vp] of [['computer', { width: 1440, height: 900 }]]) {
   test(`trends on ${name}`, async ({ page }) => {
     await page.setViewportSize(vp);
     await install(page, { generic: true, db: db() });
@@ -37,6 +37,13 @@ for (const [name, vp] of [['phone', { width: 390, height: 844 }], ['computer', {
     await expect(page.locator(`#gmCntRing${k}`)).toContainText('75%');
   });
 }
+test('phone home has no week bars, count ring or vs-yesterday chips', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await install(page, { generic: true, db: db() });
+  await page.goto('/index-ar.html');
+  await expect(page.locator('#dskTodaySalesElDelta')).toHaveCount(1, { timeout: 8000 }); // data has loaded
+  await expect(page.locator('#gmWkRowM, #gmCntM, #todaySalesElDelta, #todayInvoiceCountElDelta, #dailyCashboxBalanceElDelta')).toHaveCount(0);
+});
 test('side menu shows red badges for repairs ready and unpaid invoices', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
   await install(page, { generic: true, db: db() });
