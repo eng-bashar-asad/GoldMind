@@ -13,3 +13,11 @@ test('A5 choice switches to the A5 layout and is remembered', async ({ page }) =
   await page.selectOption('#paper-sel', 'auto');
   await expect(page.locator('body')).not.toHaveClass(/gm-paper-A5/);
 });
+test('phone: the paper choice lives in the ⋮ menu and stays in sync', async ({ page }) => {
+  await page.setViewportSize({ width: 360, height: 780 });
+  await install(page, { generic: true, db: { stores: [{ id: STORE, name: 'x', currency: 'AED' }], staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {} }], user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }] } });
+  await page.goto('/invoice-print-ar.html?id=x');
+  await page.selectOption('#paper-sel-m', 'A5');
+  await expect(page.locator('body')).toHaveClass(/gm-paper-A5/);
+  await expect(page.locator('#paper-sel')).toHaveValue('A5');
+});

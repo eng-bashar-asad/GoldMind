@@ -18,7 +18,7 @@
 <title>فاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=61"></script>
+<script src="supabase-config.js?v=62"></script>
 <script src="pint-ae.js"></script>
 <script src="theme.js?v=112"></script>
 <script src="gm-profit.js?v=7"></script>
@@ -75,7 +75,7 @@
 <span class="material-symbols-outlined" style="font-variation-settings: 'FILL' 0, 'wght' 700; font-size: 26px;">arrow_forward</span>
 </button>
 <div class="flex-1"></div>
-<label class="flex items-center gap-1 text-[12px] font-semibold text-gray-700" title="حجم ورق الطابعة — يُحفظ على هذا الجهاز">
+<label class="hidden sm:flex items-center gap-1 text-[12px] font-semibold text-gray-700" title="حجم ورق الطابعة — يُحفظ على هذا الجهاز">
 <span class="material-symbols-outlined text-[18px]" aria-hidden="true">description</span><span class="tb-opt">الورق</span>
 <select id="paper-sel" onchange="gmSetPaper(this.value)" class="h-10 rounded-lg border border-gray-300 bg-white px-2 text-[13px]" aria-label="حجم الورق">
 <option value="auto">تلقائي</option><option value="A5">A5</option><option value="A4">A4</option></select></label>
@@ -92,6 +92,10 @@
 <span class="material-symbols-outlined">more_vert</span>
 </button>
 <div id="more-menu" class="hidden absolute left-0 top-12 w-56 bg-white border border-gray-200 rounded-xl shadow-lg py-1 overflow-hidden" role="menu">
+<label class="sm:hidden flex items-center gap-3 w-full px-4 py-2 text-sm font-semibold text-gray-700 border-b border-gray-100">
+<span class="material-symbols-outlined" aria-hidden="true">description</span>الورق
+<select id="paper-sel-m" onchange="gmSetPaper(this.value)" class="ms-auto h-10 rounded-lg border border-gray-300 bg-white px-2 text-[13px]" aria-label="حجم الورق">
+<option value="auto">تلقائي</option><option value="A5">A5</option><option value="A4">A4</option></select></label>
 <button class="hidden items-center gap-3 w-full px-4 py-3 text-sm font-semibold text-right hover:bg-gray-50 text-amber-800" id="edit-invoice-btn">
 <span class="material-symbols-outlined">edit</span>
                 تعديل
@@ -125,7 +129,7 @@
 </div>
 <style>
 @media (max-width: 420px) { .tb-opt { display: none; } }
-#more-wrap:not(:has(#more-menu button:not(.hidden))) { display: none; }
+@media (min-width: 640px) { #more-wrap:not(:has(#more-menu button:not(.hidden))) { display: none; } }
 </style>
 <script>
 function gmToggleMore(e) { e.stopPropagation(); document.getElementById('more-menu').classList.toggle('hidden'); }
@@ -142,6 +146,7 @@ function gmSetPaper(v) {
   try { localStorage.setItem('gm_invoice_paper', v); } catch (e) { /* private mode */ }
   document.body.classList.remove('gm-paper-A5', 'gm-paper-A4');
   if (v === 'A5' || v === 'A4') document.body.classList.add('gm-paper-' + v);
+  ['paper-sel', 'paper-sel-m'].forEach(function (id) { var e = document.getElementById(id); if (e) e.value = v; });
 }
 (function () { var v = 'auto'; try { v = localStorage.getItem('gm_invoice_paper') || 'auto'; } catch (e) {}
   var sel = document.getElementById('paper-sel'); if (sel) sel.value = v; gmSetPaper(v); })();

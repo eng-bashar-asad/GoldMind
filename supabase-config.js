@@ -1067,7 +1067,11 @@ async function gmSavePdf(worker, filename, title, shareText) {
         var res = await P.Filesystem.getUri({ path: safe, directory: 'CACHE' });
         var opts = { title: title || safe, url: res.uri, dialogTitle: shareText != null ? 'إرسال الملف' : 'حفظ الملف أو مشاركته' };
         if (shareText != null) opts.text = shareText;
-        await P.Share.share(opts);
+        try { await P.Share.share(opts); } catch (e) {
+            // closing the share sheet without picking an app is not a failure
+            if (/cancel/i.test(String(e && (e.message || e.code || e)))) return 'cancelled';
+            throw e;
+        }
         return 'shared';
     }
     if (shareText != null && navigator.canShare) {
