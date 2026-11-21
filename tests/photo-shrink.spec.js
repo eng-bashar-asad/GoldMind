@@ -49,17 +49,16 @@ test('owner tool converts existing photos and repoints the pieces', async ({ pag
   expect(calls.some(c => c.method === 'DELETE')).toBe(false); // originals are never deleted here
 });
 
-test('cleanup deletes only unused originals that have a small copy, after confirm', async ({ page }) => {
-  const pub = n => `https://puzkfwbmipldzgwofhjg.supabase.co/storage/v1/object/public/piece-photos/${STORE}/${n}`;
-  await install(page, { generic: false, db: { ...base, pieces: [{ id: 'p1', store_id: STORE, photo_url: pub('G1-1-gm1200.jpg') }, { id: 'p3', store_id: STORE, photo_url: pub('G3-3.png') }],
-    repair_tickets: [{ store_id: STORE, intake_photo_url: pub('R4.jpg') }] } });
+test('cleanup deletes the originals the server lists, after confirm', async ({ page }) => {
+  await install(page, { generic: false, db: { ...base, pieces: [] } });
   const removed = [];
-  await page.route(/storage\/v1\/object\/list\/piece-photos/, r => r.fulfill({ json: ['G1-1.png', 'G1-1-gm1200.jpg', 'G3-3.png', 'R4.jpg', 'R4-gm1200.jpg', 'G5.heic'].map(name => ({ id: name, name, metadata: { size: 1000000 } })) }));
+  await page.route(/rest\/v1\/rpc\/gm_photo_originals/, r => r.fulfill({ json: [{ name: `${STORE}/G1-1.png`, size: 3000000 }] }));
   await page.route(/storage\/v1\/object\/piece-photos$/, r => { removed.push(...JSON.parse(r.request().postData()).prefixes); r.fulfill({ json: [] }); });
   page.on('dialog', d => d.accept());
   await page.goto('/photos-optimize-ar.html');
   await expect(page.locator('#po-clean-info')).toContainText('1 صورة أصلية');
+  await expect(page.locator('#po-clean-btn')).toBeEnabled();
   await page.click('#po-clean-btn');
   await expect(page.locator('#po-clean-info')).toContainText('تم ✓');
-  expect(removed).toEqual([`${STORE}/G1-1.png`]); // R4.jpg is still used by a repair; G3/G5 have no small copy
+  expect(removed).toEqual([`${STORE}/G1-1.png`]);
 });

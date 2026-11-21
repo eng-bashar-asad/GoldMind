@@ -11,7 +11,7 @@
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
 <script src="supabase-config.js?v=60"></script>
-<script src="theme.js?v=110"></script>
+<script src="theme.js?v=111"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
 <script id="tailwind-config">
         tailwind.config = { darkMode: "class", theme: { extend: {
@@ -128,29 +128,14 @@ async function poRun() {
   st.textContent = msg;
 }
 // Originals that now have a «-gm1200.jpg» copy and are referenced by nothing (pieces, invoice lines, repairs, transfers,
-// diamonds, bulk invoice photos). Listed through storage (the owner's own session), deleted only after a confirm.
+// diamonds, bulk invoice photos) — listed by gm_photo_originals, deleted only after a confirm.
 let PO_ORIG = [];
 async function poFindOriginals() {
   const info = document.getElementById('po-clean-info'), btn = document.getElementById('po-clean-btn');
-  const objs = [];
-  for (let off = 0; ; off += 1000) {
-    const { data, error } = await goldmindClient.storage.from('piece-photos').list(GOLDMIND_STORE_ID, { limit: 1000, offset: off, sortBy: { column: 'name', order: 'asc' } });
-    if (error) throw error;
-    (data || []).forEach(o => o.id && objs.push({ path: GOLDMIND_STORE_ID + '/' + o.name, size: (o.metadata && o.metadata.size) || 0 }));
-    if (!data || data.length < 1000) break;
-  }
-  const small = new Set(objs.filter(o => o.path.endsWith(PO_MARK)).map(o => o.path));
-  const refs = [];
-  const grab = async (table, cols, storeCol = 'store_id') => {
-    const { data } = await gmFetchAllRows(() => goldmindClient.from(table).select(cols).eq(storeCol, GOLDMIND_STORE_ID));
-    (data || []).forEach(r => refs.push(JSON.stringify(r)));
-  };
-  await Promise.all([grab('pieces', 'photo_url'), grab('repair_tickets', 'intake_photo_url, ready_photo_url'), grab('invoices', 'bulk_photos')]);
-  for (const [t, c] of [['diamond_pieces', 'photo_url'], ['branch_transfer_items', 'photo_url']]) { try { await grab(t, c); } catch (e) {} }
-  const { data: inv } = await gmFetchAllRows(() => goldmindClient.from('invoice_items').select('item_photo_url, invoices!inner(store_id)').eq('invoices.store_id', GOLDMIND_STORE_ID).not('item_photo_url', 'is', null));
-  (inv || []).forEach(r => refs.push(r.item_photo_url));
-  const used = refs.join('\n');
-  PO_ORIG = objs.filter(o => !o.path.endsWith(PO_MARK) && small.has(o.path.replace(/\.[^./]+$/, '') + PO_MARK) && !used.includes(o.path));
+  // listed on the server (owner only): storage listing is not open to staff, so the page saw an empty folder
+  const { data, error } = await goldmindClient.rpc('gm_photo_originals', { sid: GOLDMIND_STORE_ID });
+  if (error) throw error;
+  PO_ORIG = (data || []).map(r => ({ path: r.name, size: Number(r.size) || 0 }));
   const total = PO_ORIG.reduce((a, o) => a + o.size, 0);
   info.textContent = PO_ORIG.length ? `${PO_ORIG.length} صورة أصلية غير مستخدمة — ${poMB(total)}` : 'لا توجد صور أصلية للحذف ✓';
   btn.disabled = !PO_ORIG.length;
