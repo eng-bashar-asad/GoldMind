@@ -115,7 +115,7 @@ test('daily cash box: rows from an invoice do not show the invoice number, tappi
 
 test('printed daily statement: automatic rows show no document numbers (invoice, deposit…), own notes stay', async ({ page }) => {
   const d = base();
-  const at = ago(0.1), day = at.slice(0, 10);
+  const at = ago(0.1), day = new Date(at).toLocaleDateString('en-CA'); // the page reads ?from=/?to= as local days (UTC date broke this from midnight to 04:00 Dubai)
   d.daily_cash_log = [
     { id: 'e1', store_id: STORE, operation_type: 'مبيعات لـ هلا', notes: 'INV-2026-000055', direction: 'in', amount: 500, currency: 'USD', cash_movement_id: 'cm1', cm: { invoice_id: 'i1' }, created_at: at },
     { id: 'e2', store_id: STORE, operation_type: 'فاتورة بيع', notes: 'تعديل عملات الدفع — إخراج المبلغ القديم للفاتورة INV-2026-000043', direction: 'out', amount: 20, currency: 'USD', bank_invoice_id: 'i2', created_at: at },

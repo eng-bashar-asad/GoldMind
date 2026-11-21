@@ -442,6 +442,16 @@ const GOLDMIND_THEMES = {
       '--gm-outline': '#8C826E'
     }
   },
+  'glass-dark': {
+    // «الزجاجي الغامق» (بشار 2026-11-21): deep night canvas with soft gold/emerald glows, frosted see-through cards,
+    // thin light edges. Built on the black-marble dark rules (base), with its own surface layer on top.
+    label: 'الزجاجي الغامق',
+    swatch: ['#070A12', '#D4AF37', '#2FB487'],
+    lightCanvas: false,
+    shimmer: true,
+    base: 'black-marble',
+    vars: null // filled from black-marble below
+  },
   'beige-marble': {
     // «الرخام البيج» (بشار 2026-11-16): warm beige marble with taupe and gold veins (theme-beige-marble.jpg),
     // cream cards in a thin gold frame (darker sand canvas since 2026-11-16 so it is clearly apart from the default), espresso words, gold accents. A light theme like the default.
@@ -467,6 +477,13 @@ const GOLDMIND_THEMES = {
     }
   },
 };
+GOLDMIND_THEMES['glass-dark'].vars = Object.assign({}, GOLDMIND_THEMES['black-marble'].vars, {
+  '--gm-bg': '#070A12', '--gm-bg-elevated': '#070A12', '--gm-background': '#070A12',
+  // opaque on purpose: sticky bars and sheets that use these vars must not show the page through them;
+  // the see-through look comes from the glass rules on cards
+  '--gm-surface-lowest': '#0E1322', '--gm-surface-low': '#151B2C', '--gm-surface-container-low': '#151B2C',
+  '--gm-outline-variant': '#2A3248', '--gm-primary': '#141A2B'
+});
 
 // «الرخام الأسود»: black marble canvas, charcoal cards with a thin gold frame, gold titles, dark fields.
 // Pages were written for light cards, so the usual light utility classes are mapped to their dark twins here.
@@ -591,6 +608,53 @@ const GOLDMIND_THEMES = {
   (document.head || document.documentElement).appendChild(st);
 })();
 
+// «الزجاجي الغامق»: the black-marble dark rules stay underneath (data-gm-theme="black-marble"); this layer swaps the
+// marble for a night canvas with soft glows and turns the cards into frosted glass with thin light edges.
+(function () {
+  var G = 'html[data-gm-theme="black-marble"][data-gm-variant="glass-dark"]';
+  var GLASS = 'rgba(255,255,255,.055)', EDGE = 'rgba(255,255,255,.11)', GOLDEDGE = 'rgba(212,175,55,.38)';
+  var BLUR = '-webkit-backdrop-filter:blur(16px) saturate(140%);backdrop-filter:blur(16px) saturate(140%);';
+  var CARDS = ':is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white):not(input):not(select):not(textarea)';
+  var BIG = ':is(.gm-mcard,.gm-card,.gm-hero,.dsk-stat,.gm-wk-card,.dsk-action,.gmc-block,.gold-glass,.glass,.summary-card,.cu-tile,.ld-op,.gm-piece)';
+  var css = [
+    '@media screen{',
+    G + ' body{background-color:#070A12!important;background-image:radial-gradient(1100px 650px at 88% -8%,rgba(212,175,55,.20),transparent 62%),radial-gradient(900px 620px at -5% 105%,rgba(47,180,135,.16),transparent 60%),radial-gradient(700px 480px at 50% 45%,rgba(91,141,239,.08),transparent 70%),linear-gradient(165deg,#070A12 0%,#0B1020 48%,#05060A 100%)!important;background-size:auto!important;background-attachment:fixed!important;background-repeat:no-repeat!important}',
+    G + ' #gmGlassBg{display:none!important}',
+    // frosted cards: see-through, blurred, a thin light edge and a soft top highlight
+    G + ' ' + CARDS + ',' + G + ' ' + BIG + '{background:' + GLASS + '!important;background-image:linear-gradient(160deg,rgba(255,255,255,.07),rgba(255,255,255,.02))!important;border:1px solid ' + EDGE + '!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 18px 40px -22px rgba(0,0,0,.85)!important;' + BLUR + '}',
+    G + ' ' + BIG + ':hover{border-color:' + GOLDEDGE + '!important}',
+    G + ' :is(.bg-surface-container-low,.bg-gray-50,.bg-gray-100,.bg-slate-50,.bg-stone-50,.bg-neutral-50){background-color:rgba(255,255,255,.06)!important}',
+    G + ' :is(.bg-gray-200,.bg-slate-100,.bg-stone-100){background-color:rgba(255,255,255,.10)!important}',
+    G + ' :is(div,section,form,fieldset).border:is(.rounded-lg,.rounded-xl,.rounded-2xl):not([class*="bg-"]):not(.border-dashed){background-color:rgba(255,255,255,.04);border-color:' + EDGE + '!important}',
+    // top bars, side menu, phone tabs: dark glass
+    G + ' header:is(.bg-surface-container-lowest,.bg-surface,.bg-background,.bg-white),' + G + ' #gmNav,' + G + ' nav.gm-bottom-tabs{background:rgba(7,10,18,.72)!important;' + BLUR + 'border-color:' + EDGE + '!important}',
+    G + ' #gmNav.gn-light{background:rgba(7,10,18,.72)!important}',
+    G + ' #gmNav .gn-a.here{background:rgba(212,175,55,.12)!important;border-color:' + GOLDEDGE + '}',
+    // lines, tables, fields
+    G + ' :is(.border-gray-100,.border-gray-200,.border-gray-300,.border-slate-200,.border-outline-variant,.divide-gray-100>*,.divide-gray-200>*,.divide-outline-variant>*){border-color:rgba(255,255,255,.10)!important}',
+    G + ' :is(thead,th){background-color:rgba(255,255,255,.05)!important}',
+    G + ' :is(table.ld-st,table.ld-t){background:rgba(255,255,255,.04)!important;border-color:' + EDGE + '!important;' + BLUR + '}',
+    G + ' :is(table.ld-st,table.ld-t) td{border-color:rgba(255,255,255,.07)!important}',
+    G + ' :is(input,select,textarea):not([type=checkbox]):not([type=radio]):not([type=range]):not([type=color]){background-color:rgba(255,255,255,.05)!important;border-color:rgba(255,255,255,.16)!important}',
+    G + ' select option{background:#0E1220}',
+    G + ' :is(.bg-white\\/95,.bg-white\\/90,.bg-white\\/80){background-color:rgba(12,15,26,.88)!important;' + BLUR + '}',
+    G + ' .gm-piece{color:#EEE7D6!important}',
+    // day cash box: linked entries keep their colour only as the edge line — no pastel blocks on the night canvas
+    G + ' #cashbox-table tbody tr.dc-linked{background:rgba(255,255,255,.06)!important;color:#EEE7D6!important}',
+    G + ' #cashbox-table tbody tr.dc-linked .dc-amt-in{color:#5FD68A!important;-webkit-text-fill-color:#5FD68A!important}',
+    G + ' #cashbox-table tbody tr.dc-linked .dc-amt-out{color:#FF8A7A!important;-webkit-text-fill-color:#FF8A7A!important}',
+    // statements / day sheets: glass sheet instead of charcoal
+    G + ' .stmt-sheet:not(.gm-pdf){background:rgba(255,255,255,.05)!important;border-color:' + EDGE + '!important}',
+    '}',
+    '@media (prefers-reduced-transparency: reduce){' + G + ' *{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}}',
+    '@media print{' + G + ' body{background:#fff!important}}'
+  ].join('\n');
+  var st = document.createElement('style');
+  st.id = 'gm-theme-glass-dark';
+  st.textContent = css;
+  (document.head || document.documentElement).appendChild(st);
+})();
+
 // «الرخام البيج»: beige marble canvas, white cards framed in a thin gold line, soft cream bars with a gold rule.
 (function () {
   var T = 'html[data-gm-theme="beige-marble"]';
@@ -638,7 +702,9 @@ function goldmindApplyTheme(name) {
     root.style.setProperty(key, theme.vars[key]);
   });
   root.setAttribute('data-gm-display-font', theme.displayFont ? '1' : '0');
-  root.setAttribute('data-gm-theme', GOLDMIND_THEMES[name] ? name : 'warm-ingot'); // lets page CSS follow the chosen theme
+  // a theme with a «base» reuses that theme's page rules (data-gm-theme) and adds its own layer (data-gm-variant)
+  root.setAttribute('data-gm-theme', GOLDMIND_THEMES[name] ? (theme.base || name) : 'warm-ingot'); // lets page CSS follow the chosen theme
+  if (theme.base) root.setAttribute('data-gm-variant', name); else root.removeAttribute('data-gm-variant');
   if (theme.displayFont) gmEnsureDisplayFont();
   root.classList.toggle('gm-light-canvas', !!theme.lightCanvas);
   root.classList.toggle('gm-shimmer', !!theme.shimmer);
