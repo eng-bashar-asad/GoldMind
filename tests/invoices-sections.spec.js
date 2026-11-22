@@ -39,3 +39,22 @@ test('section filter shows each kind of document', async ({ page }) => {
   await expect(list.locator('a[href="customer-debts-ar.html?open=c1"]')).toHaveCount(1);
   expect(errs).toEqual([]);
 });
+
+// بشار 2026-11-22: the cancelled invoices get their own chip at the top
+test('«ملغاة» chip shows the cancelled invoices', async ({ page }) => {
+  await install(page, { db: {
+    stores: [{ id: STORE, name: 'محل', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    invoices: [
+      { id: 'i1', store_id: STORE, invoice_number: 'S-9', type: 'sale', status: 'paid', total_amount: 100, created_at: T, customer: { name: 'زبون أ' } },
+      { id: 'i2', store_id: STORE, invoice_number: 'PINV-48', type: 'buyRetail', status: 'cancelled', total_amount: 0, created_at: T }],
+    invoice_items: [], repair_tickets: [], trader_movements: [], stock_vouchers: [], customer_debts: [],
+  } });
+  await page.goto('/invoices-list-ar.html');
+  const chip = page.locator('#kind-chips button', { hasText: 'ملغاة' });
+  await expect(chip).toContainText('1');
+  await chip.click();
+  await expect(page.locator('#results-list')).toContainText('PINV-48');
+  await expect(page.locator('#results-list')).not.toContainText('S-9');
+});

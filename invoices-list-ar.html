@@ -87,7 +87,7 @@
 <option value="return">مرتجع</option>
 <option value="repair">صيانة</option>
 <option value="unpaid">فواتير بانتظار الدفع</option>
-<option value="cancelled">الفواتير الملغاة (لإعادة استخدام رقمها)</option>
+<option value="cancelled">الفواتير الملغاة</option>
 </select>
 </div>
 
@@ -148,8 +148,15 @@ function renderKindChips(rows) {
   const count = id => { const g = KIND_GROUPS.find(x => x[0] === id); return rows.filter(r => g[2].includes(r.type)).length; };
   el.innerHTML = `<button type="button" onclick="pickKind(null)" aria-pressed="${!KIND_PICK}" class="shrink-0 h-9 px-3 rounded-full border-2 text-[12.5px] font-bold" style="${!KIND_PICK ? 'background:#1C1A16;color:#FBF8F1;border-color:#1C1A16' : 'background:#fff;border-color:#CBBF9E'}">الكل <span class="font-data-mono">${rows.length}</span></button>` +
     KIND_GROUPS.filter(g => count(g[0])).map(g => { const c = KIND_COLORS[g[2][0]], on = KIND_PICK === g[0];
-      return `<button type="button" onclick="pickKind('${g[0]}')" aria-pressed="${on}" class="shrink-0 h-9 px-3 rounded-full border-2 text-[12.5px] font-bold inline-flex items-center gap-1.5" style="border-color:${c[0]};${on ? 'background:' + c[0] + ';color:#fff' : 'background:#fff;color:' + c[2]}"><span style="width:8px;height:8px;border-radius:50%;background:${on ? '#fff' : c[0]}"></span>${g[1]} <span class="font-data-mono">${count(g[0])}</span></button>`; }).join('');
+      return `<button type="button" onclick="pickKind('${g[0]}')" aria-pressed="${on}" class="shrink-0 h-9 px-3 rounded-full border-2 text-[12.5px] font-bold inline-flex items-center gap-1.5" style="border-color:${c[0]};${on ? 'background:' + c[0] + ';color:#fff' : 'background:#fff;color:' + c[2]}"><span style="width:8px;height:8px;border-radius:50%;background:${on ? '#fff' : c[0]}"></span>${g[1]} <span class="font-data-mono">${count(g[0])}</span></button>`; }).join('') + gmCancelledChip();
 }
+// «ملغاة» chip (بشار 2026-11-22: the cancelled invoices were only in the type list, hard to find)
+function gmCancelledChip() {
+  const n = allRows.filter(r => r.status === 'cancelled').length; if (!n) return '';
+  const on = document.getElementById('typeFilter').value === 'cancelled';
+  return `<button type="button" onclick="gmPickCancelled()" aria-pressed="${on}" class="shrink-0 h-9 px-3 rounded-full border-2 text-[12.5px] font-bold inline-flex items-center gap-1.5" style="border-color:#B3261E;${on ? 'background:#B3261E;color:#fff' : 'background:#fff;color:#8C1D18'}"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">block</span>ملغاة <span class="font-data-mono">${n}</span></button>`;
+}
+function gmPickCancelled() { const f = document.getElementById('typeFilter'); f.value = f.value === 'cancelled' ? '' : 'cancelled'; KIND_PICK = null; applyFilters(); }
 if (window.matchMedia) { const mq = window.matchMedia('(min-width: 1024px)'); (mq.addEventListener ? mq.addEventListener.bind(mq, 'change') : mq.addListener.bind(mq))(() => { if (allRows.length) applyFilters(); }); }
 function pickKind(id) { KIND_PICK = KIND_PICK === id ? null : id; if (KIND_PICK) document.getElementById('typeFilter').value = ''; applyFilters(); }
 
