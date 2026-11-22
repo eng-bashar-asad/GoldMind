@@ -18,6 +18,10 @@ test('dark theme: linked rows get an edge, not a pastel fill', async ({ page }) 
   await expect(cell).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   expect(await cell.evaluate(el => getComputedStyle(el).boxShadow)).toContain('inset');
   await expect(page.locator('#rowsBody')).toContainText('118,700');
+  // the linked pair g1 carries the same number on both sides; g2 is alone → no number
+  await expect(page.locator('#rowsBody .cb-tag')).toHaveCount(2);
+  await expect(page.locator('#rowsBody .cb-tag').nth(0)).toContainText('1');
+  await expect(page.locator('#rowsBody .cb-tag').nth(1)).toContainText('1');
   if (process.env.SHOT) await page.screenshot({ path: '/tmp/daily.png', fullPage: false });
   await page.emulateMedia({ media: 'print' });
   await expect(cell).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');

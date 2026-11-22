@@ -37,9 +37,12 @@
     /* link colors: pastel fill on paper and light themes; on dark themes on screen only a colored edge,
        so the sheet stays one calm dark surface instead of a patchwork (بشار 2026-11-19) */
     .cb-lk, .cb-lk2 { background-color: var(--lk); }
+    .cb-tag { display: inline-flex; align-items: center; gap: 1px; margin-inline-end: 6px; padding: 0 6px 0 4px; border-radius: 999px;
+      background: var(--lk); color: #1f2937; font: 700 11px/18px 'Times New Roman', serif; vertical-align: middle; border: 1px solid rgba(0,0,0,.18); }
+    .cb-tag .material-symbols-outlined { font-size: 13px; }
     @media screen {
       html:not(.gm-light-canvas) body .cb-lk2 { background-color: transparent; }
-      html:not(.gm-light-canvas) body .cb-lk { background-color: transparent; box-shadow: inset -4px 0 0 var(--lk); }
+      html:not(.gm-light-canvas) body .cb-lk { background-color: transparent; box-shadow: inset -6px 0 0 var(--lk); }
     }
     /* black marble on screen: the sheet is see-through so the marble shows behind it on the phone too (بشار 2026-11-19) */
     @media screen {
@@ -253,6 +256,12 @@ async function load() {
     inEntries.push(...inMembers);
   });
   const rowCount = Math.max(outEntries.length, inEntries.length, 1);
+  // a number per linked group (بشار 2026-11-22): the same «🔗 n» on both sides tells which in/out go together
+  const linkNo = new Map();
+  clusters.forEach(c => { if (c.group && c.members.length > 1 && !linkNo.has(c.group)) linkNo.set(c.group, linkNo.size + 1); });
+  const tag = e => (e && linkNo.has(e.link_group))
+    ? `<span class="cb-tag" style="--lk:${gmLinkColorFor(e.link_group)}" title="حركة مرتبطة رقم ${linkNo.get(e.link_group)}"><span class="material-symbols-outlined" aria-hidden="true">link</span>${linkNo.get(e.link_group)}</span>`
+    : '';
 
   const rowsBody = document.getElementById('rowsBody');
   let rowsHtml = '';
@@ -264,9 +273,9 @@ async function load() {
     const outBg = o && gmLinkColorFor(o.link_group) ? `--lk:${gmLinkColorFor(o.link_group)};` : '';
     const amt = e => `<span class="cb-n">${fmt(e.amount)}</span> <span class="cb-cur">${e.currency}</span>`;
     rowsHtml += `<div class="flex">
-      <div class="cb-c cb-d py-1.5 px-3 border-t border-outline-variant font-semibold${inBg ? ' cb-lk' : ''}" style="width:28%;${inBg}">${inn ? gmEscapeHtml(inn.operation_type) + (gmCashNote(inn) ? ' — ' + gmEscapeHtml(gmCashNote(inn)) : '') : ''}</div>
+      <div class="cb-c cb-d py-1.5 px-3 border-t border-outline-variant font-semibold${inBg ? ' cb-lk' : ''}" style="width:28%;${inBg}">${tag(inn)}${inn ? gmEscapeHtml(inn.operation_type) + (gmCashNote(inn) ? ' — ' + gmEscapeHtml(gmCashNote(inn)) : '') : ''}</div>
       <div class="cb-c cb-a py-1.5 px-3 border-t border-r border-outline-variant font-bold text-left${inBg ? ' cb-lk2' : ''}" style="width:22%;${inBg}" dir="ltr">${inn ? amt(inn) : ''}</div>
-      <div class="cb-c cb-d py-1.5 px-3 border-t border-r border-outline-variant font-semibold${outBg ? ' cb-lk' : ''}" style="width:28%;${outBg}">${o ? gmEscapeHtml(o.operation_type) + (gmCashNote(o) ? ' — ' + gmEscapeHtml(gmCashNote(o)) : '') : ''}</div>
+      <div class="cb-c cb-d py-1.5 px-3 border-t border-r border-outline-variant font-semibold${outBg ? ' cb-lk' : ''}" style="width:28%;${outBg}">${tag(o)}${o ? gmEscapeHtml(o.operation_type) + (gmCashNote(o) ? ' — ' + gmEscapeHtml(gmCashNote(o)) : '') : ''}</div>
       <div class="cb-c cb-a py-1.5 px-3 border-t border-r border-outline-variant font-bold text-left${outBg ? ' cb-lk2' : ''}" style="width:22%;${outBg}" dir="ltr">${o ? amt(o) : ''}</div>
     </div>`;
   }
