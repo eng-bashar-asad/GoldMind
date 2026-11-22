@@ -45,3 +45,18 @@ test('cash purchase split between USD and SYP', async ({ page }) => {
   ]);
   expect(posts.rpc.p.payment_method).toBe('cash');
 });
+
+// بشار 2026-11-22: goods photos — each pick adds more, and a wrong one can be removed
+test('purchase goods photos: add more, remove one', async ({ page }) => {
+  await install(page, { db: { stores: [{ id: STORE, currency: 'USD', name: 'محل' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'Owner' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }], traders: [] } });
+  await page.goto('/create-invoice-v2-ar.html');
+  const img = n => ({ name: n, mimeType: 'image/jpeg', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) });
+  await page.setInputFiles('#bulk-photos-input', [img('a.jpg'), img('b.jpg')]);
+  await page.setInputFiles('#bulk-photos-input', [img('c.jpg')]);
+  await expect(page.locator('#bulk-photos-preview img')).toHaveCount(3);
+  await page.locator('#bulk-photos-preview button[aria-label="حذف الصورة"]').first().click();
+  await expect(page.locator('#bulk-photos-preview img')).toHaveCount(2);
+  await expect(page.locator('#bulk-photos-label')).toContainText('2 صورة');
+});

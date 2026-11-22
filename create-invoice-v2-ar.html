@@ -376,7 +376,7 @@
 <button onclick="document.getElementById('bulk-photos-input').click()" class="w-full h-12 border-2 border-dashed border-outline-variant rounded-lg flex items-center justify-center gap-2 text-on-surface-variant" type="button">
 <span class="material-symbols-outlined">add_photo_alternate</span> <span id="bulk-photos-label">اختر صور</span>
 </button>
-<div class="hidden flex flex-wrap gap-2" id="bulk-photos-preview"></div>
+<div class="hidden flex flex-wrap gap-4 pt-3 ps-3" id="bulk-photos-preview"></div>
 </section>
 
 <!-- Totals & Payment -->
@@ -981,15 +981,22 @@
 
     // ---------- Bulk-lot photos (optional, multiple) ----------
     let bulkPhotoFiles = [];
+    // each pick ADDS photos; each one has its own ✕ (بشار 2026-11-22 — add one more / drop a wrong one)
     document.getElementById('bulk-photos-input').addEventListener('change', (e) => {
-        bulkPhotoFiles = Array.from(e.target.files || []);
+        bulkPhotoFiles = bulkPhotoFiles.concat(Array.from(e.target.files || []));
+        e.target.value = ''; // the same photo can be picked again after removing it
+        renderBulkPhotos();
+    });
+    function gmRemoveBulkPhoto(i) { bulkPhotoFiles.splice(i, 1); renderBulkPhotos(); }
+    function renderBulkPhotos() {
         document.getElementById('bulk-photos-label').textContent = bulkPhotoFiles.length
-            ? bulkPhotoFiles.length + ' صورة مختارة'
+            ? bulkPhotoFiles.length + ' صورة مختارة — اضغط لإضافة المزيد'
             : 'اختر صور';
         const preview = document.getElementById('bulk-photos-preview');
         preview.classList.toggle('hidden', bulkPhotoFiles.length === 0);
-        preview.innerHTML = bulkPhotoFiles.map(f => `<img src="${URL.createObjectURL(f)}" class="w-16 h-16 object-cover rounded-lg border border-outline-variant"/>`).join('');
-    });
+        preview.innerHTML = bulkPhotoFiles.map((f, i) => `<div class="relative"><img src="${URL.createObjectURL(f)}" alt="" class="w-16 h-16 object-cover rounded-lg border border-outline-variant"/>
+            <button type="button" onclick="gmRemoveBulkPhoto(${i})" aria-label="حذف الصورة" class="absolute -top-3 -start-3 w-11 h-11 flex items-center justify-center"><span class="w-6 h-6 rounded-full bg-error text-white flex items-center justify-center shadow"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">close</span></span></button></div>`).join('');
+    }
 
     // ---------- Invoice photo OCR (Gemini, via a protected Edge Function) ----------
     // Reads a photographed paper invoice and prefills the fields below --
