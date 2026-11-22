@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 2ewH6KvjhiocTeq7Ymj2OFMfUfTTDNQrff6ykDRNjSrwQ9CvYoUJCsYdDuvmwNU
+\restrict g1UEJ69D9FfzVdZ15ACdpNSLFGwTjq3YgU9W5mWnShP1IIObLBpyspUW7yu1mNw
 
 
 SET statement_timeout = 0;
@@ -3156,55 +3156,57 @@ CREATE FUNCTION public.mirror_invoice_cash_to_daily() RETURNS trigger
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
- declare inv record; r record; first boolean := true; full_base numeric; amt numeric; cur text; note text; op text;
- begin
-   if new.invoice_id is null then return new; end if;
-     -- a change of payment currencies: gm_invoice_daily_rewrite() sets the invoice's rows
-       if coalesce(new.description, '') like 'تعديل عملات الدفع%' then return new; end if;
-         select id, type, payment_method, pay_breakdown, pay_currency, pay_fx_rate, skip_daily into inv from public.invoices where id = new.invoice_id;
-           if inv is null or inv.skip_daily then return new; end if; -- purchase kept out of the daily box
-             if inv.payment_method not in ('cash', 'bank', 'mixed') or new.amount <= 0 then return new; end if;
-               op := case inv.type when 'sale' then 'فاتورة بيع' when 'return' then 'مرتجع مبيعات' else 'فاتورة شراء' end;
-                 if new.edit_delta then
-                     amt := case when new.fx_currency is not null and new.fx_amount > 0 then new.fx_amount
-                                     when inv.pay_currency is not null and inv.pay_fx_rate > 0 then new.amount * inv.pay_fx_rate else new.amount end;
-                                         cur := coalesce(upper(new.fx_currency), case when inv.pay_currency is not null and inv.pay_fx_rate > 0 then inv.pay_currency end, new.currency);
-                                             select l.id, l.direction, l.amount into r from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id
-                                                  where m.invoice_id = inv.id and not m.edit_delta and upper(l.currency) = upper(cur)
-                                                       order by l.created_at limit 1;
-                                                           if r.id is not null then
-                                                                 full_base := round(r.amount + case when new.direction = r.direction then amt else -amt end, 2);
-                                                                       if full_base > 0 then
-                                                                               update daily_cash_log set amount = full_base where id = r.id;
-                                                                                       perform public.sync_invoice_bank_part(new.invoice_id);
-                                                                                               return new;
-                                                                                                     end if;
-                                                                                                         end if;
-                                                                                                           end if;
-                                                                                                             if new.fx_currency is null and inv.pay_breakdown is not null then
-                                                                                                                 select sum((b->>'amount')::numeric / (b->>'rate')::numeric) into full_base from jsonb_array_elements(inv.pay_breakdown) b;
-                                                                                                                     if abs(new.amount - full_base) < 0.05 then
-                                                                                                                           for r in select upper(b->>'currency') c, sum((b->>'amount')::numeric) a from jsonb_array_elements(inv.pay_breakdown) b
-                                                                                                                                           where b->>'method' = 'cash' and (b->>'amount')::numeric > 0 group by 1 order by 1 loop
-                                                                                                                                                   insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id, bank_invoice_id)
-                                                                                                                                                           values (new.store_id, op, new.direction, round(r.a, 2), r.c, new.description, new.created_by,
-                                                                                                                                                                           case when first then new.id end, case when first then null else inv.id end);
-                                                                                                                                                                                   first := false;
-                                                                                                                                                                                         end loop;
-                                                                                                                                                                                               return new;
-                                                                                                                                                                                                   end if;
-                                                                                                                                                                                                     end if;
-                                                                                                                                                                                                       amt := round(new.amount, 2); cur := new.currency; note := new.description;
-                                                                                                                                                                                                         if new.fx_currency is not null and new.fx_amount > 0 then
-                                                                                                                                                                                                             amt := round(new.fx_amount, 2); cur := upper(new.fx_currency);
-                                                                                                                                                                                                               elsif inv.pay_currency is not null and inv.pay_fx_rate > 0 and upper(inv.pay_currency) <> upper(coalesce(new.currency, '')) then
-                                                                                                                                                                                                                   amt := round(new.amount * inv.pay_fx_rate, 2); cur := inv.pay_currency;
-                                                                                                                                                                                                                     end if;
-                                                                                                                                                                                                                       insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
-                                                                                                                                                                                                                         values (new.store_id, op, new.direction, amt, cur, note, new.created_by, new.id);
-                                                                                                                                                                                                                           perform public.sync_invoice_bank_part(new.invoice_id);
-                                                                                                                                                                                                                             return new;
-                                                                                                                                                                                                                             end $$;
+declare inv record; r record; first boolean := true; full_base numeric; amt numeric; cur text; note text; op text;
+begin
+  if new.invoice_id is null then return new; end if;
+  -- a change of payment currencies: gm_invoice_daily_rewrite() sets the invoice's rows
+  if coalesce(new.description, '') like 'تعديل عملات الدفع%' then return new; end if;
+  select id, type, payment_method, pay_breakdown, pay_currency, pay_fx_rate, skip_daily into inv from public.invoices where id = new.invoice_id;
+  if inv is null or inv.skip_daily then return new; end if; -- purchase kept out of the daily box
+  if new.amount <= 0 then return new; end if;
+  -- an edit delta always counts (cash → debt takes the money back out of the box)
+  if inv.payment_method not in ('cash', 'bank', 'mixed') and not new.edit_delta then return new; end if;
+  op := case inv.type when 'sale' then 'فاتورة بيع' when 'return' then 'مرتجع مبيعات' else 'فاتورة شراء' end;
+  if new.edit_delta then
+    amt := case when new.fx_currency is not null and new.fx_amount > 0 then new.fx_amount
+                when inv.pay_currency is not null and inv.pay_fx_rate > 0 then new.amount * inv.pay_fx_rate else new.amount end;
+    cur := coalesce(upper(new.fx_currency), case when inv.pay_currency is not null and inv.pay_fx_rate > 0 then inv.pay_currency end, new.currency);
+    select l.id, l.direction, l.amount into r from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id
+     where m.invoice_id = inv.id and not m.edit_delta and upper(l.currency) = upper(cur)
+     order by l.created_at limit 1;
+    if r.id is not null then
+      full_base := round(r.amount + case when new.direction = r.direction then amt else -amt end, 2);
+      if full_base > 0 then
+        update daily_cash_log set amount = full_base where id = r.id;
+        perform public.sync_invoice_bank_part(new.invoice_id);
+        return new;
+      end if;
+    end if;
+  end if;
+  if new.fx_currency is null and inv.pay_breakdown is not null then
+    select sum((b->>'amount')::numeric / (b->>'rate')::numeric) into full_base from jsonb_array_elements(inv.pay_breakdown) b;
+    if abs(new.amount - full_base) < 0.05 then
+      for r in select upper(b->>'currency') c, sum((b->>'amount')::numeric) a from jsonb_array_elements(inv.pay_breakdown) b
+               where b->>'method' = 'cash' and (b->>'amount')::numeric > 0 group by 1 order by 1 loop
+        insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id, bank_invoice_id)
+        values (new.store_id, op, new.direction, round(r.a, 2), r.c, new.description, new.created_by,
+                case when first then new.id end, case when first then null else inv.id end);
+        first := false;
+      end loop;
+      return new;
+    end if;
+  end if;
+  amt := round(new.amount, 2); cur := new.currency; note := new.description;
+  if new.fx_currency is not null and new.fx_amount > 0 then
+    amt := round(new.fx_amount, 2); cur := upper(new.fx_currency);
+  elsif inv.pay_currency is not null and inv.pay_fx_rate > 0 and upper(inv.pay_currency) <> upper(coalesce(new.currency, '')) then
+    amt := round(new.amount * inv.pay_fx_rate, 2); cur := inv.pay_currency;
+  end if;
+  insert into public.daily_cash_log (store_id, operation_type, direction, amount, currency, notes, created_by, cash_movement_id)
+  values (new.store_id, op, new.direction, amt, cur, note, new.created_by, new.id);
+  perform public.sync_invoice_bank_part(new.invoice_id);
+  return new;
+end $$;
 
 
 --
@@ -8986,6 +8988,13 @@ CREATE INDEX audit_log_staff_id_fk_idx ON public.audit_log USING btree (staff_id
 
 
 --
+-- Name: audit_log_store_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX audit_log_store_created_idx ON public.audit_log USING btree (store_id, created_at DESC);
+
+
+--
 -- Name: audit_log_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9014,6 +9023,27 @@ CREATE INDEX auth_webauthn_challenges_user_id_fk_idx ON public.auth_webauthn_cha
 
 
 --
+-- Name: branch_transfer_items_diamond_piece_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfer_items_diamond_piece_id_idx ON public.branch_transfer_items USING btree (diamond_piece_id);
+
+
+--
+-- Name: branch_transfer_items_piece_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfer_items_piece_id_idx ON public.branch_transfer_items USING btree (piece_id);
+
+
+--
+-- Name: branch_transfer_items_received_by_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfer_items_received_by_idx ON public.branch_transfer_items USING btree (received_by);
+
+
+--
 -- Name: branch_transfer_items_transfer_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9021,10 +9051,31 @@ CREATE INDEX branch_transfer_items_transfer_idx ON public.branch_transfer_items 
 
 
 --
+-- Name: branch_transfers_created_by_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfers_created_by_idx ON public.branch_transfers USING btree (created_by);
+
+
+--
 -- Name: branch_transfers_from_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX branch_transfers_from_idx ON public.branch_transfers USING btree (from_store_id, created_at DESC);
+
+
+--
+-- Name: branch_transfers_organization_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfers_organization_id_idx ON public.branch_transfers USING btree (organization_id);
+
+
+--
+-- Name: branch_transfers_received_by_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX branch_transfers_received_by_idx ON public.branch_transfers USING btree (received_by);
 
 
 --
@@ -9046,6 +9097,13 @@ CREATE INDEX cash_movements_created_by_fk_idx ON public.cash_movements USING btr
 --
 
 CREATE INDEX cash_movements_invoice_id_fk_idx ON public.cash_movements USING btree (invoice_id);
+
+
+--
+-- Name: cash_movements_store_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX cash_movements_store_created_idx ON public.cash_movements USING btree (store_id, created_at DESC);
 
 
 --
@@ -9105,6 +9163,13 @@ CREATE INDEX customer_debts_created_by_fk_idx ON public.customer_debts USING btr
 
 
 --
+-- Name: customer_debts_customer_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_debts_customer_created_idx ON public.customer_debts USING btree (customer_id, created_at);
+
+
+--
 -- Name: customer_debts_customer_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9116,6 +9181,13 @@ CREATE INDEX customer_debts_customer_id_fk_idx ON public.customer_debts USING bt
 --
 
 CREATE INDEX customer_debts_invoice_id_fk_idx ON public.customer_debts USING btree (invoice_id);
+
+
+--
+-- Name: customer_debts_store_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX customer_debts_store_created_idx ON public.customer_debts USING btree (store_id, created_at DESC);
 
 
 --
@@ -9172,6 +9244,13 @@ CREATE UNIQUE INDEX daily_cash_log_cash_movement_uidx ON public.daily_cash_log U
 --
 
 CREATE INDEX daily_cash_log_created_by_fk_idx ON public.daily_cash_log USING btree (created_by);
+
+
+--
+-- Name: daily_cash_log_store_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX daily_cash_log_store_created_idx ON public.daily_cash_log USING btree (store_id, created_at DESC);
 
 
 --
@@ -9567,6 +9646,20 @@ CREATE INDEX invoices_related_invoice_id_fk_idx ON public.invoices USING btree (
 
 
 --
+-- Name: invoices_salesperson_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoices_salesperson_id_idx ON public.invoices USING btree (salesperson_id);
+
+
+--
+-- Name: invoices_store_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX invoices_store_created_idx ON public.invoices USING btree (store_id, created_at DESC);
+
+
+--
 -- Name: invoices_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9602,6 +9695,13 @@ CREATE INDEX login_2fa_user_id_idx ON public.login_2fa USING btree (user_id);
 
 
 --
+-- Name: organizations_head_office_store_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX organizations_head_office_store_id_idx ON public.organizations USING btree (head_office_store_id);
+
+
+--
 -- Name: organizations_primary_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9623,10 +9723,38 @@ CREATE INDEX payroll_payments_staff_id_fk_idx ON public.payroll_payments USING b
 
 
 --
+-- Name: piece_barcode_history_changed_by_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_barcode_history_changed_by_idx ON public.piece_barcode_history USING btree (changed_by);
+
+
+--
+-- Name: piece_barcode_history_piece_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_barcode_history_piece_id_idx ON public.piece_barcode_history USING btree (piece_id);
+
+
+--
 -- Name: piece_barcode_history_store_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX piece_barcode_history_store_idx ON public.piece_barcode_history USING btree (store_id);
+
+
+--
+-- Name: piece_chip_history_changed_by_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_chip_history_changed_by_idx ON public.piece_chip_history USING btree (changed_by);
+
+
+--
+-- Name: piece_chip_history_piece_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX piece_chip_history_piece_id_idx ON public.piece_chip_history USING btree (piece_id);
 
 
 --
@@ -9707,6 +9835,13 @@ CREATE INDEX pieces_intake_batch_idx ON public.pieces USING btree (intake_batch_
 
 
 --
+-- Name: pieces_reserved_customer_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pieces_reserved_customer_id_idx ON public.pieces USING btree (reserved_customer_id);
+
+
+--
 -- Name: pieces_rfid_epc_unique; Type: INDEX; Schema: public; Owner: -
 --
 
@@ -9718,6 +9853,13 @@ CREATE UNIQUE INDEX pieces_rfid_epc_unique ON public.pieces USING btree (rfid_ep
 --
 
 CREATE INDEX pieces_store_id_fk_idx ON public.pieces USING btree (store_id);
+
+
+--
+-- Name: pieces_store_status_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX pieces_store_status_idx ON public.pieces USING btree (store_id, status);
 
 
 --
@@ -9959,10 +10101,24 @@ CREATE INDEX trader_movements_piece_id_fk_idx ON public.trader_movements USING b
 
 
 --
+-- Name: trader_movements_store_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_store_created_idx ON public.trader_movements USING btree (store_id, created_at DESC);
+
+
+--
 -- Name: trader_movements_store_id_fk_idx; Type: INDEX; Schema: public; Owner: -
 --
 
 CREATE INDEX trader_movements_store_id_fk_idx ON public.trader_movements USING btree (store_id);
+
+
+--
+-- Name: trader_movements_trader_created_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_movements_trader_created_idx ON public.trader_movements USING btree (trader_id, created_at);
 
 
 --
@@ -9977,6 +10133,13 @@ CREATE INDEX trader_movements_trader_id_fk_idx ON public.trader_movements USING 
 --
 
 CREATE INDEX trader_movements_voucher_no_idx ON public.trader_movements USING btree (store_id, voucher_no);
+
+
+--
+-- Name: trader_scrap_draws_lot_id_idx; Type: INDEX; Schema: public; Owner: -
+--
+
+CREATE INDEX trader_scrap_draws_lot_id_idx ON public.trader_scrap_draws USING btree (lot_id);
 
 
 --
@@ -11659,15 +11822,6 @@ ALTER TABLE public.auth_passkeys ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.auth_webauthn_challenges ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: organizations branch staff can view their organization; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "branch staff can view their organization" ON public.organizations FOR SELECT TO authenticated USING ((EXISTS ( SELECT 1
-   FROM public.stores s
-  WHERE ((s.organization_id = organizations.id) AND public.is_store_member(s.id)))));
-
-
---
 -- Name: branch_transfer_items; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -11702,17 +11856,31 @@ CREATE POLICY branch_transfers_select ON public.branch_transfers FOR SELECT TO a
 ALTER TABLE public.cash_movements ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: cash_movements cash_movements_select; Type: POLICY; Schema: public; Owner: -
+-- Name: cash_movements cash_movements_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY cash_movements_select ON public.cash_movements FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
+CREATE POLICY cash_movements_add ON public.cash_movements FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
 
 
 --
--- Name: cash_movements cash_movements_write; Type: POLICY; Schema: public; Owner: -
+-- Name: cash_movements cash_movements_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY cash_movements_write ON public.cash_movements USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
+CREATE POLICY cash_movements_change ON public.cash_movements FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
+
+
+--
+-- Name: cash_movements cash_movements_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY cash_movements_read ON public.cash_movements FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)) OR (public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))));
+
+
+--
+-- Name: cash_movements cash_movements_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY cash_movements_remove ON public.cash_movements FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
 
 
 --
@@ -11746,24 +11914,31 @@ ALTER TABLE public.company_search_attempts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.customer_debts ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: customer_debts customer_debts_select; Type: POLICY; Schema: public; Owner: -
+-- Name: customer_debts customer_debts_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY customer_debts_select ON public.customer_debts FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
-
-
---
--- Name: customer_debts customer_debts_select_org; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY customer_debts_select_org ON public.customer_debts FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_customers'::text));
+CREATE POLICY customer_debts_add ON public.customer_debts FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
 
 
 --
--- Name: customer_debts customer_debts_write; Type: POLICY; Schema: public; Owner: -
+-- Name: customer_debts customer_debts_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY customer_debts_write ON public.customer_debts USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
+CREATE POLICY customer_debts_change ON public.customer_debts FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
+
+
+--
+-- Name: customer_debts customer_debts_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customer_debts_read ON public.customer_debts FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)) OR public.org_can(store_id, 'view_customers'::text) OR (public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id))));
+
+
+--
+-- Name: customer_debts customer_debts_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customer_debts_remove ON public.customer_debts FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
 
 
 --
@@ -11773,17 +11948,10 @@ CREATE POLICY customer_debts_write ON public.customer_debts USING ((public.is_st
 ALTER TABLE public.customer_deposits ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: customer_deposits customer_deposits_select; Type: POLICY; Schema: public; Owner: -
+-- Name: customer_deposits customer_deposits_read; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY customer_deposits_select ON public.customer_deposits FOR SELECT USING ((public.is_store_member(store_id) AND (public.has_permission('view_customers'::text, store_id) OR public.has_permission('manage_daily_cashbox'::text, store_id))));
-
-
---
--- Name: customer_deposits customer_deposits_select_org; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY customer_deposits_select_org ON public.customer_deposits FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_customers'::text));
+CREATE POLICY customer_deposits_read ON public.customer_deposits FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND (public.has_permission('view_customers'::text, store_id) OR public.has_permission('manage_daily_cashbox'::text, store_id))) OR public.org_can(store_id, 'view_customers'::text)));
 
 
 --
@@ -11793,17 +11961,31 @@ CREATE POLICY customer_deposits_select_org ON public.customer_deposits FOR SELEC
 ALTER TABLE public.customer_phones ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: customer_phones customer_phones_select; Type: POLICY; Schema: public; Owner: -
+-- Name: customer_phones customer_phones_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY customer_phones_select ON public.customer_phones FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
+CREATE POLICY customer_phones_add ON public.customer_phones FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
 
 
 --
--- Name: customer_phones customer_phones_write; Type: POLICY; Schema: public; Owner: -
+-- Name: customer_phones customer_phones_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY customer_phones_write ON public.customer_phones USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
+CREATE POLICY customer_phones_change ON public.customer_phones FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
+
+
+--
+-- Name: customer_phones customer_phones_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customer_phones_read ON public.customer_phones FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)) OR (public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id))));
+
+
+--
+-- Name: customer_phones customer_phones_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customer_phones_remove ON public.customer_phones FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
 
 
 --
@@ -11813,38 +11995,31 @@ CREATE POLICY customer_phones_write ON public.customer_phones USING ((public.is_
 ALTER TABLE public.customers ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: customers customers_delete; Type: POLICY; Schema: public; Owner: -
+-- Name: customers customers_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY customers_delete ON public.customers FOR DELETE USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
-
-
---
--- Name: customers customers_insert; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY customers_insert ON public.customers FOR INSERT WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_customers'::text, store_id)));
+CREATE POLICY customers_add ON public.customers FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_customers'::text, store_id)));
 
 
 --
--- Name: customers customers_select; Type: POLICY; Schema: public; Owner: -
+-- Name: customers customers_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY customers_select ON public.customers FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
-
-
---
--- Name: customers customers_select_org; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY customers_select_org ON public.customers FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_customers'::text));
+CREATE POLICY customers_change ON public.customers FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
 
 
 --
--- Name: customers customers_update; Type: POLICY; Schema: public; Owner: -
+-- Name: customers customers_read; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY customers_update ON public.customers FOR UPDATE USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
+CREATE POLICY customers_read ON public.customers FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)) OR public.org_can(store_id, 'view_customers'::text)));
+
+
+--
+-- Name: customers customers_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY customers_remove ON public.customers FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_customers'::text, store_id)));
 
 
 --
@@ -11858,13 +12033,6 @@ ALTER TABLE public.daily_cash_log ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY daily_cash_log_all ON public.daily_cash_log USING ((public.is_store_member(store_id) AND public.has_permission('manage_daily_cashbox'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_daily_cashbox'::text, store_id)));
-
-
---
--- Name: invoices delete_invoice; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY delete_invoice ON public.invoices FOR DELETE USING (public.has_permission('delete_invoice'::text, store_id));
 
 
 --
@@ -11908,17 +12076,31 @@ CREATE POLICY diamond_pieces_update ON public.diamond_pieces FOR UPDATE USING ((
 ALTER TABLE public.diamond_stock_lots ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: diamond_stock_lots diamond_stock_lots_select; Type: POLICY; Schema: public; Owner: -
+-- Name: diamond_stock_lots diamond_stock_lots_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY diamond_stock_lots_select ON public.diamond_stock_lots FOR SELECT USING (public.is_store_member(store_id));
+CREATE POLICY diamond_stock_lots_add ON public.diamond_stock_lots FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
 
 
 --
--- Name: diamond_stock_lots diamond_stock_lots_write; Type: POLICY; Schema: public; Owner: -
+-- Name: diamond_stock_lots diamond_stock_lots_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY diamond_stock_lots_write ON public.diamond_stock_lots USING ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
+CREATE POLICY diamond_stock_lots_change ON public.diamond_stock_lots FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
+
+
+--
+-- Name: diamond_stock_lots diamond_stock_lots_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY diamond_stock_lots_read ON public.diamond_stock_lots FOR SELECT TO authenticated USING ((public.is_store_member(store_id) OR (public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id))));
+
+
+--
+-- Name: diamond_stock_lots diamond_stock_lots_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY diamond_stock_lots_remove ON public.diamond_stock_lots FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
 
 
 --
@@ -11942,17 +12124,31 @@ CREATE POLICY edit_settings ON public.stores FOR UPDATE USING (public.has_permis
 ALTER TABLE public.expense_categories ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: expense_categories expense_categories_select; Type: POLICY; Schema: public; Owner: -
+-- Name: expense_categories expense_categories_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expense_categories_select ON public.expense_categories FOR SELECT USING (public.is_store_member(store_id));
+CREATE POLICY expense_categories_add ON public.expense_categories FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
 
 
 --
--- Name: expense_categories expense_categories_write; Type: POLICY; Schema: public; Owner: -
+-- Name: expense_categories expense_categories_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expense_categories_write ON public.expense_categories USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
+CREATE POLICY expense_categories_change ON public.expense_categories FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
+
+
+--
+-- Name: expense_categories expense_categories_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expense_categories_read ON public.expense_categories FOR SELECT TO authenticated USING ((public.is_store_member(store_id) OR (public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))));
+
+
+--
+-- Name: expense_categories expense_categories_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expense_categories_remove ON public.expense_categories FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
 
 
 --
@@ -11962,17 +12158,31 @@ CREATE POLICY expense_categories_write ON public.expense_categories USING ((publ
 ALTER TABLE public.expense_entries ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: expense_entries expense_entries_select; Type: POLICY; Schema: public; Owner: -
+-- Name: expense_entries expense_entries_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expense_entries_select ON public.expense_entries FOR SELECT USING ((public.is_store_member(store_id) AND public.gm_can_expense(store_id)));
+CREATE POLICY expense_entries_add ON public.expense_entries FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
 
 
 --
--- Name: expense_entries expense_entries_write; Type: POLICY; Schema: public; Owner: -
+-- Name: expense_entries expense_entries_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY expense_entries_write ON public.expense_entries USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
+CREATE POLICY expense_entries_change ON public.expense_entries FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
+
+
+--
+-- Name: expense_entries expense_entries_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expense_entries_read ON public.expense_entries FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.gm_can_expense(store_id)) OR (public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id))));
+
+
+--
+-- Name: expense_entries expense_entries_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY expense_entries_remove ON public.expense_entries FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('view_profit_report'::text, store_id)));
 
 
 --
@@ -12014,10 +12224,31 @@ CREATE POLICY gifts_select ON public.inventory_gifts FOR SELECT USING ((public.h
 ALTER TABLE public.gold_prices ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: gold_prices gold_prices_select; Type: POLICY; Schema: public; Owner: -
+-- Name: gold_prices gold_prices_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY gold_prices_select ON public.gold_prices FOR SELECT USING (public.is_store_member(store_id));
+CREATE POLICY gold_prices_add ON public.gold_prices FOR INSERT TO authenticated WITH CHECK (public.has_permission('manage_gold_price'::text, store_id));
+
+
+--
+-- Name: gold_prices gold_prices_change; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY gold_prices_change ON public.gold_prices FOR UPDATE TO authenticated USING (public.has_permission('manage_gold_price'::text, store_id)) WITH CHECK (public.has_permission('manage_gold_price'::text, store_id));
+
+
+--
+-- Name: gold_prices gold_prices_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY gold_prices_read ON public.gold_prices FOR SELECT TO authenticated USING ((public.is_store_member(store_id) OR public.has_permission('manage_gold_price'::text, store_id)));
+
+
+--
+-- Name: gold_prices gold_prices_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY gold_prices_remove ON public.gold_prices FOR DELETE TO authenticated USING (public.has_permission('manage_gold_price'::text, store_id));
 
 
 --
@@ -12027,17 +12258,31 @@ CREATE POLICY gold_prices_select ON public.gold_prices FOR SELECT USING (public.
 ALTER TABLE public.gold_stock_lots ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: gold_stock_lots gold_stock_lots_select; Type: POLICY; Schema: public; Owner: -
+-- Name: gold_stock_lots gold_stock_lots_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY gold_stock_lots_select ON public.gold_stock_lots FOR SELECT USING (public.is_store_member(store_id));
+CREATE POLICY gold_stock_lots_add ON public.gold_stock_lots FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
 
 
 --
--- Name: gold_stock_lots gold_stock_lots_write; Type: POLICY; Schema: public; Owner: -
+-- Name: gold_stock_lots gold_stock_lots_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY gold_stock_lots_write ON public.gold_stock_lots USING ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
+CREATE POLICY gold_stock_lots_change ON public.gold_stock_lots FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
+
+
+--
+-- Name: gold_stock_lots gold_stock_lots_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY gold_stock_lots_read ON public.gold_stock_lots FOR SELECT TO authenticated USING ((public.is_store_member(store_id) OR (public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id))));
+
+
+--
+-- Name: gold_stock_lots gold_stock_lots_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY gold_stock_lots_remove ON public.gold_stock_lots FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('add_piece'::text, store_id)));
 
 
 --
@@ -12047,17 +12292,31 @@ CREATE POLICY gold_stock_lots_write ON public.gold_stock_lots USING ((public.is_
 ALTER TABLE public.hr_employees ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: hr_employees hr_employees_select; Type: POLICY; Schema: public; Owner: -
+-- Name: hr_employees hr_employees_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY hr_employees_select ON public.hr_employees FOR SELECT USING (public.is_store_member(store_id));
+CREATE POLICY hr_employees_add ON public.hr_employees FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
 
 
 --
--- Name: hr_employees hr_employees_write; Type: POLICY; Schema: public; Owner: -
+-- Name: hr_employees hr_employees_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY hr_employees_write ON public.hr_employees USING ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
+CREATE POLICY hr_employees_change ON public.hr_employees FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
+
+
+--
+-- Name: hr_employees hr_employees_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY hr_employees_read ON public.hr_employees FOR SELECT TO authenticated USING ((public.is_store_member(store_id) OR (public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id))));
+
+
+--
+-- Name: hr_employees hr_employees_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY hr_employees_remove ON public.hr_employees FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
 
 
 --
@@ -12067,17 +12326,31 @@ CREATE POLICY hr_employees_write ON public.hr_employees USING ((public.is_store_
 ALTER TABLE public.hr_leave_requests ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: hr_leave_requests hr_leave_requests_select; Type: POLICY; Schema: public; Owner: -
+-- Name: hr_leave_requests hr_leave_requests_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY hr_leave_requests_select ON public.hr_leave_requests FOR SELECT USING (public.is_store_member(store_id));
+CREATE POLICY hr_leave_requests_add ON public.hr_leave_requests FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
 
 
 --
--- Name: hr_leave_requests hr_leave_requests_write; Type: POLICY; Schema: public; Owner: -
+-- Name: hr_leave_requests hr_leave_requests_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY hr_leave_requests_write ON public.hr_leave_requests USING ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
+CREATE POLICY hr_leave_requests_change ON public.hr_leave_requests FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
+
+
+--
+-- Name: hr_leave_requests hr_leave_requests_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY hr_leave_requests_read ON public.hr_leave_requests FOR SELECT TO authenticated USING ((public.is_store_member(store_id) OR (public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id))));
+
+
+--
+-- Name: hr_leave_requests hr_leave_requests_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY hr_leave_requests_remove ON public.hr_leave_requests FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('manage_payroll'::text, store_id)));
 
 
 --
@@ -12125,21 +12398,45 @@ ALTER TABLE public.inventory_gifts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoice_items ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: invoice_items invoice_items: members read; Type: POLICY; Schema: public; Owner: -
+-- Name: invoice_items invoice_items_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY "invoice_items: members read" ON public.invoice_items FOR SELECT USING ((invoice_id IN ( SELECT i.id
+CREATE POLICY invoice_items_add ON public.invoice_items FOR INSERT TO authenticated WITH CHECK ((invoice_id IN ( SELECT i.id
    FROM public.invoices i
-  WHERE public.is_store_member(i.store_id))));
+  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id)))));
 
 
 --
--- Name: invoice_items invoice_items_select_org; Type: POLICY; Schema: public; Owner: -
+-- Name: invoice_items invoice_items_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY invoice_items_select_org ON public.invoice_items FOR SELECT TO authenticated USING ((invoice_id IN ( SELECT i.id
+CREATE POLICY invoice_items_change ON public.invoice_items FOR UPDATE TO authenticated USING ((invoice_id IN ( SELECT i.id
    FROM public.invoices i
-  WHERE public.org_can(i.store_id, 'view_branch_invoices'::text))));
+  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id))))) WITH CHECK ((invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id)))));
+
+
+--
+-- Name: invoice_items invoice_items_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY invoice_items_read ON public.invoice_items FOR SELECT TO authenticated USING (((invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE public.is_store_member(i.store_id))) OR (invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE public.org_can(i.store_id, 'view_branch_invoices'::text))) OR (invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id))))));
+
+
+--
+-- Name: invoice_items invoice_items_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY invoice_items_remove ON public.invoice_items FOR DELETE TO authenticated USING ((invoice_id IN ( SELECT i.id
+   FROM public.invoices i
+  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id)))));
 
 
 --
@@ -12155,31 +12452,31 @@ ALTER TABLE public.invoice_number_counters ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invoices ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: invoices invoices_insert; Type: POLICY; Schema: public; Owner: -
+-- Name: invoices invoices_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY invoices_insert ON public.invoices FOR INSERT WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('create_invoice'::text, store_id)));
-
-
---
--- Name: invoices invoices_select; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY invoices_select ON public.invoices FOR SELECT USING (public.is_store_member(store_id));
+CREATE POLICY invoices_add ON public.invoices FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('create_invoice'::text, store_id)));
 
 
 --
--- Name: invoices invoices_select_org; Type: POLICY; Schema: public; Owner: -
+-- Name: invoices invoices_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY invoices_select_org ON public.invoices FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_branch_invoices'::text));
+CREATE POLICY invoices_change ON public.invoices FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_invoice'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_invoice'::text, store_id)));
 
 
 --
--- Name: invoices invoices_update; Type: POLICY; Schema: public; Owner: -
+-- Name: invoices invoices_read; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY invoices_update ON public.invoices FOR UPDATE USING ((public.is_store_member(store_id) AND public.has_permission('edit_invoice'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_invoice'::text, store_id)));
+CREATE POLICY invoices_read ON public.invoices FOR SELECT TO authenticated USING ((public.is_store_member(store_id) OR public.org_can(store_id, 'view_branch_invoices'::text)));
+
+
+--
+-- Name: invoices invoices_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY invoices_remove ON public.invoices FOR DELETE TO authenticated USING (public.has_permission('delete_invoice'::text, store_id));
 
 
 --
@@ -12189,17 +12486,31 @@ CREATE POLICY invoices_update ON public.invoices FOR UPDATE USING ((public.is_st
 ALTER TABLE public.kyc_screenings ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: kyc_screenings kyc_screenings_select; Type: POLICY; Schema: public; Owner: -
+-- Name: kyc_screenings kyc_screenings_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY kyc_screenings_select ON public.kyc_screenings FOR SELECT USING (public.is_store_member(store_id));
+CREATE POLICY kyc_screenings_add ON public.kyc_screenings FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
 
 
 --
--- Name: kyc_screenings kyc_screenings_write; Type: POLICY; Schema: public; Owner: -
+-- Name: kyc_screenings kyc_screenings_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY kyc_screenings_write ON public.kyc_screenings USING ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
+CREATE POLICY kyc_screenings_change ON public.kyc_screenings FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
+
+
+--
+-- Name: kyc_screenings kyc_screenings_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY kyc_screenings_read ON public.kyc_screenings FOR SELECT TO authenticated USING ((public.is_store_member(store_id) OR (public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id))));
+
+
+--
+-- Name: kyc_screenings kyc_screenings_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY kyc_screenings_remove ON public.kyc_screenings FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('view_customers'::text, store_id)));
 
 
 --
@@ -12222,20 +12533,6 @@ CREATE POLICY "manage own store invites" ON public.store_invites USING ((public.
 
 
 --
--- Name: gold_prices manage_gold_price; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY manage_gold_price ON public.gold_prices USING (public.has_permission('manage_gold_price'::text, store_id)) WITH CHECK (public.has_permission('manage_gold_price'::text, store_id));
-
-
---
--- Name: subscriptions manage_subscription can edit subscription; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "manage_subscription can edit subscription" ON public.subscriptions USING ((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id)));
-
-
---
 -- Name: trader_scrap_draws members read scrap draws; Type: POLICY; Schema: public; Owner: -
 --
 
@@ -12243,17 +12540,40 @@ CREATE POLICY "members read scrap draws" ON public.trader_scrap_draws FOR SELECT
 
 
 --
--- Name: organizations org owner can update organization; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "org owner can update organization" ON public.organizations FOR UPDATE TO authenticated USING (public.is_org_owner(id)) WITH CHECK (public.is_org_owner(id));
-
-
---
 -- Name: organizations; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
 ALTER TABLE public.organizations ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: organizations organizations_add; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organizations_add ON public.organizations FOR INSERT TO authenticated WITH CHECK (public.is_platform_admin());
+
+
+--
+-- Name: organizations organizations_change; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organizations_change ON public.organizations FOR UPDATE TO authenticated USING ((public.is_org_owner(id) OR public.is_platform_admin())) WITH CHECK ((public.is_org_owner(id) OR public.is_platform_admin()));
+
+
+--
+-- Name: organizations organizations_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organizations_read ON public.organizations FOR SELECT TO authenticated USING (((EXISTS ( SELECT 1
+   FROM public.stores s
+  WHERE ((s.organization_id = organizations.id) AND public.is_store_member(s.id)))) OR public.is_platform_admin() OR public.is_store_member(primary_store_id)));
+
+
+--
+-- Name: organizations organizations_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY organizations_remove ON public.organizations FOR DELETE TO authenticated USING (public.is_platform_admin());
+
 
 --
 -- Name: auth_device_keys own device keys: remove; Type: POLICY; Schema: public; Owner: -
@@ -12309,13 +12629,6 @@ CREATE POLICY "own profile upsert" ON public.user_profiles FOR INSERT WITH CHECK
 --
 
 CREATE POLICY "owner can delete expected snapshot rows" ON public.inventory_count_expected FOR DELETE USING (public.has_permission('edit_settings'::text, store_id));
-
-
---
--- Name: staff owner or manage_staff can manage staff; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "owner or manage_staff can manage staff" ON public.staff USING ((public.is_store_member(store_id) AND public.has_permission('manage_staff'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_staff'::text, store_id)));
 
 
 --
@@ -12435,13 +12748,6 @@ CREATE POLICY pieces_select ON public.pieces FOR SELECT USING (public.is_store_m
 --
 
 ALTER TABLE public.plans ENABLE ROW LEVEL SECURITY;
-
---
--- Name: organizations platform admins full access to organizations; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "platform admins full access to organizations" ON public.organizations USING (public.is_platform_admin()) WITH CHECK (public.is_platform_admin());
-
 
 --
 -- Name: client_errors platform admins read errors; Type: POLICY; Schema: public; Owner: -
@@ -12578,31 +12884,24 @@ CREATE POLICY sp_update ON public.stock_parties FOR UPDATE USING (public.has_per
 ALTER TABLE public.staff ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: staff staff can view colleagues; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "staff can view colleagues" ON public.staff FOR SELECT USING (public.is_store_member(store_id));
-
-
---
--- Name: organizations staff can view own organization; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "staff can view own organization" ON public.organizations FOR SELECT USING (public.is_store_member(primary_store_id));
-
-
---
--- Name: staff staff can view own rows; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "staff can view own rows" ON public.staff FOR SELECT USING ((user_id = ( SELECT auth.uid() AS uid)));
-
-
---
 -- Name: stores staff can view own store; Type: POLICY; Schema: public; Owner: -
 --
 
 CREATE POLICY "staff can view own store" ON public.stores FOR SELECT USING (public.is_store_member(id));
+
+
+--
+-- Name: staff staff_add; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY staff_add ON public.staff FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_staff'::text, store_id)));
+
+
+--
+-- Name: staff staff_change; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY staff_change ON public.staff FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('manage_staff'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_staff'::text, store_id)));
 
 
 --
@@ -12616,6 +12915,20 @@ ALTER TABLE public.staff_presence ENABLE ROW LEVEL SECURITY;
 --
 
 CREATE POLICY staff_presence_select ON public.staff_presence FOR SELECT USING (public.is_store_member(store_id));
+
+
+--
+-- Name: staff staff_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY staff_read ON public.staff FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('manage_staff'::text, store_id)) OR public.is_store_member(store_id) OR (user_id = ( SELECT auth.uid() AS uid))));
+
+
+--
+-- Name: staff staff_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY staff_remove ON public.staff FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('manage_staff'::text, store_id)));
 
 
 --
@@ -12648,24 +12961,6 @@ ALTER TABLE public.stock_voucher_lines ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.stock_vouchers ENABLE ROW LEVEL SECURITY;
-
---
--- Name: invoice_items store access: invoice_items; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "store access: invoice_items" ON public.invoice_items USING ((invoice_id IN ( SELECT i.id
-   FROM public.invoices i
-  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id))))) WITH CHECK ((invoice_id IN ( SELECT i.id
-   FROM public.invoices i
-  WHERE (public.is_store_member(i.store_id) AND public.has_permission('edit_invoice'::text, i.store_id)))));
-
-
---
--- Name: subscriptions store can view own subscription; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "store can view own subscription" ON public.subscriptions FOR SELECT USING (public.is_store_member(store_id));
-
 
 --
 -- Name: company_kyc_documents store members can delete kyc docs; Type: POLICY; Schema: public; Owner: -
@@ -12738,24 +13033,10 @@ CREATE POLICY "store staff can create support requests" ON public.support_reques
 
 
 --
--- Name: zebra_label_fields store staff can manage own label fields; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "store staff can manage own label fields" ON public.zebra_label_fields USING ((public.is_store_member(store_id) AND public.has_permission('edit_settings'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_settings'::text, store_id)));
-
-
---
 -- Name: piece_intake_batches store staff can view own intake batches; Type: POLICY; Schema: public; Owner: -
 --
 
 CREATE POLICY "store staff can view own intake batches" ON public.piece_intake_batches FOR SELECT USING (public.is_store_member(store_id));
-
-
---
--- Name: zebra_label_fields store staff can view own label fields; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY "store staff can view own label fields" ON public.zebra_label_fields FOR SELECT USING (public.is_store_member(store_id));
 
 
 --
@@ -12791,6 +13072,34 @@ ALTER TABLE public.stores ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
 
 --
+-- Name: subscriptions subscriptions_add; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY subscriptions_add ON public.subscriptions FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id)));
+
+
+--
+-- Name: subscriptions subscriptions_change; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY subscriptions_change ON public.subscriptions FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id)));
+
+
+--
+-- Name: subscriptions subscriptions_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY subscriptions_read ON public.subscriptions FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id)) OR public.is_store_member(store_id)));
+
+
+--
+-- Name: subscriptions subscriptions_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY subscriptions_remove ON public.subscriptions FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('manage_subscription'::text, store_id)));
+
+
+--
 -- Name: support_requests; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -12817,17 +13126,31 @@ CREATE POLICY svl_select ON public.stock_voucher_lines FOR SELECT USING ((public
 ALTER TABLE public.trader_movements ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: trader_movements trader_movements_select; Type: POLICY; Schema: public; Owner: -
+-- Name: trader_movements trader_movements_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY trader_movements_select ON public.trader_movements FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_traders'::text, store_id)));
+CREATE POLICY trader_movements_add ON public.trader_movements FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
 
 
 --
--- Name: trader_movements trader_movements_select_org; Type: POLICY; Schema: public; Owner: -
+-- Name: trader_movements trader_movements_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY trader_movements_select_org ON public.trader_movements FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_traders'::text));
+CREATE POLICY trader_movements_change ON public.trader_movements FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
+
+
+--
+-- Name: trader_movements trader_movements_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY trader_movements_read ON public.trader_movements FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('view_traders'::text, store_id)) OR public.org_can(store_id, 'view_traders'::text) OR (public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id))));
+
+
+--
+-- Name: trader_movements trader_movements_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY trader_movements_remove ON public.trader_movements FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
 
 
 --
@@ -12845,13 +13168,6 @@ CREATE POLICY trader_movements_voucher_remove ON public.trader_movements AS REST
 
 
 --
--- Name: trader_movements trader_movements_write; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY trader_movements_write ON public.trader_movements USING ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
-
-
---
 -- Name: trader_scrap_draws; Type: ROW SECURITY; Schema: public; Owner: -
 --
 
@@ -12864,38 +13180,31 @@ ALTER TABLE public.trader_scrap_draws ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.traders ENABLE ROW LEVEL SECURITY;
 
 --
--- Name: traders traders_delete; Type: POLICY; Schema: public; Owner: -
+-- Name: traders traders_add; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY traders_delete ON public.traders FOR DELETE USING ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
-
-
---
--- Name: traders traders_insert; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY traders_insert ON public.traders FOR INSERT WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_traders'::text, store_id)));
+CREATE POLICY traders_add ON public.traders FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('add_traders'::text, store_id)));
 
 
 --
--- Name: traders traders_select; Type: POLICY; Schema: public; Owner: -
+-- Name: traders traders_change; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY traders_select ON public.traders FOR SELECT USING ((public.is_store_member(store_id) AND public.has_permission('view_traders'::text, store_id)));
-
-
---
--- Name: traders traders_select_org; Type: POLICY; Schema: public; Owner: -
---
-
-CREATE POLICY traders_select_org ON public.traders FOR SELECT TO authenticated USING (public.org_can(store_id, 'view_traders'::text));
+CREATE POLICY traders_change ON public.traders FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
 
 
 --
--- Name: traders traders_update_delete; Type: POLICY; Schema: public; Owner: -
+-- Name: traders traders_read; Type: POLICY; Schema: public; Owner: -
 --
 
-CREATE POLICY traders_update_delete ON public.traders FOR UPDATE USING ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
+CREATE POLICY traders_read ON public.traders FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('view_traders'::text, store_id)) OR public.org_can(store_id, 'view_traders'::text)));
+
+
+--
+-- Name: traders traders_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY traders_remove ON public.traders FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_traders'::text, store_id)));
 
 
 --
@@ -12915,6 +13224,34 @@ ALTER TABLE public.voucher_counters ENABLE ROW LEVEL SECURITY;
 --
 
 ALTER TABLE public.zebra_label_fields ENABLE ROW LEVEL SECURITY;
+
+--
+-- Name: zebra_label_fields zebra_label_fields_add; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY zebra_label_fields_add ON public.zebra_label_fields FOR INSERT TO authenticated WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_settings'::text, store_id)));
+
+
+--
+-- Name: zebra_label_fields zebra_label_fields_change; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY zebra_label_fields_change ON public.zebra_label_fields FOR UPDATE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_settings'::text, store_id))) WITH CHECK ((public.is_store_member(store_id) AND public.has_permission('edit_settings'::text, store_id)));
+
+
+--
+-- Name: zebra_label_fields zebra_label_fields_read; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY zebra_label_fields_read ON public.zebra_label_fields FOR SELECT TO authenticated USING (((public.is_store_member(store_id) AND public.has_permission('edit_settings'::text, store_id)) OR public.is_store_member(store_id)));
+
+
+--
+-- Name: zebra_label_fields zebra_label_fields_remove; Type: POLICY; Schema: public; Owner: -
+--
+
+CREATE POLICY zebra_label_fields_remove ON public.zebra_label_fields FOR DELETE TO authenticated USING ((public.is_store_member(store_id) AND public.has_permission('edit_settings'::text, store_id)));
+
 
 --
 -- Name: SCHEMA public; Type: ACL; Schema: -; Owner: -
@@ -15397,5 +15734,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 2ewH6KvjhiocTeq7Ymj2OFMfUfTTDNQrff6ykDRNjSrwQ9CvYoUJCsYdDuvmwNU
+\unrestrict g1UEJ69D9FfzVdZ15ACdpNSLFGwTjq3YgU9W5mWnShP1IIObLBpyspUW7yu1mNw
 
