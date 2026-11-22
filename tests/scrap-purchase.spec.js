@@ -18,7 +18,7 @@ test('scrap from an individual lands in the karat scrap box with seller ID', asy
   // record writes to the tables and storage this flow uses
   await page.route(/\.supabase\.co\/(rest\/v1\/(invoices|gold_stock_lots|company_kyc_documents|invoice_items)|storage\/v1\/object)/, async (r) => {
     const req = r.request();
-    if (req.method() === 'GET') return r.fallback();
+    if (req.method() === 'GET' || req.method() === 'HEAD') return r.fallback(); // HEAD: menu badge counts
     const key = new URL(req.url()).pathname.split('/').slice(-1)[0];
     const isStorage = /storage\/v1\/object/.test(req.url());
     (posts[isStorage ? 'storage' : key] = posts[isStorage ? 'storage' : key] || []).push(isStorage ? req.url() : JSON.parse(req.postData() || '{}'));

@@ -411,6 +411,18 @@
 </button>
 </div>
 
+<!-- cash paid in several currencies (بشار 2026-11-22) -->
+<div id="split-wrap" class="space-y-2">
+<button type="button" id="split-toggle" onclick="gmSplitToggle()" aria-expanded="false" class="w-full min-h-[44px] flex items-center justify-center gap-2 rounded-xl border border-dashed border-outline-variant text-[13px] font-semibold text-secondary">
+<span class="material-symbols-outlined text-[20px]" aria-hidden="true">currency_exchange</span><span id="split-toggle-label">الدفع بأكثر من عملة</span></button>
+<div id="split-box" class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-3 space-y-2">
+<p class="text-[11.5px] text-on-surface-variant">اكتب ما دفعته بكل عملة. سعر الصرف: كم وحدة منها مقابل 1 <span class="split-base"></span>. يُسجَّل كل مبلغ في الصندوق اليومي بعملته.</p>
+<div id="split-rows" class="space-y-2"></div>
+<button type="button" onclick="gmSplitAdd()" class="min-h-[44px] px-3 text-[13px] font-semibold text-primary flex items-center gap-1"><span class="material-symbols-outlined text-[18px]" aria-hidden="true">add</span>إضافة عملة</button>
+<div class="flex justify-between items-center text-[13px] font-bold pt-2 border-t border-outline-variant"><span>المتبقي</span><span id="split-rem" class="font-data-mono" dir="ltr">0.00</span></div>
+</div>
+</div>
+
 <!-- like the vouchers: the cash payment may stay out of the daily box (Bashar 2026-11-02) -->
 <label id="daily-opt" class="flex items-center gap-2 text-[13px] font-semibold min-h-[44px] px-1"><input type="checkbox" id="pur-daily" checked class="w-5 h-5 rounded"/> يخرج من الصندوق اليومي (الحركة اليومية)</label>
 
@@ -790,6 +802,78 @@
     });
 
     // ---------- Payment toggle ----------
+    // ---------- Cash paid in several currencies ----------
+    // Rows of {currency, amount, rate}; rate = units per 1 shop-currency unit. They must add up to
+    // the invoice total (in the shop's currency); the server checks the same and the daily box
+    // gets one row per currency.
+    let splitOn = false, splitRows = [], splitSeq = 0;
+    const splitRateKey = c => 'gm_fx_' + GOLDMIND_STORE_ID + '_' + c; // same remembered rates as the sale screen
+    function splitCodes() {
+        const sec = window.__gmPSecondary || {};
+        return [PCUR.base, PCUR.code, sec.code, 'USD', 'SYP', 'EUR', 'AED', 'TRY', 'SAR'].filter((c, i, a) => c && a.indexOf(c) === i);
+    }
+    function splitDefaultRate(c) {
+        if (c === PCUR.base) return 1;
+        if (c === PCUR.code && PCUR.rate > 0) return PCUR.rate;
+        const sec = window.__gmPSecondary || {};
+        if (sec.code === c && sec.rate > 0) return sec.rate;
+        let r = 0; try { r = parseFloat(localStorage.getItem(splitRateKey(c))) || 0; } catch (e) { /* storage off */ }
+        return r || '';
+    }
+    const splitBaseTotal = () => Math.round(cart.reduce((t, it) => t + (gmPCurOn() ? (Number(it.price) || 0) / PCUR.rate : (Number(it.price) || 0)), 0) * 100) / 100;
+    const splitRowBase = r => (Number(r.amount) > 0 && Number(r.rate) > 0) ? Number(r.amount) / Number(r.rate) : 0;
+    const splitRemaining = () => Math.round((splitBaseTotal() - splitRows.reduce((t, r) => t + splitRowBase(r), 0)) * 100) / 100;
+    function gmSplitAdd(code) {
+        const used = splitRows.map(r => r.currency);
+        const c = code || splitCodes().find(x => !used.includes(x)) || PCUR.base;
+        splitRows.push({ id: ++splitSeq, currency: c, amount: '', rate: splitDefaultRate(c) });
+        renderSplit();
+    }
+    function gmSplitToggle() {
+        splitOn = !splitOn;
+        if (splitOn && !splitRows.length) { gmSplitAdd(gmPCurSym()); gmSplitAdd(); }
+        renderSplit();
+    }
+    function gmSplitSet(id, k, v) {
+        const r = splitRows.find(x => x.id === id); if (!r) return;
+        r[k] = v;
+        if (k === 'currency') { r.rate = splitDefaultRate(v); renderSplit(); return; }
+        if (k === 'rate') { try { if (parseFloat(v) > 0) localStorage.setItem(splitRateKey(r.currency), String(parseFloat(v))); } catch (e) { /* storage off */ } }
+        const eq = document.getElementById('split-eq-' + id); if (eq) eq.textContent = '= ' + gmMoney(splitRowBase(r)) + ' ' + PCUR.base;
+        paintSplitRem();
+    }
+    function gmSplitRemove(id) { splitRows = splitRows.filter(x => x.id !== id); renderSplit(); }
+    function paintSplitRem() {
+        const rem = splitRemaining(), el = document.getElementById('split-rem');
+        el.textContent = gmMoney(rem) + ' ' + PCUR.base;
+        el.className = 'font-data-mono ' + (Math.abs(rem) < 0.05 ? 'text-success' : 'text-error');
+    }
+    function renderSplit() {
+        const on = splitOn && selectedPaymentMethod === 'cash';
+        document.getElementById('split-wrap').classList.toggle('hidden', selectedPaymentMethod !== 'cash');
+        document.getElementById('split-box').classList.toggle('hidden', !on);
+        document.getElementById('split-toggle').setAttribute('aria-expanded', String(on));
+        document.getElementById('split-toggle-label').textContent = on ? 'الدفع بعملة واحدة' : 'الدفع بأكثر من عملة';
+        document.querySelectorAll('.split-base').forEach(e => { e.textContent = PCUR.base; });
+        if (!on) return;
+        document.getElementById('split-rows').innerHTML = splitRows.map(r => {
+            const isBase = r.currency === PCUR.base;
+            return `<div class="border border-outline-variant rounded-lg p-2 grid grid-cols-2 gap-2 text-[12px]">
+            <input type="number" step="any" min="0" inputmode="decimal" placeholder="المبلغ" aria-label="المبلغ" value="${r.amount}" oninput="gmSplitSet(${r.id}, 'amount', this.value)" class="h-11 border border-outline-variant rounded-lg px-2 font-data-mono"/>
+            <select onchange="gmSplitSet(${r.id}, 'currency', this.value)" aria-label="العملة" class="h-11 border border-outline-variant rounded-lg px-2 bg-surface-container-lowest">${splitCodes().map(c => `<option value="${c}"${c === r.currency ? ' selected' : ''}>${c}</option>`).join('')}</select>
+            ${isBase ? '<span class="self-center text-on-surface-variant">عملة المحل</span>' : `<label class="flex items-center gap-1"><span class="whitespace-nowrap shrink-0" dir="ltr">1 ${PCUR.base} =</span><input type="number" step="any" min="0" inputmode="decimal" placeholder="سعر الصرف" aria-label="سعر الصرف" value="${r.rate}" oninput="gmSplitSet(${r.id}, 'rate', this.value)" class="w-full h-11 border border-outline-variant rounded-lg px-2 font-data-mono"/></label>`}
+            <div class="flex items-center justify-between gap-1"><span class="font-data-mono text-on-surface-variant" id="split-eq-${r.id}">= ${gmMoney(splitRowBase(r))} ${PCUR.base}</span>
+            <button type="button" onclick="gmSplitRemove(${r.id})" class="min-h-[44px] px-2 text-error font-semibold">حذف</button></div>
+        </div>`; }).join('');
+        paintSplitRem();
+    }
+    // what goes to the server, or null when paying in one currency
+    function gmSplitBreakdown() {
+        if (!splitOn || selectedPaymentMethod !== 'cash') return null;
+        const used = splitRows.filter(r => Number(r.amount) > 0);
+        return used.length ? used.map(r => ({ currency: r.currency, amount: Number(r.amount), rate: r.currency === PCUR.base ? 1 : Number(r.rate) })) : null;
+    }
+
     function selectPayment(mode) {
         selectedPaymentMethod = mode;
         const cashBtn = document.getElementById('pay-cash');
@@ -801,6 +885,7 @@
         document.getElementById('daily-opt').classList.toggle('hidden', mode !== 'cash'); // only cash touches the daily box
         updateFabFeeVisibility();
         renderCart();
+        renderSplit();
     }
 
     // ---------- Trader search ----------
@@ -1231,6 +1316,7 @@
         `; }).join('');
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         document.getElementById('grand-total').textContent = total.toFixed(2) + ' ' + gmPCurSym();
+        if (splitOn) paintSplitRem();
 
         const fabFeeTotal = cart.reduce((sum, item) => sum + (item.fabFee || 0), 0);
         const fabFeeVatTotal = cart.reduce((sum, item) => sum + (item.fabFeeVat || 0), 0);
@@ -1280,6 +1366,11 @@
             showMessage('أدخل سعر صرف ' + PCUR.code + ' مقابل ' + PCUR.base + ' أولاً.', true);
             document.getElementById('pcur-rate').focus();
             return;
+        }
+        const splitBD = gmSplitBreakdown();
+        if (splitBD) {
+            if (splitBD.some(b => !(b.rate > 0))) { showMessage('أدخل سعر الصرف لكل عملة في الدفع بعدة عملات.', true); return; }
+            if (Math.abs(splitRemaining()) >= 0.05) { showMessage('مجموع المبالغ بالعملات لا يساوي إجمالي الفاتورة — المتبقي ' + gmMoney(splitRemaining()) + ' ' + PCUR.base + '.', true); return; }
         }
         const confirmTotal = cart.reduce((sum, item) => sum + item.price, 0);
         if (!confirm('هل أنت متأكد من ترحيل فاتورة الشراء هذه بقيمة ' + confirmTotal.toFixed(2) + ' ' + gmPCurSym() + (gmPCurOn() ? ' (= ' + (confirmTotal / PCUR.rate).toFixed(2) + ' ' + PCUR.base + ')' : '') + '؟\nبعد الترحيل تحصل الفاتورة على رقم رسمي ثابت ولن تتمكن من تعديلها — لكن يمكنك إلغاؤها لاحقاً عند الحاجة.')) {
@@ -1340,6 +1431,7 @@
             bulk_photos: bulkPhotoUrls,
             pay_currency: gmPCurOn() ? PCUR.code : null,
             pay_fx_rate: gmPCurOn() ? PCUR.rate : null,
+            pay_breakdown: splitBD,
             items: cart.map(item => ({
                 mode: item.mode || 'piece',
                 price: toBase(item.price || 0),
