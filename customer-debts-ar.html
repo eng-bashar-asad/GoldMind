@@ -408,6 +408,7 @@ async function load() {
     const pay = new URLSearchParams(window.location.search).get('pay');
     if (pay === '1') { toggleSettleForm(); document.getElementById('settle-amount').focus(); }
     else if (pay === 'out') { toggleCashOutForm(); document.getElementById('cashout-amount').focus(); }
+    if (pay) { const u = new URL(location.href); u.searchParams.delete('pay'); history.replaceState(null, '', u.pathname + u.search); } // only once, not after every reload
   } else {
     gmReplace('customers-ar.html');
   }
@@ -472,7 +473,15 @@ document.getElementById('customers-list').addEventListener('click', function (e)
 });
 
 function showCustomerDetail(customerId) {
+  // after an operation the account is re-shown: back to its top, forms closed, say it went through
+  // (بشار 2026-11-22: the page stayed on the form and it looked as if nothing happened)
+  const __refresh = !document.getElementById('customer-detail-view').classList.contains('hidden') && currentCustomerId === customerId;
   currentCustomerId = customerId;
+  if (__refresh) {
+    ['settle-form', 'discount-form', 'cashout-form', 'opening-balance-form'].forEach(id => { const f = document.getElementById(id); if (f) f.classList.add('hidden'); });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!(Date.now() - (window.__gmOpToastAt || 0) < 2000)) { window.__gmOpToastAt = Date.now(); gmToast('تمت العملية ✓'); } // load() may re-show it too
+  }
   const customer = customers.find(c => c.id === customerId);
   if (!customer) return;
 

@@ -1262,7 +1262,15 @@ async function deleteTrader() {
 }
 
 function showTraderDetail(traderId) {
+  // after an operation the account is re-shown: back to its top, forms closed, say it went through
+  // (بشار 2026-11-22: the page stayed on the form and it looked as if nothing happened)
+  const __refresh = !document.getElementById('trader-detail-view').classList.contains('hidden') && currentTraderId === traderId;
   currentTraderId = traderId;
+  if (__refresh) {
+    ['settle-form', 'give-stock-form', 'receive-stock-form', 'trader-cash-form', 'trader-convert-form', 'trader-discount-form', 'trader-opening-balance-form'].forEach(id => { const f = document.getElementById(id); if (f) f.classList.add('hidden'); });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    if (!(Date.now() - (window.__gmOpToastAt || 0) < 2000)) { window.__gmOpToastAt = Date.now(); gmToast('تمت العملية ✓'); } // load() may re-show it too
+  }
   const trader = traders.find(t => t.id === traderId);
   if (!trader) return;
   ldSetUrl(traderId);
