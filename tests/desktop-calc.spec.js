@@ -59,3 +59,12 @@ test('change the secret sequence', async ({ page }) => {
   for (const k of seq) await page2.keyboard.press(k);
   await expect(page2.locator('#gate')).not.toHaveClass(/\bhidden\b/);
 });
+
+// بشار 2026-11-22: on an Arabic keyboard layout the digit keys send ٢٠٢٦ — the code must still open.
+test('secret sequence typed with Arabic-Indic digits opens the panel', async ({ page }) => {
+  await open(page);
+  await page.keyboard.press('ArrowDown'); await page.keyboard.press('ArrowDown');
+  await page.evaluate(() => ['٢', '٠', '٢', '٦'].forEach((k, i) => document.dispatchEvent(new KeyboardEvent('keydown', { key: k, code: 'Digit' + '2026'[i], bubbles: true }))));
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#gate')).not.toHaveClass(/\bhidden\b/);
+});

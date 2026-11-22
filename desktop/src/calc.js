@@ -120,7 +120,21 @@
     const DEFAULT_SEQ = ['D', 'D', '2', '0', '2', '6', 'E'];
     const SALT = 'calc-pro|';
 
+    // Arabic keyboard layouts send ٠–٩ (or ۰–۹) for the digit keys — same digit for us.
+    function latinDigits(key) {
+        return typeof key === 'string' && key.length === 1 ? key.replace(/[\u0660-\u0669]/, c => String(c.charCodeAt(0) - 0x0660)).replace(/[\u06F0-\u06F9]/, c => String(c.charCodeAt(0) - 0x06F0)) : key;
+    }
+    // the key as we read it: digits from the physical key when the layout sends something else
+    function keyOf(e) {
+        const k = latinDigits(e.key);
+        // only a non-Latin character falls back to the physical key (an English layout is read as is)
+        if (!e.code || typeof k !== 'string' || k.length !== 1 || k.charCodeAt(0) < 128) return k;
+        const m = e.code.match(/^(?:Digit|Numpad)([0-9])$/);
+        return m ? m[1] : k;
+    }
+
     function tokenOf(key) {
+        key = latinDigits(key);
         const m = { ArrowUp: 'U', ArrowDown: 'D', ArrowLeft: 'L', ArrowRight: 'R', Enter: 'E', '=': 'E' };
         if (m[key]) return m[key];
         if (/^[0-9]$/.test(key)) return key;
@@ -147,7 +161,7 @@
             && tokens.slice(0, -1).every(t => t !== 'E');
     }
 
-    const api = { newCalc, press, fmt, evaluate, tokenOf, encodeSeq, matches, validNewSeq, DEFAULT_SEQ };
+    const api = { newCalc, press, fmt, evaluate, tokenOf, keyOf, encodeSeq, matches, validNewSeq, DEFAULT_SEQ };
     root.CalcPro = api;
     if (typeof module !== 'undefined') module.exports = api;
 
@@ -241,7 +255,8 @@
         render();
     }
 
-    document.addEventListener('keydown', e => {
+    document.addEventListener('keydown', ev => {
+        const e = { key: keyOf(ev), preventDefault: () => ev.preventDefault() };
         if (mode === 'new1' || mode === 'new2') {
             e.preventDefault();
             if (e.key === 'Escape') { mode = 'gate'; show('gate'); return; }
