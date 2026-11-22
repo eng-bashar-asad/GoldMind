@@ -1,7 +1,7 @@
-// Day statement on a dark theme: no pastel patchwork on screen (a thin colored edge marks linked entries); paper keeps the fills.
+// Day statement: linked entries are the same colored rectangle on both sides, on dark themes too (بشار 2026-11-23).
 const { test, expect } = require('@playwright/test');
 const { install, STORE, USER, STAFF } = require('./fake-backend');
-test('dark theme: linked rows get an edge, not a pastel fill', async ({ page }) => {
+test('dark theme: linked entries get the same colored fill both sides', async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.addInitScript(() => localStorage.setItem('goldmind_theme', 'black-marble'));
   const day = new Date(); day.setHours(10, 0, 0, 0);
@@ -15,13 +15,11 @@ test('dark theme: linked rows get an edge, not a pastel fill', async ({ page }) 
   await page.goto('/daily-cashbox-print-ar.html');
   const cell = page.locator('#rowsBody .cb-lk').first();
   await expect(cell).toBeVisible();
-  await expect(cell).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
-  expect(await cell.evaluate(el => getComputedStyle(el).boxShadow)).toContain('inset');
+  const fills = await page.locator('#rowsBody .cb-lk').evaluateAll(els => els.map(el => getComputedStyle(el).backgroundColor));
+  expect(fills.length).toBe(2); // g1 in + g1 out; g2 is alone → plain
+  expect(fills[0]).toBe(fills[1]);
+  expect(fills[0]).not.toBe('rgba(0, 0, 0, 0)');
   await expect(page.locator('#rowsBody')).toContainText('118,700');
-  // the linked pair g1 carries the same number on both sides; g2 is alone → no number
-  await expect(page.locator('#rowsBody .cb-tag')).toHaveCount(2);
-  await expect(page.locator('#rowsBody .cb-tag').nth(0)).toContainText('1');
-  await expect(page.locator('#rowsBody .cb-tag').nth(1)).toContainText('1');
   if (process.env.SHOT) await page.screenshot({ path: '/tmp/daily.png', fullPage: false });
   await page.emulateMedia({ media: 'print' });
   await expect(cell).not.toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
