@@ -86,6 +86,16 @@
 </div>
 </div>
 
+<!-- Goods photos of a purchase: remove / add (بشار 2026-11-22 — fix the purchase instead of cancelling it) -->
+<div class="hidden bg-surface-container-lowest border border-outline-variant rounded-xl p-4" id="photosBlock">
+<p class="text-[12px] font-semibold text-on-surface-variant mb-2">صور البضاعة المستلمة</p>
+<div id="photosGrid" class="flex flex-wrap gap-4 pt-3 ps-3"></div>
+<label class="mt-3 w-full min-h-[44px] flex items-center justify-center gap-2 rounded-lg border border-dashed border-outline-variant text-[13px] font-semibold text-secondary cursor-pointer">
+<span class="material-symbols-outlined text-[20px]" aria-hidden="true">add_photo_alternate</span>إضافة صور
+<input id="photosInput" type="file" accept="image/*" multiple class="hidden"/></label>
+<p class="text-[11px] text-outline mt-2">تُحفظ التغييرات على الصور عند الضغط على «حفظ التعديلات».</p>
+</div>
+
 <!-- Payment method -->
 <div class="bg-surface-container-lowest border border-outline-variant rounded-xl p-4">
 <label class="block text-[12px] font-semibold text-on-surface-variant mb-2">طريقة الدفع</label>
@@ -387,6 +397,39 @@ function gmMixedNote() {
   el.className = 'col-span-2 text-[12px] font-semibold ' + (paid > total + 0.009 ? 'text-error' : 'text-on-surface-variant');
 }
 
+// ---- purchase goods photos ----
+let keptPhotos = [], addedPhotos = [], photosTouched = false;
+async function renderPhotos() {
+  const grid = document.getElementById('photosGrid');
+  const kept = keptPhotos.length ? await gmPrivateFileUrls(keptPhotos) : [];
+  const x = (fn, i) => `<button type="button" onclick="${fn}(${i})" aria-label="حذف الصورة" class="absolute -top-3 -start-3 w-11 h-11 flex items-center justify-center"><span class="w-6 h-6 rounded-full bg-error text-white flex items-center justify-center shadow"><span class="material-symbols-outlined text-[16px]" aria-hidden="true">close</span></span></button>`;
+  grid.innerHTML = kept.map((u, i) => `<div class="relative"><img src="${gmEscapeHtml(u)}" alt="" class="w-20 h-20 object-cover rounded-lg border border-outline-variant"/>${x('gmDropKept', i)}</div>`).join('')
+    + addedPhotos.map((f, i) => `<div class="relative"><img src="${URL.createObjectURL(f)}" alt="" class="w-20 h-20 object-cover rounded-lg border-2 border-primary"/>${x('gmDropAdded', i)}</div>`).join('')
+    || '<p class="text-[12px] text-outline">لا توجد صور</p>';
+}
+function gmDropKept(i) { keptPhotos.splice(i, 1); photosTouched = true; renderPhotos(); }
+function gmDropAdded(i) { addedPhotos.splice(i, 1); renderPhotos(); }
+document.getElementById('photosInput').addEventListener('change', e => {
+  addedPhotos = addedPhotos.concat(Array.from(e.target.files || [])); e.target.value = ''; renderPhotos();
+});
+// uploads the new photos and writes the final list; returns an error text or null
+async function gmSavePhotos() {
+  if (!photosTouched && !addedPhotos.length) return null;
+  const urls = keptPhotos.slice();
+  for (const f of addedPhotos) {
+    const ext = (f.name.split('.').pop() || 'jpg').toLowerCase();
+    const path = GOLDMIND_STORE_ID + '/purchase-' + invoice.id + '-photo-' + gmRandName() + '.' + ext;
+    const { error } = await goldmindClient.storage.from('invoice-attachments').upload(path, f, { upsert: true });
+    if (error) return 'تعذّر رفع إحدى الصور: ' + error.message;
+    const { data } = goldmindClient.storage.from('invoice-attachments').getPublicUrl(path);
+    if (data) urls.push(data.publicUrl);
+  }
+  const { error } = await goldmindClient.from('invoices').update({ bulk_photos: urls.length ? urls : null }).eq('id', invoice.id);
+  if (error) return 'تعذّر حفظ الصور: ' + error.message;
+  keptPhotos = urls; addedPhotos = []; photosTouched = false;
+  return null;
+}
+
 async function saveEdit() {
   const errEl = document.getElementById('save-error');
   const okEl = document.getElementById('save-success');
@@ -420,6 +463,13 @@ async function saveEdit() {
   if (res.error) {
     btn.disabled = false; btn.textContent = 'حفظ التعديلات';
     errEl.textContent = res.error;
+    errEl.classList.remove('hidden');
+    return;
+  }
+  const photoErr = await gmSavePhotos();
+  if (photoErr) {
+    btn.disabled = false; btn.textContent = 'حفظ التعديلات';
+    errEl.textContent = 'حُفظت التعديلات، لكن: ' + photoErr;
     errEl.classList.remove('hidden');
     return;
   }
@@ -520,6 +570,11 @@ async function load() {
   }
   gmMixedToggle();
 
+  if (invoice.type === 'buyRetail' || invoice.type === 'buyTrader') {
+    keptPhotos = Array.isArray(invoice.bulk_photos) ? invoice.bulk_photos.slice() : [];
+    document.getElementById('photosBlock').classList.remove('hidden');
+    renderPhotos();
+  }
   const counterpartyBlock = document.getElementById('counterpartyBlock');
   if (invoice.type === 'buyRetail') {
     document.getElementById('counterpartyLabel').textContent = 'اسم البائع';

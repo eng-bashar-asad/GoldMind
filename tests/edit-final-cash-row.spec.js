@@ -73,3 +73,23 @@ test('daily cashbox lists the day\'s sales with the debt part, even fully on cre
   await expect(box).toContainText('2,200.00');
   await expect(box).toContainText('INV-1');
 });
+
+// بشار 2026-11-22: a purchase's goods photos are fixed on the edit page (no need to cancel it)
+test('editing a purchase: remove a goods photo and add a new one', async ({ page }) => {
+  const calls = await install(page, { db: base({
+    invoices: [{ id: 'p7', store_id: STORE, invoice_number: 'PINV-7', type: 'buyRetail', status: 'paid', payment_method: 'cash', total_amount: 100, amount_paid: 100, created_at: '2026-10-01T07:00:00Z',
+      bulk_photos: ['https://x.supabase.co/storage/v1/object/public/invoice-attachments/s/a.jpg', 'https://x.supabase.co/storage/v1/object/public/invoice-attachments/s/b.jpg'] }],
+    invoice_items: [{ id: 'it7', invoice_id: 'p7', karat: 21, weight_grams: 1, line_total: 100, description: 'كسر' }],
+    customers: [], pieces: [] }) });
+  await page.route(/storage\/v1\/object\//, r => r.request().method() === 'POST' ? r.fulfill({ json: { Key: 'k' } }) : r.fallback());
+  await page.goto('/invoice-edit-ar.html?id=p7');
+  await expect(page.locator('#photosBlock')).not.toHaveClass(/\bhidden\b/);
+  await expect(page.locator('#photosGrid img')).toHaveCount(2);
+  await page.locator('#photosGrid button[aria-label="حذف الصورة"]').first().click();
+  await page.setInputFiles('#photosInput', { name: 'n.jpg', mimeType: 'image/jpeg', buffer: Buffer.from([0xff, 0xd8, 0xff, 0xd9]) });
+  await expect(page.locator('#photosGrid img')).toHaveCount(2);
+  page.on('dialog', d => d.accept());
+  await page.click('#save-btn');
+  await expect.poll(() => calls.filter(c => c.method === 'PATCH' && c.name === 'invoices').map(c => (typeof c.body === 'string' ? JSON.parse(c.body || '{}') : c.body || {}).bulk_photos).filter(Boolean)[0], { timeout: 8000 })
+    .toEqual([expect.stringContaining('/b.jpg'), expect.stringContaining('purchase-p7-photo-')]);
+});
