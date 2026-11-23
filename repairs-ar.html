@@ -11,7 +11,7 @@
 <title>الصيانة والتصليح | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=62"></script>
+<script src="supabase-config.js?v=63"></script>
 <script src="theme.js?v=112"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -120,7 +120,7 @@
 <div class="w-full h-14 bg-surface-container-lowest text-on-surface border border-outline-variant rounded-lg px-4 flex items-center gap-2">
 <span class="text-on-surface-variant font-bold select-none" id="phonePrefixLabel">+971</span>
 <span class="text-outline-variant">|</span>
-<input class="flex-1 h-full outline-none text-left bg-transparent text-on-surface" dir="ltr" id="customerPhone" maxlength="12" placeholder="5xxxxxxxx" required type="tel"/>
+<input class="flex-1 h-full outline-none text-left bg-transparent text-on-surface" dir="ltr" id="customerPhone" maxlength="20" placeholder="5xxxxxxxx أو 0090…" required type="tel"/>
 </div>
 </div>
 <div class="relative">
@@ -365,7 +365,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
 
   const { data: numData } = await goldmindClient.rpc('next_repair_number', { p_store_id: GOLDMIND_STORE_ID });
 
-  const customerPhone = window.__gmPhoneCode + document.getElementById('customerPhone').value.trim().replace(/[^0-9]/g, '').replace(/^0+/, '');
+  const customerPhone = gmIntlPhone(document.getElementById('customerPhone').value, window.__gmPhoneCode); // +90… / 0090… kept as typed
   const pieceDesc = document.getElementById('pieceDesc').value.trim();
   const problemDesc = document.getElementById('problemDesc').value.trim();
   const customerName = document.getElementById('customerName').value.trim();
@@ -401,7 +401,7 @@ document.getElementById('addForm').addEventListener('submit', async (e) => {
   // Build the WhatsApp intake message and open it
   let msg = `مرحباً ${customerName}،\n${storeName} استلم قطعتك للصيانة.\nرقم التذكرة: ${inserted.ticket_number}\nوصف القطعة: ${pieceDesc}\nالمشكلة: ${problemDesc}\nإيصال الاستلام: ${window.location.origin}${window.location.pathname.replace('repairs-ar.html', '')}repair-receipt-ar.html?id=${inserted.id}`;
   msg += `\nسنُعلمك فور جاهزيتها.`;
-  if (customerPhone.length > window.__gmPhoneCode.length + 5) {
+  if (customerPhone.length > 7) {
     window.open(`https://wa.me/${customerPhone}?text=${encodeURIComponent(msg)}`, '_blank');
   }
 

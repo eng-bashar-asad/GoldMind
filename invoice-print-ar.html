@@ -18,7 +18,7 @@
 <title>فاتورة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.16?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=62"></script>
+<script src="supabase-config.js?v=63"></script>
 <script src="pint-ae.js"></script>
 <script src="theme.js?v=112"></script>
 <script src="gm-profit.js?v=7"></script>
@@ -691,10 +691,7 @@ function gmSetPaper(v) {
             // Always print the full number including a country code — fall
             // back to the store's own country code when the counterparty
             // record doesn't have one saved (e.g. older individual customers).
-            const dialCode = counterparty.phone_country_code
-                || GOLDMIND_COUNTRY_PHONE_MAP[store.country]
-                || GOLDMIND_DEFAULT_PHONE_CODE;
-            document.getElementById('cust-phone').innerHTML = '<bdi dir="ltr">' + gmEscapeHtml('+' + dialCode + ' ' + String(counterparty.phone).replace(/^0+/, '')) + '</bdi>';
+            document.getElementById('cust-phone').innerHTML = '<bdi dir="ltr">+' + gmEscapeHtml(gmIntlPhone(counterparty.phone, counterparty.phone_country_code || store.country)) + '</bdi>';
         } else {
             document.getElementById('cust-phone').textContent = '';
         }
@@ -1013,7 +1010,7 @@ function gmSetPaper(v) {
         btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span><span>...جارِ التجهيز</span>';
         try {
             await gmWhatsAppPdf(invoicePdfNodes(), `${invNumber}.pdf`, 'فاتورة ' + invNumber, text,
-                d.customer ? d.customer.phone : '', d.store.country);
+                d.customer ? d.customer.phone : '', (d.customer && d.customer.phone_country_code) || d.store.country);
         } catch (err) {
             console.error('WhatsApp PDF failed', err);
             alert('تعذّر تجهيز ملف PDF، حاول مرة أخرى');

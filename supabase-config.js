@@ -47,6 +47,31 @@ const GOLDMIND_COUNTRY_PHONE_MAP = {
     'SY': '963', 'TR': '90', 'US': '1', 'FR': '33', 'NL': '31'
 };
 const GOLDMIND_DEFAULT_PHONE_CODE = '971'; // fallback if store has no country set
+const GOLDMIND_COUNTRY_NAME_AR = {
+    'AE': 'الإمارات', 'SA': 'السعودية', 'KW': 'الكويت', 'QA': 'قطر', 'BH': 'البحرين', 'OM': 'عُمان', 'EG': 'مصر',
+    'JO': 'الأردن', 'LB': 'لبنان', 'IQ': 'العراق', 'SY': 'سوريا', 'TR': 'تركيا', 'US': 'أمريكا', 'FR': 'فرنسا', 'NL': 'هولندا'
+};
+// option text for the phone-code pickers: "+90 تركيا"
+function gmPhoneCodeLabel(cc) { return '+' + GOLDMIND_COUNTRY_PHONE_MAP[cc] + ' ' + (GOLDMIND_COUNTRY_NAME_AR[cc] || cc); }
+// a country (ISO "TR") or a dial code ("90" / "+90") → dial code digits
+function gmDialCode(country) {
+    var s = String(country || '').trim().replace(/^\+/, '');
+    if (/^[0-9]{1,4}$/.test(s)) return s;
+    return GOLDMIND_COUNTRY_PHONE_MAP[s.toUpperCase()] || null;
+}
+// Full international number, digits only. A number typed with its own prefix (+90… / 0090…)
+// is kept as typed — whatever code is picked next to it (بشار 2026-11-23: 00905454888969).
+function gmIntlPhone(phone, country) {
+    var raw = gmLatinDigits(String(phone || '')).trim();
+    var digits = raw.replace(/[^0-9]/g, '');
+    if (!digits) return '';
+    if (/^\+/.test(raw)) return digits;
+    if (/^00/.test(digits)) return digits.slice(2);
+    digits = digits.replace(/^0+/, '');
+    var code = gmDialCode(country) || GOLDMIND_DEFAULT_PHONE_CODE;
+    if (digits.indexOf(code) === 0 && digits.length > 10) return digits; // already has it
+    return code + digits;
+}
 
 // Resolved per logged-in user. Multi-branch aware: one email can now belong
 // to several stores (branches). If the account has more than one, the active
@@ -1100,10 +1125,7 @@ async function gmSavePdf(worker, filename, title, shareText) {
 
 // wa.me link to a customer's phone (store country code added), or to any chat
 function gmWhatsAppUrl(phone, country, text) {
-    var digits = String(phone || '').replace(/[^0-9]/g, '').replace(/^0+/, '');
-    var code = GOLDMIND_COUNTRY_PHONE_MAP[country] || GOLDMIND_DEFAULT_PHONE_CODE;
-    if (digits && code && digits.indexOf(code) === 0 && digits.length > 10) code = '';
-    return 'https://wa.me/' + (digits ? code + digits : '') + '?text=' + encodeURIComponent(text || '');
+    return 'https://wa.me/' + gmIntlPhone(phone, country) + '?text=' + encodeURIComponent(text || '');
 }
 
 // Send a PDF to a customer on WhatsApp: on phones the file itself goes out with

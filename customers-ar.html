@@ -11,7 +11,7 @@
 <title>العملاء | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=62"></script>
+<script src="supabase-config.js?v=63"></script>
 <script src="theme.js?v=112"></script>
 <script src="gm-report.js?v=5"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
@@ -228,7 +228,7 @@ function renderSide() {
   const c = CUSTOMERS.find(x => x.id === PICK), el = document.getElementById('cuSide');
   if (!c) { el.classList.remove('hidden'); el.innerHTML = '<section class="cu-card text-center text-[13px] text-on-surface-variant py-8"><span class="material-symbols-outlined" style="font-size:32px;opacity:.6">touch_app</span><p class="mt-2">اضغط على عميل لعرض بطاقته هنا.</p><p class="mt-1 text-[12px]">الضغط مرتين يفتح حسابه الكامل.</p></section>'; return; }
   const b = BAL[c.id] || 0, g = GOLD[c.id] || 0;
-  const wa = c.phone ? gmWhatsAppUrl(c.phone, null, 'مرحباً ' + c.name + '، رصيد حسابكم لدينا: ' + fmt(Math.abs(b)) + ' ' + CUR) : '';
+  const wa = c.phone ? gmWhatsAppUrl(c.phone, c.phone_country_code, 'مرحباً ' + c.name + '، رصيد حسابكم لدينا: ' + fmt(Math.abs(b)) + ' ' + CUR) : '';
   const LBL = { payment: 'دفعة من العميل', cash_out: 'صرف مبلغ للعميل', discount: 'خصم على الدين', deposit: 'عربون', deposit_refund: 'استرجاع عربون', opening_balance: 'رصيد سابق' };
   const moves = (MOVES[c.id] || []).slice(-3).reverse();
   el.innerHTML = `<section class="cu-card">
@@ -274,7 +274,7 @@ document.getElementById('list').addEventListener('keydown', e => { const tr = e.
   const [{ data: me }, { data: store }, cust, debts] = await Promise.all([
     goldmindClient.from('staff').select('role, permissions').eq('id', GOLDMIND_STAFF_ID).maybeSingle(),
     goldmindClient.from('stores').select('currency').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
-    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone, is_company, id_number, id_expiry_date, nationality, tax_number, created_at').in('store_id', __orgIds).order('name')),
+    gmFetchAllRows(() => goldmindClient.from('customers').select('id, name, phone, phone_country_code, is_company, id_number, id_expiry_date, nationality, tax_number, created_at').in('store_id', __orgIds).order('name')),
     gmFetchAllRows(() => goldmindClient.from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, source, created_at').or('source.is.null,source.neq.allocation').in('store_id', __orgIds).order('created_at'))
   ]);
   document.getElementById('loading-state').classList.add('hidden');
