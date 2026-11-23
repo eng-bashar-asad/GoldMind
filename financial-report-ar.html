@@ -327,7 +327,7 @@ async function build(from, to) {
   // a sale invoice edited down lowers "new debts", it isn't a payment
   const cdIn = sum(realMoves.filter(m => m.movement_type === 'debt_increase' && m.source !== 'deposit_refund'), 'cash_amount')
     - sum(realMoves.filter(m => m.movement_type !== 'debt_increase' && m.source === 'invoice_edit'), 'cash_amount');
-  const cdOut = sum(realMoves.filter(m => m.movement_type !== 'debt_increase' && m.source !== 'deposit' && m.source !== 'invoice_edit'), 'cash_amount');
+  const cdOut = sum(realMoves.filter(m => m.movement_type !== 'debt_increase' && m.source !== 'deposit' && m.source !== 'invoice_edit' && m.source !== 'return_credit'), 'cash_amount'); // a return left as credit is not money collected
   const perCust = {};
   cdebtAllR.data.forEach(m => { perCust[m.customer_id] = (perCust[m.customer_id] || 0) + (m.movement_type === 'debt_increase' ? 1 : -1) * Number(m.cash_amount || 0); });
   const deposits = (depR && depR.data) || [];

@@ -242,6 +242,8 @@ async function searchInvoice() {
   } else {
     refundSelect.innerHTML = '<option value="cash">رد نقدي</option><option value="bank">رد لحساب البنك/الفيزا</option>';
   }
+  // the money stays on the customer's account as credit (عربون) — the next sale uses it (بشار 2026-11-23)
+  if (invoice.customer_id) refundSelect.insertAdjacentHTML('beforeend', '<option value="customer_credit">يبقى بحساب العميل رصيداً (عربون)</option>');
 
   renderItems();
   document.getElementById('invoice-block').classList.remove('hidden');
