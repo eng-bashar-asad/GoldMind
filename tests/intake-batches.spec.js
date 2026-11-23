@@ -15,4 +15,5 @@ test('intake voucher: statuses in Arabic and a 3-column grid', async ({ page }) 
   await expect(page.locator('#batch-pieces')).toContainText('متوفرة');
   await expect(page.locator('#batch-pieces')).not.toContainText('sold');
   await expect(page.locator('#batch-pieces')).toHaveClass(/lg:grid-cols-3/);
+  await expect(page.locator('#batch-list')).toHaveClass(/xl:grid-cols-4/); // the vouchers list: 3–4 per row
 });
