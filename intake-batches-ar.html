@@ -103,6 +103,8 @@
     }
 
     const PIECE_STATUS_AR = { available: 'متوفرة', sold: 'مباعة', reserved: 'محجوزة', gifted: 'هدية', given_to_trader: 'عند تاجر', reworked: 'أُعيد تصنيعها', cancelled: 'ملغاة', deleted: 'محذوفة' };
+    // accounting weight; a piece without one counts at its gross weight
+    const accW = p => Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : (p.weight_grams || 0));
     function pieceRowHtml(p) {
         const fabPerGram = Number(p.cost_fabrication_per_gram || 0);
         const totalFab = fabPerGram * Number(p.accounting_weight_grams != null ? p.accounting_weight_grams : (p.weight_grams || 0)); // shop rule: accounting weight
@@ -115,7 +117,8 @@
             <div class="flex-1 min-w-0 flex items-center gap-x-3 gap-y-0.5 flex-wrap text-on-surface-variant">
                 <span class="font-bold font-data-mono text-on-background" dir="ltr">${gmEscapeHtml(p.barcode)}</span>
                 <span class="truncate">${gmEscapeHtml(p.piece_type || p.description_ar || '—')}</span>
-                <span class="whitespace-nowrap">وزن: <span class="font-bold font-data-mono text-on-background">${Number(p.weight_grams || 0).toFixed(2)}غ</span></span>
+                <span class="whitespace-nowrap">قائم: <span class="font-bold font-data-mono text-on-background">${Number(p.weight_grams || 0).toFixed(2)}غ</span></span>
+                <span class="whitespace-nowrap">محاسبي: <span class="font-bold font-data-mono text-on-background">${accW(p).toFixed(2)}غ</span></span>
                 <span class="whitespace-nowrap">مصنعية: <span class="font-bold font-data-mono text-on-background">${totalFab.toFixed(2)}</span></span>
                 <span class="text-[11px] px-1.5 py-0.5 rounded-full whitespace-nowrap ${p.status === 'available' ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'}">${gmEscapeHtml(PIECE_STATUS_AR[p.status] || p.status || '')}</span>
             </div>
@@ -165,13 +168,15 @@
         ]);
 
         const totalWeight = (pieces || []).reduce((s, p) => s + Number(p.weight_grams || 0), 0);
+        const totalAcc = (pieces || []).reduce((s, p) => s + accW(p), 0);
         const date = new Date(batch.created_at);
         document.getElementById('batch-summary').innerHTML = `
             <div class="text-[14px] font-bold mb-1">${SOURCE_LABELS[batch.source_type] || batch.source_type}</div>
             <div class="text-[12px] text-on-surface-variant">${gmFormatDateTime(date, { year: 'numeric', month: 'long', day: 'numeric' })} — ${gmFormatDateTime(date, { hour: '2-digit', minute: '2-digit' })}</div>
             <div class="flex gap-4 mt-2 text-[13px] font-data-mono font-bold">
                 <span>${(pieces || []).length} قطعة</span>
-                <span>${totalWeight.toFixed(2)} غ</span>
+                <span>القائم: ${totalWeight.toFixed(2)} غ</span>
+                <span>المحاسبي: ${totalAcc.toFixed(2)} غ</span>
             </div>
         `;
         document.getElementById('batch-pieces').innerHTML = (pieces || []).map(pieceRowHtml).join('') || '<p class="text-center text-[12px] text-on-surface-variant py-6">لا توجد قطع في هذا السند.</p>';

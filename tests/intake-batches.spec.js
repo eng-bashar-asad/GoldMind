@@ -7,13 +7,18 @@ test('intake voucher: statuses in Arabic and a 3-column grid', async ({ page }) 
   await install(page, { generic: true, db: { stores: [{ id: STORE, name: 'x', currency: 'USD' }],
     staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {} }], user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
     piece_intake_batches: [{ id: 'b1', store_id: STORE, created_at: T, piece_count: 2, total_weight: 10 }],
-    pieces: [{ id: 'p1', store_id: STORE, intake_batch_id: 'b1', barcode: '001313', piece_type: 'عقد', weight_grams: 5, status: 'sold', created_at: T },
+    pieces: [{ id: 'p1', store_id: STORE, intake_batch_id: 'b1', barcode: '001313', piece_type: 'عقد', weight_grams: 5, accounting_weight_grams: 4.6, status: 'sold', created_at: T },
              { id: 'p2', store_id: STORE, intake_batch_id: 'b1', barcode: '001314', piece_type: 'خاتم', weight_grams: 5, status: 'available', created_at: T }] } });
   await page.goto('/intake-batches-ar.html');
   await page.evaluate(() => openBatch('b1'));
   await expect(page.locator('#batch-pieces')).toContainText('مباعة');
   await expect(page.locator('#batch-pieces')).toContainText('متوفرة');
   await expect(page.locator('#batch-pieces')).not.toContainText('sold');
+  // both weights: gross and accounting (a piece without accounting counts at gross)
+  await expect(page.locator('#batch-pieces')).toContainText('قائم: 5.00غ');
+  await expect(page.locator('#batch-pieces')).toContainText('محاسبي: 4.60غ');
+  await expect(page.locator('#batch-summary')).toContainText('القائم: 10.00 غ');
+  await expect(page.locator('#batch-summary')).toContainText('المحاسبي: 9.60 غ');
   await expect(page.locator('#batch-pieces')).toHaveClass(/lg:grid-cols-3/);
   await expect(page.locator('#batch-list')).toHaveClass(/xl:grid-cols-4/); // the vouchers list: 3–4 per row
 });
