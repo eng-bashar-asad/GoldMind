@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict g1UEJ69D9FfzVdZ15ACdpNSLFGwTjq3YgU9W5mWnShP1IIObLBpyspUW7yu1mNw
+\restrict 6fM4bCdO9uOQd8zyzVHQbnx4KPAHbaWFmWyYSOdojXf4xbMSWbSZ15v4Hew7Qd3
 
 
 SET statement_timeout = 0;
@@ -3174,7 +3174,10 @@ begin
     select l.id, l.direction, l.amount into r from daily_cash_log l join cash_movements m on m.id = l.cash_movement_id
      where m.invoice_id = inv.id and not m.edit_delta and upper(l.currency) = upper(cur)
      order by l.created_at limit 1;
-    if r.id is not null then
+    -- already offset by its own edit row: this delta gets its own row as well
+    if r.id is not null and not exists (select 1 from daily_cash_log l2 join cash_movements m2 on m2.id = l2.cash_movement_id
+                                         where m2.invoice_id = inv.id and m2.edit_delta and m2.id <> new.id
+                                           and upper(l2.currency) = upper(cur)) then
       full_base := round(r.amount + case when new.direction = r.direction then amt else -amt end, 2);
       if full_base > 0 then
         update daily_cash_log set amount = full_base where id = r.id;
@@ -3451,6 +3454,8 @@ declare
   me uuid; inv_id uuid; inv_no text; ex record;
   pcur text := nullif(upper(trim(p->>'pay_currency')), '');
   prate numeric := nullif(p->>'pay_fx_rate', '')::numeric;
+  bd jsonb := case when jsonb_typeof(p->'pay_breakdown') = 'array' and jsonb_array_length(p->'pay_breakdown') > 0 then p->'pay_breakdown' end;
+  bd_sum numeric;
   it jsonb; mode text; price numeric; w numeric; k int; fee numeric; fee_vat numeric; carat numeric; ppc numeric;
   has_gold boolean;
   total numeric := 0; fab_total numeric := 0; vat_total numeric := 0;
@@ -3513,18 +3518,36 @@ begin
     vat_total := vat_total + fee_vat;
   end loop;
   total := round(total, 2);
+  if bd is not null then
+    if pm <> 'cash' then bd := null;
+    else
+      if exists (select 1 from jsonb_array_elements(bd) b
+                  where upper(coalesce(b->>'currency', '')) !~ '^[A-Z]{3}$'
+                     or coalesce(nullif(b->>'amount', '')::numeric, 0) <= 0
+                     or coalesce(nullif(b->>'rate', '')::numeric, 0) <= 0) then
+        raise exception 'سطر غير صحيح في الدفع بعدة عملات (العملة والمبلغ وسعر الصرف مطلوبة)';
+      end if;
+      select sum((b->>'amount')::numeric / (b->>'rate')::numeric) into bd_sum from jsonb_array_elements(bd) b;
+      if abs(bd_sum - total) >= 0.05 then
+        raise exception 'مجموع المبالغ بالعملات (%) لا يساوي إجمالي الفاتورة (%)', round(bd_sum, 2), total;
+      end if;
+      select jsonb_agg(jsonb_build_object('currency', upper(b->>'currency'), 'amount', round((b->>'amount')::numeric, 2),
+                                          'rate', (b->>'rate')::numeric, 'method', 'cash'))
+        into bd from jsonb_array_elements(bd) b;
+    end if;
+  end if;
 
   inv_no := next_invoice_number(sid, 'PINV');
   insert into invoices (store_id, invoice_number, type, trader_id, counterparty_name, seller_id_type, seller_id_number,
       payment_method, fabrication_fees, vat_amount, total_amount, amount_paid, status, attachment_url, bulk_photos,
-      created_by, client_ref, pay_currency, pay_fx_rate)
+      created_by, client_ref, pay_currency, pay_fx_rate, pay_breakdown)
     values (sid, inv_no, typ, tid,
       case when typ = 'buyRetail' then nullif(trim(p->>'counterparty_name'), '') end,
       case when typ = 'buyRetail' then sid_type end,
       case when typ = 'buyRetail' then nullif(trim(p->>'seller_id_number'), '') end,
       pm, fab_total, case when typ = 'buyTrader' then vat_total else 0 end, total,
       case when pm = 'cash' then total else 0 end, case when pm = 'cash' then 'paid' else 'unpaid' end,
-      nullif(p->>'attachment_url', ''), photos, me, ref, pcur, prate)
+      nullif(p->>'attachment_url', ''), photos, me, ref, pcur, prate, bd)
     returning id into inv_id;
 
   for it in select * from jsonb_array_elements(p->'items') loop
@@ -15734,5 +15757,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict g1UEJ69D9FfzVdZ15ACdpNSLFGwTjq3YgU9W5mWnShP1IIObLBpyspUW7yu1mNw
+\unrestrict 6fM4bCdO9uOQd8zyzVHQbnx4KPAHbaWFmWyYSOdojXf4xbMSWbSZ15v4Hew7Qd3
 
