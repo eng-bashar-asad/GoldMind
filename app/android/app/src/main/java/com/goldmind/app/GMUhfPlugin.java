@@ -139,10 +139,11 @@ public class GMUhfPlugin extends Plugin {
     // Zebra sled: same steps — nearest label at low power, write, read back to verify
     private void writeSled(PluginCall c, String epc) throws Exception {
         int p = c.getInt("power", 5);
-        String old = sled.readOne(p);
-        if (old == null) { c.reject("لم تُقرأ أي شريحة — قرّب الملصقة من مقدمة الجهاز"); return; }
+        String old;
+        try { old = sled.readNearest(p); } catch (Exception e) { c.reject(e.getMessage()); return; }
+        if (old == null) { c.reject("لم تُقرأ أي شريحة — ضع الملصقة ملاصقة لمقدمة الجهاز، أو ارفع «قوة برمجة الشرائح» قليلاً من إعداد القارئ"); return; }
         if (!sled.writeEpc(old, epc, p)) { c.reject("فشلت الكتابة على الشريحة — أعد المحاولة"); return; }
-        String now = sled.readOne(p);
+        String now = sled.readOne(Math.min((p <= 0 ? 10 : p) + 4, 20)); // the label in hand: the strongest at this power
         if (now == null || !now.startsWith(epc)) { c.reject("كُتبت الشريحة لكن تعذّر التحقق منها — أعد المحاولة"); return; }
         JSObject o = new JSObject(); o.put("oldEpc", old); o.put("epc", now); c.resolve(o);
     }

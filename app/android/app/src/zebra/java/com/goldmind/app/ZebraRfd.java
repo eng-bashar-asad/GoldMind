@@ -151,6 +151,43 @@ final class ZebraRfd implements RfidSled {
         return best;
     }
 
+    // every label heard at this power with its best RSSI (dBm)
+    private java.util.Map<String, Integer> hearAll(int powerDbm) throws Exception {
+        setPower(powerDbm);
+        java.util.concurrent.ConcurrentHashMap<String, Integer> got = new java.util.concurrent.ConcurrentHashMap<>();
+        single = got;
+        try {
+            reader.Actions.Inventory.perform();
+            for (int i = 0; i < 20 && got.isEmpty(); i++) Thread.sleep(50);
+            if (!got.isEmpty()) Thread.sleep(500);
+            reader.Actions.Inventory.stop();
+        } finally { single = null; }
+        return got;
+    }
+
+    /** بشار 2026-11-24: low power missed the label, high power took one further away. Step up from the
+     *  set power (+3, +6, +9 dBm, capped at 20 — never the sled's maximum) until a label answers, and
+     *  only accept it when it is clearly stronger (6 dB) than any other label heard. */
+    @Override
+    public String readNearest(int powerDbm) throws Exception {
+        if (reader == null) return null;
+        int base = powerDbm <= 0 ? 10 : powerDbm;
+        for (int step = 0; step <= 9; step += 3) {
+            int pw = Math.min(base + step, 20);
+            java.util.Map<String, Integer> got = hearAll(pw);
+            if (got.isEmpty()) { if (pw >= 20) break; continue; }
+            String best = null; int b1 = Integer.MIN_VALUE, b2 = Integer.MIN_VALUE;
+            for (java.util.Map.Entry<String, Integer> en : got.entrySet()) {
+                int v = en.getValue();
+                if (v > b1) { b2 = b1; b1 = v; best = en.getKey(); } else if (v > b2) b2 = v;
+            }
+            if (got.size() > 1 && b1 - b2 < 6)
+                throw new Exception("يسمع الجهاز أكثر من ملصقة قريبة (" + got.size() + ") — أبعد الملصقات والقطع الأخرى عن مقدمة الجهاز وأعد المحاولة");
+            return best;
+        }
+        return null;
+    }
+
     @Override
     public boolean writeEpc(String oldEpc, String newEpc, int powerDbm) throws Exception {
         if (reader == null) return false;
@@ -163,7 +200,9 @@ final class ZebraRfd implements RfidSled {
         p.setWriteRetries(3);
         // writing needs more power than reading; the write is addressed to oldEpc only, so a stronger
         // field can't touch the neighbours. Try a bit above the read power, then the sled's maximum.
-        int[] tries = { powerDbm <= 0 ? 0 : Math.min(powerDbm + 6, 30), 0 };
+        // never the sled's maximum: the label is in hand, and a full-power field reaches the whole counter
+        int base = powerDbm <= 0 ? 10 : powerDbm;
+        int[] tries = { Math.min(base + 4, 20), Math.min(base + 8, 22) };
         Exception last = null;
         for (int pw : tries) {
             try { setPower(pw); reader.Actions.TagAccess.writeWait(oldEpc, p, null, null); return true; }

@@ -16,6 +16,10 @@ interface RfidSled {
     boolean open(Context ctx, TriggerSink trigger);
     /** Nearest single tag at this power (dBm, 0 = the sled's maximum), or null. */
     String readOne(int powerDbm) throws Exception;
+    /** For programming: the label held against the sled. Starts at this power and steps up a little
+     *  (never to the maximum) until one label answers; refuses when two labels answer about as
+     *  strongly, so a label a few cm away is never taken for the one in hand. */
+    default String readNearest(int powerDbm) throws Exception { return readOne(powerDbm); }
     /** Writes newEpc on the tag whose EPC is oldEpc. */
     boolean writeEpc(String oldEpc, String newEpc, int powerDbm) throws Exception;
     boolean start(int powerDbm, TagSink sink) throws Exception;
