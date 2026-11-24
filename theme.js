@@ -662,7 +662,7 @@ GOLDMIND_THEMES['glass-dark'].vars = Object.assign({}, GOLDMIND_THEMES['black-ma
   var BAR = 'linear-gradient(180deg,rgba(248,239,220,.96) 0%,rgba(238,226,202,.96) 100%)';
   var css = [
     '@media screen{',
-    T + ' body{background-color:#CDB693!important;background-image:url("theme-beige-marble.jpg?v=2")!important;background-size:900px 900px!important;background-repeat:repeat!important}',
+    T + ' body{background-color:#CDB693!important;background-image:url("theme-beige-marble.jpg?v=3")!important;background-size:900px 900px!important;background-repeat:repeat!important}',
     T + ' .dsk-app{--dsk-bg:transparent!important}',
     T + ' header:is(.bg-surface-container-lowest,.bg-surface,.bg-background,.bg-white){background:' + BAR + '!important;border-bottom:1px solid rgba(184,149,74,.55)!important}',
     T + ' :is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):is(.bg-surface-container-lowest,.bg-white):not(input):not(select):not(textarea):not(button)' +
@@ -680,7 +680,7 @@ GOLDMIND_THEMES['glass-dark'].vars = Object.assign({}, GOLDMIND_THEMES['black-ma
     T + ' :is(input,select,textarea)::placeholder{color:#8A7A5E!important;-webkit-text-fill-color:#8A7A5E!important;opacity:1}',
     T + ' :is(input,select,textarea):focus{border-color:#8A6A1C!important;box-shadow:0 0 0 3px rgba(184,149,74,.35)!important;outline:none}',
     // «زجاجية» mode paints its own art behind frosted cards — here the marble is that background
-    T + '.gm-glass.gm-light-canvas{background:#CDB693 url("theme-beige-marble.jpg?v=2") repeat 0 0/900px 900px!important}',
+    T + '.gm-glass.gm-light-canvas{background:#CDB693 url("theme-beige-marble.jpg?v=3") repeat 0 0/900px 900px!important}',
     T + '.gm-glass.gm-light-canvas #gmGlassBg{display:none!important}',
     T + '.gm-glass.gm-light-canvas :is(.bg-surface-container-lowest,.bg-white):is(.rounded-lg,.rounded-xl,.rounded-2xl,.rounded-3xl):not(input):not(select):not(textarea){border-color:' + FRAME + '!important}',
     '}'
