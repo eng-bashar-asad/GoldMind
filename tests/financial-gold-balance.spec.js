@@ -17,7 +17,9 @@ const db = (perm, role) => ({
     // scrap: 10 g of 21k (8.75 g 24k) for 3200 → 365.71 a 24k gram
     { id: 'l2', invoice_id: 'b1', karat: 21, weight_grams: 10, accounting_weight_grams: 10, line_total: 3200, gold_stock_lot_id: 'lot1' },
   ],
-  expense_entries: [], daily_cash_log: [], customer_debts: [], trader_movements: [], pieces: [], gold_stock_lots: [], gold_prices: [], diamond_pieces: [],
+  expense_entries: [], daily_cash_log: [], customer_debts: [], trader_movements: [],
+  pieces: [{ store_id: STORE, karat: 18, weight_grams: 13, accounting_weight_grams: 12, status: 'available' }],
+  gold_stock_lots: [{ store_id: STORE, karat: 21, weight_grams_remaining: 8, box_name: 'كسر 21' }], gold_prices: [], diamond_pieces: [],
 });
 const run = async page => { await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today')); await page.goto('/financial-report-ar.html'); };
 
@@ -34,6 +36,12 @@ test('owner: picks «ميزان الذهب» alone and gets averages + USD ounce
   await expect(b).toContainText('8.75 غ');              // scrap bought, 24k
   await expect(b).toContainText('365.71 AED');
   await expect(b).toContainText('بعنا أكثر مما اشترينا');
+  // per karat with its 24k equivalent; stock now (pieces 12 g 18k = 9, scrap 8 g 21k = 7) → shop 16 g 24k
+  await expect(b.locator('tr', { hasText: 'المجموع' })).toHaveCount(0); // one karat each: no total rows
+  await expect(b).toContainText('صناديق القطع المتوفرة الآن');
+  await expect(b).toContainText('9.00 غ');
+  await expect(b).toContainText('7.00 غ');
+  await expect(b.locator('tr', { hasText: 'رصيد المحل كاملاً' })).toContainText('16.00 غ');
   await expect(b).not.toContainText('المبيعات');        // only the picked section
 });
 

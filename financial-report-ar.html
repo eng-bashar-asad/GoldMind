@@ -289,8 +289,8 @@ async function build(from, to) {
     gmFetchAllRows(() => q().from('customer_debts').select('customer_id, movement_type, cash_amount, gold_grams_24k, source').in('store_id', S).lt('created_at', to)),
     gmFetchAllRows(() => inPeriod(q().from('trader_movements').select('movement_type, source, gold_24k_equivalent, fab_fee_amount').in('store_id', S))),
     gmFetchAllRows(() => q().from('trader_movements').select('movement_type, gold_24k_equivalent').in('store_id', S).lt('created_at', to)),
-    gmFetchAllRows(() => q().from('pieces').select('weight_grams, accounting_weight_grams, karat').in('store_id', S).eq('status', 'available')),
-    q().from('gold_stock_lots').select('weight_grams_remaining, karat').in('store_id', S),
+    gmFetchAllRows(() => q().from('pieces').select('store_id, weight_grams, accounting_weight_grams, karat').in('store_id', S).eq('status', 'available')),
+    q().from('gold_stock_lots').select('store_id, weight_grams_remaining, karat, box_name').in('store_id', S),
     q().from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID),
     gmFetchAllRows(() => q().from('customer_deposits').select('deposit_number, amount, status, created_at, refunded_at, items, customer_id, customer:customer_id(name)').in('store_id', S).lt('created_at', to).order('created_at')),
     // goods given to wholesale traders: their profit, same formula as the profit report (gm-profit.js)
@@ -434,7 +434,7 @@ async function build(from, to) {
   const salesProfitAll = P.profit + wsProfit;  // customers + wholesale traders
   const netProfit = salesProfitAll + scrapProfit - expTotal - discTotal + trDiscShop - trDiscTrader;
   let h = '';
-  if (frOn('goldbal')) h += frGoldBalance(invoices, items, buyItems, priceMap, STC);
+  if (frOn('goldbal')) h += frGoldBalance(invoices, items, buyItems, priceMap, STC, piecesR.data || [], lotsR.data || []);
   // profit line: sales → profit − expenses = net. Purchases are their own item
   // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
   const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px] fr-mut">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px] fr-mut">${t[4]}</div>` : ''}</div>`;
@@ -546,45 +546,59 @@ function frUsdRate(st) {
   if (r > 0 && r !== 1) return r;
   return c === 'AED' ? 3.6725 : 0; // AED is pegged; otherwise unknown until a rate is set
 }
-function frGoldBalance(invoices, items, buyItems, priceMap, STC) {
+function frGoldBalance(invoices, items, buyItems, priceMap, STC, pieces, lots) {
   const inv = {}; invoices.forEach(i => inv[i.id] = i);
   const G = {}; // currency -> figures
-  const g = st => { const c = (st && st.currency) || FR.cur || ''; return G[c] || (G[c] = { cur: c, rate: frUsdRate(st), sw: 0, sv: 0, bw: 0, bv: 0, sn: 0, bn: 0 }); };
+  const g = st => { const c = (st && st.currency) || FR.cur || ''; return G[c] || (G[c] = { cur: c, rate: frUsdRate(st), sw: 0, sv: 0, bw: 0, bv: 0, sold: {}, bought: {}, pcs: {}, scrap: {} }); };
+  const add = (m, k, w) => { k = Number(k); if (!k) return; m[k] = (m[k] || 0) + w; };
   items.forEach(it => {
     const i = inv[it.invoice_id]; if (!i || !it.karat) return;
     const p = gmLineProfit(it, i.type === 'return', 1, priceMap);
     if (!p.goldPrice || it.piece && it.piece.purchase_cost != null) return; // a piece bought for a price has no gold price
     const o = g(STC[i.store_id]), w = p.sign * Math.abs(p.weight);
-    o.sw += w * Number(it.karat) / 24; o.sv += w * p.goldPrice; o.sn++;
+    add(o.sold, it.karat, w); o.sw += w * Number(it.karat) / 24; o.sv += w * p.goldPrice;
   });
   buyItems.forEach(it => {
     const i = inv[it.invoice_id]; if (!i || i.type !== 'buyRetail' || !it.gold_stock_lot_id || !it.karat) return;
-    const o = g(STC[i.store_id]);
-    o.bw += (Number(it.weight_grams) || 0) * Number(it.karat) / 24; o.bv += Number(it.line_total) || 0; o.bn++;
+    const o = g(STC[i.store_id]), w = Number(it.weight_grams) || 0;
+    add(o.bought, it.karat, w); o.bw += w * Number(it.karat) / 24; o.bv += Number(it.line_total) || 0;
   });
+  // what is in the shop now: barcoded pieces (accounting weight) and the scrap / bulk boxes
+  pieces.forEach(x => add(g(STC[x.store_id]).pcs, x.karat, Number(x.accounting_weight_grams != null ? x.accounting_weight_grams : x.weight_grams) || 0));
+  lots.forEach(x => { const w = Number(x.weight_grams_remaining) || 0; if (w > 0.0005) add(g(STC[x.store_id]).scrap, x.karat, w); });
   const cur = Object.values(G);
-  if (!cur.length) return sec('balance', 'ميزان الذهب', '<p class="fr-note">لا مبيعات ولا مشتريات كسر في هذه الفترة.</p>');
+  if (!cur.length) return sec('balance', 'ميزان الذهب', '<p class="fr-note">لا مبيعات ولا مشتريات كسر ولا مخزون.</p>');
   const avg = (v, w) => w > 0.0005 ? v / w : 0;
+  const to24 = m => Object.keys(m).reduce((a, k) => a + m[k] * Number(k) / 24, 0);
   const usdOz = (gram, rate) => rate ? '$ ' + gmMoney(gram * OZ / rate) : '— (حدّد سعر الصرف من «سعر الذهب»)';
+  const kt = (title, m, wLabel) => {
+    const ks = Object.keys(m).filter(k => Math.abs(m[k]) > 0.0005).sort((a, b) => b - a);
+    return `<tr><th colspan="3">${title}</th></tr><tr><th>العيار</th><th class="n">${wLabel}</th><th class="n">يعادل عيار 24</th></tr>
+      ${ks.length ? ks.map(k => `<tr><td>${esc(k)}</td><td class="n">${g2(m[k])}</td><td class="n">${g2(m[k] * k / 24)}</td></tr>`).join('') : '<tr><td colspan="3" class="fr-mut">لا يوجد</td></tr>'}
+      ${ks.length > 1 ? `<tr class="tot"><td>المجموع</td><td class="n">${g2(ks.reduce((a, k) => a + m[k], 0))}</td><td class="n">${g2(to24(m))}</td></tr>` : ''}`;
+  };
+  const r3 = (label, val, extra) => `<tr${extra || ''}><td colspan="2">${label}</td><td class="n">${val}</td></tr>`;
   const block = o => {
     const sg = avg(o.sv, o.sw), bg = avg(o.bv, o.bw), m = x => gmMoney(x) + ' ' + esc(o.cur);
+    const pcs24 = to24(o.pcs), scrap24 = to24(o.scrap);
     return `<table class="fr-t">
-      ${cur.length > 1 ? `<tr><th colspan="2">${esc(o.cur)}</th></tr>` : ''}
-      <tr><th colspan="2">الذهب المباع للزبائن (بعد المرتجعات)</th></tr>
-      ${row('الوزن بعيار 24', g2(o.sw))}
-      ${row('متوسط سعر غرام 24 يوم البيع', o.sw > 0.0005 ? m(sg) : '—')}
-      ${row('متوسط سعر الأونصة (دولار)', o.sw > 0.0005 ? usdOz(sg, o.rate) : '—')}
-      <tr><th colspan="2">الذهب المشترى لصناديق الكسر (كل العيارات)</th></tr>
-      ${row('الوزن بعيار 24', g2(o.bw))}
-      ${row('متوسط سعر غرام 24 المدفوع', o.bw > 0.0005 ? m(bg) : '—')}
-      ${row('متوسط سعر الأونصة (دولار)', o.bw > 0.0005 ? usdOz(bg, o.rate) : '—')}
-      <tr><th colspan="2">الفرق</th></tr>
-      ${row(o.sw >= o.bw ? 'بعنا أكثر مما اشترينا (بعيار 24)' : 'اشترينا أكثر مما بعنا (بعيار 24)', g2(Math.abs(o.sw - o.bw)), ' class="tot"')}
-      ${o.sw > 0.0005 && o.bw > 0.0005 ? row(bg <= sg ? 'اشترينا أرخص من متوسط سعر البيع بـ (للغرام 24)' : 'اشترينا أغلى من متوسط سعر البيع بـ (للغرام 24)', m(Math.abs(sg - bg))) : ''}
+      ${cur.length > 1 ? `<tr><th colspan="3">${esc(o.cur)}</th></tr>` : ''}
+      ${kt('الذهب المباع للزبائن خلال الفترة (بعد المرتجعات)', o.sold, 'الوزن المحاسبي')}
+      ${r3('متوسط سعر غرام 24 يوم البيع', o.sw > 0.0005 ? m(sg) : '—')}
+      ${r3('متوسط سعر الأونصة (دولار)', o.sw > 0.0005 ? usdOz(sg, o.rate) : '—')}
+      ${kt('الذهب المشترى لصناديق الكسر خلال الفترة', o.bought, 'الوزن')}
+      ${r3('متوسط سعر غرام 24 المدفوع', o.bw > 0.0005 ? m(bg) : '—')}
+      ${r3('متوسط سعر الأونصة (دولار)', o.bw > 0.0005 ? usdOz(bg, o.rate) : '—')}
+      <tr><th colspan="3">الفرق خلال الفترة</th></tr>
+      ${r3(o.sw >= o.bw ? 'بعنا أكثر مما اشترينا (بعيار 24)' : 'اشترينا أكثر مما بعنا (بعيار 24)', g2(Math.abs(o.sw - o.bw)), ' class="tot"')}
+      ${o.sw > 0.0005 && o.bw > 0.0005 ? r3(bg <= sg ? 'اشترينا أرخص من متوسط سعر البيع بـ (للغرام 24)' : 'اشترينا أغلى من متوسط سعر البيع بـ (للغرام 24)', m(Math.abs(sg - bg))) : ''}
+      ${kt('صناديق القطع المتوفرة الآن', o.pcs, 'الوزن المحاسبي')}
+      ${kt('صناديق الكسر والجملة المتوفرة الآن', o.scrap, 'الوزن')}
+      ${r3('رصيد المحل كاملاً الآن بعيار 24 (قطع + كسر)', g2(pcs24 + scrap24), ' class="tot"')}
     </table>`;
   };
   return sec('balance', 'ميزان الذهب', cur.map(block).join(''),
-    'المباع: الوزن المحاسبي لقطع فواتير البيع محوّلاً لعيار 24، مقيّماً بسعر الذهب المحفوظ على كل سطر يوم البيع (لا يشمل المصنعية ولا البضاعة الخارجة لتجار الجملة ولا القطع المشتراة بسعر نقدي). المشترى: كسر الأفراد في صناديق الكسر محوّلاً لعيار 24 بالمبلغ المدفوع. الأونصة = 31.1035 غ بالدولار حسب سعر الصرف المحفوظ في «سعر الذهب».');
+    'المباع: الوزن المحاسبي لقطع فواتير البيع، مقيّماً بسعر الذهب المحفوظ على كل سطر يوم البيع (بدون المصنعية، ولا يشمل البضاعة الخارجة لتجار الجملة ولا القطع المشتراة بسعر نقدي). المشترى: كسر الأفراد الداخل صناديق الكسر بالمبلغ المدفوع. الرصيد: القطع المتوفرة (الوزن المحاسبي) وصناديق الكسر والجملة كما هي الآن. عيار 24 = الوزن × العيار ÷ 24. الأونصة = 31.1035 غ بالدولار حسب سعر الصرف في «سعر الذهب».');
 }
 
 (async function init() {
