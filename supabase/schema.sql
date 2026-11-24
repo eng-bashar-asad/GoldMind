@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict 6fM4bCdO9uOQd8zyzVHQbnx4KPAHbaWFmWyYSOdojXf4xbMSWbSZ15v4Hew7Qd3
+\restrict hdkPehRe3j4w1NAbg5zRlHmd2O75Lcvg0y23ZZXOj9qGpOZmOOlc5iNQR1PCCPp
 
 
 SET statement_timeout = 0;
@@ -4005,13 +4005,14 @@ begin
     select id, invoice_number into ex from invoices where client_ref = ref and store_id = sid;
     if found then return jsonb_build_object('id', ex.id, 'invoice_number', ex.invoice_number, 'duplicate', true); end if;
   end if;
-  if rm is null or rm not in ('cash', 'bank', 'debt_reduce') then raise exception 'طريقة رد غير معروفة'; end if;
+  if rm is null or rm not in ('cash', 'bank', 'debt_reduce', 'customer_credit') then raise exception 'طريقة رد غير معروفة'; end if;
 
   select * into o from invoices where id = orig and store_id = sid for update;
   if not found then raise exception 'الفاتورة الأصلية غير موجودة'; end if;
   if o.type <> 'sale' then raise exception 'يمكن إرجاع فواتير البيع فقط'; end if;
   if o.status = 'cancelled' then raise exception 'الفاتورة الأصلية ملغاة'; end if;
   if rm = 'debt_reduce' and o.customer_id is null then raise exception 'لا يوجد عميل لتخفيض دينه'; end if;
+  if rm = 'customer_credit' and o.customer_id is null then raise exception 'الفاتورة بلا عميل — لا يوجد حساب يبقى فيه المبلغ'; end if;
 
   select array_agg(distinct x::uuid) into ids from jsonb_array_elements_text(coalesce(p->'item_ids', '[]'::jsonb)) x;
   if ids is null or cardinality(ids) = 0 then raise exception 'اختر قطعة واحدة على الأقل للإرجاع'; end if;
@@ -4043,7 +4044,7 @@ begin
 
   insert into invoices (store_id, invoice_number, type, related_invoice_id, customer_id, payment_method,
       total_amount, amount_paid, status, created_by, client_ref)
-    values (sid, inv_no, 'return', orig, o.customer_id, case when rm = 'debt_reduce' then 'credit' else rm end,
+    values (sid, inv_no, 'return', orig, o.customer_id, case when rm in ('debt_reduce', 'customer_credit') then 'credit' else rm end,
       total, total, 'paid', me, ref)
     returning id into inv_id;
 
@@ -4070,6 +4071,11 @@ begin
   if rm = 'debt_reduce' then
     insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by)
       values (sid, o.customer_id, inv_id, 'debt_decrease', total, 0, note, me);
+  elsif rm = 'customer_credit' then
+    if total > 0 then
+      insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, created_by, source)
+        values (sid, o.customer_id, inv_id, 'debt_decrease', total, 0, note || ' — رصيد للعميل (عربون)', me, 'return_credit');
+    end if;
   elsif total > 0 then
     insert into cash_movements (store_id, box, direction, amount, description, created_by, invoice_id)
       values (sid, 'main', 'out', total, 'رد مبلغ ' || note, me, inv_id);
@@ -15757,5 +15763,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict 6fM4bCdO9uOQd8zyzVHQbnx4KPAHbaWFmWyYSOdojXf4xbMSWbSZ15v4Hew7Qd3
+\unrestrict hdkPehRe3j4w1NAbg5zRlHmd2O75Lcvg0y23ZZXOj9qGpOZmOOlc5iNQR1PCCPp
 
