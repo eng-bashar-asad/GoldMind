@@ -144,8 +144,18 @@ async function gmSaveInvoiceEdit(s) {
   // brand-new lines (a purchase gets a new piece in stock; a sale line reuses a
   // piece found by barcode, or stays unlinked like a manual sale line)
   for (const it of items.filter(i => i._new)) {
-    let pieceId = it.piece_id;
-    if (!pieceId && isTrader) {
+    let pieceId = it.piece_id, lotId = null;
+    if (!pieceId && invoice.type === 'buyRetail') {
+      // a purchase from a person is scrap: it goes to the «كسر NN» bulk stock like the original lines,
+      // not to a nameless piece (بشار 2026-11-24 — barcode 001297 had no history and no source)
+      const { data: lot, error: lotErr } = await goldmindClient.from('gold_stock_lots').insert({
+        store_id: GOLDMIND_STORE_ID, karat: it.karat, weight_grams_total: it.weight_grams, weight_grams_remaining: it.weight_grams,
+        cost_fabrication_per_gram: 0, source_invoice_id: invoice.id, box_name: 'كسر ' + it.karat,
+        notes: it.description || ('ذهب كسر عيار ' + it.karat + ' — أُضيف عند تعديل ' + invoice.invoice_number), created_by: GOLDMIND_STAFF_ID
+      }).select('id').single();
+      if (lotErr) return { error: 'تعذّر إضافة الكسر للمخزون: ' + lotErr.message };
+      lotId = lot.id;
+    } else if (!pieceId && isTrader) {
       const { data: barcode, error: bcError } = await goldmindClient.rpc('next_piece_barcode', { target_store_id: GOLDMIND_STORE_ID, category: 'gold' });
       const { data: newPiece } = await goldmindClient.from('pieces').insert({
         store_id: GOLDMIND_STORE_ID, barcode: bcError ? null : barcode,
@@ -153,12 +163,14 @@ async function gmSaveInvoiceEdit(s) {
         status: 'available', created_by: GOLDMIND_STAFF_ID
       }).select().single();
       pieceId = newPiece ? newPiece.id : null;
+      if (pieceId) await goldmindClient.from('piece_movements').insert({ store_id: GOLDMIND_STORE_ID, piece_id: pieceId, event_type: 'created',
+        note: 'دخلت المخزن بفاتورة الشراء ' + invoice.invoice_number + ' (أُضيفت عند تعديل الفاتورة)', created_by: GOLDMIND_STAFF_ID });
     } else if (pieceId && invoice.type === 'sale') {
       await goldmindClient.from('pieces').update({ status: 'sold' }).eq('id', pieceId);
       await goldmindClient.from('piece_movements').insert({ store_id: GOLDMIND_STORE_ID, piece_id: pieceId, event_type: 'sold', note: 'بيع بفاتورة ' + invoice.invoice_number + ' (أُضيفت عند تعديل الفاتورة)', created_by: GOLDMIND_STAFF_ID });
     }
     await goldmindClient.from('invoice_items').insert({
-      invoice_id: invoice.id, piece_id: pieceId, barcode: it.barcode,
+      invoice_id: invoice.id, piece_id: pieceId, gold_stock_lot_id: lotId, barcode: it.barcode,
       karat: it.karat, weight_grams: it.weight_grams, accounting_weight_grams: it.accounting_weight_grams,
       fabrication_fee: pieceId ? 0 : Math.max(0, Number(it.fabrication_fee) || 0), line_total: it.line_total,
       description: it.description, description_en: it.description_en,
@@ -181,10 +193,14 @@ async function gmSaveInvoiceEdit(s) {
     if (it.gold_stock_lot_id && it.weight_grams && invoice.type === 'sale') {
       bulkRestoreByLot[it.gold_stock_lot_id] = (bulkRestoreByLot[it.gold_stock_lot_id] || 0) + Number(it.weight_grams);
     }
+    // a purchase line removed: its scrap weight leaves stock again
+    if (it.gold_stock_lot_id && it.weight_grams && isTrader) {
+      bulkRestoreByLot[it.gold_stock_lot_id] = (bulkRestoreByLot[it.gold_stock_lot_id] || 0) - Number(it.weight_grams);
+    }
   }
   for (const lotId of Object.keys(bulkRestoreByLot)) {
     const { data: lot } = await goldmindClient.from('gold_stock_lots').select('weight_grams_remaining').eq('id', lotId).maybeSingle();
-    if (lot) await goldmindClient.from('gold_stock_lots').update({ weight_grams_remaining: Number(lot.weight_grams_remaining) + bulkRestoreByLot[lotId] }).eq('id', lotId);
+    if (lot) await goldmindClient.from('gold_stock_lots').update({ weight_grams_remaining: Math.max(0, Number(lot.weight_grams_remaining) + bulkRestoreByLot[lotId]) }).eq('id', lotId);
   }
 
   // the money / debt effect, dated today

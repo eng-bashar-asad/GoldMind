@@ -93,3 +93,21 @@ test('editing a purchase: remove a goods photo and add a new one', async ({ page
   await expect.poll(() => calls.filter(c => c.method === 'PATCH' && c.name === 'invoices').map(c => (typeof c.body === 'string' ? JSON.parse(c.body || '{}') : c.body || {}).bulk_photos).filter(Boolean)[0], { timeout: 8000 })
     .toEqual([expect.stringContaining('/b.jpg'), expect.stringContaining('purchase-p7-photo-')]);
 });
+
+// بشار 2026-11-24: a line added while editing a purchase from a person goes to the «كسر NN» scrap stock
+// (barcode 001297 had become a nameless piece with no history)
+test('editing a retail purchase: a new line becomes a scrap lot, not a piece', async ({ page }) => {
+  const calls = await install(page, { db: base({
+    invoices: [{ id: 'p8', store_id: STORE, invoice_number: 'PINV-8', type: 'buyRetail', status: 'paid', payment_method: 'cash', total_amount: 100, amount_paid: 100, created_at: '2026-10-01T07:00:00Z' }],
+    invoice_items: [{ id: 'it8', invoice_id: 'p8', karat: 18, weight_grams: 1, line_total: 100, description: 'كسر' }],
+    customers: [], pieces: [], gold_stock_lots: [] }) });
+  await page.goto('/invoice-edit-ar.html?id=p8');
+  await expect(page.locator('#save-btn')).toBeVisible();
+  await page.waitForFunction(() => items.length === 1);
+  await page.evaluate(() => { items.push({ _new: true, karat: 18, weight_grams: 72, line_total: 5000, description: 'كسر 18' }); });
+  page.on('dialog', d => d.accept());
+  await page.click('#save-btn');
+  const body = c => (typeof c.body === 'string' ? JSON.parse(c.body || '{}') : c.body || {});
+  await expect.poll(() => calls.some(c => c.method === 'POST' && c.name === 'gold_stock_lots' && body(c).box_name === 'كسر 18'), { timeout: 8000 }).toBe(true);
+  expect(calls.some(c => c.method === 'POST' && c.name === 'pieces')).toBe(false);
+});
