@@ -62,7 +62,9 @@ test('financial report: today, numbers, PDF', async ({ page }) => {
   test.skip(!fs.existsSync(LIB) || !fs.existsSync(H2C), 'PDF libraries not installed');
   const errs = await setup(page);
   await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
+  await page.addInitScript(() => localStorage.setItem('gm_fr_secs', JSON.stringify(['summary', 'sales', 'profit', 'expenses', 'purchases', 'weights', 'cash', 'debts', 'deposits', 'invoices'])));
   await page.goto('/financial-report-ar.html');
+  await page.locator('#fr-controls:not(.hidden) #fr-run').click(); // the report is built on demand
   await expect(page.locator('#fr-body')).toContainText('صافي الربح');
   const t = await page.locator('#fr-body').innerText();
   // sale 3600, profit 1446.24 (shared formula), expense 46.24 → net 1400.00; cash 3600 in / 1000 out
@@ -88,7 +90,9 @@ test('financial report: debts owed to us, owed by us, deposits and their receipt
     D('y', 'debt_decrease', 50, 'payment') ];
   db.customer_deposits = [{ store_id: STORE, deposit_number: 'DEP-000001', customer_id: 'hala', amount: 200, status: 'active', created_at: now, items: [{ description: 'طقم ديور' }], customer: { name: 'هلا الهفل' } }];
   await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
+  await page.addInitScript(() => localStorage.setItem('gm_fr_secs', JSON.stringify(['summary', 'sales', 'profit', 'expenses', 'purchases', 'weights', 'cash', 'debts', 'deposits', 'invoices'])));
   await page.goto('/financial-report-ar.html');
+  await page.locator('#fr-controls:not(.hidden) #fr-run').click(); // the report is built on demand
   await expect(page.locator('#fr-body')).toContainText('ديون لنا على الزبائن');
   const row = t => page.locator('#fr-body tr', { hasText: t }).first();
   await expect(row('ديون لنا على الزبائن')).toContainText('800.00');
@@ -115,7 +119,9 @@ test('financial report: weights sold to people / traders, made from scrap, scrap
   try {
     const errs = await setup(page);
     await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
+    await page.addInitScript(() => localStorage.setItem('gm_fr_secs', JSON.stringify(['summary', 'sales', 'profit', 'expenses', 'purchases', 'weights', 'cash', 'debts', 'deposits', 'invoices'])));
     await page.goto('/financial-report-ar.html');
+    await page.locator('#fr-controls:not(.hidden) #fr-run').click(); // the report is built on demand
     await expect(page.locator('#fr-body')).toContainText('كسر مُعطى للتجار');
     const cells = k => page.locator('#fr-body tr').filter({ has: page.locator('td:first-child', { hasText: new RegExp('^' + k + '$') }) }).first().locator('td').allInnerTexts();
     // karat | new goods | made from scrap | from traders' goods | to people | to traders | scrap from traders | scrap to traders
@@ -130,13 +136,16 @@ test('financial report: weights sold to people / traders, made from scrap, scrap
 test('financial report: a section closes with its arrow and stays closed after reload', async ({ page }) => {
   const errs = await setup(page);
   await page.addInitScript(() => localStorage.setItem('gm_fr_period', 'today'));
+  await page.addInitScript(() => localStorage.setItem('gm_fr_secs', JSON.stringify(['summary', 'sales', 'profit', 'expenses', 'purchases', 'weights', 'cash', 'debts', 'deposits', 'invoices'])));
   await page.goto('/financial-report-ar.html');
+  await page.locator('#fr-controls:not(.hidden) #fr-run').click(); // the report is built on demand
   const sales = page.locator('#fr-body .fr-sec[data-k="المبيعات"]');
   await expect(sales.locator('.fr-in')).toBeVisible();
   await sales.locator('.fr-tog').click();
   await expect(sales).toHaveClass(/\bclosed\b/);
   await expect(sales.locator('.fr-in')).toBeHidden();
   await page.reload();
+  await page.locator('#fr-controls:not(.hidden) #fr-run').click();
   await expect(page.locator('#fr-body .fr-sec[data-k="المبيعات"]')).toHaveClass(/\bclosed\b/);
   await page.getByText('فتح الكل').click();
   await expect(page.locator('#fr-body .fr-sec.closed')).toHaveCount(0);

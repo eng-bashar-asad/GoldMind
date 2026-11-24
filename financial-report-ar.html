@@ -117,9 +117,19 @@
 <div id="fr-custom" class="hidden fr-card grid grid-cols-2 gap-2">
 <label class="text-[12px]" style="color:#6B6150;">من تاريخ<input id="fr-from" type="date" class="w-full h-10 mt-1 rounded-lg border px-2 text-[13px]" style="border-color:#C9B98F;"/></label>
 <label class="text-[12px]" style="color:#6B6150;">إلى تاريخ<input id="fr-to" type="date" class="w-full h-10 mt-1 rounded-lg border px-2 text-[13px]" style="border-color:#C9B98F;"/></label>
-<button type="button" id="fr-apply" class="col-span-2 h-10 rounded-lg font-bold text-[13px]" style="background:#1F1A12;color:#fff;">عرض التقرير</button>
 </div>
-<label class="flex items-center gap-2 text-[13px]"><input type="checkbox" id="fr-show-list" checked class="rounded"/> إظهار قائمة الفواتير بالتفصيل</label>
+<!-- what the report shows: the employee picks, then «عرض التقرير» (بشار 2026-11-24) -->
+<div class="fr-card flex flex-col gap-2" id="fr-pick">
+<div class="text-[13px] font-bold">ماذا تريد في التقرير؟</div>
+<div class="flex gap-2 overflow-x-auto pb-1" role="group" aria-label="مجموعات جاهزة">
+<button type="button" class="fr-chip" data-preset="profit">صافي الأرباح</button>
+<button type="button" class="fr-chip" data-preset="weights">أوزان الذهب</button>
+<button type="button" class="fr-chip" data-preset="cash">الصندوق والديون</button>
+<button type="button" class="fr-chip" data-preset="all">كل الأقسام</button>
+</div>
+<div id="fr-secs" class="grid grid-cols-2 gap-x-3 gap-y-1"></div>
+<button type="button" id="fr-run" class="h-12 rounded-xl font-bold text-[15px] flex items-center justify-center gap-2" style="background:#1F1A12;color:#F3EEDF;"><span class="material-symbols-outlined" aria-hidden="true">summarize</span>عرض التقرير</button>
+</div>
 <div class="grid grid-cols-2 gap-2">
 <button type="button" onclick="window.print()" class="h-11 rounded-xl font-bold text-[14px] flex items-center justify-center gap-1" style="background:#1F1A12;color:#fff;"><span class="material-symbols-outlined">print</span>طباعة</button>
 <button type="button" onclick="gmReportPdf(document.getElementById('fr-sheet'), 'التقرير-المالي-' + (window.__frRange ? window.__frRange.fromStr + '_' + window.__frRange.toStr : '') + '.pdf', this)" class="fr-chip h-11 rounded-xl font-bold text-[14px] border flex items-center justify-center gap-1" style="height:44px;border-radius:12px;"><span class="material-symbols-outlined">picture_as_pdf</span>PDF</button>
@@ -178,6 +188,26 @@ document.addEventListener('click', e => {
 const PAY = { cash: 'نقدي', bank: 'فيزا / بنك', credit: 'دين', mixed: 'جزئي (نقدي + بنك + دين)' };
 const TYPE = { sale: 'بيع', return: 'مرتجع', buyTrader: 'شراء من تاجر', buyRetail: 'شراء من فرد' };
 
+// report sections the employee can pick; gold balance only for whoever may see it, never on by default
+const FR_SECS = [
+  ['summary', 'الملخّص (المبيعات، الربح، المصاريف)'], ['sales', 'المبيعات'], ['profit', 'الأرباح بالتفصيل', 'p'],
+  ['expenses', 'المصاريف حسب النوع'], ['purchases', 'المشتريات'], ['weights', 'الذهب بالوزن (مباع ومشترى ومُنتج)'],
+  ['goldbal', 'ميزان الذهب (متوسط سعر المباع والمشترى)', 'g'], ['cash', 'الصندوق'], ['debts', 'الديون'],
+  ['deposits', 'إيصالات العربون'], ['invoices', 'قائمة الفواتير بالتفصيل']];
+const FR_PRESETS = { profit: ['summary', 'profit', 'expenses'], weights: ['weights', 'purchases'], cash: ['cash', 'debts', 'deposits'] };
+let FR_ON = new Set(['summary', 'sales', 'expenses']);
+const frAllowed = k => { const x = FR_SECS.find(s => s[0] === k); return !!x && (x[2] !== 'p' || FR.canProfit) && (x[2] !== 'g' || FR.canGold); };
+const frOn = k => FR_ON.has(k) && frAllowed(k);
+function frPaintSecs() {
+  document.getElementById('fr-secs').innerHTML = FR_SECS.filter(x => frAllowed(x[0])).map(x =>
+    `<label class="flex items-center gap-2 text-[13px] min-h-[40px]"><input type="checkbox" class="rounded w-5 h-5" data-sec="${x[0]}"${FR_ON.has(x[0]) ? ' checked' : ''}/>${esc(x[1])}</label>`).join('');
+  document.querySelectorAll('#fr-pick [data-preset]').forEach(b => {
+    const want = b.dataset.preset === 'all' ? FR_SECS.filter(x => frAllowed(x[0]) && x[0] !== 'goldbal').map(x => x[0]) : FR_PRESETS[b.dataset.preset];
+    b.setAttribute('aria-pressed', String(want.filter(frAllowed).length === [...FR_ON].filter(frAllowed).length && want.every(k => !frAllowed(k) || FR_ON.has(k))));
+  });
+}
+function frSaveSecs() { try { localStorage.setItem('gm_fr_secs', JSON.stringify([...FR_ON])); } catch (e) { /* ignore */ } }
+
 function rangeFor(p) {
   const tz = gmGetDisplayTimeZone();
   const today = gmDateStrInTz(Date.now(), tz);
@@ -200,8 +230,15 @@ function setPeriod(p) {
   document.querySelectorAll('#fr-periods .fr-chip').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.p === p)));
   document.getElementById('fr-custom').classList.toggle('hidden', p !== 'custom');
   try { localStorage.setItem('gm_fr_period', p); } catch (e) { /* ignore */ }
-  if (p === 'custom' && !rangeFor('custom')) return;
-  load(rangeFor(p));
+  window.__frPeriod = p; // the report is built on «عرض التقرير», not on every tap
+}
+function frRun() {
+  const r = rangeFor(window.__frPeriod || 'today');
+  if (!r) { alert('اختر تاريخ البداية والنهاية'); return; }
+  if (![...FR_ON].some(frAllowed)) { alert('اختر قسماً واحداً على الأقل'); return; }
+  document.getElementById('fr-sheet').classList.remove('hidden');
+  load(r);
+  document.getElementById('fr-sheet').scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
 async function inChunks(ids, fn) {
@@ -240,6 +277,8 @@ async function build(from, to) {
   const S = FR.scope.ids(), q = () => goldmindClient;
   const inPeriod = (t) => t.gte('created_at', from).lt('created_at', to);
 
+  const storesR = await q().from('stores').select('id, currency, last_gold_ounce_rate').in('id', S);
+  const STC = {}; (storesR.data || []).forEach(x => STC[x.id] = x);
   const [invR, cancR, expR, cashR, cashBeforeR, cdebtR, cdebtAllR, tmR, tmAllR, piecesR, lotsR, pricesR, depR, givenR, scrapGivenR, scrapInR, newPiecesR] = await Promise.all([
     gmFetchAllRows(() => inPeriod(q().from('invoices').select('id, store_id, invoice_number, type, payment_method, total_amount, amount_paid, cash_paid_amount, bank_paid_amount, created_at, counterparty_name').in('store_id', S).neq('status', 'cancelled')).order('created_at')),
     inPeriod(q().from('invoices').select('id', { count: 'exact', head: true }).in('store_id', S).eq('status', 'cancelled')),
@@ -395,6 +434,7 @@ async function build(from, to) {
   const salesProfitAll = P.profit + wsProfit;  // customers + wholesale traders
   const netProfit = salesProfitAll + scrapProfit - expTotal - discTotal + trDiscShop - trDiscTrader;
   let h = '';
+  if (frOn('goldbal')) h += frGoldBalance(invoices, items, buyItems, priceMap, STC);
   // profit line: sales → profit − expenses = net. Purchases are their own item
   // (buying gold is stock, not a cost), shown apart so nobody reads them as deducted.
   const tile = t => `<div class="fr-card ${t[3] || ''}"><div class="text-[12px] fr-mut">${t[0]}</div><div class="text-[18px] font-bold ${t[2]}" dir="ltr" style="text-align:right;">${t[1]}</div>${t[4] ? `<div class="text-[11px] fr-mut">${t[4]}</div>` : ''}</div>`;
@@ -403,9 +443,9 @@ async function build(from, to) {
        ['المصاريف (تُخصم من الربح)', money(expTotal), ''], ['صافي الربح = ربح المبيعات' + (wsProfit ? ' + ربح الجملة' : '') + (scrapProfit ? ' + ربح الكسر' : '') + ' − المصاريف' + (discTotal ? ' − خصومات الديون' : '') + (trDiscShop || trDiscTrader ? ' ± خصومات التجار' : ''), money(netProfit), cls(netProfit)]]
     : [['صافي المبيعات', money(netSales), ''], ['المصاريف', money(expTotal), '']];
   tiles.push(['المشتريات', money(buysTotal), '', 'col-span-2', 'بند مستقل — لا تُخصم من الربح (شراء ذهب يدخل المخزن)']);
-  h += `<div id="fr-tiles" class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
+  if (frOn('summary')) h += `<div id="fr-tiles" class="grid grid-cols-2 gap-2">${tiles.map(tile).join('')}</div>`;
 
-  h += sec('point_of_sale', 'المبيعات', `<table class="fr-t">
+  if (frOn('sales')) h += sec('point_of_sale', 'المبيعات', `<table class="fr-t">
     ${row('عدد فواتير البيع', sales.length)}
     ${row('إجمالي المبيعات', money(salesTotal))}
     ${row('المرتجعات (' + returns.length + ')', money(-returnsTotal))}
@@ -416,7 +456,7 @@ async function build(from, to) {
     ${cancR.count ? row('فواتير ملغاة (غير محسوبة)', cancR.count) : ''}
   </table>`);
 
-  if (canProfit) {
+  if (canProfit && frOn('profit')) {
     h += sec('trending_up', 'الأرباح', `<table class="fr-t">
       ${row('صافي قيمة المبيعات', money(P.revenue))}
       ${row('قيمة الذهب (بسعر يوم البيع × الوزن المحاسبي)', money(-P.goldValue))}
@@ -435,7 +475,7 @@ async function build(from, to) {
     </table>`, P.estimated ? `تنبيه: ${P.estimated} سطر قديم بلا سعر ذهب محفوظ — حُسب بسعر اليوم تقديرياً.` : 'نفس طريقة تقرير الأرباح بالضبط.');
   }
 
-  h += sec('shopping_bag', 'المشتريات', `<table class="fr-t">
+  if (frOn('purchases')) h += sec('shopping_bag', 'المشتريات', `<table class="fr-t">
     ${row('من التجار (' + buysTrader.length + ' فاتورة)', money(sum(buysTrader, 'total_amount')))}
     ${row('من الأفراد (' + buysRetail.length + ' فاتورة)', money(sum(buysRetail, 'total_amount')))}
     ${row('إجمالي المشتريات', money(buysTotal), ' class="tot"')}
@@ -443,15 +483,15 @@ async function build(from, to) {
   </table>`);
 
   const cats = Object.keys(expByCat).sort((a, b) => expByCat[b] - expByCat[a]);
-  h += sec('receipt_long', 'المصاريف', cats.length ? `<table class="fr-t">${cats.map(c => row(esc(c), money(expByCat[c]))).join('')}${row('إجمالي المصاريف', money(expTotal), ' class="tot"')}</table>` : '<p class="fr-note">لا توجد مصاريف مسجّلة بهذه الفترة.</p>');
+  if (frOn('expenses')) h += sec('receipt_long', 'المصاريف', cats.length ? `<table class="fr-t">${cats.map(c => row(esc(c), money(expByCat[c]))).join('')}${row('إجمالي المصاريف', money(expTotal), ' class="tot"')}</table>` : '<p class="fr-note">لا توجد مصاريف مسجّلة بهذه الفترة.</p>');
 
   const curs = Object.keys(cashCur);
-  h += sec('account_balance_wallet', 'الصندوق (الحركة اليومية)', curs.length ? `<table class="fr-t">
+  if (frOn('cash')) h += sec('account_balance_wallet', 'الصندوق (الحركة اليومية)', curs.length ? `<table class="fr-t">
     <tr><th>العملة</th><th class="n">أول الفترة</th><th class="n">داخل</th><th class="n">خارج</th><th class="n">آخر الفترة</th></tr>
     ${curs.map(c => { const o = cashCur[c], end = o.open + o.inn - o.out; return `<tr><td>${esc(c)}</td><td class="n">${n2(o.open)}</td><td class="n pos">${n2(o.inn)}</td><td class="n neg">${n2(o.out)}</td><td class="n" style="font-weight:700;">${n2(end)}</td></tr>`; }).join('')}
   </table>` : '<p class="fr-note">لا توجد حركات صندوق.</p>', 'من نفس سجل صفحة "الحركة اليومية" — يشمل قبض المبيعات ودفع المشتريات والمصاريف وكل الإدخالات اليدوية.');
 
-  h += sec('handshake', 'الديون', `<table class="fr-t">
+  if (frOn('debts')) h += sec('handshake', 'الديون', `<table class="fr-t">
     <tr><th colspan="2">الزبائن — آخر الفترة</th></tr>
     ${row('ديون لنا على الزبائن', money(owedToUs), ' class="tot"')}
     ${row('ديون علينا للزبائن', money(weOwe))}
@@ -466,7 +506,7 @@ async function build(from, to) {
     ${row(tBal >= 0 ? 'صافي: لنا عند التجار (آخر الفترة)' : 'صافي: علينا للتجار (آخر الفترة)', g2(Math.abs(tBal)), ' class="tot"')}
   </table>`);
 
-  if (depOpen.length || depInPeriod.length) {
+  if (frOn('deposits') && (depOpen.length || depInPeriod.length)) {
     const shown = deposits.filter(d => depOpen.includes(d) || depInPeriod.includes(d));
     h += sec('bookmark_added', 'إيصالات العربون', `<table class="fr-t">
       <tr><th>الإيصال</th><th>العميل</th><th>القطع</th><th>الحالة</th><th class="n">المبلغ</th></tr>
@@ -479,19 +519,72 @@ async function build(from, to) {
     .filter(k => k && k !== 'null' && k !== 'undefined').sort((a, b) => b - a);
   const wcol = [k => W.fresh[k], k => W.made[k], k => W.fromTr[k], k => (soldByKarat[k] || {}).g, k => W.trSold[k], k => W.scrapIn[k], k => W.scrapOut[k]];
   const wsum = f => wk.reduce((a, k) => a + (Number(f(k)) || 0), 0);
-  h += sec('diamond', 'الذهب بالوزن', wk.length ? `<div class="fr-wide"></div><table class="fr-t fr-tight">
+  if (frOn('weights')) h += sec('diamond', 'الذهب بالوزن', wk.length ? `<div class="fr-wide"></div><table class="fr-t fr-tight">
     <tr><th>العيار</th><th class="n">بضاعة جديدة مُدخلة</th><th class="n">قطع أُنتجت من الكسر</th><th class="n">قطع أُضيفت من بضاعة التجار</th><th class="n">مباع للأفراد</th><th class="n">مباع للتجار</th><th class="n">كسر مستلم من التجار</th><th class="n">كسر مُعطى للتجار</th></tr>
     ${wk.map(k => `<tr><td>${esc(k)}</td>${wcol.map(f => `<td class="n">${n2(f(k))}</td>`).join('')}</tr>`).join('')}
     ${wk.length > 1 ? `<tr class="tot"><td>المجموع</td>${wcol.map(f => `<td class="n">${n2(wsum(f))}</td>`).join('')}</tr>` : ''}
   </table>` : '<p class="fr-note">لا توجد حركة ذهب في هذه الفترة.</p>', 'الأوزان بالغرام (الوزن القائم) خلال الفترة. «بضاعة جديدة مُدخلة» القطع المضافة يدوياً (لا تشمل القطع العائدة من التعديل)، و«قطع أُضيفت من بضاعة التجار» القطع المستلمة من التجار أو المصنوعة من وزنهم بالجملة. «مباع للأفراد» من فواتير البيع بعد خصم المرتجعات، و«مباع للتجار» البضاعة المُخرجة للتجار على الحساب. «قطع أُنتجت من الكسر» القطع المصنوعة من صناديق الكسر. «كسر مستلم من التجار» ما دخل صناديق الكسر من تسكير ذهب أو استلام، و«كسر مُعطى للتجار» ما خرج منها لهم.');
 
-  if (document.getElementById('fr-show-list').checked && invoices.length) {
+  if (frOn('invoices') && invoices.length) {
     h += sec('list_alt', 'الفواتير بالفترة (' + invoices.length + ')', `<div class="fr-wide"></div><table class="fr-t">
       <tr><th>الرقم</th>${FR.scope.multi() ? '<th>الفرع</th>' : ''}<th>النوع</th><th>التاريخ</th><th>الدفع</th><th class="n">المبلغ</th></tr>
       ${[...invoices].reverse().map(i => `<tr style="font-size:11.5px;"><td dir="ltr" style="text-align:right;white-space:nowrap;">${esc(String(i.invoice_number || '').replace(/-20\d\d-0*/, '-'))}</td>${FR.scope.multi() ? '<td>' + esc(FR.scope.nameOf(i.store_id)) + '</td>' : ''}<td>${TYPE[i.type] || esc(i.type)}</td><td style="white-space:nowrap;" dir="ltr">${gmFormatDateTime(i.created_at, { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })}</td><td>${PAY[i.payment_method] || esc(i.payment_method || '')}</td><td class="n">${n2((i.type === 'return' ? -1 : 1) * Number(i.total_amount || 0))}</td></tr>`).join('')}
     </table>`);
   }
   return h;
+}
+
+// ---- ميزان الذهب (بشار 2026-11-24): for the period, per currency —
+// sold: customers' sales after returns, accounting weight → 24k, valued at the gold price saved on each line;
+// bought: scrap from individuals into the «كسر» boxes, all karats → 24k, at the amount paid.
+// Average 24k gram price in the shop's currency; the ounce (31.1035 g) always in USD at the rate set on «سعر الذهب».
+const OZ = 31.1034768;
+function frUsdRate(st) {
+  const c = String((st && st.currency) || '').toUpperCase();
+  if (c === 'USD') return 1;
+  const r = Number(st && st.last_gold_ounce_rate);
+  if (r > 0 && r !== 1) return r;
+  return c === 'AED' ? 3.6725 : 0; // AED is pegged; otherwise unknown until a rate is set
+}
+function frGoldBalance(invoices, items, buyItems, priceMap, STC) {
+  const inv = {}; invoices.forEach(i => inv[i.id] = i);
+  const G = {}; // currency -> figures
+  const g = st => { const c = (st && st.currency) || FR.cur || ''; return G[c] || (G[c] = { cur: c, rate: frUsdRate(st), sw: 0, sv: 0, bw: 0, bv: 0, sn: 0, bn: 0 }); };
+  items.forEach(it => {
+    const i = inv[it.invoice_id]; if (!i || !it.karat) return;
+    const p = gmLineProfit(it, i.type === 'return', 1, priceMap);
+    if (!p.goldPrice || it.piece && it.piece.purchase_cost != null) return; // a piece bought for a price has no gold price
+    const o = g(STC[i.store_id]), w = p.sign * Math.abs(p.weight);
+    o.sw += w * Number(it.karat) / 24; o.sv += w * p.goldPrice; o.sn++;
+  });
+  buyItems.forEach(it => {
+    const i = inv[it.invoice_id]; if (!i || i.type !== 'buyRetail' || !it.gold_stock_lot_id || !it.karat) return;
+    const o = g(STC[i.store_id]);
+    o.bw += (Number(it.weight_grams) || 0) * Number(it.karat) / 24; o.bv += Number(it.line_total) || 0; o.bn++;
+  });
+  const cur = Object.values(G);
+  if (!cur.length) return sec('balance', 'ميزان الذهب', '<p class="fr-note">لا مبيعات ولا مشتريات كسر في هذه الفترة.</p>');
+  const avg = (v, w) => w > 0.0005 ? v / w : 0;
+  const usdOz = (gram, rate) => rate ? '$ ' + gmMoney(gram * OZ / rate) : '— (حدّد سعر الصرف من «سعر الذهب»)';
+  const block = o => {
+    const sg = avg(o.sv, o.sw), bg = avg(o.bv, o.bw), m = x => gmMoney(x) + ' ' + esc(o.cur);
+    return `<table class="fr-t">
+      ${cur.length > 1 ? `<tr><th colspan="2">${esc(o.cur)}</th></tr>` : ''}
+      <tr><th colspan="2">الذهب المباع للزبائن (بعد المرتجعات)</th></tr>
+      ${row('الوزن بعيار 24', g2(o.sw))}
+      ${row('متوسط سعر غرام 24 يوم البيع', o.sw > 0.0005 ? m(sg) : '—')}
+      ${row('متوسط سعر الأونصة (دولار)', o.sw > 0.0005 ? usdOz(sg, o.rate) : '—')}
+      <tr><th colspan="2">الذهب المشترى لصناديق الكسر (كل العيارات)</th></tr>
+      ${row('الوزن بعيار 24', g2(o.bw))}
+      ${row('متوسط سعر غرام 24 المدفوع', o.bw > 0.0005 ? m(bg) : '—')}
+      ${row('متوسط سعر الأونصة (دولار)', o.bw > 0.0005 ? usdOz(bg, o.rate) : '—')}
+      <tr><th colspan="2">الفرق</th></tr>
+      ${row(o.sw >= o.bw ? 'بعنا أكثر مما اشترينا (بعيار 24)' : 'اشترينا أكثر مما بعنا (بعيار 24)', g2(Math.abs(o.sw - o.bw)), ' class="tot"')}
+      ${o.sw > 0.0005 && o.bw > 0.0005 ? row(bg <= sg ? 'اشترينا أرخص من متوسط سعر البيع بـ (للغرام 24)' : 'اشترينا أغلى من متوسط سعر البيع بـ (للغرام 24)', m(Math.abs(sg - bg))) : ''}
+    </table>`;
+  };
+  return sec('balance', 'ميزان الذهب', cur.map(block).join(''),
+    'المباع: الوزن المحاسبي لقطع فواتير البيع محوّلاً لعيار 24، مقيّماً بسعر الذهب المحفوظ على كل سطر يوم البيع (لا يشمل المصنعية ولا البضاعة الخارجة لتجار الجملة ولا القطع المشتراة بسعر نقدي). المشترى: كسر الأفراد في صناديق الكسر محوّلاً لعيار 24 بالمبلغ المدفوع. الأونصة = 31.1035 غ بالدولار حسب سعر الصرف المحفوظ في «سعر الذهب».');
 }
 
 (async function init() {
@@ -505,16 +598,22 @@ async function build(from, to) {
   const owner = me && me.role === 'owner', perm = (me && me.permissions) || {};
   if (!owner && !perm.view_reports) { document.getElementById('fr-noaccess').classList.remove('hidden'); return; }
   FR.canProfit = owner || !!perm.view_profit_report;
+  FR.canGold = owner || !!perm.view_gold_balance;
   FR.store = store || {};
   FR.cur = FR.store.currency || '';
-  FR.scope = await gmBranchScope(document.getElementById('fr-controls'), 'view_reports', () => load(window.__frRange));
+  FR.scope = await gmBranchScope(document.getElementById('fr-controls'), 'view_reports', () => { if (window.__frRange) load(window.__frRange); });
   const all = await gmReportBranches('view_reports');
   if (all.length > 1) { const pr = await gmReportBranches('view_profit_report'); FR.profitAll = all.every(b => pr.some(x => x.id === b.id)); }
   document.getElementById('fr-controls').classList.remove('hidden');
-  document.getElementById('fr-sheet').classList.remove('hidden');
   document.querySelectorAll('#fr-periods .fr-chip').forEach(b => b.addEventListener('click', () => setPeriod(b.dataset.p)));
-  document.getElementById('fr-apply').addEventListener('click', () => { const r = rangeFor('custom'); if (!r) { alert('اختر تاريخ البداية والنهاية'); return; } load(r); });
-  document.getElementById('fr-show-list').addEventListener('change', () => load(window.__frRange));
+  try { const saved = JSON.parse(localStorage.getItem('gm_fr_secs') || 'null'); if (Array.isArray(saved) && saved.length) FR_ON = new Set(saved); } catch (e) { /* ignore */ }
+  frPaintSecs();
+  document.getElementById('fr-secs').addEventListener('change', e => { const k = e.target.dataset.sec; if (!k) return; e.target.checked ? FR_ON.add(k) : FR_ON.delete(k); frSaveSecs(); frPaintSecs(); });
+  document.querySelectorAll('#fr-pick [data-preset]').forEach(b => b.addEventListener('click', () => {
+    FR_ON = new Set(b.dataset.preset === 'all' ? FR_SECS.filter(x => x[0] !== 'goldbal').map(x => x[0]) : FR_PRESETS[b.dataset.preset]);
+    frSaveSecs(); frPaintSecs();
+  }));
+  document.getElementById('fr-run').addEventListener('click', frRun);
   let p = 'today'; try { p = localStorage.getItem('gm_fr_period') || 'today'; } catch (e) { /* ignore */ }
   if (p === 'custom') p = 'today';
   setPeriod(p);

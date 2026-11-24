@@ -14,7 +14,9 @@ test('net profit = customers + wholesale traders + scrap − expenses', async ({
     trader_movements: [{ id: 'g1', store_id: STORE, source: 'stock_given', movement_type: 'debt_decrease', karat: 18, gold_24k_equivalent: 7.5,
       piece_acc_weight: 9, fab_fee_per_gram: 15, gold_price_24k: 100, fab_fee_amount: 150, piece: { cost_fabrication_per_gram: 6 }, created_at: now }],
   } });
+  await page.addInitScript(() => localStorage.setItem('gm_fr_secs', JSON.stringify(['summary', 'sales', 'profit', 'expenses', 'purchases', 'weights', 'cash', 'debts', 'deposits', 'invoices'])));
   await page.goto('/financial-report-ar.html');
+  await page.locator('#fr-controls:not(.hidden) #fr-run').click(); // the report is built on demand
   const body = page.locator('body');
   await expect(body).toContainText('ربح البضاعة الخارجة لتجار الجملة');
   await expect(body).toContainText('171.00');                                  // 96 making + 75 gold difference

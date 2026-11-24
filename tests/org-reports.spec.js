@@ -57,6 +57,7 @@ for (const [path, done] of [['/reports-ar.html', '#invoices-count'], ['/financia
     await setup(page);
     await page.goto(path + '?branch=all');
     await expect(page.locator('#gm-branch-scope')).toHaveValue('all');
+    if (path === '/financial-report-ar.html') await page.locator('#fr-controls:not(.hidden) #fr-run').click(); // built on demand
     await expect(page.locator(done).first()).toBeVisible();
     if (path === '/reports-ar.html') { await expect(page.locator('#invoices-count')).toHaveText('2'); await expect(page.locator('#invoices-tbody')).toContainText('فرع ديرة'); }
     if (path === '/financial-report-ar.html') await expect(page.locator('#fr-store')).toContainText('كل الفروع');
