@@ -118,6 +118,7 @@ test('camera scan fills the barcode and finds the piece', async ({ page }) => {
 test('price typed in SYP: invoice kept in the shop currency, paid and printed in SYP', async ({ page }) => {
   const posted = [];
   const d = db(); d.stores[0].secondary_currency = 'SYP'; d.stores[0].secondary_currency_rate = 13000;
+  d.gold_prices = []; // $76.92 for 10 g would be a losing price (that warning has its own test)
   await install(page, { db: d, rpc: { post_sale_invoice: ({ p }) => { posted.push(p); return { body: { id: 'inv-7', invoice_number: 'INV-7' } }; } } });
   page.on('dialog', dl => dl.accept());
   await page.goto('/new-sale-ar.html');

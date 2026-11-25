@@ -18,6 +18,7 @@
 <script src="supabase-config.js?v=63"></script>
 <script src="theme.js?v=113"></script>
 <script src="gm-invoice-edit.js?v=5"></script>
+<script src="gm-profit.js?v=7"></script>
 <script id="tailwind-config">
         tailwind.config = {
           darkMode: "class",
@@ -118,6 +119,11 @@
   .ns-change b{color:#211D17}
 }
 @media (max-width:1023px) and (prefers-reduced-motion:reduce){#ns-pay{transition:none}}
+/* loss check: a line sold below cost */
+.gm-loss-row td{background:rgba(220,38,38,.10)!important}
+.gm-loss-tag{margin-top:2px;font-size:11px;font-weight:800;color:#B91C1C;white-space:nowrap}
+.gm-loss-msg{margin:6px 0;padding:10px 12px;border-radius:12px;background:#FEE2E2;border:1.5px solid #DC2626;color:#991B1B;font-weight:800;font-size:13px;text-align:center}
+.gm-loss-input{border-color:#DC2626!important;box-shadow:0 0 0 2px rgba(220,38,38,.25)!important}
 </style>
 </head>
 <body class="bg-background font-body-md text-on-background antialiased min-h-screen flex flex-col md:flex-row-reverse overflow-x-hidden">
@@ -424,6 +430,7 @@
 <tfoot id="cart-foot" class="font-data-mono text-data-mono border-t border-outline-variant"></tfoot>
 </table>
 </div>
+<div id="loss-banner" role="alert" class="hidden gm-loss-msg mx-3 mb-3"></div>
 </section>
 
 <!-- Totals & Payment (phone: a bottom sheet opened from the «الدفع» bar — design "MPay") -->
@@ -658,13 +665,52 @@
     // fabrication rate yet.
     let __fabRate = null;
     let __goldPriceByKarat = {};
+    let __vatMul = 1;
+
+    // ---------- Loss check (بشار 2026-11-25) ----------
+    // A line sold below its cost (same formula as the profit report, gm-profit.js:
+    // gold value at today's price + making + diamonds, or the price paid for a bought piece)
+    // is marked red, and the invoice is not posted on the first press.
+    // Returns the loss amount (> 0) or 0 when unknown / no loss.
+    function gmItemLoss(item) {
+        if (typeof gmLineProfit !== 'function' || !(item.price > 0)) return 0;
+        const L = item.line || {};
+        const gp = L.gold_price_per_gram != null ? Number(L.gold_price_per_gram) : __goldPriceByKarat[item.karat];
+        const isD = item.mode === 'diamond';
+        if (!(gp > 0) && !(isD && !item.karat) && !(item.piece && item.piece.purchase_cost != null)) return 0; // no price for this karat yet
+        const it = {
+            line_total: item.price, karat: item.karat, gold_price_per_gram: gp || 0,
+            weight_grams: isD ? 0 : item.weight, accounting_weight_grams: isD ? (item.piece && item.piece.gold_weight_grams) || 0 : (item.accountingWeight ?? item.weight),
+            fabrication_fee: item.piece ? 0 : (Number(item.manualFabFee) || Number(L.fabrication_fee) || 0),
+            piece: !isD && item.piece ? item.piece : null,
+            lot: item.mode === 'stock' ? { cost_fabrication_per_gram: item.fabPerGram || 0 } : null,
+            diamond: isD ? item.piece : null
+        };
+        const pr = gmLineProfit(it, false, __vatMul, {}).profit;
+        return pr < -0.005 ? -pr : 0;
+    }
+    function gmLossLines() { return cart.filter(i => gmItemLoss(i) > 0); }
+    let __lossAck = null; // the cart the seller already confirmed despite the loss
+    function gmCartSig() { return cart.map(i => i.cartId + ':' + i.price).join('|'); }
+    // live hint under the barcode price field, before the piece is added
+    function gmBarcodeLossHint() {
+        const box = document.getElementById('barcode-loss-hint'), inp = document.getElementById('barcode-price-input');
+        if (!box || !inp || !window.__bcPiece) return;
+        const v = parseFloat(inp.value), p = window.__bcPiece;
+        const loss = v > 0 ? gmItemLoss({ price: gmToBase(v), piece: p, karat: p.karat, weight: p.weight_grams, accountingWeight: p.accounting_weight_grams }) : 0;
+        box.classList.toggle('hidden', !loss);
+        inp.classList.toggle('gm-loss-input', !!loss);
+        box.textContent = '⚠ هذه القيمة خاسرة — السعر أقل من تكلفة القطعة' + (__canSeeCost ? ' (خسارة ' + gmMoney(loss) + ' ' + CUR + ')' : '');
+    }
     (async function __loadPriceSuggestionData() {
+        if (typeof GOLDMIND_STORE_ID === 'undefined' || !GOLDMIND_STORE_ID) await requireGoldMindSession('login-entry-ar.html');
         const [{ data: storeRates }, { data: goldPrices }] = await Promise.all([
-            goldmindClient.from('stores').select('fab_rate_retail').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
+            goldmindClient.from('stores').select('fab_rate_retail, vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle(),
             goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID)
         ]);
-        if (storeRates) __fabRate = storeRates.fab_rate_retail;
+        if (storeRates) { __fabRate = storeRates.fab_rate_retail; __vatMul = 1 + (Number(storeRates.vat_rate) || 0) / 100; }
         (goldPrices || []).forEach(p => { __goldPriceByKarat[p.karat] = Number(p.price_per_gram); });
+        if (cart.length) renderCart(); // loss marks need the gold prices
         updateManualPriceSuggestion();
     })();
 
@@ -1550,6 +1596,7 @@
             ? `<img loading="lazy" decoding="async" src="${gmEscapeHtml(p.photo_url)}" alt="صورة القطعة" onclick="openPiecePhoto(this.src)" style="width:72px;height:72px" class="rounded-lg object-cover border border-outline-variant cursor-zoom-in shrink-0 bg-white"/>`
             : `<div style="width:72px;height:72px" class="rounded-lg border border-dashed border-outline-variant flex items-center justify-center shrink-0"><span class="material-symbols-outlined text-outline">no_photography</span></div>`;
         const pieceJson = JSON.stringify(p).replace(/'/g, '&apos;');
+        window.__bcPiece = p;
         return `
             <div class="p-2 bg-surface-container-low rounded-lg flex flex-col gap-2">
                 <div class="flex items-center gap-3">
@@ -1561,12 +1608,13 @@
                 <div class="flex flex-col md:flex-row gap-2">
                     <input type="text" placeholder="وصف القطعة (خاتم، حلق...)" class="flex-1 h-10 border border-outline-variant rounded px-3 text-right" id="barcode-desc-input" value="${gmEscapeHtml(p.description_ar || '')}"/>
                     <div class="flex items-center gap-2 md:w-56">
-                        <input type="number" placeholder="السعر" class="flex-1 min-w-0 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input" onkeydown="if (event.key === 'Enter') this.nextElementSibling.click()"/>
+                        <input type="number" placeholder="السعر" class="flex-1 min-w-0 h-10 border border-outline-variant rounded px-2 text-left font-data-mono" id="barcode-price-input" oninput="gmBarcodeLossHint()" onkeydown="if (event.key === 'Enter') this.nextElementSibling.click()"/>
                         <button onclick='confirmAddBarcodePiece(${pieceJson})' class="w-10 h-10 bg-primary text-white rounded-full flex items-center justify-center active:scale-90 transition-all shrink-0" title="إضافة للفاتورة">
                             <span class="material-symbols-outlined">add</span>
                         </button>
                     </div>
                 </div>
+                <div id="barcode-loss-hint" role="alert" class="hidden gm-loss-msg"></div>
             </div>`;
     }
     function openPiecePhoto(src) {
@@ -1994,8 +2042,8 @@
             return;
         }
 
-        body.innerHTML = cart.map(item => `
-            <tr>
+        body.innerHTML = cart.map(item => { const loss = gmItemLoss(item); return `
+            <tr class="${loss ? 'gm-loss-row' : ''}">
                 <td class="px-3 py-3">
                     <div class="font-body-md">${gmEscapeHtml(item.description) || '—'}${item.mode === 'stock' ? ' <span class="text-[10px] text-secondary font-semibold">(من الرصيد)</span>' : ''}${item.mode === 'diamond' ? ' <span class="text-[10px] text-secondary font-semibold">(ماس)</span>' : ''}</div>
                     <div class="text-outline text-[10px] font-data-mono">${gmEscapeHtml(item.barcode || '')}</div>
@@ -2005,7 +2053,7 @@
                 <td class="px-2 py-3 text-left font-semibold">
                     <button type="button" onclick="editCartPrice(${item.cartId}, this)" aria-label="تعديل سعر القطعة ${gmEscapeHtml(item.barcode || '')}" title="اضغط لتعديل السعر" class="inline-flex items-center gap-1 min-h-[40px] px-1 -mx-1 rounded hover:bg-surface-container-high underline decoration-dotted decoration-outline underline-offset-4">
                         ${gmMoney(gmItemF(item))}${gmItemCode(item) !== BASE_CODE ? ' ' + gmSymOf(gmItemCode(item)) : ''}<span class="material-symbols-outlined text-[14px] text-outline" aria-hidden="true">edit</span>
-                    </button>
+                    </button>${loss ? `<div class="gm-loss-tag">قيمة خاسرة${__canSeeCost ? ' <bdi dir="ltr">−' + gmMoney(loss) + '</bdi>' : ''}</div>` : ''}
                 </td>
                 <td class="px-2 py-3 text-left">
                     <button onclick="removeFromCart(${item.cartId})" aria-label="إزالة القطعة من الفاتورة" class="text-error w-10 h-10 -my-2 inline-flex items-center justify-center rounded-full hover:bg-red-50">
@@ -2013,7 +2061,10 @@
                     </button>
                 </td>
             </tr>
-        `).join('');
+        `; }).join('');
+        const lossN = gmLossLines().length, lossBox = document.getElementById('loss-banner');
+        lossBox.classList.toggle('hidden', !lossN);
+        lossBox.textContent = lossN ? '⚠ يوجد ' + (lossN === 1 ? 'قطعة خاسرة' : lossN + ' قطع خاسرة') + ' داخل الفاتورة — سعرها أقل من تكلفتها. راجع القيمة قبل الترحيل.' : '';
 
         const total = cart.reduce((sum, item) => sum + item.price, 0);
         const byCur = gmCartByCur(), curs = Object.keys(byCur);
@@ -2083,6 +2134,13 @@
     saveBtn.addEventListener('click', async () => {
         const gmSession = await requireGoldMindSession('login-entry-ar.html');
         if (!gmSession) return;
+        // a line below cost: warn in red and stop; a second press on the same cart posts it
+        if (gmLossLines().length && __lossAck !== gmCartSig()) {
+            __lossAck = gmCartSig();
+            showMessage('⚠ انتبه: في الفاتورة قيمة خاسرة (القطع المعلّمة بالأحمر). صحّح السعر، أو اضغط «حفظ الفاتورة» مرة ثانية للترحيل رغم الخسارة.', true);
+            document.getElementById('loss-banner').scrollIntoView({ block: 'center', behavior: 'smooth' });
+            return;
+        }
         if (EDIT_ID) return gmSaveEditFromSale();
 
         if (!selectedCustomer) {
