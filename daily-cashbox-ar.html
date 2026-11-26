@@ -206,9 +206,20 @@ html:root body #cashbox-table tbody :is(.dc-amt-in,.dc-amt-out) *{color:inherit!
 
 <p class="text-[11px] text-outline">هذا دفتر يدوي بسيط لمتابعة نقد الدرج فقط — وليس جزءاً من الحسابات الرسمية (المبيعات/الديون/الضريبة موجودة في مكان آخر). يُرحَّل الرصيد تلقائياً كل يوم كقيد افتتاحي لليوم التالي.</p>
 
+<style>
+/* theme.js wraps every date box in a span with its own date text: here the box is an invisible tap area over the day label */
+.dc-pick { position: relative; }
+.dc-pick > span:has(> #day-nav-pick), #day-nav-pick { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; }
+#day-nav-pick { opacity: 0; cursor: pointer; }
+.dc-pick .gm-date-overlay { display: none !important; }
+</style>
 <div id="day-nav" class="hidden items-center justify-between bg-surface-container-lowest border border-outline-variant rounded-xl p-2">
 <button onclick="shiftDay(-1)" class="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-surface-container-low"><span class="material-symbols-outlined">chevron_right</span></button>
+<span class="dc-pick relative flex items-center gap-1.5 h-9 px-3 rounded-lg hover:bg-surface-container-low">
+<span class="material-symbols-outlined text-[18px]" aria-hidden="true">calendar_month</span>
 <span class="text-[13px] font-semibold" id="day-nav-label"></span>
+<input id="day-nav-pick" type="date" aria-label="اختيار يوم" onclick="try { this.showPicker(); } catch (e) {}" onchange="pickDay(this.value)"/>
+</span>
 <button onclick="shiftDay(1)" class="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-surface-container-low" id="day-nav-next"><span class="material-symbols-outlined">chevron_left</span></button>
 </div>
 
@@ -463,6 +474,8 @@ function updateDayNav() {
   const label = document.getElementById('day-nav-label');
   label.textContent = isToday(selectedDate) ? 'اليوم' : gmFormatDateTime(selectedDate, { day: '2-digit', month: '2-digit', year: 'numeric' });
   document.getElementById('day-nav-next').classList.toggle('invisible', isToday(selectedDate));
+  const pick = document.getElementById('day-nav-pick');
+  pick.max = localDateStr(new Date()); pick.value = localDateStr(selectedDate);
   document.getElementById('entries-heading').textContent = isToday(selectedDate) ? 'عمليات اليوم' : 'عمليات يوم ' + label.textContent;
   document.getElementById('empty-state').textContent = isToday(selectedDate) ? 'لا توجد عمليات مسجّلة اليوم بعد.' : 'لا توجد عمليات مسجّلة بهذا اليوم.';
 }
@@ -471,6 +484,20 @@ function shiftDay(delta) {
   if (delta > 0 && isToday(selectedDate)) return; // can't go past today
   const d = new Date(selectedDate);
   d.setDate(d.getDate() + delta);
+  goToDay(d);
+}
+
+// tapping the date opens the phone's / computer's calendar to jump straight to a day
+function pickDay(v) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(v || '');
+  if (!m) return updateDayNav();
+  const d = new Date(+m[1], +m[2] - 1, +m[3]);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  if (isNaN(d) || d > today) return updateDayNav();
+  goToDay(d);
+}
+
+function goToDay(d) {
   selectedDate = d;
   updateDayNav();
   document.getElementById('addFormDate').value = localDateStr(selectedDate);
