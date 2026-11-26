@@ -21,10 +21,40 @@ test('sale invoice edit: change the customer', async ({ page }) => {
   await expect(page.locator('#customerResults')).toContainText('أحمد سالم');
   page.on('dialog', d => d.accept());
   await page.click('#save-btn');
-  await expect.poll(() => moved).toEqual({ p_invoice: 's1', p_customer: 'c2' });
+  await expect.poll(() => moved).toEqual({ p_invoice: 's1', p_customer: 'c2', p_move_payments: false });
   await expect.poll(() => calls.some(c => c.method === 'PATCH' && c.name === 'invoices')).toBe(true);
   expect(errs).toEqual([]);
 });
+
+// A debt invoice paid off later from the customer's account: the screen asks whose payments they were.
+for (const [answer, move] of [[true, true], [false, false]]) {
+  test('change customer of a paid-later invoice asks about the payments (' + (move ? 'move' : 'return') + ')', async ({ page }) => {
+    let moved = null, asked = '';
+    const calls = await install(page, { db: {
+      stores: [{ id: STORE, name: 'محل', currency: 'USD' }],
+      staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+      user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+      invoices: [{ id: 's1', store_id: STORE, invoice_number: 'INV-135', type: 'sale', status: 'paid', payment_method: 'credit', customer_id: 'c1', total_amount: 1950, amount_paid: 1950, created_at: '2026-11-21T07:00:00Z' }],
+      invoice_items: [{ id: 'it1', invoice_id: 's1', karat: 21, weight_grams: 5, line_total: 1950, description: 'خاتم' }],
+      customer_debts: [{ id: 'd1', store_id: STORE, customer_id: 'c1', invoice_id: 's1', movement_type: 'debt_decrease', cash_amount: 1950, source: 'allocation' }],
+      customers: [{ id: 'c1', store_id: STORE, name: 'علاء', phone: '0501' }, { id: 'c2', store_id: STORE, name: 'علي', phone: '0502' }],
+      pieces: []
+    }, rpc: { sale_invoice_change_customer: a => { moved = a; return { body: null }; } } });
+    await page.goto('/invoice-edit-ar.html?id=s1');
+    await expect(page.locator('#customerCurrent')).toContainText('علاء');
+    await page.fill('#customerSearch', 'علي');
+    await page.locator('#customerResults button').first().click();
+    page.on('dialog', d => { if (/الزبون السابق/.test(d.message())) { asked = d.message(); return answer ? d.accept() : d.dismiss(); } return d.accept(); });
+    await page.click('#save-btn');
+    await expect.poll(() => moved).toEqual({ p_invoice: 's1', p_customer: 'c2', p_move_payments: move });
+    expect(asked).toContain('1,950');
+    if (move) {
+      await expect.poll(() => calls.some(c => c.method === 'PATCH' && c.name === 'invoices')).toBe(true);
+      const body = JSON.parse(calls.find(c => c.method === 'PATCH' && c.name === 'invoices').body);
+      expect([body.amount_paid, body.status]).toEqual([1950, 'paid']);
+    }
+  });
+}
 
 test('sale invoice edit: mixed payment (cash + card, rest on debt)', async ({ page }) => {
   const errs = []; page.on('pageerror', e => errs.push(e.message));

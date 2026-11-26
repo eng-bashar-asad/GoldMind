@@ -67,7 +67,7 @@ async function gmSaveInvoiceEdit(s) {
   const r2 = v => Math.round(v * 100) / 100;
   const newTotal = r2(items.reduce((t, it) => t + Number(it.line_total || 0), 0));
   const oldTotal = Number(invoice.total_amount);
-  const later = await gmInvoiceLaterPaid(invoice);
+  let later = await gmInvoiceLaterPaid(invoice);
   const mixCash = (s.mixed && s.mixed.cash) || 0, mixBank = (s.mixed && s.mixed.bank) || 0;
 
   if (invoice.type === 'sale') {
@@ -78,9 +78,21 @@ async function gmSaveInvoiceEdit(s) {
   // customer first (with the invoice's old amounts), so its remaining debt moves
   // to the new customer and any difference below is posted on the new one
   if (invoice.type === 'sale' && s.newCustomer && s.newCustomer.id && s.newCustomer.id !== invoice.customer_id) {
-    const { error } = await goldmindClient.rpc('sale_invoice_change_customer', { p_invoice: invoice.id, p_customer: s.newCustomer.id });
+    // ponytail: a plain confirm(); a two-button dialog would read better if staff find OK/Cancel unclear
+    const movePayments = later > 0.009 && typeof confirm === 'function' && confirm(
+      'دُفع على هذه الفاتورة لاحقاً ' + gmFormatNumber(later) + ' من حساب الزبون السابق.\n\n'
+      + 'اضغط «موافق» إذا كانت هذه الدفعات من الزبون الجديد أيضاً (تصحيح اسم): تبقى الفاتورة مدفوعة ولا يتغيّر رصيد أيٍّ منهما.\n\n'
+      + 'اضغط «إلغاء» إذا كانت من الزبون السابق: تعود رصيداً له، وينتقل المبلغ إلى الزبون الجديد ديناً عليه.');
+    const { error } = await goldmindClient.rpc('sale_invoice_change_customer', { p_invoice: invoice.id, p_customer: s.newCustomer.id, p_move_payments: movePayments });
     if (error) return { error: 'تعذّر تغيير الزبون: ' + error.message };
     invoice.customer_id = s.newCustomer.id;
+    {
+      // the server may have changed what is paid (payments returned, the new customer's credit applied):
+      // carry on from its amounts, not the ones loaded with the page
+      const { data: fresh } = await goldmindClient.from('invoices').select('amount_paid, status').eq('id', invoice.id).maybeSingle();
+      if (fresh) { invoice.amount_paid = fresh.amount_paid; invoice.status = fresh.status; }
+      later = await gmInvoiceLaterPaid(invoice);
+    }
   }
 
   const isTrader = invoice.type === 'buyTrader' || invoice.type === 'buyRetail';
