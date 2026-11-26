@@ -545,6 +545,27 @@
 </div>
 </div>
 </details>
+<details class="mt-2 group space-y-4" id="calc-code-section">
+<summary class="flex items-center justify-between cursor-pointer list-none marker:content-none py-2.5 px-3 rounded-lg bg-surface-container-low">
+<h3 class="font-label-md text-label-md text-secondary font-bold">رمز فتح البرنامج على هذا الكمبيوتر</h3>
+<span class="material-symbols-outlined text-[20px] text-outline transition-transform duration-200 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="pt-4 flex flex-col gap-4">
+<p class="text-[11px] text-outline">يفتح البرنامج على هذا الكمبيوتر من شاشة الآلة الحاسبة بالرمز السري. لتغييره: اضغط الزر، ثم أدخل الرمز الجديد (أسهم وأرقام ثم Enter) مرتين، فيعود البرنامج. يمكن أيضاً تغييره من الآلة الحاسبة بإدخال الرمز الحالي وإنهائه بـ Shift + Enter.</p>
+<button type="button" id="calc-code-btn" onclick="gmChangeCalcCode()" class="h-11 rounded-lg border border-outline-variant text-[13px] font-semibold text-on-surface hover:bg-surface-container-low transition">تغيير الرمز السري</button>
+<p id="calc-code-msg" class="text-[12px] font-semibold text-error" aria-live="polite"></p>
+</div>
+</details>
+<script>
+// Only inside the Windows "Calculator Pro" app: it hands the window back to its change-code screen.
+(function () {
+  const sec = document.getElementById('calc-code-section');
+  if (!(window.__TAURI__ && window.__TAURI__.core)) { sec.remove(); return; }
+  window.gmChangeCalcCode = () => window.__TAURI__.core.invoke('change_code').catch(() => {
+    document.getElementById('calc-code-msg').textContent = 'هذه الميزة تحتاج آخر نسخة من تطبيق الكمبيوتر.';
+  });
+})();
+</script>
 <div id="save-message" class="hidden text-center text-sm font-semibold py-2 rounded-lg"></div>
 
 <button id="save-btn" type="button" class="gm-cta w-full h-14 bg-secondary text-on-secondary rounded-lg font-bold shadow-md active:scale-[0.98] transition-all mt-2">
@@ -1261,7 +1282,7 @@ if ('serviceWorker' in navigator) {
   const TABS = [['basic', 'الأساسية', 'storefront'], ['invoice', 'الفواتير والضريبة', 'receipt_long'], ['pieces', 'القطع والأسعار', 'diamond'], ['labels', 'الملصقات والأجهزة', 'qr_code_2'], ['security', 'الأمان', 'fingerprint']];
   const MAP = { 'ترقيم الفواتير': 'invoice', 'أجرة المصنعية': 'pieces', 'معادلة المصنعية': 'labels', 'مصمم ملصق': 'labels', 'أنواع وتصنيفات': 'pieces', 'ترقيم القطع': 'pieces',
     'بيانات التواصل': 'basic', 'أشخاص التواصل': 'basic', 'بيانات المنشأة': 'basic', 'البيانات القانونية': 'basic', 'الفوترة الإلكترونية': 'invoice', 'الألماس': 'pieces',
-    'الجرد بـ RFID': 'labels', 'تنبيه الديون': 'invoice', 'الدخول بالبصمة': 'security' };
+    'الجرد بـ RFID': 'labels', 'تنبيه الديون': 'invoice', 'الدخول بالبصمة': 'security', 'رمز فتح البرنامج': 'security' };
   const first = document.querySelector('details.group'); if (!first) return;
   const box = first.parentElement, kids = [...box.children];
   const tabOf = el => {
