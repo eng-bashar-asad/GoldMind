@@ -1,5 +1,7 @@
 // Calculator Pro — a working calculator. A secret key sequence (arrows/digits ending with Enter)
-// hands over to the main program; a wrong sequence does nothing at all, so nothing looks hidden.
+// opens the main program at once; ending it with Shift+Enter opens "change the code" instead.
+// GoldMind's settings can also send the window here (index.html#change) to change the code.
+// A wrong sequence does nothing at all, so nothing looks hidden.
 (function (root) {
     'use strict';
 
@@ -176,6 +178,7 @@
     let stored = null;          // "<n>:<hash>"
     let mode = 'calc';          // calc | gate | new1 | new2
     let newSeq = [];
+    let fromProgram = false;    // came from GoldMind's settings: cancel/save go back to it
 
     const $ = id => document.getElementById(id);
 
@@ -193,9 +196,18 @@
         ['gate', 'newseq'].forEach(p => $(p).classList.toggle('hidden', p !== id));
     }
 
-    function openApp() {
-        $('gate-msg').textContent = 'جارٍ الفتح…';
-        invoke('open_app').catch(() => { $('gate-msg').textContent = 'تعذّر الفتح. أعد المحاولة.'; });
+    // the gate panel only shows when opening failed, with a retry button
+    function openApp(note) {
+        invoke('open_app').catch(() => {
+            mode = 'gate'; show('gate');
+            $('gate-msg').textContent = (note ? note + ' ' : '') + 'تعذّر فتح البرنامج.';
+            $('gate-open').focus();
+        });
+    }
+
+    function leaveNewSeq() {
+        if (fromProgram) return openApp();
+        mode = 'calc'; show(null);
     }
 
     function startNewSeq() {
@@ -231,22 +243,22 @@
         try {
             await invoke('set_code', { value: enc });
             stored = enc;
-            mode = 'gate'; show('gate');
-            $('gate-msg').textContent = 'تم حفظ الرمز الجديد.';
+            $('ns-title').textContent = 'تم حفظ الرمز الجديد.';
+            $('ns-dots').textContent = '';
+            openApp('تم حفظ الرمز الجديد.');
         } catch (e) {
             $('ns-msg').textContent = 'تعذّر حفظ الرمز. أعد المحاولة.';
             mode = 'new1'; newSeq = [];
         }
     }
 
-    async function feed(t) {
+    async function feed(t, shift) {
         if (!t) return;
         buffer.push(t);
         if (buffer.length > 40) buffer = buffer.slice(-40);
         if (t === 'E' && stored && await matches(buffer, stored)) {
             buffer = []; calc = newCalc(); render();
-            mode = 'gate'; $('gate-msg').textContent = ''; show('gate');
-            $('gate-open').focus();
+            if (shift) { fromProgram = false; startNewSeq(); } else openApp();
         }
     }
 
@@ -259,7 +271,7 @@
         const e = { key: keyOf(ev), preventDefault: () => ev.preventDefault() };
         if (mode === 'new1' || mode === 'new2') {
             e.preventDefault();
-            if (e.key === 'Escape') { mode = 'gate'; show('gate'); return; }
+            if (e.key === 'Escape') { leaveNewSeq(); return; }
             const t = tokenOf(e.key);
             if (t && e.key !== '=') onNewSeqKey(t);
             return;
@@ -272,7 +284,7 @@
         const k = map[e.key] || e.key;
         if (/^[0-9.+−×÷^()!%=BCπe]$/.test(k)) { e.preventDefault(); onCalcKey(k); }
         if (e.key.startsWith('Arrow')) e.preventDefault();
-        feed(tokenOf(e.key));
+        feed(tokenOf(e.key), ev.shiftKey);
     });
 
     document.querySelectorAll('[data-k]').forEach(b => b.addEventListener('click', () => {
@@ -283,11 +295,14 @@
         b.blur();
     }));
 
-    $('gate-open').addEventListener('click', openApp);
-    $('gate-change').addEventListener('click', startNewSeq);
-    $('ns-cancel').addEventListener('click', () => { mode = 'gate'; show('gate'); });
+    $('gate-open').addEventListener('click', () => openApp());
+    $('ns-cancel').addEventListener('click', leaveNewSeq);
     document.addEventListener('contextmenu', e => e.preventDefault());
 
     loadStored();
     render();
+    if (location.hash === '#change') {
+        history.replaceState(null, '', location.pathname);
+        fromProgram = true; startNewSeq();
+    }
 })(typeof window !== 'undefined' ? window : globalThis);

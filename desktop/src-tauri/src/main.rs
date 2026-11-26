@@ -51,6 +51,16 @@ fn open_app(window: WebviewWindow) -> Result<(), String> {
     window.navigate(url).map_err(|e| e.to_string())
 }
 
+// GoldMind's settings («رمز فتح البرنامج») call this: back to the calculator page, straight into
+// "change the code". Only this command is open to the remote pages (capabilities/goldmind.json).
+#[tauri::command]
+fn change_code(window: WebviewWindow) -> Result<(), String> {
+    // Tauri 2 serves the local page from http://tauri.localhost on Windows
+    let local = if cfg!(windows) { "http://tauri.localhost/index.html#change" } else { "tauri://localhost/index.html#change" };
+    let url: Url = local.parse().map_err(|_| "bad url".to_string())?;
+    window.navigate(url).map_err(|e| e.to_string())
+}
+
 // Pages of the program (print views, reports opened in a new tab) open in a new app window that
 // shares this window's session; anything else (WhatsApp, maps, mail) opens in the default browser.
 fn is_program_url(url: &Url) -> bool {
@@ -92,7 +102,7 @@ fn main() {
                 .build()?;
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![get_code, set_code, open_app])
+        .invoke_handler(tauri::generate_handler![get_code, set_code, open_app, change_code])
         .run(tauri::generate_context!())
         .expect("error while running application");
 }
