@@ -73,14 +73,17 @@ body.gm-hero-page { justify-content: flex-start !important; }
   var st = document.createElement('style'); st.id = 'gm-hero-style'; st.textContent = css;
   (document.head || document.documentElement).appendChild(st);
   // runs from <head> (not deferred): fetch the artwork right away
+  // sharper artwork (بشار 2026-11-27): AI-upscaled 4× master, served at the size the screen needs
+  var HERO_SET = 'goldmind-hero.jpg 1024w, goldmind-hero-1536.jpg 1536w, goldmind-hero-2048.jpg 2048w', HERO_SIZES = '(min-width: 1024px) and (min-aspect-ratio: 4/3) min(64vw, 104vh), min(100vw, 560px)';
   var pl = document.createElement('link'); pl.rel = 'preload'; pl.as = 'image'; pl.href = 'goldmind-hero.jpg';
+  pl.setAttribute('imagesrcset', HERO_SET); pl.setAttribute('imagesizes', HERO_SIZES);
   (document.head || document.documentElement).appendChild(pl);
   function mount() {
     if (document.querySelector('.gm-hero')) return;
     var main = document.querySelector('main'); if (!main) return;
     document.body.classList.add('gm-hero-page');
     var wrap = document.createElement('div');
-    wrap.innerHTML = '<div class="gm-hero" aria-hidden="true"><img src="goldmind-hero.jpg" alt="" width="1024" height="1024" decoding="async" fetchpriority="high"/>' +
+    wrap.innerHTML = '<div class="gm-hero" aria-hidden="true"><img src="goldmind-hero.jpg" srcset="' + HERO_SET + '" sizes="' + HERO_SIZES + '" alt="" width="1024" height="1024" decoding="async" fetchpriority="high"/>' +
       '<div class="gm-hero-glow"></div><div class="gm-hero-shine"></div><div class="gm-hero-sparks">' + '<i style="--x:45%;--y:64%;--s:4px;--d:7.6s;--w:0.5s;--dx:4px"></i><i style="--x:16%;--y:78%;--s:5px;--d:5.2s;--w:3.6s;--dx:-28px"></i><i style="--x:15%;--y:82%;--s:4px;--d:5.3s;--w:0.6s;--dx:-3px"></i><i style="--x:11%;--y:91%;--s:2px;--d:8.8s;--w:4.4s;--dx:7px"></i><i style="--x:11%;--y:91%;--s:5px;--d:6.6s;--w:6.8s;--dx:-28px"></i><i style="--x:75%;--y:63%;--s:3px;--d:6.7s;--w:3.8s;--dx:6px"></i><i style="--x:43%;--y:90%;--s:3px;--d:5.4s;--w:4.0s;--dx:-18px"></i><i style="--x:51%;--y:61%;--s:5px;--d:7.8s;--w:4.0s;--dx:9px"></i><i style="--x:30%;--y:86%;--s:5px;--d:6.7s;--w:2.2s;--dx:7px"></i><i style="--x:62%;--y:78%;--s:3px;--d:6.0s;--w:1.3s;--dx:19px"></i><i style="--x:35%;--y:60%;--s:5px;--d:6.2s;--w:3.5s;--dx:-9px"></i><i style="--x:61%;--y:73%;--s:5px;--d:8.9s;--w:0.8s;--dx:-4px"></i><i style="--x:25%;--y:76%;--s:3px;--d:8.7s;--w:3.0s;--dx:12px"></i><i style="--x:13%;--y:90%;--s:5px;--d:8.2s;--w:5.7s;--dx:-9px"></i><i style="--x:92%;--y:77%;--s:5px;--d:7.0s;--w:5.6s;--dx:-26px"></i><i style="--x:15%;--y:72%;--s:4px;--d:7.8s;--w:0.5s;--dx:16px"></i><i style="--x:93%;--y:74%;--s:5px;--d:9.0s;--w:5.8s;--dx:-12px"></i><i style="--x:95%;--y:79%;--s:3px;--d:5.1s;--w:3.2s;--dx:-20px"></i>' + '</div></div>' +
       '<div class="gm-hero-spacer" aria-hidden="true"></div>';
     while (wrap.firstChild) main.parentNode.insertBefore(wrap.firstChild, main);
