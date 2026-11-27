@@ -143,7 +143,8 @@ public class GMUhfPlugin extends Plugin {
         try { old = sled.readNearest(p); } catch (Exception e) { c.reject(e.getMessage()); return; }
         if (old == null) { c.reject("لم تُقرأ أي شريحة — ضع الملصقة ملاصقة لمقدمة الجهاز، أو ارفع «قوة برمجة الشرائح» قليلاً من إعداد القارئ"); return; }
         if (!sled.writeEpc(old, epc, p)) { c.reject("فشلت الكتابة على الشريحة — أعد المحاولة"); return; }
-        String now = sled.readOne(Math.min((p <= 0 ? 10 : p) + 4, 20)); // the label in hand: the strongest at this power
+        String now; // the label in hand, found the same way as before the write (power steps up until it answers)
+        try { now = sled.readNearest(p); } catch (Exception e) { now = null; }
         if (now == null || !now.startsWith(epc)) { c.reject("كُتبت الشريحة لكن تعذّر التحقق منها — أعد المحاولة"); return; }
         JSObject o = new JSObject(); o.put("oldEpc", old); o.put("epc", now); c.resolve(o);
     }

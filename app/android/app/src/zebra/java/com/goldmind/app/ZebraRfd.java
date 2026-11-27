@@ -198,11 +198,12 @@ final class ZebraRfd implements RfidSled {
         p.setWriteDataLength(newEpc.length() / 4); // in 16-bit words
         p.setAccessPassword(0);
         p.setWriteRetries(3);
-        // writing needs more power than reading; the write is addressed to oldEpc only, so a stronger
-        // field can't touch the neighbours. Try a bit above the read power, then the sled's maximum.
-        // never the sled's maximum: the label is in hand, and a full-power field reaches the whole counter
+        // writing needs much more power than reading. بشار 2026-11-27: capped at 20–22 dBm (from the 24th)
+        // the writes kept failing — staff tried 15+ times per label. The write is addressed to oldEpc only
+        // (readNearest made sure it is the one label held against the sled), so step up to the sled's
+        // maximum as before the 24th: about 17 dBm, then 24, then full power.
         int base = powerDbm <= 0 ? 10 : powerDbm;
-        int[] tries = { Math.min(base + 4, 20), Math.min(base + 8, 22) };
+        int[] tries = { Math.max(base + 8, 17), 24, 0 }; // 0 = the sled's maximum
         Exception last = null;
         for (int pw : tries) {
             try { setPower(pw); reader.Actions.TagAccess.writeWait(oldEpc, p, null, null); return true; }
