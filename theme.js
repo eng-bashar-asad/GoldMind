@@ -1958,8 +1958,10 @@ function gmClosePhotoViewer() {
     get() { return desc.get.call(this); },
     set(v) { desc.set.call(this, v); if (this.__gmDateOverlay) sync(this); }
   });
+  // six :not()s: themes paint every input's text with !important (beige marble's (0,7,2) beat the old three);
+  // on Android the date's own text then showed under the overlay — two dates on top of each other (بشار 2026-11-27)
   const st = document.createElement('style');
-  st.textContent = 'html:root body input.gm-date-native.gm-date-native:not(.gm-z):not(.gm-z):not(.gm-z){color:transparent !important;-webkit-text-fill-color:transparent !important;caret-color:transparent}' +
+  st.textContent = 'html:root body input.gm-date-native.gm-date-native:not(.gm-z):not(.gm-z):not(.gm-z):not(.gm-z):not(.gm-z):not(.gm-z){color:transparent !important;-webkit-text-fill-color:transparent !important;caret-color:transparent}' +
     'input.gm-date-native::-webkit-datetime-edit{color:transparent !important}' +
     'input.gm-date-native::-webkit-calendar-picker-indicator{opacity:.7;cursor:pointer}';
   (document.head || document.documentElement).appendChild(st);
