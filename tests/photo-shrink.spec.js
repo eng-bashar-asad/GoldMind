@@ -11,7 +11,7 @@ const bigPng = page => page.evaluate(() => { const c = document.createElement('c
 test('uploads to piece-photos are shrunk to 1200px JPEG', async ({ page }) => {
   await install(page, { generic: true, db: base });
   const ups = [];
-  await page.route(/storage\/v1\/object\/piece-photos\//, async r => { const b = r.request().postDataBuffer(); ups.push({ type: r.request().headers()['content-type'], size: b ? b.length : 0 }); r.fulfill({ json: { Key: 'x' } }); });
+  await page.route(/storage\/v1\/object\/piece-photos\//, async r => { const b = r.request().postDataBuffer(); ups.push({ type: r.request().headers()['content-type'], cache: r.request().headers()['cache-control'] || ((b && b.toString('latin1').match(/name="cacheControl"\r\n\r\n([^\r]+)/)) || [])[1], size: b ? b.length : 0 }); r.fulfill({ json: { Key: 'x' } }); });
   await page.goto('/settings-ar.html');
   const b64 = await bigPng(page);
   const res = await page.evaluate(async b64 => {
@@ -27,5 +27,6 @@ test('uploads to piece-photos are shrunk to 1200px JPEG', async ({ page }) => {
   expect(res.same).toBe('a.heic'); // undecodable formats go up unchanged
   expect(ups).toHaveLength(1);
   expect(ups[0].size).toBeLessThan(res.before / 3);
+  expect(String(ups[0].cache)).toMatch(/31536000/); // devices keep a photo a year instead of re-downloading it hourly
 });
 

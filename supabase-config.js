@@ -232,9 +232,11 @@ async function gmShrinkPhoto(file, maxSide = 1200, quality = 0.8) {
     const api = from(bucket);
     if (bucket !== 'piece-photos') return api;
     const upload = api.upload.bind(api);
+    // a photo's path is never reused (upsert: false, a new name on every change), so devices may keep it a year:
+    // the old one-hour default re-downloaded every photo each hour and used up Supabase's free cached-egress quota
     api.upload = async (path, body, opts) => {
       const small = await gmShrinkPhoto(body);
-      return upload(path, small, small !== body ? Object.assign({}, opts, { contentType: 'image/jpeg' }) : opts);
+      return upload(path, small, Object.assign({ cacheControl: '31536000' }, opts, small !== body ? { contentType: 'image/jpeg' } : {}));
     };
     return api;
   };

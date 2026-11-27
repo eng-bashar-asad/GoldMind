@@ -12,7 +12,7 @@
 <title>بيانات الشركة | GoldMind</title>
 <script src="https://cdn.tailwindcss.com/3.4.17?plugins=forms@0.5.10,container-queries@0.1.1"></script>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
-<script src="supabase-config.js?v=63"></script>
+<script src="supabase-config.js?v=64"></script>
 <script src="theme.js?v=114"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet"/>
 <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet"/>
@@ -545,6 +545,55 @@
 </div>
 </div>
 </details>
+<details class="mt-2 group space-y-4" id="photo-cache-section">
+<summary class="flex items-center justify-between cursor-pointer list-none marker:content-none py-2.5 px-3 rounded-lg bg-surface-container-low">
+<h3 class="font-label-md text-label-md text-secondary font-bold">تسريع تحميل صور القطع القديمة</h3>
+<span class="material-symbols-outlined text-[20px] text-outline transition-transform duration-200 group-open:rotate-180">expand_more</span>
+</summary>
+<div class="pt-4 flex flex-col gap-4">
+<p class="text-[11px] text-outline">الصور الجديدة يحتفظ بها كل جهاز سنة كاملة. الصور التي رُفعت قبل ذلك يعيد الجهاز تنزيلها كل ساعة، وهذا يستهلك حدّ التخزين المجاني. اضغط مرة واحدة لكل شركة: تُعاد حفظ صور هذه الشركة كما هي دون أي تغيير في الصورة.</p>
+<button type="button" id="photo-cache-btn" onclick="gmFixOldPhotos()" class="h-11 rounded-lg border border-outline-variant text-[13px] font-semibold text-on-surface hover:bg-surface-container-low transition">تحديث الصور القديمة</button>
+<p id="photo-cache-msg" class="text-[12px] font-semibold text-on-surface-variant" aria-live="polite"></p>
+</div>
+</details>
+<script>
+// One-off per company: old piece photos were stored with a one-hour cache, so every device re-downloaded them
+// hourly (Supabase free cached-egress quota, 2026-11-27). Re-save each one unchanged with a one-year cache.
+// update() is not shrunk by the upload wrapper: the bytes stay exactly the same.
+async function gmFixOldPhotos() {
+  const btn = document.getElementById('photo-cache-btn'), msg = document.getElementById('photo-cache-msg');
+  const st = goldmindClient.storage.from('piece-photos');
+  btn.disabled = true; msg.textContent = 'جارٍ البحث عن الصور...';
+  try {
+    const all = [];
+    for (let off = 0; ; off += 1000) {
+      const { data, error } = await st.list(GOLDMIND_STORE_ID, { limit: 1000, offset: off });
+      if (error) throw error;
+      all.push(...data.filter(o => o.id));
+      if (data.length < 1000) break;
+    }
+    const todo = all.filter(o => !/31536000/.test((o.metadata && o.metadata.cacheControl) || ''));
+    let done = 0, failed = 0;
+    const one = async o => {
+      const path = GOLDMIND_STORE_ID + '/' + o.name;
+      try {
+        const { data: blob, error } = await st.download(path);
+        if (error || !blob || !blob.size) throw error || new Error('empty');
+        const { error: e2 } = await st.update(path, blob, { cacheControl: '31536000', contentType: (o.metadata && o.metadata.mimetype) || blob.type || 'image/jpeg' });
+        if (e2) throw e2;
+        done++;
+      } catch (e) { failed++; }
+      msg.textContent = 'تمّ ' + (done + failed) + ' من ' + todo.length + (failed ? ' (تعذّر ' + failed + ')' : '');
+    };
+    for (let i = 0; i < todo.length; i += 4) await Promise.all(todo.slice(i, i + 4).map(one));
+    msg.textContent = !todo.length ? 'كل صور هذه الشركة محدّثة.'
+      : 'تمّ تحديث ' + done + ' صورة' + (failed ? '، وتعذّر ' + failed + ' — اضغط مرة أخرى لإعادة المحاولة.' : '.');
+  } catch (e) {
+    msg.textContent = 'تعذّر الوصول إلى الصور: ' + (e.message || e);
+  }
+  btn.disabled = false;
+}
+</script>
 <details class="mt-2 group space-y-4" id="calc-code-section">
 <summary class="flex items-center justify-between cursor-pointer list-none marker:content-none py-2.5 px-3 rounded-lg bg-surface-container-low">
 <h3 class="font-label-md text-label-md text-secondary font-bold">رمز فتح البرنامج على هذا الكمبيوتر</h3>
@@ -1282,7 +1331,7 @@ if ('serviceWorker' in navigator) {
   const TABS = [['basic', 'الأساسية', 'storefront'], ['invoice', 'الفواتير والضريبة', 'receipt_long'], ['pieces', 'القطع والأسعار', 'diamond'], ['labels', 'الملصقات والأجهزة', 'qr_code_2'], ['security', 'الأمان', 'fingerprint']];
   const MAP = { 'ترقيم الفواتير': 'invoice', 'أجرة المصنعية': 'pieces', 'معادلة المصنعية': 'labels', 'مصمم ملصق': 'labels', 'أنواع وتصنيفات': 'pieces', 'ترقيم القطع': 'pieces',
     'بيانات التواصل': 'basic', 'أشخاص التواصل': 'basic', 'بيانات المنشأة': 'basic', 'البيانات القانونية': 'basic', 'الفوترة الإلكترونية': 'invoice', 'الألماس': 'pieces',
-    'الجرد بـ RFID': 'labels', 'تنبيه الديون': 'invoice', 'الدخول بالبصمة': 'security', 'رمز فتح البرنامج': 'security' };
+    'الجرد بـ RFID': 'labels', 'تنبيه الديون': 'invoice', 'الدخول بالبصمة': 'security', 'رمز فتح البرنامج': 'security', 'تسريع تحميل صور': 'pieces' };
   const first = document.querySelector('details.group'); if (!first) return;
   const box = first.parentElement, kids = [...box.children];
   const tabOf = el => {
