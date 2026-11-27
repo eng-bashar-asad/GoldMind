@@ -31,3 +31,12 @@ test('one branch: no organization-price box', async ({ page }) => {
   await expect(page.locator('#price24')).not.toHaveText('—');
   await expect(page.locator('#orgPriceBox')).toHaveClass(/\bhidden\b/);
 });
+
+// بشار 2026-11-27: «آخر تحديث» showed no date, and the page carried an unrelated profit-report link.
+test('last update shows its date and time; no profit-report link', async ({ page }) => {
+  await setup(page, { branches: 1 });
+  await page.goto('/gold-price-ar.html');
+  await expect(page.locator('#lastUpdated')).toContainText('18/10/2026');
+  await expect(page.locator('#lastUpdated')).toContainText(/\d{1,2}:\d{2}/);
+  await expect(page.locator('main a[href="profit-report-ar.html"]')).toHaveCount(0);
+});

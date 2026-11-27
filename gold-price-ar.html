@@ -97,7 +97,6 @@
 <p class="text-[12px] text-on-surface-variant" id="lastUpdated">لم يتم تحديد سعر بعد</p>
 </div>
 
-<a href="profit-report-ar.html" class="text-center text-[13px] font-semibold text-secondary">عرض تقرير الأرباح على القطع المباعة ←</a>
 
 </div>
 </main>
@@ -165,7 +164,7 @@ async function loadLastUpdated() {
 
   if (data) {
     document.getElementById('lastUpdated').textContent =
-      'آخر تحديث: ' + gmFormatDateTime(data.updated_at, { dateStyle: 'medium', timeStyle: 'short' });
+      gmFormatDateTime(data.updated_at); // date and time (the dateStyle/timeStyle options gave an empty text)
 
     const { data: allPrices } = await goldmindClient.from('gold_prices').select('karat, price_per_gram').eq('store_id', GOLDMIND_STORE_ID);
     (allPrices || []).forEach(p => {
