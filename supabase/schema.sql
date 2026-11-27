@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict a8L3DkPQA6YBcKbG63A9WPJc6jsi0AaxTCYQgcrLi3xDPd30SVGnppZ20ReLVLJ
+\restrict jn6Dzk5MW1n1jca7IqmwDFXzsCNd3ddxWkR8IDUT0vb2SjwEx5TO7BwoVFyyesY
 
 
 SET statement_timeout = 0;
@@ -4867,45 +4867,55 @@ end $$;
 --
 
 CREATE FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid) RETURNS void
+    LANGUAGE sql SECURITY DEFINER
+    SET search_path TO 'public'
+    AS $$ select public.sale_invoice_change_customer(p_invoice, p_customer, false) $$;
+
+
+--
+-- Name: sale_invoice_change_customer(uuid, uuid, boolean); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid, p_move_payments boolean) RETURNS void
     LANGUAGE plpgsql SECURITY DEFINER
     SET search_path TO 'public'
     AS $$
-declare inv record; newc record; oldname text; rem numeric; me uuid; alloc numeric;
-begin
-  select * into inv from invoices where id = p_invoice for update;
-  if inv is null then raise exception 'الفاتورة غير موجودة'; end if;
-  if not has_permission('edit_invoice', inv.store_id) then raise exception 'ليس لديك صلاحية تعديل الفواتير' using errcode = '42501'; end if;
-  if inv.type <> 'sale' or inv.status = 'cancelled' then raise exception 'يمكن تغيير الزبون لفواتير البيع غير الملغاة فقط'; end if;
-  select id, name into newc from customers where id = p_customer and store_id in (select org_store_ids(inv.store_id));
-  if newc is null then raise exception 'الزبون غير موجود'; end if;
-  if inv.customer_id = newc.id then return; end if;
-  select name into oldname from customers where id = inv.customer_id;
-  select id into me from staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
-  -- the old customer's later payments that were applied to this invoice go back to him as credit
-  if inv.customer_id is not null then
-    select coalesce(sum(case when movement_type = 'debt_decrease' then cash_amount else -cash_amount end), 0) into alloc
-      from customer_debts where invoice_id = inv.id and customer_id = inv.customer_id and source = 'allocation';
-    if alloc > 0.009 then
-      insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
-        (inv.store_id, inv.customer_id, inv.id, 'debt_increase', alloc, 0, 'إلغاء تخصيص للفاتورة ' || inv.invoice_number || ' (نُقلت إلى ' || newc.name || ')', 'allocation', me),
-        (inv.store_id, inv.customer_id, null, 'debt_decrease', alloc, 0, 'إلغاء تخصيص للفاتورة ' || inv.invoice_number || ' (نُقلت إلى ' || newc.name || ')', 'allocation', me);
-      update invoices set amount_paid = greatest(coalesce(amount_paid, 0) - alloc, 0), status = case when status = 'paid' then 'unpaid' else status end
-       where id = inv.id returning * into inv;
-    end if;
-  end if;
-  rem := round(inv.total_amount - coalesce(inv.amount_paid, 0), 2);
-  update invoices set customer_id = newc.id where id = inv.id;
-  if rem > 0.009 and inv.customer_id is not null then
-    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
-    values (inv.store_id, inv.customer_id, inv.id, 'debt_decrease', rem, 0, 'نقل دين الفاتورة ' || inv.invoice_number || ' إلى ' || newc.name, 'invoice_edit', me);
-  end if;
-  if rem > 0.009 then
-    insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
-    values (inv.store_id, newc.id, inv.id, 'debt_increase', rem, 0, 'دين الفاتورة ' || inv.invoice_number || ' منقول من ' || coalesce(oldname, 'زبون سابق'), 'invoice_edit', me);
-  end if;
-  if inv.customer_id is not null then perform gm_allocate_customer_credit(inv.store_id, inv.customer_id); end if;
-  perform gm_allocate_customer_credit(inv.store_id, newc.id);
-end $$;
+    declare inv record; newc record; oldname text; rem numeric; me uuid; alloc numeric;
+    begin
+      select * into inv from invoices where id = p_invoice for update;
+        if inv is null then raise exception 'الفاتورة غير موجودة'; end if;
+          if not has_permission('edit_invoice', inv.store_id) then raise exception 'ليس لديك صلاحية تعديل الفواتير' using errcode = '42501'; end if;
+            if inv.type <> 'sale' or inv.status = 'cancelled' then raise exception 'يمكن تغيير الزبون لفواتير البيع غير الملغاة فقط'; end if;
+              select id, name into newc from customers where id = p_customer and store_id in (select org_store_ids(inv.store_id));
+                if newc is null then raise exception 'الزبون غير موجود'; end if;
+                  if inv.customer_id = newc.id then return; end if;
+                    select name into oldname from customers where id = inv.customer_id;
+                      select id into me from staff where user_id = auth.uid() and store_id = inv.store_id limit 1;
+                        -- unless they move with the invoice, the old customer's later payments applied to it go back to him as credit
+                          if inv.customer_id is not null and not coalesce(p_move_payments, false) then
+                              select coalesce(sum(case when movement_type = 'debt_decrease' then cash_amount else -cash_amount end), 0) into alloc
+                                    from customer_debts where invoice_id = inv.id and customer_id = inv.customer_id and source = 'allocation';
+                                        if alloc > 0.009 then
+                                              insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by) values
+                                                      (inv.store_id, inv.customer_id, inv.id, 'debt_increase', alloc, 0, 'إلغاء تخصيص للفاتورة ' || inv.invoice_number || ' (نُقلت إلى ' || newc.name || ')', 'allocation', me),
+                                                              (inv.store_id, inv.customer_id, null, 'debt_decrease', alloc, 0, 'إلغاء تخصيص للفاتورة ' || inv.invoice_number || ' (نُقلت إلى ' || newc.name || ')', 'allocation', me);
+                                                                    update invoices set amount_paid = greatest(coalesce(amount_paid, 0) - alloc, 0), status = case when status = 'paid' then 'unpaid' else status end
+                                                                           where id = inv.id returning * into inv;
+                                                                               end if;
+                                                                                 end if;
+                                                                                   rem := round(inv.total_amount - coalesce(inv.amount_paid, 0), 2);
+                                                                                     update invoices set customer_id = newc.id where id = inv.id;
+                                                                                       if rem > 0.009 and inv.customer_id is not null then
+                                                                                           insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+                                                                                               values (inv.store_id, inv.customer_id, inv.id, 'debt_decrease', rem, 0, 'نقل دين الفاتورة ' || inv.invoice_number || ' إلى ' || newc.name, 'invoice_edit', me);
+                                                                                                 end if;
+                                                                                                   if rem > 0.009 then
+                                                                                                       insert into customer_debts (store_id, customer_id, invoice_id, movement_type, cash_amount, gold_grams_24k, notes, source, created_by)
+                                                                                                           values (inv.store_id, newc.id, inv.id, 'debt_increase', rem, 0, 'دين الفاتورة ' || inv.invoice_number || ' منقول من ' || coalesce(oldname, 'زبون سابق'), 'invoice_edit', me);
+                                                                                                             end if;
+                                                                                                               if inv.customer_id is not null then perform gm_allocate_customer_credit(inv.store_id, inv.customer_id); end if;
+                                                                                                                 perform gm_allocate_customer_credit(inv.store_id, newc.id);
+                                                                                                                 end $$;
 
 
 --
@@ -14533,6 +14543,15 @@ GRANT ALL ON FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_cust
 
 
 --
+-- Name: FUNCTION sale_invoice_change_customer(p_invoice uuid, p_customer uuid, p_move_payments boolean); Type: ACL; Schema: public; Owner: -
+--
+
+REVOKE ALL ON FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid, p_move_payments boolean) FROM PUBLIC;
+GRANT ALL ON FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid, p_move_payments boolean) TO authenticated;
+GRANT ALL ON FUNCTION public.sale_invoice_change_customer(p_invoice uuid, p_customer uuid, p_move_payments boolean) TO service_role;
+
+
+--
 -- Name: FUNCTION save_expense_category(p_store uuid, p_name text, p_id uuid); Type: ACL; Schema: public; Owner: -
 --
 
@@ -15763,5 +15782,5 @@ ALTER DEFAULT PRIVILEGES FOR ROLE supabase_admin IN SCHEMA public GRANT ALL ON T
 -- PostgreSQL database dump complete
 --
 
-\unrestrict a8L3DkPQA6YBcKbG63A9WPJc6jsi0AaxTCYQgcrLi3xDPd30SVGnppZ20ReLVLJ
+\unrestrict jn6Dzk5MW1n1jca7IqmwDFXzsCNd3ddxWkR8IDUT0vb2SjwEx5TO7BwoVFyyesY
 
