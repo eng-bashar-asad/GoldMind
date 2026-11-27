@@ -209,7 +209,8 @@ html:root body #cashbox-table tbody :is(.dc-amt-in,.dc-amt-out) *{color:inherit!
 <style>
 /* theme.js wraps every date box in a span with its own date text: here the box is an invisible tap area over the day label */
 .dc-pick { position: relative; }
-.dc-pick > span:has(> #day-nav-pick), #day-nav-pick { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; }
+/* no :has() — older Android WebViews ignore it and left the tap area 0px high (بشار 2026-11-27) */
+.dc-pick > span:last-child, #day-nav-pick { position: absolute !important; inset: 0 !important; width: 100% !important; height: 100% !important; }
 #day-nav-pick { opacity: 0; cursor: pointer; }
 .dc-pick .gm-date-overlay { display: none !important; }
 </style>
@@ -218,7 +219,7 @@ html:root body #cashbox-table tbody :is(.dc-amt-in,.dc-amt-out) *{color:inherit!
 <span class="dc-pick relative flex items-center gap-1.5 h-9 px-3 rounded-lg hover:bg-surface-container-low">
 <span class="material-symbols-outlined text-[18px]" aria-hidden="true">calendar_month</span>
 <span class="text-[13px] font-semibold" id="day-nav-label"></span>
-<input id="day-nav-pick" type="date" aria-label="اختيار يوم" onclick="try { this.showPicker(); } catch (e) {}" onchange="pickDay(this.value)"/>
+<input id="day-nav-pick" type="date" aria-label="اختيار يوم" onchange="pickDay(this.value)"/>
 </span>
 <button onclick="shiftDay(1)" class="h-9 w-9 flex items-center justify-center rounded-lg hover:bg-surface-container-low" id="day-nav-next"><span class="material-symbols-outlined">chevron_left</span></button>
 </div>

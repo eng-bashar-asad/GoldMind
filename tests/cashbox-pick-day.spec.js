@@ -15,6 +15,15 @@ test('pick a day from the date on the day bar', async ({ page }) => {
   await page.goto('/daily-cashbox-ar.html');
   await expect(page.locator('#day-nav-label')).toHaveText('اليوم');
   const pick = page.locator('#day-nav-pick');
+  // the invisible date box covers the whole date button, so a tap anywhere on it opens the calendar
+  const hit = await page.evaluate(() => {
+    document.querySelector('.dc-pick').scrollIntoView({ block: 'center' });
+    const r = document.querySelector('.dc-pick').getBoundingClientRect();
+    const el = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return { id: el && el.id, h: document.getElementById('day-nav-pick').getBoundingClientRect().height };
+  });
+  expect(hit.id).toBe('day-nav-pick');
+  expect(hit.h).toBeGreaterThan(10);
   await expect(pick).toHaveAttribute('max', /^\d{4}-\d{2}-\d{2}$/);
   await page.waitForFunction(() => typeof allEntries !== 'undefined' && allEntries.length > 0);
   await pick.fill('2026-03-15');
