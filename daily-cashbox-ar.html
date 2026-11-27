@@ -41,7 +41,9 @@
 @media (max-width:1023px){ .dc-actions{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
   .dc-actions>button{height:64px!important;flex-direction:column;gap:2px!important;font-size:11px;padding:0 2px;min-width:0;overflow:hidden;border-width:1px!important;border-radius:14px!important}
   .dc-actions>button#dcCountBtn{display:flex} }
-@media (min-width:1024px){ .dc-actions{display:flex;flex-direction:column;gap:12px} }
+/* computer: the tools sit at the top of the side column as one row of small buttons (بشار 2026-11-27: no scrolling to reach them) */
+@media (min-width:1024px){ .dc-actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+  .dc-actions>button{height:58px!important;flex-direction:column;gap:2px!important;font-size:12px;padding:0 2px;min-width:0;border-width:1px!important;border-radius:12px!important} }
 #cashbox-table tr[data-src="man"] .dc-src{display:none}
 </style>
 <style> body { min-height: max(884px, 100dvh); } </style>
@@ -52,7 +54,9 @@
 /* phone: the short "what is this page" note goes to the end, the balance comes first */
 @media (max-width:1023px){ #page-content > p.text-outline{order:99} }
 @media (min-width:1024px){
-  #page-content:not(.hidden){display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,330px);gap:14px 22px;align-items:start}
+  #page-content:not(.hidden){display:grid;grid-template-columns:minmax(0,1fr) minmax(300px,360px);gap:14px 22px;align-items:start}
+  /* side column, top to bottom: day picker, tools, the open tool's panel, then drawer count and last days */
+  #page-content > #dcKpis{order:-3} #page-content > #day-nav{order:-2} #page-content > .dc-actions{order:-1} #page-content > #dcSide{order:1}
   #page-content > *{grid-column:2;margin:0!important}
   #page-content > #dcKpis{grid-column:1/-1;display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px}
   #page-content > #gm-entries-col{grid-column:1;grid-row:2 / span 40}
@@ -183,7 +187,7 @@ html:root body #cashbox-table tbody :is(.dc-amt-in,.dc-amt-out) *{color:inherit!
 </div>
 </div>
 </header>
-<main class="pb-32 max-w-md lg:max-w-7xl mx-auto px-4 lg:px-8">
+<main class="pb-32 max-w-md lg:max-w-none mx-auto px-4 lg:px-8">
 
 <div id="loading-state" class="py-16 text-center text-on-surface-variant text-sm">جارِ التحميل...</div>
 <div id="no-access" class="hidden py-16 text-center text-error text-sm">ليس لديك صلاحية الوصول للصندوق اليومي.</div>
