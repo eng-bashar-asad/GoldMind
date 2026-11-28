@@ -16,18 +16,19 @@ if (!history.state) {
 // build) against the latest commit on GitHub and — only when they differ,
 // and only inside the actual installed app, never on the website — shows
 // a small dismissible banner linking to the newest APK download.
-(function gmCheckAppUpdate() {
-  const isNativeApp = !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
-  if (!isNativeApp) return;
+const GM_APK_URL = 'https://github.com/eng-bashar-asad/GoldMind/releases/download/app-latest/GoldMind.apk';
+function gmIsNativeApp() {
+  return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === 'function' && window.Capacitor.isNativePlatform());
+}
 
-  const DISMISS_KEY = 'goldmind_update_dismissed_sha';
-  const APK_URL = 'https://github.com/eng-bashar-asad/GoldMind/releases/download/app-latest/GoldMind.apk';
-
+// → { current: build-info of this APK, latestSha, available } ; null when it can't tell (website, offline)
+function gmAppUpdateCheck() {
+  if (!gmIsNativeApp()) return Promise.resolve(null);
   // ?t=: never an older copy from a cache (an app update keeps the old service worker for one launch)
-  fetch('build-info.json?t=' + Date.now(), { cache: 'no-store' })
+  return fetch('build-info.json?t=' + Date.now(), { cache: 'no-store' })
     .then(r => r.ok ? r.json() : null)
     .then(buildInfo => {
-      if (!buildInfo || !buildInfo.sha) return;
+      if (!buildInfo || !buildInfo.sha) return null;
       // Compare with the commit the downloadable APK was actually built from
       // (written in the release notes), not the newest commit on main: a new
       // commit is on main minutes before its APK is ready, and downloading
@@ -37,20 +38,51 @@ if (!history.state) {
         .then(rel => {
           const body = String(rel && rel.body || '');
           const m = body.match(/commit ([0-9a-f]{40})/);
-          if (!m) return;
-          const releaseSha = m[1];
-          if (releaseSha === buildInfo.sha) return; // this phone already has the newest APK
+          if (!m) return null;
+          const latestSha = m[1];
           // Same app files, only another commit (tests, SQL, notes): not an update (Bashar 2026-11-02).
           const c = body.match(/content ([0-9a-f]{16})/);
-          if (c && buildInfo.content && c[1] === buildInfo.content) return;
-          if (localStorage.getItem(DISMISS_KEY) === releaseSha) return; // user already dismissed this exact version
-          gmShowUpdateBanner(APK_URL, releaseSha);
+          const same = latestSha === buildInfo.sha || !!(c && buildInfo.content && c[1] === buildInfo.content);
+          return { current: buildInfo, latestSha, available: !same };
         });
     })
-    .catch(() => {}); // silent — a failed version check should never block using the app
+    .catch(() => null); // silent — a failed version check should never block using the app
+}
+
+// Download and install the newest APK from inside the app (GMUpdate plugin, APKs from 2026-11-28 on);
+// an older APK without the plugin opens the download link in the browser as before.
+// onProgress(percent | -1, text) ; resolves when Android's installer is open.
+function gmAppUpdateInstall(latestSha, onProgress) {
+  // a different link for every version: the phone's browser otherwise offers to "open" the APK it
+  // downloaded last time (same address), which reinstalls the old version and the bar comes back.
+  const url = GM_APK_URL + '?v=' + String(latestSha || Date.now()).slice(0, 12);
+  const P = window.Capacitor && window.Capacitor.Plugins && window.Capacitor.Plugins.GMUpdate;
+  const say = (p, t) => { try { onProgress && onProgress(p, t); } catch (e) {} };
+  if (!P) { location.href = url; return Promise.resolve(); }
+  say(0, 'جارٍ تنزيل آخر إصدار...');
+  let sub = null;
+  return Promise.resolve(P.addListener('progress', d => say(d.percent, d.percent >= 0 ? 'جارٍ التنزيل ' + d.percent + '%' : 'جارٍ التنزيل...')))
+    .then(h => { sub = h; return P.install({ url }); })
+    .then(() => say(100, 'اضغط «تثبيت» في النافذة التي ظهرت.'))
+    .catch(e => {
+      if (e && e.code === 'NEED_PERMISSION') say(-1, 'اسمح لـ GoldMind بتثبيت التطبيقات في الشاشة التي فُتحت، ثم ارجع واضغط الزر مرة أخرى.');
+      else say(-1, 'تعذّر تنزيل التحديث. تأكد من الإنترنت وحاول مرة أخرى.');
+      throw e;
+    })
+    .finally(() => { if (sub && sub.remove) sub.remove(); });
+}
+
+// Inside the installed app only: a small dismissible bar when a newer APK exists.
+// The sideloaded APK is a snapshot frozen at build time inside app/www (the website updates itself).
+(function gmCheckAppUpdate() {
+  gmAppUpdateCheck().then(u => {
+    if (!u || !u.available) return;
+    if (localStorage.getItem('goldmind_update_dismissed_sha') === u.latestSha) return; // user already dismissed this exact version
+    gmShowUpdateBanner(u.latestSha);
+  });
 })();
 
-function gmShowUpdateBanner(apkUrl, latestSha) {
+function gmShowUpdateBanner(latestSha) {
   if (document.getElementById('gm-update-banner')) return;
   const bar = document.createElement('div');
   bar.id = 'gm-update-banner';
@@ -61,16 +93,20 @@ function gmShowUpdateBanner(apkUrl, latestSha) {
     'display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 12px;padding-top:calc(8px + ' + SAFE_TOP + ');' +
     'font-family:Inter,sans-serif;font-size:12.5px;font-weight:600;direction:rtl;box-shadow:0 2px 8px rgba(0,0,0,.15);';
   bar.innerHTML =
-    '<span>يتوفر تحديث جديد للتطبيق</span>' +
+    '<span id="gm-update-text">يتوفر تحديث جديد للتطبيق</span>' +
     '<span style="display:flex;gap:6px;align-items:center;">' +
-      // a different link for every version: the phone's browser otherwise offers to "open" the APK it
-      // downloaded last time (same address), which reinstalls the old version and the bar comes back.
-      '<a href="' + apkUrl + '?v=' + String(latestSha).slice(0, 12) + '" style="background:#fff;color:#7a6222;border-radius:999px;padding:8px 14px;text-decoration:none;font-weight:700;">تنزيل</a>' +
-      '<button type="button" aria-label="إخفاء" style="background:transparent;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;min-width:44px;min-height:44px;">×</button>' +
+      '<button type="button" id="gm-update-go" style="background:#fff;color:#7a6222;border:none;border-radius:999px;padding:8px 14px;font-weight:700;cursor:pointer;">تنزيل</button>' +
+      '<button type="button" id="gm-update-x" aria-label="إخفاء" style="background:transparent;border:none;color:#fff;font-size:18px;line-height:1;cursor:pointer;min-width:44px;min-height:44px;">×</button>' +
     '</span>';
-  bar.querySelector('button').onclick = function () {
+  bar.querySelector('#gm-update-x').onclick = function () {
     localStorage.setItem('goldmind_update_dismissed_sha', latestSha);
     bar.remove();
+  };
+  const go = bar.querySelector('#gm-update-go');
+  go.onclick = function () {
+    go.disabled = true;
+    gmAppUpdateInstall(latestSha, (p, t) => { bar.querySelector('#gm-update-text').textContent = t; })
+      .catch(() => {}).finally(() => { go.disabled = false; });
   };
   document.body.prepend(bar);
   document.body.style.paddingTop = 'calc(' + (document.body.style.paddingTop || '0px') + ' + 44px + max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px)))';

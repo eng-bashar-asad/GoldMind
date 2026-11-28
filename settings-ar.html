@@ -134,7 +134,7 @@
   </style>
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0/dist/umd/supabase.js" integrity="sha384-TcHRA3zBbn+Lexh5n+Oil4guNPOS3rjNDpGRAN46u/s/mB2IZ50ceC6TYDU2yvgK" crossorigin="anonymous"></script>
   <script src="supabase-config.js?v=64"></script>
-<script src="theme.js?v=114"></script>
+<script src="theme.js?v=115"></script>
   </head>
 <body class="bg-background text-on-background selection:bg-secondary-container">
 <!-- TopAppBar -->
@@ -264,6 +264,40 @@
 </div>
 </div>
 </section>
+<!-- App version (installed app only) -->
+<section class="mb-6 hidden" id="appUpdateSection">
+<h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">التطبيق</h3>
+<div class="bg-surface-container-lowest border border-outline-variant rounded-xl luxury-shadow p-4 flex flex-col gap-3">
+<div class="flex items-center gap-3">
+<span class="material-symbols-outlined text-secondary">system_update</span>
+<div class="flex-1 min-w-0">
+<p class="font-label-md text-label-md text-on-surface">إصدار التطبيق</p>
+<p id="appUpdateState" class="text-[12px] text-on-surface-variant" aria-live="polite">جارٍ التحقق من آخر إصدار...</p>
+</div>
+</div>
+<button type="button" id="appUpdateBtn" class="h-11 rounded-lg border border-outline-variant text-[13px] font-semibold text-on-surface hover:bg-surface-container-low transition disabled:opacity-50">تنزيل آخر إصدار</button>
+</div>
+</section>
+<script>
+// Settings › التطبيق: see whether a newer app exists and install it from inside the app (gmAppUpdateInstall, theme.js).
+(function () {
+  if (typeof gmIsNativeApp !== 'function' || !gmIsNativeApp()) return;
+  const sec = document.getElementById('appUpdateSection'), st = document.getElementById('appUpdateState'), btn = document.getElementById('appUpdateBtn');
+  sec.classList.remove('hidden');
+  let latest = null;
+  const when = b => (b && b.built_at && typeof gmFormatDateTime === 'function') ? ' — ' + gmFormatDateTime(b.built_at) : '';
+  gmAppUpdateCheck().then(u => {
+    if (!u) { st.textContent = 'تعذّر التحقق الآن. يمكنك تنزيل آخر إصدار على أي حال.'; return; }
+    latest = u.latestSha;
+    st.textContent = (u.available ? 'يتوفر إصدار جديد. إصدارك الحالي' : 'لديك آخر إصدار') + when(u.current);
+    btn.textContent = u.available ? 'تنزيل آخر إصدار وتثبيته' : 'إعادة تنزيل آخر إصدار';
+  });
+  btn.onclick = () => {
+    btn.disabled = true;
+    gmAppUpdateInstall(latest, (p, t) => { st.textContent = t; }).catch(() => {}).finally(() => { btn.disabled = false; });
+  };
+})();
+</script>
 <!-- Account -->
 <section class="mb-6">
 <h3 class="font-label-md text-label-md text-on-surface-variant mb-3 uppercase tracking-wider">الحساب</h3>

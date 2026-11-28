@@ -16,6 +16,7 @@ public class MainActivity extends BridgeActivity {
     public void onCreate(Bundle savedInstanceState) {
         registerPlugin(GMPrintPlugin.class); // printing from the app (see GMPrintPlugin)
         registerPlugin(GMUhfPlugin.class);   // RFID on Chainway and Urovo handhelds (see GMUhfPlugin)
+        registerPlugin(GMUpdatePlugin.class); // download + install the newest APK from inside the app
         super.onCreate(savedInstanceState);
         if (webViewTooOld()) {
             // the pages need a modern WebView; on old handhelds (C72, Android 6,
