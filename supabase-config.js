@@ -502,7 +502,7 @@ function gmLoadAssistant() {
     const page = (location.pathname.split('/').pop() || '');
     if (!navigator.onLine || window.__gmAssistant || /print|receipt|label|certificate|privacy|switch-branch|login|zebra/.test(page)) return;
     const s = document.createElement('script');
-    s.src = 'gm-assistant.js?v=1';
+    s.src = 'gm-assistant.js?v=2';
     s.defer = true;
     document.head.appendChild(s);
 }

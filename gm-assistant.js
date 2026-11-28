@@ -31,7 +31,7 @@
   .gma-panel{position:fixed;z-index:10030;inset-inline-start:12px;bottom:calc(12px + env(safe-area-inset-bottom));width:min(420px,calc(100vw - 24px));height:min(620px,calc(100dvh - 24px));
     display:none;flex-direction:column;direction:rtl;font-family:var(--gm-font-family,Arial),Arial,sans-serif;background:var(--gm-bg-elevated,#fff);color:var(--gm-on-surface,#1C1A16);
     border:1px solid var(--gm-outline-variant,#E4DAC0);border-radius:16px;box-shadow:0 18px 48px rgba(28,26,22,.28);overflow:hidden}
-  .gma-panel.open{display:flex}
+  .gma-panel.open{display:flex}.gma-panel.hidden{display:none}
   .gma-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--gm-outline-variant,#E4DAC0)}
   .gma-head h2{flex:1;margin:0;font-size:15px}
   .gma-ic{width:44px;height:44px;border:0;background:none;color:inherit;border-radius:10px;cursor:pointer;display:flex;align-items:center;justify-content:center}
@@ -59,7 +59,9 @@
   btn.innerHTML = '<span class="material-symbols-outlined" aria-hidden="true">support_agent</span>';
 
   const panel = document.createElement('section');
-  panel.className = 'gma-panel'; panel.id = 'gmAssistant'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'مساعد GoldMind');
+  // closed = class 'hidden': gm-nav.js treats any [role=dialog]:not(.hidden) as open
+  // and pauses the phone gestures (swipe back, pull to refresh) while it is.
+  panel.className = 'gma-panel hidden'; panel.id = 'gmAssistant'; panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'مساعد GoldMind');
   panel.innerHTML = `
     <div class="gma-head"><span class="material-symbols-outlined" aria-hidden="true">support_agent</span><h2>مساعد GoldMind</h2>
       <button type="button" class="gma-ic" id="gmaClear" aria-label="محادثة جديدة"><span class="material-symbols-outlined" aria-hidden="true">refresh</span></button>
@@ -111,7 +113,7 @@
   }
 
   function open(on) {
-    panel.classList.toggle('open', on); btn.style.display = on ? 'none' : '';
+    panel.classList.toggle('open', on); panel.classList.toggle('hidden', !on); btn.style.display = on ? 'none' : '';
     btn.setAttribute('aria-expanded', String(on));
     if (on) { paint(); input.focus(); } else btn.focus();
   }

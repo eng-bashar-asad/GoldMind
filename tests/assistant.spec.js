@@ -24,6 +24,8 @@ test('assistant: opens, sends the conversation with the company id, shows the re
   await page.goto('/reports-ar.html');
   const btn = page.locator('#gmAssistantBtn');
   await expect(btn).toBeVisible();
+  // closed panel must not count as an open dialog (that pauses the phone gestures in gm-nav.js)
+  expect(await page.locator('[role="dialog"]:not(.hidden)').count()).toBe(0);
   await btn.click();
   await page.locator('#gmaInput').fill('وين الفواتير؟');
   await page.locator('#gmaSend').click();
