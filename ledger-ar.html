@@ -1479,8 +1479,14 @@ function showTraderDetail(traderId) {
                 <input id="edit-batch-fee-${group.batchId}-${idx}" type="number" step="0.01" dir="ltr" placeholder="مصنعية/غ" class="col-span-3 h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${r.fab_fee_per_gram || ''}"/>
               </div>
               <input type="hidden" id="edit-batch-id-${group.batchId}-${idx}" value="${r.id}"/>
+              <input type="hidden" id="edit-batch-basis-${group.batchId}-${idx}" value="${ldRowBasis(r)}"/>
+              <input type="hidden" id="edit-batch-priced-${group.batchId}-${idx}" value="${r.sale_cost != null && !(Number(r.fab_fee_per_gram) > 0) ? 1 : ''}"/>
             </div>`;
           }).join('')}
+          <label class="flex items-center gap-2 text-[12px] font-semibold text-on-surface-variant">ضريبة على المصنعية %
+            <input id="edit-batch-vat-${group.batchId}" type="number" step="0.01" min="0" dir="ltr" placeholder="0" class="w-24 h-9 border border-outline-variant rounded-lg px-2 text-[12px] font-data-mono" value="${ldBatchVat(rows)}"/>
+            <span class="font-normal text-[11px]">اتركها 0 إن لم توجد ضريبة</span>
+          </label>
           <textarea id="edit-batch-notes-${group.batchId}" class="w-full h-14 border border-outline-variant rounded-lg px-3 py-2 text-[13px]">${gmEscapeHtml(first.notes || '')}</textarea>
           <p class="text-error text-[11px] hidden" id="edit-batch-error-${group.batchId}"></p>
           <div class="flex gap-2">
@@ -1868,6 +1874,24 @@ function toggleEditStockBatch(batchId) {
   el.classList.toggle('flex');
 }
 
+// Which weight a goods line was billed on: its gold owed (24K) = billed weight × karat/24.
+function ldRowBasis(r) {
+  const k = Number(r.karat || 0) / 24, g = Number(r.gold_24k_equivalent || 0);
+  const gross = Number(r.weight_grams || 0), acc = Number(r.accounting_weight_grams || gross);
+  if (!(k > 0 && g > 0)) return 'acc';
+  const w = g / k;
+  return Math.abs(w - gross) < Math.abs(w - acc) ? 'gross' : 'acc';
+}
+// VAT % on making already in a voucher: making = billed weight × per gram × (1 + VAT).
+function ldBatchVat(rows) {
+  const r = rows.find(x => Number(x.fab_fee_per_gram) > 0 && Number(x.fab_fee_amount) > 0);
+  if (!r) return 0;
+  const w = ldRowBasis(r) === 'gross' ? Number(r.weight_grams || 0) : Number(r.accounting_weight_grams || r.weight_grams || 0);
+  if (!(w > 0)) return 0;
+  const v = Math.round((Number(r.fab_fee_amount) / (w * Number(r.fab_fee_per_gram)) - 1) * 10000) / 100;
+  return Math.abs(v) < 0.05 ? 0 : v;
+}
+
 async function saveEditStockBatch(batchId, rowCount) {
   const errEl = document.getElementById('edit-batch-error-' + batchId);
   errEl.classList.add('hidden');
@@ -1878,9 +1902,12 @@ async function saveEditStockBatch(batchId, rowCount) {
   // each line keeps its own note (its barcode) unless the note was actually edited
   const notesChanged = notesEl.value !== notesEl.defaultValue;
   const updates = [];
+  const vatRate = Math.max(0, parseFloat(document.getElementById('edit-batch-vat-' + batchId).value) || 0);
 
   for (let idx = 0; idx < rowCount; idx++) {
     const id = document.getElementById(`edit-batch-id-${batchId}-${idx}`).value;
+    const basis = document.getElementById(`edit-batch-basis-${batchId}-${idx}`).value;
+    const priced = !!document.getElementById(`edit-batch-priced-${batchId}-${idx}`).value;
     const weight = parseFloat(document.getElementById(`edit-batch-weight-${batchId}-${idx}`).value);
     const accWeight = parseFloat(document.getElementById(`edit-batch-accweight-${batchId}-${idx}`).value) || weight;
     const karat = parseInt(document.getElementById(`edit-batch-karat-${batchId}-${idx}`).value, 10);
@@ -1892,18 +1919,21 @@ async function saveEditStockBatch(batchId, rowCount) {
       return;
     }
 
+    // The gold owed and the making are recomputed on the weight the voucher was billed on (gross or
+    // accounting, as when it was saved), plus the VAT on making typed above (بشار 2026-11-28: editing used
+    // to switch gross-billed vouchers to the accounting weight and dropped the VAT without showing it).
+    // A fixed-price line (sale_cost, no per-gram making) keeps its price.
+    const billW = basis === 'gross' ? weight : accWeight;
     updates.push({
       id,
       weight_grams: weight,
       accounting_weight_grams: accWeight,
       karat,
-      // Gold-24k-equivalent must be recomputed from the (possibly edited)
-      // accounting weight + karat -- it's what the trader's gold-debt
-      // balance is actually built from, so it can never be left stale
-      // after an edit.
-      gold_24k_equivalent: +(accWeight * (karat / 24)).toFixed(3),
-      fab_fee_per_gram: fee,
-      fab_fee_amount: +(accWeight * fee).toFixed(2),
+      ...(priced ? {} : {
+        gold_24k_equivalent: +(billW * (karat / 24)).toFixed(3),
+        fab_fee_per_gram: fee,
+        fab_fee_amount: +(billW * fee * (1 + vatRate / 100)).toFixed(2),
+      }),
       notes: notes || null
     });
   }
@@ -1913,9 +1943,7 @@ async function saveEditStockBatch(batchId, rowCount) {
       weight_grams: u.weight_grams,
       accounting_weight_grams: u.accounting_weight_grams,
       karat: u.karat,
-      gold_24k_equivalent: u.gold_24k_equivalent,
-      fab_fee_per_gram: u.fab_fee_per_gram,
-      fab_fee_amount: u.fab_fee_amount,
+      ...('fab_fee_amount' in u ? { gold_24k_equivalent: u.gold_24k_equivalent, fab_fee_per_gram: u.fab_fee_per_gram, fab_fee_amount: u.fab_fee_amount } : {}),
       ...(notesChanged ? { notes: u.notes } : {})
     }).eq('id', u.id))
   );

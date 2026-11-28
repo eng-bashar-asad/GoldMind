@@ -70,3 +70,29 @@ test('single give-out row: «إرجاع للمخزن» returns the piece on its 
   await expect.poll(() => asked.length).toBe(1);
   expect(asked[0]).toMatchObject({ p_movement: 'm1' });
 });
+
+// بشار 2026-11-28: the voucher edit shows the VAT on making (1% here) and keeps the gross-weight billing.
+test('voucher edit shows the VAT on making; clearing it bills 18/g on the gross weight', async ({ page }) => {
+  const patches = [];
+  await install(page, { generic: true, db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD' }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'بشار' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    traders: [{ id: 't1', store_id: STORE, name: 'إلياس' }],
+    pieces: [{ id: 'pc1', store_id: STORE, barcode: '001244' }],
+    trader_movements: [
+      // gross 37.46, accounting 35.39, billed on gross: gold 37.46×18/24 = 28.095, making 37.46×18×1.01 = 681.02
+      { id: 'm1', store_id: STORE, trader_id: 't1', batch_id: 'b1', piece_id: 'pc1', movement_type: 'debt_decrease', source: 'stock_given',
+        weight_grams: 37.46, accounting_weight_grams: 35.39, karat: 18, gold_24k_equivalent: 28.095, fab_fee_per_gram: 18, fab_fee_amount: 681.02, created_at: ago(2) },
+    ],
+  } });
+  page.on('request', r => { if (r.method() === 'PATCH' && /trader_movements/.test(r.url())) patches.push(r.postDataJSON()); });
+  await page.addInitScript(() => { window.ldCards = true; });
+  await page.goto('/ledger-ar.html?trader=t1');
+  await page.locator('button', { hasText: 'تعديل' }).first().click();
+  await expect(page.locator('#edit-batch-vat-b1')).toHaveValue('1');
+  await page.fill('#edit-batch-vat-b1', '0');
+  await page.locator('#edit-batch-form-b1 button', { hasText: 'حفظ التعديلات' }).click();
+  await expect.poll(() => patches.length).toBe(1);
+  expect(patches[0]).toMatchObject({ fab_fee_per_gram: 18, fab_fee_amount: 674.28, gold_24k_equivalent: 28.095 });
+});
