@@ -491,8 +491,20 @@ async function requireGoldMindSession(redirectTo) {
     if (GOLDMIND_STORE_ID && GOLDMIND_STAFF_ID) {
         try { localStorage.setItem('gm_membership', JSON.stringify({ user: session.user.id, store: GOLDMIND_STORE_ID, staff: GOLDMIND_STAFF_ID })); } catch (e) { /* ignore */ }
         gmStartHeartbeat();
+        gmLoadAssistant();
     }
     return session;
+}
+
+// In-app support assistant (gm-assistant.js): only for a signed-in company
+// user, online, and not on print / receipt / label pages.
+function gmLoadAssistant() {
+    const page = (location.pathname.split('/').pop() || '');
+    if (!navigator.onLine || window.__gmAssistant || /print|receipt|label|certificate|privacy|switch-branch|login|zebra/.test(page)) return;
+    const s = document.createElement('script');
+    s.src = 'gm-assistant.js?v=1';
+    s.defer = true;
+    document.head.appendChild(s);
 }
 
 // "Who is online" for the owner's home screen: while a page is open and
