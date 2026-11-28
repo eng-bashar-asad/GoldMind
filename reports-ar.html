@@ -343,6 +343,7 @@ function applyCustomRange() {
 
 let REP_RUN = 0; // only the latest period may paint
 async function loadReport() {
+  if (!SCOPE) return; // page still starting: load() runs the chosen period when ready
   const run = ++REP_RUN;
   const { data: storeRow } = await goldmindClient.from('stores').select('vat_rate').eq('id', GOLDMIND_STORE_ID).maybeSingle();
   const vatRate = Number((storeRow && storeRow.vat_rate) || 0);
@@ -632,7 +633,7 @@ async function load() {
   document.getElementById('loading-state').classList.add('hidden');
   document.getElementById('page-content').classList.remove('hidden');
   document.querySelectorAll('.rp-profit-link').forEach(a => a.classList.toggle('hidden', !PROFIT_OK));
-  setPeriod('today');
+  setPeriod(currentPeriod); // keep a period tapped while the page was still loading (was always 'today')
 }
 
 load();

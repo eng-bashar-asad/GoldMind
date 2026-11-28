@@ -47,3 +47,21 @@ test('this month: one bar per day; a day keeps only its invoices in the table, w
   await page.click('#rp-day-clear');
   await expect(page.locator('#invoices-count')).toHaveText('2');
 });
+
+test('a period tapped while the page is still starting is kept (not reset to today)', async ({ page }) => {
+  const now = new Date();
+  const earlier = new Date(now.getFullYear(), now.getMonth(), 1, 12).toISOString();
+  await install(page, { db: {
+    stores: [{ id: STORE, name: 'x', currency: 'USD', vat_rate: 0 }],
+    staff: [{ id: STAFF, user_id: USER, store_id: STORE, role: 'owner', permissions: {}, full_name: 'b' }],
+    user_profiles: [{ id: USER, privacy_accepted_at: '2026-01-01' }],
+    invoices: [{ id: 'i1', store_id: STORE, invoice_number: 'INV-1', type: 'sale', status: 'paid', total_amount: 2700, created_at: earlier }],
+    invoice_items: [], gold_prices: [], pieces: [], gold_stock_lots: [],
+  } });
+  // slow permission check = the page is still in load() when the tab is tapped
+  await page.route(/\/rest\/v1\/staff\?.*permissions/, async (r) => { await new Promise((ok) => setTimeout(ok, 1500)); await r.fallback(); });
+  await page.goto('/reports-ar.html', { waitUntil: 'domcontentloaded' });
+  await page.evaluate(() => setPeriod('custom'));
+  await expect(page.locator('#stat-total-sales')).toHaveText('2,700.00', { timeout: 15000 });
+  await expect(page.locator('[data-period="custom"]')).toHaveClass(/\bactive\b/);
+});

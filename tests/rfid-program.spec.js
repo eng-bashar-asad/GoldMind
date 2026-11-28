@@ -35,6 +35,8 @@ test('scan → written → counted, ready for the next one', async ({ page }) =>
 });
 
 test('unknown or sold barcode is refused; no reader is explained', async ({ page }) => {
+  // the phone case (Bluetooth reader): a desktop Chrome with Web Serial gets the port picker instead
+  await page.addInitScript(() => { delete Navigator.prototype.serial; });
   await open(page, false);
   await page.fill('#rpCode', '000807');
   await page.press('#rpCode', 'Enter');
